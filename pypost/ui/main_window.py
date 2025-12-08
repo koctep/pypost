@@ -1,15 +1,17 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QComboBox, QLabel, QSplitter, QTreeView, QTabWidget, QMessageBox,
-                               QPushButton)
-from PySide6.QtGui import QStandardItemModel, QStandardItem
+                               QPushButton, QApplication)
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QFont
 from PySide6.QtCore import Qt
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 from pypost.core.worker import RequestWorker
 from pypost.models.models import RequestData, Collection, Environment
 from pypost.core.storage import StorageManager
+from pypost.core.config_manager import ConfigManager
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
+from pypost.ui.dialogs.settings_dialog import SettingsDialog
 
 class RequestTab(QWidget):
     def __init__(self, request_data: RequestData = None):
@@ -32,8 +34,12 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
 
         self.storage = StorageManager()
+        self.config_manager = ConfigManager()
         self.collections = []
         self.environments = []
+        self.settings = self.config_manager.load_config()
+
+        self.apply_settings(self.settings)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -48,10 +54,14 @@ class MainWindow(QMainWindow):
         manage_env_btn = QPushButton("Manage")
         manage_env_btn.clicked.connect(self.open_env_manager)
 
+        settings_btn = QPushButton("Settings")
+        settings_btn.clicked.connect(self.open_settings)
+
         self.top_bar.addWidget(QLabel("Environment:"))
         self.top_bar.addWidget(self.env_selector)
         self.top_bar.addWidget(manage_env_btn)
         self.top_bar.addStretch()
+        self.top_bar.addWidget(settings_btn)
 
         self.main_layout.addLayout(self.top_bar)
 
@@ -113,6 +123,22 @@ class MainWindow(QMainWindow):
         # Save changes
         self.storage.save_environments(self.environments)
         self.load_environments() # Refresh combo
+
+    def open_settings(self):
+        dialog = SettingsDialog(self.settings, self)
+        if dialog.exec():
+            new_settings = dialog.get_settings()
+            if new_settings:
+                self.settings = new_settings
+                self.config_manager.save_config(self.settings)
+                self.apply_settings(self.settings)
+
+    def apply_settings(self, settings):
+        app = QApplication.instance()
+        if app:
+            font = app.font()
+            font.setPointSize(settings.font_size)
+            app.setFont(font)
 
     def add_new_tab(self, request_data: RequestData = None):
         tab = RequestTab(request_data)
