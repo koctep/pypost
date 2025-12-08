@@ -16,6 +16,7 @@ from pypost.ui.dialogs.settings_dialog import SettingsDialog
 class RequestTab(QWidget):
     def __init__(self, request_data: RequestData = None):
         super().__init__()
+        self.request_data = request_data
         self.layout = QVBoxLayout(self)
         self.splitter = QSplitter(Qt.Vertical)
 
@@ -50,6 +51,7 @@ class MainWindow(QMainWindow):
         self.top_bar = QHBoxLayout()
         self.env_selector = QComboBox()
         self.env_selector.addItems(["No Environment"])
+        self.env_selector.currentIndexChanged.connect(self.on_env_changed)
 
         manage_env_btn = QPushButton("Manage")
         manage_env_btn.clicked.connect(self.open_env_manager)
@@ -89,8 +91,30 @@ class MainWindow(QMainWindow):
         self.load_collections()
         self.load_environments()
 
-        # Add a default tab
-        self.add_new_tab()
+        # Restore open tabs
+        self.restore_tabs()
+
+    def restore_tabs(self):
+        tabs_restored = False
+        if self.settings.open_tabs:
+            for request_id in self.settings.open_tabs:
+                found_request = None
+                # Search for request in collections
+                for col in self.collections:
+                    for req in col.requests:
+                        if req.id == request_id:
+                            found_request = req
+                            break
+                    if found_request:
+                        break
+                
+                if found_request:
+                    self.add_new_tab(found_request, save_state=False)
+                    tabs_restored = True
+        
+        # If no tabs restored, open a default new one
+        if not tabs_restored:
+            self.add_new_tab(save_state=False)
 
     def load_collections(self):
         self.collections = self.storage.load_collections()
@@ -111,11 +135,39 @@ class MainWindow(QMainWindow):
 
     def load_environments(self):
         self.environments = self.storage.load_environments()
+        
+        # Block signals to prevent on_env_changed from firing during load
+        self.env_selector.blockSignals(True)
         self.env_selector.clear()
         self.env_selector.addItem("No Environment", None)
 
-        for env in self.environments:
+        selected_index = 0
+        for i, env in enumerate(self.environments):
             self.env_selector.addItem(env.name, env)
+            if self.settings.last_environment_id == env.id:
+                selected_index = i + 1
+
+        self.env_selector.setCurrentIndex(selected_index)
+        self.env_selector.blockSignals(False)
+
+    def on_env_changed(self, index):
+        selected_env = self.env_selector.itemData(index)
+        if isinstance(selected_env, Environment):
+            self.settings.last_environment_id = selected_env.id
+        else:
+            self.settings.last_environment_id = None
+        
+        self.config_manager.save_config(self.settings)
+
+    def save_tabs_state(self):
+        open_tabs_ids = []
+        for i in range(self.tabs.count()):
+            tab = self.tabs.widget(i)
+            if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id:
+                open_tabs_ids.append(tab.request_data.id)
+        
+        self.settings.open_tabs = open_tabs_ids
+        self.config_manager.save_config(self.settings)
 
     def open_env_manager(self):
         dialog = EnvironmentDialog(self.environments, self)
@@ -140,7 +192,7 @@ class MainWindow(QMainWindow):
             font.setPointSize(settings.font_size)
             app.setFont(font)
 
-    def add_new_tab(self, request_data: RequestData = None):
+    def add_new_tab(self, request_data: RequestData = None, save_state: bool = True):
         tab = RequestTab(request_data)
         tab.request_editor.send_requested.connect(self.handle_send_request)
         tab.request_editor.save_requested.connect(self.handle_save_request)
@@ -148,18 +200,29 @@ class MainWindow(QMainWindow):
         name = request_data.name if request_data else "New Request"
         self.tabs.addTab(tab, name)
         self.tabs.setCurrentWidget(tab)
+        
+        if save_state:
+            self.save_tabs_state()
 
     def close_tab(self, index):
-        # Allow closing last tab, but maybe create a new empty one?
         self.tabs.removeTab(index)
         if self.tabs.count() == 0:
-            self.add_new_tab()
+            self.add_new_tab(save_state=False)
+        
+        self.save_tabs_state()
 
     def on_collection_double_click(self, index):
         item = self.collections_model.itemFromIndex(index)
         data = item.data(Qt.UserRole)
 
         if isinstance(data, RequestData):
+            # Check if already open
+            for i in range(self.tabs.count()):
+                tab = self.tabs.widget(i)
+                if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id == data.id:
+                    self.tabs.setCurrentIndex(i)
+                    return
+
             self.add_new_tab(data)
 
     def handle_save_request(self, request_data: RequestData):
@@ -202,6 +265,14 @@ class MainWindow(QMainWindow):
                 # Update tab title
                 current_index = self.tabs.currentIndex()
                 self.tabs.setTabText(current_index, request_data.name)
+                
+                # Update saved request in tab
+                tab = self.tabs.widget(current_index)
+                if isinstance(tab, RequestTab):
+                     tab.request_data = request_data
+
+                # Save tab state as ID might have been assigned/changed if it was new
+                self.save_tabs_state()
 
     def handle_send_request(self, request_data: RequestData):
         sender_tab = None
