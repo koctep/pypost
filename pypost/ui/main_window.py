@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
         self.collections_view.setHeaderHidden(True)
         self.collections_model = QStandardItemModel()
         self.collections_view.setModel(self.collections_model)
-        self.collections_view.doubleClicked.connect(self.on_collection_double_click)
+        self.collections_view.clicked.connect(self.on_collection_clicked)
         self.splitter.addWidget(self.collections_view)
 
         # Right Content (Request Tabs)
@@ -238,7 +238,7 @@ class MainWindow(QMainWindow):
         
         self.save_tabs_state()
 
-    def on_collection_double_click(self, index):
+    def on_collection_clicked(self, index):
         item = self.collections_model.itemFromIndex(index)
         data = item.data(Qt.UserRole)
 
@@ -251,6 +251,12 @@ class MainWindow(QMainWindow):
                     return
 
             self.add_new_tab(data)
+        else:
+            # It's a folder/collection - toggle expansion
+            if self.collections_view.isExpanded(index):
+                self.collections_view.collapse(index)
+            else:
+                self.collections_view.expand(index)
 
     def handle_save_request(self, request_data: RequestData):
         dialog = SaveRequestDialog(self.collections, self)
