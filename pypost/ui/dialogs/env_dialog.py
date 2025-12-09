@@ -5,11 +5,12 @@ from typing import List
 from pypost.models.models import Environment
 
 class EnvironmentDialog(QDialog):
-    def __init__(self, environments: List[Environment], parent=None):
+    def __init__(self, environments: List[Environment], parent=None, current_env_name: str = None):
         super().__init__(parent)
         self.setWindowTitle("Manage Environments")
         self.resize(800, 600)
         self.environments = environments
+        self.current_env_name = current_env_name
         # Deep copy or direct modification? Direct for simplicity now, but be careful with cancel
         # For a "Manage" dialog, changes usually apply immediately or on "Save"
 
@@ -49,11 +50,14 @@ class EnvironmentDialog(QDialog):
 
     def load_list(self):
         self.env_list.clear()
-        for env in self.environments:
+        target_row = 0
+        for i, env in enumerate(self.environments):
             self.env_list.addItem(env.name)
+            if self.current_env_name and env.name == self.current_env_name:
+                target_row = i
 
         if self.environments:
-            self.env_list.setCurrentRow(0)
+            self.env_list.setCurrentRow(target_row)
 
     def add_environment(self):
         name, ok = QInputDialog.getText(self, "New Environment", "Name:")

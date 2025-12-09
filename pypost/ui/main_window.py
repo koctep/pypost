@@ -194,7 +194,12 @@ class MainWindow(QMainWindow):
         self.config_manager.save_config(self.settings)
 
     def open_env_manager(self):
-        dialog = EnvironmentDialog(self.environments, self)
+        current_env_name = self.env_selector.currentText()
+        # If "No Environment" is selected, currentText might be "No Environment", check data
+        if self.env_selector.currentIndex() == 0: # Assuming 0 is "No Environment"
+             current_env_name = None
+
+        dialog = EnvironmentDialog(self.environments, self, current_env_name)
         dialog.exec()
         # Save changes
         self.storage.save_environments(self.environments)
