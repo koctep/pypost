@@ -55,6 +55,11 @@ class RequestWidget(QWidget):
         self.body_edit = QPlainTextEdit()
         self.detail_tabs.addTab(self.body_edit, "Body")
 
+        # Post-Script
+        self.script_edit = QPlainTextEdit()
+        self.script_edit.setPlaceholderText("# Python script to run after request\n# Available: pypost, request, response\n# Example: pypost.env.set('token', response.json()['token'])")
+        self.detail_tabs.addTab(self.script_edit, "Script")
+
         layout.addWidget(self.detail_tabs)
 
         # Load initial data
@@ -69,6 +74,7 @@ class RequestWidget(QWidget):
         self.params_table.set_data(self.request_data.params)
         self.headers_table.set_data(self.request_data.headers)
         self.body_edit.setPlainText(self.request_data.body)
+        self.script_edit.setPlainText(self.request_data.post_script)
 
     def update_request_data(self):
         self.request_data.url = self.url_input.text()
@@ -76,6 +82,7 @@ class RequestWidget(QWidget):
         self.request_data.params = self.params_table.get_data()
         self.request_data.headers = self.headers_table.get_data()
         self.request_data.body = self.body_edit.toPlainText()
+        self.request_data.post_script = self.script_edit.toPlainText()
 
     def on_send(self):
         self.update_request_data()

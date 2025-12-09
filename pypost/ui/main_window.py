@@ -335,11 +335,35 @@ class MainWindow(QMainWindow):
         worker = RequestWorker(request_data, variables=variables)
         worker.finished.connect(lambda resp: self.on_request_finished(sender_tab, resp))
         worker.error.connect(lambda err: self.on_request_error(sender_tab, err))
+        worker.env_update.connect(lambda vars: self.on_env_update(vars))
+        worker.script_output.connect(lambda logs, err: self.on_script_output(sender_tab, logs, err))
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
         worker.start()
 
         sender_tab.worker = worker
+
+    def on_env_update(self, updated_variables: dict):
+        """Handle environment variable updates from scripts."""
+        selected_env = self.env_selector.currentData()
+        if isinstance(selected_env, Environment):
+            # Update local object
+            selected_env.variables.update(updated_variables)
+            # Save to storage
+            self.storage.save_environments(self.environments)
+            # Maybe show a notification?
+            # print(f"Environment updated: {updated_variables}")
+
+    def on_script_output(self, tab: RequestTab, logs: list, error: str):
+        """Handle logs and errors from post-request scripts."""
+        if error:
+            QMessageBox.warning(self, "Script Error", f"Post-request script failed:\n{error}")
+        
+        # In a real app, we might want to show logs in a dedicated panel.
+        # For now, if there are logs, maybe just print them or show if important?
+        # Let's just print to console/stdout for now or show in a dialog if requested.
+        if logs:
+            print("Script Logs:", logs)
 
     def on_request_finished(self, tab: RequestTab, response):
         tab.response_view.display_response(response)
@@ -407,6 +431,8 @@ class MainWindow(QMainWindow):
         headers_shortcut.activated.connect(self.handle_switch_to_headers_global)
         body_shortcut = QShortcut(QKeySequence("Ctrl+B"), self)
         body_shortcut.activated.connect(self.handle_switch_to_body_global)
+        script_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
+        script_shortcut.activated.connect(self.handle_switch_to_script_global)
 
     def handle_exit(self):
         """Handler for application exit (Ctrl+Q)."""
@@ -487,3 +513,9 @@ class MainWindow(QMainWindow):
         current_tab = self.tabs.currentWidget()
         if isinstance(current_tab, RequestTab):
             current_tab.request_editor.detail_tabs.setCurrentIndex(2)
+
+    def handle_switch_to_script_global(self):
+        """Global handler for switching to Script tab (Ctrl+T)."""
+        current_tab = self.tabs.currentWidget()
+        if isinstance(current_tab, RequestTab):
+            current_tab.request_editor.detail_tabs.setCurrentIndex(3)

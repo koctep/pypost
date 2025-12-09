@@ -11,6 +11,7 @@ class RequestData(BaseModel):
     params: Dict[str, str] = Field(default_factory=dict)
     body: str = ""
     body_type: str = "json"  # json, text, etc.
+    post_script: str = ""  # Python script to execute after response
 
 class Collection(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
