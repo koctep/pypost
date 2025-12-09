@@ -14,6 +14,8 @@ from pypost.core.style_manager import StyleManager
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
+from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
+from pypost.ui.dialogs.about_dialog import AboutDialog
 
 class RequestTab(QWidget):
     def __init__(self, request_data: RequestData = None):
@@ -56,6 +58,9 @@ class MainWindow(QMainWindow):
         self.settings = self.config_manager.load_config()
 
         self.apply_settings(self.settings)
+        
+        # Setup Menu Bar
+        self._create_menu_bar()
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -111,6 +116,25 @@ class MainWindow(QMainWindow):
 
         # Setup keyboard shortcuts
         self._setup_shortcuts()
+
+    def _create_menu_bar(self):
+        menubar = self.menuBar()
+
+        # File Menu
+        file_menu = menubar.addMenu("File")
+        
+        quit_action = file_menu.addAction("Quit")
+        quit_action.setShortcut("Ctrl+Q")
+        quit_action.triggered.connect(self.handle_exit)
+
+        # Help Menu
+        help_menu = menubar.addMenu("Help")
+
+        hotkeys_action = help_menu.addAction("Hotkeys")
+        hotkeys_action.triggered.connect(self.handle_show_hotkeys)
+
+        about_action = help_menu.addAction("About")
+        about_action.triggered.connect(self.handle_show_about)
 
     def restore_tabs(self):
         tabs_restored = False
@@ -377,10 +401,8 @@ class MainWindow(QMainWindow):
 
     def _setup_shortcuts(self):
         """Initializes all global shortcuts."""
-        # Exit application (Ctrl+Q)
-        exit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
-        exit_shortcut.activated.connect(self.handle_exit)
-
+        # Exit application (Ctrl+Q) is now handled via QAction in menu
+        
         # Create new tab (Ctrl+N)
         new_tab_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
         new_tab_shortcut.activated.connect(self.handle_new_tab)
@@ -519,3 +541,13 @@ class MainWindow(QMainWindow):
         current_tab = self.tabs.currentWidget()
         if isinstance(current_tab, RequestTab):
             current_tab.request_editor.detail_tabs.setCurrentIndex(3)
+
+    def handle_show_hotkeys(self):
+        """Show hotkeys dialog."""
+        dialog = HotkeysDialog(self)
+        dialog.exec()
+
+    def handle_show_about(self):
+        """Show about dialog."""
+        dialog = AboutDialog(self)
+        dialog.exec()

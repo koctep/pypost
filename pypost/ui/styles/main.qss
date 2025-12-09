@@ -40,3 +40,14 @@ QTreeView::branch:open:has-children:has-siblings:hover {
     image: url(%ICONS_DIR%/branch-open.svg);
 }
 
+/* Menu Styles */
+QMenu::item {
+    /* Top Right Bottom Left */
+    padding: 8px 60px 8px 30px; 
+    margin: 2px;
+}
+
+QMenu::item:selected {
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+}
