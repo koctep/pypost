@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
                                QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
                                QHeaderView, QPlainTextEdit, QTabWidget)
-from PySide6.QtCore import Signal
+from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtCore import Signal, Qt
 from pypost.models.models import RequestData
 
 class RequestWidget(QWidget):
@@ -59,6 +60,9 @@ class RequestWidget(QWidget):
         # Load initial data
         self.load_data()
 
+        # Setup keyboard shortcuts
+        self._setup_shortcuts()
+
     def load_data(self):
         self.url_input.setText(self.request_data.url)
         self.method_combo.setCurrentText(self.request_data.method)
@@ -80,6 +84,16 @@ class RequestWidget(QWidget):
     def on_save(self):
         self.update_request_data()
         self.save_requested.emit(self.request_data)
+
+    def _setup_shortcuts(self):
+        """Initializes context shortcuts."""
+        # Save request (Ctrl+S)
+        save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        save_shortcut.activated.connect(self.handle_save_request_shortcut)
+
+    def handle_save_request_shortcut(self):
+        """Handler for saving request via shortcut (Ctrl+S)."""
+        self.on_save()
 
 class KeyValueTable(QTableWidget):
     def __init__(self):

@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QComboBox, QLabel, QSplitter, QTreeView, QTabWidget, QMessageBox,
                                QPushButton, QApplication)
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QFont, QIcon
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QFont, QIcon, QShortcut, QKeySequence
 from PySide6.QtCore import Qt
 from pathlib import Path
 from pypost.ui.widgets.request_editor import RequestWidget
@@ -108,6 +108,9 @@ class MainWindow(QMainWindow):
 
         # Restore open tabs
         self.restore_tabs()
+
+        # Setup keyboard shortcuts
+        self._setup_shortcuts()
 
     def restore_tabs(self):
         tabs_restored = False
@@ -336,3 +339,140 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Error", f"Request failed: {error_msg}")
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
+
+    def _setup_shortcuts(self):
+        """Initializes all global shortcuts."""
+        # Exit application (Ctrl+Q)
+        exit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
+        exit_shortcut.activated.connect(self.handle_exit)
+
+        # Create new tab (Ctrl+N)
+        new_tab_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
+        new_tab_shortcut.activated.connect(self.handle_new_tab)
+
+        # Close current tab (Ctrl+W)
+        close_tab_shortcut = QShortcut(QKeySequence("Ctrl+W"), self)
+        close_tab_shortcut.activated.connect(self.handle_close_tab)
+
+        # Switch to next tab (Ctrl+Tab)
+        # QTabWidget handles Ctrl+Tab automatically, but add explicit handling
+        next_tab_shortcut = QShortcut(QKeySequence("Ctrl+Tab"), self)
+        next_tab_shortcut.activated.connect(self.handle_next_tab)
+
+        # Switch to previous tab (Ctrl+Shift+Tab)
+        prev_tab_shortcut = QShortcut(QKeySequence("Ctrl+Shift+Tab"), self)
+        prev_tab_shortcut.activated.connect(self.handle_previous_tab)
+
+        # Switch to specific tab (Alt+1 to Alt+9)
+        for i in range(1, 10):
+            idx = i - 1  # Store index in local variable for correct closure
+            shortcut = QShortcut(QKeySequence(f"Alt+{i}"), self)
+            shortcut.activated.connect(lambda index=idx: self.handle_switch_to_tab(index))
+
+        # Open settings (Ctrl+, or F12)
+        settings_shortcut1 = QShortcut(QKeySequence("Ctrl+,"), self)
+        settings_shortcut1.activated.connect(self.handle_open_settings)
+        settings_shortcut2 = QShortcut(QKeySequence("F12"), self)
+        settings_shortcut2.activated.connect(self.handle_open_settings)
+
+        # Manage environments (Ctrl+E)
+        env_shortcut = QShortcut(QKeySequence("Ctrl+E"), self)
+        env_shortcut.activated.connect(self.handle_open_environments)
+
+        # Focus on URL field (Ctrl+L or Alt+D)
+        focus_url_shortcut1 = QShortcut(QKeySequence("Ctrl+L"), self)
+        focus_url_shortcut1.activated.connect(self.handle_focus_url)
+        focus_url_shortcut2 = QShortcut(QKeySequence("Alt+D"), self)
+        focus_url_shortcut2.activated.connect(self.handle_focus_url)
+
+        # Send request (F5) - global
+        send_request_shortcut = QShortcut(QKeySequence("F5"), self)
+        send_request_shortcut.activated.connect(self.handle_send_request_global)
+
+        # Switch between request editor tabs (Ctrl+P/H/B) - global
+        params_shortcut = QShortcut(QKeySequence("Ctrl+P"), self)
+        params_shortcut.activated.connect(self.handle_switch_to_params_global)
+        headers_shortcut = QShortcut(QKeySequence("Ctrl+H"), self)
+        headers_shortcut.activated.connect(self.handle_switch_to_headers_global)
+        body_shortcut = QShortcut(QKeySequence("Ctrl+B"), self)
+        body_shortcut.activated.connect(self.handle_switch_to_body_global)
+
+    def handle_exit(self):
+        """Handler for application exit (Ctrl+Q)."""
+        QApplication.instance().quit()
+
+    def handle_new_tab(self):
+        """Handler for creating new tab (Ctrl+N)."""
+        self.add_new_tab()
+
+    def handle_close_tab(self):
+        """Handler for closing current tab (Ctrl+W)."""
+        current_index = self.tabs.currentIndex()
+        if current_index >= 0:
+            self.close_tab(current_index)
+
+    def handle_next_tab(self):
+        """Handler for switching to next tab (Ctrl+Tab)."""
+        current_index = self.tabs.currentIndex()
+        if self.tabs.count() > 0:
+            next_index = (current_index + 1) % self.tabs.count()
+            self.tabs.setCurrentIndex(next_index)
+
+    def handle_previous_tab(self):
+        """Handler for switching to previous tab (Ctrl+Shift+Tab)."""
+        current_index = self.tabs.currentIndex()
+        if self.tabs.count() > 0:
+            prev_index = (current_index - 1) % self.tabs.count()
+            self.tabs.setCurrentIndex(prev_index)
+
+    def handle_switch_to_tab(self, index: int):
+        """Handler for switching to specific tab (Alt+1-9)."""
+        if 0 <= index < self.tabs.count():
+            self.tabs.setCurrentIndex(index)
+
+    def handle_open_settings(self):
+        """Handler for opening settings (Ctrl+, / F12)."""
+        self.open_settings()
+
+    def handle_open_environments(self):
+        """Handler for opening environment manager (Ctrl+E)."""
+        self.open_env_manager()
+
+    def keyPressEvent(self, event):
+        """Handles Ctrl+Enter for sending request globally."""
+        if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_Return:
+            self.handle_send_request_global()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def handle_focus_url(self):
+        """Handler for setting focus on URL field (Ctrl+L / Alt+D)."""
+        current_tab = self.tabs.currentWidget()
+        if isinstance(current_tab, RequestTab):
+            current_tab.request_editor.url_input.setFocus()
+            current_tab.request_editor.url_input.selectAll()
+
+    def handle_send_request_global(self):
+        """Global handler for sending request (F5)."""
+        current_tab = self.tabs.currentWidget()
+        if isinstance(current_tab, RequestTab):
+            current_tab.request_editor.on_send()
+
+    def handle_switch_to_params_global(self):
+        """Global handler for switching to Params tab (Ctrl+P)."""
+        current_tab = self.tabs.currentWidget()
+        if isinstance(current_tab, RequestTab):
+            current_tab.request_editor.detail_tabs.setCurrentIndex(0)
+
+    def handle_switch_to_headers_global(self):
+        """Global handler for switching to Headers tab (Ctrl+H)."""
+        current_tab = self.tabs.currentWidget()
+        if isinstance(current_tab, RequestTab):
+            current_tab.request_editor.detail_tabs.setCurrentIndex(1)
+
+    def handle_switch_to_body_global(self):
+        """Global handler for switching to Body tab (Ctrl+B)."""
+        current_tab = self.tabs.currentWidget()
+        if isinstance(current_tab, RequestTab):
+            current_tab.request_editor.detail_tabs.setCurrentIndex(2)
