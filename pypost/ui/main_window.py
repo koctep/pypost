@@ -96,6 +96,8 @@ class MainWindow(QMainWindow):
         self.collections_model = QStandardItemModel()
         self.collections_view.setModel(self.collections_model)
         self.collections_view.clicked.connect(self.on_collection_clicked)
+        self.collections_view.expanded.connect(self.on_tree_expanded)
+        self.collections_view.collapsed.connect(self.on_tree_collapsed)
         self.splitter.addWidget(self.collections_view)
 
         # Right Content (Request Tabs)
@@ -113,6 +115,9 @@ class MainWindow(QMainWindow):
 
         # Restore open tabs
         self.restore_tabs()
+
+        # Restore tree state
+        self.restore_tree_state()
 
         # Setup keyboard shortcuts
         self._setup_shortcuts()
@@ -321,8 +326,14 @@ class MainWindow(QMainWindow):
                 # Save to disk
                 self.storage.save_collection(target_collection)
 
+                # Ensure target collection is expanded in settings if it's new or was closed
+                if target_collection.id not in self.settings.expanded_collections:
+                    self.settings.expanded_collections.append(target_collection.id)
+                    self.config_manager.save_config(self.settings)
+
                 # Reload UI
                 self.load_collections()
+                self.restore_tree_state()
 
                 # Update tab title
                 current_index = self.tabs.currentIndex()
@@ -551,3 +562,31 @@ class MainWindow(QMainWindow):
         """Show about dialog."""
         dialog = AboutDialog(self)
         dialog.exec()
+
+    def on_tree_expanded(self, index):
+        """Handle tree item expansion."""
+        item = self.collections_model.itemFromIndex(index)
+        data = item.data(Qt.UserRole)
+        # Check if it is a collection ID (string) and not a RequestData object
+        if isinstance(data, str): 
+            if data not in self.settings.expanded_collections:
+                self.settings.expanded_collections.append(data)
+                self.config_manager.save_config(self.settings)
+
+    def on_tree_collapsed(self, index):
+        """Handle tree item collapse."""
+        item = self.collections_model.itemFromIndex(index)
+        data = item.data(Qt.UserRole)
+        if isinstance(data, str):
+            if data in self.settings.expanded_collections:
+                self.settings.expanded_collections.remove(data)
+                self.config_manager.save_config(self.settings)
+
+    def restore_tree_state(self):
+        """Restore expanded state of collections."""
+        root = self.collections_model.invisibleRootItem()
+        for row in range(root.rowCount()):
+            item = root.child(row)
+            data = item.data(Qt.UserRole)
+            if isinstance(data, str) and data in self.settings.expanded_collections:
+                self.collections_view.setExpanded(item.index(), True)

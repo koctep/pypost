@@ -8,4 +8,5 @@ class AppSettings(BaseModel):
     revision: int = 0
     last_environment_id: Optional[str] = None
     open_tabs: List[str] = []
+    expanded_collections: List[str] = []
 
