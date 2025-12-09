@@ -1,0 +1,42 @@
+/* PyPost Default Styles */
+
+/* 
+   Example: Adjusting Tab Close Button Size
+   Uncomment and modify the values below to change the size of the close button on tabs.
+*/
+
+QTabBar::close-button {
+    image: url(%ICONS_DIR%/close.svg);
+}
+
+QTabBar::tab {
+    padding: 0px 0px 0px 0px;
+}
+
+QTabBar::close-button:hover {
+    image: url(%ICONS_DIR%/close-hover.svg);
+}
+
+/* Tree View Branch Indicators */
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings {
+    border-image: none;
+    image: url(%ICONS_DIR%/branch-closed.svg);
+}
+
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings {
+    border-image: none;
+    image: url(%ICONS_DIR%/branch-open.svg);
+}
+
+QTreeView::branch:has-children:!has-siblings:closed:hover,
+QTreeView::branch:closed:has-children:has-siblings:hover {
+    image: url(%ICONS_DIR%/branch-closed.svg);
+}
+
+QTreeView::branch:open:has-children:!has-siblings:hover,
+QTreeView::branch:open:has-children:has-siblings:hover {
+    image: url(%ICONS_DIR%/branch-open.svg);
+}
+

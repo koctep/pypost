@@ -1,14 +1,16 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QComboBox, QLabel, QSplitter, QTreeView, QTabWidget, QMessageBox,
                                QPushButton, QApplication)
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QFont
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QFont, QIcon
 from PySide6.QtCore import Qt
+from pathlib import Path
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 from pypost.core.worker import RequestWorker
 from pypost.models.models import RequestData, Collection, Environment
 from pypost.core.storage import StorageManager
 from pypost.core.config_manager import ConfigManager
+from pypost.core.style_manager import StyleManager
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
@@ -36,6 +38,19 @@ class MainWindow(QMainWindow):
 
         self.storage = StorageManager()
         self.config_manager = ConfigManager()
+        self.style_manager = StyleManager()
+        
+        # Load icons
+        icons_dir = Path(__file__).parent / 'resources' / 'icons'
+        self.icons = {
+            'collection': QIcon(str(icons_dir / 'collection.svg')),
+            'GET': QIcon(str(icons_dir / 'method-get.svg')),
+            'POST': QIcon(str(icons_dir / 'method-post.svg')),
+            'PUT': QIcon(str(icons_dir / 'method-put.svg')),
+            'DELETE': QIcon(str(icons_dir / 'method-delete.svg')),
+            'PATCH': QIcon(str(icons_dir / 'method-patch.svg')),
+        }
+        
         self.collections = []
         self.environments = []
         self.settings = self.config_manager.load_config()
@@ -124,11 +139,17 @@ class MainWindow(QMainWindow):
             col_item = QStandardItem(col.name)
             col_item.setData(col.id, Qt.UserRole)
             col_item.setEditable(False)
+            col_item.setIcon(self.icons['collection'])
 
             for req in col.requests:
                 req_item = QStandardItem(f"{req.method} {req.name}")
                 req_item.setData(req, Qt.UserRole) # Store RequestData object
                 req_item.setEditable(False)
+                
+                # Set icon based on HTTP method
+                if req.method in self.icons:
+                    req_item.setIcon(self.icons[req.method])
+                
                 col_item.appendRow(req_item)
 
             self.collections_model.appendRow(col_item)
@@ -191,6 +212,9 @@ class MainWindow(QMainWindow):
             font = app.font()
             font.setPointSize(settings.font_size)
             app.setFont(font)
+            
+            # Apply external styles
+            self.style_manager.apply_styles(app)
 
     def add_new_tab(self, request_data: RequestData = None, save_state: bool = True):
         tab = RequestTab(request_data)
