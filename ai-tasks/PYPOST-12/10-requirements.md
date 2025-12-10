@@ -1,36 +1,29 @@
-# PYPOST-12: Сохранение состояния дерева вызовов
+# Requirements: PYPOST-12 - Saving Tree View State
 
-## Цели
+## Goals
+Users want the state of the collection tree (open/closed folders) to be preserved between application restarts. This will improve UX, as the user won't have to reopen necessary collections every time.
 
-Пользователи хотят, чтобы состояние дерева коллекций (открытые/закрытые папки) сохранялось между перезапусками приложения. Это улучшит UX, так как пользователю не придется каждый раз заново открывать нужные коллекции.
+## User Stories
+- As a user, I want the collection tree to be restored to the same state (open/closed branches) when I restart the application, so I don't have to search for necessary requests again.
 
-## Пользовательские истории
+## Acceptance Criteria
+- [ ] On application startup, the state (collapsed/expanded) is restored for all collections.
+- [ ] When collapsing/expanding a collection, the state is saved to configuration immediately (or on close).
+- [ ] New collections are created collapsed by default (or expanded if convenient, but usually collapsed).
+- [ ] Deleted collections are correctly removed from the saved state (cleanup, optional but desirable).
 
-- Как пользователь, я хочу, чтобы при перезапуске приложения дерево коллекций восстанавливалось в том же состоянии (открытые/закрытые ветки), в котором я его оставил, чтобы мне не приходилось заново искать нужные запросы.
+## Task Description
+Implement a mechanism to save and restore the state of the `QTreeView` widget displaying collections.
+To do this:
+1. Add a field to the settings model to store the list of IDs of expanded collections.
+2. Track branch expansion/collapse events in `MainWindow` and update settings.
+3. Apply the saved state when loading collections.
 
-## Критерии готовности
+## Technical Details
+- **UI Component**: `QTreeView` (sidebar).
+- **Storage**: `AppSettings` (json config).
+- **Identification**: By collection `id` (UUID).
 
-- [ ] При запуске приложения восстанавливается состояние (свернуто/развернуто) для всех коллекций.
-- [ ] При сворачивании/разворачивании коллекции состояние немедленно (или при закрытии) сохраняется в конфигурацию.
-- [ ] Новые коллекции по умолчанию создаются свернутыми (или развернутыми, если это будет удобно, но обычно свернутыми).
-- [ ] Удаленные коллекции корректно удаляются из сохраненного состояния (cleanup, опционально, но желательно).
-
-## Описание задачи
-
-Необходимо реализовать механизм сохранения и восстановления состояния виджета `QTreeView`, отображающего коллекции.
-Для этого нужно:
-1. Добавить поле в модель настроек для хранения списка ID развернутых коллекций.
-2. Отслеживать события разворачивания/сворачивания веток в `MainWindow` и обновлять настройки.
-3. При загрузке коллекций применять сохраненное состояние.
-
-## Технические детали
-
-- **Компонент UI**: `QTreeView` (sidebar).
-- **Хранилище**: `AppSettings` (json config).
-- **Идентификация**: По `id` коллекции (UUID).
-
-## Вопросы и ответы
-
-- **Нужно ли сохранять состояние вложенных папок?**
-  - В текущей модели данных (`Collection -> Requests`) вложенность коллекций не предусмотрена (плоский список коллекций). Если в будущем появится вложенность, механизм должен быть расширяемым. Пока сохраняем только состояние коллекций верхнего уровня.
-
+## Q&A
+- **Do we need to save the state of nested folders?**
+    - The current data model (`Collection -> Requests`) does not support nested collections (flat list of collections). If nesting appears in the future, the mechanism should be extensible. For now, we save only the state of top-level collections.

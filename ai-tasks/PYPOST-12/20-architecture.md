@@ -1,62 +1,48 @@
-# PYPOST-12: Сохранение состояния дерева вызовов
+# Architecture: PYPOST-12 - Saving Tree View State
 
-## Исследования
+## Research
+In `PySide6`, `QTreeView` has methods `expand(index)`, `collapse(index)`, and `isExpanded(index)`.
+The data model (`QStandardItemModel`) stores data. Top-level items (collections) have `Qt.UserRole` with the collection ID (UUID).
 
-В `PySide6` `QTreeView` имеет методы `expand(index)`, `collapse(index)` и `isExpanded(index)`.
-Модель данных (`QStandardItemModel`) хранит данные. Элементы верхнего уровня (коллекции) имеют `Qt.UserRole` с ID коллекции (UUID).
+To track expansion/collapse state changes, signals `expanded(QModelIndex)` and `collapsed(QModelIndex)` of `QTreeView` itself can be used.
 
-Для отслеживания изменений состояния разворачивания/сворачивания можно использовать сигналы `expanded(QModelIndex)` и `collapsed(QModelIndex)` самого `QTreeView`.
+Settings storage is already implemented via `AppSettings` and `ConfigManager`. We need to add a new field to `AppSettings`.
 
-Хранение настроек уже реализовано через `AppSettings` и `ConfigManager`. Нам нужно добавить новое поле в `AppSettings`.
+## Implementation Plan
+1.  **Data Model**:
+    *   Update `pypost/models/settings.py`: add field `expanded_collections: List[str] = []` to `AppSettings` class.
 
-## План реализации
+2.  **UI Logic (`MainWindow`)**:
+    *   In `__init__` or `load_collections`:
+    *   After loading data, iterate through model items.
+    *   If collection ID is in `settings.expanded_collections`, call `self.collections_view.expand(index)`.
+    *   Connect `QTreeView.expanded` and `QTreeView.collapsed` signals to new slots.
+    *   In signal handling slots:
+    *   Get collection ID from index.
+    *   Update `expanded_collections` list in `self.settings`.
+    *   Save settings via `self.config_manager.save_config(self.settings)`.
 
-1.  **Модель данных**:
-    *   Обновить `pypost/models/settings.py`: добавить поле `expanded_collections: List[str] = []` в класс `AppSettings`.
+## Architecture
 
-2.  **UI Логика (`MainWindow`)**:
-    *   В `__init__` или `load_collections`:
-        *   После загрузки данных пройтись по элементам модели.
-        *   Если ID коллекции есть в `settings.expanded_collections`, вызвать `self.collections_view.expand(index)`.
-    *   Подключить сигналы `QTreeView.expanded` и `QTreeView.collapsed` к новым слотам.
-    *   В слотах обработки сигналов:
-        *   Получить ID коллекции из индекса.
-        *   Обновить список `expanded_collections` в `self.settings`.
-        *   Сохранить настройки через `self.config_manager.save_config(self.settings)`.
+### 1. Models (`pypost/models/settings.py`)
+Change settings schema to store list of expanded collection IDs.
 
-## Архитектура
+### 2. UI (`pypost/ui/main_window.py`)
+Add logic for handling tree signals and restoring state.
 
-### 1. Модели (`pypost/models/settings.py`)
+*   **New Methods**:
+    *   `on_tree_expanded(index: QModelIndex)`: Adds ID to settings.
+    *   `on_tree_collapsed(index: QModelIndex)`: Removes ID from settings.
+    *   `restore_tree_state()`: Applies settings to tree after loading.
 
-Изменение схемы настроек для хранения списка ID развернутых коллекций.
+*   **Changes in `load_collections`**:
+    *   Call `restore_tree_state()` after populating the model.
 
-```python
-class AppSettings(BaseModel):
-    # ... existing fields
-    expanded_collections: List[str] = Field(default_factory=list) 
-```
+### 3. Interaction
+[Diagram describing interaction]
 
-### 2. MainWindow (`pypost/ui/main_window.py`)
-
-Добавление логики обработки сигналов дерева и восстановления состояния.
-
-*   **Новые методы**:
-    *   `on_tree_expanded(index: QModelIndex)`: Добавляет ID в настройки.
-    *   `on_tree_collapsed(index: QModelIndex)`: Удаляет ID из настроек.
-    *   `restore_tree_state()`: Применяет настройки к дереву после загрузки.
-
-*   **Изменения в `load_collections`**:
-    *   Вызов `restore_tree_state()` после заполнения модели.
-
-### 3. Взаимодействие
-
-1.  **Start/Load**: `MainWindow` -> `StorageManager` (load collections) -> `ConfigManager` (load settings) -> `QTreeView.expand(...)`.
-2.  **User Action**: User clicks expand -> `QTreeView` emits `expanded` -> `MainWindow` updates `AppSettings` -> `ConfigManager.save_config`.
-
-## Вопросы и ответы
-
-*   **Q: Как быть, если ID коллекции в настройках есть, а самой коллекции уже нет?**
-    *   A: `restore_tree_state` будет просто игнорировать ID, которых нет в модели. При следующем сохранении (если пользователь что-то свернет/развернет) список перезапишется актуальными данными (или можно делать очистку при загрузке, но проще "лениво" обновлять при сохранении).
-*   **Q: Когда сохранять настройки?**
-    *   A: Можно сохранять сразу при каждом клике (просто и надежно для desktop app с локальным конфигом).
-
+## Q&A
+*   **Q: What if a collection ID is in settings, but the collection itself no longer exists?**
+    *   A: `restore_tree_state` will simply ignore IDs not present in the model. On next save (if user collapses/expands something), the list will be overwritten with actual data (or cleanup can be done on load, but "lazy" update on save is simpler).
+*   **Q: When to save settings?**
+    *   A: Can save immediately on every click (simple and reliable for desktop app with local config).

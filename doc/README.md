@@ -1,143 +1,136 @@
-# Руководство пользователя PyPost
+# PyPost User Guide
 
-PyPost — это инструмент для тестирования API, который позволяет отправлять HTTP-запросы, просматривать ответы и организовывать запросы в коллекции.
+PyPost is an API testing tool that allows you to send HTTP requests, view responses, and organize requests into collections.
 
-## Содержание
+## Contents
 
-1.  [Начало работы](#начало-работы)
-2.  [Интерфейс](#интерфейс)
-3.  [Работа с запросами](#работа-с-запросами)
-    *   [Создание запроса](#создание-запроса)
-    *   [Параметры и заголовки](#параметры-и-заголовки)
-    *   [Тело запроса](#тело-запроса)
-    *   [Скрипты](#скрипты)
-4.  [Коллекции](#коллекции)
-5.  [Переменные окружения](#переменные-окружения)
-6.  [Шаблонизация](#шаблонизация)
-7.  [Горячие клавиши](#горячие-клавиши)
+1.  [Getting Started](#getting-started)
+2.  [Interface](#interface)
+3.  [Working with Requests](#working-with-requests)
+    *   [Creating a Request](#creating-a-request)
+    *   [Parameters and Headers](#parameters-and-headers)
+    *   [Request Body](#request-body)
+    *   [Scripts](#scripts)
+4.  [Collections](#collections)
+5.  [Environment Variables](#environment-variables)
+6.  [Templating](#templating)
+7.  [Hotkeys](#hotkeys)
 
----
+## Getting Started
 
-## Начало работы
-
-Запустите приложение командой:
-
+Run the application with the command:
 ```bash
 make run
 ```
 
-Или вручную из виртуального окружения:
-
+Or manually from the virtual environment:
 ```bash
-PYTHONPATH=. python pypost/main.py
+python pypost/main.py
 ```
 
-## Интерфейс
+## Interface
 
-Главное окно приложения разделено на несколько основных зон:
+The main application window is divided into several main areas:
 
-1.  **Строка меню (сверху)**: Предоставляет доступ к управлению файлами (**File**) и справке (**Help**).
-2.  **Панель окружения (под меню)**: Выбор активного окружения и доступ к настройкам.
-3.  **Боковая панель (слева)**: Дерево коллекций и сохраненных запросов.
-4.  **Рабочая область (справа)**: Вкладки с редакторами запросов.
+1.  **Menu Bar (top)**: Provides access to file management (**File**) and help (**Help**).
+2.  **Environment Panel (below menu)**: Select active environment and access settings.
+3.  **Sidebar (left)**: Tree of collections and saved requests.
+4.  **Workspace (right)**: Tabs with request editors.
 
-## Работа с запросами
+## Working with Requests
 
-### Создание запроса
+### Creating a Request
 
-Чтобы создать новый запрос, нажмите `Ctrl+N` или кнопку создания новой вкладки (если она предусмотрена интерфейсом).
+To create a new request, press `Ctrl+N` or the new tab button (if provided by the interface).
 
-В редакторе запроса вы можете настроить:
-*   **Метод**: GET, POST, PUT, DELETE, PATCH.
-*   **URL**: Адрес ресурса.
-*   **Params**: URL-параметры (Query params).
-*   **Headers**: HTTP-заголовки.
-*   **Body**: Тело запроса (для POST/PUT методов).
+In the request editor, you can configure:
+*   **Method**: GET, POST, PUT, DELETE, PATCH.
+*   **URL**: Resource address.
+*   **Params**: URL parameters (Query params).
+*   **Headers**: HTTP headers.
+*   **Body**: Request body (for POST/PUT methods).
 
-### Параметры и заголовки
+### Parameters and Headers
 
-Во вкладках **Params** и **Headers** используется табличный редактор "Key-Value".
-*   Введите ключ и значение.
-*   Новая пустая строка добавляется автоматически при заполнении последней.
+In the **Params** and **Headers** tabs, a "Key-Value" table editor is used.
+*   Enter key and value.
+*   A new empty row is added automatically when the last one is filled.
 
-### Тело запроса
+### Request Body
 
-Во вкладке **Body** вы можете ввести текстовое содержимое запроса (например, JSON, XML, Plain Text).
+In the **Body** tab, you can enter the text content of the request (e.g., JSON, XML, Plain Text).
 
-### Скрипты
+### Scripts
 
-Во вкладке **Script** можно писать Python-код, который будет выполнен **после** получения ответа. Это полезно для автоматизации, например, сохранения полученного токена в переменные окружения.
+In the **Script** tab, you can write Python code that will be executed **after** receiving a response. This is useful for automation, for example, saving a received token to environment variables.
 
-Доступные объекты:
-*   `response`: Объект ответа (методы `.json()`, `.text`, `.status_code`, `.headers`).
-*   `request`: Объект отправленного запроса.
-*   `pypost`: Основной объект взаимодействия с приложением.
+Available objects:
+*   `response`: Response object (methods `.json()`, `.text`, `.status_code`, `.headers`).
+*   `request`: Sent request object.
+*   `pypost`: Main object for interaction with the application.
 
-**Примеры:**
+**Examples:**
 
-Сохранение токена из JSON-ответа в переменную окружения:
+Saving a token from a JSON response to an environment variable:
 ```python
-token = response.json().get('access_token')
+token = response.json()['token']
 pypost.env.set('auth_token', token)
 ```
 
-Проверка статус-кода (вывод в консоль/лог):
+Checking status code (output to console/log):
 ```python
 if response.status_code != 200:
     print(f"Error: {response.status_code}")
 ```
 
-## Коллекции
+## Collections
 
-Коллекции позволяют группировать запросы по папкам.
+Collections allow grouping requests into folders.
 
-*   Чтобы сохранить запрос в коллекцию, нажмите **Save** (`Ctrl+S`).
-*   В диалоге сохранения выберите существующую коллекцию или создайте новую.
-*   Запросы в боковой панели можно открывать двойным кликом.
+*   To save a request to a collection, press **Save** (`Ctrl+S`).
+*   In the save dialog, select an existing collection or create a new one.
+*   Requests in the sidebar can be opened with a double click (or single click if configured).
 
-## Переменные окружения
+## Environment Variables
 
-Переменные окружения позволяют хранить конфигурационные данные (хосты, токены, ключи API) и переключаться между ними (например, `Local`, `Dev`, `Prod`).
+Environment variables allow storing configuration data (hosts, tokens, API keys) and switching between them (e.g., `Local`, `Dev`, `Prod`).
 
-1.  Нажмите кнопку **Manage** в верхней панели (или `Ctrl+E`).
-2.  Создайте новое окружение (кнопка `+`).
-3.  Добавьте переменные в таблицу Key-Value.
-4.  Сохраните изменения.
+1.  Click the **Manage** button in the top panel (or `Ctrl+E`).
+2.  Create a new environment (`+` button).
+3.  Add variables to the Key-Value table.
+4.  Save changes.
 
-Выберите окружение в выпадающем списке сверху, чтобы активировать его переменные.
+Select an environment in the dropdown list at the top to activate its variables.
 
-## Шаблонизация
+## Templating
 
-Вы можете использовать переменные окружения в URL, заголовках, параметрах и теле запроса, используя синтаксис Jinja2: `{{ variable_name }}`.
+You can use environment variables in URL, headers, parameters, and request body using Jinja2 syntax: `{{ variable_name }}`.
 
-**Пример:**
-Если в активном окружении есть переменная `host` со значением `https://api.example.com`, то в поле URL можно написать:
+**Example:**
+If the active environment has a `host` variable with value `https://api.example.com`, then in the URL field you can write:
+`{{ host }}/users`
 
-```
-{{ host }}/users
-```
+This will be converted to `https://api.example.com/users` before sending the request.
 
-Это будет преобразовано в `https://api.example.com/users` перед отправкой запроса.
+## Hotkeys
 
-## Горячие клавиши
-
-| Действие | Сочетание клавиш |
-|:---|:---|
-| **Управление приложением** | |
-| Выход | `Ctrl+Q` |
-| Настройки | `Ctrl+,` или `F12` |
-| Менеджер окружений | `Ctrl+E` |
-| **Работа с вкладками** | |
-| Новая вкладка | `Ctrl+N` |
-| Закрыть вкладку | `Ctrl+W` |
-| Следующая вкладка | `Ctrl+Tab` |
-| Предыдущая вкладка | `Ctrl+Shift+Tab` |
-| Переключиться на вкладку N | `Alt+1` ... `Alt+9` |
-| **Редактор запроса** | |
-| Отправить запрос | `F5` или `Ctrl+Enter` |
-| Сохранить запрос | `Ctrl+S` |
-| Фокус на URL | `Ctrl+L` или `Alt+D` |
-| Вкладка Params | `Ctrl+P` |
-| Вкладка Headers | `Ctrl+H` |
-| Вкладка Body | `Ctrl+B` |
-| Вкладка Script | `Ctrl+T` |
+| Action | Shortcut |
+| :--- | :--- |
+| **Application Control** | |
+| Exit | `Ctrl+Q` |
+| Settings | `Ctrl+,` or `F12` |
+| Environment Manager | `Ctrl+E` |
+| **Tab Management** | |
+| New Tab | `Ctrl+N` |
+| Close Tab | `Ctrl+W` |
+| Next Tab | `Ctrl+Tab` |
+| Previous Tab | `Ctrl+Shift+Tab` |
+| Switch to Tab N | `Alt+1` ... `Alt+9` |
+| **Request Editor** | |
+| Send Request | `F5` or `Ctrl+Enter` |
+| Save Request | `Ctrl+S` |
+| Focus on URL | `Ctrl+L` or `Alt+D` |
+| Params Tab | `Ctrl+P` |
+| Headers Tab | `Ctrl+H` |
+| Body Tab | `Ctrl+B` |
+| Script Tab | `Ctrl+T` |

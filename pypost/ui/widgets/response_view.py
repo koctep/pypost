@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QLabel, QHBoxLayout)
 from pypost.models.response import ResponseData
+from pypost.ui.widgets.json_highlighter import JsonHighlighter
 import json
 
 class ResponseView(QWidget):
@@ -28,6 +29,7 @@ class ResponseView(QWidget):
         # Body View
         self.body_view = QTextEdit()
         self.body_view.setReadOnly(True)
+        self.json_highlighter = JsonHighlighter(self.body_view.document())
         layout.addWidget(self.body_view)
 
     def display_response(self, response: ResponseData):

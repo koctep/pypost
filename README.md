@@ -1,76 +1,68 @@
 # PyPost
 
-PyPost — это легковесный HTTP-клиент с графическим интерфейсом, написанный на Python с использованием PySide6. Приложение предназначено для тестирования API и отправки HTTP-запросов, предоставляя удобный инструмент для разработчиков, аналогичный Postman.
+PyPost is a lightweight HTTP client with a graphical interface, written in Python using PySide6. The application is designed for API testing and sending HTTP requests, providing a convenient tool for developers, similar to Postman.
 
-## Возможности
+## Features
 
-*   **Отправка HTTP-запросов**: Поддержка основных методов (GET, POST, PUT, DELETE, PATCH и др.).
-*   **Управление коллекциями**: Организация запросов в коллекции для удобного доступа и повторного использования.
-*   **Редактор запросов**: Удобный интерфейс для настройки заголовков, параметров и тела запроса.
-*   **Просмотр ответов**: Отображение статуса, заголовков и тела ответа (JSON, текст и т.д.).
-*   **Переменные окружения**: Поддержка переменных окружения для переключения между конфигурациями (например, dev/prod).
-*   **Шаблонизация**: Использование Jinja2 для динамической генерации данных в запросах.
+*   **Send HTTP Requests**: Support for main methods (GET, POST, PUT, DELETE, PATCH, etc.).
+*   **Collection Management**: Organize requests into collections for easy access and reuse.
+*   **Request Editor**: Convenient interface for configuring headers, parameters, and request body.
+*   **Response Viewer**: Display status, headers, and response body (JSON, text, etc.).
+*   **Environment Variables**: Support for environment variables to switch between configurations (e.g., dev/prod).
+*   **Templating**: Use Jinja2 for dynamic data generation in requests.
 
-## Требования
+## Requirements
 
-*   Python 3.8+
-*   Make (опционально, для использования Makefile)
+*   Python 3.11+
+*   Make (optional, for using Makefile)
 
-## Установка
+## Installation
 
-Для упрощения процесса установки и запуска в проекте предусмотрен `Makefile`.
+To simplify the installation and startup process, a `Makefile` is provided in the project.
 
-### С использованием Make
+### Using Make
 
-1.  **Установка зависимостей:**
-    Создаст виртуальное окружение (`venv`) и установит все необходимые библиотеки.
+1.  **Install dependencies:**
     ```bash
     make install
     ```
+    This will create a virtual environment (`venv`) and install all necessary libraries.
 
-### Ручная установка
+### Manual Installation
 
-1.  Создайте виртуальное окружение:
+1.  Create a virtual environment:
     ```bash
     python3 -m venv venv
     ```
 
-2.  Активируйте виртуальное окружение:
-    *   Linux/macOS:
-        ```bash
-        source venv/bin/activate
-        ```
-    *   Windows:
-        ```powershell
-        .\venv\Scripts\Activate.ps1
-        ```
+2.  Activate the virtual environment:
+    *   Linux/macOS: `source venv/bin/activate`
+    *   Windows: `venv\Scripts\activate`
 
-3.  Установите зависимости:
+3.  Install dependencies:
     ```bash
     pip install -r requirements.txt
     ```
 
-## Запуск
+## Running
 
-### С использованием Make
+### Using Make
 
 ```bash
 make run
 ```
 
-### Ручной запуск
+### Manual Run
 
-Убедитесь, что виртуальное окружение активировано, и выполните:
-
+Make sure the virtual environment is activated, and run:
 ```bash
 PYTHONPATH=. python pypost/main.py
 ```
 
-## Разработка
+## Development
 
-В проекте доступны дополнительные команды для разработчиков:
+Additional commands for developers are available in the project:
 
-*   `make lint` — проверка кода линтером (flake8).
-*   `make test` — запуск тестов (pytest).
-*   `make clean` — очистка временных файлов и виртуального окружения.
-
+*   `make lint` — check code with linter (flake8).
+*   `make test` — run tests (pytest).
+*   `make clean` — clean temporary files and virtual environment.

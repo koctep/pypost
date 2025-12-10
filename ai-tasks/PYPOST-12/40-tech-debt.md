@@ -2,23 +2,23 @@
 
 ## Shortcuts Taken
 
-- **Прямая манипуляция настройками из UI**: Логика сохранения состояния дерева (`expanded_collections`) реализована прямо в `MainWindow`. В идеале, это можно было бы вынести в отдельный контроллер состояния UI или расширить `StorageManager`, чтобы UI не зависел напрямую от структуры `AppSettings` в таких деталях.
-- **Синхронное сохранение**: Сохранение настроек происходит синхронно при каждом клике (expand/collapse). При очень частом кликании это может вызвать лишние операции ввода-вывода, но для текущего масштаба это не критично.
+- **Direct Settings Manipulation from UI**: Tree state logic (`expanded_collections`) is implemented directly in `MainWindow`. Ideally, this could be moved to a separate UI state controller or `StorageManager` extended so UI doesn't depend directly on `AppSettings` structure in such details.
+- **Synchronous Saving**: Settings are saved synchronously on every click (expand/collapse). With very frequent clicking, this might cause excess I/O operations, but for current scale, it's not critical.
 
 ## Code Quality Issues
 
-- **Дублирование логики проверки типа**: В методах `on_tree_expanded`, `on_tree_collapsed` и `restore_tree_state` повторяется проверка `isinstance(data, str)` для определения, является ли элемент коллекцией. Можно вынести это в helper метод `_is_collection_item(index)`.
+- **Type Check Duplication**: In methods `on_tree_expanded`, `on_tree_collapsed`, and `restore_tree_state`, the check `isinstance(data, str)` is repeated to determine if an item is a collection. This could be moved to a helper method `_is_collection_item(index)`.
 
 ## Missing Tests
 
-- Отсутствуют unit-тесты для логики сохранения/восстановления состояния дерева. Тестирование проводилось вручную.
-- Нет тестов на граничные случаи (например, если ID в настройках есть, а коллекции уже нет).
+- Unit tests for tree state save/restore logic are missing. Testing was done manually.
+- No tests for edge cases (e.g., ID exists in settings but collection is gone).
 
 ## Performance Concerns
 
-- **Линейный поиск при восстановлении**: `restore_tree_state` проходит по всем элементам корневого уровня. При огромном количестве коллекций (тысячи) это может быть медленно, но для типичного использования (десятки коллекций) это мгновенно.
+- **Linear Search on Restore**: `restore_tree_state` iterates through all root level items. With a huge number of collections (thousands), this might be slow, but for typical usage (dozens of collections), it's instant.
 
 ## Follow-up Tasks
 
-- Написать тесты для проверки сохранения состояния UI.
-- Рассмотреть возможность дебаунсинга (debouncing) сохранения настроек, если появятся проблемы с производительностью IO.
+- Write tests to verify UI state preservation.
+- Consider debouncing settings saving if I/O performance issues arise.

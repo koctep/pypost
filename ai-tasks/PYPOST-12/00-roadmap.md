@@ -1,39 +1,39 @@
 # Roadmap: PYPOST-12
 
-## Статус выполнения шагов
+## Step Execution Status
 
-- [x] **ШАГ 1: Сбор и документирование требований**
-- [x] **ШАГ 2: Архитектурное проектирование высокого уровня**
-- [x] **ШАГ 3: Разработка**
-  - [x] Добавлено поле `expanded_collections` в `AppSettings`
-  - [x] Реализована логика сохранения состояния дерева (expand/collapse)
-  - [x] Реализовано восстановление состояния дерева при запуске
-  - [x] Реализовано сохранение состояния дерева при обновлении списка коллекций
-  - [x] Реализовано автоматическое раскрытие коллекции при сохранении запроса
-- [/] **ШАГ 4: Ревью и технический долг**
+- [x] **STEP 1: Requirements gathering and documentation**
+- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 3: Development**
+  - [x] Added `expanded_collections` field to `AppSettings`
+  - [x] Implemented tree state saving logic (expand/collapse)
+  - [x] Implemented tree state restoration on startup
+  - [x] Implemented tree state saving when updating collection list
+  - [x] Implemented automatic collection expansion when saving a request
+- [/] **STEP 4: Review and Technical Debt**
 
-## Легенда статусов
+## Status Legend
 
-- `[ ]` — шаг не начат
-- `[/]` — работа над шагом начата (in progress)
-- `[x]` — шаг завершен
+- `[ ]` — step not started
+- `[/]` — step in progress
+- `[x]` — step completed
 
-## Артефакты
+## Artifacts
 
-### ШАГ 1: Требования
+### STEP 1: Requirements
 
 - `ai-tasks/PYPOST-12/10-requirements.md`
 
-### ШАГ 2: Архитектура
+### STEP 2: Architecture
 
 - `ai-tasks/PYPOST-12/20-architecture.md`
 
-### ШАГ 3: Разработка
+### STEP 3: Development
 
-- Исходный код
-- Тесты
-- Обновления документации
+- Source code
+- Tests
+- Documentation updates
 
-### ШАГ 4: Ревью
+### STEP 4: Review
 
 - `ai-tasks/PYPOST-12/40-tech-debt.md`

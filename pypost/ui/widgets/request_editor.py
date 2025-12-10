@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
 from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtCore import Signal, Qt
 from pypost.models.models import RequestData
+from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
 class RequestWidget(QWidget):
     send_requested = Signal(RequestData)
@@ -53,6 +54,7 @@ class RequestWidget(QWidget):
 
         # Body
         self.body_edit = QPlainTextEdit()
+        self.json_highlighter = JsonHighlighter(self.body_edit.document())
         self.detail_tabs.addTab(self.body_edit, "Body")
 
         # Post-Script

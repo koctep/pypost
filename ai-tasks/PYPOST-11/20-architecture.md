@@ -1,48 +1,47 @@
-# Архитектура задачи PYPOST-11
+# Architecture for Task PYPOST-11
 
-## Обзор
-Реализация главного меню приложения с пунктами "File" и "Help" в классе `MainWindow`. Добавление диалоговых окон для отображения справки и информации о программе.
+## Overview
+Implementation of the main application menu with "File" and "Help" items in the `MainWindow` class. Addition of dialog boxes for displaying help and program information.
 
-## Компоненты
+## Components
 
-### 1. MainWindow (`pypost/ui/main_window.py`)
-Необходимо расширить метод `__init__` (или создать отдельный метод `setup_menu`) для инициализации `QMenuBar`.
+### MainWindow (`pypost/ui/main_window.py`)
+Extend the `__init__` method (or create a separate `setup_menu` method) to initialize `QMenuBar`.
 
-*   **Методы**:
-    *   `_create_menu_bar()`: Приватный метод для создания структуры меню.
-    *   `handle_show_hotkeys()`: Слот для отображения диалога горячих клавиш.
-    *   `handle_show_about()`: Слот для отображения диалога "О программе".
+*   **Methods**:
+    *   `_create_menu_bar()`: Private method to create the menu structure.
+    *   `handle_show_hotkeys()`: Slot to display the hotkeys dialog.
+    *   `handle_show_about()`: Slot to display the "About" dialog.
 
-### 2. HotkeysDialog (`pypost/ui/dialogs/hotkeys_dialog.py`)
-Новый класс, наследуемый от `QDialog`, для отображения списка горячих клавиш.
+### HotkeysDialog (`pypost/ui/dialogs/hotkeys_dialog.py`)
+New class inheriting from `QDialog` to display the list of hotkeys.
 
-*   **UI**:
-    *   `QTableWidget` или `QFormLayout` для отображения пар "Действие - Клавиша".
-    *   Данные для отображения можно передать в конструктор или хранить как константу в классе, либо извлекать динамически (сложнее, но правильнее), но для MVP можно захардкодить список в соответствии с `doc/README.md` или `main_window.py`.
-    *   Кнопка "Close".
+*   **UI Elements**:
+    *   `QTableWidget` or `QFormLayout` to display "Action - Key" pairs.
+    *   Data for display can be passed to the constructor or stored as a constant in the class, or extracted dynamically (harder but more correct), but for MVP, hardcoding the list according to `doc/README.md` or `main_window.py` is acceptable.
+    *   "Close" button.
 
-### 3. AboutDialog (`pypost/ui/dialogs/about_dialog.py`)
-Новый класс, наследуемый от `QDialog` (или использование `QMessageBox.about`), для отображения информации.
+### AboutDialog (`pypost/ui/dialogs/about_dialog.py`)
+New class inheriting from `QDialog` (or using `QMessageBox.about`) to display information.
 
-*   **UI**:
-    *   Название программы (жирный шрифт).
-    *   Версия.
-    *   Краткое описание.
-    *   Copyright.
-    *   Кнопка "OK".
+*   **Content**:
+    *   Program name (bold font).
+    *   Version.
+    *   Brief description.
+*   **UI Elements**:
+    *   "OK" button.
 
-## Взаимодействие
-1.  Пользователь нажимает на пункт меню.
-2.  `MainWindow` перехватывает сигнал `triggered` от `QAction`.
-3.  Вызывается соответствующий обработчик (`handle_exit`, `handle_show_hotkeys`, `handle_show_about`).
-4.  Для диалогов создается экземпляр диалога и вызывается `exec()`.
+## Interaction
+1.  User clicks a menu item.
+2.  `MainWindow` intercepts the `triggered` signal from `QAction`.
+3.  Corresponding handler is called (`handle_exit`, `handle_show_hotkeys`, `handle_show_about`).
+4.  For dialogs, a dialog instance is created and `exec()` is called.
 
-## План реализации
-1.  Создать `pypost/ui/dialogs/about_dialog.py` с классом `AboutDialog`.
-2.  Создать `pypost/ui/dialogs/hotkeys_dialog.py` с классом `HotkeysDialog`.
-3.  В `pypost/ui/main_window.py`:
-    *   Импортировать новые диалоги.
-    *   Реализовать метод `_create_menu_bar`.
-    *   Добавить вызов `_create_menu_bar` в `__init__`.
-    *   Реализовать слоты `handle_show_hotkeys` и `handle_show_about`.
-
+## Implementation Plan
+1.  Create `pypost/ui/dialogs/about_dialog.py` with `AboutDialog` class.
+2.  Create `pypost/ui/dialogs/hotkeys_dialog.py` with `HotkeysDialog` class.
+3.  In `pypost/ui/main_window.py`:
+    *   Import new dialogs.
+    *   Implement `_create_menu_bar` method.
+    *   Add `_create_menu_bar` call to `__init__`.
+    *   Implement `handle_show_hotkeys` and `handle_show_about` slots.

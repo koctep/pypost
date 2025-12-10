@@ -1,15 +1,14 @@
-# Технический долг по задаче PYPOST-11
+# Technical Debt for Task PYPOST-11
 
-## 1. Отсутствие локализации
-На данный момент все пункты меню и диалоги захардкожены на английском языке. В будущем необходимо внедрить механизм локализации (например, `gettext` или `Qt Linguist`), чтобы поддерживать несколько языков.
+## 1. Lack of Localization
+Currently, all menu items and dialogs are hardcoded in English. In the future, a localization mechanism (e.g., `gettext` or `Qt Linguist`) needs to be implemented to support multiple languages.
 
-## 2. Хардкод горячих клавиш в HotkeysDialog
-Список горячих клавиш в `HotkeysDialog` задан статическим списком. Если горячие клавиши будут изменены в коде (`MainWindow`), диалог справки не обновится автоматически.
-**Решение**: Реализовать динамическое извлечение горячих клавиш из `QAction` и `QShortcut` приложения, либо создать единый реестр команд.
+## 2. Hardcoded Hotkeys in HotkeysDialog
+The list of hotkeys in `HotkeysDialog` is defined as a static list. If hotkeys are changed in the code (`MainWindow`), the help dialog will not update automatically.
+**Solution**: Implement dynamic extraction of hotkeys from `QAction` and `QShortcut` of the application, or create a single command registry.
 
-## 3. Отсутствие механизма обновления версии
-Версия приложения в `AboutDialog` захардкожена ("Version 0.1.0"). Необходимо вынести версию в отдельную константу (например, в `pypost/__init__.py`) или читать её из метаданных пакета.
+## 3. No Version Update Mechanism
+The application version in `AboutDialog` is hardcoded ("Version 0.1.0"). The version needs to be moved to a separate constant (e.g., in `pypost/__init__.py`) or read from package metadata.
 
-## 4. Стилизация меню
-Текущая стилизация меню через QSS (padding) является workaround'ом для улучшения читаемости на больших шрифтах. Возможно, стоит рассмотреть более надежный способ управления масштабированием интерфейса (DPI awareness) или использование системных настроек стиля.
-
+## 4. Menu Styling
+Current menu styling via QSS (padding) is a workaround to improve readability on large fonts. A more robust way to manage interface scaling (DPI awareness) or use system style settings should be considered.

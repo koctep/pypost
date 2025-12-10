@@ -1,14 +1,14 @@
-# Roadmap: PYPOST-11
+# Roadmap: PYPOST-13
 
 ## Step Execution Status
 
 - [x] **STEP 1: Requirements** — gathering and documenting requirements
 - [x] **STEP 2: Architecture** — high-level architectural design
 - [x] **STEP 3: Development** — iterative implementation with minimal significant changes
-  - [x] Created `HotkeysDialog` and `AboutDialog`
-  - [x] Added menu to `MainWindow` (File -> Quit, Help -> Hotkeys/About)
-  - [x] Fixed hotkey conflict (Ctrl+Q)
-  - [x] Fixed menu display with large fonts (via QSS)
+  - [x] Implemented `JsonHighlighter` component.
+  - [x] Integrated highlighting into `RequestWidget`.
+  - [x] Integrated highlighting into `ResponseView`.
+- [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend
 
@@ -20,14 +20,18 @@
 
 ### STEP 1: Requirements
 
-- `ai-tasks/PYPOST-11/10-requirements.md`
+- `ai-tasks/PYPOST-13/10-requirements.md`
 
 ### STEP 2: Architecture
 
-- `ai-tasks/PYPOST-11/20-architecture.md`
+- `ai-tasks/PYPOST-13/20-architecture.md`
 
 ### STEP 3: Development
 
 - Source code
 - Tests
 - Documentation updates
+
+### STEP 4: Review
+
+- `ai-tasks/PYPOST-13/40-tech-debt.md`

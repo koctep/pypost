@@ -1,42 +1,40 @@
-# Требования к задаче PYPOST-11
+# Requirements for Task PYPOST-11
 
-## Описание задачи
-Необходимо добавить главное меню приложения, содержащее пункты "File" и "Help". Меню должно предоставлять доступ к базовым функциям управления приложением (выход) и информационной справке (горячие клавиши, о программе).
+## Task Description
+Add a main application menu containing "File" and "Help" items. The menu should provide access to basic application control functions (exit) and informational help (hotkeys, about).
 
-## Язык программирования
-Python (PySide6)
+## Programming Language
+**Python** (PySide6/Qt for UI)
 
-## Функциональные требования
+## Functional Requirements
 
-### Меню "File"
-1.  **Пункт "Quit"**:
-    *   При выборе должен закрывать приложение.
-    *   Должен дублировать функционал существующего хоткея `Ctrl+Q`.
+### "File" Menu
+1.  **"Quit" Item**:
+    *   Closes the application when selected.
+    *   Should duplicate the functionality of the existing `Ctrl+Q` hotkey.
 
-### Меню "Help"
-1.  **Пункт "Hotkeys"**:
-    *   При выборе должен открывать диалоговое окно со списком горячих клавиш.
-    *   Список должен быть актуальным и соответствовать реализованным хоткеям (см. `pypost/ui/main_window.py`).
-2.  **Пункт "About"**:
-    *   При выборе должен открывать диалоговое окно "About".
-    *   Окно должно содержать название приложения ("PyPost"), краткое описание и, возможно, версию/автора.
+### "Help" Menu
+1.  **"Hotkeys" Item**:
+    *   Opens a dialog box with a list of hotkeys when selected.
+    *   The list must be up-to-date and correspond to implemented hotkeys (see `pypost/ui/main_window.py`).
+2.  **"About" Item**:
+    *   Opens an "About" dialog box when selected.
+    *   The window should contain the application name ("PyPost"), a brief description, and possibly version/author.
 
-## Нефункциональные требования
-1.  Меню должно нативно интегрироваться в оконный интерфейс ОС (в PySide6 это `QMenuBar`).
-2.  Диалоговые окна должны быть модальными.
+## Non-functional Requirements
+1.  The menu must integrate natively into the OS window interface (in PySide6 this is `QMenuBar`).
+2.  Dialog boxes must be modal.
 
-## Сущности и взаимодействия
-*   **MainWindow** (`pypost/ui/main_window.py`):
-    *   Добавление `QMenuBar`.
-    *   Создание `QMenu` ("File", "Help").
-    *   Создание `QAction` для пунктов меню.
-    *   Реализация слотов для обработки действий (или переиспользование существующих).
-*   **HotkeysDialog** (новая сущность или `QMessageBox`):
-    *   Отображение таблицы/списка горячих клавиш.
-*   **AboutDialog** (новая сущность или `QMessageBox`):
-    *   Отображение информации о программе.
+## Entities and Interactions
+*   Add `QMenuBar`.
+*   Create `QMenu` ("File", "Help").
+*   Create `QAction` for menu items.
+*   Implement slots for action handling (or reuse existing ones).
+*   **HotkeysDialog** (new entity or `QMessageBox`):
+    *   Display table/list of hotkeys.
+*   **AboutDialog** (new entity or `QMessageBox`):
+    *   Display program information.
 
-## Ограничения и допущения
-*   Использовать стандартные виджеты PySide6.
-*   Дизайн диалогов должен соответствовать общему стилю приложения (если есть кастомные стили).
-
+## Constraints and Assumptions
+*   Use standard PySide6 widgets.
+*   Dialog design should match the general application style (if custom styles exist).
