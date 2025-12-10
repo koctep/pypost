@@ -57,8 +57,6 @@ class MainWindow(QMainWindow):
         self.environments = []
         self.settings = self.config_manager.load_config()
 
-        self.apply_settings(self.settings)
-        
         # Setup Menu Bar
         self._create_menu_bar()
 
@@ -73,17 +71,19 @@ class MainWindow(QMainWindow):
         self.env_selector.addItems(["No Environment"])
         self.env_selector.currentIndexChanged.connect(self.on_env_changed)
 
-        manage_env_btn = QPushButton("Manage")
-        manage_env_btn.clicked.connect(self.open_env_manager)
+        self.manage_env_btn = QPushButton("Manage")
+        self.manage_env_btn.clicked.connect(self.open_env_manager)
 
-        settings_btn = QPushButton("Settings")
-        settings_btn.clicked.connect(self.open_settings)
+        self.settings_btn = QPushButton("Settings")
+        self.settings_btn.clicked.connect(self.open_settings)
+        
+        self.env_label = QLabel("Environment:")
 
-        self.top_bar.addWidget(QLabel("Environment:"))
+        self.top_bar.addWidget(self.env_label)
         self.top_bar.addWidget(self.env_selector)
-        self.top_bar.addWidget(manage_env_btn)
+        self.top_bar.addWidget(self.manage_env_btn)
         self.top_bar.addStretch()
-        self.top_bar.addWidget(settings_btn)
+        self.top_bar.addWidget(self.settings_btn)
 
         self.main_layout.addLayout(self.top_bar)
 
@@ -108,6 +108,10 @@ class MainWindow(QMainWindow):
 
         self.splitter.setSizes([300, 900])
         self.main_layout.addWidget(self.splitter)
+        
+        # Apply settings BEFORE loading tabs to ensure correct font size/style
+        # Note: indent settings will be applied to tabs as they are created
+        self.apply_settings(self.settings)
 
         # Load data
         self.load_collections()
@@ -252,9 +256,49 @@ class MainWindow(QMainWindow):
             
             # Apply external styles
             self.style_manager.apply_styles(app)
+            
+            # Force update widgets that might not inherit font correctly or need specific updates
+            self.collections_view.setFont(font)
+            self.env_selector.setFont(font)
+            self.tabs.setFont(font)
+            # Update stylesheet for QTabBar explicitly if needed, but setFont usually works
+            # If tabs are styled via QSS, font might need to be in QSS or QTabBar::tab
+            
+            if self.menuBar():
+                self.menuBar().setFont(font)
+            
+            # Top bar elements
+            self.manage_env_btn.setFont(font)
+            self.settings_btn.setFont(font)
+            self.env_label.setFont(font)
+            
+            # Recursively update fonts for all child widgets if needed
+            # For now, explicit updates cover main areas. 
+            # Tab bar specifically:
+            self.tabs.tabBar().setFont(font)
+
+        # Apply settings to all open tabs
+        for i in range(self.tabs.count()):
+            tab = self.tabs.widget(i)
+            if isinstance(tab, RequestTab):
+                # Update RequestWidget (CodeEditor)
+                if hasattr(tab.request_editor, 'body_edit'):
+                    tab.request_editor.body_edit.update_indent_size(settings.indent_size)
+                    tab.request_editor.body_edit.reformat_text()
+                
+                # Update ResponseView
+                if hasattr(tab.response_view, 'set_indent_size'):
+                    tab.response_view.set_indent_size(settings.indent_size)
 
     def add_new_tab(self, request_data: RequestData = None, save_state: bool = True):
         tab = RequestTab(request_data)
+        
+        # Apply current settings to new tab
+        if hasattr(tab.request_editor, 'body_edit'):
+            tab.request_editor.body_edit.update_indent_size(self.settings.indent_size)
+        if hasattr(tab.response_view, 'set_indent_size'):
+            tab.response_view.set_indent_size(self.settings.indent_size)
+
         tab.request_editor.send_requested.connect(self.handle_send_request)
         tab.request_editor.save_requested.connect(self.handle_save_request)
 

@@ -19,7 +19,12 @@ class SettingsDialog(QDialog):
         self.font_size_spin.setRange(8, 48)
         self.font_size_spin.setValue(current_settings.font_size)
         
+        self.indent_size_spin = QSpinBox()
+        self.indent_size_spin.setRange(2, 8)
+        self.indent_size_spin.setValue(current_settings.indent_size)
+
         self.form_layout.addRow("Application Font Size:", self.font_size_spin)
+        self.form_layout.addRow("JSON Indent Size:", self.indent_size_spin)
         self.layout.addLayout(self.form_layout)
 
         # Buttons
@@ -31,7 +36,13 @@ class SettingsDialog(QDialog):
     def accept(self):
         # Create new settings object
         self.new_settings = AppSettings(
-            font_size=self.font_size_spin.value()
+            font_size=self.font_size_spin.value(),
+            indent_size=self.indent_size_spin.value(),
+            config_version=self.current_settings.config_version,
+            revision=self.current_settings.revision,
+            last_environment_id=self.current_settings.last_environment_id,
+            open_tabs=self.current_settings.open_tabs,
+            expanded_collections=self.current_settings.expanded_collections
         )
         super().accept()
     
