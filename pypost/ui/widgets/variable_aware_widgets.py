@@ -1,5 +1,5 @@
 from typing import Optional, Dict
-from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QToolTip
+from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QToolTip, QTableWidget
 from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QTextCursor
 import re
@@ -26,6 +26,15 @@ class VariableHoverHelper:
         """Returns the value of the variable or a default message."""
         return variables.get(variable_name, "<not defined>")
 
+    @staticmethod
+    def resolve_text(text: str, variables: Dict[str, str]) -> str:
+        """Replaces all {{variable}} occurrences with their values."""
+        def replace(match):
+            var_name = match.group(1)
+            # We want to show the value in the tooltip, so we return the value.
+            return VariableHoverHelper.get_variable_value(var_name, variables)
+        return VariableHoverHelper.VARIABLE_PATTERN.sub(replace, text)
+
 class VariableAwareLineEdit(QLineEdit):
     """QLineEdit with variable tooltip support."""
     
@@ -41,18 +50,8 @@ class VariableAwareLineEdit(QLineEdit):
         # Calculate character index under cursor
         pos = event.pos()
         # Ensure we are over text
-        # cursorPositionAt returns the nearest cursor position, 
-        # but we need to check if the mouse is actually over the text rect
-        # For simplicity, we assume if it's inside the widget and we get an index, it's valid-ish.
-        # But cursorPositionAt returns the insertion point between characters.
         
         index = self.cursorPositionAt(pos)
-        
-        # Adjust index: cursorPositionAt returns index where caret would be. 
-        # If we hover over char 'a' at index 0, it might return 0 or 1 depending on which half.
-        # Let's try to map strictly.
-        # Actually, QLineEdit doesn't expose strict char hit testing easily.
-        # But checking around the index is usually enough for {{var}}.
         
         text = self.text()
         if not text:
@@ -60,7 +59,6 @@ class VariableAwareLineEdit(QLineEdit):
             return
 
         # Check the variable at this index
-        # We might need to check index and index-1 because cursorPositionAt is "between" chars.
         var_name = VariableHoverHelper.find_variable_at_index(text, index)
         if not var_name and index > 0:
              var_name = VariableHoverHelper.find_variable_at_index(text, index - 1)
@@ -68,7 +66,7 @@ class VariableAwareLineEdit(QLineEdit):
         if var_name:
             value = VariableHoverHelper.get_variable_value(var_name, self._variables)
             # Show tooltip globally
-            QToolTip.showText(event.globalPos(), f"{var_name}: {value}", self)
+            QToolTip.showText(event.globalPos(), value, self)
         else:
             QToolTip.hideText()
             
@@ -87,10 +85,6 @@ class VariableAwarePlainTextEdit(QPlainTextEdit):
 
     def mouseMoveEvent(self, event):
         cursor = self.cursorForPosition(event.pos())
-        # cursor.position() is the absolute position in document
-        
-        # Check if we are actually over the text block?
-        # cursorForPosition returns the nearest cursor.
         
         text = self.toPlainText()
         index = cursor.position()
@@ -101,9 +95,35 @@ class VariableAwarePlainTextEdit(QPlainTextEdit):
 
         if var_name:
             value = VariableHoverHelper.get_variable_value(var_name, self._variables)
-            QToolTip.showText(event.globalPos(), f"{var_name}: {value}", self)
+            QToolTip.showText(event.globalPos(), value, self)
         else:
             QToolTip.hideText()
             
         super().mouseMoveEvent(event)
 
+class VariableAwareTableWidget(QTableWidget):
+    """QTableWidget with variable tooltip support."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMouseTracking(True)
+        self._variables: Dict[str, str] = {}
+
+    def set_variables(self, variables: Dict[str, str]):
+        self._variables = variables
+
+    def mouseMoveEvent(self, event):
+        item = self.itemAt(event.pos())
+        if item:
+            text = item.text()
+            # If text has variables, show resolved text tooltip
+            if VariableHoverHelper.VARIABLE_PATTERN.search(text):
+                resolved = VariableHoverHelper.resolve_text(text, self._variables)
+                # Show tooltip with resolved content
+                QToolTip.showText(event.globalPos(), resolved, self)
+            else:
+                QToolTip.hideText()
+        else:
+            QToolTip.hideText()
+        
+        super().mouseMoveEvent(event)

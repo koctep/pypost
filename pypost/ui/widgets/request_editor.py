@@ -6,7 +6,7 @@ from PySide6.QtCore import Signal, Qt
 from pypost.models.models import RequestData
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.code_editor import CodeEditor
-from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwarePlainTextEdit
+from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwarePlainTextEdit, VariableAwareTableWidget
 
 class RequestWidget(QWidget):
     send_requested = Signal(RequestData)
@@ -86,6 +86,8 @@ class RequestWidget(QWidget):
     def set_variables(self, variables: dict):
         """Update environment variables for child widgets."""
         self.url_input.set_variables(variables)
+        self.params_table.set_variables(variables)
+        self.headers_table.set_variables(variables)
         if hasattr(self.body_edit, 'set_variables'):
             self.body_edit.set_variables(variables)
 
@@ -124,7 +126,7 @@ class RequestWidget(QWidget):
         """Handler for saving request via shortcut (Ctrl+S)."""
         self.on_save()
 
-class KeyValueTable(QTableWidget):
+class KeyValueTable(VariableAwareTableWidget):
     def __init__(self):
         super().__init__(1, 2) # Start with 1 empty row
         self.setHorizontalHeaderLabels(["Key", "Value"])
