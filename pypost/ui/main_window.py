@@ -209,12 +209,20 @@ class MainWindow(QMainWindow):
 
     def on_env_changed(self, index):
         selected_env = self.env_selector.itemData(index)
+        variables = {}
         if isinstance(selected_env, Environment):
             self.settings.last_environment_id = selected_env.id
+            variables = selected_env.variables
         else:
             self.settings.last_environment_id = None
         
         self.config_manager.save_config(self.settings)
+
+        # Update all open tabs with new variables
+        for i in range(self.tabs.count()):
+            tab = self.tabs.widget(i)
+            if isinstance(tab, RequestTab) and hasattr(tab.request_editor, 'set_variables'):
+                tab.request_editor.set_variables(variables)
 
     def save_tabs_state(self):
         open_tabs_ids = []
@@ -298,6 +306,11 @@ class MainWindow(QMainWindow):
             tab.request_editor.body_edit.update_indent_size(self.settings.indent_size)
         if hasattr(tab.response_view, 'set_indent_size'):
             tab.response_view.set_indent_size(self.settings.indent_size)
+
+        # Set current environment variables
+        selected_env = self.env_selector.currentData()
+        if isinstance(selected_env, Environment) and hasattr(tab.request_editor, 'set_variables'):
+             tab.request_editor.set_variables(selected_env.variables)
 
         tab.request_editor.send_requested.connect(self.handle_send_request)
         tab.request_editor.save_requested.connect(self.handle_save_request)
@@ -430,8 +443,12 @@ class MainWindow(QMainWindow):
             selected_env.variables.update(updated_variables)
             # Save to storage
             self.storage.save_environments(self.environments)
-            # Maybe show a notification?
-            # print(f"Environment updated: {updated_variables}")
+            
+            # Propagate updates to all tabs
+            for i in range(self.tabs.count()):
+                tab = self.tabs.widget(i)
+                if isinstance(tab, RequestTab) and hasattr(tab.request_editor, 'set_variables'):
+                    tab.request_editor.set_variables(selected_env.variables)
 
     def on_script_output(self, tab: RequestTab, logs: list, error: str):
         """Handle logs and errors from post-request scripts."""

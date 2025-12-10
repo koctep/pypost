@@ -2,8 +2,9 @@ from PySide6.QtWidgets import QPlainTextEdit
 from PySide6.QtGui import QKeyEvent, QFontMetrics, QTextCursor
 from PySide6.QtCore import Qt, QMimeData
 import json
+from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
 
-class CodeEditor(QPlainTextEdit):
+class CodeEditor(VariableAwarePlainTextEdit):
     def __init__(self, parent=None, indent_size=2):
         super().__init__(parent)
         self.indent_size = indent_size

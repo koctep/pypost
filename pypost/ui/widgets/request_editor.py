@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal, Qt
 from pypost.models.models import RequestData
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.code_editor import CodeEditor
+from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwarePlainTextEdit
 
 class RequestWidget(QWidget):
     send_requested = Signal(RequestData)
@@ -26,7 +27,7 @@ class RequestWidget(QWidget):
         self.method_combo.addItems(["GET", "POST", "PUT", "DELETE", "PATCH"])
         self.method_combo.setCurrentText(self.request_data.method)
 
-        self.url_input = QLineEdit(self.request_data.url)
+        self.url_input = VariableAwareLineEdit(self.request_data.url)
         self.url_input.setPlaceholderText("Enter request URL")
 
         self.send_btn = QPushButton("Send")
@@ -54,7 +55,18 @@ class RequestWidget(QWidget):
         self.detail_tabs.addTab(self.headers_table, "Headers")
 
         # Body
-        self.body_edit = CodeEditor()
+        # We need a CodeEditor that is also VariableAware.
+        # Since CodeEditor inherits QPlainTextEdit, we can create a mixin or just use VariableAwarePlainTextEdit logic in CodeEditor.
+        # For now, let's mixin VariableAwarePlainTextEdit into CodeEditor or make a new class VariableAwareCodeEditor.
+        # Wait, the requirements said replace QPlainTextEdit. CodeEditor was introduced in PYPOST-15.
+        # Let's inspect CodeEditor in pypost/ui/widgets/code_editor.py first to decide how to merge.
+        # But based on the previous context, CodeEditor was likely just created.
+        # I'll use CodeEditor as base but inject VariableAware capabilities.
+        # Actually, let's just make CodeEditor inherit from VariableAwarePlainTextEdit instead of QPlainTextEdit if possible.
+        # But I don't want to modify CodeEditor directly if I can avoid it or I should modify it.
+        # Let's look at CodeEditor content first.
+        
+        self.body_edit = CodeEditor() 
         self.json_highlighter = JsonHighlighter(self.body_edit.document())
         self.detail_tabs.addTab(self.body_edit, "Body")
 
@@ -70,6 +82,13 @@ class RequestWidget(QWidget):
 
         # Setup keyboard shortcuts
         self._setup_shortcuts()
+
+    def set_variables(self, variables: dict):
+        """Update environment variables for child widgets."""
+        self.url_input.set_variables(variables)
+        if hasattr(self.body_edit, 'set_variables'):
+            self.body_edit.set_variables(variables)
+
 
     def load_data(self):
         self.url_input.setText(self.request_data.url)
