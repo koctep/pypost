@@ -2,7 +2,8 @@
 
 ## 1. Project Structure
 
-The project will be organized on a modular principle, with a clear separation of logic (Core), data (Models), and interface (UI).
+The project will be organized on a modular principle, with a clear separation of logic (Core), data
+(Models), and interface (UI).
 
 ```text
 pypost/
@@ -35,6 +36,7 @@ pypost/
 ## 2. Main System Components
 
 ### 2.1. Data Models (Models)
+
 We use `dataclasses` (or `pydantic` for validation) to describe structures.
 
 *   **RequestData**:
@@ -56,7 +58,8 @@ We use `dataclasses` (or `pydantic` for validation) to describe structures.
 
 *   **HTTPClient**:
     *   Wrapper around the `requests` library.
-    *   Executes requests asynchronously (in `QThread` or via `QRunnable`) so as not to block the UI.
+    *   Executes requests asynchronously (in `QThread` or via `QRunnable`) so as not to block the
+        UI.
     *   Returns a `ResponseData` object (status, time, headers, body).
 
 *   **TemplateEngine**:
@@ -83,6 +86,7 @@ We use `dataclasses` (or `pydantic` for validation) to describe structures.
 ## 3. Data Storage Schemas (JSON)
 
 ### 3.1. Collection (`collections/my_api.json`)
+
 ```json
 {
   "id": "uuid...",
@@ -102,6 +106,7 @@ We use `dataclasses` (or `pydantic` for validation) to describe structures.
 ```
 
 ### 3.2. Environments (`environments.json`)
+
 ```json
 [
   {
@@ -118,16 +123,18 @@ We use `dataclasses` (or `pydantic` for validation) to describe structures.
 ## 4. Request Execution Flow (Data Flow)
 
 1.  User clicks "Send".
-2.  UI collects data from input fields into a `RequestData` object.
-3.  UI retrieves the currently active environment from `EnvironmentManager`.
-4.  `TemplateEngine` is called to substitute variables in URL, Headers, Body.
-5.  The prepared request is passed to `HTTPClient` (started in a background thread).
-6.  `HTTPClient` executes the request via `requests`.
-7.  The result is returned via Signal to the UI.
-8.  `ResponseView` displays the status, headers, and response body.
+1.  UI collects data from input fields into a `RequestData` object.
+1.  UI retrieves the currently active environment from `EnvironmentManager`.
+1.  `TemplateEngine` is called to substitute variables in URL, Headers, Body.
+1.  The prepared request is passed to `HTTPClient` (started in a background thread).
+1.  `HTTPClient` executes the request via `requests`.
+1.  The result is returned via Signal to the UI.
+1.  `ResponseView` displays the status, headers, and response body.
 
 ## 5. Technical Decisions
-- **Multithreading**: Using `QThread` for network requests is mandatory so the interface does not freeze.
+
+- **Multithreading**: Using `QThread` for network requests is mandatory so the interface does not
+  freeze.
 - **Error Handling**: `try-except` blocks around network calls and JSON parsing.
 - **Dependencies**:
     - `PySide6`

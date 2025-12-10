@@ -79,6 +79,7 @@ The project uses a `Makefile` to simplify common tasks:
 
 ## Troubleshooting
 
-- **Missing modules**: Ensure your virtual environment is activated and you have installed requirements.
-- **Qt Platform plugin "xcb"**: On Linux, you might need to install `libxcb-cursor0` or similar system libraries if the app fails to launch.
-
+- **Missing modules**: Ensure your virtual environment is activated and you have installed
+  requirements.
+- **Qt Platform plugin "xcb"**: On Linux, you might need to install `libxcb-cursor0` or similar
+  system libraries if the app fails to launch.

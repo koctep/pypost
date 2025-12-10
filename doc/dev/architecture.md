@@ -1,6 +1,7 @@
 # Architecture Overview
 
-PyPost follows a modular architecture, separating business logic (Core), data definitions (Models), and the user interface (UI).
+PyPost follows a modular architecture, separating business logic (Core), data definitions (Models),
+and the user interface (UI).
 
 ## Directory Structure
 
@@ -37,22 +38,29 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 
 ### Business Logic (`pypost/core/`)
 
-- **HTTPClient**: Handles the actual network communication. It executes requests asynchronously (typically using QThread or similar mechanisms) to keep the UI responsive.
-- **TemplateEngine**: Processes strings like `{{base_url}}/api` using environment variables before sending requests.
-- **Storage**: Manages saving and loading collections and environments to/from the filesystem (JSON format).
+- **HTTPClient**: Handles the actual network communication. It executes requests asynchronously
+  (typically using QThread or similar mechanisms) to keep the UI responsive.
+- **TemplateEngine**: Processes strings like `{{base_url}}/api` using environment variables before
+  sending requests.
+- **Storage**: Manages saving and loading collections and environments to/from the filesystem (JSON
+  format).
 
 ### User Interface (`pypost/ui/`)
 
 Built with **PySide6** (Qt for Python).
 
 - **MainWindow**: The central hub, managing the layout.
-- **Widgets**: Specialized components like `RequestEditor` for composing requests and `ResponseView` for displaying results.
-- **Dialogs**: Separate windows for specific tasks like editing environment variables (`env_dialog.py`).
+- **Widgets**: Specialized components like `RequestEditor` for composing requests and `ResponseView`
+  for displaying results.
+- **Dialogs**: Separate windows for specific tasks like editing environment variables
+  (`env_dialog.py`).
 
 ## Data Flow
 
 1. **Input**: User edits a request in the UI (URL, headers, body).
-2. **Templating**: On sending, the `TemplateEngine` interpolates variables (e.g., replacing `{{token}}`).
-3. **Execution**: The `HTTPClient` sends the request in a background thread.
-4. **Response**: The result is captured, wrapped in a `Response` model, and sent back to the UI via signals.
-5. **Display**: The `ResponseView` renders the response data (JSON highlighting, headers).
+1. **Templating**: On sending, the `TemplateEngine` interpolates variables (e.g., replacing
+   `{{token}}`).
+1. **Execution**: The `HTTPClient` sends the request in a background thread.
+1. **Response**: The result is captured, wrapped in a `Response` model, and sent back to the UI via
+   signals.
+1. **Display**: The `ResponseView` renders the response data (JSON highlighting, headers).

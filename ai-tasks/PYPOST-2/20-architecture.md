@@ -1,12 +1,14 @@
 # Architecture: Adding Application Settings (Font Size)
 
 ## 1. General Approach
+
 The MVC (Model-View-Controller) pattern will be implemented for managing settings.
 *   **Model**: Pydantic model for validation and storage of settings structure.
 *   **Controller**: Extension of `StorageManager` or a separate class for loading/saving.
 *   **View**: New `SettingsDialog` and update to `MainWindow`.
 
 ## 2. Data Structure
+
 The `settings.json` file will have the following structure:
 ```json
 {
@@ -16,6 +18,7 @@ The `settings.json` file will have the following structure:
 ```
 
 ### Model (`pypost/models/settings.py`)
+
 ```python
 from pydantic import BaseModel
 
@@ -26,7 +29,9 @@ class AppSettings(BaseModel):
 ## 3. Module Changes
 
 ### 3.1 `pypost/core/config_manager.py` (New File)
-Create a separate manager for configuration to avoid overloading `StorageManager`, which handles business data (collections).
+
+Create a separate manager for configuration to avoid overloading `StorageManager`, which handles
+business data (collections).
 
 **Class `ConfigManager`**:
 *   `__init__(self, config_path="settings.json")`
@@ -34,6 +39,7 @@ Create a separate manager for configuration to avoid overloading `StorageManager
 *   `save_config(settings: AppSettings)`: Saves settings to file.
 
 ### 3.2 `pypost/ui/dialogs/settings_dialog.py` (New File)
+
 Dialog for editing settings.
 
 **Class `SettingsDialog(QDialog)`**:
@@ -42,17 +48,22 @@ Dialog for editing settings.
 *   Returns updated `AppSettings` object on save.
 
 ### 3.3 `pypost/ui/main_window.py`
+
 *   Add "Settings" button to `top_bar`.
 *   In `__init__`: Initialize `ConfigManager`, load settings, apply font.
 *   Method `open_settings()`: Opens dialog, saves config and updates app font on save.
 *   Method `apply_settings(settings)`: `QApplication.instance().setFont(...)`.
 
 ### 3.4 `pypost/main.py`
-*   Consider loading settings here before creating the main window so the app starts with the correct font immediately. However, it's simpler to do this in `MainWindow` or pass settings to it.
+
+*   Consider loading settings here before creating the main window so the app starts with the
+    correct font immediately. However, it's simpler to do this in `MainWindow` or pass settings to
+    it.
 *   *Decision*: Load settings in `main.py` and apply font globally before showing the window.
 
 ## 4. Implementation Plan
+
 1.  Create `AppSettings` model.
-2.  Implement `ConfigManager`.
-3.  Create `SettingsDialog`.
-4.  Integrate into `MainWindow` and `main.py`.
+1.  Implement `ConfigManager`.
+1.  Create `SettingsDialog`.
+1.  Integrate into `MainWindow` and `main.py`.
