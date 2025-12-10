@@ -10,4 +10,5 @@ class AppSettings(BaseModel):
     last_environment_id: Optional[str] = None
     open_tabs: List[str] = []
     expanded_collections: List[str] = []
+    confirm_overwrite_request: bool = False
 

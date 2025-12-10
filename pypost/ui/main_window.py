@@ -350,6 +350,74 @@ class MainWindow(QMainWindow):
                 self.collections_view.expand(index)
 
     def handle_save_request(self, request_data: RequestData):
+        # 1. Search for existing request
+        existing_request = None
+        found_collection = None
+        existing_index = -1
+
+        for col in self.collections:
+            for i, req in enumerate(col.requests):
+                if req.id == request_data.id:
+                    existing_request = req
+                    found_collection = col
+                    existing_index = i
+                    break
+            if existing_request:
+                break
+        
+        # 2. If found -> Check overwrite setting and Save
+        if existing_request:
+            if self.settings.confirm_overwrite_request:
+                reply = QMessageBox.question(
+                    self, 
+                    "Overwrite Request?", 
+                    f"This will overwrite the existing request '{existing_request.name}'. Continue?",
+                    QMessageBox.Yes | QMessageBox.No, 
+                    QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    return
+
+            # Update existing request with new data
+            # Preserve name and ID, update everything else
+            # Ideally we should probably merge or copy fields.
+            # Here we replace the object but we must ensure ID stays same (it should be)
+            # The request_data passed here comes from RequestWidget which modifies the object in place usually, 
+            # but let's be safe and assign explicitly.
+            
+            # Since request_data IS effectively the current state of the editor,
+            # and it has the same ID, we can just replace it in the list.
+            # HOWEVER, we should ensure the Name matches the stored name if we didn't want to rename it implicitly.
+            # But the user might have changed the name in the tab? 
+            # Current implementation: Name is not editable in tab, only in Save As dialog.
+            # So name should be consistent.
+            
+            found_collection.requests[existing_index] = request_data
+            
+            self.storage.save_collection(found_collection)
+            
+            # Update tab title just in case (though name shouldn't change here)
+            # Find the tab
+            for i in range(self.tabs.count()):
+                tab = self.tabs.widget(i)
+                if isinstance(tab, RequestTab) and tab.request_data.id == request_data.id:
+                    self.tabs.setTabText(i, request_data.name)
+                    # Update internal reference if needed (though it should be same ref)
+                    tab.request_data = request_data
+                    break
+            
+            # Force refresh of collection view item text if needed
+            # (We might need to find the item in the model and update it)
+            # For now, full reload is safest but maybe slow. 
+            # Let's try to update specific item if possible or just reload.
+            # Reloading is robust.
+            self.load_collections()
+            self.restore_tree_state()
+            
+            # self.save_tabs_state() # Optional, state hasn't changed structure
+            return
+
+        # 3. If not found (New) -> Open Save Dialog
         dialog = SaveRequestDialog(self.collections, self)
         if dialog.exec():
             # Update request data
@@ -368,22 +436,13 @@ class MainWindow(QMainWindow):
                 self.collections.append(target_collection)
 
             if target_collection:
-                # Check if updating existing request in collection
-                existing_index = -1
-                for i, req in enumerate(target_collection.requests):
-                    if req.id == request_data.id:
-                        existing_index = i
-                        break
-
-                if existing_index >= 0:
-                    target_collection.requests[existing_index] = request_data
-                else:
-                    target_collection.requests.append(request_data)
+                # Append new request
+                target_collection.requests.append(request_data)
 
                 # Save to disk
                 self.storage.save_collection(target_collection)
 
-                # Ensure target collection is expanded in settings if it's new or was closed
+                # Ensure target collection is expanded
                 if target_collection.id not in self.settings.expanded_collections:
                     self.settings.expanded_collections.append(target_collection.id)
                     self.config_manager.save_config(self.settings)
@@ -392,7 +451,7 @@ class MainWindow(QMainWindow):
                 self.load_collections()
                 self.restore_tree_state()
 
-                # Update tab title
+                # Update tab
                 current_index = self.tabs.currentIndex()
                 self.tabs.setTabText(current_index, request_data.name)
                 
@@ -401,7 +460,7 @@ class MainWindow(QMainWindow):
                 if isinstance(tab, RequestTab):
                      tab.request_data = request_data
 
-                # Save tab state as ID might have been assigned/changed if it was new
+                # Save tab state
                 self.save_tabs_state()
 
     def handle_send_request(self, request_data: RequestData):

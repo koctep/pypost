@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, 
-                               QSpinBox, QDialogButtonBox)
+                               QSpinBox, QDialogButtonBox, QCheckBox)
 from pypost.models.settings import AppSettings
 
 class SettingsDialog(QDialog):
@@ -23,9 +23,14 @@ class SettingsDialog(QDialog):
         self.indent_size_spin.setRange(2, 8)
         self.indent_size_spin.setValue(current_settings.indent_size)
 
+        self.confirm_overwrite_check = QCheckBox()
+        self.confirm_overwrite_check.setChecked(current_settings.confirm_overwrite_request)
+
         self.form_layout.addRow("Application Font Size:", self.font_size_spin)
         self.form_layout.addRow("JSON Indent Size:", self.indent_size_spin)
+        self.form_layout.addRow("Confirm before overwriting requests:", self.confirm_overwrite_check)
         self.layout.addLayout(self.form_layout)
+
 
         # Buttons
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
@@ -42,7 +47,8 @@ class SettingsDialog(QDialog):
             revision=self.current_settings.revision,
             last_environment_id=self.current_settings.last_environment_id,
             open_tabs=self.current_settings.open_tabs,
-            expanded_collections=self.current_settings.expanded_collections
+            expanded_collections=self.current_settings.expanded_collections,
+            confirm_overwrite_request=self.confirm_overwrite_check.isChecked()
         )
         super().accept()
     
