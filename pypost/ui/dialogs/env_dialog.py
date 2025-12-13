@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QListWidget,
                                QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QMessageBox, QInputDialog)
+                               QMessageBox, QInputDialog, QCheckBox)
 from typing import List
 from pypost.models.models import Environment
 
@@ -11,8 +11,6 @@ class EnvironmentDialog(QDialog):
         self.resize(800, 600)
         self.environments = environments
         self.current_env_name = current_env_name
-        # Deep copy or direct modification? Direct for simplicity now, but be careful with cancel
-        # For a "Manage" dialog, changes usually apply immediately or on "Save"
 
         self.init_ui()
 
@@ -43,7 +41,13 @@ class EnvironmentDialog(QDialog):
         self.vars_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.vars_table.itemChanged.connect(self.on_var_changed)
 
+        self.mcp_check = QCheckBox("Enable MCP (Model Context Protocol)")
+        self.mcp_check.toggled.connect(self.on_mcp_toggled)
+        # Initially disabled until env is selected
+        self.mcp_check.setEnabled(False) 
+
         right_layout.addWidget(self.vars_table)
+        right_layout.addWidget(self.mcp_check)
         layout.addLayout(right_layout, 3)
 
         self.load_list()
@@ -76,9 +80,17 @@ class EnvironmentDialog(QDialog):
     def on_env_selected(self, row):
         if row < 0 or row >= len(self.environments):
             self.vars_table.setRowCount(0)
+            self.mcp_check.setEnabled(False)
+            self.mcp_check.setChecked(False)
             return
 
         env = self.environments[row]
+        self.mcp_check.setEnabled(True)
+        # Block signals to prevent triggering on_mcp_toggled during load
+        self.mcp_check.blockSignals(True)
+        self.mcp_check.setChecked(getattr(env, 'enable_mcp', False))
+        self.mcp_check.blockSignals(False)
+
         self.vars_table.blockSignals(True)
         self.vars_table.setRowCount(len(env.variables) + 1)
 
@@ -112,3 +124,9 @@ class EnvironmentDialog(QDialog):
                 new_vars[k_item.text()] = v_item.text() if v_item else ""
 
         env.variables = new_vars
+
+    def on_mcp_toggled(self, checked):
+        row = self.env_list.currentRow()
+        if row >= 0:
+            env = self.environments[row]
+            env.enable_mcp = checked

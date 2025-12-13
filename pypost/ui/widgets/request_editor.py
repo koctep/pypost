@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
                                QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-                               QHeaderView, QPlainTextEdit, QTabWidget)
+                               QHeaderView, QPlainTextEdit, QTabWidget, QCheckBox)
 from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtCore import Signal, Qt
 from pypost.models.models import RequestData
@@ -38,7 +38,13 @@ class RequestWidget(QWidget):
 
         url_layout.addWidget(self.method_combo)
         url_layout.addWidget(self.url_input)
+        
+        self.mcp_check = QCheckBox("MCP Tool")
+        self.mcp_check.setToolTip("Expose as MCP Tool")
+        url_layout.addWidget(self.mcp_check)
+        
         url_layout.addWidget(self.save_btn)
+
         url_layout.addWidget(self.send_btn)
 
         layout.addLayout(url_layout)
@@ -99,6 +105,7 @@ class RequestWidget(QWidget):
         self.headers_table.set_data(self.request_data.headers)
         self.body_edit.setPlainText(self.request_data.body)
         self.script_edit.setPlainText(self.request_data.post_script)
+        self.mcp_check.setChecked(self.request_data.expose_as_mcp)
 
     def update_request_data(self):
         self.request_data.url = self.url_input.text()
@@ -107,6 +114,7 @@ class RequestWidget(QWidget):
         self.request_data.headers = self.headers_table.get_data()
         self.request_data.body = self.body_edit.toPlainText()
         self.request_data.post_script = self.script_edit.toPlainText()
+        self.request_data.expose_as_mcp = self.mcp_check.isChecked()
 
     def on_send(self):
         self.update_request_data()

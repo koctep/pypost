@@ -23,11 +23,17 @@ class SettingsDialog(QDialog):
         self.indent_size_spin.setRange(2, 8)
         self.indent_size_spin.setValue(current_settings.indent_size)
 
+        self.mcp_port_spin = QSpinBox()
+        self.mcp_port_spin.setRange(1024, 65535)
+        self.mcp_port_spin.setValue(current_settings.mcp_port)
+
         self.confirm_overwrite_check = QCheckBox()
+
         self.confirm_overwrite_check.setChecked(current_settings.confirm_overwrite_request)
 
         self.form_layout.addRow("Application Font Size:", self.font_size_spin)
         self.form_layout.addRow("JSON Indent Size:", self.indent_size_spin)
+        self.form_layout.addRow("MCP Server Port:", self.mcp_port_spin)
         self.form_layout.addRow("Confirm before overwriting requests:", self.confirm_overwrite_check)
         self.layout.addLayout(self.form_layout)
 
@@ -48,7 +54,8 @@ class SettingsDialog(QDialog):
             last_environment_id=self.current_settings.last_environment_id,
             open_tabs=self.current_settings.open_tabs,
             expanded_collections=self.current_settings.expanded_collections,
-            confirm_overwrite_request=self.confirm_overwrite_check.isChecked()
+            confirm_overwrite_request=self.confirm_overwrite_check.isChecked(),
+            mcp_port=self.mcp_port_spin.value()
         )
         super().accept()
     

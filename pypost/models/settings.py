@@ -11,4 +11,5 @@ class AppSettings(BaseModel):
     open_tabs: List[str] = []
     expanded_collections: List[str] = []
     confirm_overwrite_request: bool = False
+    mcp_port: int = 1080
 
