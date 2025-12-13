@@ -16,6 +16,7 @@ from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.about_dialog import AboutDialog
+from pypost.core.mcp_server import MCPServerManager
 
 class RequestTab(QWidget):
     def __init__(self, request_data: RequestData = None):
@@ -41,6 +42,8 @@ class MainWindow(QMainWindow):
         self.storage = StorageManager()
         self.config_manager = ConfigManager()
         self.style_manager = StyleManager()
+        self.mcp_manager = MCPServerManager()
+        self.mcp_manager.status_changed.connect(self.on_mcp_status_changed)
         
         # Load icons
         icons_dir = Path(__file__).parent / 'resources' / 'icons'
@@ -78,10 +81,13 @@ class MainWindow(QMainWindow):
         self.settings_btn.clicked.connect(self.open_settings)
         
         self.env_label = QLabel("Environment:")
+        self.mcp_status_label = QLabel("MCP: OFF")
+        self.mcp_status_label.setStyleSheet("color: gray;")
 
         self.top_bar.addWidget(self.env_label)
         self.top_bar.addWidget(self.env_selector)
         self.top_bar.addWidget(self.manage_env_btn)
+        self.top_bar.addWidget(self.mcp_status_label)
         self.top_bar.addStretch()
         self.top_bar.addWidget(self.settings_btn)
 
@@ -110,7 +116,6 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget(self.splitter)
         
         # Apply settings BEFORE loading tabs to ensure correct font size/style
-        # Note: indent settings will be applied to tabs as they are created
         self.apply_settings(self.settings)
 
         # Load data
@@ -207,14 +212,35 @@ class MainWindow(QMainWindow):
         self.env_selector.setCurrentIndex(selected_index)
         self.env_selector.blockSignals(False)
 
+        # Also trigger on_env_changed logic manually to start server if needed on startup
+        if selected_index > 0:
+             self.on_env_changed(selected_index)
+
     def on_env_changed(self, index):
         selected_env = self.env_selector.itemData(index)
         variables = {}
         if isinstance(selected_env, Environment):
             self.settings.last_environment_id = selected_env.id
             variables = selected_env.variables
+            
+            # Manage MCP Server
+            if selected_env.enable_mcp:
+                # Collect all requests that are exposed as tools
+                tools = []
+                for col in self.collections:
+                    for req in col.requests:
+                        if req.expose_as_mcp:
+                            tools.append(req)
+                self.mcp_manager.start_server(
+                    port=self.settings.mcp_port, 
+                    tools=tools,
+                    host=self.settings.mcp_host
+                )
+            else:
+                self.mcp_manager.stop_server()
         else:
             self.settings.last_environment_id = None
+            self.mcp_manager.stop_server()
         
         self.config_manager.save_config(self.settings)
 
@@ -223,6 +249,14 @@ class MainWindow(QMainWindow):
             tab = self.tabs.widget(i)
             if isinstance(tab, RequestTab) and hasattr(tab.request_editor, 'set_variables'):
                 tab.request_editor.set_variables(variables)
+
+    def on_mcp_status_changed(self, is_running: bool):
+        if is_running:
+            self.mcp_status_label.setText(f"MCP: ON ({self.settings.mcp_host}:{self.settings.mcp_port})")
+            self.mcp_status_label.setStyleSheet("color: green; font-weight: bold;")
+        else:
+            self.mcp_status_label.setText("MCP: OFF")
+            self.mcp_status_label.setStyleSheet("color: gray;")
 
     def save_tabs_state(self):
         open_tabs_ids = []
@@ -236,15 +270,16 @@ class MainWindow(QMainWindow):
 
     def open_env_manager(self):
         current_env_name = self.env_selector.currentText()
-        # If "No Environment" is selected, currentText might be "No Environment", check data
-        if self.env_selector.currentIndex() == 0: # Assuming 0 is "No Environment"
+        if self.env_selector.currentIndex() == 0: 
              current_env_name = None
 
         dialog = EnvironmentDialog(self.environments, self, current_env_name)
         dialog.exec()
-        # Save changes
         self.storage.save_environments(self.environments)
-        self.load_environments() # Refresh combo
+        self.load_environments() 
+        
+        # Force update of current environment to apply changes (e.g. MCP toggle)
+        self.on_env_changed(self.env_selector.currentIndex())
 
     def open_settings(self):
         dialog = SettingsDialog(self.settings, self)
@@ -254,6 +289,9 @@ class MainWindow(QMainWindow):
                 self.settings = new_settings
                 self.config_manager.save_config(self.settings)
                 self.apply_settings(self.settings)
+                
+                # Force update to apply port changes if needed
+                self.on_env_changed(self.env_selector.currentIndex())
 
     def apply_settings(self, settings):
         app = QApplication.instance()
@@ -262,52 +300,38 @@ class MainWindow(QMainWindow):
             font.setPointSize(settings.font_size)
             app.setFont(font)
             
-            # Apply external styles
             self.style_manager.apply_styles(app)
             
-            # Force update widgets that might not inherit font correctly or need specific updates
             self.collections_view.setFont(font)
             self.env_selector.setFont(font)
             self.tabs.setFont(font)
-            # Update stylesheet for QTabBar explicitly if needed, but setFont usually works
-            # If tabs are styled via QSS, font might need to be in QSS or QTabBar::tab
             
             if self.menuBar():
                 self.menuBar().setFont(font)
             
-            # Top bar elements
             self.manage_env_btn.setFont(font)
             self.settings_btn.setFont(font)
             self.env_label.setFont(font)
-            
-            # Recursively update fonts for all child widgets if needed
-            # For now, explicit updates cover main areas. 
-            # Tab bar specifically:
             self.tabs.tabBar().setFont(font)
 
-        # Apply settings to all open tabs
         for i in range(self.tabs.count()):
             tab = self.tabs.widget(i)
             if isinstance(tab, RequestTab):
-                # Update RequestWidget (CodeEditor)
                 if hasattr(tab.request_editor, 'body_edit'):
                     tab.request_editor.body_edit.update_indent_size(settings.indent_size)
                     tab.request_editor.body_edit.reformat_text()
                 
-                # Update ResponseView
                 if hasattr(tab.response_view, 'set_indent_size'):
                     tab.response_view.set_indent_size(settings.indent_size)
 
     def add_new_tab(self, request_data: RequestData = None, save_state: bool = True):
         tab = RequestTab(request_data)
         
-        # Apply current settings to new tab
         if hasattr(tab.request_editor, 'body_edit'):
             tab.request_editor.body_edit.update_indent_size(self.settings.indent_size)
         if hasattr(tab.response_view, 'set_indent_size'):
             tab.response_view.set_indent_size(self.settings.indent_size)
 
-        # Set current environment variables
         selected_env = self.env_selector.currentData()
         if isinstance(selected_env, Environment) and hasattr(tab.request_editor, 'set_variables'):
              tab.request_editor.set_variables(selected_env.variables)
@@ -334,7 +358,6 @@ class MainWindow(QMainWindow):
         data = item.data(Qt.UserRole)
 
         if isinstance(data, RequestData):
-            # Check if already open
             for i in range(self.tabs.count()):
                 tab = self.tabs.widget(i)
                 if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id == data.id:
@@ -343,14 +366,12 @@ class MainWindow(QMainWindow):
 
             self.add_new_tab(data)
         else:
-            # It's a folder/collection - toggle expansion
             if self.collections_view.isExpanded(index):
                 self.collections_view.collapse(index)
             else:
                 self.collections_view.expand(index)
 
     def handle_save_request(self, request_data: RequestData):
-        # 1. Search for existing request
         existing_request = None
         found_collection = None
         existing_index = -1
@@ -365,7 +386,6 @@ class MainWindow(QMainWindow):
             if existing_request:
                 break
         
-        # 2. If found -> Check overwrite setting and Save
         if existing_request:
             if self.settings.confirm_overwrite_request:
                 reply = QMessageBox.question(
@@ -378,52 +398,23 @@ class MainWindow(QMainWindow):
                 if reply == QMessageBox.No:
                     return
 
-            # Update existing request with new data
-            # Preserve name and ID, update everything else
-            # Ideally we should probably merge or copy fields.
-            # Here we replace the object but we must ensure ID stays same (it should be)
-            # The request_data passed here comes from RequestWidget which modifies the object in place usually, 
-            # but let's be safe and assign explicitly.
-            
-            # Since request_data IS effectively the current state of the editor,
-            # and it has the same ID, we can just replace it in the list.
-            # HOWEVER, we should ensure the Name matches the stored name if we didn't want to rename it implicitly.
-            # But the user might have changed the name in the tab? 
-            # Current implementation: Name is not editable in tab, only in Save As dialog.
-            # So name should be consistent.
-            
             found_collection.requests[existing_index] = request_data
-            
             self.storage.save_collection(found_collection)
             
-            # Update tab title just in case (though name shouldn't change here)
-            # Find the tab
             for i in range(self.tabs.count()):
                 tab = self.tabs.widget(i)
                 if isinstance(tab, RequestTab) and tab.request_data.id == request_data.id:
                     self.tabs.setTabText(i, request_data.name)
-                    # Update internal reference if needed (though it should be same ref)
                     tab.request_data = request_data
                     break
             
-            # Force refresh of collection view item text if needed
-            # (We might need to find the item in the model and update it)
-            # For now, full reload is safest but maybe slow. 
-            # Let's try to update specific item if possible or just reload.
-            # Reloading is robust.
             self.load_collections()
             self.restore_tree_state()
-            
-            # self.save_tabs_state() # Optional, state hasn't changed structure
             return
 
-        # 3. If not found (New) -> Open Save Dialog
         dialog = SaveRequestDialog(self.collections, self)
         if dialog.exec():
-            # Update request data
             request_data.name = dialog.request_name
-
-            # Find or create collection
             target_collection = None
 
             if dialog.selected_collection_id:
@@ -436,31 +427,23 @@ class MainWindow(QMainWindow):
                 self.collections.append(target_collection)
 
             if target_collection:
-                # Append new request
                 target_collection.requests.append(request_data)
-
-                # Save to disk
                 self.storage.save_collection(target_collection)
 
-                # Ensure target collection is expanded
                 if target_collection.id not in self.settings.expanded_collections:
                     self.settings.expanded_collections.append(target_collection.id)
                     self.config_manager.save_config(self.settings)
 
-                # Reload UI
                 self.load_collections()
                 self.restore_tree_state()
 
-                # Update tab
                 current_index = self.tabs.currentIndex()
                 self.tabs.setTabText(current_index, request_data.name)
                 
-                # Update saved request in tab
                 tab = self.tabs.widget(current_index)
                 if isinstance(tab, RequestTab):
                      tab.request_data = request_data
 
-                # Save tab state
                 self.save_tabs_state()
 
     def handle_send_request(self, request_data: RequestData):
@@ -477,7 +460,6 @@ class MainWindow(QMainWindow):
         sender_tab.request_editor.send_btn.setEnabled(False)
         sender_tab.request_editor.send_btn.setText("Sending...")
 
-        # Get current environment variables
         variables = {}
         selected_env = self.env_selector.currentData()
         if isinstance(selected_env, Environment):
@@ -495,28 +477,19 @@ class MainWindow(QMainWindow):
         sender_tab.worker = worker
 
     def on_env_update(self, updated_variables: dict):
-        """Handle environment variable updates from scripts."""
         selected_env = self.env_selector.currentData()
         if isinstance(selected_env, Environment):
-            # Update local object
             selected_env.variables.update(updated_variables)
-            # Save to storage
             self.storage.save_environments(self.environments)
             
-            # Propagate updates to all tabs
             for i in range(self.tabs.count()):
                 tab = self.tabs.widget(i)
                 if isinstance(tab, RequestTab) and hasattr(tab.request_editor, 'set_variables'):
                     tab.request_editor.set_variables(selected_env.variables)
 
     def on_script_output(self, tab: RequestTab, logs: list, error: str):
-        """Handle logs and errors from post-request scripts."""
         if error:
             QMessageBox.warning(self, "Script Error", f"Post-request script failed:\n{error}")
-        
-        # In a real app, we might want to show logs in a dedicated panel.
-        # For now, if there are logs, maybe just print them or show if important?
-        # Let's just print to console/stdout for now or show in a dialog if requested.
         if logs:
             print("Script Logs:", logs)
 

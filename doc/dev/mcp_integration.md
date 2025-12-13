@@ -16,6 +16,7 @@ This class acts as the bridge between the PySide6 UI and the background MCP serv
 
 *   **Responsibility**: Lifecycle management (Start/Stop/Restart).
 *   **Threading**: It spawns a dedicated `threading.Thread` to run the `uvicorn` server. This is necessary because `uvicorn` blocks the thread it runs in, and we cannot block the main Qt GUI thread.
+*   **Configuration**: Supports configurable `host` and `port` via `start_server`.
 *   **Communication**: Uses Qt Signals (`status_changed`) to notify the UI about server state.
 *   **Shutdown**: Handles the complex logic of stopping `uvicorn` from another thread by setting flags and waiting for the thread to join.
 
@@ -36,11 +37,11 @@ This class contains the actual business logic of the MCP server.
 ### Server Startup
 
 1.  User selects an Environment with `enable_mcp=True`.
-2.  `MainWindow` calls `MCPServerManager.start_server(port, tools)`.
+2.  `MainWindow` calls `MCPServerManager.start_server(port, tools, host)`.
 3.  `MCPServerManager` creates a new thread.
 4.  Inside the thread, a new `asyncio` event loop is created.
 5.  `MCPServerImpl.create_app()` builds the Starlette app.
-6.  `uvicorn.Server.serve()` is called to start listening.
+6.  `uvicorn.Server.serve()` is called to start listening on the specified host and port.
 
 ### Tool Execution
 
@@ -63,7 +64,6 @@ This class contains the actual business logic of the MCP server.
 ## Limitations & Tech Debt
 
 *   **Synchronous Execution**: The core uses `requests` (sync). Ideally, we should move to `httpx` for async support to avoid `run_in_threadpool`.
-*   **Address Binding**: Currently hardcoded to `127.0.0.1`.
 *   **Parsing**: Schema generation uses `TemplateService` for AST parsing, but complex Jinja2 constructs might still need attention.
 
 See `ai-tasks/PYPOST-20/40-tech-debt.md` for more details.

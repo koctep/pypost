@@ -12,4 +12,5 @@ class AppSettings(BaseModel):
     expanded_collections: List[str] = []
     confirm_overwrite_request: bool = False
     mcp_port: int = 1080
+    mcp_host: str = "127.0.0.1"
 

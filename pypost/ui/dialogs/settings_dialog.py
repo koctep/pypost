@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, 
-                               QSpinBox, QDialogButtonBox, QCheckBox)
+                               QSpinBox, QDialogButtonBox, QCheckBox, QLineEdit)
 from pypost.models.settings import AppSettings
 
 class SettingsDialog(QDialog):
@@ -27,6 +27,9 @@ class SettingsDialog(QDialog):
         self.mcp_port_spin.setRange(1024, 65535)
         self.mcp_port_spin.setValue(current_settings.mcp_port)
 
+        self.mcp_host_edit = QLineEdit()
+        self.mcp_host_edit.setText(current_settings.mcp_host)
+
         self.confirm_overwrite_check = QCheckBox()
 
         self.confirm_overwrite_check.setChecked(current_settings.confirm_overwrite_request)
@@ -34,6 +37,7 @@ class SettingsDialog(QDialog):
         self.form_layout.addRow("Application Font Size:", self.font_size_spin)
         self.form_layout.addRow("JSON Indent Size:", self.indent_size_spin)
         self.form_layout.addRow("MCP Server Port:", self.mcp_port_spin)
+        self.form_layout.addRow("MCP Server Host:", self.mcp_host_edit)
         self.form_layout.addRow("Confirm before overwriting requests:", self.confirm_overwrite_check)
         self.layout.addLayout(self.form_layout)
 
@@ -55,7 +59,8 @@ class SettingsDialog(QDialog):
             open_tabs=self.current_settings.open_tabs,
             expanded_collections=self.current_settings.expanded_collections,
             confirm_overwrite_request=self.confirm_overwrite_check.isChecked(),
-            mcp_port=self.mcp_port_spin.value()
+            mcp_port=self.mcp_port_spin.value(),
+            mcp_host=self.mcp_host_edit.text()
         )
         super().accept()
     

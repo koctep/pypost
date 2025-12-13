@@ -18,12 +18,14 @@ class MCPServerManager(QObject):
         self._server_instance: Optional[uvicorn.Server] = None
         self._impl = MCPServerImpl()
         self._current_port = 1080
+        self._current_host = "127.0.0.1"
 
-    def start_server(self, port: int, tools: List[RequestData]):
+    def start_server(self, port: int, tools: List[RequestData], host: str = "127.0.0.1"):
         if self.is_running():
             self.stop_server()
 
         self._current_port = port
+        self._current_host = host
         self._impl.register_tools(tools)
         self._stop_event.clear()
 
@@ -55,7 +57,7 @@ class MCPServerManager(QObject):
         if self.is_running():
             # Restart to refresh tools
             self.stop_server()
-            self.start_server(self._current_port, tools)
+            self.start_server(self._current_port, tools, self._current_host)
 
     def _run_uvicorn(self):
         app = self._impl.create_app()
@@ -63,7 +65,7 @@ class MCPServerManager(QObject):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        config = uvicorn.Config(app=app, host="127.0.0.1", port=self._current_port, loop="asyncio")
+        config = uvicorn.Config(app=app, host=self._current_host, port=self._current_port, loop="asyncio")
         self._server_instance = uvicorn.Server(config)
         
         # Override install_signal_handlers because we are not in main thread
