@@ -9,14 +9,14 @@ import jinja2
 from jinja2 import Environment
 import json
 from starlette.concurrency import run_in_threadpool
-from pypost.core.http_client import HTTPClient
-from pypost.core.template_engine import TemplateEngine
+from pypost.core.request_service import RequestService
 
 class MCPServerImpl:
     def __init__(self, name: str = "pypost-server"):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
         self.env = Environment() # Jinja2 environment for parsing
+        self.request_service = RequestService()
         
         # Register handlers
         self.server.list_tools()(self.list_tools)
@@ -39,39 +39,32 @@ class MCPServerImpl:
         
         request_data = self.tools_map[name]
         
-        # Execute request in threadpool since HTTPClient is synchronous
+        # Execute request in threadpool since RequestService is synchronous
         try:
-            response_text = await run_in_threadpool(
+            result = await run_in_threadpool(
                 self._execute_request_sync, request_data, arguments
             )
-            return [TextContent(type="text", text=response_text)]
+            
+            # Format output
+            output_text = result.response.body
+            
+            # Append script logs if any (helpful for debugging)
+            if result.script_logs:
+                logs_str = "\n".join(result.script_logs)
+                output_text += f"\n\n--- Script Logs ---\n{logs_str}"
+            
+            if result.script_error:
+                output_text += f"\n\n--- Script Error ---\n{result.script_error}"
+
+            return [TextContent(type="text", text=output_text)]
         except Exception as e:
             return [TextContent(type="text", text=f"Error executing request: {str(e)}")]
 
-    def _execute_request_sync(self, request_data: RequestData, args: dict) -> str:
+    def _execute_request_sync(self, request_data: RequestData, args: dict):
         # Prepare context
         context = {"mcp": {"request": args}}
         
-        # Render request parts
-        url = TemplateEngine.render(request_data.url, context)
-        method = request_data.method
-        headers = {k: TemplateEngine.render(v, context) for k, v in request_data.headers.items()}
-        params = {k: TemplateEngine.render(v, context) for k, v in request_data.params.items()}
-        body = TemplateEngine.render(request_data.body, context) if request_data.body else None
-        
-        # Use HTTPClient directly
-        client = HTTPClient()
-        response = client.send_request(
-            method=method,
-            url=url,
-            headers=headers,
-            params=params,
-            body=body,
-            timeout=30 # Default timeout
-        )
-        
-        # Return response body
-        return response.body
+        return self.request_service.execute(request_data, context)
 
     def register_tools(self, requests: List[RequestData]):
         self.tools_map.clear()

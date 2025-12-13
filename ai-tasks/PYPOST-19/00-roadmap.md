@@ -1,40 +1,39 @@
 # Roadmap: PYPOST-19
 
-## Статус выполнения шагов
+## Step Execution Status
 
-- [x] **ШАГ 1: Сбор и документирование требований**
-- [x] **ШАГ 2: Архитектурное проектирование высокого уровня**
-- [x] **ШАГ 3: Разработка**
-  - [x] Добавлены зависимости и поля моделей.
-  - [x] Реализовано ядро MCP сервера.
-  - [x] Обновлен UI.
-  - [x] Реализована интеграция.
-  - [x] Написана пользовательская документация.
-- [x] **ШАГ 4: Ревью и технический долг**
-  - [x] Создан анализ технического долга.
+- [x] **STEP 1: Requirements gathering and documentation**
+- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 3: Development**
+  - [x] Implemented `MCPServerManager` and `MCPServerImpl` with SSE transport
+  - [x] Updated `RequestData` and `Environment` models for MCP settings
+  - [x] Added UI controls for enabling MCP and exposing tools
+  - [x] Integrated server lifecycle into `MainWindow`
+  - [x] Added user and developer documentation
+- [x] **STEP 4: Review and Technical Debt**
 
-## Легенда статусов
+## Status Legend
 
-- `[ ]` — шаг не начат
-- `[/]` — работа над шагом начата (in progress)
-- `[x]` — шаг завершен
+- `[ ]` — step not started
+- `[/]` — step in progress
+- `[x]` — step completed
 
-## Артефакты
+## Artifacts
 
-### ШАГ 1: Требования
+### STEP 1: Requirements
 
 - `ai-tasks/PYPOST-19/10-requirements.md`
 
-### ШАГ 2: Архитектура
+### STEP 2: Architecture
 
 - `ai-tasks/PYPOST-19/20-architecture.md`
 
-### ШАГ 3: Разработка
+### STEP 3: Development
 
-- Исходный код
-- Тесты
-- `doc/mcp_integration.md` (Пользовательская документация)
+- Source code
+- Tests
+- Documentation updates
 
-### ШАГ 4: Ревью
+### STEP 4: Review
 
 - `ai-tasks/PYPOST-19/40-tech-debt.md`

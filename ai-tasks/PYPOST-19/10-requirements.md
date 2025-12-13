@@ -1,70 +1,42 @@
-# Требования: PYPOST-19 - MCP Server Integration
+# Requirements: PYPOST-19 - Model Context Protocol (MCP) Integration
 
-## 1. Описание проблемы
+## Goals
+Integrate support for Model Context Protocol (MCP) into PyPost. This will allow PyPost to act as an MCP server, exposing saved requests as tools for AI agents (e.g., Claude, Cursor). This enables agents to execute HTTP requests configured in PyPost directly from their context.
 
-Необходимо интегрировать поддержку **Model Context Protocol (MCP)** в приложение PyPost.
-Это позволит внешним AI-агентам (например, Claude Desktop, Cursor) использовать сохраненные
-в PyPost запросы как инструменты (Tools) для выполнения действий.
+## User Stories
+- As a user, I want to be able to enable the MCP server in PyPost settings so that my AI agent can connect to it.
+- As a user, I want to mark specific requests as "Expose as Tool" so that only selected requests are available to the agent.
+- As a user, I want the agent to be able to call my requests, passing parameters (if any), and receive the response.
+- As a user, I want to see the status of the MCP server (running/stopped) in the interface.
 
-## 2. Технический стек
+## Acceptance Criteria
+- [ ] **MCP Server**:
+    - Implemented MCP server supporting SSE (Server-Sent Events) transport.
+    - Server runs on a configurable port (default 8000).
+- [ ] **Data Model**:
+    - `RequestData` has an `expose_as_mcp` (bool) field.
+    - `Environment` has `enable_mcp` (bool) field.
+- [ ] **UI**:
+    - Checkbox "Expose as MCP Tool" in request editor.
+    - Checkbox "Enable MCP Server" in environment settings (or global settings).
+    - Server status indicator in the main window.
+- [ ] **Functionality**:
+    - When the server is enabled, it exposes a list of tools corresponding to requests with `expose_as_mcp=True`.
+    - Tool name corresponds to request name (sanitized).
+    - Tool execution performs the HTTP request using PyPost logic (including variable substitution).
+    - Execution result is returned to the agent.
 
-- **Язык**: Python 3.10+
-- **Библиотеки**:
-    - `mcp` (Model Context Protocol SDK)
-    - `uvicorn`/`fastapi` или `starlette` (для реализации SSE сервера)
-    - `jinja2` (парсинг шаблонов AST для авто-обнаружения переменных)
+## Task Description
+Implement an MCP server inside PyPost using the `mcp` SDK (python).
 
-## 3. Функциональные требования
+### Technical Details
+- **Protocol**: MCP (Model Context Protocol).
+- **Transport**: SSE (easiest for local integration).
+- **SDK**: `mcp` (Python).
+- **Integration**: The server must run in a separate thread/process or use `asyncio` loop, integrated with the Qt event loop (e.g., via `qasync` or running in a separate thread).
 
-### 3.1. Глобальные настройки (Settings)
-
-- В глобальные настройки приложения (`AppSettings`) добавить:
-  - **MCP Server Port**: Порт для запуска сервера. Значение по умолчанию: `1080`.
-
-### 3.2. Управление сервером (Environment)
-
-- В настройки окружения (`Environment`) добавляется флаг **"Enable MCP"**.
-- Логика работы:
-  - Если активное окружение имеет флаг `enable_mcp=True`, приложение запускает
-    фоновый процесс MCP-сервера на указанном порту (SSE транспорт).
-  - Если переключаемся на окружение без флага, сервер останавливается.
-  - Состояние сервера должно отображаться в UI (например, иконка в статус-баре).
-
-### 3.3. Экспорт инструментов (Request)
-
-- В настройки запроса (`RequestData`) добавляется опция **"Expose as MCP Tool"** (boolean).
-- Список инструментов (ListTools) формируется динамически из всех запросов,
-  где эта опция включена.
-- **Именование инструмента**:
-  - Имя: транслитерация/нормализация имени запроса (только латиница, цифры,
-    подчеркивания). Пример: "Get User Data" -> `get_user_data`.
-  - Описание: берется из описания запроса (если будет реализовано) или названия.
-
-### 3.4. Аргументы и Переменные (`mcp.request`)
-
-- **Авто-обнаружение аргументов (Вариант B)**:
-  - При старте сервера/обновлении запроса, система сканирует поля запроса
-    (URL, Headers, Body, Params) на наличие переменных вида
-    `{{ mcp.request.variable_name }}`.
-  - Из найденных переменных формируется JSON Schema для инструмента.
-    Все найденные переменные считаются обязательными строковыми параметрами.
-- **Исполнение**:
-  - При вызове инструмента MCP-сервер создает контекст, где объект `mcp.request`
-    содержит переданные аргументы.
-  - Выполняется HTTP запрос через существующий механизм `ScriptExecutor`/`RequestWorker`.
-  - Ответ (Body) возвращается как результат инструмента.
-
-## 4. Нефункциональные требования
-
-- Сервер не должен блокировать основной UI поток (запуск в отдельном
-  потоке/процессе).
-- Корректная остановка сервера при закрытии приложения.
-
-## 5. Критерии приемки
-
-- [ ] В `AppSettings` есть настройка порта (default 1080).
-- [ ] В `Environment` есть флаг `enable_mcp`.
-- [ ] В `RequestData` есть флаг `expose_as_mcp`.
-- [ ] Реализовано авто-обнаружение переменных `{{ mcp.request.* }}` для схемы.
-- [ ] При включении опции сервер доступен по SSE на порту 1080.
-- [ ] Инструмент успешно вызывается из MCP-клиента, переменные подставляются.
+## Q&A
+- **How to handle parameters?**
+    - For the first version, tools will not accept arguments (execute "as is" with current environment variables). In the future, we can add parameter parsing from `{{variable}}`.
+- **Security?**
+    - The server runs on localhost. Access is open to local processes. This is standard for local MCP servers.

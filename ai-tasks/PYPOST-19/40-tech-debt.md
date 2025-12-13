@@ -2,62 +2,18 @@
 
 ## Shortcuts Taken
 
-1.  **Server Shutdown Mechanism**:
-    - Использован доступ к приватному API `uvicorn.Server` (установка `should_exit = True`) и переопределение обработчиков сигналов.
-    - **Риск**: При обновлении `uvicorn` это может сломаться.
-    - **Решение**: Изучить возможность запуска `uvicorn` в полностью контролируемом `asyncio` loop без использования `Server.serve()` или перейти на `hypercorn`, который имеет более гибкое API.
-
-2.  **Schema Generation**:
-    - Используется Regex для поиска переменных `{{ mcp.request.var }}`.
-    - **Риск**: Может давать ложные срабатывания в комментариях или строках, которые не являются шаблонами Jinja2, или пропускать сложные выражения.
-    - **Решение**: Использовать полноценный AST парсинг Jinja2 (уже подключен, но не используется полностью).
-
-3.  **Synchronous HTTP Client**:
-    - Внутри async MCP сервера используется `run_in_threadpool` для вызова синхронного `HTTPClient`.
-    - **Риск**: Дополнительные накладные расходы на переключение контекста.
-    - **Решение**: В будущем рассмотреть переход на `httpx` для асинхронных запросов в ядре.
-
-4.  **Hardcoded Server Address**:
-    - Сервер жестко привязан к `127.0.0.1`.
-    - **Риск**: Невозможность использования сервера с других машин или интерфейсов.
-    - **Решение**: Вынести настройку адреса (host) в `AppSettings` и UI.
-
-## Code Quality Issues
-
-1.  **Mixed Concerns in MainWindow**:
-    - Логика управления сервером (`start_server`/`stop_server` вызовы) находится прямо в `on_env_changed`.
-    - Лучше вынести это в отдельный `ApplicationController` или расширить `EnvironmentManager`.
-
-2.  **Duplicate Variable Logic & Request Execution**:
-    - Логика подстановки переменных в `MCPServerImpl._execute_request_sync` дублирует логику `RequestWorker`.
-    - MCP сервер сейчас не выполняет post-request скрипты, что делает поведение отличным от GUI.
-    - **Решение**: Выделить общий класс `RequestExecutor`, который:
-        1. Принимает `RequestData` и контекст переменных.
-        2. Рендерит шаблон.
-        3. Выполняет запрос.
-        4. Выполняет скрипты.
-        5. Возвращает результат.
-    - Использовать этот `RequestExecutor` как в `RequestWorker` (GUI), так и в `MCPServerImpl` (MCP).
+- **No Arguments Support**: Tools exposed via MCP do not accept arguments. They execute the request exactly as configured in PyPost (with current environment variables). This limits flexibility (agent cannot pass ID dynamically).
+    - *Future*: Parse `{{variable}}` in request and generate JSON Schema for tool arguments.
+- **Restart on Update**: When the list of tools (requests) changes, the server might need a restart or explicit update notification to clients (if supported by MCP). Currently, we might rely on the agent polling `list_tools`.
+- **Single Environment**: The server uses the currently active environment in PyPost. If the user switches environment in UI, the server starts using new variables. This might be unexpected for the agent if it relies on state.
+- **Thread Safety**: We are running `asyncio` server in a thread and calling PyPost core logic (which might be synchronous or use Qt). Need to ensure `HTTPClient` is thread-safe or instantiated per request.
 
 ## Missing Tests
 
-1.  **Unit Tests for MCPServerImpl**:
-    - Нет тестов на генерацию схемы.
-    - Нет тестов на выполнение запроса.
-
-2.  **Integration Tests**:
-    - Нет проверки, что сервер действительно поднимается на порту и отвечает на SSE handshake.
-
-## Performance Concerns
-
-1.  **Server Startup/Shutdown**:
-    - Перезапуск сервера при каждом переключении окружения или изменении настроек может быть медленным (секунды).
-    - Для UX это может выглядеть как "подтормаживание" интерфейса, если `join()` потока занимает время.
+- No automated tests for MCP server interaction. Testing is manual via MCP Inspector or Cursor.
 
 ## Follow-up Tasks
 
-1.  [ ] Написать unit-тесты для `MCPServerImpl` (schema generation).
-2.  [ ] **Рефакторинг**: Создать абстракцию `RequestExecutor` для унификации выполнения запросов в GUI и MCP.
-3.  [ ] Улучшить механизм остановки `uvicorn` (Graceful shutdown).
-4.  [ ] Добавить валидацию порта (проверка занятости).
-5.  [ ] Добавить настройку адреса привязки сервера (host).
+- Implement argument parsing for tools.
+- Add logging/inspection of MCP calls in UI.
+- Add tests using an MCP client mock.

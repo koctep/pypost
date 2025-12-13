@@ -9,7 +9,9 @@ and the user interface (UI).
 pypost/
 ├── main.py                 # Application entry point
 ├── core/                   # Business logic
+│   ├── request_service.py  # Unified request execution service
 │   ├── http_client.py      # HTTP request handling (wrapping `requests`)
+│   ├── script_executor.py  # Python script execution environment
 │   ├── template_engine.py  # Variable interpolation (Jinja2)
 │   ├── storage.py          # Persistence (JSON)
 │   ├── config_manager.py   # Configuration management
@@ -38,10 +40,11 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 
 ### Business Logic (`pypost/core/`)
 
-- **HTTPClient**: Handles the actual network communication. It executes requests asynchronously
-  (typically using QThread or similar mechanisms) to keep the UI responsive.
-- **TemplateEngine**: Processes strings like `{{base_url}}/api` using environment variables before
-  sending requests.
+- **RequestService**: The central entry point for executing requests. It coordinates the `HTTPClient`
+  for network calls and `ScriptExecutor` for post-request scripts.
+- **HTTPClient**: Handles the actual network communication using `requests`.
+- **ScriptExecutor**: Runs user-defined Python scripts in a sandboxed environment to manipulate variables.
+- **TemplateEngine**: Processes strings like `{{base_url}}/api` using environment variables.
 - **Storage**: Manages saving and loading collections and environments to/from the filesystem (JSON
   format).
 
@@ -58,9 +61,9 @@ Built with **PySide6** (Qt for Python).
 ## Data Flow
 
 1. **Input**: User edits a request in the UI (URL, headers, body).
-1. **Templating**: On sending, the `TemplateEngine` interpolates variables (e.g., replacing
-   `{{token}}`).
-1. **Execution**: The `HTTPClient` sends the request in a background thread.
-1. **Response**: The result is captured, wrapped in a `Response` model, and sent back to the UI via
-   signals.
-1. **Display**: The `ResponseView` renders the response data (JSON highlighting, headers).
+1. **Execution**: The `RequestWorker` calls `RequestService.execute()` in a background thread.
+1. **Service Logic**:
+   - `RequestService` calls `HTTPClient` to perform the network request.
+   - If successful, it calls `ScriptExecutor` to run any post-request scripts.
+1. **Response**: The `ExecutionResult` (containing response, logs, and updated variables) is returned.
+1. **UI Update**: The worker emits signals with the result, and `ResponseView` renders the data.

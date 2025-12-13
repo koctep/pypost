@@ -1,96 +1,60 @@
-# Architecture: PYPOST-19 - MCP Server Integration
+# Architecture: PYPOST-19 - MCP Integration
 
-## 1. Исследования
+## Research
+The Model Context Protocol (MCP) allows applications to provide context and tools to AI models.
+Python SDK: `mcp`.
+Transport: SSE (Server-Sent Events) is preferred for local servers.
 
-### 1.1. Model Context Protocol (MCP) Python SDK
-SDK `mcp` предоставляет абстракции для создания серверов и клиентов.
-Для реализации сервера с транспортом SSE (Server-Sent Events) необходимо
-использовать интеграцию с ASGI-фреймворком (например, `starlette` или `fastapi`).
+Integration with PySide6 (Qt) requires managing the event loop. Since `mcp` uses `asyncio`, and Qt has its own loop, we need to coordinate them.
+Option 1: Run `asyncio` loop in a separate thread (`QThread`).
+Option 2: Use `qasync` to run `asyncio` on top of Qt loop.
+**Choice**: Separate thread for the server to avoid blocking UI and minimize dependencies.
 
-**Ключевые компоненты SDK:**
-- `mcp.server.Server`: Основной класс сервера.
-- `mcp.server.sse.SseServerTransport`: Транспорт для SSE.
-- `mcp.types`: Типы данных (Tool, TextContent, etc.).
+## Implementation Plan
 
-**Поток работы SSE сервера:**
-1. Клиент подключается к `/sse` (GET).
-2. Сервер отправляет endpoint для POST запросов (например, `/messages`).
-3. Клиент отправляет JSON-RPC сообщения на endpoint POST.
-4. Сервер стримит ответы через открытое SSE соединение.
+1.  **Data Model**:
+    -   Update `RequestData`: add `expose_as_mcp: bool = False`.
+    -   Update `Environment` (or `AppSettings`): add `enable_mcp: bool = False` and `mcp_port: int = 8000`.
 
-### 1.2. Интеграция с PyPost
-Так как PyPost - это PyQt (PySide6) приложение с блокирующим GUI циклом,
-MCP сервер (использующий `asyncio`/`uvicorn`) должен запускаться
-в **отдельном процессе** или **потоке с отдельным event loop**.
-Учитывая GIL и конфликты зависимостей, **отдельный процесс**
-(`multiprocessing`/`subprocess`) более надежен для изоляции.
-**Отдельный поток** (`threading`) позволит иметь доступ к общим
-объектам (Settings, RequestData), но требует синхронизации.
-*Решение*: Запуск сервера в отдельном `QThread` или `threading.Thread`, который
-запускает `uvicorn.run()` внутри. Так как `uvicorn` блокирует поток,
-это не заблокирует GUI. Доступ к данным read-only (копии запросов).
+2.  **Core Logic (`pypost/core/mcp_server.py`)**:
+    -   Class `MCPServerManager`: manages the server thread.
+    -   Class `MCPServerImpl`: implementation of MCP server using SDK.
+    -   Methods to start/stop server.
+    -   Method `update_tools(requests)`: updates list of available tools.
 
-## 2. Архитектура компонентов
+3.  **UI**:
+    -   `RequestWidget`: Add "MCP Tool" checkbox.
+    -   `EnvironmentDialog` (or Settings): Add "Enable MCP Server" toggle.
+    -   `MainWindow`:
+        -   Initialize `MCPServerManager`.
+        -   Start/stop server depending on settings.
+        -   Update tools list when requests change.
+        -   Indicator "MCP: ON/OFF".
 
-### 2.1. `MCPServerManager` (Новый класс)
-Отвечает за жизненный цикл сервера.
-- **Location**: `pypost/core/mcp_server.py`
-- **Responsibilities**:
-  - `start_server(port, tools)`: Запуск сервера в отдельном потоке.
-  - `stop_server()`: Остановка сервера (graceful shutdown).
-  - `update_tools(tools)`: Обновление списка (через рестарт).
-- **Signals**:
-  - `server_status_changed(bool)`: Для обновления UI.
+## Architecture
 
-### 2.2. Модуль сервера (`pypost/core/mcp_server_impl.py`)
-Содержит саму логику FastMcp/Starlette приложения.
-- Инициализация `mcp.server.Server`.
-- Регистрация инструментов (Tools) на основе `RequestData`.
-- Реализация хендлера `call_tool`.
-- Функция `create_app()` возвращающая Starlette app.
+### `MCPServerManager`
+Responsible for the lifecycle of the server thread.
+Signals:
+- `status_changed(bool)`: Server status changed.
+- `log_message(str)`: Logs.
 
-### 2.3. Интеграция в `MainWindow` / `EnvironmentManager`
-- При смене активного Environment проверять флаг `enable_mcp`.
-- Если `True` -> `MCPServerManager.start()`.
-- Если `False` -> `MCPServerManager.stop()`.
+### `MCPServerImpl`
+Runs `FastMCP` or low-level server.
+Since we need dynamic tool updates, `FastMCP` might be less flexible (decorators). Better to use low-level API or check if `FastMCP` supports dynamic tools.
+*Research update*: `FastMCP` allows defining tools via decorators. For dynamic tools, we might need to register them dynamically or use a generic "execute_request" tool with an argument, but the requirement is "list of tools corresponding to requests".
+*Solution*: Use `Server` from `mcp.server` and define `list_tools` and `call_tool` handlers manually.
 
-### 2.4. Исполнение запросов (Tool Execution)
-Когда MCP вызывает инструмент:
-1. `MCPServer` получает вызов `call_tool`.
-2. Извлекает аргументы.
-3. Формирует контекст: `variables = { "mcp": { "request": args } }`.
-4. Использует существующий `HTTPClient`/`RequestWorker`.
-   - *Важно*: `HTTPClient` синхронный. В `async` хендлере сервера
-     его нужно вызывать через `run_in_threadpool`.
+### Interaction
+1.  User enables MCP in Environment settings.
+2.  `MainWindow` calls `mcp_manager.start(port, tools)`.
+3.  `mcp_manager` starts a thread with `uvicorn` / `starlette` (for SSE) or uses `mcp` built-in serving if available.
+    -   *Note*: MCP Python SDK usually runs over stdio or SSE. For SSE we need a web server (e.g., starlette/uvicorn).
+4.  Agent connects to SSE endpoint.
+5.  Agent calls `list_tools`. Server returns requests marked as `expose_as_mcp`.
+6.  Agent calls `call_tool("request_name")`.
+7.  Server executes request (using `HTTPClient` logic) and returns result.
 
-## 3. Схема данных
-
-### 3.1. Settings & Environment
-- `AppSettings`: `mcp_port: int = 1080`
-- `Environment`: `enable_mcp: bool = False`
-
-### 3.2. RequestData
-- `expose_as_mcp: bool = False`
-
-## 4. План реализации
-
-1.  **Модели**: Добавить поля в `AppSettings`, `Environment`, `RequestData`.
-2.  **Core**: Создать `pypost/core/mcp_server.py` с `Starlette` + `mcp`.
-    - Генерация JSON Schema из `{{ mcp.request.x }}`.
-    - `call_tool` (рендеринг + отправка).
-3.  **Manager**: `MCPServerManager` для управления `uvicorn`.
-4.  **UI**:
-    - Настройки в `SettingsDialog` (порт).
-    - Чекбокс "Enable MCP" в `EnvDialog`.
-    - Чекбокс "Expose as MCP Tool" в `RequestEditor`.
-    - Индикатор статуса в статус-баре.
-5.  **Wiring**: Подключить сигналы смены окружения.
-
-## 5. Вопросы и ответы
-
-**Q: Как передать аргументы в запрос?**
-A: Аргументы доступны в Jinja2 как `mcp.request.<arg_name>`.
-
-**Q: Как сервер узнает об изменениях в запросах?**
-A: Рестарт сервера при смене окружения.
-*Уточнение*: При сохранении коллекции можно триггерить рестарт.
+## Q&A
+-   **Dependencies?**
+    -   `mcp`, `starlette`, `uvicorn`.

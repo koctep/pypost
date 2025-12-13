@@ -1,88 +1,43 @@
-# Интеграция с Model Context Protocol (MCP)
+# PyPost MCP Integration
 
-PyPost поддерживает протокол **Model Context Protocol (MCP)**, что позволяет использовать ваши сохраненные HTTP-запросы как инструменты (Tools) для внешних AI-агентов, таких как **Claude Desktop** или **Cursor**.
+PyPost supports the **Model Context Protocol (MCP)**, allowing it to act as a server for AI agents (like Claude Desktop, Cursor, etc.).
 
-## Как это работает?
+## What is it?
 
-Вы можете "экспортировать" любые запросы из вашей коллекции в виде инструментов MCP. Когда AI-агент вызывает этот инструмент, PyPost выполняет реальный HTTP-запрос и возвращает ответ агенту.
+You can expose your saved HTTP requests as "tools" for AI. The AI agent can then execute these requests directly from the chat interface.
 
-Это позволяет AI взаимодействовать с вашими внутренними API, базами данных или сервисами, используя уже настроенные вами запросы в PyPost.
+## How to use
 
-## Настройка
+1.  **Configure Request**:
+    -   Open a request in PyPost.
+    -   Check the **"MCP Tool"** checkbox (next to the URL bar).
+    -   Save the request.
 
-### 1. Включение сервера MCP
+2.  **Enable Server**:
+    -   Go to **Manage Environments**.
+    -   Select your environment.
+    -   Check **"Enable MCP Server"**.
+    -   (Optional) Change port (default 8000).
+    -   Click **Save**.
+    -   You should see "MCP: ON" in the top bar.
 
-Сервер MCP привязывается к конкретному **Окружению (Environment)**. Это сделано для того, чтобы вы могли безопасно управлять тем, когда сервер активен и какие переменные используются.
+3.  **Connect Agent**:
+    -   In your AI agent configuration (e.g., `claude_desktop_config.json`), add PyPost as an MCP server:
 
-1. Откройте менеджер окружений (**Ctrl+E** или кнопка "Manage" в верхней панели).
-2. Выберите или создайте окружение.
-3. Установите галочку **"Enable MCP (Model Context Protocol)"**.
-4. Закройте окно.
-
-Теперь, когда вы выберете это окружение в главном окне, PyPost автоматически запустит MCP сервер.
-В статус-баре (внизу окна) появится индикатор: **MCP: ON (1080)**.
-
-### 2. Добавление запросов в инструменты
-
-По умолчанию запросы **не доступны** через MCP. Вы должны явно разрешить доступ к каждому запросу.
-
-1. Откройте запрос, который хотите использовать.
-2. Рядом с кнопкой "Save" установите галочку **"MCP Tool"**.
-3. Сохраните запрос (**Ctrl+S**).
-
-Теперь этот запрос будет виден AI-агенту как инструмент. Имя инструмента генерируется автоматически из названия запроса (например, "Get User Profile" -> `get_user_profile`).
-
-### 3. Использование переменных (Prompt Engineering)
-
-Чтобы AI мог передавать параметры в ваш запрос, используйте специальную переменную `{{ mcp.request.VAR_NAME }}`.
-
-**Пример:**
-Вы хотите сделать инструмент для поиска пользователя по ID.
-1. Создайте GET запрос: `https://api.example.com/users/{{ mcp.request.user_id }}`.
-2. Включите галочку "MCP Tool".
-3. Сохраните запрос как "Find User".
-
-PyPost автоматически сгенерирует схему инструмента, в которой укажет, что параметр `user_id` является обязательным.
-Когда AI вызовет инструмент `find_user` с аргументом `user_id="123"`, PyPost выполнит запрос `https://api.example.com/users/123`.
-
-Вы можете использовать `{{ mcp.request.variable }}` в:
-- URL
-- Заголовках
-- Теле запроса (Body)
-- Query параметрах
-
-## Подключение к клиентам
-
-### Claude Desktop
-
-Для подключения PyPost к Claude Desktop, отредактируйте файл конфигурации Claude (обычно `claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "pypost": {
-      "command": "uvicorn", 
-      "args": [], 
-      "url": "http://localhost:1080/sse" 
+    ```json
+    {
+      "mcpServers": {
+        "pypost": {
+          "command": "python", // Or path to python in venv
+          "args": ["-m", "pypost.main"], // NOTE: PyPost currently runs as SSE server, not stdio
+          // For SSE support, use the URL:
+          "url": "http://localhost:8000/sse"
+        }
+      }
     }
-  }
-}
-```
-*Примечание: Текущая версия PyPost реализует транспорт SSE. Поддержка stdio (запуск через command) планируется в будущем. Для работы с Claude Desktop через SSE может потребоваться промежуточный прокси или использование поддерживаемого транспорта.*
+    ```
+    *Note: Client support for SSE varies. Check your agent's documentation.*
 
-### Cursor
-
-В настройках Cursor (Features > MCP):
-1. Добавьте новый сервер.
-2. Type: **SSE**.
-3. URL: `http://localhost:1080/sse`.
-
-Теперь вы можете в чате Cursor использовать `@MCP` и видеть ваши запросы из PyPost.
-
-## Настройки сервера
-
-Вы можете изменить порт сервера MCP в глобальных настройках (**Settings**):
-- **MCP Server Port**: по умолчанию `1080`.
-
-Если порт занят, сервер не сможет запуститься (следите за ошибками в консоли/логах).
-
+4.  **Use**:
+    -   Ask the agent: "Call the 'Get Users' tool".
+    -   The agent will execute the request via PyPost and see the response.
