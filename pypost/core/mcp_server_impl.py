@@ -6,7 +6,7 @@ from mcp.server.sse import SseServerTransport
 from mcp.types import Tool, TextContent
 from pypost.models.models import RequestData
 import jinja2
-from jinja2 import Environment
+from pypost.core.template_service import template_service
 import json
 from starlette.concurrency import run_in_threadpool
 from pypost.core.request_service import RequestService
@@ -15,7 +15,6 @@ class MCPServerImpl:
     def __init__(self, name: str = "pypost-server"):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
-        self.env = Environment() # Jinja2 environment for parsing
         self.request_service = RequestService()
         
         # Register handlers
@@ -109,7 +108,7 @@ class MCPServerImpl:
             if not content:
                 continue
             try:
-                ast = self.env.parse(content)
+                ast = template_service.parse(content)
                 meta_vars = jinja2.meta.find_undeclared_variables(ast)
                 for var in meta_vars:
                     # check for mcp.request.x pattern

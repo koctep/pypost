@@ -12,7 +12,7 @@ pypost/
 │   ├── request_service.py  # Unified request execution service
 │   ├── http_client.py      # HTTP request handling (wrapping `requests`)
 │   ├── script_executor.py  # Python script execution environment
-│   ├── template_engine.py  # Variable interpolation (Jinja2)
+│   ├── template_service.py # Variable interpolation (Jinja2) Service
 │   ├── storage.py          # Persistence (JSON)
 │   ├── config_manager.py   # Configuration management
 │   └── worker.py           # Background task execution
@@ -44,7 +44,7 @@ The application uses classes (often Pydantic models or dataclasses) to define st
   for network calls and `ScriptExecutor` for post-request scripts.
 - **HTTPClient**: Handles the actual network communication using `requests`.
 - **ScriptExecutor**: Runs user-defined Python scripts in a sandboxed environment to manipulate variables.
-- **TemplateEngine**: Processes strings like `{{base_url}}/api` using environment variables.
+- **TemplateService**: A service that manages the Jinja2 Environment and processes strings like `{{base_url}}/api`.
 - **Storage**: Manages saving and loading collections and environments to/from the filesystem (JSON
   format).
 

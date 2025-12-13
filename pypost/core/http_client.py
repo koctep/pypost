@@ -4,7 +4,7 @@ import json
 from typing import Dict, Any
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
-from pypost.core.template_engine import TemplateEngine
+from pypost.core.template_service import template_service
 
 class HTTPClient:
     def __init__(self):
@@ -15,24 +15,24 @@ class HTTPClient:
             variables = {}
 
         # 1. Prepare data (render templates)
-        url = TemplateEngine.render(request_data.url, variables)
+        url = template_service.render_string(request_data.url, variables)
 
         # Render headers
         headers = {}
         for k, v in request_data.headers.items():
-            rendered_k = TemplateEngine.render(k, variables)
-            rendered_v = TemplateEngine.render(v, variables)
+            rendered_k = template_service.render_string(k, variables)
+            rendered_v = template_service.render_string(v, variables)
             headers[rendered_k] = rendered_v
 
         # Render params
         params = {}
         for k, v in request_data.params.items():
-            rendered_k = TemplateEngine.render(k, variables)
-            rendered_v = TemplateEngine.render(v, variables)
+            rendered_k = template_service.render_string(k, variables)
+            rendered_v = template_service.render_string(v, variables)
             params[rendered_k] = rendered_v
 
         # Render body
-        body = TemplateEngine.render(request_data.body, variables)
+        body = template_service.render_string(request_data.body, variables)
 
         # 2. Execute request
         start_time = time.time()
