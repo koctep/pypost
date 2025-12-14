@@ -45,6 +45,7 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 - **HTTPClient**: Handles the actual network communication using `requests`.
 - **ScriptExecutor**: Runs user-defined Python scripts in a sandboxed environment to manipulate variables.
 - **TemplateService**: A service that manages the Jinja2 Environment and processes strings like `{{base_url}}/api`.
+- **MetricsManager**: A singleton service managing the Prometheus HTTP server and collecting metrics for observability.
 - **Storage**: Manages saving and loading collections and environments to/from the filesystem (JSON
   format).
 

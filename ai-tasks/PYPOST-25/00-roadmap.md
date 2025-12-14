@@ -1,40 +1,38 @@
 # Roadmap: PYPOST-25
 
-## Статус выполнения шагов
+## Step Execution Status
 
-- [x] **ШАГ 1: Сбор и документирование требований**
-- [x] **ШАГ 2: Архитектурное проектирование высокого уровня**
-- [x] **ШАГ 3: Разработка**
-  - [x] Implement manual context menu in ResponseView with "Set env" and "Copy"
-  - [x] Implement "New Variable..." logic in ResponseView and signal handling
-  - [x] Connect ResponseView signals in MainWindow and handle variable creation/update
-  - [x] Fix initialization of ResponseView keys in add_new_tab
-  - [x] Rename "Set env" menu item to "Set Variable"
-  - [x] Fix signal connection bug in add_new_tab
-- [x] **ШАГ 4: Ревью и технический долг**
+- [x] **STEP 1: Requirements gathering and documentation**
+- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 3: Development**
+  - [x] Updated `ResponseView` to support custom context menu.
+  - [x] Implemented "Set env" submenu with list of variables.
+  - [x] Implemented logic for creating new variables from context menu.
+  - [x] Integrated `MainWindow` to handle variable updates.
+- [x] **STEP 4: Review and Technical Debt**
 
-## Легенда статусов
+## Status Legend
 
-- `[ ]` — шаг не начат
-- `[/]` — работа над шагом начата (in progress)
-- `[x]` — шаг завершен
+- `[ ]` — step not started
+- `[/]` — step in progress
+- `[x]` — step completed
 
-## Артефакты
+## Artifacts
 
-### ШАГ 1: Требования
+### STEP 1: Requirements
 
 - `ai-tasks/PYPOST-25/10-requirements.md`
 
-### ШАГ 2: Архитектура
+### STEP 2: Architecture
 
 - `ai-tasks/PYPOST-25/20-architecture.md`
 
-### ШАГ 3: Разработка
+### STEP 3: Development
 
-- Исходный код
-- Тесты
-- Обновления документации
+- Source code
+- Tests
+- Documentation updates
 
-### ШАГ 4: Ревью
+### STEP 4: Review
 
 - `ai-tasks/PYPOST-25/40-tech-debt.md`

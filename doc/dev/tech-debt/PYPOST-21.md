@@ -1,22 +1,17 @@
-# PYPOST-21: Technical Debt Analysis
+# Technical Debt for Task PYPOST-21
 
-## Shortcuts Taken
+## 1. Global Instance for Singleton
+`TemplateService` is implemented as a module with a global instance (`template_service`). This is a "pythonic" way to implement Singleton, but in larger systems, using a Dependency Injection container to manage dependency lifecycles might be preferable. For the current project size, this is acceptable.
 
-- **Global Instance for Singleton**: `TemplateService` реализован как модуль с глобальным экземпляром (`template_service`). Это "pythonic" способ реализации Singleton, но в более крупных системах может быть предпочтительнее использовать Dependency Injection контейнер для управления жизненным циклом зависимостей. Для текущего размера проекта это допустимо.
+## 2. Direct Global Access
+`HTTPClient` and `MCPServerImpl` import the global `template_service` directly. This creates a tight coupling. In the future, consider passing `TemplateService` via constructor (DI) if mocking it for `HTTPClient` unit tests becomes necessary.
 
-## Code Quality Issues
+## 3. Unit Tests for TemplateService
+Although functionality is verified integration-wise (application runs and works), isolated unit tests for `TemplateService` are missing (checking `render_string` with different variable types, checking template syntax error handling).
 
-- **Direct Global Access**: `HTTPClient` и `MCPServerImpl` импортируют глобальный `template_service` напрямую. Это создает жесткую связь. В будущем можно рассмотреть передачу `TemplateService` через конструктор (DI), если потребуется мокать его для unit-тестов `HTTPClient`.
-
-## Missing Tests
-
-- **Unit Tests for TemplateService**: Хотя функционал проверен интеграционно (приложение запускается и работает), отсутствуют изолированные unit-тесты для `TemplateService` (проверка `render_string` с разными типами переменных, проверка обработки ошибок синтаксиса шаблонов).
-
-## Performance Concerns
-
-- **Улучшение**: Использование единого `Environment` должно положительно сказаться на производительности за счет внутреннего кэширования Jinja2 (хотя по умолчанию кэш скомпилированных шаблонов работает, только если использовать `env.get_template`, а здесь мы используем `env.from_string`, который тоже может кэшировать, но зависит от настроек). В данной реализации мы просто избегаем создания лишних объектов `Environment` и `Template` (через старый `TemplateEngine`), что уже хорошо.
+## 4. Improvement
+Using a single `Environment` should positively impact performance due to internal Jinja2 caching (although compiled template cache works by default only if using `env.get_template`, and here we use `env.from_string`, which can also cache but depends on settings). In this implementation, we simply avoid creating unnecessary `Environment` and `Template` objects (via old `TemplateEngine`), which is already good.
 
 ## Follow-up Tasks
-
-- Создать unit-тесты для `pypost/core/template_service.py`.
-- Рассмотреть возможность использования `lru_cache` или встроенного кэша Jinja2 для `from_string`, если будет замечено замедление при рендеринге одних и тех же строк многократно.
+- Create unit tests for `pypost/core/template_service.py`.
+- Consider using `lru_cache` or built-in Jinja2 cache for `from_string` if slowdown is noticed when rendering the same strings repeatedly.

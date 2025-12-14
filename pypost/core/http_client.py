@@ -5,6 +5,7 @@ from typing import Dict, Any
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.template_service import template_service
+from pypost.core.metrics import MetricsManager
 
 class HTTPClient:
     def __init__(self):
@@ -36,6 +37,10 @@ class HTTPClient:
 
         # 2. Execute request
         start_time = time.time()
+        
+        # Track request sent
+        MetricsManager().track_request_sent(request_data.method)
+        
         try:
             response = self.session.request(
                 method=request_data.method,
@@ -62,6 +67,8 @@ class HTTPClient:
         end_time = time.time()
 
         # 3. Process response
+        MetricsManager().track_response_received(request_data.method, str(response.status_code))
+        
         return ResponseData(
             status_code=response.status_code,
             headers=dict(response.headers),

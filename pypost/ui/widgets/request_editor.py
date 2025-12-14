@@ -7,6 +7,7 @@ from pypost.models.models import RequestData
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwarePlainTextEdit, VariableAwareTableWidget
+from pypost.core.metrics import MetricsManager
 
 class RequestWidget(QWidget):
     send_requested = Signal(RequestData)
@@ -117,6 +118,7 @@ class RequestWidget(QWidget):
         self.request_data.expose_as_mcp = self.mcp_check.isChecked()
 
     def on_send(self):
+        MetricsManager().track_gui_send_click()
         self.update_request_data()
         self.send_requested.emit(self.request_data)
 

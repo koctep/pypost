@@ -17,6 +17,7 @@ from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.core.mcp_server import MCPServerManager
+from pypost.core.metrics import MetricsManager
 
 class RequestTab(QWidget):
     def __init__(self, request_data: RequestData = None):
@@ -290,9 +291,17 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             new_settings = dialog.get_settings()
             if new_settings:
+                # Check if metrics settings changed
+                metrics_changed = (self.settings.metrics_host != new_settings.metrics_host or 
+                                   self.settings.metrics_port != new_settings.metrics_port)
+
                 self.settings = new_settings
                 self.config_manager.save_config(self.settings)
                 self.apply_settings(self.settings)
+                
+                # Restart metrics server if needed
+                if metrics_changed:
+                    MetricsManager().restart_server(self.settings.metrics_host, self.settings.metrics_port)
                 
                 # Force update to apply port changes if needed
                 self.on_env_changed(self.env_selector.currentIndex())

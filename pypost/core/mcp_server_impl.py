@@ -10,6 +10,7 @@ from pypost.core.template_service import template_service
 import json
 from starlette.concurrency import run_in_threadpool
 from pypost.core.request_service import RequestService
+from pypost.core.metrics import MetricsManager
 
 class MCPServerImpl:
     def __init__(self, name: str = "pypost-server"):
@@ -38,6 +39,9 @@ class MCPServerImpl:
         
         request_data = self.tools_map[name]
         
+        # Track MCP request
+        MetricsManager().track_mcp_request_received(request_data.method)
+        
         # Execute request in threadpool since RequestService is synchronous
         try:
             result = await run_in_threadpool(
@@ -55,8 +59,13 @@ class MCPServerImpl:
             if result.script_error:
                 output_text += f"\n\n--- Script Error ---\n{result.script_error}"
 
+            # Track MCP response success
+            MetricsManager().track_mcp_response_sent(request_data.method, "success")
+
             return [TextContent(type="text", text=output_text)]
         except Exception as e:
+            # Track MCP response error
+            MetricsManager().track_mcp_response_sent(request_data.method, "error")
             return [TextContent(type="text", text=f"Error executing request: {str(e)}")]
 
     def _execute_request_sync(self, request_data: RequestData, args: dict):

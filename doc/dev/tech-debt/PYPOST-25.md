@@ -1,27 +1,7 @@
-# PYPOST-25: Technical Debt Analysis
+# Technical Debt for Task PYPOST-25
 
-## Shortcuts Taken
+## 1. Variable Name Validation
+Currently, when creating a new variable via the context menu, only a check for an empty string is performed. It is necessary to add validation for allowed characters (alphanumeric + underscore) to ensure compatibility with Jinja2 templates.
 
-- **Manual Context Menu Construction**: The context menu in `ResponseView` is built manually in `show_context_menu`. It works but could be abstracted if menus become more complex.
-- **Signal Glue Code**: The connection between `ResponseView` (emission) and `MainWindow` (handling) is manual and distributed. `MainWindow` acts as a mediator, which increases coupling.
-
-## Code Quality Issues
-
-- **Variable Keys Sync**: `ResponseView` maintains a copy of keys (`current_env_keys`). Updates rely on `MainWindow` explicitly calling `set_env_keys` when environment changes. A reactive model observing the `Environment` would be robust.
-- **Tight Coupling**: `MainWindow` knows too much about `ResponseView` internals (signals, key setting).
-
-## Missing Tests
-
-- No unit tests for `ResponseView` context menu logic.
-- No integration tests for variable setting flow.
-- Requires `pytest-qt` setup which is not yet fully integrated/utilized for this UI part.
-
-## Performance Concerns
-
-- None identified.
-
-## Follow-up Tasks
-
-- [ ] Refactor environment management into a service that emits signals, allowing `ResponseView` to subscribe directly or via a lighter controller.
-- [ ] Add error handling for `save_environments` in `StorageManager` and UI feedback.
-- [ ] Add unit tests for `ResponseView`.
+## 2. Signal Connection
+The `variable_set_requested` signal is connected in `add_new_tab`. It is worth considering a more centralized way of connecting signals for dynamically created widgets.

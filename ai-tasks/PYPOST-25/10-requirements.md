@@ -1,49 +1,48 @@
-# PYPOST-25: Контекстное меню для ответа (Set env)
+# Requirements: PYPOST-25 - Response Context Menu (Set env)
 
-## Цели
+## Goals
+Improve the convenience of working with environment variables by allowing the user to quickly update variable values and create new ones directly from the received response.
 
-Улучшить удобство работы с переменными окружения, позволив пользователю быстро обновлять значения переменных и создавать новые прямо из полученного ответа.
+## User Stories
+- As a user, I want to access the "Set env" function in the response context menu as the first item, and "Copy" as the second.
+- As a user, I want to select text in the response and save it to an existing environment variable via the context menu.
+- As a user, I want to be able to create a new environment variable from the selected text via the same menu.
 
-## Пользовательские истории
-
-- Как пользователь, я хочу иметь доступ к функции "Set env" в контекстном меню ответа первым пунктом, а "Copy" — вторым.
-- Как пользователь, я хочу выделить текст в ответе и через контекстное меню сохранить его в существующую переменную окружения.
-- Как пользователь, я хочу иметь возможность создать новую переменную окружения из выделенного текста через то же меню.
-
-## Критерии готовности
-
-- [ ] В компоненте `ResponseView` при клике правой кнопкой мыши на выделенном тексте появляется контекстное меню.
-- [ ] Порядок пунктов меню:
-    1.  `Set env` (подменю)
+## Acceptance Criteria
+- [ ] In the `ResponseView` component, a context menu appears when right-clicking on selected text.
+- [ ] Menu item order:
+    1.  `Set env` (submenu)
     2.  `Copy`
-- [ ] В подменю `Set env`:
-    - Список существующих переменных окружения.
-    - Пункт `New Variable...` (или аналогичный) для создания новой переменной.
-- [ ] При выборе существующей переменной, её значение обновляется.
-- [ ] При выборе `New Variable...` появляется диалог ввода имени новой переменной. После ввода переменная создается с выделенным значением.
-- [ ] Изменения сохраняются в конфигурации окружений.
-- [ ] Обновленное/новое значение сразу доступно для использования.
+- [ ] In the `Set env` submenu:
+    - List of existing environment variables.
+    - Item `New Variable...` (or similar) to create a new variable.
+- [ ] When selecting an existing variable, its value is updated.
+- [ ] When selecting `New Variable...`, a dialog appears to enter the name of the new variable. After entry, the variable is created with the selected value.
+- [ ] Changes are saved in the environment configuration.
+- [ ] The updated/new value is immediately available for use.
 
-## Описание задачи
+## Task Description
+It is necessary to refine `ResponseView` and `MainWindow`.
 
-Необходимо доработать `ResponseView` и `MainWindow`.
+### Technical Details
+- **Component**: `ResponseView`.
+- **Method**: `contextMenuEvent` or `createStandardContextMenu`.
+- **Logic**:
+    - Update `show_context_menu` method.
+    - Change order of adding actions (first Env, then Copy).
+    - Add "Add new..." item to variables menu.
+    - Emit `variable_set_requested` signal with a special key value (e.g., `None` or a special flag) for creating a new variable, or handle this inside `MainWindow`.
+    - *Clarification*: It is better if `ResponseView` just emits a signal "want to set variable", and `MainWindow` figures out if it's new or old. Or `ResponseView` can request the new variable name itself?
+    - *Decision*: `ResponseView` is responsible only for display. If "New Variable..." is selected, it emits a signal, e.g., `variable_set_requested(None, value)` or `create_variable_requested(value)`.
+    - Let's extend the contract `variable_set_requested(key, value)`. If `key` is `None`, it means a request to create a new one.
 
-1.  **ResponseView**:
-    *   Обновить метод `show_context_menu`.
-    *   Изменить порядок добавления действий (сначала Env, потом Copy).
-    *   Добавить пункт "Add new..." в меню переменных.
-    *   Эмитить сигнал `variable_set_requested` с особым значением ключа (например, `None` или специальным флагом) для создания новой переменной, либо обрабатывать это внутри `MainWindow`.
-    *   *Уточнение*: Лучше если `ResponseView` просто эмитит сигнал "хочу установить переменную", а `MainWindow` разбирается, новую или старую. Или `ResponseView` может запросить имя новой переменной сам?
-    *   *Решение*: `ResponseView` отвечает только за отображение. Если выбран "New Variable...", он эмитит сигнал, например `variable_set_requested(None, value)` или `create_variable_requested(value)`.
-    *   Давайте расширим контракт `variable_set_requested(key, value)`. Если `key` равен `None`, это значит запрос на создание новой.
+- **Component**: `MainWindow`.
+- **Logic**:
+    - Signal handling: if `key` is `None`, show `QInputDialog` to enter variable name.
+    - Variable name validation.
+    - Creation/Update of variable in `Environment`.
+    - Saving and broadcasting updates.
 
-2.  **MainWindow**:
-    *   Обработка сигнала: если `key` is `None`, показать `QInputDialog` для ввода имени переменной.
-    *   Валидация имени переменной.
-    *   Создание/Обновление переменной в `Environment`.
-    *   Сохранение и рассылка обновлений.
-
-## Вопросы и ответы
-
-- **В:** Что если окружение не выбрано?
-  **О:** Пункт "Set env" должен быть скрыт или неактивен.
+## Q&A
+- **Q:** What if no environment is selected?
+- **A:** The "Set env" item should be hidden or disabled.

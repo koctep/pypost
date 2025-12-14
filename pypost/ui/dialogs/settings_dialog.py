@@ -6,7 +6,7 @@ class SettingsDialog(QDialog):
     def __init__(self, current_settings: AppSettings, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.resize(300, 150)
+        self.resize(300, 200)
         self.current_settings = current_settings
         self.new_settings = None
 
@@ -29,6 +29,13 @@ class SettingsDialog(QDialog):
 
         self.mcp_host_edit = QLineEdit()
         self.mcp_host_edit.setText(current_settings.mcp_host)
+        
+        self.metrics_port_spin = QSpinBox()
+        self.metrics_port_spin.setRange(1024, 65535)
+        self.metrics_port_spin.setValue(current_settings.metrics_port)
+        
+        self.metrics_host_edit = QLineEdit()
+        self.metrics_host_edit.setText(current_settings.metrics_host)
 
         self.confirm_overwrite_check = QCheckBox()
 
@@ -38,6 +45,8 @@ class SettingsDialog(QDialog):
         self.form_layout.addRow("JSON Indent Size:", self.indent_size_spin)
         self.form_layout.addRow("MCP Server Port:", self.mcp_port_spin)
         self.form_layout.addRow("MCP Server Host:", self.mcp_host_edit)
+        self.form_layout.addRow("Metrics Server Port:", self.metrics_port_spin)
+        self.form_layout.addRow("Metrics Server Host:", self.metrics_host_edit)
         self.form_layout.addRow("Confirm before overwriting requests:", self.confirm_overwrite_check)
         self.layout.addLayout(self.form_layout)
 
@@ -60,10 +69,11 @@ class SettingsDialog(QDialog):
             expanded_collections=self.current_settings.expanded_collections,
             confirm_overwrite_request=self.confirm_overwrite_check.isChecked(),
             mcp_port=self.mcp_port_spin.value(),
-            mcp_host=self.mcp_host_edit.text()
+            mcp_host=self.mcp_host_edit.text(),
+            metrics_port=self.metrics_port_spin.value(),
+            metrics_host=self.metrics_host_edit.text()
         )
         super().accept()
     
     def get_settings(self) -> AppSettings:
         return self.new_settings
-

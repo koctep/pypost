@@ -6,3 +6,4 @@ platformdirs
 mcp
 starlette
 uvicorn
+prometheus_client

@@ -1,73 +1,55 @@
-# PYPOST-25: Архитектура
+# Architecture: PYPOST-25
 
-## Обзор
+## Overview
+The task is to extend the functionality of `ResponseView` to support a context menu with the ability to:
+1.  Set environment variable values (existing and new).
+2.  Copy selected text.
 
-Задача заключается в расширении функциональности `ResponseView` для поддержки контекстного меню с возможностью:
-1.  Установки значений переменных окружения (существующих и новых).
-2.  Копирования выделенного текста.
+This requires changes in UI components (`ResponseView`, `MainWindow`) and establishing interaction between them via signals.
 
-Это требует изменений в UI компонентах (`ResponseView`, `MainWindow`) и налаживания взаимодействия между ними через сигналы.
+## Component Diagram
+[Diagram]
 
-## Диаграмма компонентов
+## Changes in Components
 
-```mermaid
-graph TD
-    RV[ResponseView] -->|variable_set_requested| MW[MainWindow]
-    MW -->|update/create variable| E[Environment]
-    MW -->|save| S[StorageManager]
-    MW -->|set_variables| RW[RequestWidget]
-    MW -->|set_env_keys| RV
-```
+### `ResponseView` (`pypost/ui/widgets/response_view.py`)
+Class `ResponseView` is responsible for displaying the response and the context menu.
 
-## Изменения в компонентах
+**Changes:**
+-   **Signals**: Update `variable_set_requested(str, str)` signal. First argument is variable name (`None` for new), second is value.
+-   **Method `show_context_menu`**:
+    -   Rework menu construction logic.
+    -   First add "Set env" menu.
+    -   Inside "Set env" add list of current keys and "New Variable..." item.
+    -   Then add standard "Copy" action (or create custom one if standard doesn't fit order, but `QTextEdit` provides a standard menu that can be modified or created from scratch).
+    -   *Decision*: Create menu from scratch, adding `Set env`, then standard actions (Copy).
+    -   When "New Variable..." is selected, emit signal with `key=None`.
 
-### 1. `pypost/ui/widgets/response_view.py`
+### `MainWindow` (`pypost/ui/main_window.py`)
+Class `MainWindow` manages application state, including environments.
 
-Класс `ResponseView` отвечает за отображение ответа и контекстное меню.
+**Changes:**
+-   **Method `add_new_tab`**:
+    -   Connect `tab.response_view.variable_set_requested` signal to handler slot in `MainWindow`.
+-   **Method `on_env_changed`**:
+    -   Pass list of keys (`selected_env.variables.keys()`) to `ResponseView` of active tab and all other tabs.
+-   **New Method `handle_variable_set_request(key, value)`**:
+    -   If `key` is set: update variable in current environment.
+    -   If `key` is `None`:
+        -   Show `QInputDialog.getText` to enter new variable name.
+        -   Validate name (not empty).
+        -   Create new variable in current environment.
+    -   Save changes via `StorageManager`.
+    -   Update `RequestWidget` and `ResponseView` (key list) in all tabs.
 
-**Изменения:**
+## Implementation Plan
+1.  Modify `show_context_menu` to implement required order and items.
+2.  Ensure correct signal transmission.
+3.  Implement variable change handling slot.
+4.  Link `ResponseView` signal to this slot.
+5.  Ensure key list update in `ResponseView` when environment changes or variable is added.
 
--   **Сигналы**: Обновить сигнал `variable_set_requested(str, str)`. Первый аргумент — имя переменной (`None` для новой), второй — значение.
--   **Метод `show_context_menu`**:
-    -   Переработать логику построения меню.
-    -   Сначала добавлять меню "Set env".
-    -   Внутри "Set env" добавить список текущих ключей и пункт "New Variable...".
-    -   Затем добавлять стандартное действие "Copy" (или создавать своё, если стандартное не подходит по порядку, но `QTextEdit` предоставляет стандартное меню, которое можно модифицировать или создать с нуля).
-    -   *Решение*: Создать меню с нуля, добавив `Set env`, а затем стандартные действия (Copy).
-    -   При выборе "New Variable..." эмитить сигнал с `key=None`.
-
-### 2. `pypost/ui/main_window.py`
-
-Класс `MainWindow` управляет состоянием приложения, включая окружения.
-
-**Изменения:**
-
--   **Метод `add_new_tab`**:
-    -   Подключить сигнал `tab.response_view.variable_set_requested` к слоту-обработчику в `MainWindow`.
--   **Метод `on_env_changed`**:
-    -   Передавать список ключей (`selected_env.variables.keys()`) в `ResponseView` активной вкладки и всех остальных вкладок.
--   **Новый метод `handle_variable_set_request(key, value)`**:
-    -   Если `key` задан: обновить переменную в текущем окружении.
-    -   Если `key` is `None`:
-        -   Показать `QInputDialog.getText` для ввода имени новой переменной.
-        -   Валидировать имя (не пустое).
-        -   Создать новую переменную в текущем окружении.
-    -   Сохранить изменения через `StorageManager`.
-    -   Обновить `RequestWidget` и `ResponseView` (список ключей) во всех вкладках.
-
-## План реализации
-
-1.  **ResponseView**:
-    -   Модифицировать `show_context_menu` для реализации требуемого порядка и пунктов.
-    -   Обеспечить корректную передачу сигналов.
-2.  **MainWindow**:
-    -   Реализовать слот обработки изменения переменной.
-    -   Связать сигнал `ResponseView` с этим слотом.
-    -   Обеспечить обновление списка ключей в `ResponseView` при смене окружения или добавлении переменной.
-
-## Зависимости и риски
-
--   **Риск**: Стандартное меню `createStandardContextMenu` может содержать много лишних пунктов.
-    -   *Mitigation*: Использовать только необходимые действия (Copy) или создать меню полностью вручную, добавив `copyAvailable` проверку.
--   **Зависимость**: Требуется активное окружение. Если `env` is `None`, меню "Set env" не должно показываться.
-
+## Dependencies and Risks
+-   **Risk**: Standard `createStandardContextMenu` might contain many unnecessary items.
+    -   *Mitigation*: Use only necessary actions (Copy) or create menu entirely manually, adding `copyAvailable` check.
+-   **Dependency**: Active environment required. If `env` is `None`, "Set env" menu should not be shown.

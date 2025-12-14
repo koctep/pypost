@@ -44,6 +44,7 @@ pip install -r requirements.txt
 - `requests`: HTTP library for sending requests.
 - `jinja2`: Template engine for variable interpolation.
 - `pydantic`: Data validation using Python type hints.
+- `prometheus_client`: Library for exposing Prometheus metrics.
 
 ### 3. Run the Application
 

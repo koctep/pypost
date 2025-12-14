@@ -38,25 +38,19 @@ You can expose your saved HTTP requests as "tools" for AI. The AI agent can then
     ```
     *Note: Client support for SSE varies. Check your agent's documentation.*
 
-<<<<<<< HEAD
-4.  **Use**:
-    -   Ask the agent: "Call the 'Get Users' tool".
-    -   The agent will execute the request via PyPost and see the response.
-=======
 ### Cursor
 
-В настройках Cursor (Features > MCP):
-1. Добавьте новый сервер.
+In Cursor settings (Features > MCP):
+1. Add a new server.
 2. Type: **SSE**.
 3. URL: `http://localhost:1080/sse`.
 
-Теперь вы можете в чате Cursor использовать `@MCP` и видеть ваши запросы из PyPost.
+Now you can use `@MCP` in Cursor chat and see your requests from PyPost.
 
-## Настройки сервера
+## Server Settings
 
-Вы можете изменить настройки MCP сервера в глобальных настройках (**Settings**):
-- **MCP Server Port**: по умолчанию `1080`.
-- **MCP Server Host**: по умолчанию `127.0.0.1`. Измените на `0.0.0.0`, чтобы сделать сервер доступным из внешней сети.
+You can change MCP server settings in global settings (**Settings**):
+- **MCP Server Port**: default `1080`.
+- **MCP Server Host**: default `127.0.0.1`. Change to `0.0.0.0` to make the server available from external network.
 
-Если порт занят или хост недоступен, сервер не сможет запуститься (следите за ошибками в консоли/логах).
->>>>>>> 24e64fc (feat(mcp): PYPOST-22 configurable MCP server host)
+If the port is busy or host is unavailable, the server will not start (check console/logs for errors).

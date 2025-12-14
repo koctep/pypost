@@ -2,26 +2,13 @@
 
 ## Shortcuts Taken
 
-- **Manual Context Menu Construction**: The context menu in `ResponseView` is built manually in `show_context_menu`. It works but could be abstracted if menus become more complex.
-- **Signal Glue Code**: The connection between `ResponseView` (emission) and `MainWindow` (handling) is manual and distributed. `MainWindow` acts as a mediator, which increases coupling.
-
-## Code Quality Issues
-
-- **Variable Keys Sync**: `ResponseView` maintains a copy of keys (`current_env_keys`). Updates rely on `MainWindow` explicitly calling `set_env_keys` when environment changes. A reactive model observing the `Environment` would be robust.
-- **Tight Coupling**: `MainWindow` knows too much about `ResponseView` internals (signals, key setting).
+- **Manual Signal Connection**: Signal connection happens in `add_new_tab`. If tabs are created elsewhere, connection might be missed.
+- **No Validation for New Variable Name**: Basic check for empty string is present, but no check for valid characters (e.g., spaces, special symbols) that might be invalid for Jinja2 templates.
 
 ## Missing Tests
 
-- No unit tests for `ResponseView` context menu logic.
-- No integration tests for variable setting flow.
-- Requires `pytest-qt` setup which is not yet fully integrated/utilized for this UI part.
-
-## Performance Concerns
-
-- None identified.
+- No UI tests for context menu interaction.
 
 ## Follow-up Tasks
 
-- [ ] Refactor environment management into a service that emits signals, allowing `ResponseView` to subscribe directly or via a lighter controller.
-- [ ] Add error handling for `save_environments` in `StorageManager` and UI feedback.
-- [ ] Add unit tests for `ResponseView`.
+- Add validation for variable names.
