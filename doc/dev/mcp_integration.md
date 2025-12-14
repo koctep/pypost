@@ -32,6 +32,16 @@ This class contains the actual business logic of the MCP server.
 *   **Schema Generation**: Automatically generates JSON Schema for tools by parsing the request URL, headers, and body using `TemplateService` (Jinja2 AST) to find variables matching the pattern `{{ mcp.request.VAR_NAME }}`.
 *   **Execution**: Delegates request execution to `RequestService`.
 
+### 3. `MetricsManager` (`pypost/core/metrics.py`)
+
+PyPost also exposes a separate MCP server dedicated to observability.
+
+*   **Role**: Provides application metrics via MCP Resources.
+*   **Framework**: Same stack as the main server (`Starlette` + `mcp` SDK + `uvicorn`).
+*   **Hybrid Server**: Hosts both the Prometheus metrics endpoint (`/metrics`) and the MCP SSE endpoints (`/sse`, `/messages`) on the same port (default 9091).
+*   **Resources**:
+    *   `metrics://all`: Returns the full Prometheus metrics dump as `text/plain`.
+
 ## Key Flows
 
 ### Server Startup
@@ -60,6 +70,7 @@ This class contains the actual business logic of the MCP server.
 *   **Worker Thread (`RequestWorker`)**: Used for GUI-initiated requests.
 *   **MCP Thread (`MCPServerManager`)**: Runs the `uvicorn` loop.
     *   **Thread Pool**: Used inside MCP Thread for blocking I/O (Request execution).
+*   **Metrics Thread (`MetricsManager`)**: Runs its own isolated `uvicorn` loop for metrics and observability.
 
 ## Limitations & Tech Debt
 
