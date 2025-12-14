@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QComboBox, QLabel, QSplitter, QTreeView, QTabWidget, QMessageBox,
-                               QPushButton, QApplication)
+                               QPushButton, QApplication, QInputDialog)
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QFont, QIcon, QShortcut, QKeySequence
 from PySide6.QtCore import Qt
 from pathlib import Path
@@ -247,8 +247,12 @@ class MainWindow(QMainWindow):
         # Update all open tabs with new variables
         for i in range(self.tabs.count()):
             tab = self.tabs.widget(i)
-            if isinstance(tab, RequestTab) and hasattr(tab.request_editor, 'set_variables'):
-                tab.request_editor.set_variables(variables)
+            if isinstance(tab, RequestTab):
+                if hasattr(tab.request_editor, 'set_variables'):
+                    tab.request_editor.set_variables(variables)
+                if hasattr(tab.response_view, 'set_env_keys'):
+                    keys = list(variables.keys()) if isinstance(selected_env, Environment) else None
+                    tab.response_view.set_env_keys(keys)
 
     def on_mcp_status_changed(self, is_running: bool):
         if is_running:
@@ -333,11 +337,15 @@ class MainWindow(QMainWindow):
             tab.response_view.set_indent_size(self.settings.indent_size)
 
         selected_env = self.env_selector.currentData()
-        if isinstance(selected_env, Environment) and hasattr(tab.request_editor, 'set_variables'):
-             tab.request_editor.set_variables(selected_env.variables)
+        if isinstance(selected_env, Environment):
+            if hasattr(tab.request_editor, 'set_variables'):
+                tab.request_editor.set_variables(selected_env.variables)
+            if hasattr(tab.response_view, 'set_env_keys'):
+                tab.response_view.set_env_keys(list(selected_env.variables.keys()))
 
         tab.request_editor.send_requested.connect(self.handle_send_request)
         tab.request_editor.save_requested.connect(self.handle_save_request)
+        tab.response_view.variable_set_requested.connect(self.handle_variable_set_request)
 
         name = request_data.name if request_data else "New Request"
         self.tabs.addTab(tab, name)
@@ -502,6 +510,32 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Error", f"Request failed: {error_msg}")
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
+
+    def handle_variable_set_request(self, key, value):
+        selected_env = self.env_selector.currentData()
+        if not isinstance(selected_env, Environment):
+            QMessageBox.warning(self, "No Environment", "Please select an environment to set variables.")
+            return
+
+        target_key = key
+        
+        # New Variable Case
+        if target_key is None:
+            text, ok = QInputDialog.getText(self, "New Variable", "Enter variable name:")
+            if ok and text:
+                target_key = text.strip()
+                if not target_key:
+                    QMessageBox.warning(self, "Invalid Name", "Variable name cannot be empty.")
+                    return
+            else:
+                return
+
+        # Update Variable
+        selected_env.variables[target_key] = value
+        self.storage.save_environments(self.environments)
+        
+        # Refresh UI
+        self.on_env_changed(self.env_selector.currentIndex())
 
     def _setup_shortcuts(self):
         """Initializes all global shortcuts."""
