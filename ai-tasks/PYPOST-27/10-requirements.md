@@ -1,46 +1,23 @@
-# PYPOST-27: Экспорт метрик через MCP
+# Requirements: PYPOST-27 - MCP Metrics
 
-## Цели
+## Goals
+Extend the metrics system (PYPOST-26) to track the performance and usage of the MCP server.
 
-Расширить возможности сервера метрик (`MetricsManager`), превратив его в полноценный MCP-сервер, который предоставляет доступ к метрикам как к MCP Resources. Это должно быть реализовано непосредственно в `MetricsManager`, отдельно от существующего `MCPServerImpl`.
+## User Stories
+- As a developer, I want to see how many requests the MCP server processes.
+- As a developer, I want to measure the execution time of MCP tools.
+- As a developer, I want to track errors in MCP tools.
 
-## Пользовательские истории
+## Acceptance Criteria
+- [ ] **MCP Request Counter**: A counter metric tracking the number of requests to the MCP server.
+- [ ] **MCP Request Duration**: A histogram metric tracking the duration of MCP request processing.
+- [ ] **Labels**: Metrics include labels for the tool name and execution status (success/error).
 
-- Как разработчик, я хочу подключаться к серверу метрик как к MCP-серверу, чтобы получать данные о метриках в стандартизированном формате.
-- Как AI-ассистент, я хочу иметь возможность читать ресурс `metrics://all` напрямую с порта метрик.
+## Task Description
+Add specific metrics for MCP to `MetricsManager` and call them from `MCPServerImpl`.
 
-## Критерии готовности
-
-- [ ] `MetricsManager` расширен функциональностью MCP-сервера.
-- [ ] Существующий функционал Prometheus (`/metrics`) сохранен.
-- [ ] Добавлены endpoints для MCP (SSE transport) на том же порту (или интегрированы в существующий WSGI/ASGI сервер, если потребуется смена технологии).
-- [ ] Реализован ресурс `metrics://all`.
-- [ ] Реализация не конфликтует с основным MCP сервером приложения (`MCPServerManager`).
-
-## Описание задачи
-
-Текущий `MetricsManager` использует `wsgiref.simple_server` для отдачи метрик Prometheus. Необходимо перевести его на более мощный стек (например, `starlette` + `uvicorn`, как в `MCPServerImpl`), чтобы поддерживать и Prometheus endpoint, и MCP SSE endpoints (`/sse`, `/messages`).
-
-Это означает, что `MetricsManager` станет **вторым** MCP-сервером в приложении, специализированным исключительно на метриках.
-
-### Технические детали
-
-- **Стек**: Заменить `wsgiref` на `starlette` + `uvicorn` внутри `MetricsManager`.
-- **Endpoints**:
-  - `/metrics` -> Prometheus metrics (как сейчас).
-  - `/sse` -> MCP SSE connection.
-  - `/messages` -> MCP messages.
-- **Resources**:
-  - `metrics://all` -> Возвращает дамп метрик.
-
-## Вопросы и ответы
-
-**В: Почему не использовать существующий `MCPServerImpl`?**
-О: Требование пользователя — реализовать это именно в сервере метрик. Это позволяет изолировать мониторинг от основной логики выполнения запросов и потенциально запускать их на разных портах/процессах в будущем.
-
-**В: Будет ли конфликт портов?**
-О: Нет, `MetricsManager` уже имеет свой настраиваемый порт (обычно отличный от порта основного MCP сервера).
-
-**В: Как это повлияет на производительность?**
-О: `uvicorn` более производителен, чем `wsgiref`, поэтому влияние должно быть положительным или нейтральным.
-
+### Technical Details
+- **Component**: `MetricsManager`, `MCPServerImpl`.
+- **Metrics**:
+    - `mcp_requests_total`: Counter (labels: `tool`, `status`).
+    - `mcp_request_duration_seconds`: Histogram (labels: `tool`).

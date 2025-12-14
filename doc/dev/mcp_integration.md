@@ -38,7 +38,7 @@ PyPost also exposes a separate MCP server dedicated to observability.
 
 *   **Role**: Provides application metrics via MCP Resources.
 *   **Framework**: Same stack as the main server (`Starlette` + `mcp` SDK + `uvicorn`).
-*   **Hybrid Server**: Hosts both the Prometheus metrics endpoint (`/metrics`) and the MCP SSE endpoints (`/sse`, `/messages`) on the same port (default 9091).
+*   **Hybrid Server**: Hosts both the Prometheus metrics endpoint (`/metrics`) and the MCP SSE endpoints (`/sse`, `/messages`) on the same port (default 9080).
 *   **Resources**:
     *   `metrics://all`: Returns the full Prometheus metrics dump as `text/plain`.
 
