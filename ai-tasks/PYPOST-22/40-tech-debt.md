@@ -2,22 +2,13 @@
 
 ## Shortcuts Taken
 
-- Валидация IP адреса (host) отсутствует в UI. `uvicorn` выдаст ошибку при старте, если адрес некорректен, но пользователю это не будет очевидно до запуска.
-
-## Code Quality Issues
-
-- `MainWindow.on_env_changed` отвечает и за обновление переменных, и за управление сервером MCP. Возможно, стоит вынести логику управления состоянием MCP в отдельный контроллер или расширить `MCPServerManager`.
+- **No Input Validation**: The host input field is a simple text field. There is no validation for IP address format or hostname validity. If an invalid host is entered, the server will fail to start (error will be logged, but user might not understand why).
+    - *Mitigation*: Add regex validator or `QHostAddress` validation in the future.
 
 ## Missing Tests
 
-- Отсутствуют unit-тесты для `MCPServerManager`, проверяющие корректность передачи `host` в `uvicorn.Config`.
-- Нет UI тестов для `SettingsDialog`, проверяющих сохранение нового поля.
-
-## Performance Concerns
-
-- Нет.
+- No automated tests verifying that the server actually binds to the specified host. Testing is manual (using `netstat` or connecting from external).
 
 ## Follow-up Tasks
 
-- Добавить валидацию IP адреса в `SettingsDialog` (например, через `QValidator`).
-- Написать тесты для конфигурации MCP сервера.
+- Add validation for Host and Port fields in `SettingsDialog`.

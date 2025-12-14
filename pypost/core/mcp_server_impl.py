@@ -144,7 +144,7 @@ class MCPServerImpl:
 
         async def handle_sse(request):
             async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
-                await self.server.run(streams[0], streams[1], sse.create_initialization_options())
+                await self.server.run(streams[0], streams[1], self.server.create_initialization_options())
 
         async def handle_messages(request):
             await sse.handle_post_message(request.scope, request.receive, request._send)

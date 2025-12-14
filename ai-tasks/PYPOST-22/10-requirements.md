@@ -1,32 +1,23 @@
-# PYPOST-22: Add MCP Server Address Option
+# Requirements: PYPOST-22 - Configurable MCP Server Host
 
-## Цели
+## Goals
+Allow users to configure the network interface (host) on which the MCP server runs. By default, the server runs on `127.0.0.1` (localhost), which restricts access from external devices or containers. Users need the ability to change this to `0.0.0.0` or another IP address.
 
-Добавить возможность конфигурирования адреса (хоста) для MCP сервера. По умолчанию сервер запускается на `127.0.0.1`, но пользователю может потребоваться привязать его к другому интерфейсу (например, `0.0.0.0` для доступа извне) или конкретному IP.
+## User Stories
+- As a user, I want to change the MCP server host to `0.0.0.0` so that I can connect to it from another computer or a Docker container.
+- As a user, I want to see the current host and port in the interface to know where to connect.
 
-## Пользовательские истории
+## Acceptance Criteria
+- [ ] **Settings**: Added "MCP Server Host" field to settings dialog.
+- [ ] **Default Value**: `127.0.0.1`.
+- [ ] **Validation**: The field accepts valid IP addresses or hostnames.
+- [ ] **Server**: The server starts on the specified host.
+- [ ] **UI**: The status bar displays the current address (e.g., `MCP: ON (0.0.0.0:1080)`).
 
-- **Как пользователь**, я хочу иметь возможность изменить адрес привязки MCP сервера в настройках приложения, чтобы я мог использовать его в сетевых конфигурациях, отличных от localhost.
+## Task Description
+Update `AppSettings`, `SettingsDialog`, and `MCPServerManager` to support host configuration.
 
-## Критерии готовности
-
-- [ ] В модели `AppSettings` (`pypost/models/settings.py`) добавлено поле `mcp_host` со значением по умолчанию `"127.0.0.1"`.
-- [ ] В диалог настроек `SettingsDialog` (`pypost/ui/dialogs/settings_dialog.py`) добавлено текстовое поле для ввода "MCP Server Host".
-- [ ] `MCPServerManager` (`pypost/core/mcp_server.py`) обновлен для приема параметра `host` в методе `start_server`.
-- [ ] `MCPServerManager` использует переданный `host` при запуске `uvicorn`.
-- [ ] `MainWindow` (`pypost/ui/main_window.py`) обновлен для передачи настройки `mcp_host` в `MCPServerManager`.
-- [ ] При сохранении настроек и перезапуске сервера (или смене окружения) сервер запускается на новом адресе.
-
-## Описание задачи
-
-Текущая реализация MCP сервера жестко задает хост как `"127.0.0.1"`. Необходимо вынести это значение в настройки приложения, аналогично тому, как это сделано для порта.
-
-Необходимо внести изменения в:
-1.  **Модель настроек**: добавить поле.
-2.  **UI**: добавить поле ввода в диалог настроек.
-3.  **Логику запуска**: прокинуть параметр от настроек до `uvicorn`.
-
-## Вопросы и ответы
-
-- **Нужна ли валидация IP адреса?**
-  - Базовая валидация не обязательна, `uvicorn` выдаст ошибку, если адрес некорректен. Можно оставить как простое текстовое поле.
+### Technical Details
+- **Component**: `SettingsDialog`.
+- **Model**: `AppSettings.mcp_host`.
+- **Server**: Pass `host` parameter to `uvicorn.run` or `starlette` server.
