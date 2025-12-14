@@ -1,14 +1,14 @@
-# Roadmap: PYPOST-23
+# Roadmap: PYPOST-24
 
 ## Step Execution Status
 
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Fixed `AttributeError: 'Starlette' object has no attribute 'add_route'`
-  - [x] Updated `MCPServerImpl` to use `Starlette.add_route` correctly or initialize routes in constructor
-  - [x] Verified SSE endpoint availability
-- [x] **STEP 4: Review and Technical Debt**
+  - [x] Used `Mount` instead of `Route` for `/sse` and `/messages` endpoints to avoid Starlette
+    wrapper that expected Response return.
+  - [x] Added POST method check in `MessagesEndpoint`.
+- [/] **STEP 4: Review and technical debt**
 
 ## Status Legend
 
@@ -20,11 +20,11 @@
 
 ### STEP 1: Requirements
 
-- `ai-tasks/PYPOST-23/10-requirements.md`
+- `ai-tasks/PYPOST-24/10-requirements.md`
 
 ### STEP 2: Architecture
 
-- `ai-tasks/PYPOST-23/20-architecture.md`
+- `ai-tasks/PYPOST-24/20-architecture.md`
 
 ### STEP 3: Development
 
@@ -34,4 +34,4 @@
 
 ### STEP 4: Review
 
-- `ai-tasks/PYPOST-23/40-tech-debt.md`
+- `ai-tasks/PYPOST-24/40-tech-debt.md`

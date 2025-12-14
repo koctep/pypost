@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Set
 from starlette.applications import Starlette
-from starlette.routing import Route
+from starlette.routing import Route, Mount
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp.types import Tool, TextContent
@@ -142,17 +142,42 @@ class MCPServerImpl:
     def create_app(self) -> Starlette:
         sse = SseServerTransport("/messages")
 
-        async def handle_sse(request):
-            async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
-                await self.server.run(streams[0], streams[1], self.server.create_initialization_options())
+        class SSEEndpoint:
+            def __init__(self, server, sse_transport):
+                self.server = server
+                self.sse_transport = sse_transport
 
-        async def handle_messages(request):
-            await sse.handle_post_message(request.scope, request.receive, request._send)
+            async def __call__(self, scope, receive, send):
+                async with self.sse_transport.connect_sse(scope, receive, send) as streams:
+                    await self.server.run(streams[0], streams[1], self.server.create_initialization_options())
+
+        class MessagesEndpoint:
+            def __init__(self, sse_transport):
+                self.sse_transport = sse_transport
+
+            async def __call__(self, scope, receive, send):
+                # Ensure we only handle POST requests if it's HTTP
+                if scope["type"] == "http" and scope["method"] != "POST":
+                    # Manually send 405 Method Not Allowed
+                    await self._send_response(send, 405, b"Method Not Allowed")
+                    return
+                await self.sse_transport.handle_post_message(scope, receive, send)
+
+            async def _send_response(self, send, status, body):
+                await send({
+                    "type": "http.response.start",
+                    "status": status,
+                    "headers": [(b"content-type", b"text/plain")],
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": body,
+                })
 
         return Starlette(
             debug=True,
             routes=[
-                Route("/sse", endpoint=handle_sse),
-                Route("/messages", endpoint=handle_messages, methods=["POST"]),
+                Mount("/sse", app=SSEEndpoint(self.server, sse)),
+                Mount("/messages", app=MessagesEndpoint(sse)),
             ],
         )

@@ -1,24 +1,49 @@
-# PYPOST-23: Fix AttributeError in MCP Server SSE Handling - Architecture
+# Architecture: PYPOST-23 - Fix AttributeError in SSE Handling
 
-## Проблема
+## Research
+The error `AttributeError: 'Starlette' object has no attribute 'add_route'` suggests that the object we are trying to add a route to is not what we think it is, or the method is named differently.
 
-В методе `MCPServerImpl.create_app` при инициализации SSE соединения вызывается `sse.create_initialization_options()`.
-Объект `sse` является экземпляром `SseServerTransport`, который не имеет метода `create_initialization_options`.
-Этот метод принадлежит классу `Server` (экземпляр `self.server`).
+In `MCPServerImpl.create_app`:
+```python
+self.app = Starlette(debug=True)
+# ...
+self.app.add_route("/sse", handle_sse)
+```
+This code is correct for Starlette.
 
-## Решение
+However, if `mcp.server.fastmcp` or another abstraction is used which returns its own object wrapping Starlette, then `add_route` might be missing.
 
-Изменить вызов метода в файле `pypost/core/mcp_server_impl.py`:
+**Investigation**:
+The code uses `mcp.server.Server`.
+The implementation of `create_app` creates a `Starlette` app.
+
+**Possible Cause**:
+Conflict between `starlette` versions or incorrect import.
+Or `self.app` is overwritten somewhere.
+
+**Solution**:
+Ensure `Starlette` is initialized correctly.
+Pass routes to the constructor `Starlette(routes=[...])` instead of `add_route` if dynamic addition fails (though it should work).
+
+## Implementation Plan
+
+1.  **Refactor `create_app`**:
+    -   Define `handle_sse` and `handle_messages` functions.
+    -   Create `Route` objects.
+    -   Initialize `Starlette` with the list of routes.
 
 ```python
-# Было
-await self.server.run(streams[0], streams[1], sse.create_initialization_options())
+from starlette.applications import Starlette
+from starlette.routing import Route
 
-# Стало
-await self.server.run(streams[0], streams[1], self.server.create_initialization_options())
+# ...
+routes = [
+    Route("/sse", endpoint=handle_sse, methods=["GET"]),
+    Route("/messages", endpoint=handle_messages, methods=["POST"])
+]
+self.app = Starlette(debug=True, routes=routes)
 ```
 
-## Влияние
-
-- Исправляет падение сервера при подключении к SSE.
-- Не влияет на другие компоненты.
+2.  **Verify**:
+    -   Run the application.
+    -   Check logs.

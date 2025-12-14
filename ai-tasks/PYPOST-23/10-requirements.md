@@ -1,31 +1,21 @@
-# PYPOST-23: Fix AttributeError in MCP Server SSE Handling
+# Requirements: PYPOST-23 - Fix AttributeError in SSE Handling
 
-## Цели
+## Goals
+Fix a critical error preventing the MCP server from starting. The error `AttributeError: 'Starlette' object has no attribute 'add_route'` occurs when attempting to register SSE routes.
 
-Исправить ошибку `AttributeError: 'SseServerTransport' object has no attribute 'create_initialization_options'`, возникающую при подключении к SSE endpoint'у MCP сервера.
+## User Stories
+- As a developer, I want the MCP server to start without errors so I can test integration with AI agents.
+- As a user, I want the "MCP: ON" indicator to reflect the actual working state of the server, not just the attempt to start it.
 
-## Пользовательские истории
+## Acceptance Criteria
+- [ ] The application starts without `AttributeError` related to Starlette.
+- [ ] The MCP server successfully binds to the port and accepts connections.
+- [ ] The `/sse` endpoint is available and returns a 200 OK (or stream).
 
-- Как пользователь, я хочу, чтобы MCP сервер корректно обрабатывал SSE подключения, чтобы я мог использовать инструменты через MCP протокол.
+## Task Description
+Investigate the cause of the error in `pypost/core/mcp_server_impl.py` and fix the route registration logic.
+It seems that `Starlette` does not have an `add_route` method on the application instance if it is initialized incorrectly or if an outdated version is used (though Starlette usually has it). More likely, the issue is how `mcp` SDK creates the app or how we try to modify it.
 
-## Критерии готовности
-
-- [ ] Метод `handle_sse` в `pypost/core/mcp_server_impl.py` не вызывает несуществующий метод `create_initialization_options`.
-- [ ] Сервер успешно запускается и обрабатывает SSE запросы без падения.
-- [ ] Инициализация сервера (`self.server.run`) происходит с корректными аргументами.
-
-## Описание задачи
-
-При обращении к `/sse` происходит падение сервера с ошибкой:
-```
-AttributeError: 'SseServerTransport' object has no attribute 'create_initialization_options'
-```
-Это происходит в строке 147 файла `pypost/core/mcp_server_impl.py`.
-Необходимо выяснить правильный способ инициализации `server.run` с использованием `SseServerTransport` из установленной версии библиотеки `mcp`.
-
-## Вопросы и ответы
-
-- **Q:** Какая версия библиотеки `mcp` используется?
-  - **A:** Нужно проверить в окружении.
-- **Q:** Как правильно передать initialization options?
-  - **A:** Вероятно, они либо не нужны, либо передаются иначе.
+### Technical Details
+- **Component**: `MCPServerImpl`.
+- **Library**: `starlette`, `mcp`.
