@@ -1,106 +1,44 @@
-# PYPOST-26: Добавление метрик Prometheus для трассировки запросов
+# Architecture: PYPOST-26 - Adding Prometheus Metrics for Request Tracing
 
-## Исследования
+## Research
+- **`prometheus_client` Library**: Standard library for exporting metrics in Python. Allows starting an HTTP server via `start_http_server`.
+- **PyQt Integration**: Starting an HTTP server is a blocking operation. It must be run in a separate thread (`threading.Thread`).
+- **Server Restart**: `prometheus_client.start_http_server` starts a server that is difficult to stop gracefully without socket access or using internal API. However, `make_wsgi_app` can be used and run via `wsgiref.simple_server` (or another WSGI server), which is easier to manage (start/stop).
+    - *Alternative*: Use `threading` and just start a new server on a new port, but the old port might remain occupied if the server is not stopped correctly.
+    - *Decision*: Use `wsgiref.simple_server.make_server` in a separate thread. This allows calling `shutdown()` and `server_close()`.
+- **Metrics Collection Points**:
+    - GUI: `ResponseView` or `MainWindow` (button click signal).
+    - Request: `RequestService` or `HttpClient`.
+    - MCP: `McpServerImpl` or `McpServer`.
 
-- **Библиотека `prometheus_client`**: Стандартная библиотека для экспорта метрик в Python. Позволяет запускать HTTP-сервер через `start_http_server`.
-- **Интеграция с PyQt**: Запуск HTTP сервера является блокирующей операцией. Необходимо запускать его в отдельном потоке (`threading.Thread`).
-- **Перезапуск сервера**: `prometheus_client.start_http_server` запускает сервер, который сложно остановить штатно без доступа к сокету или использования внутреннего API. Однако, можно использовать `make_wsgi_app` и запускать его через `wsgiref.simple_server` (или другой WSGI сервер), которым проще управлять (start/stop).
-    - *Альтернатива*: Использовать `threading` и просто запускать новый сервер на новом порту, но старый порт может остаться занятым, если не остановить сервер корректно.
-    - *Решение*: Использовать `wsgiref.simple_server.make_server` в отдельном потоке. Это позволяет вызывать `shutdown()` и `server_close()`.
-- **Точки сбора метрик**:
-    - GUI: `ResponseView` или `MainWindow` (сигнал нажатия кнопки).
-    - Request: `RequestService` или `HttpClient`.
-    - MCP: `McpServerImpl` или `McpServer`.
+## Implementation Plan
 
-## План реализации
+1.  **`metrics` Module**: Create a new module `pypost/core/metrics.py`.
+    - Class `MetricsManager`: Singleton or global object.
+    - Methods `start_server(host, port)`, `stop_server()`, `restart_server(host, port)`.
+    - Define metrics (Counter, Summary/Histogram) in `__init__`.
+    - Wrapper methods for incrementing metrics (e.g., `track_gui_send_click()`).
 
-1.  **Модуль `metrics`**: Создать новый модуль `pypost/core/metrics.py`.
-    - Класс `MetricsManager`: Singleton или глобальный объект.
-    - Методы `start_server(host, port)`, `stop_server()`, `restart_server(host, port)`.
-    - Определение метрик (Counter, Summary/Histogram) в `__init__`.
-    - Методы-обертки для инкремента метрик (например, `track_gui_send_click()`).
-2.  **Настройки**:
-    - Обновить `pypost/models/settings.py`: добавить поля `metrics_host` (str, default '0.0.0.0') и `metrics_port` (int, default 9080).
-    - Обновить `pypost/ui/dialogs/settings_dialog.py`: добавить поля ввода.
-    - При сохранении настроек вызывать `MetricsManager.restart_server()`.
-3.  **Инструментация**:
-    - В `pypost/ui/widgets/request_editor.py` (или где кнопка Send) -> вызвать `track_gui_send_click()`.
-    - В `pypost/core/request_service.py` или `http_client.py` -> `track_request_sent()`, `track_response_received()`.
-    - В `pypost/core/mcp_server_impl.py` -> `track_mcp_request_received()`, `track_mcp_response_sent()`.
-4.  **Инициализация**:
-    - В `pypost/main.py` инициализировать `MetricsManager` при старте с параметрами из настроек.
+2.  **Settings**:
+    - Update `pypost/models/settings.py`: add fields `metrics_host` (str, default '0.0.0.0') and `metrics_port` (int, default 9080).
+    - Update `pypost/ui/dialogs/settings_dialog.py`: add input fields.
+    - On settings save, call `MetricsManager.restart_server()`.
 
-## Архитектура
+3.  **Instrumentation**:
+    - In `pypost/ui/widgets/request_editor.py` (or where Send button is) -> call `track_gui_send_click()`.
+    - In `pypost/core/request_service.py` or `http_client.py` -> `track_request_sent()`, `track_response_received()`.
+    - In `pypost/core/mcp_server_impl.py` -> `track_mcp_request_received()`, `track_mcp_response_sent()`.
 
-### Компоненты
+4.  **Initialization**:
+    - In `pypost/main.py`, initialize `MetricsManager` at startup with parameters from settings.
 
-```mermaid
-classDiagram
-    class MetricsManager {
-        - instance: MetricsManager
-        - server: WSGIServer
-        - thread: Thread
-        - registry: CollectorRegistry
-        + get_instance()
-        + start_server(host, port)
-        + stop_server()
-        + restart_server(host, port)
-        + track_gui_send_click()
-        + track_request_sent(method)
-        + track_response_received(method, status)
-        + track_mcp_request_received(method)
-        + track_mcp_response_sent(method, status)
-    }
+## Architecture
 
-    class Settings {
-        + metrics_host: str
-        + metrics_port: int
-    }
+### Components
 
-    class MainWindow {
-    }
+### MetricsManager Implementation Details
+Using `wsgiref` for a managed server.
 
-    class RequestService {
-    }
-
-    class McpServer {
-    }
-
-    MainWindow --> Settings
-    MainWindow --> MetricsManager : calls restart_server() on settings save
-    RequestService --> MetricsManager : tracks request/response
-    McpServer --> MetricsManager : tracks mcp request/response
-    MetricsManager --> prometheus_client : uses
-```
-
-### Детали реализации MetricsManager
-
-Использование `wsgiref` для управляемого сервера.
-
-```python
-from prometheus_client import make_wsgi_app, CollectorRegistry
-from wsgiref.simple_server import make_server
-import threading
-
-class MetricsManager:
-    # ... singleton logic ...
-    
-    def start_server(self, host, port):
-        self.stop_server() # Stop existing if any
-        app = make_wsgi_app(registry=self.registry)
-        self.server = make_server(host, port, app)
-        self.thread = threading.Thread(target=self.server.serve_forever)
-        self.thread.start()
-
-    def stop_server(self):
-        if self.server:
-            self.server.shutdown()
-            self.server.server_close()
-            self.thread.join()
-            self.server = None
-```
-
-## Вопросы и ответы
-
-- **В:** Как обеспечить потокобезопасность метрик?
-  **О:** `prometheus_client` потокобезопасен по умолчанию.
+## Q&A
+- **Q:** How to ensure metrics thread safety?
+    - **A:** `prometheus_client` is thread-safe by default.

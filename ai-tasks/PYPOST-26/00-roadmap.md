@@ -1,39 +1,39 @@
 # Roadmap: PYPOST-26
 
-## Статус выполнения шагов
+## Step Execution Status
 
-- [x] **ШАГ 1: Сбор и документирование требований**
-- [x] **ШАГ 2: Архитектурное проектирование высокого уровня**
-- [x] **ШАГ 3: Разработка**
-  - [x] Создан класс `MetricsManager` для управления сервером Prometheus и сбора метрик.
-  - [x] Добавлены настройки хоста и порта метрик в `Settings` и диалог настроек.
-  - [x] Инициализация `MetricsManager` добавлена в `main.py` (исправлена ошибка `ConfigManager`).
-  - [x] Реализована инструментация в `RequestWidget` (GUI), `HTTPClient` (HTTP) и `MCPServerImpl` (MCP).
-  - [x] Сервер метрик ограничен endpoint-ом `/metrics`.
-- [x] **ШАГ 4: Ревью и технический долг**
+- [x] **STEP 1: Requirements gathering and documentation**
+- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 3: Development**
+  - [x] Created `MetricsManager` class for Prometheus server management and metrics collection.
+  - [x] Added metrics host and port settings to `Settings` and settings dialog.
+  - [x] `MetricsManager` initialization added to `main.py` (fixed `ConfigManager` error).
+  - [x] Implemented instrumentation in `RequestWidget` (GUI), `HTTPClient` (HTTP) and `MCPServerImpl` (MCP).
+  - [x] Metrics server restricted to `/metrics` endpoint.
+- [x] **STEP 4: Review and Technical Debt**
 
-## Легенда статусов
+## Status Legend
 
-- `[ ]` — шаг не начат
-- `[/]` — работа над шагом начата (in progress)
-- `[x]` — шаг завершен
+- `[ ]` — step not started
+- `[/]` — step in progress
+- `[x]` — step completed
 
-## Артефакты
+## Artifacts
 
-### ШАГ 1: Требования
+### STEP 1: Requirements
 
 - `ai-tasks/PYPOST-26/10-requirements.md`
 
-### ШАГ 2: Архитектура
+### STEP 2: Architecture
 
 - `ai-tasks/PYPOST-26/20-architecture.md`
 
-### ШАГ 3: Разработка
+### STEP 3: Development
 
-- Исходный код
-- Тесты
-- Обновления документации
+- Source code
+- Tests
+- Documentation updates
 
-### ШАГ 4: Ревью
+### STEP 4: Review
 
 - `ai-tasks/PYPOST-26/40-tech-debt.md`

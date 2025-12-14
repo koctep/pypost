@@ -1,62 +1,54 @@
-# PYPOST-26: Добавление метрик Prometheus для трассировки запросов
+# Requirements: PYPOST-26 - Adding Prometheus Metrics for Request Tracing
 
-## Цели
+## Goals
+Ensure observability of the request execution process in the application using Prometheus metrics. This will allow tracking the request lifecycle from clicking the button in the GUI to processing by the MCP server.
 
-Обеспечить наблюдаемость (observability) процесса выполнения запросов в приложении с помощью метрик Prometheus. Это позволит отслеживать жизненный цикл запроса от нажатия кнопки в GUI до обработки MCP сервером.
+## User Stories
+- As a developer/DevOps, I want to see Prometheus metrics to monitor request flow through the system.
+- As a developer, I want to know the time between clicking the "Send" button and sending the request.
+- As a developer, I want to know the request processing time by the MCP server.
+- As a developer, I want to see counters of successful and failed requests at different stages.
+- As a user, I want to be able to configure the IP address and port for metrics export via application settings.
 
-## Пользовательские истории
+## Functional Requirements
 
-- Как разработчик/DevOps, я хочу видеть метрики Prometheus, чтобы мониторить прохождение запросов через систему.
-- Как разработчик, я хочу знать время между нажатием кнопки "Send" и отправкой запроса.
-- Как разработчик, я хочу знать время обработки запроса MCP сервером.
-- Как разработчик, я хочу видеть счетчики успешных и неуспешных запросов на разных этапах.
-- Как пользователь, я хочу иметь возможность настроить IP-адрес и порт для экспорта метрик через настройки приложения.
+1.  **Prometheus Client Integration**:
+    - Add `prometheus_client` library to dependencies.
+    - Start an HTTP server to serve metrics (endpoint `/metrics`) on a separate port.
 
-## Функциональные требования
+2.  **Settings**:
+    - Add "Metrics Host" (IP) and "Metrics Port" fields to the settings dialog.
+    - Default values: `0.0.0.0` (or `localhost`) for host and `9080` for port.
+    - Metrics server must restart when settings change.
 
-1.  **Интеграция Prometheus Client**:
-    - Добавить библиотеку `prometheus_client` в зависимости.
-    - Запустить HTTP-сервер для отдачи метрик (endpoint `/metrics`) на отдельном порту.
+3.  **Metrics Collection (Trace)**:
+    Implement the following metrics (Counter or Histogram/Summary):
+    - **GUI Send Click**: Event of clicking the send button in the interface.
+    - **Request Sent**: Event of sending an HTTP request by the client.
+    - **Response Received**: Event of receiving a response by the client.
+    - **MCP Request Received**: Event of receiving a request by the MCP server.
+    - **MCP Response Sent**: Event of sending a response by the MCP server.
 
-2.  **Настройки**:
-    - Добавить поля "Metrics Host" (IP) и "Metrics Port" в диалог настроек.
-    - Значения по умолчанию: `0.0.0.0` (или `localhost`) для хоста и `9080` для порта.
-    - Сервер метрик должен перезапускаться при изменении настроек.
+4.  **Labels**:
+    - Desirable to add labels for method type (GET, POST, etc.) and status (success/error) where applicable.
 
-3.  **Сбор метрик (Trace)**:
-    Необходимо реализовать следующие метрики (Counter или Histogram/Summary):
-    - **GUI Send Click**: Событие нажатия кнопки отправки в интерфейсе.
-    - **Request Sent**: Событие отправки HTTP запроса клиентом.
-    - **Response Received**: Событие получения ответа клиентом.
-    - **MCP Request Received**: Событие получения запроса MCP сервером.
-    - **MCP Response Sent**: Событие отправки ответа MCP сервером.
+## Non-functional Requirements
+- **Performance**: Metrics collection should not significantly slow down the application.
+- **Isolation**: Metrics server should not block the main UI thread (run in a separate thread).
 
-4.  **Метки (Labels)**:
-    - Желательно добавить метки для типа метода (GET, POST и т.д.) и статуса (успех/ошибка), где это применимо.
+## Constraints and Assumptions
+- Application is written in Python (PyQt for GUI).
+- `prometheus_client` library is used.
+- Default port: 9080.
+- Deploying an external Prometheus server (Docker, etc.) is **not required**.
 
-## Нефункциональные требования
+## Main Entities
+- **MetricsServer**: Component responsible for running the Prometheus HTTP server.
+- **MetricsRegistry**: Centralized place for defining metrics.
+- **Settings**: Extension of the settings model with new fields.
 
-- **Производительность**: Сбор метрик не должен существенно замедлять работу приложения.
-- **Изоляция**: Сервер метрик не должен блокировать основной UI поток (запуск в отдельном потоке).
-
-## Ограничения и допущения
-
-- Приложение написано на Python (PyQt для GUI).
-- Используется библиотека `prometheus_client`.
-- Дефолтный порт: 9080.
-- Разворачивание внешнего сервера Prometheus (Docker и т.д.) **не требуется**.
-
-## Основные сущности
-
-- **MetricsServer**: Компонент, отвечающий за запуск HTTP сервера Prometheus.
-- **MetricsRegistry**: Централизованное место определения метрик.
-- **Settings**: Расширение модели настроек новыми полями.
-
-## Вопросы и ответы
-
-- **В:** Как связать события GUI и MCP?
-  **О:** Если MCP сервер работает в том же процессе, метрики будут общие. Если разные процессы, метрики будут собираться независимо.
-
-- **В:** Нужно ли перезапускать сервер метрик при смене порта?
-  **О:** Да, необходимо реализовать перезапуск сервера метрик "на лету" при изменении настроек в конфигурации.
-
+## Q&A
+- **Q:** How to link GUI and MCP events?
+    - **A:** If the MCP server runs in the same process, metrics will be shared. If different processes, metrics will be collected independently.
+- **Q:** Do we need to restart the metrics server when changing the port?
+    - **A:** Yes, it is necessary to implement "on-the-fly" restart of the metrics server when configuration settings change.

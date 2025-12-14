@@ -1,6 +1,12 @@
 import threading
-from wsgiref.simple_server import make_server
-from prometheus_client import make_wsgi_app, CollectorRegistry, Counter, Summary
+import asyncio
+import uvicorn
+from starlette.applications import Starlette
+from starlette.routing import Mount, Route
+from prometheus_client import make_asgi_app, CollectorRegistry, Counter, generate_latest
+from mcp.server import Server
+from mcp.server.sse import SseServerTransport
+from mcp.types import Resource, TextResourceContents
 
 class MetricsManager:
     _instance = None
@@ -20,12 +26,17 @@ class MetricsManager:
             
         self._initialized = True
         self.registry = CollectorRegistry()
-        self.server = None
+        self.server_instance = None
         self.thread = None
         self.server_lock = threading.Lock()
         
         # Define metrics
         self._init_metrics()
+        
+        # Initialize MCP Server
+        self.mcp_server = Server("pypost-metrics")
+        self.mcp_server.list_resources()(self.list_resources)
+        self.mcp_server.read_resource()(self.read_resource)
 
     def _init_metrics(self):
         """Initialize all Prometheus metrics."""
@@ -63,42 +74,116 @@ class MetricsManager:
             registry=self.registry
         )
 
+    # MCP Resource Handlers
+    async def list_resources(self) -> list[Resource]:
+        return [Resource(
+            uri="metrics://all",
+            name="All Metrics",
+            description="Prometheus metrics in text format",
+            mimeType="text/plain"
+        )]
+
+    async def read_resource(self, uri: str) -> list[TextResourceContents]:
+        if uri == "metrics://all":
+            # Track access via existing metric
+            self.track_mcp_request_received("read_resource:metrics")
+            try:
+                data = generate_latest(self.registry).decode('utf-8')
+                self.track_mcp_response_sent("read_resource:metrics", "success")
+                return [TextResourceContents(
+                    uri=uri,
+                    mimeType="text/plain",
+                    text=data
+                )]
+            except Exception as e:
+                self.track_mcp_response_sent("read_resource:metrics", "error")
+                raise e
+        
+        raise ValueError(f"Resource {uri} not found")
+
+    def _create_app(self) -> Starlette:
+        # 1. Prometheus app
+        prometheus_app = make_asgi_app(registry=self.registry)
+        
+        # 2. MCP Transport setup (SSE)
+        sse = SseServerTransport("/messages")
+
+        class SSEEndpoint:
+            def __init__(self, server, sse_transport):
+                self.server = server
+                self.sse_transport = sse_transport
+
+            async def __call__(self, scope, receive, send):
+                async with self.sse_transport.connect_sse(scope, receive, send) as streams:
+                    await self.server.run(streams[0], streams[1], self.server.create_initialization_options())
+
+        class MessagesEndpoint:
+            def __init__(self, sse_transport):
+                self.sse_transport = sse_transport
+
+            async def __call__(self, scope, receive, send):
+                # Ensure we only handle POST requests if it's HTTP
+                if scope["type"] == "http" and scope["method"] != "POST":
+                    # Manually send 405 Method Not Allowed
+                    await self._send_response(send, 405, b"Method Not Allowed")
+                    return
+                await self.sse_transport.handle_post_message(scope, receive, send)
+
+            async def _send_response(self, send, status, body):
+                await send({
+                    "type": "http.response.start",
+                    "status": status,
+                    "headers": [(b"content-type", b"text/plain")],
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": body,
+                })
+
+        # 3. Combine in Starlette
+        return Starlette(routes=[
+            Mount("/metrics", app=prometheus_app),
+            Mount("/sse", app=SSEEndpoint(self.mcp_server, sse)),
+            Mount("/messages", app=MessagesEndpoint(sse))
+        ])
+
     def start_server(self, host: str, port: int):
-        """Start the Prometheus metrics server."""
+        """Start the metrics server (Prometheus + MCP)."""
         with self.server_lock:
-            if self.server:
+            if self.thread and self.thread.is_alive():
                 self.stop_server()
             
-            try:
-                prometheus_app = make_wsgi_app(registry=self.registry)
-                
-                def app_wrapper(environ, start_response):
-                    if environ['PATH_INFO'] == '/metrics':
-                        return prometheus_app(environ, start_response)
-                    else:
-                        start_response('404 Not Found', [('Content-Type', 'text/plain')])
-                        return [b'Not Found']
+            self._current_host = host
+            self._current_port = port
+            
+            self.thread = threading.Thread(target=self._run_uvicorn, daemon=True)
+            self.thread.start()
+            print(f"Metrics server started on {host}:{port}")
 
-                self.server = make_server(host, port, app_wrapper)
-                self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-                self.thread.start()
-                print(f"Metrics server started on {host}:{port}")
-            except Exception as e:
-                print(f"Failed to start metrics server: {e}")
+    def _run_uvicorn(self):
+        app = self._create_app()
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        config = uvicorn.Config(app=app, host=self._current_host, port=self._current_port, loop="asyncio", log_level="warning")
+        self.server_instance = uvicorn.Server(config)
+        
+        # Override signal handlers to avoid main thread conflict
+        self.server_instance.install_signal_handlers = lambda: None
+        
+        loop.run_until_complete(self.server_instance.serve())
 
     def stop_server(self):
-        """Stop the Prometheus metrics server."""
-        if self.server:
-            try:
-                self.server.shutdown()
-                self.server.server_close()
-            except Exception as e:
-                print(f"Error stopping metrics server: {e}")
-            finally:
-                if self.thread:
-                    self.thread.join(timeout=1.0)
-                self.server = None
+        """Stop the metrics server."""
+        with self.server_lock:
+            if self.server_instance:
+                self.server_instance.should_exit = True
+            
+            if self.thread:
+                self.thread.join(timeout=2.0)
                 self.thread = None
+                self.server_instance = None
                 print("Metrics server stopped")
 
     def restart_server(self, host: str, port: int):
