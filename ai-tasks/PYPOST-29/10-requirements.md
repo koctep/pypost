@@ -1,28 +1,21 @@
-# PYPOST-29: Fix "Sending..." stuck on Transfer-Encoding: chunked
+# Requirements: PYPOST-29 - Chunked Response Streaming
 
-## Цели
+## Goals
+Ensure correct handling of HTTP responses with `Transfer-Encoding: chunked`. Currently, the application might hang or not display the response until it is fully downloaded, which is problematic for large responses or streams.
 
-Исправить проблему, при которой интерфейс зависает в статусе "Sending...", когда сервер возвращает ответ с заголовком `Transfer-Encoding: chunked`.
+## User Stories
+- As a user, I want the application to handle chunked responses correctly and display the result.
+- As a user, I want to see the response content even if it is transmitted in chunks.
 
-## Пользовательские истории
+## Acceptance Criteria
+- [ ] **Chunked Encoding**: The client correctly processes responses with `Transfer-Encoding: chunked`.
+- [ ] **Streaming**: The response is read in chunks (stream) to avoid loading the entire file into memory at once (although for display in `ResponseView` we still accumulate it, but the reading process should be robust).
+- [ ] **No Freezes**: The application does not freeze when receiving chunked data.
 
-- Как пользователь, я хочу, чтобы приложение корректно обрабатывало ответы с `Transfer-Encoding: chunked`, завершая статус "Sending..." и отображая полученный ответ.
+## Task Description
+Update `HTTPClient` to use `stream=True` in `requests` and read data in chunks.
 
-## Критерии готовности
-
-- [ ] При получении ответа с `Transfer-Encoding: chunked` кнопка отправки запроса возвращается в исходное состояние (не "Sending...").
-- [ ] Тело ответа (даже если оно передается частями) корректно отображается или хотя бы сигнализирует о завершении приема.
-- [ ] Нет зависаний UI при chunked-ответах.
-
-## Описание задачи
-
-Пользователь сообщает, что когда сервер отвечает с заголовком `Transfer-Encoding: chunked`, кнопка в интерфейсе залипает в статусе "Sending...". Это указывает на то, что клиентская часть (или связующая логика) не может корректно определить конец передачи или не обрабатывает потоковую передачу, ожидая `Content-Length` или другого сигнала завершения.
-
-Необходимо:
-1. Найти место, где обрабатывается отправка HTTP запроса и получение ответа.
-2. Проверить логику обработки `Transfer-Encoding: chunked`.
-3. Обеспечить корректное завершение состояния "Sending...".
-
-## Вопросы и ответы
-
-(Пока нет)
+### Technical Details
+- **Component**: `HTTPClient`.
+- **Library**: `requests`.
+- **Method**: `iter_content` or `iter_lines`.

@@ -504,6 +504,13 @@ class MainWindow(QMainWindow):
 
         sender_tab.worker = worker
 
+    def on_env_update(self, vars: dict):
+        selected_env = self.env_selector.currentData()
+        if isinstance(selected_env, Environment):
+            selected_env.variables.update(vars)
+            self.storage.save_environments(self.environments)
+            self.on_env_changed(self.env_selector.currentIndex())
+
     def on_headers_received(self, tab: RequestTab, status: int, headers: dict):
         tab.response_view.status_label.setText(f"Status: {status}")
         # We can also update time label if we track start time, but for now Status is key.
