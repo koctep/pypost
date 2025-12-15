@@ -23,6 +23,10 @@ class SettingsDialog(QDialog):
         self.indent_size_spin.setRange(2, 8)
         self.indent_size_spin.setValue(current_settings.indent_size)
 
+        self.timeout_spin = QSpinBox()
+        self.timeout_spin.setRange(1, 300)
+        self.timeout_spin.setValue(current_settings.request_timeout)
+
         self.mcp_port_spin = QSpinBox()
         self.mcp_port_spin.setRange(1024, 65535)
         self.mcp_port_spin.setValue(current_settings.mcp_port)
@@ -62,6 +66,7 @@ class SettingsDialog(QDialog):
         self.new_settings = AppSettings(
             font_size=self.font_size_spin.value(),
             indent_size=self.indent_size_spin.value(),
+            request_timeout=self.timeout_spin.value(),
             config_version=self.current_settings.config_version,
             revision=self.current_settings.revision,
             last_environment_id=self.current_settings.last_environment_id,

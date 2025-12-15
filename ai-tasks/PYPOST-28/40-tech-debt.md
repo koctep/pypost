@@ -2,16 +2,12 @@
 
 ## Shortcuts Taken
 
-- **Ручное создание JSON**: Файл коллекции создан вручную, а не сгенерирован через API приложения или скрипт, использующий модели Pydantic напрямую (хотя структура выверена по моделям).
-
-## Code Quality Issues
-
-- Нет. Создан только файл данных.
+- **Manual File Creation**: Files were created via PyPost UI and then committed. No script for generating test data.
 
 ## Missing Tests
 
-- **CI/CD**: Этот файл коллекции можно было бы использовать в автоматизированных E2E тестах (например, с использованием Playwright или PyTest), которые запускают приложение и проверяют ответы от MCP серверов. На данный момент он предназначен только для ручного тестирования.
+- No automated tests that use this collection. It is intended for manual testing via MCP Inspector or AI agents.
 
 ## Follow-up Tasks
 
-- Добавить автоматизированный тест, который загружает эту коллекцию и выполняет запросы к локальным серверам (требует headless запуска PyPost).
+- Add integration tests that load this collection and execute requests via MCP.

@@ -474,8 +474,17 @@ class MainWindow(QMainWindow):
         if not sender_tab:
             return
 
-        sender_tab.request_editor.send_btn.setEnabled(False)
-        sender_tab.request_editor.send_btn.setText("Sending...")
+        # Check if already running (Stop/Cancel)
+        if hasattr(sender_tab, 'worker') and sender_tab.worker and sender_tab.worker.isRunning():
+            sender_tab.worker.stop()
+            # Disable button immediately to prevent double clicks and show feedback
+            sender_tab.request_editor.send_btn.setEnabled(False)
+            sender_tab.request_editor.send_btn.setText("Stopping...")
+            return
+
+        # Start new request
+        sender_tab.response_view.clear_body() # Clear previous response
+        sender_tab.request_editor.send_btn.setText("Stop") # Change button to Stop
 
         variables = {}
         selected_env = self.env_selector.currentData()
@@ -487,38 +496,56 @@ class MainWindow(QMainWindow):
         worker.error.connect(lambda err: self.on_request_error(sender_tab, err))
         worker.env_update.connect(lambda vars: self.on_env_update(vars))
         worker.script_output.connect(lambda logs, err: self.on_script_output(sender_tab, logs, err))
+        worker.chunk_received.connect(lambda chunk: self.on_chunk_received(sender_tab, chunk)) # Connect chunk signal
+        worker.headers_received.connect(lambda status, headers: self.on_headers_received(sender_tab, status, headers))
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
         worker.start()
 
         sender_tab.worker = worker
 
-    def on_env_update(self, updated_variables: dict):
-        selected_env = self.env_selector.currentData()
-        if isinstance(selected_env, Environment):
-            selected_env.variables.update(updated_variables)
-            self.storage.save_environments(self.environments)
-            
-            for i in range(self.tabs.count()):
-                tab = self.tabs.widget(i)
-                if isinstance(tab, RequestTab) and hasattr(tab.request_editor, 'set_variables'):
-                    tab.request_editor.set_variables(selected_env.variables)
-
-    def on_script_output(self, tab: RequestTab, logs: list, error: str):
-        if error:
-            QMessageBox.warning(self, "Script Error", f"Post-request script failed:\n{error}")
-        if logs:
-            print("Script Logs:", logs)
+    def on_headers_received(self, tab: RequestTab, status: int, headers: dict):
+        tab.response_view.status_label.setText(f"Status: {status}")
+        # We can also update time label if we track start time, but for now Status is key.
+        # Size will update with chunks.
+    
+    def on_chunk_received(self, tab: RequestTab, chunk: str):
+        tab.response_view.append_body(chunk)
+        # Update metrics (size) in real-time if needed
+        # Since we don't have full response object here, we can just estimate size
+        current_text = tab.response_view.body_view.toPlainText()
+        size_bytes = len(current_text.encode('utf-8'))
+        tab.response_view.size_label.setText(f"Size: {size_bytes} bytes")
+        # Estimate Status from first chunk? No, status is header. 
+        # Ideally, we should receive headers first then chunks.
+        # But RequestWorker only emits finished with full response.
+        # We need to signal headers separately if we want real-time status.
+        # For now, Status remains "-" until finished.
 
     def on_request_finished(self, tab: RequestTab, response):
         tab.response_view.display_response(response)
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
+        
+        # Ensure status label is updated one last time
+        tab.response_view.status_label.setText(f"Status: {response.status_code}")
+        tab.response_view.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
+        tab.response_view.size_label.setText(f"Size: {response.size} bytes")
 
     def on_request_error(self, tab: RequestTab, error_msg):
-        QMessageBox.critical(self, "Error", f"Request failed: {error_msg}")
+        # Check if error is due to cancellation (not ideal check, but works for now)
+        # If we manually stopped, we might want to just reset button.
+        # But for now, just show error if it's actual error.
+        # If it's just "stopped", we might want to be silent or say "Cancelled".
+        
+        # Reset button state
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
+
+        if "cancelled" in error_msg.lower() or "aborted" in error_msg.lower():
+             return
+
+        QMessageBox.critical(self, "Error", f"Request failed: {error_msg}")
 
     def handle_variable_set_request(self, key, value):
         selected_env = self.env_selector.currentData()

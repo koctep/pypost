@@ -1,41 +1,24 @@
-# PYPOST-28: Create Example Collection for MCP Testing
+# Requirements: PYPOST-28 - MCP Testing Collection
 
-## Цели
+## Goals
+Create a set of test data (collection and environment) to verify the functionality of the MCP server. This will allow developers and users to quickly check if the integration with AI agents works.
 
-Создать эталонную коллекцию запросов (`examples/collections/mcp.json`), которая будет использоваться для ручного тестирования и демонстрации возможностей MCP-сервера приложения PyPost.
+## User Stories
+- As a developer, I want to have a ready-made collection of requests that I can use to test the MCP server.
+- As a developer, I want to have a pre-configured environment with variables for test requests.
 
-## Пользовательские истории
+## Acceptance Criteria
+- [ ] **Collection**: Created `MCP_Test.json` collection containing:
+    - GET request (e.g., `httpbin.org/get`).
+    - POST request with JSON body (e.g., `httpbin.org/post`).
+    - Request using variables.
+    - Request with post-request script.
+- [ ] **Environment**: Created `Test Env` environment containing variables used in the collection.
+- [ ] **Configuration**: Requests in the collection have `expose_as_mcp=True`.
 
-- Как **разработчик PYPOST**, я хочу иметь набор эталонных данных, чтобы тестировать функциональность MCP-сервера, предоставляемую самим приложением PYPOST.
-- Как **QA**, я хочу иметь готовую коллекцию запросов, чтобы быстро проверить работоспособность интеграции.
-- Как **пользователь**, я хочу видеть примеры того, какие запросы можно экспортировать как MCP-инструменты.
+## Task Description
+Create JSON files for the collection and environment manually or via PyPost interface and commit them to the repository.
 
-## Критерии готовности
-
-- Файл `examples/collections/mcp.json` создан.
-- Файл содержит валидную структуру JSON, соответствующую модели `Collection` в PyPost.
-- Коллекция содержит набор запросов, покрывающих различные сценарии HTTP (GET, POST, PUT, DELETE, Headers, Body).
-- Все запросы в коллекции имеют флаг `expose_as_mcp: true`.
-- **Важно**: Запросы **НЕ** используют переменные шаблона `{{ mcp.request.var }}` (инструменты не требуют аргументов).
-- Запросы направлены на локальный сервер (`http://localhost:1080`) для обеспечения изолированного тестирования.
-
-## Описание задачи
-
-Необходимо создать JSON-файл коллекции, который можно импортировать в PyPost (или просто поместить в папку `collections`).
-Коллекция должна демонстрировать работу MCP-сервера с "статическими" инструментами (tool), которые не требуют входных параметров от LLM, но выполняют полезные действия (в контексте теста).
-
-### Требования к содержимому
-
-1.  **Metrics (GET)**: GET запрос к `http://localhost:9080/metrics`. Проверяет доступность Prometheus метрик.
-2.  **MCP Connect (SSE)**: GET запрос к `http://localhost:9080/sse`. Проверяет доступность MCP SSE транспорта.
-3.  **MCP List Resources**: POST запрос к `http://localhost:9080/messages`. Тело запроса: JSON-RPC для получения списка ресурсов (`resources/list`).
-4.  **Main MCP Connect (SSE)**: GET запрос к `http://localhost:1080/sse`. Проверяет доступность основного MCP сервера.
-
-Все запросы должны иметь понятные имена (`name`).
-
-## Вопросы и ответы
-
-1.  **Q**: Нужно ли использовать переменные `{{ mcp.request... }}`?
-    **A**: Нет.
-2.  **Q**: Какой API использовать?
-    **A**: `http://localhost:9080` (Metrics Server, порт по умолчанию в `settings.py`) и `http://localhost:1080` (Main MCP Server).
+### Technical Details
+- **Path**: `collections/MCP_Test.json`, `environments.json`.
+- **Content**: Valid JSON matching PyPost models.

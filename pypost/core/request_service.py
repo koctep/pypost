@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.http_client import HTTPClient
@@ -16,7 +16,10 @@ class RequestService:
     def __init__(self):
         self.http_client = HTTPClient()
 
-    def execute(self, request: RequestData, variables: Dict[str, Any] = None) -> ExecutionResult:
+    def execute(self, request: RequestData, variables: Dict[str, Any] = None, 
+                stream_callback: Callable[[str], None] = None,
+                stop_flag: Callable[[], bool] = None,
+                headers_callback: Callable[[int, Dict], None] = None) -> ExecutionResult:
         """
         Executes a request with the given context.
         """
@@ -24,7 +27,7 @@ class RequestService:
             variables = {}
 
         # 1. Execute request
-        response = self.http_client.send_request(request, variables)
+        response = self.http_client.send_request(request, variables, stream_callback, stop_flag, headers_callback)
 
         updated_variables = {}
         script_logs = []

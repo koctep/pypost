@@ -11,13 +11,25 @@ class HTTPClient:
     def __init__(self):
         self.session = requests.Session()
 
-    def send_request(self, request_data: RequestData, variables: Dict[str, str] = None) -> ResponseData:
+from typing import Dict, Any, Callable, Optional
+
+# ... imports ...
+
+class HTTPClient:
+    def __init__(self):
+        self.session = requests.Session()
+
+    def send_request(self, request_data: RequestData, variables: Dict[str, str] = None, 
+                    stream_callback: Callable[[str], None] = None,
+                    stop_flag: Callable[[], bool] = None,
+                    headers_callback: Callable[[int, Dict], None] = None) -> ResponseData:
         if variables is None:
             variables = {}
 
+        # ... (preparing data code is same) ...
         # 1. Prepare data (render templates)
         url = template_service.render_string(request_data.url, variables)
-
+        
         # Render headers
         headers = {}
         for k, v in request_data.headers.items():
@@ -42,27 +54,60 @@ class HTTPClient:
         MetricsManager().track_request_sent(request_data.method)
         
         try:
-            response = self.session.request(
-                method=request_data.method,
-                url=url,
-                headers=headers,
-                params=params,
-                data=body if request_data.body_type != 'json' else None,
-                json=json.loads(body) if request_data.body_type == 'json' and body else None
-            )
-        except json.JSONDecodeError:
-             # Fallback if body is not valid JSON but type is json (send as string/data)
-             # Or maybe raise error? For now, let's try sending as raw data if json fails
-             response = self.session.request(
-                method=request_data.method,
-                url=url,
-                headers=headers,
-                params=params,
-                data=body
-            )
+            # Prepare arguments for requests.request
+            kwargs = {
+                'method': request_data.method,
+                'url': url,
+                'headers': headers,
+                'params': params,
+                'stream': True,
+                'timeout': 30.0 # Default timeout still applies for connect/read
+            }
+            
+            if request_data.body_type == 'json' and body:
+                try:
+                    kwargs['json'] = json.loads(body)
+                except json.JSONDecodeError:
+                    kwargs['data'] = body
+            elif request_data.body_type != 'json':
+                kwargs['data'] = body
+
+            response = self.session.request(**kwargs)
+            
         except Exception as e:
-            # Re-raise or return error response
             raise e
+
+        if headers_callback:
+            headers_callback(response.status_code, dict(response.headers))
+
+        # Check for Transfer-Encoding: chunked. If so, and if we want to stream, we do so.
+        # But 'requests' always returns a Response object immediately if stream=True.
+        # So we can emit headers/status HERE if we had a callback for it.
+        # But we don't have a callback for headers yet in send_request signature (only stream_callback for body).
+        # We could add on_response_started callback.
+
+        # Stream content
+        content_parts = []
+        # iter_content with None uses optimal chunk size from server (or fallback)
+        # decode_unicode=True yields strings instead of bytes
+        for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+            if stop_flag and stop_flag():
+                # If cancelled, we break the loop. 
+                # Note: This stops reading, but doesn't necessarily close socket immediately unless we close response.
+                response.close() 
+                break
+                
+            if chunk:
+                content_parts.append(chunk)
+                if stream_callback:
+                    stream_callback(chunk)
+            
+            # Check stop flag again after processing chunk to be responsive
+            if stop_flag and stop_flag():
+                response.close()
+                break
+
+        content = "".join(content_parts)
 
         end_time = time.time()
 
@@ -72,7 +117,7 @@ class HTTPClient:
         return ResponseData(
             status_code=response.status_code,
             headers=dict(response.headers),
-            body=response.text,
+            body=content,
             elapsed_time=end_time - start_time,
-            size=len(response.content)
+            size=len(content.encode('utf-8')) # Calculate size from content
         )

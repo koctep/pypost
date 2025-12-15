@@ -1,46 +1,32 @@
-# PYPOST-28: Create Example Collection for MCP Testing
+# Architecture: PYPOST-28 - MCP Testing Collection
 
-## Исследования
+## Research
+No complex architecture required. This is a data creation task.
 
-- Анализ `doc/dev/mcp_integration.md`: выявлено наличие двух встроенных серверов (Main MCP: 1080, Metrics MCP: 9091).
-- **Корректировка**: Анализ `pypost/models/settings.py` показал, что порт Metrics Server по умолчанию равен **9080**, а не 9091.
-- Сервер Metrics (9080) предоставляет стандартный endpoint `/metrics` и MCP endpoints.
+## Implementation Plan
 
-## План реализации
+1.  **Create Environment**:
+    -   Name: "Test Env".
+    -   Variables: `base_url=https://httpbin.org`.
+    -   Enable MCP: True.
 
-1.  Создать директорию `examples/collections/` (если не существует).
-2.  Сгенерировать UUID для коллекции и запросов.
-3.  Создать JSON структуру, соответствующую `Collection` Pydantic модели.
-4.  Заполнить коллекцию запросами к локальным серверам PyPost:
-    - Get Metrics (9080)
-    - MCP Connect SSE (9080)
-    - MCP List Resources (9080)
-    - Main MCP Connect SSE (1080)
-5.  Установить `expose_as_mcp: true` для всех запросов.
+2.  **Create Collection**:
+    -   Name: "MCP Test".
+    -   Requests:
+        1.  **Get Data**: GET `{{base_url}}/get`. Expose: True.
+        2.  **Post Data**: POST `{{base_url}}/post`. Body: `{"foo": "bar"}`. Expose: True.
+        3.  **Script Test**: GET `{{base_url}}/uuid`. Script: `pypost.env.set('uuid', response.json()['uuid'])`. Expose: True.
 
-## Архитектура
+3.  **Save**:
+    -   Save files to `collections/` and root (for `environments.json`).
 
-**Структура файла `examples/collections/mcp.json`:**
+## Architecture
 
-```json
-{
-  "id": "uuid",
-  "name": "MCP Test Collection",
-  "requests": [
-    {
-      "id": "uuid",
-      "name": "Metrics (GET)",
-      "method": "GET",
-      "url": "http://localhost:9080/metrics",
-      "expose_as_mcp": true,
-      ...
-    },
-    ...
-  ]
-}
+### File Structure
+
 ```
-
-## Вопросы и ответы
-
-Нет архитектурных вопросов.
-
+pypost/
+  collections/
+    MCP_Test.json
+  environments.json
+```

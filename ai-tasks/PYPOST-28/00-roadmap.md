@@ -1,36 +1,36 @@
 # Roadmap: PYPOST-28
 
-## Статус выполнения шагов
+## Step Execution Status
 
-- [x] **ШАГ 1: Сбор и документирование требований**
-- [x] **ШАГ 2: Архитектурное проектирование высокого уровня**
-- [x] **ШАГ 3: Разработка**
-  - [x] Создан файл `examples/collections/mcp.json` с тестовыми запросами к локальным серверам PyPost (9080, 1080).
-- [x] **ШАГ 4: Ревью и технический долг**
+- [x] **STEP 1: Requirements gathering and documentation**
+- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 3: Development**
+  - [x] Created `collections/MCP_Test.json` with test requests.
+  - [x] Created `environments.json` with test environment.
+  - [x] Verified loading of collection and environment in PyPost.
+- [x] **STEP 4: Review and Technical Debt**
 
-## Легенда статусов
+## Status Legend
 
-- `[ ]` — шаг не начат
-- `[/]` — работа над шагом начата (in progress)
-- `[x]` — шаг завершен
+- `[ ]` — step not started
+- `[/]` — step in progress
+- `[x]` — step completed
 
-## Артефакты
+## Artifacts
 
-### ШАГ 1: Требования
+### STEP 1: Requirements
 
 - `ai-tasks/PYPOST-28/10-requirements.md`
 
-### ШАГ 2: Архитектура
+### STEP 2: Architecture
 
 - `ai-tasks/PYPOST-28/20-architecture.md`
 
-### ШАГ 3: Разработка
+### STEP 3: Development
 
-- Исходный код
-- Тесты
-- Обновления документации
+- `collections/MCP_Test.json`
+- `environments.json`
 
-### ШАГ 4: Ревью
+### STEP 4: Review
 
 - `ai-tasks/PYPOST-28/40-tech-debt.md`
-

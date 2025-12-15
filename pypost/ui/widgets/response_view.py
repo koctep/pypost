@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QLabel, QHBoxLayout, QMenu)
+from PySide6.QtGui import QTextCursor
 from PySide6.QtCore import Qt, Signal
 from pypost.models.response import ResponseData
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
@@ -97,6 +98,19 @@ class ResponseView(QWidget):
                 self.body_view.setText(pretty_json)
              except:
                 pass
+
+    def clear_body(self):
+        """Clears the response body and status labels."""
+        self.body_view.clear()
+        self.status_label.setText("Status: -")
+        self.time_label.setText("Time: -")
+        self.size_label.setText("Size: -")
+
+    def append_body(self, text: str):
+        """Appends text to the response body."""
+        self.body_view.moveCursor(QTextCursor.End)
+        self.body_view.insertPlainText(text)
+        self.body_view.moveCursor(QTextCursor.End)
 
     def display_response(self, response: ResponseData):
         self.status_label.setText(f"Status: {response.status_code}")
