@@ -41,7 +41,7 @@ The main application window is divided into several main areas:
 
 ### Creating a Request
 
-To create a new request, press `Ctrl+N` or the new tab button (if provided by the interface).
+To create a new request, press `Ctrl+N` or click the `+` button in the tab bar.
 
 In the request editor, you can configure:
 *   **Method**: GET, POST, PUT, DELETE, PATCH.

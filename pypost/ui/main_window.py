@@ -1,13 +1,15 @@
+import logging
+
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QComboBox, QLabel, QSplitter, QTreeView, QTabWidget, QMessageBox,
-                               QPushButton, QApplication, QInputDialog)
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QFont, QIcon, QShortcut, QKeySequence
-from PySide6.QtCore import Qt
+                               QPushButton, QApplication, QInputDialog, QTabBar)
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QShortcut, QKeySequence
+from PySide6.QtCore import Qt, Signal
 from pathlib import Path
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 from pypost.core.worker import RequestWorker
-from pypost.models.models import RequestData, Collection, Environment
+from pypost.models.models import RequestData, Environment
 from pypost.core.storage import StorageManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.style_manager import StyleManager
@@ -20,6 +22,9 @@ from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
+
+logger = logging.getLogger(__name__)
+
 
 class RequestTab(QWidget):
     def __init__(self, request_data: RequestData = None):
@@ -35,8 +40,21 @@ class RequestTab(QWidget):
         self.splitter.addWidget(self.response_view)
 
         self.layout.addWidget(self.splitter)
-        
+
         self.worker = None
+
+
+class TabBarWithAddButton(QTabBar):
+    layout_changed = Signal()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.layout_changed.emit()
+
+    def tabLayoutChange(self):
+        super().tabLayoutChange()
+        self.layout_changed.emit()
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -49,7 +67,7 @@ class MainWindow(QMainWindow):
 
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
-        
+
         self.style_manager = StyleManager()
         self.mcp_manager = MCPServerManager()
         self.mcp_manager.status_changed.connect(self.on_mcp_status_changed)
@@ -85,7 +103,7 @@ class MainWindow(QMainWindow):
 
         self.settings_btn = QPushButton("Settings")
         self.settings_btn.clicked.connect(self.open_settings)
-        
+
         self.env_label = QLabel("Environment:")
         self.mcp_status_label = QLabel("MCP: OFF")
         self.mcp_status_label.setStyleSheet("color: gray;")
@@ -111,8 +129,17 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(self.collections_view)
 
         self.tabs = QTabWidget()
+        self.tab_bar = TabBarWithAddButton()
+        self.tab_bar.setExpanding(False)
+        self.tabs.setTabBar(self.tab_bar)
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.add_tab_btn = QPushButton("+", self.tabs)
+        self.add_tab_btn.setToolTip("New Tab (Ctrl+N)")
+        self.add_tab_btn.setFixedSize(24, 24)
+        self.add_tab_btn.clicked.connect(lambda: self.handle_new_tab("plus_button"))
+        self.tab_bar.layout_changed.connect(self._position_add_tab_button)
+        self._position_add_tab_button()
         self.splitter.addWidget(self.tabs)
 
         self.splitter.setSizes([300, 900])
@@ -131,7 +158,7 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
 
         file_menu = menubar.addMenu("File")
-        
+
         quit_action = file_menu.addAction("Quit")
         quit_action.setShortcut("Ctrl+Q")
         quit_action.triggered.connect(self.handle_exit)
@@ -175,7 +202,7 @@ class MainWindow(QMainWindow):
 
                 if req.method in self.icons:
                     req_item.setIcon(self.icons[req.method])
-                
+
                 col_item.appendRow(req_item)
 
             self.collections_model.appendRow(col_item)
@@ -197,7 +224,7 @@ class MainWindow(QMainWindow):
         self.env_selector.blockSignals(False)
 
         if selected_index > 0:
-             self.on_env_changed(selected_index)
+            self.on_env_changed(selected_index)
 
     def on_env_changed(self, index):
         selected_env = self.env_selector.itemData(index)
@@ -213,7 +240,7 @@ class MainWindow(QMainWindow):
                         if req.expose_as_mcp:
                             tools.append(req)
                 self.mcp_manager.start_server(
-                    port=self.settings.mcp_port, 
+                    port=self.settings.mcp_port,
                     tools=tools,
                     host=self.settings.mcp_host
                 )
@@ -222,7 +249,7 @@ class MainWindow(QMainWindow):
         else:
             self.settings.last_environment_id = None
             self.mcp_manager.stop_server()
-        
+
         self.config_manager.save_config(self.settings)
 
         for i in range(self.tabs.count()):
@@ -236,7 +263,9 @@ class MainWindow(QMainWindow):
 
     def on_mcp_status_changed(self, is_running: bool):
         if is_running:
-            self.mcp_status_label.setText(f"MCP: ON ({self.settings.mcp_host}:{self.settings.mcp_port})")
+            self.mcp_status_label.setText(
+                f"MCP: ON ({self.settings.mcp_host}:{self.settings.mcp_port})"
+            )
             self.mcp_status_label.setStyleSheet("color: green; font-weight: bold;")
         else:
             self.mcp_status_label.setText("MCP: OFF")
@@ -248,13 +277,13 @@ class MainWindow(QMainWindow):
             tab = self.tabs.widget(i)
             if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id:
                 open_tabs_ids.append(tab.request_data.id)
-        
+
         self.state_manager.set_open_tabs(open_tabs_ids)
 
     def open_env_manager(self):
         current_env_name = self.env_selector.currentText()
-        if self.env_selector.currentIndex() == 0: 
-             current_env_name = None
+        if self.env_selector.currentIndex() == 0:
+            current_env_name = None
 
         dialog = EnvironmentDialog(self.environments, self, current_env_name)
         dialog.exec()
@@ -268,7 +297,7 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             new_settings = dialog.get_settings()
             if new_settings:
-                metrics_changed = (self.settings.metrics_host != new_settings.metrics_host or 
+                metrics_changed = (self.settings.metrics_host != new_settings.metrics_host or
                                    self.settings.metrics_port != new_settings.metrics_port)
 
                 self.settings = new_settings
@@ -276,7 +305,10 @@ class MainWindow(QMainWindow):
                 self.apply_settings(self.settings)
 
                 if metrics_changed:
-                    MetricsManager().restart_server(self.settings.metrics_host, self.settings.metrics_port)
+                    MetricsManager().restart_server(
+                        self.settings.metrics_host,
+                        self.settings.metrics_port
+                    )
 
                 self.on_env_changed(self.env_selector.currentIndex())
 
@@ -286,16 +318,16 @@ class MainWindow(QMainWindow):
             font = app.font()
             font.setPointSize(settings.font_size)
             app.setFont(font)
-            
+
             self.style_manager.apply_styles(app)
-            
+
             self.collections_view.setFont(font)
             self.env_selector.setFont(font)
             self.tabs.setFont(font)
-            
+
             if self.menuBar():
                 self.menuBar().setFont(font)
-            
+
             self.manage_env_btn.setFont(font)
             self.settings_btn.setFont(font)
             self.env_label.setFont(font)
@@ -307,13 +339,13 @@ class MainWindow(QMainWindow):
                 if hasattr(tab.request_editor, 'body_edit'):
                     tab.request_editor.body_edit.update_indent_size(settings.indent_size)
                     tab.request_editor.body_edit.reformat_text()
-                
+
                 if hasattr(tab.response_view, 'set_indent_size'):
                     tab.response_view.set_indent_size(settings.indent_size)
 
     def add_new_tab(self, request_data: RequestData = None, save_state: bool = True):
         tab = RequestTab(request_data)
-        
+
         if hasattr(tab.request_editor, 'body_edit'):
             tab.request_editor.body_edit.update_indent_size(self.settings.indent_size)
         if hasattr(tab.response_view, 'set_indent_size'):
@@ -333,7 +365,8 @@ class MainWindow(QMainWindow):
         name = request_data.name if request_data else "New Request"
         self.tabs.addTab(tab, name)
         self.tabs.setCurrentWidget(tab)
-        
+        self._position_add_tab_button()
+
         if save_state:
             self.save_tabs_state()
 
@@ -341,7 +374,8 @@ class MainWindow(QMainWindow):
         self.tabs.removeTab(index)
         if self.tabs.count() == 0:
             self.add_new_tab(save_state=False)
-        
+        self._position_add_tab_button()
+
         self.save_tabs_state()
 
     def on_collection_clicked(self, index):
@@ -351,7 +385,11 @@ class MainWindow(QMainWindow):
         if isinstance(data, RequestData):
             for i in range(self.tabs.count()):
                 tab = self.tabs.widget(i)
-                if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id == data.id:
+                if (
+                    isinstance(tab, RequestTab)
+                    and tab.request_data
+                    and tab.request_data.id == data.id
+                ):
                     self.tabs.setCurrentIndex(i)
                     return
 
@@ -364,16 +402,19 @@ class MainWindow(QMainWindow):
 
     def handle_save_request(self, request_data: RequestData):
         existing_result = self.request_manager.find_request(request_data.id)
-        
+
         if existing_result:
             existing_request, found_collection = existing_result
-            
+
             if self.settings.confirm_overwrite_request:
                 reply = QMessageBox.question(
-                    self, 
-                    "Overwrite Request?", 
-                    f"This will overwrite the existing request '{existing_request.name}'. Continue?",
-                    QMessageBox.Yes | QMessageBox.No, 
+                    self,
+                    "Overwrite Request?",
+                    (
+                        "This will overwrite the existing request "
+                        f"'{existing_request.name}'. Continue?"
+                    ),
+                    QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No
                 )
                 if reply == QMessageBox.No:
@@ -414,10 +455,10 @@ class MainWindow(QMainWindow):
 
                 current_index = self.tabs.currentIndex()
                 self.tabs.setTabText(current_index, request_data.name)
-                
+
                 tab = self.tabs.widget(current_index)
                 if isinstance(tab, RequestTab):
-                     tab.request_data = request_data
+                    tab.request_data = request_data
 
                 self.save_tabs_state()
 
@@ -452,7 +493,9 @@ class MainWindow(QMainWindow):
         worker.env_update.connect(lambda vars: self.on_env_update(vars))
         worker.script_output.connect(lambda logs, err: self.on_script_output(sender_tab, logs, err))
         worker.chunk_received.connect(lambda chunk: self.on_chunk_received(sender_tab, chunk))
-        worker.headers_received.connect(lambda status, headers: self.on_headers_received(sender_tab, status, headers))
+        worker.headers_received.connect(
+            lambda status, headers: self.on_headers_received(sender_tab, status, headers)
+        )
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
         worker.start()
@@ -493,14 +536,18 @@ class MainWindow(QMainWindow):
         self._reset_tab_ui_state(tab)
 
         if "cancelled" in error_msg.lower() or "aborted" in error_msg.lower():
-             return
+            return
 
         QMessageBox.critical(self, "Error", f"Request failed: {error_msg}")
 
     def handle_variable_set_request(self, key, value):
         selected_env = self.env_selector.currentData()
         if not isinstance(selected_env, Environment):
-            QMessageBox.warning(self, "No Environment", "Please select an environment to set variables.")
+            QMessageBox.warning(
+                self,
+                "No Environment",
+                "Please select an environment to set variables."
+            )
             return
 
         target_key = key
@@ -522,7 +569,7 @@ class MainWindow(QMainWindow):
 
     def _setup_shortcuts(self):
         new_tab_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
-        new_tab_shortcut.activated.connect(self.handle_new_tab)
+        new_tab_shortcut.activated.connect(lambda: self.handle_new_tab("shortcut"))
 
         close_tab_shortcut = QShortcut(QKeySequence("Ctrl+W"), self)
         close_tab_shortcut.activated.connect(self.handle_close_tab)
@@ -566,7 +613,10 @@ class MainWindow(QMainWindow):
     def handle_exit(self):
         QApplication.instance().quit()
 
-    def handle_new_tab(self):
+    def handle_new_tab(self, source: str = "unknown"):
+        tabs_before = self.tabs.count()
+        logger.info("new_tab_action_triggered source=%s tabs_before=%d", source, tabs_before)
+        MetricsManager().track_gui_new_tab_action(source)
         self.add_new_tab()
 
     def handle_close_tab(self):
@@ -645,7 +695,7 @@ class MainWindow(QMainWindow):
     def on_tree_expanded(self, index):
         item = self.collections_model.itemFromIndex(index)
         data = item.data(Qt.UserRole)
-        if isinstance(data, str): 
+        if isinstance(data, str):
             current_expanded = self.state_manager.get_expanded_collections()
             if data not in current_expanded:
                 current_expanded.append(data)
@@ -668,3 +718,27 @@ class MainWindow(QMainWindow):
             data = item.data(Qt.UserRole)
             if isinstance(data, str) and data in expanded_collections:
                 self.collections_view.setExpanded(item.index(), True)
+
+    def _position_add_tab_button(self):
+        if not hasattr(self, "add_tab_btn"):
+            return
+
+        tab_count = self.tabs.count()
+        tab_bar_rect = self.tab_bar.geometry()
+
+        if tab_count > 0:
+            last_rect = self.tab_bar.tabRect(tab_count - 1)
+            x_pos = tab_bar_rect.x() + last_rect.right() + 6
+            y_pos = tab_bar_rect.y() + last_rect.top()
+            y_pos += max(0, (last_rect.height() - self.add_tab_btn.height()) // 2)
+        else:
+            x_pos = tab_bar_rect.x() + 6
+            y_pos = tab_bar_rect.y()
+            y_pos += max(0, (self.tab_bar.height() - self.add_tab_btn.height()) // 2)
+
+        max_x = max(0, self.tabs.width() - self.add_tab_btn.width() - 6)
+        x_pos = min(x_pos, max_x)
+
+        self.add_tab_btn.move(x_pos, y_pos)
+        self.add_tab_btn.raise_()
+        self.add_tab_btn.show()

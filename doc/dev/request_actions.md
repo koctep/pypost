@@ -20,11 +20,22 @@ This design reduces UI clutter and allows adding more actions in the same menu l
   - Collects GUI action metrics:
     - `gui_send_clicks_total`
     - `gui_save_actions_total{source=<menu|shortcut>}`
+    - `gui_new_tab_actions_total{source=<plus_button|shortcut|unknown>}`
+- **`MainWindow` tab controls (`pypost/ui/main_window.py`)**:
+  - Defines `TabBarWithAddButton` (custom `QTabBar`) to emit layout-change notifications.
+  - Places a `+` tab action button (`add_tab_btn`) next to the last tab.
+  - Routes both `Ctrl+N` and `+` click to `handle_new_tab(source=...)`.
 
 High-level flow:
 1. User clicks `Actions -> Save` or presses `Ctrl+S`.
 2. `RequestWidget.on_save(source=...)` updates request data and emits `save_requested`.
 3. `MainWindow.handle_save_request` runs the persistence flow.
+
+New-tab flow:
+1. User clicks `+` or presses `Ctrl+N`.
+1. `MainWindow.handle_new_tab(source=...)` logs source and tab count before action.
+1. `MetricsManager.track_gui_new_tab_action(source)` increments labeled metric.
+1. `MainWindow.add_new_tab()` creates and selects the new request tab.
 
 ## API / Usage
 
@@ -50,6 +61,29 @@ Shortcut callback for `Ctrl+S`. Calls `on_save("shortcut")`.
 
 Records a labeled counter increment for save action source.
 
+### `MainWindow.handle_new_tab(source: str = "unknown")`
+
+Centralized new-tab entry point used by both keyboard and button flows.
+
+- **source**: trigger origin (`plus_button`, `shortcut`, fallback `unknown`).
+- **Behavior**:
+  1. Writes INFO log `new_tab_action_triggered source=<source> tabs_before=<count>`.
+  1. Increments metric `gui_new_tab_actions_total{source=<source>}`.
+  1. Calls `add_new_tab()` once.
+
+### `MainWindow._position_add_tab_button()`
+
+Positions `add_tab_btn` relative to `QTabWidget`/`QTabBar` geometry.
+
+- Uses last tab rect when tabs exist.
+- Uses left offset baseline when no tabs exist.
+- Clamps X position to widget bounds to avoid clipping.
+- Triggered on tab layout changes, resize, and tab add/close operations.
+
+### `MetricsManager.track_gui_new_tab_action(source: str)`
+
+Records a labeled counter increment for new-tab trigger source.
+
 ## Configuration
 
 No new task-specific configuration keys were added.
@@ -57,6 +91,10 @@ No new task-specific configuration keys were added.
 Observability endpoint configuration remains global and unchanged:
 - `settings.metrics_host`
 - `settings.metrics_port`
+
+Tab action UI uses internal constants in `MainWindow`:
+- Button size: `24x24`
+- Horizontal spacing offset: `6px`
 
 ## Troubleshooting
 
@@ -81,3 +119,19 @@ Observability endpoint configuration remains global and unchanged:
 
 - Inspect `MainWindow.handle_save_request` flow.
 - Check collection and storage files for write permissions.
+
+### `+` button is not visible or overlaps tabs
+
+- Confirm `self.tab_bar.setExpanding(False)` is active.
+- Verify `_position_add_tab_button()` is called after tab add/close and on layout changes.
+- Check that the position clamp (`max_x`) still uses current tab widget width.
+
+### `Ctrl+N` works but `+` click does nothing
+
+- Confirm `add_tab_btn.clicked` is connected to `handle_new_tab("plus_button")`.
+- Verify `handle_new_tab` still calls `add_new_tab()` (not an early return path).
+
+### New-tab metrics are missing
+
+- Ensure `gui_new_tab_actions_total` is registered in `MetricsManager._init_metrics()`.
+- Trigger at least one `Ctrl+N` and one `+` click before checking `/metrics`.
