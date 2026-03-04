@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from pypost.core.storage import StorageManager
 from pypost.models.models import Collection, RequestData
 
@@ -9,11 +9,20 @@ class RequestManager:
     def __init__(self, storage_manager: StorageManager):
         self.storage = storage_manager
         self.collections: List[Collection] = []
+        self._request_index: Dict[str, Tuple[RequestData, Collection]] = {}
         self.reload_collections()
 
     def reload_collections(self):
         """Reloads collections from storage."""
         self.collections = self.storage.load_collections()
+        self._rebuild_index()
+
+    def _rebuild_index(self):
+        """Rebuilds the internal index of requests for O(1) access."""
+        self._request_index.clear()
+        for col in self.collections:
+            for req in col.requests:
+                self._request_index[req.id] = (req, col)
 
     def get_collections(self) -> List[Collection]:
         return self.collections
@@ -23,11 +32,7 @@ class RequestManager:
         Finds a request by ID.
         Returns a tuple (RequestData, Collection) or None if not found.
         """
-        for col in self.collections:
-            for req in col.requests:
-                if req.id == request_id:
-                    return req, col
-        return None
+        return self._request_index.get(request_id)
 
     def save_request(self, request: RequestData, collection_id: str):
         """
@@ -56,6 +61,9 @@ class RequestManager:
 
         # Persist
         self.storage.save_collection(target_collection)
+        
+        # Update index
+        self._rebuild_index()
 
     def create_collection(self, name: str) -> Collection:
         """Creates a new collection."""

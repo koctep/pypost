@@ -1,7 +1,7 @@
 import requests
 import time
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Callable, Optional
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.template_service import template_service
@@ -11,13 +11,44 @@ class HTTPClient:
     def __init__(self):
         self.session = requests.Session()
 
-from typing import Dict, Any, Callable, Optional
+    def _prepare_request_kwargs(self, request_data: RequestData, variables: Dict[str, str]) -> Dict[str, Any]:
+        """Prepares the arguments for requests.request by rendering templates."""
+        # Render templates
+        url = template_service.render_string(request_data.url, variables)
+        
+        headers = {}
+        for k, v in request_data.headers.items():
+            rendered_k = template_service.render_string(k, variables)
+            rendered_v = template_service.render_string(v, variables)
+            headers[rendered_k] = rendered_v
 
-# ... imports ...
+        params = {}
+        for k, v in request_data.params.items():
+            rendered_k = template_service.render_string(k, variables)
+            rendered_v = template_service.render_string(v, variables)
+            params[rendered_k] = rendered_v
 
-class HTTPClient:
-    def __init__(self):
-        self.session = requests.Session()
+        body = template_service.render_string(request_data.body, variables)
+
+        # Prepare kwargs
+        kwargs = {
+            'method': request_data.method,
+            'url': url,
+            'headers': headers,
+            'params': params,
+            'stream': True,
+            'timeout': 30.0
+        }
+        
+        if request_data.body_type == 'json' and body:
+            try:
+                kwargs['json'] = json.loads(body)
+            except json.JSONDecodeError:
+                kwargs['data'] = body
+        elif request_data.body_type != 'json':
+            kwargs['data'] = body
+            
+        return kwargs
 
     def send_request(self, request_data: RequestData, variables: Dict[str, str] = None, 
                     stream_callback: Callable[[str], None] = None,
@@ -26,27 +57,7 @@ class HTTPClient:
         if variables is None:
             variables = {}
 
-        # ... (preparing data code is same) ...
-        # 1. Prepare data (render templates)
-        url = template_service.render_string(request_data.url, variables)
-        
-        # Render headers
-        headers = {}
-        for k, v in request_data.headers.items():
-            rendered_k = template_service.render_string(k, variables)
-            rendered_v = template_service.render_string(v, variables)
-            headers[rendered_k] = rendered_v
-
-        # Render params
-        params = {}
-        for k, v in request_data.params.items():
-            rendered_k = template_service.render_string(k, variables)
-            rendered_v = template_service.render_string(v, variables)
-            params[rendered_k] = rendered_v
-
-        # Render body
-        body = template_service.render_string(request_data.body, variables)
-
+        # 1. Prepare data (render templates and build kwargs)
         # 2. Execute request
         start_time = time.time()
         
@@ -54,24 +65,7 @@ class HTTPClient:
         MetricsManager().track_request_sent(request_data.method)
         
         try:
-            # Prepare arguments for requests.request
-            kwargs = {
-                'method': request_data.method,
-                'url': url,
-                'headers': headers,
-                'params': params,
-                'stream': True,
-                'timeout': 30.0 # Default timeout still applies for connect/read
-            }
-            
-            if request_data.body_type == 'json' and body:
-                try:
-                    kwargs['json'] = json.loads(body)
-                except json.JSONDecodeError:
-                    kwargs['data'] = body
-            elif request_data.body_type != 'json':
-                kwargs['data'] = body
-
+            kwargs = self._prepare_request_kwargs(request_data, variables)
             response = self.session.request(**kwargs)
             
         except Exception as e:

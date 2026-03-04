@@ -1,29 +1,29 @@
 # PYPOST-32: Technical Debt Refactoring Architecture
 
-## Исследования
+## Research
 
-Поскольку задача является чисто рефакторингом (без добавления новой бизнес-логики), исследования сосредоточены на анализе текущей кодовой базы для определения точек разрыва зависимостей.
+Since the task is purely refactoring (without adding new business logic), research is focused on analyzing the current codebase to identify dependency breaking points.
 
-### Текущая структура зависимостей (Проблемная)
+### Current Dependency Structure (Problematic)
 - **MainWindow**
-  - Напрямую управляет `StorageManager` для загрузки/сохранения коллекций.
-  - Напрямую взаимодействует с `ConfigManager` и `AppSettings` для сохранения состояния UI (expanded nodes, tabs).
-  - Содержит бизнес-логику поиска запроса по ID (`restore_tabs`, `save_request`).
-  - Содержит логику создания и обновления запросов.
+  - Directly manages `StorageManager` for loading/saving collections.
+  - Directly interacts with `ConfigManager` and `AppSettings` for saving UI state (expanded nodes, tabs).
+  - Contains business logic for finding request by ID (`restore_tabs`, `save_request`).
+  - Contains logic for creating and updating requests.
 - **VariableAware Widgets**
-  - Дублируют код `mouseMoveEvent` и использование `VariableHoverHelper`.
+  - Duplicate `mouseMoveEvent` code and usage of `VariableHoverHelper`.
 
-### Целевая структура
-Внедрение паттерна "Service/Manager" для изоляции бизнес-логики и паттерна "Mixin" для переиспользования кода UI.
+### Target Structure
+Implementation of the "Service/Manager" pattern to isolate business logic and the "Mixin" pattern for reusing UI code.
 
-## Архитектура
+## Architecture
 
-### Новые компоненты
+### New Components
 
 #### 1. `RequestManager` (Service)
-**Ответственность**: Управление жизненным циклом запросов и коллекций.
-**Зависимости**: `StorageManager`.
-**Методы**:
+**Responsibility**: Managing the lifecycle of requests and collections.
+**Dependencies**: `StorageManager`.
+**Methods**:
 - `get_collections() -> List[Collection]`
 - `find_request(request_id: str) -> Optional[Tuple[RequestData, Collection]]`
 - `save_request(request: RequestData, collection_id: str) -> None`
@@ -31,9 +31,9 @@
 - `delete_request(request_id: str) -> None`
 
 #### 2. `StateManager` (Service)
-**Ответственность**: Управление персистентным состоянием UI, абстрагируя структуру конфигурации.
-**Зависимости**: `ConfigManager`.
-**Методы**:
+**Responsibility**: Managing persistent UI state, abstracting the configuration structure.
+**Dependencies**: `ConfigManager`.
+**Methods**:
 - `get_expanded_collections() -> List[str]`
 - `set_expanded_collections(ids: List[str]) -> None`
 - `get_open_tabs() -> List[str]`
@@ -42,12 +42,12 @@
 - `set_last_environment_id(id: str) -> None`
 
 #### 3. `VariableHoverMixin` (UI Mixin)
-**Ответственность**: Предоставление функционала всплывающих подсказок для переменных.
-**Использование**: Наследуется виджетами (`VariableAwareLineEdit`, `VariableAwarePlainTextEdit`).
-**Абстрактные методы** (которые должны реализовать наследники):
-- `_get_text_at_cursor(event) -> Tuple[str, int]` (текст и индекс)
+**Responsibility**: Providing tooltip functionality for variables.
+**Usage**: Inherited by widgets (`VariableAwareLineEdit`, `VariableAwarePlainTextEdit`).
+**Abstract Methods** (which inheritors must implement):
+- `_get_text_at_cursor(event) -> Tuple[str, int]` (text and index)
 
-### Диаграмма взаимодействия (Mermaid)
+### Interaction Diagram (Mermaid)
 
 ```mermaid
 classDiagram
@@ -83,20 +83,20 @@ classDiagram
     VariableAwareLineEdit --|> VariableHoverMixin
 ```
 
-## План реализации
+## Implementation Plan
 
 1.  **Core Refactoring**:
-    - Создать `pypost/core/request_manager.py`. Перенести логику поиска/сохранения из `MainWindow`.
-    - Создать `pypost/core/state_manager.py`. Перенести логику работы с `AppSettings` (касательно UI state).
+    - Create `pypost/core/request_manager.py`. Move search/save logic from `MainWindow`.
+    - Create `pypost/core/state_manager.py`. Move logic for working with `AppSettings` (regarding UI state).
 2.  **UI Refactoring (Widgets)**:
-    - Создать `pypost/ui/widgets/mixins.py` с `VariableHoverMixin`.
-    - Обновить виджеты в `pypost/ui/widgets/variable_aware_widgets.py` для использования миксина.
+    - Create `pypost/ui/widgets/mixins.py` with `VariableHoverMixin`.
+    - Update widgets in `pypost/ui/widgets/variable_aware_widgets.py` to use the mixin.
 3.  **MainWindow Integration**:
-    - Внедрить `RequestManager` и `StateManager` в `MainWindow`.
-    - Заменить прямые вызовы `storage` и циклы поиска на вызовы менеджеров.
+    - Inject `RequestManager` and `StateManager` into `MainWindow`.
+    - Replace direct calls to `storage` and search loops with calls to managers.
 
-## Вопросы и ответы
+## Q&A
 
-- **Почему не использовать полноценный DI container?**
-  - Для текущего масштаба приложения (Python/PySide6) это избыточно. Простая инициализация в `main.py` или `MainWindow.__init__` ("Composition Root") достаточна.
+- **Why not use a full DI container?**
+  - For the current scale of the application (Python/PySide6), this is excessive. Simple initialization in `main.py` or `MainWindow.__init__` ("Composition Root") is sufficient.
 

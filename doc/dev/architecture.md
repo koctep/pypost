@@ -43,11 +43,11 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 
 ### Business Logic (`pypost/core/`)
 
-- **RequestManager**: Manages the CRUD operations for Requests and Collections. Encapsulates searching and saving logic, decoupling it from the UI.
+- **RequestManager**: Manages the CRUD operations for Requests and Collections. Encapsulates searching and saving logic, decoupling it from the UI. Maintains an internal index for O(1) request lookup.
 - **StateManager**: Manages the persistence of UI state (e.g., open tabs, expanded tree nodes), abstracting the configuration structure.
 - **RequestService**: The central entry point for executing requests. It coordinates the `HTTPClient`
   for network calls and `ScriptExecutor` for post-request scripts.
-- **HTTPClient**: Handles the actual network communication using `requests`.
+- **HTTPClient**: Handles the actual network communication using `requests`. Responsible for rendering templates and preparing request parameters.
 - **ScriptExecutor**: Runs user-defined Python scripts in a sandboxed environment to manipulate variables.
 - **TemplateService**: A service that manages the Jinja2 Environment and processes strings like `{{base_url}}/api`.
 - **MetricsManager**: A singleton service managing the observability server. It runs an isolated `uvicorn` server providing both Prometheus metrics (`/metrics`) and an MCP interface (`/sse`) for accessing metrics as resources.

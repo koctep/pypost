@@ -1,44 +1,44 @@
 # PYPOST-32: Technical Debt Refactoring (Managers & Mixins)
 
-## Цели
+## Goals
 
-Основная цель — устранение технического долга, накопленного в процессе разработки (PYPOST-12, PYPOST-16, PYPOST-17), путем декомпозиции `MainWindow` и уменьшения дублирования кода.
-Это повысит поддерживаемость, тестируемость кода и упростит дальнейшее развитие функционала.
+The main goal is to eliminate technical debt accumulated during development (PYPOST-12, PYPOST-16, PYPOST-17) by decomposing `MainWindow` and reducing code duplication.
+This will improve code maintainability, testability, and simplify future feature development.
 
-## Пользовательские истории
+## User Stories
 
-- **Как разработчик**, я хочу, чтобы логика работы с запросами была вынесена в отдельный сервис `RequestManager`, чтобы не искать её внутри огромного класса `MainWindow`.
-- **Как разработчик**, я хочу, чтобы сохранение состояния UI (`expanded_collections`, `open_tabs`) управлялось отдельным компонентом `StateManager`, чтобы разгрузить UI-код.
-- **Как разработчик**, я хочу, чтобы общая логика всплывающих подсказок для переменных была вынесена в миксин, чтобы избежать дублирования кода в разных виджетах.
+- **As a developer**, I want request handling logic to be extracted into a separate `RequestManager` service so I don't have to search for it inside the huge `MainWindow` class.
+- **As a developer**, I want UI state persistence (`expanded_collections`, `open_tabs`) to be managed by a separate `StateManager` component to offload UI code.
+- **As a developer**, I want common variable tooltip logic to be extracted into a mixin to avoid code duplication across different widgets.
 
-## Критерии готовности
+## Acceptance Criteria
 
-- [ ] Создан и используется класс `RequestManager` для поиска и сохранения запросов.
-- [ ] Создан и используется класс `StateManager` для управления состоянием UI.
-- [ ] Создан `VariableHoverMixin` и применен к `VariableAwareLineEdit`, `VariableAwarePlainTextEdit`, `VariableAwareTableWidget`.
-- [ ] Логика удалена из `MainWindow` и делегирована новым менеджерам.
-- [ ] Приложение функционирует идентично (регрессионное тестирование):
-    - Дерево коллекций сохраняет состояние (свернуто/развернуто).
-    - Вкладки восстанавливаются.
-    - Запросы сохраняются и обновляются корректно.
-    - Тултипы переменных работают во всех виджетах.
-- [ ] Linter не выдает новых ошибок.
+- [ ] `RequestManager` class is created and used for request search and persistence.
+- [ ] `StateManager` class is created and used for UI state management.
+- [ ] `VariableHoverMixin` is created and applied to `VariableAwareLineEdit`, `VariableAwarePlainTextEdit`, `VariableAwareTableWidget`.
+- [ ] Logic is removed from `MainWindow` and delegated to new managers.
+- [ ] Application functions identically (regression testing):
+    - Collection tree preserves state (collapsed/expanded).
+    - Tabs are restored.
+    - Requests are saved and updated correctly.
+    - Variable tooltips work in all widgets.
+- [ ] Linter reports no new errors.
 
-## Описание задачи
+## Task Description
 
-Необходимо провести рефакторинг трех областей:
-1.  **Request Management**: Вынести логику поиска запроса по ID (сейчас это перебор циклом в UI) и сохранения запроса в класс `RequestManager`.
-2.  **UI State Persistence**: Вынести логику сохранения/загрузки состояния дерева и вкладок в `StateManager`, убрав прямую зависимость UI от структуры настроек.
-3.  **Widget Duplication**: Устранить дублирование `mouseMoveEvent` и логики поиска переменных в виджетах редакторов, вынеся её в миксин.
+Refactoring is required in three areas:
+1.  **Request Management**: Extract request search by ID logic (currently iterative search in UI) and request saving into `RequestManager` class.
+2.  **UI State Persistence**: Extract tree and tab state saving/loading logic into `StateManager`, removing direct UI dependency on settings structure.
+3.  **Widget Duplication**: Eliminate `mouseMoveEvent` and variable search logic duplication in editor widgets by extracting it into a mixin.
 
-### Текущие проблемы (из тех. долга)
-- `MainWindow` перегружен ответственностью.
-- Поиск запроса имеет сложность O(N) и реализован "по месту".
-- Дублирование кода в `VariableAware*` виджетах.
-- Прямая манипуляция настройками из UI методов.
+### Current Issues (from Tech Debt)
+- `MainWindow` is overloaded with responsibilities.
+- Request search has O(N) complexity and is implemented "in place".
+- Code duplication in `VariableAware*` widgets.
+- Direct settings manipulation from UI methods.
 
-## Вопросы и ответы
+## Q&A
 
-- **Нужен ли индекс запросов для O(1) поиска?**
-  - Пока достаточно инкапсуляции поиска. Оптимизация (индекс) может быть добавлена внутри `RequestManager` позже без изменения внешнего API, если производительность станет проблемой. Сейчас важно именно архитектурное разделение.
+- **Is a request index needed for O(1) search?**
+  - For now, search encapsulation is sufficient. Optimization (index) can be added inside `RequestManager` later without changing external API if performance becomes an issue. The architectural separation is what's important now.
 

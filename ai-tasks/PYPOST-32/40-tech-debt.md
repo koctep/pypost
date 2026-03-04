@@ -2,7 +2,7 @@
 
 ## Shortcuts Taken
 
-- **No Request Indexing**: `RequestManager` currently iterates through all collections to find a request. For O(1) access, an internal dictionary mapping `id -> (request, collection)` should be maintained and updated on load/save. Given the current usage volume, linear search is acceptable.
+- **No Request Indexing**: [FIXED in PYPOST-33] `RequestManager` currently iterates through all collections to find a request. For O(1) access, an internal dictionary mapping `id -> (request, collection)` should be maintained and updated on load/save. Given the current usage volume, linear search is acceptable.
 - **StateManager Dependency**: `StateManager` is currently just a thin wrapper around `ConfigManager`'s loaded settings object. It assumes `settings` is mutable and shared. A more robust approach might be to have `StateManager` own the specific settings it manages or have granular updates.
 
 ## Code Quality Issues
@@ -15,10 +15,10 @@
 
 ## Performance Concerns
 
-- Same as before: Request lookup is O(N).
+- Same as before: Request lookup is O(N). [FIXED in PYPOST-33]
 
 ## Follow-up Tasks
 
 - [ ] Implement `pytest` infrastructure and add tests for `RequestManager` and `StateManager`.
-- [ ] Add internal index to `RequestManager` for O(1) lookups.
+- [x] Add internal index to `RequestManager` for O(1) lookups. [DONE in PYPOST-33]
 

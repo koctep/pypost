@@ -8,7 +8,7 @@
 
 ## Code Quality Issues
 
-- **HTTPClient.send_request Complexity**: The method is getting slightly large with the try-except blocks, fallback logic for JSON, and streaming loop. It could be refactored into smaller helper methods.
+- **HTTPClient.send_request Complexity**: [FIXED in PYPOST-33] The method is getting slightly large with the try-except blocks, fallback logic for JSON, and streaming loop. It could be refactored into smaller helper methods.
 
 ## Missing Tests
 

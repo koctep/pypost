@@ -525,18 +525,21 @@ class MainWindow(QMainWindow):
         # We need to signal headers separately if we want real-time status.
         # For now, Status remains "-" until finished.
 
-    def on_request_finished(self, tab: RequestTab, response):
-        tab.response_view.display_response(response)
+    def _reset_tab_ui_state(self, tab: RequestTab):
+        """Resets the UI state of a tab after a request finishes or errors."""
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
+        tab.worker = None
+
+    def on_request_finished(self, tab: RequestTab, response):
+        tab.response_view.display_response(response)
+        
+        self._reset_tab_ui_state(tab)
         
         # Ensure status label is updated one last time
         tab.response_view.status_label.setText(f"Status: {response.status_code}")
         tab.response_view.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
         tab.response_view.size_label.setText(f"Size: {response.size} bytes")
-
-        # Clear worker reference
-        tab.worker = None
 
     def on_request_error(self, tab: RequestTab, error_msg):
         # Check if error is due to cancellation (not ideal check, but works for now)
@@ -544,12 +547,7 @@ class MainWindow(QMainWindow):
         # But for now, just show error if it's actual error.
         # If it's just "stopped", we might want to be silent or say "Cancelled".
         
-        # Reset button state
-        tab.request_editor.send_btn.setEnabled(True)
-        tab.request_editor.send_btn.setText("Send")
-
-        # Clear worker reference
-        tab.worker = None
+        self._reset_tab_ui_state(tab)
 
         if "cancelled" in error_msg.lower() or "aborted" in error_msg.lower():
              return
