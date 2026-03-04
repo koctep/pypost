@@ -2,7 +2,7 @@ import threading
 import asyncio
 import uvicorn
 from starlette.applications import Starlette
-from starlette.routing import Mount, Route
+from starlette.routing import Mount
 from prometheus_client import make_asgi_app, CollectorRegistry, Counter, generate_latest
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
@@ -23,16 +23,16 @@ class MetricsManager:
     def __init__(self):
         if self._initialized:
             return
-            
+
         self._initialized = True
         self.registry = CollectorRegistry()
         self.server_instance = None
         self.thread = None
         self.server_lock = threading.Lock()
-        
+
         # Define metrics
         self._init_metrics()
-        
+
         # Initialize MCP Server
         self.mcp_server = Server("pypost-metrics")
         self.mcp_server.list_resources()(self.list_resources)
@@ -41,32 +41,39 @@ class MetricsManager:
     def _init_metrics(self):
         """Initialize all Prometheus metrics."""
         self.gui_send_clicks = Counter(
-            'gui_send_clicks_total', 
+            'gui_send_clicks_total',
             'Number of times Send button was clicked',
             registry=self.registry
         )
-        
+
+        self.gui_save_actions = Counter(
+            'gui_save_actions_total',
+            'Number of times Save action was triggered in GUI',
+            ['source'],
+            registry=self.registry
+        )
+
         self.requests_sent = Counter(
             'requests_sent_total',
             'Number of HTTP requests sent',
             ['method'],
             registry=self.registry
         )
-        
+
         self.responses_received = Counter(
             'responses_received_total',
             'Number of HTTP responses received',
             ['method', 'status_code'],
             registry=self.registry
         )
-        
+
         self.mcp_requests_received = Counter(
             'mcp_requests_received_total',
             'Number of requests received by MCP server',
             ['method'],
             registry=self.registry
         )
-        
+
         self.mcp_responses_sent = Counter(
             'mcp_responses_sent_total',
             'Number of responses sent by MCP server',
@@ -95,16 +102,16 @@ class MetricsManager:
                     mimeType="text/plain",
                     text=data
                 )]
-            except Exception as e:
+            except Exception:
                 self.track_mcp_response_sent("read_resource:metrics", "error")
-                raise e
-        
+                raise
+
         raise ValueError(f"Resource {uri} not found")
 
     def _create_app(self) -> Starlette:
         # 1. Prometheus app
         prometheus_app = make_asgi_app(registry=self.registry)
-        
+
         # 2. MCP Transport setup (SSE)
         sse = SseServerTransport("/messages")
 
@@ -115,7 +122,8 @@ class MetricsManager:
 
             async def __call__(self, scope, receive, send):
                 async with self.sse_transport.connect_sse(scope, receive, send) as streams:
-                    await self.server.run(streams[0], streams[1], self.server.create_initialization_options())
+                    init_opts = self.server.create_initialization_options()
+                    await self.server.run(streams[0], streams[1], init_opts)
 
         class MessagesEndpoint:
             def __init__(self, sse_transport):
@@ -152,10 +160,10 @@ class MetricsManager:
         with self.server_lock:
             if self.thread and self.thread.is_alive():
                 self.stop_server()
-            
+
             self._current_host = host
             self._current_port = port
-            
+
             self.thread = threading.Thread(target=self._run_uvicorn, daemon=True)
             self.thread.start()
             print(f"Metrics server started on {host}:{port}")
@@ -165,13 +173,19 @@ class MetricsManager:
         # Create a new event loop for this thread
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
-        config = uvicorn.Config(app=app, host=self._current_host, port=self._current_port, loop="asyncio", log_level="warning")
+
+        config = uvicorn.Config(
+            app=app,
+            host=self._current_host,
+            port=self._current_port,
+            loop="asyncio",
+            log_level="warning",
+        )
         self.server_instance = uvicorn.Server(config)
-        
+
         # Override signal handlers to avoid main thread conflict
         self.server_instance.install_signal_handlers = lambda: None
-        
+
         loop.run_until_complete(self.server_instance.serve())
 
     def stop_server(self):
@@ -179,7 +193,7 @@ class MetricsManager:
         with self.server_lock:
             if self.server_instance:
                 self.server_instance.should_exit = True
-            
+
             if self.thread:
                 self.thread.join(timeout=2.0)
                 self.thread = None
@@ -194,6 +208,9 @@ class MetricsManager:
     # Tracking methods
     def track_gui_send_click(self):
         self.gui_send_clicks.inc()
+
+    def track_gui_save_action(self, source: str):
+        self.gui_save_actions.labels(source=source).inc()
 
     def track_request_sent(self, method: str):
         self.requests_sent.labels(method=method).inc()

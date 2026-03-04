@@ -46,16 +46,14 @@ class MainWindow(QMainWindow):
 
         self.storage = StorageManager()
         self.config_manager = ConfigManager()
-        
-        # Initialize Managers
+
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
         
         self.style_manager = StyleManager()
         self.mcp_manager = MCPServerManager()
         self.mcp_manager.status_changed.connect(self.on_mcp_status_changed)
-        
-        # Load icons
+
         icons_dir = Path(__file__).parent / 'resources' / 'icons'
         self.icons = {
             'collection': QIcon(str(icons_dir / 'collection.svg')),
@@ -65,14 +63,11 @@ class MainWindow(QMainWindow):
             'DELETE': QIcon(str(icons_dir / 'method-delete.svg')),
             'PATCH': QIcon(str(icons_dir / 'method-patch.svg')),
         }
-        
-        # Use managers to get data
+
         self.collections = self.request_manager.get_collections()
         self.environments = []
-        # Settings are now managed by StateManager mostly, but we still need general settings
         self.settings = self.state_manager.settings
 
-        # Setup Menu Bar
         self._create_menu_bar()
 
         self.central_widget = QWidget()
@@ -80,7 +75,6 @@ class MainWindow(QMainWindow):
 
         self.main_layout = QVBoxLayout(self.central_widget)
 
-        # Top Bar
         self.top_bar = QHBoxLayout()
         self.env_selector = QComboBox()
         self.env_selector.addItems(["No Environment"])
@@ -105,10 +99,8 @@ class MainWindow(QMainWindow):
 
         self.main_layout.addLayout(self.top_bar)
 
-        # Main Content (Splitter)
         self.splitter = QSplitter(Qt.Horizontal)
 
-        # Left Sidebar (Collections)
         self.collections_view = QTreeView()
         self.collections_view.setHeaderHidden(True)
         self.collections_model = QStandardItemModel()
@@ -118,7 +110,6 @@ class MainWindow(QMainWindow):
         self.collections_view.collapsed.connect(self.on_tree_collapsed)
         self.splitter.addWidget(self.collections_view)
 
-        # Right Content (Request Tabs)
         self.tabs = QTabWidget()
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
@@ -126,34 +117,25 @@ class MainWindow(QMainWindow):
 
         self.splitter.setSizes([300, 900])
         self.main_layout.addWidget(self.splitter)
-        
-        # Apply settings BEFORE loading tabs to ensure correct font size/style
+
         self.apply_settings(self.settings)
 
-        # Load data
         self.load_collections()
         self.load_environments()
 
-        # Restore open tabs
         self.restore_tabs()
-
-        # Restore tree state
         self.restore_tree_state()
-
-        # Setup keyboard shortcuts
         self._setup_shortcuts()
 
     def _create_menu_bar(self):
         menubar = self.menuBar()
 
-        # File Menu
         file_menu = menubar.addMenu("File")
         
         quit_action = file_menu.addAction("Quit")
         quit_action.setShortcut("Ctrl+Q")
         quit_action.triggered.connect(self.handle_exit)
 
-        # Help Menu
         help_menu = menubar.addMenu("Help")
 
         hotkeys_action = help_menu.addAction("Hotkeys")
@@ -172,8 +154,7 @@ class MainWindow(QMainWindow):
                     found_request, _ = result
                     self.add_new_tab(found_request, save_state=False)
                     tabs_restored = True
-        
-        # If no tabs restored, open a default new one
+
         if not tabs_restored:
             self.add_new_tab(save_state=False)
 
@@ -189,10 +170,9 @@ class MainWindow(QMainWindow):
 
             for req in col.requests:
                 req_item = QStandardItem(f"{req.method} {req.name}")
-                req_item.setData(req, Qt.UserRole) # Store RequestData object
+                req_item.setData(req, Qt.UserRole)
                 req_item.setEditable(False)
-                
-                # Set icon based on HTTP method
+
                 if req.method in self.icons:
                     req_item.setIcon(self.icons[req.method])
                 
@@ -202,8 +182,7 @@ class MainWindow(QMainWindow):
 
     def load_environments(self):
         self.environments = self.storage.load_environments()
-        
-        # Block signals to prevent on_env_changed from firing during load
+
         self.env_selector.blockSignals(True)
         self.env_selector.clear()
         self.env_selector.addItem("No Environment", None)
@@ -217,7 +196,6 @@ class MainWindow(QMainWindow):
         self.env_selector.setCurrentIndex(selected_index)
         self.env_selector.blockSignals(False)
 
-        # Also trigger on_env_changed logic manually to start server if needed on startup
         if selected_index > 0:
              self.on_env_changed(selected_index)
 
@@ -227,10 +205,8 @@ class MainWindow(QMainWindow):
         if isinstance(selected_env, Environment):
             self.settings.last_environment_id = selected_env.id
             variables = selected_env.variables
-            
-            # Manage MCP Server
+
             if selected_env.enable_mcp:
-                # Collect all requests that are exposed as tools
                 tools = []
                 for col in self.collections:
                     for req in col.requests:
@@ -249,7 +225,6 @@ class MainWindow(QMainWindow):
         
         self.config_manager.save_config(self.settings)
 
-        # Update all open tabs with new variables
         for i in range(self.tabs.count()):
             tab = self.tabs.widget(i)
             if isinstance(tab, RequestTab):
@@ -284,9 +259,8 @@ class MainWindow(QMainWindow):
         dialog = EnvironmentDialog(self.environments, self, current_env_name)
         dialog.exec()
         self.storage.save_environments(self.environments)
-        self.load_environments() 
-        
-        # Force update of current environment to apply changes (e.g. MCP toggle)
+        self.load_environments()
+
         self.on_env_changed(self.env_selector.currentIndex())
 
     def open_settings(self):
@@ -294,19 +268,16 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             new_settings = dialog.get_settings()
             if new_settings:
-                # Check if metrics settings changed
                 metrics_changed = (self.settings.metrics_host != new_settings.metrics_host or 
                                    self.settings.metrics_port != new_settings.metrics_port)
 
                 self.settings = new_settings
                 self.config_manager.save_config(self.settings)
                 self.apply_settings(self.settings)
-                
-                # Restart metrics server if needed
+
                 if metrics_changed:
                     MetricsManager().restart_server(self.settings.metrics_host, self.settings.metrics_port)
-                
-                # Force update to apply port changes if needed
+
                 self.on_env_changed(self.env_selector.currentIndex())
 
     def apply_settings(self, settings):
@@ -392,7 +363,6 @@ class MainWindow(QMainWindow):
                 self.collections_view.expand(index)
 
     def handle_save_request(self, request_data: RequestData):
-        # 1. Check if request exists
         existing_result = self.request_manager.find_request(request_data.id)
         
         if existing_result:
@@ -409,23 +379,19 @@ class MainWindow(QMainWindow):
                 if reply == QMessageBox.No:
                     return
 
-            # Update existing request
             self.request_manager.save_request(request_data, found_collection.id)
-            
-            # Update UI Tabs
+
             for i in range(self.tabs.count()):
                 tab = self.tabs.widget(i)
                 if isinstance(tab, RequestTab) and tab.request_data.id == request_data.id:
                     self.tabs.setTabText(i, request_data.name)
                     tab.request_data = request_data
                     break
-            
-            # Refresh Collection View
+
             self.load_collections()
             self.restore_tree_state()
             return
 
-        # 2. New Request Dialog
         dialog = SaveRequestDialog(self.collections, self)
         if dialog.exec():
             request_data.name = dialog.request_name
@@ -436,20 +402,16 @@ class MainWindow(QMainWindow):
                 target_collection_id = new_col.id
 
             if target_collection_id:
-                # Save new request
                 self.request_manager.save_request(request_data, target_collection_id)
 
-                # Expand collection if needed
                 current_expanded = self.state_manager.get_expanded_collections()
                 if target_collection_id not in current_expanded:
                     current_expanded.append(target_collection_id)
                     self.state_manager.set_expanded_collections(current_expanded)
 
-                # Refresh UI
                 self.load_collections()
                 self.restore_tree_state()
 
-                # Update current tab
                 current_index = self.tabs.currentIndex()
                 self.tabs.setTabText(current_index, request_data.name)
                 
@@ -470,17 +432,14 @@ class MainWindow(QMainWindow):
         if not sender_tab:
             return
 
-        # Check if already running (Stop/Cancel)
         if hasattr(sender_tab, 'worker') and sender_tab.worker and sender_tab.worker.isRunning():
             sender_tab.worker.stop()
-            # Disable button immediately to prevent double clicks and show feedback
             sender_tab.request_editor.send_btn.setEnabled(False)
             sender_tab.request_editor.send_btn.setText("Stopping...")
             return
 
-        # Start new request
-        sender_tab.response_view.clear_body() # Clear previous response
-        sender_tab.request_editor.send_btn.setText("Stop") # Change button to Stop
+        sender_tab.response_view.clear_body()
+        sender_tab.request_editor.send_btn.setText("Stop")
 
         variables = {}
         selected_env = self.env_selector.currentData()
@@ -492,7 +451,7 @@ class MainWindow(QMainWindow):
         worker.error.connect(lambda err: self.on_request_error(sender_tab, err))
         worker.env_update.connect(lambda vars: self.on_env_update(vars))
         worker.script_output.connect(lambda logs, err: self.on_script_output(sender_tab, logs, err))
-        worker.chunk_received.connect(lambda chunk: self.on_chunk_received(sender_tab, chunk)) # Connect chunk signal
+        worker.chunk_received.connect(lambda chunk: self.on_chunk_received(sender_tab, chunk))
         worker.headers_received.connect(lambda status, headers: self.on_headers_received(sender_tab, status, headers))
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
@@ -509,44 +468,28 @@ class MainWindow(QMainWindow):
 
     def on_headers_received(self, tab: RequestTab, status: int, headers: dict):
         tab.response_view.status_label.setText(f"Status: {status}")
-        # We can also update time label if we track start time, but for now Status is key.
-        # Size will update with chunks.
-    
+
     def on_chunk_received(self, tab: RequestTab, chunk: str):
         tab.response_view.append_body(chunk)
-        # Update metrics (size) in real-time if needed
-        # Since we don't have full response object here, we can just estimate size
         current_text = tab.response_view.body_view.toPlainText()
         size_bytes = len(current_text.encode('utf-8'))
         tab.response_view.size_label.setText(f"Size: {size_bytes} bytes")
-        # Estimate Status from first chunk? No, status is header. 
-        # Ideally, we should receive headers first then chunks.
-        # But RequestWorker only emits finished with full response.
-        # We need to signal headers separately if we want real-time status.
-        # For now, Status remains "-" until finished.
 
     def _reset_tab_ui_state(self, tab: RequestTab):
-        """Resets the UI state of a tab after a request finishes or errors."""
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
         tab.worker = None
 
     def on_request_finished(self, tab: RequestTab, response):
         tab.response_view.display_response(response)
-        
+
         self._reset_tab_ui_state(tab)
-        
-        # Ensure status label is updated one last time
+
         tab.response_view.status_label.setText(f"Status: {response.status_code}")
         tab.response_view.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
         tab.response_view.size_label.setText(f"Size: {response.size} bytes")
 
     def on_request_error(self, tab: RequestTab, error_msg):
-        # Check if error is due to cancellation (not ideal check, but works for now)
-        # If we manually stopped, we might want to just reset button.
-        # But for now, just show error if it's actual error.
-        # If it's just "stopped", we might want to be silent or say "Cancelled".
-        
         self._reset_tab_ui_state(tab)
 
         if "cancelled" in error_msg.lower() or "aborted" in error_msg.lower():
@@ -561,8 +504,7 @@ class MainWindow(QMainWindow):
             return
 
         target_key = key
-        
-        # New Variable Case
+
         if target_key is None:
             text, ok = QInputDialog.getText(self, "New Variable", "Enter variable name:")
             if ok and text:
@@ -573,61 +515,45 @@ class MainWindow(QMainWindow):
             else:
                 return
 
-        # Update Variable
         selected_env.variables[target_key] = value
         self.storage.save_environments(self.environments)
-        
-        # Refresh UI
+
         self.on_env_changed(self.env_selector.currentIndex())
 
     def _setup_shortcuts(self):
-        """Initializes all global shortcuts."""
-        # Exit application (Ctrl+Q) is now handled via QAction in menu
-        
-        # Create new tab (Ctrl+N)
         new_tab_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
         new_tab_shortcut.activated.connect(self.handle_new_tab)
 
-        # Close current tab (Ctrl+W)
         close_tab_shortcut = QShortcut(QKeySequence("Ctrl+W"), self)
         close_tab_shortcut.activated.connect(self.handle_close_tab)
 
-        # Switch to next tab (Ctrl+Tab)
-        # QTabWidget handles Ctrl+Tab automatically, but add explicit handling
         next_tab_shortcut = QShortcut(QKeySequence("Ctrl+Tab"), self)
         next_tab_shortcut.activated.connect(self.handle_next_tab)
 
-        # Switch to previous tab (Ctrl+Shift+Tab)
         prev_tab_shortcut = QShortcut(QKeySequence("Ctrl+Shift+Tab"), self)
         prev_tab_shortcut.activated.connect(self.handle_previous_tab)
 
-        # Switch to specific tab (Alt+1 to Alt+9)
         for i in range(1, 10):
-            idx = i - 1  # Store index in local variable for correct closure
+            idx = i - 1
             shortcut = QShortcut(QKeySequence(f"Alt+{i}"), self)
             shortcut.activated.connect(lambda index=idx: self.handle_switch_to_tab(index))
 
-        # Open settings (Ctrl+, or F12)
         settings_shortcut1 = QShortcut(QKeySequence("Ctrl+,"), self)
         settings_shortcut1.activated.connect(self.handle_open_settings)
         settings_shortcut2 = QShortcut(QKeySequence("F12"), self)
         settings_shortcut2.activated.connect(self.handle_open_settings)
 
-        # Manage environments (Ctrl+E)
         env_shortcut = QShortcut(QKeySequence("Ctrl+E"), self)
         env_shortcut.activated.connect(self.handle_open_environments)
 
-        # Focus on URL field (Ctrl+L or Alt+D)
         focus_url_shortcut1 = QShortcut(QKeySequence("Ctrl+L"), self)
         focus_url_shortcut1.activated.connect(self.handle_focus_url)
         focus_url_shortcut2 = QShortcut(QKeySequence("Alt+D"), self)
         focus_url_shortcut2.activated.connect(self.handle_focus_url)
 
-        # Send request (F5) - global
         send_request_shortcut = QShortcut(QKeySequence("F5"), self)
         send_request_shortcut.activated.connect(self.handle_send_request_global)
 
-        # Switch between request editor tabs (Ctrl+P/H/B) - global
         params_shortcut = QShortcut(QKeySequence("Ctrl+P"), self)
         params_shortcut.activated.connect(self.handle_switch_to_params_global)
         headers_shortcut = QShortcut(QKeySequence("Ctrl+H"), self)
@@ -638,48 +564,39 @@ class MainWindow(QMainWindow):
         script_shortcut.activated.connect(self.handle_switch_to_script_global)
 
     def handle_exit(self):
-        """Handler for application exit (Ctrl+Q)."""
         QApplication.instance().quit()
 
     def handle_new_tab(self):
-        """Handler for creating new tab (Ctrl+N)."""
         self.add_new_tab()
 
     def handle_close_tab(self):
-        """Handler for closing current tab (Ctrl+W)."""
         current_index = self.tabs.currentIndex()
         if current_index >= 0:
             self.close_tab(current_index)
 
     def handle_next_tab(self):
-        """Handler for switching to next tab (Ctrl+Tab)."""
         current_index = self.tabs.currentIndex()
         if self.tabs.count() > 0:
             next_index = (current_index + 1) % self.tabs.count()
             self.tabs.setCurrentIndex(next_index)
 
     def handle_previous_tab(self):
-        """Handler for switching to previous tab (Ctrl+Shift+Tab)."""
         current_index = self.tabs.currentIndex()
         if self.tabs.count() > 0:
             prev_index = (current_index - 1) % self.tabs.count()
             self.tabs.setCurrentIndex(prev_index)
 
     def handle_switch_to_tab(self, index: int):
-        """Handler for switching to specific tab (Alt+1-9)."""
         if 0 <= index < self.tabs.count():
             self.tabs.setCurrentIndex(index)
 
     def handle_open_settings(self):
-        """Handler for opening settings (Ctrl+, / F12)."""
         self.open_settings()
 
     def handle_open_environments(self):
-        """Handler for opening environment manager (Ctrl+E)."""
         self.open_env_manager()
 
     def keyPressEvent(self, event):
-        """Handles Ctrl+Enter for sending request globally."""
         if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_Return:
             self.handle_send_request_global()
             event.accept()
@@ -687,57 +604,47 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(event)
 
     def handle_focus_url(self):
-        """Handler for setting focus on URL field (Ctrl+L / Alt+D)."""
         current_tab = self.tabs.currentWidget()
         if isinstance(current_tab, RequestTab):
             current_tab.request_editor.url_input.setFocus()
             current_tab.request_editor.url_input.selectAll()
 
     def handle_send_request_global(self):
-        """Global handler for sending request (F5)."""
         current_tab = self.tabs.currentWidget()
         if isinstance(current_tab, RequestTab):
             current_tab.request_editor.on_send()
 
     def handle_switch_to_params_global(self):
-        """Global handler for switching to Params tab (Ctrl+P)."""
         current_tab = self.tabs.currentWidget()
         if isinstance(current_tab, RequestTab):
             current_tab.request_editor.detail_tabs.setCurrentIndex(0)
 
     def handle_switch_to_headers_global(self):
-        """Global handler for switching to Headers tab (Ctrl+H)."""
         current_tab = self.tabs.currentWidget()
         if isinstance(current_tab, RequestTab):
             current_tab.request_editor.detail_tabs.setCurrentIndex(1)
 
     def handle_switch_to_body_global(self):
-        """Global handler for switching to Body tab (Ctrl+B)."""
         current_tab = self.tabs.currentWidget()
         if isinstance(current_tab, RequestTab):
             current_tab.request_editor.detail_tabs.setCurrentIndex(2)
 
     def handle_switch_to_script_global(self):
-        """Global handler for switching to Script tab (Ctrl+T)."""
         current_tab = self.tabs.currentWidget()
         if isinstance(current_tab, RequestTab):
             current_tab.request_editor.detail_tabs.setCurrentIndex(3)
 
     def handle_show_hotkeys(self):
-        """Show hotkeys dialog."""
         dialog = HotkeysDialog(self)
         dialog.exec()
 
     def handle_show_about(self):
-        """Show about dialog."""
         dialog = AboutDialog(self)
         dialog.exec()
 
     def on_tree_expanded(self, index):
-        """Handle tree item expansion."""
         item = self.collections_model.itemFromIndex(index)
         data = item.data(Qt.UserRole)
-        # Check if it is a collection ID (string) and not a RequestData object
         if isinstance(data, str): 
             current_expanded = self.state_manager.get_expanded_collections()
             if data not in current_expanded:
@@ -745,7 +652,6 @@ class MainWindow(QMainWindow):
                 self.state_manager.set_expanded_collections(current_expanded)
 
     def on_tree_collapsed(self, index):
-        """Handle tree item collapse."""
         item = self.collections_model.itemFromIndex(index)
         data = item.data(Qt.UserRole)
         if isinstance(data, str):
@@ -755,7 +661,6 @@ class MainWindow(QMainWindow):
                 self.state_manager.set_expanded_collections(current_expanded)
 
     def restore_tree_state(self):
-        """Restore expanded state of collections."""
         root = self.collections_model.invisibleRootItem()
         expanded_collections = self.state_manager.get_expanded_collections()
         for row in range(root.rowCount()):

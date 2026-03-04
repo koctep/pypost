@@ -11,7 +11,7 @@ You can expose your saved HTTP requests as "tools" for AI. The AI agent can then
 1.  **Configure Request**:
     -   Open a request in PyPost.
     -   Check the **"MCP Tool"** checkbox (next to the URL bar).
-    -   Save the request.
+    -   Open **Actions** (right of **Send**) and click **Save** (or press `Ctrl+S`).
 
 2.  **Enable Server**:
     -   Go to **Manage Environments**.

@@ -87,7 +87,8 @@ if response.status_code != 200:
 
 Collections allow grouping requests into folders.
 
-*   To save a request to a collection, press **Save** (`Ctrl+S`).
+*   To save a request to a collection, open **Actions** (right of **Send**) and select
+    **Save**, or press `Ctrl+S`.
 *   In the save dialog, select an existing collection or create a new one.
 *   Requests in the sidebar can be opened with a double click (or single click if configured).
 
