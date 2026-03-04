@@ -33,6 +33,8 @@ class RequestTab(QWidget):
         self.splitter.addWidget(self.response_view)
 
         self.layout.addWidget(self.splitter)
+        
+        self.worker = None
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -539,6 +541,9 @@ class MainWindow(QMainWindow):
         tab.response_view.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
         tab.response_view.size_label.setText(f"Size: {response.size} bytes")
 
+        # Clear worker reference
+        tab.worker = None
+
     def on_request_error(self, tab: RequestTab, error_msg):
         # Check if error is due to cancellation (not ideal check, but works for now)
         # If we manually stopped, we might want to just reset button.
@@ -548,6 +553,9 @@ class MainWindow(QMainWindow):
         # Reset button state
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
+
+        # Clear worker reference
+        tab.worker = None
 
         if "cancelled" in error_msg.lower() or "aborted" in error_msg.lower():
              return
