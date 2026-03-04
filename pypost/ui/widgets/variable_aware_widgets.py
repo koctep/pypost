@@ -1,108 +1,47 @@
-from typing import Optional, Dict
-from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QToolTip, QTableWidget
-from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QTextCursor
-import re
+from typing import Dict, Optional, Tuple
+from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QTableWidget, QToolTip
+from PySide6.QtCore import Qt
+from pypost.ui.widgets.mixins import VariableHoverMixin, VariableHoverHelper
 
-class VariableHoverHelper:
-    """Helper class to find variables in text and manage tooltip display."""
-    
-    # Regex to find {{variable}} pattern
-    VARIABLE_PATTERN = re.compile(r'\{\{([a-zA-Z0-9_]+)\}\}')
-
-    @staticmethod
-    def find_variable_at_index(text: str, index: int) -> Optional[str]:
-        """
-        Finds a variable name under the given index in text.
-        Returns the variable name (without braces) or None.
-        """
-        for match in VariableHoverHelper.VARIABLE_PATTERN.finditer(text):
-            if match.start() <= index < match.end():
-                return match.group(1)
-        return None
-
-    @staticmethod
-    def get_variable_value(variable_name: str, variables: Dict[str, str]) -> str:
-        """Returns the value of the variable or a default message."""
-        return variables.get(variable_name, "<not defined>")
-
-    @staticmethod
-    def resolve_text(text: str, variables: Dict[str, str]) -> str:
-        """Replaces all {{variable}} occurrences with their values."""
-        def replace(match):
-            var_name = match.group(1)
-            # We want to show the value in the tooltip, so we return the value.
-            return VariableHoverHelper.get_variable_value(var_name, variables)
-        return VariableHoverHelper.VARIABLE_PATTERN.sub(replace, text)
-
-class VariableAwareLineEdit(QLineEdit):
+class VariableAwareLineEdit(VariableHoverMixin, QLineEdit):
     """QLineEdit with variable tooltip support."""
     
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setMouseTracking(True)
-        self._variables: Dict[str, str] = {}
+        QLineEdit.__init__(self, parent)
+        VariableHoverMixin.__init__(self)
 
-    def set_variables(self, variables: Dict[str, str]):
-        self._variables = variables
-
-    def mouseMoveEvent(self, event):
-        # Calculate character index under cursor
-        pos = event.pos()
-        # Ensure we are over text
-        
-        index = self.cursorPositionAt(pos)
-        
+    def _get_text_at_cursor(self, event) -> Tuple[str, int]:
         text = self.text()
         if not text:
-            super().mouseMoveEvent(event)
-            return
+            return "", 0
+        
+        # Calculate character index under cursor
+        index = self.cursorPositionAt(event.pos())
+        return text, index
 
-        # Check the variable at this index
-        var_name = VariableHoverHelper.find_variable_at_index(text, index)
-        if not var_name and index > 0:
-             var_name = VariableHoverHelper.find_variable_at_index(text, index - 1)
-
-        if var_name:
-            value = VariableHoverHelper.get_variable_value(var_name, self._variables)
-            # Show tooltip globally
-            QToolTip.showText(event.globalPos(), value, self)
-        else:
-            QToolTip.hideText()
-            
-        super().mouseMoveEvent(event)
-
-class VariableAwarePlainTextEdit(QPlainTextEdit):
+class VariableAwarePlainTextEdit(VariableHoverMixin, QPlainTextEdit):
     """QPlainTextEdit with variable tooltip support."""
     
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setMouseTracking(True)
-        self._variables: Dict[str, str] = {}
+        QPlainTextEdit.__init__(self, parent)
+        VariableHoverMixin.__init__(self)
 
-    def set_variables(self, variables: Dict[str, str]):
-        self._variables = variables
-
-    def mouseMoveEvent(self, event):
+    def _get_text_at_cursor(self, event) -> Tuple[str, int]:
         cursor = self.cursorForPosition(event.pos())
-        
         text = self.toPlainText()
         index = cursor.position()
-        
-        var_name = VariableHoverHelper.find_variable_at_index(text, index)
-        if not var_name and index > 0:
-            var_name = VariableHoverHelper.find_variable_at_index(text, index - 1)
-
-        if var_name:
-            value = VariableHoverHelper.get_variable_value(var_name, self._variables)
-            QToolTip.showText(event.globalPos(), value, self)
-        else:
-            QToolTip.hideText()
-            
-        super().mouseMoveEvent(event)
+        return text, index
 
 class VariableAwareTableWidget(QTableWidget):
-    """QTableWidget with variable tooltip support."""
+    """
+    QTableWidget with variable tooltip support.
+    Note: TableWidget structure is different (items vs text stream), so we override mouseMoveEvent manually
+    or we could adapt the mixin. For now, let's keep the manual implementation but use the Helper.
+    Or adapt to Mixin if possible. 
+    Actually, TableWidget hovers over items, which is slightly different than text cursor position.
+    Let's keep using VariableHoverHelper but implement mouseMoveEvent directly as before, 
+    since mixin expects _get_text_at_cursor logic which applies to text fields.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -11,6 +11,8 @@ from pypost.models.models import RequestData, Collection, Environment
 from pypost.core.storage import StorageManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.style_manager import StyleManager
+from pypost.core.request_manager import RequestManager
+from pypost.core.state_manager import StateManager
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
@@ -44,6 +46,11 @@ class MainWindow(QMainWindow):
 
         self.storage = StorageManager()
         self.config_manager = ConfigManager()
+        
+        # Initialize Managers
+        self.request_manager = RequestManager(self.storage)
+        self.state_manager = StateManager(self.config_manager)
+        
         self.style_manager = StyleManager()
         self.mcp_manager = MCPServerManager()
         self.mcp_manager.status_changed.connect(self.on_mcp_status_changed)
@@ -59,9 +66,11 @@ class MainWindow(QMainWindow):
             'PATCH': QIcon(str(icons_dir / 'method-patch.svg')),
         }
         
-        self.collections = []
+        # Use managers to get data
+        self.collections = self.request_manager.get_collections()
         self.environments = []
-        self.settings = self.config_manager.load_config()
+        # Settings are now managed by StateManager mostly, but we still need general settings
+        self.settings = self.state_manager.settings
 
         # Setup Menu Bar
         self._create_menu_bar()
@@ -155,19 +164,12 @@ class MainWindow(QMainWindow):
 
     def restore_tabs(self):
         tabs_restored = False
-        if self.settings.open_tabs:
-            for request_id in self.settings.open_tabs:
-                found_request = None
-                # Search for request in collections
-                for col in self.collections:
-                    for req in col.requests:
-                        if req.id == request_id:
-                            found_request = req
-                            break
-                    if found_request:
-                        break
-                
-                if found_request:
+        open_tabs_ids = self.state_manager.get_open_tabs()
+        if open_tabs_ids:
+            for request_id in open_tabs_ids:
+                result = self.request_manager.find_request(request_id)
+                if result:
+                    found_request, _ = result
                     self.add_new_tab(found_request, save_state=False)
                     tabs_restored = True
         
@@ -272,8 +274,7 @@ class MainWindow(QMainWindow):
             if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id:
                 open_tabs_ids.append(tab.request_data.id)
         
-        self.settings.open_tabs = open_tabs_ids
-        self.config_manager.save_config(self.settings)
+        self.state_manager.set_open_tabs(open_tabs_ids)
 
     def open_env_manager(self):
         current_env_name = self.env_selector.currentText()
@@ -391,21 +392,12 @@ class MainWindow(QMainWindow):
                 self.collections_view.expand(index)
 
     def handle_save_request(self, request_data: RequestData):
-        existing_request = None
-        found_collection = None
-        existing_index = -1
-
-        for col in self.collections:
-            for i, req in enumerate(col.requests):
-                if req.id == request_data.id:
-                    existing_request = req
-                    found_collection = col
-                    existing_index = i
-                    break
-            if existing_request:
-                break
+        # 1. Check if request exists
+        existing_result = self.request_manager.find_request(request_data.id)
         
-        if existing_request:
+        if existing_result:
+            existing_request, found_collection = existing_result
+            
             if self.settings.confirm_overwrite_request:
                 reply = QMessageBox.question(
                     self, 
@@ -417,9 +409,10 @@ class MainWindow(QMainWindow):
                 if reply == QMessageBox.No:
                     return
 
-            found_collection.requests[existing_index] = request_data
-            self.storage.save_collection(found_collection)
+            # Update existing request
+            self.request_manager.save_request(request_data, found_collection.id)
             
+            # Update UI Tabs
             for i in range(self.tabs.count()):
                 tab = self.tabs.widget(i)
                 if isinstance(tab, RequestTab) and tab.request_data.id == request_data.id:
@@ -427,35 +420,36 @@ class MainWindow(QMainWindow):
                     tab.request_data = request_data
                     break
             
+            # Refresh Collection View
             self.load_collections()
             self.restore_tree_state()
             return
 
+        # 2. New Request Dialog
         dialog = SaveRequestDialog(self.collections, self)
         if dialog.exec():
             request_data.name = dialog.request_name
-            target_collection = None
+            target_collection_id = dialog.selected_collection_id
 
-            if dialog.selected_collection_id:
-                for col in self.collections:
-                    if col.id == dialog.selected_collection_id:
-                        target_collection = col
-                        break
-            elif dialog.new_collection_name:
-                target_collection = Collection(name=dialog.new_collection_name)
-                self.collections.append(target_collection)
+            if not target_collection_id and dialog.new_collection_name:
+                new_col = self.request_manager.create_collection(dialog.new_collection_name)
+                target_collection_id = new_col.id
 
-            if target_collection:
-                target_collection.requests.append(request_data)
-                self.storage.save_collection(target_collection)
+            if target_collection_id:
+                # Save new request
+                self.request_manager.save_request(request_data, target_collection_id)
 
-                if target_collection.id not in self.settings.expanded_collections:
-                    self.settings.expanded_collections.append(target_collection.id)
-                    self.config_manager.save_config(self.settings)
+                # Expand collection if needed
+                current_expanded = self.state_manager.get_expanded_collections()
+                if target_collection_id not in current_expanded:
+                    current_expanded.append(target_collection_id)
+                    self.state_manager.set_expanded_collections(current_expanded)
 
+                # Refresh UI
                 self.load_collections()
                 self.restore_tree_state()
 
+                # Update current tab
                 current_index = self.tabs.currentIndex()
                 self.tabs.setTabText(current_index, request_data.name)
                 
@@ -747,24 +741,27 @@ class MainWindow(QMainWindow):
         data = item.data(Qt.UserRole)
         # Check if it is a collection ID (string) and not a RequestData object
         if isinstance(data, str): 
-            if data not in self.settings.expanded_collections:
-                self.settings.expanded_collections.append(data)
-                self.config_manager.save_config(self.settings)
+            current_expanded = self.state_manager.get_expanded_collections()
+            if data not in current_expanded:
+                current_expanded.append(data)
+                self.state_manager.set_expanded_collections(current_expanded)
 
     def on_tree_collapsed(self, index):
         """Handle tree item collapse."""
         item = self.collections_model.itemFromIndex(index)
         data = item.data(Qt.UserRole)
         if isinstance(data, str):
-            if data in self.settings.expanded_collections:
-                self.settings.expanded_collections.remove(data)
-                self.config_manager.save_config(self.settings)
+            current_expanded = self.state_manager.get_expanded_collections()
+            if data in current_expanded:
+                current_expanded.remove(data)
+                self.state_manager.set_expanded_collections(current_expanded)
 
     def restore_tree_state(self):
         """Restore expanded state of collections."""
         root = self.collections_model.invisibleRootItem()
+        expanded_collections = self.state_manager.get_expanded_collections()
         for row in range(root.rowCount()):
             item = root.child(row)
             data = item.data(Qt.UserRole)
-            if isinstance(data, str) and data in self.settings.expanded_collections:
+            if isinstance(data, str) and data in expanded_collections:
                 self.collections_view.setExpanded(item.index(), True)

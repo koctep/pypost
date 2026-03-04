@@ -1,9 +1,16 @@
 # PYPOST-12: Technical Debt Analysis
 
+## Status: FIXED
+Addressed in PYPOST-32 by implementing `StateManager`.
+
 ## Shortcuts Taken
 
-- **Direct Settings Manipulation from UI**: Tree state logic (`expanded_collections`) is implemented directly in `MainWindow`. Ideally, this could be moved to a separate UI state controller or `StorageManager` extended so UI doesn't depend directly on `AppSettings` structure in such details.
-- **Synchronous Saving**: Settings are saved synchronously on every click (expand/collapse). With very frequent clicking, this might cause excess I/O operations, but for current scale, it's not critical.
+- **[FIXED] Direct Settings Manipulation from UI**: Tree state logic
+  (`expanded_collections`) is now managed via `StateManager`. `MainWindow` no longer depends
+  directly on the settings structure for this functionality.
+- **Synchronous Saving**: Settings are saved synchronously on every click
+  (expand/collapse). With very frequent clicking, this might cause excess I/O operations, but
+  for current scale, it's not critical.
 
 ## Code Quality Issues
 

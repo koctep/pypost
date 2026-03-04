@@ -9,6 +9,8 @@ and the user interface (UI).
 pypost/
 ├── main.py                 # Application entry point
 ├── core/                   # Business logic
+│   ├── request_manager.py  # Request & Collection lifecycle management
+│   ├── state_manager.py    # UI State persistence
 │   ├── request_service.py  # Unified request execution service
 │   ├── http_client.py      # HTTP request handling (wrapping `requests`)
 │   ├── script_executor.py  # Python script execution environment
@@ -24,6 +26,7 @@ pypost/
 │   ├── main_window.py      # Main application window
 │   ├── dialogs/            # Modal dialogs (Settings, Save, Env)
 │   ├── widgets/            # Reusable UI components
+│   │   ├── mixins.py       # UI Mixins (e.g. VariableHoverMixin)
 │   └── styles/             # Qt Stylesheets (.qss) and custom styles
 └── utils/                  # Helper utilities
 ```
@@ -40,6 +43,8 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 
 ### Business Logic (`pypost/core/`)
 
+- **RequestManager**: Manages the CRUD operations for Requests and Collections. Encapsulates searching and saving logic, decoupling it from the UI.
+- **StateManager**: Manages the persistence of UI state (e.g., open tabs, expanded tree nodes), abstracting the configuration structure.
 - **RequestService**: The central entry point for executing requests. It coordinates the `HTTPClient`
   for network calls and `ScriptExecutor` for post-request scripts.
 - **HTTPClient**: Handles the actual network communication using `requests`.
@@ -53,9 +58,9 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 
 Built with **PySide6** (Qt for Python).
 
-- **MainWindow**: The central hub, managing the layout.
+- **MainWindow**: The central hub, managing the layout. Delegates logic to `RequestManager` and `StateManager`.
 - **Widgets**: Specialized components like `RequestEditor` for composing requests and `ResponseView`
-  for displaying results.
+  for displaying results. `VariableAware` widgets use `VariableHoverMixin` for shared tooltip logic.
 - **Dialogs**: Separate windows for specific tasks like editing environment variables
   (`env_dialog.py`).
 

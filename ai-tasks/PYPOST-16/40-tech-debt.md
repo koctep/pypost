@@ -1,12 +1,26 @@
 # PYPOST-16: Technical Debt Analysis
 
+## Status: FIXED
+Addressed in PYPOST-32 by implementing `VariableHoverMixin`.
+
 ## Shortcuts Taken
 
-- **Variable Parsing Logic**: Simple regex `\{\{([a-zA-Z0-9_]+)\}\}` is used to find variables. This works for most cases but might give false positives inside string literals if they accidentally contain such pattern, or not support complex expressions (if planned in future).
-- **Hardcoded Colors/Styles**: Tooltip styling is standard for now. Customization via QSS might be needed in future.
-- **Single Level Resolution**: Variable resolution happens only one level deep. If a variable refers to another variable (`VAR_A = {{VAR_B}}`), this is not handled recursively for tooltip (although `TemplateEngine` might support it).
-- **Duplication of Logic**: Variable search logic (`find_variable_at_index`) is moved to helper, but `VariableAwareLineEdit` and `VariableAwarePlainTextEdit` classes still have similar `mouseMoveEvent` structure. Could use mixin, but due to different base classes (`QLineEdit` vs `QPlainTextEdit`) and cursor position methods, it would be slightly harder.
-- **Direct Variable Injection**: `set_variables` method injects dictionary directly. Perhaps using `Property` or signal-slot mechanism for more reactive update would be better, but sufficient for current goals.
+- **Variable Parsing Logic**: A simple regex `\{\{([a-zA-Z0-9_]+)\}\}` is used to find
+  variables. This works for most cases but might give false positives inside string literals if they
+  accidentally contain such a pattern, or not support complex expressions (if planned in future).
+- **Hardcoded Colors/Styles**: Tooltip styling is standard for now. Customization via QSS might be
+  needed in future.
+- **Single Level Resolution**: Variable resolution happens only one level deep. If a variable refers
+  to another variable (`VAR_A = {{VAR_B}}`), this is not handled recursively for tooltip (although
+  `TemplateEngine` might support it).
+
+## Code Quality Issues
+
+- **[FIXED] Duplication of Logic**: Variable search logic (`find_variable_at_index`) was moved to a helper
+  but duplicated in `mouseMoveEvent`. Now `VariableHoverMixin` is used in `pypost/ui/widgets/mixins.py`.
+- **Direct Variable Injection**: The `set_variables` method injects dictionary directly. Perhaps using
+  `Property` or signal-slot mechanism for more reactive update would be better, but sufficient for
+  current goals.
 
 ## Missing Tests
 

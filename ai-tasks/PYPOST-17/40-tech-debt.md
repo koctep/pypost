@@ -1,17 +1,17 @@
 # PYPOST-17: Technical Debt Analysis
 
+## Status: FIXED
+Addressed in PYPOST-32 by implementing `RequestManager`.
+
 ## Shortcuts Taken
 
-- **Search for existing request**: We iterate through all collections and requests to find the
-  request ID. For a small number of requests, this is fine, but it's O(N) where N is total requests.
-- **Data Update**: We update the request object in place within the collection list. Ideally, there
-  should be a cleaner method in `StorageManager` or `Collection` model to "update_request(req)".
+- **[FIXED] Search for existing request**: Logic for searching requests has been moved to `RequestManager.find_request`. While it is still O(N) internally, the complexity is encapsulated.
+- **[FIXED] Data Update**: Request updates are now handled by `RequestManager.save_request`.
 
 ## Code Quality Issues
 
-- `MainWindow.handle_save_request` is becoming a bit large and handles UI logic (dialogs), business
-  logic (search), and storage logic. It might be better to move the "search and save" logic into a
-  controller or service method.
+- **[FIXED] `MainWindow.handle_save_request` complexity**: The logic has been simplified by delegating
+  search and persistence to `RequestManager`. `MainWindow` now focuses on UI interaction (dialogs).
 
 ## Missing Tests
 
@@ -21,10 +21,10 @@
 ## Performance Concerns
 
 - As mentioned, linear search for request ID might be slow if the user has thousands of requests. A
-  hash map index (ID -> Request) would be O(1).
+  hash map index (ID -> Request) would be O(1). This can now be optimized inside `RequestManager`
+  without changing the rest of the app.
 
 ## Follow-up Tasks
 
-- **Refactor Request Management**: Create a `RequestManager` service that handles finding, updating,
-  and saving requests, decoupling it from `MainWindow`.
-- **Optimize Lookup**: Implement an index for request IDs.
+- **[COMPLETED] Refactor Request Management**: Create a `RequestManager` service.
+- **Optimize Lookup**: Implement an index for request IDs inside `RequestManager`.
