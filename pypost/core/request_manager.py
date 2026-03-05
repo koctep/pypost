@@ -1,6 +1,10 @@
+import logging
 from typing import List, Optional, Tuple, Dict
 from pypost.core.storage import StorageManager
 from pypost.models.models import Collection, RequestData
+
+logger = logging.getLogger(__name__)
+
 
 class RequestManager:
     """
@@ -44,7 +48,7 @@ class RequestManager:
             if col.id == collection_id:
                 target_collection = col
                 break
-        
+
         if not target_collection:
             raise ValueError(f"Collection with ID {collection_id} not found")
 
@@ -55,22 +59,77 @@ class RequestManager:
                 target_collection.requests[i] = request
                 found = True
                 break
-        
+
         if not found:
             target_collection.requests.append(request)
 
         # Persist
         self.storage.save_collection(target_collection)
-        
+
         # Update index
         self._rebuild_index()
 
     def create_collection(self, name: str) -> Collection:
         """Creates a new collection."""
-        # Note: In a real app we might want to check for name duplicates or generate a UUID here if not handled by model
+        # Note: in a real app we may check duplicate names before persisting.
         import uuid
         new_col = Collection(id=str(uuid.uuid4()), name=name, requests=[])
         self.collections.append(new_col)
         self.storage.save_collection(new_col)
         return new_col
 
+    def delete_request(self, request_id: str) -> bool:
+        """Deletes a request by ID from its collection."""
+        logger.info("delete_request_started request_id=%s", request_id)
+        for col in self.collections:
+            for idx, req in enumerate(col.requests):
+                if req.id == request_id:
+                    del col.requests[idx]
+                    self.storage.save_collection(col)
+                    self._rebuild_index()
+                    logger.info(
+                        "delete_request_succeeded request_id=%s collection_id=%s",
+                        request_id,
+                        col.id,
+                    )
+                    return True
+        logger.warning("delete_request_not_found request_id=%s", request_id)
+        return False
+
+    def delete_collection(self, collection_id: str) -> bool:
+        """Deletes a collection by ID."""
+        logger.info("delete_collection_started collection_id=%s", collection_id)
+        for idx, col in enumerate(self.collections):
+            if col.id == collection_id:
+                self.storage.delete_collection(col.name)
+                del self.collections[idx]
+                self._rebuild_index()
+                logger.info(
+                    "delete_collection_succeeded collection_id=%s collection_name=%s",
+                    collection_id,
+                    col.name,
+                )
+                return True
+        logger.warning("delete_collection_not_found collection_id=%s", collection_id)
+        return False
+
+    def delete_collection_item(self, item_id: str, item_type: str) -> bool:
+        """
+        Deletes a collection item by type.
+        Supported types: "collection", "request".
+        """
+        logger.info(
+            "delete_collection_item_started item_id=%s item_type=%s",
+            item_id,
+            item_type,
+        )
+        if item_type == "collection":
+            return self.delete_collection(item_id)
+        if item_type == "request":
+            return self.delete_request(item_id)
+        logger.warning(
+            "delete_collection_item_unsupported_type item_id=%s item_type=%s",
+            item_id,
+            item_type,
+        )
+        return False

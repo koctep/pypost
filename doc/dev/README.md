@@ -9,6 +9,7 @@ set up your development environment, and contribute to the project.
 1. [Architecture Overview](architecture.md)
 1. [MCP Integration](mcp_integration.md)
 1. [Request Actions](request_actions.md)
+1. [Collection Item Delete](collection_item_delete.md)
 
 ## Quick Start
 

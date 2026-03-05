@@ -1,9 +1,10 @@
 import os
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 from platformdirs import user_data_dir
 from pypost.models.models import Collection, Environment
+
 
 class StorageManager:
     def __init__(self, app_name="pypost", app_author=None):
@@ -24,22 +25,28 @@ class StorageManager:
                 self.collections_path.mkdir(exist_ok=True)
             except Exception as e:
                 print(f"Error creating collections directory: {e}")
-                
+
         if not self.environments_file.exists():
             try:
                 with open(self.environments_file, 'w') as f:
                     json.dump([], f)
             except Exception as e:
-                 print(f"Error creating environments file: {e}")
+                print(f"Error creating environments file: {e}")
 
     def save_collection(self, collection: Collection):
         # Ensure collections directory exists before saving (in case it was deleted)
         if not self.collections_path.exists():
-             self.collections_path.mkdir(exist_ok=True, parents=True)
+            self.collections_path.mkdir(exist_ok=True, parents=True)
 
-        file_path = self.collections_path / f"{collection.name}.json" # Simplification: using name as filename
+        # Simplification: using collection name as filename.
+        file_path = self.collections_path / f"{collection.name}.json"
         with open(file_path, 'w') as f:
             f.write(collection.model_dump_json(indent=2))
+
+    def delete_collection(self, collection_name: str):
+        file_path = self.collections_path / f"{collection_name}.json"
+        if file_path.exists():
+            file_path.unlink()
 
     def load_collections(self) -> List[Collection]:
         collections = []

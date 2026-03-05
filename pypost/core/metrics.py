@@ -8,6 +8,7 @@ from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp.types import Resource, TextResourceContents
 
+
 class MetricsManager:
     _instance = None
     _lock = threading.Lock()
@@ -62,6 +63,12 @@ class MetricsManager:
             'gui_new_tab_actions_total',
             'Number of times New Tab action was triggered in GUI',
             ['source'],
+            registry=self.registry
+        )
+        self.gui_collection_delete_actions = Counter(
+            'gui_collection_delete_actions_total',
+            'Number of delete actions from collection context menu',
+            ['item_type', 'status'],
             registry=self.registry
         )
 
@@ -229,6 +236,9 @@ class MetricsManager:
 
     def track_gui_new_tab_action(self, source: str):
         self.gui_new_tab_actions.labels(source=source).inc()
+
+    def track_gui_collection_delete_action(self, item_type: str, status: str):
+        self.gui_collection_delete_actions.labels(item_type=item_type, status=status).inc()
 
     def track_request_sent(self, method: str):
         self.requests_sent.labels(method=method).inc()

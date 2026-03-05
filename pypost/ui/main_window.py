@@ -3,7 +3,7 @@ import uuid
 
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QComboBox, QLabel, QSplitter, QTreeView, QTabWidget, QMessageBox,
-                               QPushButton, QApplication, QInputDialog, QTabBar)
+                               QPushButton, QApplication, QInputDialog, QTabBar, QMenu)
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QShortcut, QKeySequence
 from PySide6.QtCore import Qt, Signal
 from pathlib import Path
@@ -125,6 +125,10 @@ class MainWindow(QMainWindow):
         self.collections_model = QStandardItemModel()
         self.collections_view.setModel(self.collections_model)
         self.collections_view.clicked.connect(self.on_collection_clicked)
+        self.collections_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.collections_view.customContextMenuRequested.connect(
+            self.show_collection_item_context_menu
+        )
         self.collections_view.expanded.connect(self.on_tree_expanded)
         self.collections_view.collapsed.connect(self.on_tree_collapsed)
         self.splitter.addWidget(self.collections_view)
@@ -401,6 +405,101 @@ class MainWindow(QMainWindow):
                 self.collections_view.collapse(index)
             else:
                 self.collections_view.expand(index)
+
+    def show_collection_item_context_menu(self, pos):
+        index = self.collections_view.indexAt(pos)
+        if not index.isValid():
+            return
+
+        item = self.collections_model.itemFromIndex(index)
+        data = item.data(Qt.UserRole)
+
+        item_type = None
+        item_id = None
+        item_label = item.text()
+
+        if isinstance(data, RequestData):
+            item_type = "request"
+            item_id = data.id
+        elif isinstance(data, str):
+            item_type = "collection"
+            item_id = data
+
+        if not item_type or not item_id:
+            return
+
+        menu = QMenu(self.collections_view)
+        delete_action = menu.addAction("Delete")
+        selected_action = menu.exec(self.collections_view.viewport().mapToGlobal(pos))
+        if selected_action != delete_action:
+            return
+
+        logger.info(
+            "collection_item_delete_selected item_type=%s item_id=%s item_label=%s",
+            item_type,
+            item_id,
+            item_label,
+        )
+        MetricsManager().track_gui_collection_delete_action(item_type, "selected")
+
+        if not self.confirm_delete(item_label):
+            logger.info(
+                "collection_item_delete_cancelled item_type=%s item_id=%s item_label=%s",
+                item_type,
+                item_id,
+                item_label,
+            )
+            MetricsManager().track_gui_collection_delete_action(item_type, "cancelled")
+            return
+
+        self.handle_delete_collection_item(item_id, item_type, item_label)
+
+    def confirm_delete(self, item_label: str) -> bool:
+        reply = QMessageBox.question(
+            self,
+            "Confirm Delete",
+            f"Delete '{item_label}'?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        return reply == QMessageBox.Yes
+
+    def handle_delete_collection_item(self, item_id: str, item_type: str, item_label: str):
+        try:
+            deleted = self.request_manager.delete_collection_item(item_id, item_type)
+        except Exception as exc:
+            logger.error(
+                "collection_item_delete_failed item_type=%s item_id=%s item_label=%s error=%s",
+                item_type,
+                item_id,
+                item_label,
+                exc,
+            )
+            MetricsManager().track_gui_collection_delete_action(item_type, "error")
+            QMessageBox.critical(self, "Delete Error", f"Failed to delete '{item_label}': {exc}")
+            return
+
+        if not deleted:
+            logger.warning(
+                "collection_item_delete_not_found item_type=%s item_id=%s item_label=%s",
+                item_type,
+                item_id,
+                item_label,
+            )
+            MetricsManager().track_gui_collection_delete_action(item_type, "not_found")
+            QMessageBox.warning(self, "Delete Error", f"Could not delete '{item_label}'.")
+            return
+
+        logger.info(
+            "collection_item_delete_succeeded item_type=%s item_id=%s item_label=%s",
+            item_type,
+            item_id,
+            item_label,
+        )
+        MetricsManager().track_gui_collection_delete_action(item_type, "succeeded")
+        self.load_collections()
+        self.restore_tree_state()
+        self.save_tabs_state()
 
     def handle_save_request(self, request_data: RequestData):
         existing_result = self.request_manager.find_request(request_data.id)
