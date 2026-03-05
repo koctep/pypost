@@ -1,6 +1,8 @@
 # PyPost
 
-PyPost is a lightweight HTTP client with a graphical interface, written in Python using PySide6. The application is designed for API testing and sending HTTP requests, providing a convenient tool for developers, similar to Postman.
+PyPost is a lightweight HTTP client with a graphical interface, written in Python using
+PySide6. The application is designed for API testing and sending HTTP requests, providing a
+convenient tool for developers, similar to Postman.
 
 ## Features
 
@@ -8,7 +10,8 @@ PyPost is a lightweight HTTP client with a graphical interface, written in Pytho
 *   **Collection Management**: Organize requests into collections for easy access and reuse.
 *   **Request Editor**: Convenient interface for configuring headers, parameters, and request body.
 *   **Response Viewer**: Display status, headers, and response body (JSON, text, etc.).
-*   **Environment Variables**: Support for environment variables to switch between configurations (e.g., dev/prod).
+*   **Environment Variables**: Support for environment variables to switch between
+    configurations (e.g., dev/prod).
 *   **Templating**: Use Jinja2 for dynamic data generation in requests.
 
 ## Requirements
@@ -26,18 +29,18 @@ To simplify the installation and startup process, a `Makefile` is provided in th
     ```bash
     make install
     ```
-    This will create a virtual environment (`venv`) and install all necessary libraries.
+    This will create a virtual environment (`.venv`) and install all necessary libraries.
 
 ### Manual Installation
 
 1.  Create a virtual environment:
     ```bash
-    python3 -m venv venv
+    python3 -m venv .venv
     ```
 
 2.  Activate the virtual environment:
-    *   Linux/macOS: `source venv/bin/activate`
-    *   Windows: `venv\Scripts\activate`
+    *   Linux/macOS: `source .venv/bin/activate`
+    *   Windows: `.venv\Scripts\activate`
 
 3.  Install dependencies:
     ```bash

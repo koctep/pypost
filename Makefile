@@ -1,29 +1,39 @@
-.PHONY: venv install run clean test lint
+.PHONY: venv venv-test install run clean test lint
 
 PYTHON := python3
-VENV := venv
+PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+VENV := .venv
 BIN := $(VENV)/bin
+VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
 
 # Create virtual environment
-venv:
+venv: $(VENV_MARKER)
+
+$(VENV_MARKER):
 	$(PYTHON) -m venv $(VENV)
-	$(BIN)/pip install --upgrade pip
+	$(BIN)/python -m ensurepip --upgrade
+	$(BIN)/python -m pip install --upgrade pip
+	touch "$(VENV_MARKER)"
+
+# Create test virtual environment tools
+venv-test: $(VENV_MARKER)
+	$(BIN)/python -m pip install pytest flake8
 
 # Install dependencies
-install: venv
-	$(BIN)/pip install -r requirements.txt
+install: $(VENV_MARKER) venv-test
+	$(BIN)/python -m pip install -r requirements.txt
 
 # Run application
-run:
+run: $(VENV_MARKER)
 	PYTHONPATH=. $(BIN)/python pypost/main.py
 
 # Run tests
-test:
-	$(BIN)/pytest tests/
+test: $(VENV_MARKER)
+	$(BIN)/python -m pytest tests/
 
 # Linting
-lint:
-	$(BIN)/flake8 pypost/
+lint: $(VENV_MARKER)
+	$(BIN)/python -m flake8 --jobs=1 pypost/
 
 # Clean
 clean:

@@ -27,15 +27,15 @@ Alternatively, to do it manually:
 
 **Linux/macOS:**
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 **Windows:**
 ```bash
-python -m venv venv
-.\venv\Scripts\activate
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -57,7 +57,7 @@ make run
 Or manually:
 
 ```bash
-# Ensure venv is activated
+# Ensure .venv is activated
 python -m pypost.main
 ```
 
@@ -65,6 +65,14 @@ python -m pypost.main
 
 The project uses a `Makefile` to simplify common tasks:
 
+- **Initialize virtual environment only**:
+  ```bash
+  make venv
+  ```
+- **Install dependencies explicitly**:
+  ```bash
+  make install
+  ```
 - **Run tests**:
   ```bash
   make test
@@ -73,14 +81,22 @@ The project uses a `Makefile` to simplify common tasks:
   ```bash
   make lint
   ```
-- **Clean up** (removes venv and cache):
+- **Clean up** (removes `.venv` and cache):
   ```bash
   make clean
   ```
 
+### Makefile Behavior Notes
+
+- `venv` is driven by `$(VENV_MARKER)` and is version-aware
+  (`.venv/.initialized-<major.minor>`).
+- `run`, `test`, and `lint` depend on `$(VENV_MARKER)` only and do not trigger `install`.
+- If dependencies are missing, `run/test/lint` fail naturally with interpreter/module errors.
+- Use `make install` explicitly when dependencies must be installed or refreshed.
+
 ## Troubleshooting
 
 - **Missing modules**: Ensure your virtual environment is activated and you have installed
-  requirements.
+  requirements (`make install`).
 - **Qt Platform plugin "xcb"**: On Linux, you might need to install `libxcb-cursor0` or similar
   system libraries if the app fails to launch.
