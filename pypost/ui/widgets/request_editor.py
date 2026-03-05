@@ -1,9 +1,19 @@
 import logging
 
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
-                               QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-                               QHeaderView, QPlainTextEdit, QTabWidget, QCheckBox,
-                               QToolButton, QMenu)
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QComboBox,
+    QPushButton,
+    QTableWidgetItem,
+    QHeaderView,
+    QPlainTextEdit,
+    QTabWidget,
+    QCheckBox,
+    QToolButton,
+    QMenu,
+)
 from PySide6.QtGui import QShortcut, QKeySequence, QAction
 from PySide6.QtCore import Signal
 from pypost.models.models import RequestData
@@ -21,6 +31,7 @@ logger = logging.getLogger(__name__)
 class RequestWidget(QWidget):
     send_requested = Signal(RequestData)
     save_requested = Signal(RequestData)
+    save_as_requested = Signal(RequestData)
 
     def __init__(self, request_data: RequestData = None):
         super().__init__()
@@ -47,6 +58,9 @@ class RequestWidget(QWidget):
         self.actions_btn.setPopupMode(QToolButton.InstantPopup)
 
         self.actions_menu = QMenu(self.actions_btn)
+        self.save_as_action = QAction("Save As...", self)
+        self.save_as_action.triggered.connect(self.handle_save_as_menu_action)
+        self.actions_menu.addAction(self.save_as_action)
         self.save_action = QAction("Save", self)
         self.save_action.triggered.connect(self.handle_save_menu_action)
         self.actions_menu.addAction(self.save_action)
@@ -115,26 +129,53 @@ class RequestWidget(QWidget):
         self.request_data.post_script = self.script_edit.toPlainText()
         self.request_data.expose_as_mcp = self.mcp_check.isChecked()
 
+    def get_request_data_from_ui(self) -> RequestData:
+        request_data = self.request_data.model_copy(deep=True)
+        request_data.url = self.url_input.text()
+        request_data.method = self.method_combo.currentText()
+        request_data.params = self.params_table.get_data()
+        request_data.headers = self.headers_table.get_data()
+        request_data.body = self.body_edit.toPlainText()
+        request_data.post_script = self.script_edit.toPlainText()
+        request_data.expose_as_mcp = self.mcp_check.isChecked()
+        return request_data
+
     def on_send(self):
         MetricsManager().track_gui_send_click()
-        self.update_request_data()
-        self.send_requested.emit(self.request_data)
+        current_request = self.get_request_data_from_ui()
+        self.request_data = current_request
+        self.send_requested.emit(current_request)
 
     def on_save(self, source: str = "unknown"):
         logger.info("save_action_triggered source=%s", source)
         MetricsManager().track_gui_save_action(source)
-        self.update_request_data()
-        self.save_requested.emit(self.request_data)
+        current_request = self.get_request_data_from_ui()
+        self.request_data = current_request
+        self.save_requested.emit(current_request)
 
     def _setup_shortcuts(self):
         save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
         save_shortcut.activated.connect(self.handle_save_request_shortcut)
+        save_as_shortcut = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
+        save_as_shortcut.activated.connect(self.handle_save_as_shortcut)
 
     def handle_save_request_shortcut(self):
         self.on_save("shortcut")
 
     def handle_save_menu_action(self):
         self.on_save("menu")
+
+    def handle_save_as_shortcut(self):
+        self.on_save_as("shortcut")
+
+    def on_save_as(self, source: str = "unknown"):
+        logger.info("save_as_action_triggered source=%s", source)
+        MetricsManager().track_gui_save_as_action(source)
+        current_request = self.get_request_data_from_ui()
+        self.save_as_requested.emit(current_request)
+
+    def handle_save_as_menu_action(self):
+        self.on_save_as("menu")
 
 
 class KeyValueTable(VariableAwareTableWidget):

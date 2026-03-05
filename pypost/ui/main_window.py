@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QComboBox, QLabel, QSplitter, QTreeView, QTabWidget, QMessageBox,
@@ -360,6 +361,7 @@ class MainWindow(QMainWindow):
 
         tab.request_editor.send_requested.connect(self.handle_send_request)
         tab.request_editor.save_requested.connect(self.handle_save_request)
+        tab.request_editor.save_as_requested.connect(self.handle_save_as_request)
         tab.response_view.variable_set_requested.connect(self.handle_variable_set_request)
 
         name = request_data.name if request_data else "New Request"
@@ -461,6 +463,55 @@ class MainWindow(QMainWindow):
                     tab.request_data = request_data
 
                 self.save_tabs_state()
+
+    def handle_save_as_request(self, request_data: RequestData):
+        logger.info("save_as_flow_started source_request_id=%s", request_data.id)
+        dialog = SaveRequestDialog(self.collections, self)
+        if not dialog.exec():
+            logger.info("save_as_flow_cancelled source_request_id=%s", request_data.id)
+            return
+
+        target_collection_id = dialog.selected_collection_id
+        if not target_collection_id and dialog.new_collection_name:
+            new_col = self.request_manager.create_collection(dialog.new_collection_name)
+            target_collection_id = new_col.id
+
+        if not target_collection_id:
+            logger.warning("save_as_flow_failed reason=missing_target_collection")
+            return
+
+        new_request = request_data.model_copy(
+            deep=True,
+            update={
+                "id": str(uuid.uuid4()),
+                "name": dialog.request_name,
+            }
+        )
+        self.request_manager.save_request(new_request, target_collection_id)
+        logger.info(
+            "save_as_flow_completed source_request_id=%s new_request_id=%s target_collection_id=%s",
+            request_data.id,
+            new_request.id,
+            target_collection_id,
+        )
+
+        current_expanded = self.state_manager.get_expanded_collections()
+        if target_collection_id not in current_expanded:
+            current_expanded.append(target_collection_id)
+            self.state_manager.set_expanded_collections(current_expanded)
+
+        self.load_collections()
+        self.restore_tree_state()
+
+        current_index = self.tabs.currentIndex()
+        self.tabs.setTabText(current_index, new_request.name)
+
+        tab = self.tabs.widget(current_index)
+        if isinstance(tab, RequestTab):
+            tab.request_data = new_request
+            tab.request_editor.request_data = new_request
+
+        self.save_tabs_state()
 
     def handle_send_request(self, request_data: RequestData):
         sender_tab = None

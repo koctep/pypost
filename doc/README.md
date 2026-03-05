@@ -89,6 +89,8 @@ Collections allow grouping requests into folders.
 
 *   To save a request to a collection, open **Actions** (right of **Send**) and select
     **Save**, or press `Ctrl+S`.
+*   To save a modified request as a new entry, open **Actions** and select **Save As...**.
+    This always creates a new request and leaves the original request unchanged.
 *   In the save dialog, select an existing collection or create a new one.
 *   Requests in the sidebar can be opened with a double click (or single click if configured).
 
@@ -130,6 +132,7 @@ This will be converted to `https://api.example.com/users` before sending the req
 | **Request Editor** | |
 | Send Request | `F5` or `Ctrl+Enter` |
 | Save Request | `Ctrl+S` |
+| Save As Request | `Ctrl+Shift+S` |
 | Focus on URL | `Ctrl+L` or `Alt+D` |
 | Params Tab | `Ctrl+P` |
 | Headers Tab | `Ctrl+H` |

@@ -52,6 +52,12 @@ class MetricsManager:
             ['source'],
             registry=self.registry
         )
+        self.gui_save_as_actions = Counter(
+            'gui_save_as_actions_total',
+            'Number of times Save As action was triggered in GUI',
+            ['source'],
+            registry=self.registry
+        )
         self.gui_new_tab_actions = Counter(
             'gui_new_tab_actions_total',
             'Number of times New Tab action was triggered in GUI',
@@ -217,6 +223,9 @@ class MetricsManager:
 
     def track_gui_save_action(self, source: str):
         self.gui_save_actions.labels(source=source).inc()
+
+    def track_gui_save_as_action(self, source: str):
+        self.gui_save_as_actions.labels(source=source).inc()
 
     def track_gui_new_tab_action(self, source: str):
         self.gui_new_tab_actions.labels(source=source).inc()

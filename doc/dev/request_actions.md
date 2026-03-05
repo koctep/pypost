@@ -37,6 +37,13 @@ New-tab flow:
 1. `MetricsManager.track_gui_new_tab_action(source)` increments labeled metric.
 1. `MainWindow.add_new_tab()` creates and selects the new request tab.
 
+Save-as flow:
+1. User clicks `Actions -> Save As...` or presses `Ctrl+Shift+S`.
+1. `RequestWidget.on_save_as(source=...)` updates request data and emits
+   `save_as_requested`.
+1. `MainWindow.handle_save_as_request` opens save dialog and persists a new request ID.
+1. `Save As...` uses a UI snapshot copy of request data; source request is not mutated in-place.
+
 ## API / Usage
 
 ### `RequestWidget.on_save(source: str = "unknown")`
@@ -56,6 +63,31 @@ Menu callback for `Actions -> Save`. Calls `on_save("menu")`.
 ### `RequestWidget.handle_save_request_shortcut()`
 
 Shortcut callback for `Ctrl+S`. Calls `on_save("shortcut")`.
+
+### `RequestWidget.on_save_as(source: str = "unknown")`
+
+Triggers save-as from UI action entry points.
+
+- **source**: save-as origin (`menu`, `shortcut`, or fallback value).
+- **Behavior**:
+  1. Writes INFO log `save_as_action_triggered source=<source>`.
+  1. Increments metric `gui_save_as_actions_total{source=<source>}`.
+  1. Emits `save_as_requested` with a copied `RequestData` snapshot from UI fields.
+
+### `RequestWidget.get_request_data_from_ui()`
+
+Builds a deep-copied `RequestData` snapshot from current editor widgets.
+
+- Used by `send`, `save`, and `save as` actions.
+- Prevents unintended mutation of the original opened entity before explicit save operations.
+
+### `RequestWidget.handle_save_as_menu_action()`
+
+Menu callback for `Actions -> Save As...`. Calls `on_save_as("menu")`.
+
+### `RequestWidget.handle_save_as_shortcut()`
+
+Shortcut callback for `Ctrl+Shift+S`. Calls `on_save_as("shortcut")`.
 
 ### `MetricsManager.track_gui_save_action(source: str)`
 
@@ -83,6 +115,10 @@ Positions `add_tab_btn` relative to `QTabWidget`/`QTabBar` geometry.
 ### `MetricsManager.track_gui_new_tab_action(source: str)`
 
 Records a labeled counter increment for new-tab trigger source.
+
+### `MetricsManager.track_gui_save_as_action(source: str)`
+
+Records a labeled counter increment for save-as trigger source.
 
 ## Configuration
 
@@ -114,6 +150,16 @@ Tab action UI uses internal constants in `MainWindow`:
 - Ensure metrics server is running (`pypost/main.py` starts `MetricsManager`).
 - Trigger save at least once and inspect `/metrics` for
   `gui_save_actions_total{source="menu"}` or `source="shortcut"`.
+
+### Save-as shortcut does nothing
+
+- Verify `_setup_shortcuts` in `RequestWidget` binds `Ctrl+Shift+S`.
+- Confirm focus remains in the request tab widget and shortcut is not intercepted globally.
+
+### Save-as metric is missing
+
+- Ensure `gui_save_as_actions_total` is registered in `MetricsManager._init_metrics()`.
+- Trigger `Actions -> Save As...` and `Ctrl+Shift+S`, then inspect `/metrics`.
 
 ### Save action works but data is not persisted
 

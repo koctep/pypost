@@ -25,7 +25,7 @@ class HotkeysDialog(QDialog):
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.NoSelection)
-        
+
         # Data
         shortcuts = [
             ("General", ""),
@@ -41,6 +41,7 @@ class HotkeysDialog(QDialog):
             ("Request Editor", ""),
             ("Send Request", "F5 / Ctrl+Enter"),
             ("Save Request", "Ctrl+S"),
+            ("Save As Request", "Ctrl+Shift+S"),
             ("Focus URL Bar", "Ctrl+L / Alt+D"),
             ("Switch to Params", "Ctrl+P"),
             ("Switch to Headers", "Ctrl+H"),
@@ -49,26 +50,26 @@ class HotkeysDialog(QDialog):
         ]
 
         self.table.setRowCount(len(shortcuts))
-        
+
         for row, (action, key) in enumerate(shortcuts):
             action_item = QTableWidgetItem(action)
             key_item = QTableWidgetItem(key)
-            
+
             if not key:  # Section header
                 action_item.setFlags(Qt.NoItemFlags)
                 action_item.setBackground(Qt.lightGray)
                 action_item.setForeground(Qt.black)
                 key_item.setFlags(Qt.NoItemFlags)
                 key_item.setBackground(Qt.lightGray)
-                
+
                 # Make section header span both columns? Or just look distinct
                 # Spanning isn't trivial in QTableWidget without setSpan, let's just style it
                 font = action_item.font()
                 font.setBold(True)
                 action_item.setFont(font)
-            
+
             self.table.setItem(row, 0, action_item)
-            
+
             # Align shortcuts to the right
             key_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.table.setItem(row, 1, key_item)
@@ -79,4 +80,3 @@ class HotkeysDialog(QDialog):
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
-
