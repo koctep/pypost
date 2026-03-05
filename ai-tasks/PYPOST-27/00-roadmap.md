@@ -5,9 +5,9 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Updated `MetricsManager` to support MCP metrics.
-  - [x] Implemented `track_mcp_request_received` and `track_mcp_response_sent`.
-  - [x] Integrated metrics into `MCPServerImpl`.
+  - [x] Implemented `on_env_update` method in `MainWindow`.
+  - [x] Implemented signal connection from `RequestWorker.env_update` to `MainWindow.on_env_update`.
+  - [x] Implemented environment saving and variable propagation to tabs.
 - [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend

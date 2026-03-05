@@ -2,14 +2,15 @@
 
 ## Step Execution Status
 
-- [x] **STEP 1: Requirements** — requirements gathering and documentation
-- [x] **STEP 2: Architecture** — high-level architectural design
-- [x] **STEP 3: Development** — iterative implementation with minimal significant changes
-  - [x] Updated RequestData model (`post_script` field)
-  - [x] Implemented ScriptExecutor for executing Python code
-  - [x] Updated RequestWorker to run scripts after request
-  - [x] Added "Script" tab to request editor
-  - [x] Implemented environment variable update from script
+- [x] **STEP 1: Requirements gathering and documentation**
+- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 3: Development**
+  - [x] Added `expanded_collections` field to `AppSettings`
+  - [x] Implemented tree state saving logic (expand/collapse)
+  - [x] Implemented tree state restoration on startup
+  - [x] Implemented tree state saving when updating collection list
+  - [x] Implemented automatic collection expansion when saving a request
+- [/] **STEP 4: Review and Technical Debt**
 
 ## Status Legend
 
@@ -32,3 +33,7 @@
 - Source code
 - Tests
 - Documentation updates
+
+### STEP 4: Review
+
+- `ai-tasks/PYPOST-10/40-tech-debt.md`

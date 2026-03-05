@@ -1,105 +1,48 @@
-# Architecture: PYPOST-10 - Post-request Scripts
+# Architecture: PYPOST-10 - Saving Tree View State
 
-## 1. System Components
+## Research
+In `PySide6`, `QTreeView` has methods `expand(index)`, `collapse(index)`, and `isExpanded(index)`.
+The data model (`QStandardItemModel`) stores data. Top-level items (collections) have `Qt.UserRole` with the collection ID (UUID).
 
-We will introduce a new component `ScriptExecutor` and modify existing ones to support the scripting
-lifecycle.
+To track expansion/collapse state changes, signals `expanded(QModelIndex)` and `collapsed(QModelIndex)` of `QTreeView` itself can be used.
 
-### 1.1. ScriptExecutor (`pypost/core/script_executor.py`)
+Settings storage is already implemented via `AppSettings` and `ConfigManager`. We need to add a new field to `AppSettings`.
 
-A new dedicated class responsible for executing user scripts safely and managing the context.
+## Implementation Plan
+1.  **Data Model**:
+    *   Update `pypost/models/settings.py`: add field `expanded_collections: List[str] = []` to `AppSettings` class.
 
-*   **Responsibility**:
-    *   Prepare execution context (`request`, `response`, `pypost`).
-    *   Execute python code using `exec()`.
-    *   Capture outputs and errors.
-    *   Update environment variables based on script actions.
+2.  **UI Logic (`MainWindow`)**:
+    *   In `__init__` or `load_collections`:
+    *   After loading data, iterate through model items.
+    *   If collection ID is in `settings.expanded_collections`, call `self.collections_view.expand(index)`.
+    *   Connect `QTreeView.expanded` and `QTreeView.collapsed` signals to new slots.
+    *   In signal handling slots:
+    *   Get collection ID from index.
+    *   Update `expanded_collections` list in `self.settings`.
+    *   Save settings via `self.config_manager.save_config(self.settings)`.
 
-*   **API**:
-    ```python
-    class ScriptExecutor:
-        def execute(self, script: str, request_data: RequestData, response_data: ResponseData, env_variables: Dict[str, str]) -> ExecutionResult:
-            ...
-    ```
+## Architecture
 
-*   **Context Objects**:
-    *   `PyPostAPI`: A wrapper class exposed as `pypost` (or `env`) to the script, providing methods
-        like `set_env(key, value)`.
+### 1. Models (`pypost/models/settings.py`)
+Change settings schema to store list of expanded collection IDs.
 
-### 1.2. Model Changes (`pypost/models/models.py`)
+### 2. UI (`pypost/ui/main_window.py`)
+Add logic for handling tree signals and restoring state.
 
-*   **RequestData**: Add `post_script: str` field to store the user's python script.
+*   **New Methods**:
+    *   `on_tree_expanded(index: QModelIndex)`: Adds ID to settings.
+    *   `on_tree_collapsed(index: QModelIndex)`: Removes ID from settings.
+    *   `restore_tree_state()`: Applies settings to tree after loading.
 
-### 1.3. Worker Changes (`pypost/core/worker.py`)
+*   **Changes in `load_collections`**:
+    *   Call `restore_tree_state()` after populating the model.
 
-The `RequestWorker` needs to encompass the script execution step *after* the HTTP request is
-successful.
+### 3. Interaction
+[Diagram describing interaction]
 
-*   **Flow**:
-    1.  `HTTPClient.send_request(...)` -> `ResponseData`
-    1.  If `RequestData.post_script` is present:
-        *   Initialize `ScriptExecutor`.
-        *   Run script.
-        *   If script modifies environment, capture updates.
-    1.  Emit `finished` signal (now possibly containing updated environment or execution logs).
-
-### 1.4. UI Changes
-
-*   **RequestEditor**: Add a new tab "Script" alongside Headers/Body.
-*   **MainWindow**: Handle the updated environment coming back from the worker (if variables
-    changed).
-
-## 2. Data Flow
-
-1.  **User** writes script in `RequestEditor` -> saved to `RequestData.post_script`.
-1.  **User** clicks Send -> `RequestWorker` starts.
-1.  `HTTPClient` performs network request.
-1.  `RequestWorker` calls `ScriptExecutor` with `response` and `request`.
-1.  **Script** runs `pypost.env.set('token', 'abc')`.
-1.  `ScriptExecutor` returns modified environment variables.
-1.  `RequestWorker` emits signal with `(ResponseData, UpdatedEnvironment)`.
-1.  `MainWindow` updates the global environment state with new variables.
-
-## 3. Detailed Design
-
-### 3.1. Script Context
-
-```python
-# The 'pypost' object exposed to script
-class ScriptContext:
-    def __init__(self, variables: Dict[str, str]):
-        self._variables = variables.copy()
-        self._logs = []
-
-    @property
-    def env(self):
-        return self # or a sub-object
-
-    def set(self, key: str, value: str):
-        self._variables[key] = str(value)
-
-    def get(self, key: str):
-        return self._variables.get(key)
-
-    def log(self, message: str):
-        self._logs.append(str(message))
-```
-
-### 3.2. Worker Signal Update
-
-Existing `finished = Signal(ResponseData)` might need to change or we add a new signal `env_updated
-= Signal(dict)`.
-Better approach:
-*   Define a `RequestResult` dataclass that holds both `ResponseData` and `execution_logs` /
-    `updated_variables`.
-*   Or just emit a separate signal for env updates since the `ResponseView` only cares about
-    response.
-
-**Decision**:
-Add `env_update = Signal(dict)` to `RequestWorker`.
-If script runs successfully and changes env, emit `env_update`.
-`finished` signal continues to emit `ResponseData`.
-
-## 4. Dependencies
-
-*   No new external dependencies (standard library `builtins`).
+## Q&A
+*   **Q: What if a collection ID is in settings, but the collection itself no longer exists?**
+    *   A: `restore_tree_state` will simply ignore IDs not present in the model. On next save (if user collapses/expands something), the list will be overwritten with actual data (or cleanup can be done on load, but "lazy" update on save is simpler).
+*   **Q: When to save settings?**
+    *   A: Can save immediately on every click (simple and reliable for desktop app with local config).

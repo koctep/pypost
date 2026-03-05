@@ -5,11 +5,11 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Implemented `MCPServerManager` and `MCPServerImpl` with SSE transport
-  - [x] Updated `RequestData` and `Environment` models for MCP settings
-  - [x] Added UI controls for enabling MCP and exposing tools
-  - [x] Integrated server lifecycle into `MainWindow`
-  - [x] Added user and developer documentation
+  - [x] Added `mcp_host` field to `AppSettings` model
+  - [x] Updated `SettingsDialog` to include host input field
+  - [x] Updated `MCPServerManager` to support custom host binding
+  - [x] Updated `MainWindow` to display current host and port
+  - [x] Updated documentation
 - [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend

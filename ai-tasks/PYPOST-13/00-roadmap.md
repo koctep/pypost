@@ -2,12 +2,13 @@
 
 ## Step Execution Status
 
-- [x] **STEP 1: Requirements** — gathering and documenting requirements
-- [x] **STEP 2: Architecture** — high-level architectural design
-- [x] **STEP 3: Development** — iterative implementation with minimal significant changes
-  - [x] Implemented `JsonHighlighter` component.
-  - [x] Integrated highlighting into `RequestWidget`.
-  - [x] Integrated highlighting into `ResponseView`.
+- [x] **STEP 1: Requirements gathering and documentation**
+- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 3: Development**
+  - [x] Created `pypost/ui/widgets/variable_aware_widgets.py` module with basic widget implementation.
+  - [x] Updated `pypost/ui/widgets/request_editor.py` to use `VariableAwareLineEdit` and `CodeEditor`.
+  - [x] Updated `pypost/ui/widgets/code_editor.py` to inherit from `VariableAwarePlainTextEdit`.
+  - [x] Updated `pypost/ui/main_window.py` to pass environment variables to `RequestWidget` on environment change and tab creation.
 - [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend

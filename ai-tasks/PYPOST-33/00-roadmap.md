@@ -1,14 +1,23 @@
 # Roadmap: PYPOST-33
 
-## Step Execution Status
+## Task Metadata
 
-- [x] **STEP 1: Requirements gathering and documentation**
-- [x] **STEP 2: High-level architectural design**
+- Programming language: Python
+- Recommended branch: fix/PYPOST-33-ci-makefile-reliability
+
+## Step Status
+
+- [x] **STEP 1: Requirements Gathering and Documentation**
+- [x] **STEP 2: High-Level Architecture Design**
 - [x] **STEP 3: Development**
-  - [x] Implemented O(1) search in RequestManager
-  - [x] HTTPClient refactoring (preparation method extraction)
-  - [x] MainWindow refactoring (common cleanup method)
-- [x] **STEP 4: Review and technical debt**
+  - [x] Iteration 1: Updated Makefile to use `.venv`, enforce single-environment execution
+    for `run/test/lint`, and align targets to deterministic dependency/bootstrap flow.
+  - [x] Iteration 2: Refactored `venv` target to depend on `$(VENV_MARKER)` and moved
+    environment initialization to marker target for clearer Make dependency behavior.
+- [x] **STEP 4: Code Cleanup**
+- [x] **STEP 5: Observability**
+- [x] **STEP 6: Review and Technical Debt**
+- [x] **STEP 7: Dev Docs**
 
 ## Status Legend
 
@@ -32,6 +41,18 @@
 - Tests
 - Documentation updates
 
-### STEP 4: Review
+### STEP 4: Code Cleanup
 
-- `ai-tasks/PYPOST-33/40-tech-debt.md`
+- `ai-tasks/PYPOST-33/40-code-cleanup.md`
+
+### STEP 5: Observability
+
+- `ai-tasks/PYPOST-33/50-observability.md`
+
+### STEP 6: Review
+
+- `ai-tasks/PYPOST-33/60-tech-debt.md`
+
+### STEP 7: Dev Docs
+
+- `doc/dev/`

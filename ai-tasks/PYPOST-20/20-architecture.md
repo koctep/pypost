@@ -1,104 +1,49 @@
-# PYPOST-20: Create abstraction for request execution
+# Architecture: PYPOST-20 - Fix AttributeError in SSE Handling
 
 ## Research
+The error `AttributeError: 'Starlette' object has no attribute 'add_route'` suggests that the object we are trying to add a route to is not what we think it is, or the method is named differently.
 
-Analysis of the current architecture revealed that request execution logic is duplicated and
-inconsistent. `RequestWorker` (GUI) handles requests correctly with script execution, but
-`MCPServerImpl` has a simplified and incorrect implementation.
+In `MCPServerImpl.create_app`:
+```python
+self.app = Starlette(debug=True)
+# ...
+self.app.add_route("/sse", handle_sse)
+```
+This code is correct for Starlette.
 
-We do not need complex external libraries for this, as the task is solved by refactoring
-existing code and extracting a common service layer.
+However, if `mcp.server.fastmcp` or another abstraction is used which returns its own object wrapping Starlette, then `add_route` might be missing.
+
+**Investigation**:
+The code uses `mcp.server.Server`.
+The implementation of `create_app` creates a `Starlette` app.
+
+**Possible Cause**:
+Conflict between `starlette` versions or incorrect import.
+Or `self.app` is overwritten somewhere.
+
+**Solution**:
+Ensure `Starlette` is initialized correctly.
+Pass routes to the constructor `Starlette(routes=[...])` instead of `add_route` if dynamic addition fails (though it should work).
 
 ## Implementation Plan
 
-1. **Create `RequestService`**:
-   - Implement `RequestService` class in `pypost/core/request_service.py`.
-   - Move `HTTPClient` and `ScriptExecutor` invocation logic into `RequestService`.
-   - Define return data structure `ExecutionResult`.
-
-2. **Refactor `RequestWorker`**:
-   - Replace direct calls to `HTTPClient` and `ScriptExecutor` with `RequestService.execute`.
-   - Update result handling for signal transmission.
-
-3. **Refactor `MCPServerImpl`**:
-   - Remove manual template rendering code.
-   - Remove incorrect `HTTPClient` call.
-   - Integrate `RequestService` for request execution.
-   - Process `ExecutionResult` to build MCP response (including script logs if needed).
-
-## Architecture
-
-### New Interaction Structure
-
-```mermaid
-graph TD
-    GUI[GUI / RequestWorker] --> RS[RequestService]
-    MCP[MCP Server] --> RS[RequestService]
-    RS --> HC[HTTPClient]
-    RS --> SE[ScriptExecutor]
-    HC --> NET[External API]
-    SE --> RS
-```
-
-### Components
-
-#### `RequestService` (`pypost/core/request_service.py`)
-
-Central component for request execution.
-
-* **Responsibility**:
-    *   Coordinating the request execution process.
-    *   Calling `HTTPClient` for network interaction.
-    *   Calling `ScriptExecutor` for post-response handling.
-    *   Collecting execution statistics and logs.
-
-* **Interface**:
+1.  **Refactor `create_app`**:
+    -   Define `handle_sse` and `handle_messages` functions.
+    -   Create `Route` objects.
+    -   Initialize `Starlette` with the list of routes.
 
 ```python
-from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
-from pypost.models.models import RequestData
-from pypost.models.response import ResponseData
+from starlette.applications import Starlette
+from starlette.routing import Route
 
-@dataclass
-class ExecutionResult:
-    response: ResponseData
-    updated_variables: Dict[str, Any]
-    script_logs: List[str]
-    script_error: Optional[str]
-
-class RequestService:
-    def execute(self, request: RequestData, variables: Dict[str, Any] = None) -> ExecutionResult:
-        """
-        Executes a request with the given context.
-        """
-        pass
+# ...
+routes = [
+    Route("/sse", endpoint=handle_sse, methods=["GET"]),
+    Route("/messages", endpoint=handle_messages, methods=["POST"])
+]
+self.app = Starlette(debug=True, routes=routes)
 ```
 
-#### `RequestWorker` (`pypost/core/worker.py`)
-
-Adapter for GUI, running `RequestService` in a separate `QThread`.
-
-*   **Changes**:
-    *   Remove request execution business logic.
-    *   Keep only thread management and result translation to Qt signals.
-
-#### `MCPServerImpl` (`pypost/core/mcp_server_impl.py`)
-
-MCP server implementation.
-
-*   **Changes**:
-    *   `call_tool` method delegates execution to `RequestService`.
-    *   `ExecutionResult` is converted to MCP response format (`TextContent`).
-    *   Script logs may be added to the response for user debugging.
-
-## Q&A
-
-**Q:** Will `RequestService` hold state?
-**A:** No, `RequestService` must be stateless. All required data (request, variables) is passed
-to the `execute` method.
-
-**Q:** How to handle errors in `RequestService`?
-**A:** Exceptions from `HTTPClient` or `ScriptExecutor` should be caught and, if needed, wrapped
-in clear errors or returned as part of `ExecutionResult` (for scripts) so the caller can display
-them correctly to the user. Critical network errors are raised as exceptions.
+2.  **Verify**:
+    -   Run the application.
+    -   Check logs.

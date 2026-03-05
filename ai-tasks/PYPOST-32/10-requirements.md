@@ -1,44 +1,77 @@
-# PYPOST-32: Technical Debt Refactoring (Managers & Mixins)
+# PYPOST-32: Add New-Tab Plus Button Next to Tabs
 
 ## Goals
 
-The main goal is to eliminate technical debt accumulated during development (PYPOST-12, PYPOST-16, PYPOST-17) by decomposing `MainWindow` and reducing code duplication.
-This will improve code maintainability, testability, and simplify future feature development.
+Improve user experience by making tab creation more discoverable through a dedicated `+` button in
+the tab bar.
+
+## Programming Language
+
+Python
 
 ## User Stories
 
-- **As a developer**, I want request handling logic to be extracted into a separate `RequestManager` service so I don't have to search for it inside the huge `MainWindow` class.
-- **As a developer**, I want UI state persistence (`expanded_collections`, `open_tabs`) to be managed by a separate `StateManager` component to offload UI code.
-- **As a developer**, I want common variable tooltip logic to be extracted into a mixin to avoid code duplication across different widgets.
+- As a user, I want to see a `+` button next to tabs so I can quickly discover how to create a new
+  tab.
+- As a user, I want clicking the `+` button to behave exactly like `Ctrl+N` so tab creation is
+  consistent across mouse and keyboard flows.
 
-## Acceptance Criteria
+## Definition of Done
 
-- [ ] `RequestManager` class is created and used for request search and persistence.
-- [ ] `StateManager` class is created and used for UI state management.
-- [ ] `VariableHoverMixin` is created and applied to `VariableAwareLineEdit`, `VariableAwarePlainTextEdit`, `VariableAwareTableWidget`.
-- [ ] Logic is removed from `MainWindow` and delegated to new managers.
-- [ ] Application functions identically (regression testing):
-    - Collection tree preserves state (collapsed/expanded).
-    - Tabs are restored.
-    - Requests are saved and updated correctly.
-    - Variable tooltips work in all widgets.
-- [ ] Linter reports no new errors.
+1. A `+` button is visible in the tab area, positioned immediately to the right of the last tab.
+2. Clicking the `+` button triggers the same user-visible behavior as `Ctrl+N`.
+3. Existing `Ctrl+N` behavior remains unchanged.
+4. Existing tab behavior (open/select/close current tabs) remains unchanged by this task.
 
 ## Task Description
 
-Refactoring is required in three areas:
-1.  **Request Management**: Extract request search by ID logic (currently iterative search in UI) and request saving into `RequestManager` class.
-2.  **UI State Persistence**: Extract tree and tab state saving/loading logic into `StateManager`, removing direct UI dependency on settings structure.
-3.  **Widget Duplication**: Eliminate `mouseMoveEvent` and variable search logic duplication in editor widgets by extracting it into a mixin.
+### Problem Statement
 
-### Current Issues (from Tech Debt)
-- `MainWindow` is overloaded with responsibilities.
-- Request search has O(N) complexity and is implemented "in place".
-- Code duplication in `VariableAware*` widgets.
-- Direct settings manipulation from UI methods.
+Creating a new tab is currently less discoverable in the tab interface, which negatively impacts UX.
+
+### Scope
+
+- In scope:
+  - Add a `+` button in the tab area.
+  - Position it right of the last tab.
+  - Ensure it performs the same action as `Ctrl+N`.
+- Out of scope:
+  - Changes to the business behavior of tab creation.
+  - Redesign of the overall tab system.
+  - Any change unrelated to new-tab entry point UX.
+
+### Constraints and Assumptions
+
+- Constraint: The `+` button action must be behaviorally equivalent to `Ctrl+N`.
+- Constraint: Existing new-tab shortcut behavior must be preserved.
+- Assumption: Primary impacted role is a general application user.
+
+### Main Business Entities and Interactions
+
+- User: interacts with tabs and creates new tabs.
+- Tab Bar: area where existing tabs and tab actions are shown.
+- New Tab Action: business action that creates a new tab session.
+
+Interaction flow:
+1. User clicks the `+` button in the tab bar.
+2. System executes the same business action as `Ctrl+N`.
+3. User gets the same outcome as keyboard-based new-tab creation.
+
+## Non-Functional Requirements
+
+- Usability: the new-tab action is easy to find in the tab area.
+- Consistency: mouse-triggered `+` and keyboard-triggered `Ctrl+N` produce the same result.
+- Stability: no regression in existing tab usage behavior.
 
 ## Q&A
 
-- **Is a request index needed for O(1) search?**
-  - For now, search encapsulation is sufficient. Optimization (index) can be added inside `RequestManager` later without changing external API if performance becomes an issue. The architectural separation is what's important now.
-
+- Q: What should be changed?
+  - A: Add a `+` button next to tabs.
+- Q: Where should the button be placed?
+  - A: Immediately to the right of the last tab.
+- Q: What should happen on click?
+  - A: It should perform the same action as `Ctrl+N`.
+- Q: Why is this needed?
+  - A: To improve UX.
+- Q: Who is the primary user?
+  - A: User.

@@ -1,40 +1,36 @@
-# Requirements: PYPOST-13 - JSON Syntax Highlighting
+# Requirements: PYPOST-13 - Variable Tooltips
 
 ## Goals
-Improve visual perception of JSON data in the request editor and response viewer by adding syntax highlighting. This will simplify reading and editing JSON structures.
+Improve the experience of using environment variables by allowing the user to quickly view variable values without switching to the environment manager. Hovering over a variable placeholder (e.g., `{{baseUrl}}`) should display a tooltip with its current value.
 
 ## User Stories
-- As a user, I want to see highlighted JSON syntax in the request body input field (Body) to easily distinguish keys, values, and data structure.
-- As a user, I want to see highlighted JSON syntax in the response viewer field to quickly find the necessary information in the server response.
+- As a user, I want to see the value of the `{{baseUrl}}` variable when hovering over it in the address bar to ensure I am sending the request to the correct address.
+- As a user, I want to see variable values in the request body (JSON body) to verify correct data substitution.
+- As a user, I want tooltips to work for request headers and parameters.
+- As a user, I want to see "Variable not found" or a similar message if the variable is not defined in the current environment.
 
 ## Acceptance Criteria
-- [ ] `JsonHighlighter` class implemented (based on `QSyntaxHighlighter`).
-- [ ] Highlighting applied to request body input field (`QPlainTextEdit`) in `RequestWidget`.
-- [ ] Highlighting applied to response viewer field (`QTextEdit` or `QPlainTextEdit`) in `ResponseView`.
-- [ ] Main JSON elements are highlighted:
-    - Keys (strings in dictionary keys).
-    - String values.
-    - Numbers.
-    - Literals (`true`, `false`, `null`).
-- [ ] Highlighting works correctly when editing text (in request).
+- [ ] **URL Input**: Hovering over `{{variable}}` in the URL bar displays a tooltip with the value.
+- [ ] **Request Body**: Hovering over `{{variable}}` in the request body editor displays a tooltip with the value.
+- [ ] **Headers/Params**: (Optional/Nice-to-have) Tooltips in header and parameter tables.
+- [ ] **Dynamic Update**: When changing the environment, tooltips should show values from the new environment.
+- [ ] **Missing Variable Handling**: If a variable is not found, an appropriate message is displayed (e.g., `<not defined>`).
 
 ## Task Description
-Develop a JSON syntax highlighting component for use in PySide6 text fields.
-The component must recognize JSON structure and color elements in different colors.
+Implement a mechanism to detect `{{name}}` variable tokens under the mouse cursor in various editing widgets.
 
-### Components to Change
-1. **New File**: `pypost/ui/widgets/json_highlighter.py` - `QSyntaxHighlighter` implementation.
-2. `pypost/ui/widgets/request_editor.py` - connect highlighter to `self.body_edit`.
-3. `pypost/ui/widgets/response_view.py` - connect highlighter to `self.body_view`.
-
-### Color Scheme (approximate)
-- **Keys**: Dark Blue / Purple.
-- **Strings**: Green / Dark Green.
-- **Numbers**: Blue / Orange.
-- **Literals (true/false/null)**: Bold Blue / Red.
+### Technical Details
+- **Language**: Python (PySide6).
+- **Components**:
+    - `RequestWidget`: must receive current environment variables from `MainWindow`.
+    - `QLineEdit` (URL): Requires custom `mouseMoveEvent` handling and `fontMetrics` to determine text under cursor.
+    - `QPlainTextEdit` (Body): Use `cursorForPosition` and `document().find()` or text analysis around cursor.
+- **Integration**:
+    - `MainWindow` must pass the variable dictionary to `RequestWidget` when the environment changes.
+    - `RequestWidget` must propagate these variables to its child components (URL bar, Body editor).
 
 ## Q&A
-- **Is dark theme support needed?**
-    - For now, use fixed colors that read well on a light background (current default theme). If a dark theme is introduced, colors will need to be moved to style settings, but that is out of scope for this task.
-- **What if JSON is invalid?**
-    - The highlighter usually works based on regular expressions or lexical analysis, so it will highlight what looks like JSON elements, even if the overall structure is broken. This is acceptable behavior.
+- **Should syntax highlighting be shown for variables?**
+    - This is useful, but the focus of this task is on tooltips. If it's easy to add (e.g., in Body via Highlighter) — good.
+- **How to handle nested variables?**
+    - Show only the first-level value (as `TemplateEngine.render` does for a single pass).

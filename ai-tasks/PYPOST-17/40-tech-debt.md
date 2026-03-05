@@ -1,30 +1,31 @@
 # PYPOST-17: Technical Debt Analysis
 
-## Status: FIXED
-Addressed in PYPOST-32 by implementing `RequestManager`.
-
 ## Shortcuts Taken
 
-- **[FIXED] Search for existing request**: Logic for searching requests has been moved to `RequestManager.find_request`. While it is still O(N) internally, the complexity is encapsulated.
-- **[FIXED] Data Update**: Request updates are now handled by `RequestManager.save_request`.
+* **Synchronous Execution in MCP:** `RequestService` was made synchronous because `HTTPClient` is
+  built on `requests`. In `MCPServerImpl` this is handled via `run_in_threadpool`. In the future,
+  when switching to an async HTTP client (e.g. `httpx`), `RequestService` will need to be updated.
 
 ## Code Quality Issues
 
-- **[FIXED] `MainWindow.handle_save_request` complexity**: The logic has been simplified by delegating
-  search and persistence to `RequestManager`. `MainWindow` now focuses on UI interaction (dialogs).
+* **Jinja2 Environment Duplication:** `MCPServerImpl` creates its own `Environment`, while
+  `TemplateEngine` (used inside `HTTPClient` and indirectly `RequestService`) may use another (or
+  recreate it). This is not critical in this iteration, but having a unified `TemplateService` is
+  preferable.
+* **Variable Extraction Logic:** The `_extract_mcp_variables` logic in `MCPServerImpl` still
+  duplicates template parsing logic that partially exists in `TemplateEngine`.
 
 ## Missing Tests
 
-- No unit tests were added for the save logic or the settings persistence. Manual testing is relied
-  upon.
+* **Unit Tests for RequestService:** The class was created but no dedicated unit tests were added.
+* **Integration Tests for MCP:** No automated tests verifying script execution via MCP.
 
 ## Performance Concerns
 
-- As mentioned, linear search for request ID might be slow if the user has thousands of requests. A
-  hash map index (ID -> Request) would be O(1). This can now be optimized inside `RequestManager`
-  without changing the rest of the app.
+* **Thread Overhead:** Using `run_in_threadpool` for each MCP request may add overhead under high
+  load, but for the current usage scenario (desktop app) this is acceptable.
 
 ## Follow-up Tasks
 
-- **[COMPLETED] Refactor Request Management**: Create a `RequestManager` service.
-- **Optimize Lookup**: Implement an index for request IDs inside `RequestManager`.
+* **PYPOST-8:** Add unit tests for `RequestService`.
+* **PYPOST-9:** Refactor `TemplateEngine` to eliminate Jinja2 usage duplication.

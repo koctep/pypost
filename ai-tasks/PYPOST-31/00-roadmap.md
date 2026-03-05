@@ -1,13 +1,17 @@
 # Roadmap: PYPOST-31
 
-## Step Execution Status
+## Step Status
 
-- [x] **STEP 1: Requirements gathering and documentation**
-- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 1: Requirements Gathering and Documentation**
+- [x] **STEP 2: High-Level Architecture Design**
 - [x] **STEP 3: Development**
-  - [x] Fixed crash when retrying a request (`sender_tab` was `None`).
-  - [x] Updated `handle_send_request` to correctly determine the active tab.
-- [x] **STEP 4: Review and Technical Debt**
+  - [ ] *[Add summaries of completed iterations here]*
+  - [x] Replaced standalone Save button with Actions menu button to the right of
+    Send in RequestWidget.
+- [x] **STEP 4: Code Cleanup**
+- [x] **STEP 5: Observability**
+- [x] **STEP 6: Review and Technical Debt**
+- [x] **STEP 7: Dev Docs**
 
 ## Status Legend
 
@@ -31,6 +35,23 @@
 - Tests
 - Documentation updates
 
-### STEP 4: Review
+### STEP 4: Code Cleanup
 
-- `ai-tasks/PYPOST-31/40-tech-debt.md`
+- `ai-tasks/PYPOST-31/40-code-cleanup.md`
+
+### STEP 5: Observability
+
+- `ai-tasks/PYPOST-31/50-observability.md`
+
+### STEP 6: Review
+
+- `ai-tasks/PYPOST-31/60-tech-debt.md`
+
+### STEP 7: Dev Docs
+
+- `doc/dev/`
+
+## Task Context
+
+- Programming language: Python
+- Recommended branch: `feature/PYPOST-31-actions-save-menu`

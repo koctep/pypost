@@ -2,13 +2,12 @@
 
 ## Shortcuts Taken
 
-- **Manual Signal Connection**: Signal connection happens in `add_new_tab`. If tabs are created elsewhere, connection might be missed.
-- **No Validation for New Variable Name**: Basic check for empty string is present, but no check for valid characters (e.g., spaces, special symbols) that might be invalid for Jinja2 templates.
+- **Manual File Creation**: Files were created via PyPost UI and then committed. No script for generating test data.
 
 ## Missing Tests
 
-- No UI tests for context menu interaction.
+- No automated tests that use this collection. It is intended for manual testing via MCP Inspector or AI agents.
 
 ## Follow-up Tasks
 
-- Add validation for variable names.
+- Add integration tests that load this collection and execute requests via MCP.

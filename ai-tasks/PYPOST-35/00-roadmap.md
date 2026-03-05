@@ -1,15 +1,20 @@
 # Roadmap: PYPOST-35
 
+## Task Metadata
+
+- Programming language: Python
+- Recommended branch: feature/PYPOST-35-collection-item-context-menu
+
 ## Step Status
 
 - [x] **STEP 1: Requirements Gathering and Documentation**
 - [x] **STEP 2: High-Level Architecture Design**
 - [x] **STEP 3: Development**
-  - [ ] *[Add summaries of completed iterations here]*
-  - [x] Added `+` button in tab area and wired click to `handle_new_tab()` (same flow as `Ctrl+N`).
-  - [x] Repositioned `+` button to track tab layout so it appears right after the last tab.
-  - [x] Fixed hidden `+` button by disabling tab expansion and clamping button position.
-  - [x] Moved `+` button positioning to `QTabWidget` coordinates to avoid overlap with last tab.
+  - [x] Added backend deletion APIs in `RequestManager` and collection-file deletion in
+    `StorageManager`.
+  - [x] Added collection tree item context menu with `Delete` action, confirmation dialog,
+    and UI-to-manager deletion wiring.
+  - [x] Added unit tests for request/collection deletion flows in `RequestManager`.
 - [x] **STEP 4: Code Cleanup**
 - [x] **STEP 5: Observability**
 - [x] **STEP 6: Review and Technical Debt**
@@ -52,9 +57,3 @@
 ### STEP 7: Dev Docs
 
 - `doc/dev/`
-
-## Task Context
-
-- Programming language: Python
-
-- Recommended branch name: feature/PYPOST-35-new-tab-plus-button

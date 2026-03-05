@@ -5,10 +5,10 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Used `Mount` instead of `Route` for `/sse` and `/messages` endpoints to avoid Starlette
-    wrapper that expected Response return.
-  - [x] Added POST method check in `MessagesEndpoint`.
-- [/] **STEP 4: Review and technical debt**
+  - [x] Updated `MetricsManager` to support MCP metrics.
+  - [x] Implemented `track_mcp_request_received` and `track_mcp_response_sent`.
+  - [x] Integrated metrics into `MCPServerImpl`.
+- [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend
 

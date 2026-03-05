@@ -2,28 +2,23 @@
 
 ## Shortcuts Taken
 
-- **Global Timeout Hardcoding**: We introduced a hardcoded timeout of `30.0` seconds in `HTTPClient.send_request`. Ideally, this should be configurable by the user per request or in global settings.
-- **Metrics Estimation**: While streaming, we estimate the size based on the utf-8 encoded length of the text received so far. This is generally accurate for text but might differ slightly from wire bytes.
-- **Time Updates**: The Status code is updated immediately via `headers_received` signal, but "Elapsed Time" is only final when the request completes. We don't update "Elapsed Time" in real-time during streaming (it stays "-" until finished).
+- **No Request Indexing**: [FIXED in PYPOST-8] `RequestManager` currently iterates through all collections to find a request. For O(1) access, an internal dictionary mapping `id -> (request, collection)` should be maintained and updated on load/save. Given the current usage volume, linear search is acceptable.
+- **StateManager Dependency**: `StateManager` is currently just a thin wrapper around `ConfigManager`'s loaded settings object. It assumes `settings` is mutable and shared. A more robust approach might be to have `StateManager` own the specific settings it manages or have granular updates.
 
 ## Code Quality Issues
 
-- **HTTPClient.send_request Complexity**: [FIXED in PYPOST-33] The method is getting slightly large with the try-except blocks, fallback logic for JSON, and streaming loop. It could be refactored into smaller helper methods.
+- **Mixin Type Hinting**: `VariableHoverMixin` uses `self` as `QWidget` but inherits from `object` (implicit). Some `type: ignore` comments were added to satisfy static analysis conceptually, though runtime is fine since it's used with multiple inheritance.
 
 ## Missing Tests
 
-- **SSE Endpoint Automated Test**: We verified manually with `test_streaming.py`, but haven't integrated a permanent test suite for SSE.
-- **Cancellation Test**: We haven't added an automated test to verify that clicking "Stop" actually terminates the connection immediately. We observed that checking the flag only once per chunk might be delayed if chunks are large or slow; we improved this by checking again after processing, but `requests` loop is still the driver.
+- **Automated Tests**: No new automated tests were added because the project currently lacks a setup for running tests (pytest missing, empty tests folder). The refactoring was verified manually.
 
 ## Performance Concerns
 
-- **Memory Usage on Large Streams**: We still accumulate the full body in `content_parts` (in `HTTPClient`) and `body_view` (in UI). An infinite stream will eventually consume all memory. For production SSE support, we should probably only keep a buffer of the last N lines or allow clearing the view.
+- Same as before: Request lookup is O(N). [FIXED in PYPOST-8]
 
 ## Follow-up Tasks
 
-- [ ] Add "Timeout" configuration to `RequestData` model and UI.
-- [ ] Implement "tail" mode for logging/streaming (limit buffer size).
-- [ ] Add real-time "Elapsed Time" counter in UI during request.
-- [ ] Refactor `HTTPClient` to better handle different content types and errors.
-
+- [ ] Implement `pytest` infrastructure and add tests for `RequestManager` and `StateManager`.
+- [x] Add internal index to `RequestManager` for O(1) lookups. [DONE in PYPOST-8]
 

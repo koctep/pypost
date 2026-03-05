@@ -5,10 +5,9 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Updated `ResponseView` to support custom context menu.
-  - [x] Implemented "Set env" submenu with list of variables.
-  - [x] Implemented logic for creating new variables from context menu.
-  - [x] Integrated `MainWindow` to handle variable updates.
+  - [x] Created `collections/MCP_Test.json` with test requests.
+  - [x] Created `environments.json` with test environment.
+  - [x] Verified loading of collection and environment in PyPost.
 - [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend
@@ -29,9 +28,8 @@
 
 ### STEP 3: Development
 
-- Source code
-- Tests
-- Documentation updates
+- `collections/MCP_Test.json`
+- `environments.json`
 
 ### STEP 4: Review
 

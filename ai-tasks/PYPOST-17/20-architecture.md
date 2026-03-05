@@ -1,75 +1,104 @@
-# Architecture: PYPOST-17 - Improve Request Save Logic
+# PYPOST-17: Create abstraction for request execution
 
 ## Research
-- **Current Implementation**:
-    - `MainWindow.handle_save_request` always calls `SaveRequestDialog`.
-    - No check if the request already exists in a collection.
-    - Settings are stored in `AppSettings` (Pydantic model) and edited in `SettingsDialog`.
 
-- **Needs**:
-    - Need to distinguish "Save" (Ctrl+S) and "Save As" (but currently only Save button logic).
-    - If request exists in collection -> overwrite (with optional confirmation).
-    - If request is new -> name/collection selection dialog.
-    - New setting `confirm_overwrite_request` (bool).
+Analysis of the current architecture revealed that request execution logic is duplicated and
+inconsistent. `RequestWorker` (GUI) handles requests correctly with script execution, but
+`MCPServerImpl` has a simplified and incorrect implementation.
+
+We do not need complex external libraries for this, as the task is solved by refactoring
+existing code and extracting a common service layer.
 
 ## Implementation Plan
 
-1.  **Data Model**:
-    - Add field `confirm_overwrite_request: bool = False` to `AppSettings`.
+1. **Create `RequestService`**:
+   - Implement `RequestService` class in `pypost/core/request_service.py`.
+   - Move `HTTPClient` and `ScriptExecutor` invocation logic into `RequestService`.
+   - Define return data structure `ExecutionResult`.
 
-2.  **Settings UI**:
-    - Add `QCheckBox` to `SettingsDialog` to control the new setting.
+2. **Refactor `RequestWorker`**:
+   - Replace direct calls to `HTTPClient` and `ScriptExecutor` with `RequestService.execute`.
+   - Update result handling for signal transmission.
 
-3.  **Save Logic (`MainWindow`)**:
-    - In `handle_save_request`:
-    - Try to find request by ID in all collections.
-    - If found (`existing_request`):
-        - Check `settings.confirm_overwrite_request`.
-        - If enabled -> Show `QMessageBox.question`.
-        - If confirmed or disabled -> Update `existing_request` fields with data from editor and save collection.
-    - If not found (new) -> Open `SaveRequestDialog` (existing logic).
+3. **Refactor `MCPServerImpl`**:
+   - Remove manual template rendering code.
+   - Remove incorrect `HTTPClient` call.
+   - Integrate `RequestService` for request execution.
+   - Process `ExecutionResult` to build MCP response (including script logs if needed).
 
 ## Architecture
 
-### Modules
+### New Interaction Structure
 
-#### Models (`pypost/models/settings.py`)
-Change settings model.
-```python
-class AppSettings(BaseModel):
-    # ... existing fields ...
-    confirm_overwrite_request: bool = False
+```mermaid
+graph TD
+    GUI[GUI / RequestWorker] --> RS[RequestService]
+    MCP[MCP Server] --> RS[RequestService]
+    RS --> HC[HTTPClient]
+    RS --> SE[ScriptExecutor]
+    HC --> NET[External API]
+    SE --> RS
 ```
 
-#### UI (`pypost/ui/dialogs/settings_dialog.py`)
-Add UI element.
-- Add `QCheckBox` "Confirm before overwriting requests".
-- Bind to `confirm_overwrite_request`.
+### Components
 
-#### Logic (`pypost/ui/main_window.py`)
-Change save handling logic.
+#### `RequestService` (`pypost/core/request_service.py`)
 
-**Algorithm `handle_save_request(self, request_data)`:**
+Central component for request execution.
 
-1.  **Search**: Iterate through `self.collections` and nested `requests`. Find request with `id == request_data.id`.
-    - *Optimization*: Could store ID -> (Collection, Request) map, but full scan is acceptable for now (small number of requests).
+* **Responsibility**:
+    *   Coordinating the request execution process.
+    *   Calling `HTTPClient` for network interaction.
+    *   Calling `ScriptExecutor` for post-response handling.
+    *   Collecting execution statistics and logs.
 
-2.  **Branching**:
-    - **CASE: New Request** (not found):
-        - Call `SaveRequestDialog`.
-        - (Logic for creating new record and adding to collection remains same).
+* **Interface**:
 
-    - **CASE: Existing Request** (found):
-        - If `settings.confirm_overwrite_request == True`:
-            - Show dialog "Overwrite Request? This will overwrite existing request...".
-            - If "No" -> `return`.
-        - **Overwrite**:
-            - Update found request object with data from `request_data` (URL, method, headers, params, body, script).
-            - Save corresponding collection: `self.storage.save_collection(found_collection)`.
-            - Update UI (tab title if name changed - though name usually changes via Save As/Rename, here we just update content).
-            - Reset modification flag (if implemented, for now user just visually sees it's saved).
+```python
+from dataclasses import dataclass
+from typing import Dict, Any, List, Optional
+from pypost.models.models import RequestData
+from pypost.models.response import ResponseData
+
+@dataclass
+class ExecutionResult:
+    response: ResponseData
+    updated_variables: Dict[str, Any]
+    script_logs: List[str]
+    script_error: Optional[str]
+
+class RequestService:
+    def execute(self, request: RequestData, variables: Dict[str, Any] = None) -> ExecutionResult:
+        """
+        Executes a request with the given context.
+        """
+        pass
+```
+
+#### `RequestWorker` (`pypost/core/worker.py`)
+
+Adapter for GUI, running `RequestService` in a separate `QThread`.
+
+*   **Changes**:
+    *   Remove request execution business logic.
+    *   Keep only thread management and result translation to Qt signals.
+
+#### `MCPServerImpl` (`pypost/core/mcp_server_impl.py`)
+
+MCP server implementation.
+
+*   **Changes**:
+    *   `call_tool` method delegates execution to `RequestService`.
+    *   `ExecutionResult` is converted to MCP response format (`TextContent`).
+    *   Script logs may be added to the response for user debugging.
 
 ## Q&A
-- **How to distinguish new request from existing one if ID is generated on `RequestData` creation?**
-    - Even if `RequestData` has an ID (generated in constructor), it doesn't mean it's saved in "database" (file system/collections).
-    - Existence criterion: presence of this ID in `self.collections`.
+
+**Q:** Will `RequestService` hold state?
+**A:** No, `RequestService` must be stateless. All required data (request, variables) is passed
+to the `execute` method.
+
+**Q:** How to handle errors in `RequestService`?
+**A:** Exceptions from `HTTPClient` or `ScriptExecutor` should be caught and, if needed, wrapped
+in clear errors or returned as part of `ExecutionResult` (for scripts) so the caller can display
+them correctly to the user. Critical network errors are raised as exceptions.

@@ -1,49 +1,100 @@
-# Requirements: PYPOST-17 - Improve Request Save Logic
+# PYPOST-17: Create abstraction for request execution
 
 ## Goals
-Improve request saving logic, making it more intuitive and safe. Separate behavior for new and existing requests, and add an overwrite confirmation setting.
+
+Create a unified abstraction layer for executing HTTP requests that will be used both in the GUI
+(via Worker) and in the MCP server. This will eliminate code duplication, ensure consistent
+behavior (including script execution) and fix current implementation bugs in the MCP server.
 
 ## User Stories
-- As a user, I want the request to be updated automatically when I click "Save" on an already saved request, to speed up work.
-- As a user, I want to be able to enable overwrite confirmation for existing requests to avoid accidental data loss.
-- As a user, when I save a new (not yet saved) request, I want to see a dialog box to select a name and collection.
 
-## Acceptance Criteria
-- [ ] **Existing Request**:
-    - When clicking "Save" (or Ctrl+S), the request is saved to the same file/location in the collection.
-    - "Confirm before overwrite" setting is checked.
-- [ ] **New Request**:
-    - When clicking "Save", the "Save Request" dialog opens.
-    - In the dialog, you can specify the request name.
-    - In the dialog, you can select a collection (folder) for saving.
-- [ ] **Settings**:
-    - Added "Confirm before overwriting requests" option (checkbox) to application settings.
-    - Setting persists between application launches.
-    - If option is enabled: when saving an existing request, a Yes/No dialog appears.
-    - If option is disabled: saving happens instantly without questions.
-- [ ] **UI Updates**:
-    - Indication that the request has unsaved changes (e.g., `*` in tab title) disappears after saving.
-    - If it was a new request, the tab title updates to the new name after saving.
+- As **Developer**, I want request execution logic to be in one place so I don't have to fix bugs
+  in two places.
+- As **MCP User**, I want post-request scripts (e.g. for setting variables) to run when calling
+  tools, the same as in the GUI.
+- As **User**, I want request behavior to be predictable and identical regardless of whether I run
+  them from the interface or via MCP.
 
 ## Task Description
-It is necessary to refine the save event handler in `MainWindow` or `RequestWidget`.
-Current behavior (presumably) always calls "Save As" or lacks confirmation setting.
-New behavior must distinguish request context:
-1. **Is New**: Call save dialog (Save As).
-2. **Is Existing**:
-    - Read `confirm_overwrite` setting.
-    - If `True` -> Confirmation dialog.
-    - If `False` -> Direct write.
 
-### Technical Details
-- **Language**: Python (PySide6).
-- **Components**:
-    - `MainWindow`: Handling `actionSave`.
-    - `TabWidget` / `RequestWidget`: Storing state (file path, `is_new`, `is_modified` flag).
-    - `SettingsDialog`: Adding new setting.
+Currently request execution logic is fragmented:
+
+1. **GUI** uses `RequestWorker`, which calls `HTTPClient` and then separately `ScriptExecutor`.
+2. **MCP Server** manually renders templates and calls `HTTPClient` (with incorrect signature,
+   which is a bug).
+
+It is necessary to extract a `RequestService` that encapsulates the entire request execution
+process.
+
+### Current Problems
+
+- **Code duplication:** Template rendering and client invocation happen in different places.
+- **MCP bug:** `MCPServerImpl` calls `HTTPClient.send_request` with arguments it doesn't accept.
+- **Missing MCP functionality:** MCP server does not execute post-request scripts.
+
+## Solution Requirements
+
+### 1. Create `RequestService`
+
+Create class `pypost.core.request_service.RequestService` (or `request_executor.py`) that will be
+responsible for:
+
+1. Accepting `RequestData` and variable context.
+2. Executing request via `HTTPClient`.
+3. Executing post-request scripts via `ScriptExecutor`.
+4. Returning a comprehensive execution result.
+
+### 2. `RequestService` Interface
+
+The service must provide a synchronous method (since `HTTPClient` is synchronous, and thread
+management is the caller's responsibility).
+
+```python
+@dataclass
+class ExecutionResult:
+    response: ResponseData
+    updated_variables: Dict[str, Any] = None
+    script_logs: List[str] = None
+    script_error: str = None
+
+class RequestService:
+    def execute(self, request: RequestData, variables: Dict[str, Any] = None) -> ExecutionResult:
+        pass
+```
+
+### 3. GUI Integration (`RequestWorker`)
+
+`RequestWorker` must be refactored:
+
+- Remove direct logic for calling `HTTPClient` and `ScriptExecutor`.
+- Use `RequestService.execute`.
+- Translate `ExecutionResult` to Qt signals.
+
+### 4. MCP Server Integration (`MCPServerImpl`)
+
+`MCPServerImpl` must be refactored:
+
+- Remove manual template rendering.
+- Remove incorrect `HTTPClient` call.
+- Use `RequestService.execute`.
+- Build MCP response from `ExecutionResult`.
+
+## Acceptance Criteria
+
+- [ ] `RequestService` class is created.
+- [ ] `RequestWorker` uses `RequestService`.
+- [ ] `MCPServerImpl` uses `RequestService`.
+- [ ] Post-request scripts run in both GUI and MCP.
+- [ ] `HTTPClient` call error in MCP is fixed.
+- [ ] Tests (if any) pass.
 
 ## Q&A
-- **What is the default value for the confirmation setting?**
-    - *Assumption*: `True` (safer) or `False` (faster). Let's make it `False` (like in most IDEs), but user can enable it.
-- **What happens on "Save As"?**
-    - There should be a separate "Save As" command that always opens the dialog, even for existing ones. (This is standard behavior, but user requirements are about the Save button).
+
+**Q:** Should `RequestService` be asynchronous?
+**A:** No, current `HTTPClient` is synchronous (based on `requests`). `RequestService` should also be
+synchronous. Async/threading is managed at `RequestWorker` level (for GUI) and `run_in_threadpool`
+(for MCP).
+
+**Q:** How to pass request arguments from MCP?
+**A:** They should be passed to `RequestService` via the `variables` dict (e.g. in structure
+`{"mcp": {"request": args}}`), which `HTTPClient` uses for template rendering.

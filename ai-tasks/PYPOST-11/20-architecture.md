@@ -1,47 +1,69 @@
-# Architecture for Task PYPOST-11
+# Architecture: PYPOST-11 - JSON Syntax Highlighting
 
-## Overview
-Implementation of the main application menu with "File" and "Help" items in the `MainWindow` class. Addition of dialog boxes for displaying help and program information.
+## Research
+To implement syntax highlighting in Qt (PySide6), the `QSyntaxHighlighter` class is used.
+It allows applying formatting to text in `QTextDocument` (used in `QTextEdit` and `QPlainTextEdit`) without changing the text itself.
 
-## Components
+Key points:
+1. Inherit from `QSyntaxHighlighter`.
+2. Override `highlightBlock(text)` method.
+3. Inside the method, use regular expressions to find patterns (keys, strings, numbers, etc.).
+4. Apply `setFormat(start, length, format)` for found matches.
 
-### MainWindow (`pypost/ui/main_window.py`)
-Extend the `__init__` method (or create a separate `setup_menu` method) to initialize `QMenuBar`.
+There are ready-made examples of JSON highlighter implementation for Qt. Usually, they use several regular expressions with different priorities.
 
-*   **Methods**:
-    *   `_create_menu_bar()`: Private method to create the menu structure.
-    *   `handle_show_hotkeys()`: Slot to display the hotkeys dialog.
-    *   `handle_show_about()`: Slot to display the "About" dialog.
-
-### HotkeysDialog (`pypost/ui/dialogs/hotkeys_dialog.py`)
-New class inheriting from `QDialog` to display the list of hotkeys.
-
-*   **UI Elements**:
-    *   `QTableWidget` or `QFormLayout` to display "Action - Key" pairs.
-    *   Data for display can be passed to the constructor or stored as a constant in the class, or extracted dynamically (harder but more correct), but for MVP, hardcoding the list according to `doc/README.md` or `main_window.py` is acceptable.
-    *   "Close" button.
-
-### AboutDialog (`pypost/ui/dialogs/about_dialog.py`)
-New class inheriting from `QDialog` (or using `QMessageBox.about`) to display information.
-
-*   **Content**:
-    *   Program name (bold font).
-    *   Version.
-    *   Brief description.
-*   **UI Elements**:
-    *   "OK" button.
-
-## Interaction
-1.  User clicks a menu item.
-2.  `MainWindow` intercepts the `triggered` signal from `QAction`.
-3.  Corresponding handler is called (`handle_exit`, `handle_show_hotkeys`, `handle_show_about`).
-4.  For dialogs, a dialog instance is created and `exec()` is called.
+Order of rule application matters. For example, first find strings, then numbers, then keywords.
+For JSON, the specifics are:
+- Strings (in double quotes).
+- Keys (strings followed by a colon, possibly separated by spaces).
+- Numbers.
+- Literals (`true`, `false`, `null`).
 
 ## Implementation Plan
-1.  Create `pypost/ui/dialogs/about_dialog.py` with `AboutDialog` class.
-2.  Create `pypost/ui/dialogs/hotkeys_dialog.py` with `HotkeysDialog` class.
-3.  In `pypost/ui/main_window.py`:
-    *   Import new dialogs.
-    *   Implement `_create_menu_bar` method.
-    *   Add `_create_menu_bar` call to `__init__`.
-    *   Implement `handle_show_hotkeys` and `handle_show_about` slots.
+1. Create file `pypost/ui/widgets/json_highlighter.py`.
+2. Implement `JsonHighlighter(QSyntaxHighlighter)` class.
+    - Define colors and styles for different tokens.
+    - Implement `highlightBlock` logic.
+3. Integrate highlighter into `RequestWidget` (`pypost/ui/widgets/request_editor.py`).
+    - Connect to `self.body_edit.document()`.
+4. Integrate highlighter into `ResponseView` (`pypost/ui/widgets/response_view.py`).
+    - Connect to `self.body_view.document()`.
+
+## Architecture
+
+### New Component: `JsonHighlighter`
+Location: `pypost/ui/widgets/json_highlighter.py`
+
+**Responsibilities:**
+- Storing highlighting rules (Regex + TextCharFormat).
+- Parsing text blocks and applying formatting.
+
+**Interface:**
+```python
+class JsonHighlighter(QSyntaxHighlighter):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Initialize rules and formats
+    
+    def highlightBlock(self, text):
+        # Apply rules
+```
+
+### Changes in `RequestWidget`
+In `init_ui` method after creating `self.body_edit`:
+```python
+self.json_highlighter = JsonHighlighter(self.body_edit.document())
+```
+
+### Changes in `ResponseView`
+In `init_ui` method after creating `self.body_view`:
+```python
+self.json_highlighter = JsonHighlighter(self.body_view.document())
+```
+
+### Interaction
+The highlighter automatically reacts to changes in the document. For `ResponseView`, which is `ReadOnly`, highlighting will apply once when text is set. For `RequestWidget` - in real-time during typing.
+
+## Q&A
+- **Do we need to handle complex cases (nested quotes)?**
+    - JSON standard is quite simple, strings are always in double quotes. Escaped quotes `\"` need to be accounted for in string regex.

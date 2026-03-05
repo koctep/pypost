@@ -1,102 +1,110 @@
-# PYPOST-32: Technical Debt Refactoring Architecture
+# PYPOST-32: Add New-Tab Plus Button Next to Tabs
 
 ## Research
 
-Since the task is purely refactoring (without adding new business logic), research is focused on analyzing the current codebase to identify dependency breaking points.
+### External research (Qt official docs)
 
-### Current Dependency Structure (Problematic)
-- **MainWindow**
-  - Directly manages `StorageManager` for loading/saving collections.
-  - Directly interacts with `ConfigManager` and `AppSettings` for saving UI state (expanded nodes, tabs).
-  - Contains business logic for finding request by ID (`restore_tabs`, `save_request`).
-  - Contains logic for creating and updating requests.
-- **VariableAware Widgets**
-  - Duplicate `mouseMoveEvent` code and usage of `VariableHoverHelper`.
+1. `QTabWidget::setCornerWidget(...)` allows placing an extra widget in tab-frame corners.
+   This is suitable for a persistent action button near tabs.
+   Source: https://doc.qt.io/qt-6/qtabwidget.html#setCornerWidget
+2. `QToolButton` is intended for compact toolbar-like actions and icon/text actions.
+   Source: https://doc.qt.io/qt-6/qtoolbutton.html
+3. `QTabBar::setTabButton(...)` can inject widgets per tab side, but it is tab-specific and
+   less suitable for one global "new tab" button after all tabs.
+   Source: https://doc.qt.io/qt-6/qtabbar.html#setTabButton
+4. Existing shortcut flow should remain centralized via `QShortcut` and `QKeySequence`.
+   Sources:
+   - https://doc.qt.io/qt-6/qshortcut.html
+   - https://doc.qt.io/qt-6/qkeysequence.html
 
-### Target Structure
-Implementation of the "Service/Manager" pattern to isolate business logic and the "Mixin" pattern for reusing UI code.
+### Current codebase findings
 
-## Architecture
-
-### New Components
-
-#### 1. `RequestManager` (Service)
-**Responsibility**: Managing the lifecycle of requests and collections.
-**Dependencies**: `StorageManager`.
-**Methods**:
-- `get_collections() -> List[Collection]`
-- `find_request(request_id: str) -> Optional[Tuple[RequestData, Collection]]`
-- `save_request(request: RequestData, collection_id: str) -> None`
-- `create_request(collection_id: str, request: RequestData) -> None`
-- `delete_request(request_id: str) -> None`
-
-#### 2. `StateManager` (Service)
-**Responsibility**: Managing persistent UI state, abstracting the configuration structure.
-**Dependencies**: `ConfigManager`.
-**Methods**:
-- `get_expanded_collections() -> List[str]`
-- `set_expanded_collections(ids: List[str]) -> None`
-- `get_open_tabs() -> List[str]`
-- `set_open_tabs(ids: List[str]) -> None`
-- `get_last_environment_id() -> Optional[str]`
-- `set_last_environment_id(id: str) -> None`
-
-#### 3. `VariableHoverMixin` (UI Mixin)
-**Responsibility**: Providing tooltip functionality for variables.
-**Usage**: Inherited by widgets (`VariableAwareLineEdit`, `VariableAwarePlainTextEdit`).
-**Abstract Methods** (which inheritors must implement):
-- `_get_text_at_cursor(event) -> Tuple[str, int]` (text and index)
-
-### Interaction Diagram (Mermaid)
-
-```mermaid
-classDiagram
-    class MainWindow {
-        +RequestManager request_manager
-        +StateManager state_manager
-        +refresh_ui()
-    }
-
-    class RequestManager {
-        +find_request(id)
-        +save_request(req)
-        -StorageManager storage
-    }
-
-    class StateManager {
-        +get_open_tabs()
-        +save_tree_state()
-        -ConfigManager config
-    }
-
-    class VariableHoverMixin {
-        +mouseMoveEvent(event)
-        #_get_text_and_index(event)*
-    }
-
-    class VariableAwareLineEdit {
-        +_get_text_and_index(event)
-    }
-
-    MainWindow --> RequestManager
-    MainWindow --> StateManager
-    VariableAwareLineEdit --|> VariableHoverMixin
-```
+1. Tab container is `self.tabs = QTabWidget()` in `pypost/ui/main_window.py`.
+2. New tab behavior is centralized:
+   - `Ctrl+N` -> `_setup_shortcuts()` -> `handle_new_tab()`
+   - `handle_new_tab()` -> `add_new_tab()`
+3. `add_new_tab()` constructs `RequestTab`, wires signals, sets title, and persists state.
+4. Hotkeys UI lists `Ctrl+N` as new-tab shortcut in `pypost/ui/dialogs/hotkeys_dialog.py`.
 
 ## Implementation Plan
 
-1.  **Core Refactoring**:
-    - Create `pypost/core/request_manager.py`. Move search/save logic from `MainWindow`.
-    - Create `pypost/core/state_manager.py`. Move logic for working with `AppSettings` (regarding UI state).
-2.  **UI Refactoring (Widgets)**:
-    - Create `pypost/ui/widgets/mixins.py` with `VariableHoverMixin`.
-    - Update widgets in `pypost/ui/widgets/variable_aware_widgets.py` to use the mixin.
-3.  **MainWindow Integration**:
-    - Inject `RequestManager` and `StateManager` into `MainWindow`.
-    - Replace direct calls to `storage` and search loops with calls to managers.
+1. Keep current business flow unchanged by reusing `MainWindow.handle_new_tab()`.
+2. Add one UI control (`+`) in the tab area as a corner widget of `QTabWidget`.
+3. Wire `+` button click directly to `handle_new_tab()`, matching `Ctrl+N` behavior.
+4. Keep `Ctrl+N` shortcut mapping unchanged.
+5. Limit change surface to `MainWindow` tab-area setup; no request data model changes.
+
+## Architecture
+
+### Module Diagram
+
+```mermaid
+flowchart LR
+    U[User] -->|Click '+'| PTB[Plus Tab Button]
+    U -->|Ctrl+N| NS[QShortcut Ctrl+N]
+    PTB --> HNT[MainWindow.handle_new_tab]
+    NS --> HNT
+    HNT --> ANT[MainWindow.add_new_tab]
+    ANT --> RT[RequestTab]
+    ANT --> QT[QTabWidget]
+    ANT --> SS[MainWindow.save_tabs_state]
+```
+
+### Modules and Responsibilities
+
+1. `MainWindow` (`pypost/ui/main_window.py`)
+   - Owns tab container and global shortcuts.
+   - Owns new-tab orchestration (`handle_new_tab`, `add_new_tab`).
+   - Will own creation and placement of the `+` tab button.
+2. Tab container (`QTabWidget` in `MainWindow`)
+   - Displays tabs and handles close/select behavior.
+   - Hosts corner widget for global tab action entry point.
+3. New-tab trigger inputs
+   - Keyboard path: `QShortcut("Ctrl+N")`.
+   - Mouse path: new `+` button click.
+   - Both converge to the same handler.
+4. `RequestTab` (`main_window.py`)
+   - Concrete content created by `add_new_tab()`.
+
+### Dependencies
+
+1. `MainWindow` depends on Qt widgets (`QTabWidget`, button widget) and Qt shortcuts.
+2. New `+` control depends only on `MainWindow.handle_new_tab` public behavior.
+3. Existing tabs state persistence remains in `MainWindow.save_tabs_state()`.
+
+### Selected Patterns and Justification
+
+1. Single-entry action handler pattern
+   - Keep one source of truth for new-tab behavior: `handle_new_tab()`.
+   - Ensures mouse and keyboard produce identical outcomes.
+2. Signal-slot event pattern (Qt)
+   - Button click and shortcut activation are both event sources routed via slots.
+3. Contained UI extension
+   - Add button as tab-area extension, avoiding tab business-flow refactoring.
+
+### Main Interfaces / APIs
+
+1. `MainWindow.handle_new_tab()`
+   - Input: none (UI event).
+   - Output: calls `add_new_tab()` once.
+2. `MainWindow.add_new_tab(request_data: RequestData = None, save_state: bool = True)`
+   - Input: optional request seed.
+   - Output: creates a new tab and optionally persists open tabs state.
+3. `QShortcut("Ctrl+N").activated -> MainWindow.handle_new_tab`
+4. `PlusButton.clicked -> MainWindow.handle_new_tab`
+
+### Interaction Scheme
+
+1. User clicks `+` in tab area (right of last tab).
+2. UI emits click signal to `MainWindow.handle_new_tab()`.
+3. Handler calls `add_new_tab()` (same as `Ctrl+N` path).
+4. New `RequestTab` is added, selected, and state is saved.
 
 ## Q&A
 
-- **Why not use a full DI container?**
-  - For the current scale of the application (Python/PySide6), this is excessive. Simple initialization in `main.py` or `MainWindow.__init__` ("Composition Root") is sufficient.
-
+- Q: Why not implement a second new-tab code path for the `+` button?
+  - A: Reusing `handle_new_tab()` guarantees behavior parity with `Ctrl+N`.
+- Q: Why prefer a tab-area corner widget over per-tab button injection?
+  - A: Requirement is one global button right of tab list, not per-tab controls.
+- Q: Does this architecture change request/save/send flows?
+  - A: No. Changes are isolated to tab creation entry point UI.

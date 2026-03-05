@@ -5,9 +5,8 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Created `collections/MCP_Test.json` with test requests.
-  - [x] Created `environments.json` with test environment.
-  - [x] Verified loading of collection and environment in PyPost.
+  - [x] Fixed crash when retrying a request (`sender_tab` was `None`).
+  - [x] Updated `handle_send_request` to correctly determine the active tab.
 - [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend
@@ -28,8 +27,9 @@
 
 ### STEP 3: Development
 
-- `collections/MCP_Test.json`
-- `environments.json`
+- Source code
+- Tests
+- Documentation updates
 
 ### STEP 4: Review
 

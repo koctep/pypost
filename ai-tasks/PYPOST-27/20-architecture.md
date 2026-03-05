@@ -1,42 +1,71 @@
-# Architecture: PYPOST-27 - MCP Metrics
+# PYPOST-27: Fix AttributeError: 'MainWindow' object has no attribute 'on_env_update'
 
 ## Research
-We already have `MetricsManager` from PYPOST-26. We need to add new metrics definitions and expose methods to track them.
+
+Analysis of `pypost/ui/main_window.py` showed that in `handle_send_request` a signal connection is
+created:
+```python
+worker.env_update.connect(lambda vars: self.on_env_update(vars))
+```
+However the `on_env_update` method is missing from the `MainWindow` class.
+At the same time, there is `handle_variable_set_request` used for manual variable updates via UI.
+Update logic should be similar.
 
 ## Implementation Plan
 
-1.  **Update `MetricsManager`**:
-    -   Define `mcp_requests_total` (Counter).
-    -   Define `mcp_request_duration_seconds` (Histogram).
-    -   Add `track_mcp_request(tool_name, status, duration)` method.
-
-2.  **Update `MCPServerImpl`**:
-    -   In `call_tool` method:
-        -   Start timer.
-        -   Execute tool.
-        -   Stop timer.
-        -   Call `MetricsManager.track_mcp_request`.
+1.  Add method `on_env_update(self, vars: dict)` to `MainWindow` class
+    (`pypost/ui/main_window.py`).
+2.  Implement logic for updating current environment variables in this method.
+3.  Ensure changes are saved and UI is updated.
 
 ## Architecture
 
-### `MetricsManager`
+### Changes in `pypost/ui/main_window.py`
+
+`MainWindow` class:
 
 ```python
-self.mcp_requests = Counter('pypost_mcp_requests_total', 'Total MCP requests', ['tool', 'status'])
-self.mcp_duration = Histogram('pypost_mcp_request_duration_seconds', 'MCP request duration', ['tool'])
+    def on_env_update(self, vars: dict):
+        """
+        Slot to handle environment variable updates from RequestWorker.
+        """
+        selected_env = self.env_selector.currentData()
+
+        # If no environment is selected, we cannot update variables.
+        # Can log a warning or ignore.
+        if not isinstance(selected_env, Environment):
+            return
+
+        # Update variables in the environment object
+        # vars is a dict with changed/new variables
+        selected_env.variables.update(vars)
+
+        # Save changes to disk
+        self.storage.save_environments(self.environments)
+
+        # Update UI (signal environment change so tabs etc. refresh)
+        # Calling on_env_changed with current index will update all dependent components
+        self.on_env_changed(self.env_selector.currentIndex())
 ```
 
-### `MCPServerImpl`
+### Interaction Diagram
 
-```python
-start_time = time.time()
-try:
-    result = await self._execute_tool(...)
-    status = "success"
-except Exception:
-    status = "error"
-    raise
-finally:
-    duration = time.time() - start_time
-    metrics_manager.track_mcp_request(tool_name, status, duration)
+```mermaid
+sequenceDiagram
+    participant Worker as RequestWorker
+    participant MainWindow
+    participant Env as Environment
+    participant Storage as StorageManager
+
+    Worker->>Worker: Script executes & updates env
+    Worker->>MainWindow: signal env_update(vars)
+    MainWindow->>MainWindow: on_env_update(vars)
+    MainWindow->>Env: update variables
+    MainWindow->>Storage: save_environments()
+    MainWindow->>MainWindow: on_env_changed() (Update UI)
 ```
+
+## Q&A
+
+No open questions. The task is localized and clear.
+

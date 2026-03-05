@@ -1,58 +1,62 @@
-# Architecture: PYPOST-15 - Auto-indentation and JSON Auto-formatting
+# Architecture: PYPOST-15 - Variable Tooltips in Tables
 
 ## Research
+To implement tooltips in `QTableWidget`, the following options were considered:
 
-### PySide6 QPlainTextEdit Event Overriding
+1.  **QTableWidget.setToolTip()**: Allows setting a static tooltip for the entire widget or individual cells.
+    - *Pros*: Simplicity.
+    - *Cons*: Static tooltip. If variables change, tooltips for all cells need to be updated. Does not allow dynamic reaction to variable changes without repainting the entire table.
+2.  **Overriding `mouseMoveEvent`**:
+    - *Pros*: Full control over display. Tooltip value can be calculated "on the fly" (lazy evaluation) using current variables.
+    - *Cons*: Requires `setMouseTracking(True)` and manual `QToolTip` management.
+3.  **Delegate (QStyledItemDelegate)**:
+    - *Pros*: Custom rendering and editor can be customized.
+    - *Cons*: Can intercept `helpEvent` (for tooltips) in delegate, but `mouseMoveEvent` logic at widget level seems more direct for global table behavior.
 
-To implement auto-indentation and paste handling, it is necessary to override event methods in a class inheriting `QPlainTextEdit`:
-
-*   Intercept `Qt.Key_Return` (or `Qt.Key_Enter`) press.
-*   Analyze text before cursor to determine indentation.
-*   Implement logic for increasing/preserving indentation.
-*   Intercept `}` or `]` press to decrease indentation (might require `textChanged` processing or input filtering, but `keyPressEvent` is simpler for start).
-
-*   This is the standard method for handling Paste in Qt widgets.
-*   Text can be obtained from `source.text()`.
-*   Try to parse as JSON.
-*   If valid JSON -> format (`json.dumps(data, indent=4)`) and insert.
-*   If not -> call `super().insertFromMimeData(source)` (standard paste).
-
-### Architectural Patterns
-
-*   **Inheritance**: Creating a specialized widget `CodeEditor` (or `JsonEditor`) inheriting `QPlainTextEdit`.
-*   **Composition**: `RequestWidget` will use `CodeEditor` instead of `QPlainTextEdit`.
-*   **Separation of Concerns**: Formatting and input handling logic is encapsulated in `CodeEditor`, not cluttering `RequestWidget`.
+**Choice**: Overriding `mouseMoveEvent` (Option 2). This matches the approach already used in `VariableAwareLineEdit` and `VariableAwarePlainTextEdit` (PYPOST-9), ensuring codebase consistency.
 
 ## Implementation Plan
 
-1.  Create `CodeEditor` class in `pypost/ui/widgets/code_editor.py`.
-2.  Implement `keyPressEvent` method to handle `Enter` (indentation calculation).
-3.  Implement `insertFromMimeData` method to intercept paste and auto-format.
-4.  Replace `QPlainTextEdit` with `CodeEditor` in `pypost/ui/widgets/request_editor.py`.
-5.  Test manual entry and paste.
+1.  **Modify `VariableHoverHelper`**:
+    - Add `resolve_text(text, variables)` method for full variable substitution in a string. This is needed because a table cell might contain multiple variables or text with variables (e.g., `Bearer {{token}}`), and we want to show the final string.
+2.  **Create `VariableAwareTableWidget`**:
+    - New class in `pypost/ui/widgets/variable_aware_widgets.py`, inheriting from `QTableWidget`.
+    - Implements `set_variables`, `mouseMoveEvent`, and `setMouseTracking(True)`.
+3.  **Update `KeyValueTable`**:
+    - Change inheritance in `pypost/ui/widgets/request_editor.py` from `QTableWidget` to `VariableAwareTableWidget`.
+4.  **Integration into `RequestWidget`**:
+    - In `set_variables` method, pass variables to `params_table` and `headers_table`.
 
 ## Architecture
 
-### Class Diagram
-[Diagram]
+### Changes in `pypost/ui/widgets/variable_aware_widgets.py`
 
-### Modules
+Adding static method:
+```python
+@staticmethod
+def resolve_text(text: str, variables: dict) -> str:
+    # Replaces all occurrences of {{variable}} with their values.
+```
 
-*   **Class `CodeEditor`**:
-    *   Inherits from `QPlainTextEdit`.
-    *   **Responsibility**: Provide a convenient interface for editing code (JSON) with support for auto-indentation and formatting.
-    *   **Methods**:
-        *   `keyPressEvent`: "Smart" Enter logic.
-        *   `insertFromMimeData`: "Smart" paste logic.
+New class:
+```python
+class VariableAwareTableWidget(QTableWidget, VariableHoverHelper):
+    # ... implementation ...
+```
 
-*   **Class `RequestWidget`**:
-    *   Existing class.
-    *   **Change**: Replace `self.body_edit = QPlainTextEdit()` with `self.body_edit = CodeEditor()`.
-    *   Connection of `JsonHighlighter` to the new editor remains unchanged (it works with `QTextDocument`, which both have).
+### Changes in `pypost/ui/widgets/request_editor.py`
+
+```python
+class KeyValueTable(VariableAwareTableWidget):
+    # Existing KeyValueTable logic remains unchanged,
+    # variable functionality is inherited.
+```
+
+Update data flow:
+`MainWindow` -> `RequestWidget.set_variables` -> `KeyValueTable.set_variables`.
 
 ## Q&A
-
-*   **How to handle `Tab`?**
-    *   By default, `QPlainTextEdit` inserts a tab character. We can override to insert 4 spaces, but requirements don't explicitly state this. Leave standard behavior or 4 spaces (Python/JSON standard). *Decision: use 4 spaces for consistency.*
-*   **Is a separate file needed for CodeEditor?**
-    *   Yes, better to move to a separate file `code_editor.py` for reuse and code cleanliness.
+- **Q**: Do we need to update tooltips if the table is not in focus?
+- **A**: Tooltips are shown only on mouse hover. `mouseMoveEvent` fires when the mouse is over the widget. Data relevance is ensured by passing `variables` on environment change.
+- **Q**: What about performance with a large number of rows?
+- **A**: Tooltip calculation happens only for one cell under the cursor at the moment of hovering. This is a very cheap operation.

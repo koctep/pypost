@@ -3,7 +3,8 @@ import uuid
 
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QComboBox, QLabel, QSplitter, QTreeView, QTabWidget, QMessageBox,
-                               QPushButton, QApplication, QInputDialog, QTabBar, QMenu)
+                               QPushButton, QApplication, QInputDialog, QTabBar, QMenu,
+                               QAbstractItemDelegate)
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QShortcut, QKeySequence
 from PySide6.QtCore import Qt, Signal
 from pathlib import Path
@@ -131,7 +132,11 @@ class MainWindow(QMainWindow):
         )
         self.collections_view.expanded.connect(self.on_tree_expanded)
         self.collections_view.collapsed.connect(self.on_tree_collapsed)
+        self.collections_view.itemDelegate().closeEditor.connect(
+            self.on_collection_item_editor_closed
+        )
         self.splitter.addWidget(self.collections_view)
+        self._pending_rename = None
 
         self.tabs = QTabWidget()
         self.tab_bar = TabBarWithAddButton()
@@ -211,6 +216,14 @@ class MainWindow(QMainWindow):
                 col_item.appendRow(req_item)
 
             self.collections_model.appendRow(col_item)
+
+    def _resolve_collection_item_target(self, item):
+        data = item.data(Qt.UserRole)
+        if isinstance(data, RequestData):
+            return "request", data.id, item.text(), data
+        if isinstance(data, str):
+            return "collection", data, item.text(), data
+        return None, None, item.text(), data
 
     def load_environments(self):
         self.environments = self.storage.load_environments()
@@ -412,25 +425,25 @@ class MainWindow(QMainWindow):
             return
 
         item = self.collections_model.itemFromIndex(index)
-        data = item.data(Qt.UserRole)
-
-        item_type = None
-        item_id = None
-        item_label = item.text()
-
-        if isinstance(data, RequestData):
-            item_type = "request"
-            item_id = data.id
-        elif isinstance(data, str):
-            item_type = "collection"
-            item_id = data
+        item_type, item_id, item_label, _ = self._resolve_collection_item_target(item)
 
         if not item_type or not item_id:
             return
 
         menu = QMenu(self.collections_view)
+        rename_action = menu.addAction("Rename")
         delete_action = menu.addAction("Delete")
         selected_action = menu.exec(self.collections_view.viewport().mapToGlobal(pos))
+        if selected_action == rename_action:
+            logger.info(
+                "collection_item_rename_selected item_type=%s item_id=%s item_label=%s",
+                item_type,
+                item_id,
+                item_label,
+            )
+            MetricsManager().track_gui_collection_rename_action(item_type, "selected")
+            self.start_collection_item_rename(index)
+            return
         if selected_action != delete_action:
             return
 
@@ -500,6 +513,139 @@ class MainWindow(QMainWindow):
         self.load_collections()
         self.restore_tree_state()
         self.save_tabs_state()
+
+    def start_collection_item_rename(self, index):
+        if self._pending_rename:
+            return
+        item = self.collections_model.itemFromIndex(index)
+        item_type, item_id, _, data = self._resolve_collection_item_target(item)
+        if not item_type or not item_id:
+            return
+
+        if item_type == "request" and isinstance(data, RequestData):
+            item.setText(data.name)
+
+        self._pending_rename = {"item_id": item_id, "item_type": item_type}
+        item.setEditable(True)
+        self.collections_view.setCurrentIndex(index)
+        self.collections_view.edit(index)
+
+    def on_collection_item_editor_closed(self, _editor, hint):
+        if not self._pending_rename:
+            return
+
+        item_type = self._pending_rename["item_type"]
+        item_id = self._pending_rename["item_id"]
+
+        if hint == QAbstractItemDelegate.EndEditHint.RevertModelCache:
+            logger.info(
+                "collection_item_rename_cancelled item_type=%s item_id=%s",
+                item_type,
+                item_id,
+            )
+            MetricsManager().track_gui_collection_rename_action(item_type, "cancelled")
+            self._pending_rename = None
+            self.load_collections()
+            self.restore_tree_state()
+            return
+
+        item = self._find_collection_item(item_id, item_type)
+        self._pending_rename = None
+
+        if item is None:
+            logger.warning(
+                "collection_item_rename_not_found_in_model item_type=%s item_id=%s",
+                item_type,
+                item_id,
+            )
+            MetricsManager().track_gui_collection_rename_action(item_type, "not_found")
+            self.load_collections()
+            self.restore_tree_state()
+            return
+
+        new_name = item.text().strip()
+        if not new_name:
+            logger.warning(
+                "collection_item_rename_rejected_empty item_type=%s item_id=%s",
+                item_type,
+                item_id,
+            )
+            MetricsManager().track_gui_collection_rename_action(item_type, "rejected_empty")
+            QMessageBox.warning(self, "Rename Error", "Name cannot be empty.")
+            self.load_collections()
+            self.restore_tree_state()
+            return
+
+        try:
+            renamed = self.request_manager.rename_collection_item(item_id, item_type, new_name)
+        except Exception as exc:
+            logger.error(
+                "collection_item_rename_failed item_type=%s item_id=%s new_name=%s error=%s",
+                item_type,
+                item_id,
+                new_name,
+                exc,
+            )
+            MetricsManager().track_gui_collection_rename_action(item_type, "error")
+            QMessageBox.critical(self, "Rename Error", f"Failed to rename '{item.text()}': {exc}")
+            self.load_collections()
+            self.restore_tree_state()
+            return
+
+        if not renamed:
+            logger.warning(
+                "collection_item_rename_not_found item_type=%s item_id=%s new_name=%s",
+                item_type,
+                item_id,
+                new_name,
+            )
+            MetricsManager().track_gui_collection_rename_action(item_type, "not_found")
+            QMessageBox.warning(self, "Rename Error", f"Could not rename '{item.text()}'.")
+            self.load_collections()
+            self.restore_tree_state()
+            return
+
+        logger.info(
+            "collection_item_rename_succeeded item_type=%s item_id=%s new_name=%s",
+            item_type,
+            item_id,
+            new_name,
+        )
+        MetricsManager().track_gui_collection_rename_action(item_type, "succeeded")
+
+        if item_type == "request":
+            self._rename_request_tabs(item_id, new_name)
+
+        self.load_collections()
+        self.restore_tree_state()
+        self.save_tabs_state()
+
+    def _find_collection_item(self, item_id: str, item_type: str):
+        for row in range(self.collections_model.rowCount()):
+            col_item = self.collections_model.item(row)
+            if item_type == "collection" and col_item.data(Qt.UserRole) == item_id:
+                return col_item
+            for child_row in range(col_item.rowCount()):
+                req_item = col_item.child(child_row)
+                data = req_item.data(Qt.UserRole)
+                if (
+                    item_type == "request"
+                    and isinstance(data, RequestData)
+                    and data.id == item_id
+                ):
+                    return req_item
+        return None
+
+    def _rename_request_tabs(self, request_id: str, new_name: str):
+        for i in range(self.tabs.count()):
+            tab = self.tabs.widget(i)
+            if (
+                isinstance(tab, RequestTab)
+                and tab.request_data
+                and tab.request_data.id == request_id
+            ):
+                tab.request_data.name = new_name
+                self.tabs.setTabText(i, new_name)
 
     def handle_save_request(self, request_data: RequestData):
         existing_result = self.request_manager.find_request(request_data.id)

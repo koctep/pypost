@@ -2,33 +2,29 @@
 
 ## Shortcuts Taken
 
-- **Global Instance for Singleton**: `TemplateService` is implemented as a module with global
-  instance (`template_service`). This is the "pythonic" way to implement Singleton, but in larger
-  systems a Dependency Injection container for managing dependency lifecycle may be preferable. For
-  current project size this is acceptable.
+- To fix the `/messages` issue, manual method control (POST) inside the ASGI application and manual
+  405 response were used, since `Mount` in Starlette does not support method filtering (unlike
+  `Route`). This is a somewhat "low-level" solution.
 
 ## Code Quality Issues
 
-- **Direct Global Access**: `HTTPClient` and `MCPServerImpl` import global `template_service`
-  directly. This creates tight coupling. In the future, passing `TemplateService` through the
-  constructor (DI) could be considered if mocking is needed for `HTTPClient` unit tests.
+- `SSEEndpoint` and `MessagesEndpoint` classes are defined inside `create_app` method. This
+  hinders reuse and isolated testing. They should be moved to module level.
+- `MessagesEndpoint` now has a dependency on `starlette.responses` (import inside method if
+  `Response` object were used) or manual response formatting, which duplicates framework logic.
 
 ## Missing Tests
 
-- **Unit Tests for TemplateService**: Although functionality is verified integrationally
-  (application starts and works), there are no isolated unit tests for `TemplateService` (testing
-  `render_string` with different variable types, testing template syntax error handling).
+- No automated tests for this specific behavior (correct SSE connection closure and 405 return for
+  non-POST requests to `/messages`). Testing was done manually or assumed covered by MCP
+  integration tests.
 
 ## Performance Concerns
 
-- **Improvement**: Using a single `Environment` should positively affect performance via Jinja2
-  internal caching (though by default compiled template cache works only with `env.get_template`,
-  and here we use `env.from_string` which can also cache depending on settings). In this
-  implementation we simply avoid creating redundant `Environment` and `Template` objects (via old
-  `TemplateEngine`), which is already good.
+- None. Using `Mount` and direct ASGI invocation is even more efficient than the `request_response`
+  wrapper in `Route`.
 
 ## Follow-up Tasks
 
-- Create unit tests for `pypost/core/template_service.py`.
-- Consider using `lru_cache` or built-in Jinja2 cache for `from_string` if slowdown is observed
-  when rendering the same strings repeatedly.
+- Refactor `MCPServerImpl`: move `SSEEndpoint` and `MessagesEndpoint` out of `create_app` method.
+- Add tests for ASGI compatibility of endpoints.

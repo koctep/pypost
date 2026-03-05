@@ -2,22 +2,33 @@
 
 ## Shortcuts Taken
 
-- **Manual Variable Propagation**: Variable updates happen via explicit call to `set_variables` in `RequestWidget`, which pushes them down the hierarchy. This works, but as UI structure complicates, it might become inconvenient. In the future, consider using Dependency Injection or a global context/signal mechanism.
+- **Global Instance for Singleton**: `TemplateService` is implemented as a module with global
+  instance (`template_service`). This is the "pythonic" way to implement Singleton, but in larger
+  systems a Dependency Injection container for managing dependency lifecycle may be preferable. For
+  current project size this is acceptable.
 
 ## Code Quality Issues
 
-- **VariableHoverHelper**: The helper performs two functions: finding a variable by index (for text fields) and full string resolution (for tables). Perhaps variable resolution logic should be separated into a distinct service (e.g., `EnvironmentService` or `TemplateEngine`) to avoid duplicating substitution logic, which might also exist in `TemplateEngine`.
+- **Direct Global Access**: `HTTPClient` and `MCPServerImpl` import global `template_service`
+  directly. This creates tight coupling. In the future, passing `TemplateService` through the
+  constructor (DI) could be considered if mocking is needed for `HTTPClient` unit tests.
 
 ## Missing Tests
 
-- **Unit Tests**: Unit tests for `VariableHoverHelper.resolve_text` are missing. Tests were created but not committed.
-- **UI Tests**: No automated UI tests to verify tooltip appearance in the table.
+- **Unit Tests for TemplateService**: Although functionality is verified integrationally
+  (application starts and works), there are no isolated unit tests for `TemplateService` (testing
+  `render_string` with different variable types, testing template syntax error handling).
 
 ## Performance Concerns
 
-- **MouseMoveEvent**: Variable resolution happens inside `mouseMoveEvent`. Although the regular expression is simple, with very large tables and active mouse movement, this could create load. Currently, preliminary check `VARIABLE_PATTERN.search(text)` minimizes impact.
+- **Improvement**: Using a single `Environment` should positively affect performance via Jinja2
+  internal caching (though by default compiled template cache works only with `env.get_template`,
+  and here we use `env.from_string` which can also cache depending on settings). In this
+  implementation we simply avoid creating redundant `Environment` and `Template` objects (via old
+  `TemplateEngine`), which is already good.
 
 ## Follow-up Tasks
 
-- [ ] Write and commit unit tests for `VariableHoverHelper` (methods `find_variable_at_index` and `resolve_text`).
-- [ ] Consider moving variable substitution logic to a common `TemplateEngine`.
+- Create unit tests for `pypost/core/template_service.py`.
+- Consider using `lru_cache` or built-in Jinja2 cache for `from_string` if slowdown is observed
+  when rendering the same strings repeatedly.

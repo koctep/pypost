@@ -1,13 +1,18 @@
 # Roadmap: PYPOST-34
 
+## Task Metadata
+
+- Programming language: Python
+- Recommended branch: fix/PYPOST-34-save-as-new-entity
+
 ## Step Status
 
 - [x] **STEP 1: Requirements Gathering and Documentation**
 - [x] **STEP 2: High-Level Architecture Design**
 - [x] **STEP 3: Development**
-  - [ ] *[Add summaries of completed iterations here]*
-  - [x] Replaced standalone Save button with Actions menu button to the right of
-    Send in RequestWidget.
+  - [x] Iteration 1: Added `Save As...` action before `Save`, shortcut `Ctrl+Shift+S`, and a
+    separate save-as path that always creates a new request entity and rebinds the active tab to
+    that entity.
 - [x] **STEP 4: Code Cleanup**
 - [x] **STEP 5: Observability**
 - [x] **STEP 6: Review and Technical Debt**
@@ -50,8 +55,3 @@
 ### STEP 7: Dev Docs
 
 - `doc/dev/`
-
-## Task Context
-
-- Programming language: Python
-- Recommended branch: `feature/PYPOST-34-actions-save-menu`

@@ -5,11 +5,10 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Added `mcp_host` field to `AppSettings` model
-  - [x] Updated `SettingsDialog` to include host input field
-  - [x] Updated `MCPServerManager` to support custom host binding
-  - [x] Updated `MainWindow` to display current host and port
-  - [x] Updated documentation
+  - [x] Updated `ResponseView` to support custom context menu.
+  - [x] Implemented "Set env" submenu with list of variables.
+  - [x] Implemented logic for creating new variables from context menu.
+  - [x] Integrated `MainWindow` to handle variable updates.
 - [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend

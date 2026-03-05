@@ -1,32 +1,40 @@
-# Architecture: PYPOST-28 - MCP Testing Collection
+# Architecture: PYPOST-28 - Fix Crash on Request Retry
 
 ## Research
-No complex architecture required. This is a data creation task.
+In `handle_send_request(self, request_data)`:
+```python
+sender_tab = None
+for i in range(self.tabs.count()):
+    tab = self.tabs.widget(i)
+    if tab.request_editor == self.sender(): # <--- Problem here
+        sender_tab = tab
+        break
+```
+When called via signal from `RequestWidget` (button click), `self.sender()` is `RequestWidget` (or button).
+When called via `handle_send_request_global` (hotkey), `self.sender()` might be `QShortcut` or `MainWindow` or `None`.
 
 ## Implementation Plan
 
-1.  **Create Environment**:
-    -   Name: "Test Env".
-    -   Variables: `base_url=https://httpbin.org`.
-    -   Enable MCP: True.
-
-2.  **Create Collection**:
-    -   Name: "MCP Test".
-    -   Requests:
-        1.  **Get Data**: GET `{{base_url}}/get`. Expose: True.
-        2.  **Post Data**: POST `{{base_url}}/post`. Body: `{"foo": "bar"}`. Expose: True.
-        3.  **Script Test**: GET `{{base_url}}/uuid`. Script: `pypost.env.set('uuid', response.json()['uuid'])`. Expose: True.
-
-3.  **Save**:
-    -   Save files to `collections/` and root (for `environments.json`).
+1.  **Update `handle_send_request`**:
+    -   If `sender_tab` is not found via `self.sender()`, assume the request comes from the *active* tab.
+    -   Use `self.tabs.currentWidget()` as a fallback.
 
 ## Architecture
 
-### File Structure
+### `MainWindow.handle_send_request`
 
-```
-pypost/
-  collections/
-    MCP_Test.json
-  environments.json
+```python
+def handle_send_request(self, request_data: RequestData):
+    sender_tab = None
+    # ... search by sender ...
+    
+    if not sender_tab:
+        # Fallback: use current tab
+        current = self.tabs.currentWidget()
+        if isinstance(current, RequestTab) and current.request_data.id == request_data.id:
+             sender_tab = current
+    
+    if not sender_tab:
+         return
+    # ...
 ```

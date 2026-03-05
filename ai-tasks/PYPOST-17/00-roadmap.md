@@ -1,14 +1,14 @@
-**Language**: Python (PySide6)
+# Roadmap: PYPOST-17
 
 ## Step Execution Status
 
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Implemented "Confirm before overwriting requests" setting in UI and model.
-  - [x] Implemented quick save logic (Save) for existing requests with setting check.
-  - [x] Implemented "Save As" logic (dialog) for new requests.
-- [x] **STEP 4: Review and Technical Debt**
+  - [x] Implemented `RequestService` class in `pypost/core/request_service.py`
+  - [x] Refactored `RequestWorker`
+  - [x] Refactored `MCPServerImpl`
+- [x] **STEP 4: Review and technical debt**
 
 ## Status Legend
 

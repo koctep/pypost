@@ -2,34 +2,23 @@
 
 ## Shortcuts Taken
 
-- When implementing `on_env_update` we ignore updates if no environment is selected (`None`).
-  Perhaps a warning to the user (in log or status bar) that the script tried to update a variable
-  but context is missing would be useful. Currently this happens "silently".
+- **Manual Testing Only**: Since the automated test infrastructure (pytest) is not yet fully set up and integrated for GUI components, validation of these refactorings was done via code review and assumption of correct behavior based on simple logic changes. No new automated tests were added.
 
 ## Code Quality Issues
 
-- No significant code quality issues. Implementation is concise and uses existing methods
-  (`on_env_changed`, `storage.save_environments`).
+- **None Identified**: The primary goal of this task was to improve code quality, and the changes successfully reduced complexity in `HTTPClient` and duplication in `MainWindow`.
 
 ## Missing Tests
 
-- No automated tests for `MainWindow` and `RequestWorker` interaction when updating variables.
-  Testing was done manually (assumed).
-- Add unit test for `on_env_update` method, mocking `env_selector` and `storage`.
+- **RequestManager Indexing**: A unit test specifically ensuring that `_rebuild_index` is called correctly on all modification paths (create, save, reload) would be beneficial once the test suite is active.
+- **HTTPClient Helper**: The new `_prepare_request_kwargs` method is now easily testable in isolation, but no test was added yet.
 
 ## Performance Concerns
 
-- Environment saving (`self.storage.save_environments`) happens synchronously on every variable
-  update from script. If a script updates variables in a loop very frequently, this could cause
-  UI freezes and excess disk load.
-  - *Mitigation:* Consider adding debounce or saving only after script completion, not on every
-    `env_update` signal. In current architecture `RequestWorker` emits `env_update` after script
-    execution (if variables changed), so this should not be a mass issue if `RequestWorker`
-    accumulates changes. *Check:* `RequestWorker.run` emits `env_update` once after execution. So
-    no problem.
+- **None**: The refactoring explicitly improved performance (O(1) lookup).
 
 ## Follow-up Tasks
 
-- Add unit tests for `MainWindow` (UI test coverage may currently be low).
-- Consider notifying the user if a script tries to write to an "empty" environment.
+- [ ] Add unit tests for `RequestManager` index integrity.
+- [ ] Add unit tests for `HTTPClient._prepare_request_kwargs`.
 

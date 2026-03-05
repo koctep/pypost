@@ -2,25 +2,22 @@
 
 ## Shortcuts Taken
 
-- **No Tests**: Creation of automated tests was skipped by user request. Auto-indentation and paste logic is not covered by tests.
-- **Simplified Unindent Logic**: Unindentation works only if the line contains *only* the closing bracket and spaces before it. In more complex cases (e.g., code on the same line), unindentation might not work or work unexpectedly.
-- **Manual Font Propagation**: In `MainWindow.apply_settings`, the font is manually applied to individual widgets (`collections_view`, `tabs`, `menuBar`, etc.) because automatic inheritance from `QApplication` did not work for all elements. This creates a risk of missing new elements when expanding UI.
+- **Manual Variable Propagation**: Variable updates happen via explicit call to `set_variables` in `RequestWidget`, which pushes them down the hierarchy. This works, but as UI structure complicates, it might become inconvenient. In the future, consider using Dependency Injection or a global context/signal mechanism.
 
 ## Code Quality Issues
 
-- **Manual Font Propagation**: (See above). This violates DRY principle and complicates UI maintenance.
+- **VariableHoverHelper**: The helper performs two functions: finding a variable by index (for text fields) and full string resolution (for tables). Perhaps variable resolution logic should be separated into a distinct service (e.g., `EnvironmentService` or `TemplateEngine`) to avoid duplicating substitution logic, which might also exist in `TemplateEngine`.
 
 ## Missing Tests
 
-- Tests for `CodeEditor`:
-    - `update_indent_size` and `reformat_text`.
+- **Unit Tests**: Unit tests for `VariableHoverHelper.resolve_text` are missing. Tests were created but not committed.
+- **UI Tests**: No automated UI tests to verify tooltip appearance in the table.
 
 ## Performance Concerns
 
-- **JSON Parsing on Paste**: When pasting *very* large text, attempting to parse it as JSON might cause interface lag. Currently, this is executed in the main UI thread.
+- **MouseMoveEvent**: Variable resolution happens inside `mouseMoveEvent`. Although the regular expression is simple, with very large tables and active mouse movement, this could create load. Currently, preliminary check `VARIABLE_PATTERN.search(text)` minimizes impact.
 
 ## Follow-up Tasks
 
-- Create tests for `CodeEditor`.
-- Implement asynchronous JSON check on paste for large data volumes (optional).
-- Investigate reasons for font inheritance issues and refactor `apply_settings` for a cleaner solution (possibly via global QSS).
+- [ ] Write and commit unit tests for `VariableHoverHelper` (methods `find_variable_at_index` and `resolve_text`).
+- [ ] Consider moving variable substitution logic to a common `TemplateEngine`.

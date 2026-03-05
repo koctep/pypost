@@ -5,45 +5,47 @@
 ### Added Logs
 
 Describe added logging:
-- **EMERG**: not added (not applicable for this UI change).
-- **ALERT**: not added (not applicable for this UI change).
-- **CRIT**: not added (not applicable for this UI change).
-- **ERR**: not added (not applicable for this UI change).
-- **WARNING**: not added (not applicable for this UI change).
-- **NOTICE**: not added (not applicable for this UI change).
-- **INFO**: `pypost/ui/widgets/request_editor.py` - log save action trigger source
-  (`menu` or `shortcut`) in `RequestWidget.on_save`.
-- **DEBUG**: not added (not required for current scope).
+- **EMERG**: not added (not applicable for this feature scope).
+- **ALERT**: not added (not applicable for this feature scope).
+- **CRIT**: not added (not applicable for this feature scope).
+- **ERR**: not added (not applicable for this feature scope).
+- **WARNING**: `pypost/ui/main_window.py` - logs save-as flow failure when no target collection
+  can be resolved.
+- **NOTICE**: not added.
+- **INFO**:
+  - `pypost/ui/widgets/request_editor.py` - logs `save_as_action_triggered` with trigger source.
+  - `pypost/ui/main_window.py` - logs save-as flow start, cancel, and completion with IDs.
+- **DEBUG**: not added.
 
 ### Log Structure
 
 Log format used:
-- Structured logs: yes (key/value style message: `save_action_triggered source=<value>`).
-- Includes context: yes (`source` context field).
-- Log levels: `INFO`.
+- Structured logs: yes (key/value message pattern).
+- Includes context: yes (`source_request_id`, `new_request_id`, `target_collection_id`,
+  `source`).
+- Log levels: `INFO`, `WARNING`.
 
 ## Metrics Implementation (if applicable)
 
 ### Performance Metrics
 
 Added performance metrics:
-- **Response time**: no new metric in this task.
-- **Throughput**: no new metric in this task.
-- **Error rate**: no new metric in this task.
+- **Response time**: not added in this task.
+- **Throughput**: not added in this task.
+- **Error rate**: not added in this task.
 
 ### Business Metrics
 
 Business metrics:
-- `gui_save_actions_total{source="<menu|shortcut>"}`: counts how save is triggered from
-  main screen request editor.
+- `gui_save_as_actions_total{source="<value>"}`: counts `Save As...` action triggers by source.
   - Definition: `pypost/core/metrics.py` (`MetricsManager._init_metrics`).
-  - Tracking call: `pypost/ui/widgets/request_editor.py` (`RequestWidget.on_save`).
+  - Tracking call: `pypost/ui/widgets/request_editor.py` (`RequestWidget.on_save_as`).
 
 ### System Health Metrics
 
 System health metrics:
 - **Resource usage**: not added in this task.
-- **Component status**: existing metrics server health behavior unchanged.
+- **Component status**: existing metrics server behavior unchanged.
 
 ## Monitoring Integration
 
@@ -64,10 +66,8 @@ Validation results:
 
 ## Notes
 
-Additional notes on observability or special cases:
-- Added metric API:
-  - `MetricsManager.track_gui_save_action(source: str)`.
-- Save action observability now covers both menu interaction and `Ctrl+S` shortcut.
-- Local validation:
-  - `venv/bin/python -m py_compile pypost/core/metrics.py pypost/ui/widgets/request_editor.py`
-  - `venv/bin/python -m unittest discover -q` (no tests discovered in current setup).
+- Validation run:
+  - `python3 -m py_compile pypost/core/metrics.py pypost/ui/main_window.py`
+    `pypost/ui/widgets/request_editor.py`.
+  - Focused lint check passed for `pypost/ui/widgets/request_editor.py`.
+- Repository-wide lint baseline remains noisy and is outside this task scope.

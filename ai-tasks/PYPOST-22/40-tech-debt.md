@@ -2,13 +2,13 @@
 
 ## Shortcuts Taken
 
-- **No Input Validation**: The host input field is a simple text field. There is no validation for IP address format or hostname validity. If an invalid host is entered, the server will fail to start (error will be logged, but user might not understand why).
-    - *Mitigation*: Add regex validator or `QHostAddress` validation in the future.
+- **Manual Signal Connection**: Signal connection happens in `add_new_tab`. If tabs are created elsewhere, connection might be missed.
+- **No Validation for New Variable Name**: Basic check for empty string is present, but no check for valid characters (e.g., spaces, special symbols) that might be invalid for Jinja2 templates.
 
 ## Missing Tests
 
-- No automated tests verifying that the server actually binds to the specified host. Testing is manual (using `netstat` or connecting from external).
+- No UI tests for context menu interaction.
 
 ## Follow-up Tasks
 
-- Add validation for Host and Port fields in `SettingsDialog`.
+- Add validation for variable names.

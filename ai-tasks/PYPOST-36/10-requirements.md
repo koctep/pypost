@@ -1,33 +1,31 @@
-# PYPOST-36: Improve CI Reliability for Python Project Automation
+# PYPOST-36: Add Rename Action to Context Menu
 
 ## Goals
 
-Increase CI reliability by removing environment-related inconsistencies between local and
-pipeline execution.
+Allow users to rename items in the tree directly from the context menu so item names can be kept
+clear and up to date during daily work.
 
 ## User Stories
 
-- As a DevOps engineer, I want project automation commands to behave consistently across local
-  and CI environments so that pipeline outcomes are predictable.
-- As a DevOps engineer, I want setup and quality-check commands to use a single project
-  environment convention so that environment mismatch issues are minimized.
-- As a DevOps engineer, I want virtual environment location conventions to be consistent and
-  unambiguous so that operational maintenance and troubleshooting are simpler.
+- As an API user, I want to rename any tree item from the context menu so I can keep my workspace
+  organized.
+- As an API user, I want to rename the selected item inline so the action is quick and does not
+  interrupt my flow.
 
 ## Definition of Done
 
-- CI failures caused by environment or tool mismatch are reduced to near zero.
-- Quality-check commands produce consistent pass/fail outcomes in local and CI usage.
-- The rerun rate for failed pipelines decreases compared with the current baseline.
-- Project automation conventions are documented clearly enough for DevOps and developers to use
-  without ambiguity.
+- Every tree item supports a context menu action named `Rename`.
+- Renaming is available for all tree item types in scope.
+- Renaming is performed inline in the tree.
+- Empty names are rejected and cannot be saved.
+- Duplicate names under the same parent are allowed.
 
 ## Task Description
 
 ### Problem Statement
 
-The current project automation flow does not provide sufficiently reliable and predictable
-execution behavior for CI operations.
+Users need the ability to rename tree items. Without it, they cannot maintain meaningful names in
+the interface.
 
 ### Programming Language
 
@@ -35,48 +33,48 @@ Python
 
 ### Functional Requirements
 
-- The project must provide a clear and consistent automation workflow for environment setup,
-  execution, and quality checks.
-- Automation behavior must be deterministic across local and CI contexts.
-- Environment conventions must be explicit, including the virtual environment directory
-  convention (`.venv`).
+- The system must provide a `Rename` action in the context menu for every tree item.
+- The system must allow renaming of all tree item types.
+- The system must start rename in inline edit mode.
+- The system must reject empty names.
+- The system must allow duplicate names under the same parent.
 
 ### Non-Functional Requirements
 
-- Reliability: command outcomes must be stable and reproducible in CI.
-- Maintainability: automation conventions must be straightforward for ongoing DevOps support.
-- Clarity: command usage and expectations must be easy to understand.
+- UX speed: rename should be fast and low-friction.
+- UX consistency: rename behavior should be the same for all tree item types.
+- Data quality: item names must never be saved as empty.
 
 ### Constraints and Assumptions
 
-- Existing make target names are preserved: `venv`, `install`, `run`, `test`, `lint`, `clean`.
-- Scope is limited to project automation artifacts and related task documentation.
-- Business logic and application functional behavior are out of scope.
-- The project remains Python-based.
+- Scope is limited to renaming through the tree item context menu.
+- No additional validation constraints were provided beyond non-empty names.
+- No role-based restrictions were provided for rename.
 
 ### System Boundaries (Scope)
 
-- In scope: project automation behavior for environment preparation, command execution, and
-  quality checks that affect CI reliability.
-- Out of scope: feature-level application behavior, product functionality changes, and unrelated
-  infrastructure work.
+- In scope: context menu rename action for all tree items, inline rename flow, non-empty name
+  validation.
+- Out of scope: unrelated item management features and non-context-menu rename flows.
 
 ### Main Entities and Interactions
 
-- DevOps engineer: defines and maintains CI expectations and operational reliability.
-- Developer: runs project automation commands locally before CI.
-- CI pipeline: executes project automation commands and reports pass/fail outcomes.
-- Project automation configuration: defines operational command behavior used by both local and CI
-  actors.
+- User: starts and confirms/cancels rename.
+- Tree item: business object being renamed.
+- Tree view: interaction surface where inline rename is performed.
 
-Interaction summary: Developers and CI pipeline rely on shared automation conventions; DevOps
-maintains those conventions to ensure reliable, repeatable outcomes.
+Interaction summary: user opens context menu for a tree item, chooses `Rename`, edits the name
+inline, then applies or cancels the rename.
 
 ## Q&A
 
-- Q: Why is this task needed now?
-  A: To improve CI reliability.
-- Q: Who is the primary impacted role?
-  A: DevOps.
-- Q: Why use `.venv` as the virtual environment directory convention?
-  A: To improve consistency and reduce environment ambiguity, supporting CI reliability.
+- Q: Why is this task needed?
+  A: Users need the ability to rename items.
+- Q: Which items are in scope?
+  A: All tree items.
+- Q: How should rename be performed?
+  A: Inline in the tree.
+- Q: What validation is required?
+  A: Empty names are prohibited.
+- Q: Are duplicate names allowed under the same parent?
+  A: Yes.

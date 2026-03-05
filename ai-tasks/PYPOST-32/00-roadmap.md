@@ -1,19 +1,19 @@
 # Roadmap: PYPOST-32
 
-## Step Execution Status
+## Step Status
 
-- [x] **STEP 1: Requirements gathering and documentation**
-- [x] **STEP 2: High-level architectural design**
+- [x] **STEP 1: Requirements Gathering and Documentation**
+- [x] **STEP 2: High-Level Architecture Design**
 - [x] **STEP 3: Development**
-  - [x] Create StateManager
-  - [x] Create RequestManager
-  - [x] Create VariableHoverMixin
-  - [x] Refactor widgets to use Mixin
-  - [x] Integrate managers into MainWindow
-- [x] **STEP 4: Review and technical debt**
-
-## Programming Language
-Python
+  - [ ] *[Add summaries of completed iterations here]*
+  - [x] Added `+` button in tab area and wired click to `handle_new_tab()` (same flow as `Ctrl+N`).
+  - [x] Repositioned `+` button to track tab layout so it appears right after the last tab.
+  - [x] Fixed hidden `+` button by disabling tab expansion and clamping button position.
+  - [x] Moved `+` button positioning to `QTabWidget` coordinates to avoid overlap with last tab.
+- [x] **STEP 4: Code Cleanup**
+- [x] **STEP 5: Observability**
+- [x] **STEP 6: Review and Technical Debt**
+- [x] **STEP 7: Dev Docs**
 
 ## Status Legend
 
@@ -37,6 +37,24 @@ Python
 - Tests
 - Documentation updates
 
-### STEP 4: Review
+### STEP 4: Code Cleanup
 
-- `ai-tasks/PYPOST-32/40-tech-debt.md`
+- `ai-tasks/PYPOST-32/40-code-cleanup.md`
+
+### STEP 5: Observability
+
+- `ai-tasks/PYPOST-32/50-observability.md`
+
+### STEP 6: Review
+
+- `ai-tasks/PYPOST-32/60-tech-debt.md`
+
+### STEP 7: Dev Docs
+
+- `doc/dev/`
+
+## Task Context
+
+- Programming language: Python
+
+- Recommended branch name: feature/PYPOST-32-new-tab-plus-button

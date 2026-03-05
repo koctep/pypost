@@ -1,40 +1,40 @@
-# PYPOST-34: Consolidate Save into Actions Menu on Main Screen
+# PYPOST-34: Architecture for "Save As..." Action in Request Workflow
 
 ## Research
 
-### External research (official Qt docs)
+### External research (Qt official docs)
 
-1. `QToolButton` supports popup menus and is intended for compact action presentation.
-   - Source: https://doc.qt.io/qt-6/qtoolbutton.html
-2. `QMenu` can host `QAction` items and is the standard way to expose contextual actions.
-   - Source: https://doc.qt.io/qt-6/qmenu.html
-3. `QAction` supports shortcuts and centralizes action behavior independently from a specific
-   button widget.
-   - Source: https://doc.qt.io/qt-6/qaction.html
-4. Qt shortcut handling is built around `QShortcut`/`QKeySequence`; `Ctrl+S` should remain
-   mapped to the same save behavior.
-   - Sources:
-     - https://doc.qt.io/qt-6/qshortcut.html
-     - https://doc.qt.io/qt-6/qkeysequence.html
+1. `QMenu` keeps action ordering as inserted; this supports explicit placement of `Save As...`
+   before `Save`.
+   Source: https://doc.qt.io/qt-6/qmenu.html
+2. `QAction` provides a reusable command object with `triggered` signal for menu actions.
+   Source: https://doc.qt.io/qt-6/qaction.html
+3. `QFileDialog::getSaveFileName` describes standard save-file dialog behavior when user must
+   provide a new save target.
+   Source: https://doc.qt.io/qt-6/qfiledialog.html#getSaveFileName
 
 ### Current codebase findings
 
-1. Main request actions are built in `pypost/ui/widgets/request_editor.py`.
-2. Current layout order is: method selector, URL input, `MCP Tool`, `Save`, `Send`.
-3. Save workflow endpoint is already centralized in `RequestWidget.on_save()`, which emits
-   `save_requested`.
-4. `MainWindow` listens to `save_requested` and executes actual save business logic in
-   `handle_save_request`, so UI placement can change without changing save domain behavior.
+1. Request action menu is owned by `RequestWidget` in
+   `pypost/ui/widgets/request_editor.py` and currently contains only `Save`.
+2. Current save workflow emits `save_requested` from `RequestWidget` and is handled by
+   `MainWindow.handle_save_request(...)` in `pypost/ui/main_window.py`.
+3. Existing save flow supports overwrite for existing request IDs and creation flow via
+   `SaveRequestDialog` for unsaved/new requests.
+4. Step 1 requirement for this task is: `Save As...` appears in `Actions` before `Save`, opens
+   new-save dialog flow, and always writes to a new request entity without overwriting source.
 
 ## Implementation Plan
 
-1. Keep business flow unchanged: preserve `save_requested -> MainWindow.handle_save_request`.
-2. Replace standalone `Save` button in `RequestWidget` with an `Actions` control to the right
-   of `Send`.
-3. Implement `Actions` as a `QToolButton` with `QMenu`.
-4. Add one `QAction`: `Save`, triggered by existing `on_save()` method.
-5. Preserve keyboard behavior by keeping `Ctrl+S` shortcut bound to save.
-6. Keep this change local to the main screen request editor; do not modify other screens.
+1. Extend request action entry points in `RequestWidget` with a dedicated `Save As...` action
+   placed before `Save`, plus keyboard shortcut `Ctrl+Shift+S`.
+2. Introduce a separate event path from `RequestWidget` to `MainWindow` for `Save As...` to keep
+   save semantics explicit and avoid accidental overwrite behavior reuse.
+3. Reuse existing save dialog module (`SaveRequestDialog`) as the UI boundary for entering target
+   name/collection, preserving current user save patterns.
+4. Ensure save-as orchestration in `MainWindow` produces a new request identity and updates UI
+   state (tab title, active request reference, collections tree).
+5. Keep send flow and regular save flow unchanged.
 
 ## Architecture
 
@@ -42,64 +42,86 @@
 
 ```mermaid
 flowchart LR
-    U[User] --> RW[RequestWidget]
-    RW -->|Send click| SEND[on_send]
-    RW -->|Actions menu -> Save| SAVE[on_save]
-    RW -->|Ctrl+S| SAVE
-    SAVE --> SIG[save_requested signal]
-    SIG --> MW[MainWindow.handle_save_request]
+    U[User] -->|Actions: Save As...| RW[RequestWidget]
+    U -->|Ctrl+Shift+S| RW
+    RW -->|save_as_requested(RequestData)| MW[MainWindow Save-As Orchestrator]
+    MW --> SD[SaveRequestDialog]
+    SD -->|name + collection target| MW
     MW --> RM[RequestManager]
     RM --> ST[StorageManager]
+    MW --> TV[Tabs and Collections UI State]
+
+    U -->|Actions: Save| RW
+    RW -->|save_requested(RequestData)| MW2[Existing Save Orchestrator]
 ```
 
 ### Modules and Responsibilities
 
 1. `RequestWidget` (`pypost/ui/widgets/request_editor.py`)
-   - Owns main-screen request action controls.
-   - Translates UI events (click/menu/shortcut) into existing signals.
-2. `MainWindow` (`pypost/ui/main_window.py`)
-   - Orchestrates tab-level behavior.
-   - Receives save/send signals and routes to core services.
-3. `RequestManager` (`pypost/core/request_manager.py`)
-   - Owns request persistence rules and collection management.
-4. `StorageManager` (`pypost/core/storage.py`)
-   - Persists collections/environments/config data.
+   - Owns `Actions` menu structure and ordering.
+   - Emits dedicated user-intent events: save vs save as.
+2. Save-As Orchestrator (`MainWindow` scope)
+   - Receives save-as intent and executes "always create new entity" behavior.
+   - Coordinates dialog input, entity creation, and UI refresh.
+3. `SaveRequestDialog` (`pypost/ui/dialogs/save_dialog.py`)
+   - Captures user-provided request name and collection target.
+   - Validates required save inputs before accept.
+4. `RequestManager` / `StorageManager` (`pypost/core/`)
+   - Persist new request entity and collection linkage.
+5. UI State Update Layer (`MainWindow` tabs/tree)
+   - Refreshes collections tree and updates active tab context to newly created request.
 
-### Dependencies
+### Dependencies Between Modules
 
-1. `RequestWidget` depends on Qt Widgets (`QToolButton`, `QMenu`, `QAction`, `QShortcut`).
-2. `MainWindow` depends on `RequestWidget` public signals only.
-3. Save persistence path remains `MainWindow -> RequestManager -> StorageManager`.
+1. `RequestWidget` depends on Qt menu/action components and emits high-level signals only.
+2. Save-As Orchestrator depends on `SaveRequestDialog` and `RequestManager`.
+3. `SaveRequestDialog` depends on available collections provided by orchestrator.
+4. UI State Update Layer depends on orchestrator outputs (new request data and target
+   collection).
 
-### Selected Patterns and Justification
+### Selected Architectural Patterns and Justification
 
-1. Signal-slot pattern (existing, preserved)
-   - Keeps UI control changes decoupled from business save logic.
-2. Action pattern via `QAction`
-   - Encapsulates save behavior as an action reusable from menu and shortcut.
-3. Presenter-like UI orchestration in `MainWindow`
-   - Maintains current separation: widget emits intents, main window coordinates services.
+1. Intent-Separated Command pattern
+   - Separate `Save` and `Save As...` entry points to prevent semantic ambiguity between
+     overwrite and create-new behavior.
+2. Orchestrator pattern in `MainWindow`
+   - Keep cross-module coordination (dialog, persistence, UI refresh) in one controller layer.
+3. Signal-Slot Event pattern (Qt)
+   - Preserve existing Qt event architecture and keep widget components decoupled from
+     persistence logic.
 
-### Main Interfaces / APIs
+### Main Interfaces Between Modules
 
-1. `RequestWidget.save_requested: Signal(RequestData)` (unchanged)
-2. `RequestWidget.send_requested: Signal(RequestData)` (unchanged)
-3. `RequestWidget.on_save()` (reused by menu action and shortcut)
-4. `MainWindow.handle_save_request(request_data: RequestData)` (unchanged)
+1. `RequestWidget` -> `MainWindow` save-as interface
+   - Event: `save_as_requested(RequestData)`.
+   - Contract: data reflects current editor state at trigger time.
+2. `MainWindow` -> `SaveRequestDialog` interface
+   - Input: available collections and parent window context.
+   - Output: accepted request name + target collection (or new collection intent).
+3. `MainWindow` -> `RequestManager` persistence interface
+   - Operation: create and persist a request as a new entity in target collection.
+   - Contract: source request is not overwritten.
+4. `MainWindow` -> UI state interface
+   - Operations: update tab title/current request reference, reload collection tree, preserve
+     expanded-state behavior.
 
 ### Interaction Scheme
 
-1. User clicks `Actions` control near `Send`.
-2. User selects `Save`.
-3. `QAction` triggers `RequestWidget.on_save()`.
-4. `RequestWidget` updates request model and emits `save_requested`.
-5. `MainWindow` executes existing save flow and updates UI/tree/tab state.
+1. User edits an existing request and selects `Actions -> Save As...`.
+2. `RequestWidget` updates in-memory request data and emits save-as intent event.
+3. `MainWindow` opens `SaveRequestDialog` for new save target input.
+4. On confirm, orchestrator resolves target collection (existing or newly created).
+5. Orchestrator persists a new request entity via `RequestManager`.
+6. `MainWindow` refreshes tree/tabs and binds current tab to the newly created request entity.
+7. Original request remains unchanged throughout this path.
 
 ## Q&A
 
-- Q: Why use `QToolButton + QMenu` instead of another `QPushButton`?
-  - A: It is a standard Qt mechanism for grouped actions and future menu growth.
-- Q: Will save behavior change?
-  - A: No. The same `on_save()` and `save_requested` path is preserved.
-- Q: How is keyboard accessibility preserved?
-  - A: `Ctrl+S` remains bound to save, and menu action maps to the same save handler.
+- Q: Why separate save-as signal/path instead of reusing current save handler with a flag?
+  A: Separate intent reduces regression risk in existing overwrite behavior and keeps logic
+  explicit.
+- Q: Why keep `SaveRequestDialog` rather than introducing a new dialog type?
+  A: It already captures required save target data and aligns with current user flow.
+- Q: How is menu placement guaranteed?
+  A: `QMenu` action ordering follows insertion order, so `Save As...` is inserted before
+  `Save`.

@@ -1,31 +1,26 @@
 # PYPOST-12: Technical Debt Analysis
 
-## Status: FIXED
-Addressed in PYPOST-32 by implementing `StateManager`.
-
 ## Shortcuts Taken
 
-- **[FIXED] Direct Settings Manipulation from UI**: Tree state logic
-  (`expanded_collections`) is now managed via `StateManager`. `MainWindow` no longer depends
-  directly on the settings structure for this functionality.
-- **Synchronous Saving**: Settings are saved synchronously on every click
-  (expand/collapse). With very frequent clicking, this might cause excess I/O operations, but
-  for current scale, it's not critical.
+- **No Tests**: Creation of automated tests was skipped by user request. Auto-indentation and paste logic is not covered by tests.
+- **Simplified Unindent Logic**: Unindentation works only if the line contains *only* the closing bracket and spaces before it. In more complex cases (e.g., code on the same line), unindentation might not work or work unexpectedly.
+- **Manual Font Propagation**: In `MainWindow.apply_settings`, the font is manually applied to individual widgets (`collections_view`, `tabs`, `menuBar`, etc.) because automatic inheritance from `QApplication` did not work for all elements. This creates a risk of missing new elements when expanding UI.
 
 ## Code Quality Issues
 
-- **Type Check Duplication**: In methods `on_tree_expanded`, `on_tree_collapsed`, and `restore_tree_state`, the check `isinstance(data, str)` is repeated to determine if an item is a collection. This could be moved to a helper method `_is_collection_item(index)`.
+- **Manual Font Propagation**: (See above). This violates DRY principle and complicates UI maintenance.
 
 ## Missing Tests
 
-- Unit tests for tree state save/restore logic are missing. Testing was done manually.
-- No tests for edge cases (e.g., ID exists in settings but collection is gone).
+- Tests for `CodeEditor`:
+    - `update_indent_size` and `reformat_text`.
 
 ## Performance Concerns
 
-- **Linear Search on Restore**: `restore_tree_state` iterates through all root level items. With a huge number of collections (thousands), this might be slow, but for typical usage (dozens of collections), it's instant.
+- **JSON Parsing on Paste**: When pasting *very* large text, attempting to parse it as JSON might cause interface lag. Currently, this is executed in the main UI thread.
 
 ## Follow-up Tasks
 
-- Write tests to verify UI state preservation.
-- Consider debouncing settings saving if I/O performance issues arise.
+- Create tests for `CodeEditor`.
+- Implement asynchronous JSON check on paste for large data volumes (optional).
+- Investigate reasons for font inheritance issues and refactor `apply_settings` for a cleaner solution (possibly via global QSS).

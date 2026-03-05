@@ -5,12 +5,8 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Created skeleton of `CodeEditor` class
-  - [x] Implemented auto-indentation logic (Enter) and unindentation (})
-  - [x] Implemented auto-formatting on paste
-  - [x] Integrated `CodeEditor` into `RequestWidget`
-  - [x] Added `Indent Size` setting to settings dialog
-  - [x] Implemented applying font and indent settings to all UI elements
+  - [x] Update `KeyValueTable` to support `mouseMoveEvent` and variables.
+  - [x] Integrate variable updates into `KeyValueTable`.
 - [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend
@@ -33,7 +29,6 @@
 
 - Source code
 - Tests
-- Documentation updates
 
 ### STEP 4: Review
 

@@ -1,110 +1,127 @@
-# PYPOST-35: Add New-Tab Plus Button Next to Tabs
+# PYPOST-35: Add Delete Action in Collection Item Context Menu
 
 ## Research
 
-### External research (Qt official docs)
+### Project Baseline
 
-1. `QTabWidget::setCornerWidget(...)` allows placing an extra widget in tab-frame corners.
-   This is suitable for a persistent action button near tabs.
-   Source: https://doc.qt.io/qt-6/qtabwidget.html#setCornerWidget
-2. `QToolButton` is intended for compact toolbar-like actions and icon/text actions.
-   Source: https://doc.qt.io/qt-6/qtoolbutton.html
-3. `QTabBar::setTabButton(...)` can inject widgets per tab side, but it is tab-specific and
-   less suitable for one global "new tab" button after all tabs.
-   Source: https://doc.qt.io/qt-6/qtabbar.html#setTabButton
-4. Existing shortcut flow should remain centralized via `QShortcut` and `QKeySequence`.
-   Sources:
-   - https://doc.qt.io/qt-6/qshortcut.html
-   - https://doc.qt.io/qt-6/qkeysequence.html
+- UI stack is PySide6 (`requirements.txt`).
+- Collection tree UI lives in `pypost/ui/main_window.py` (`QTreeView` + `QStandardItemModel`).
+- Business data layer is `pypost/core/request_manager.py` (`Collection`, `RequestData` lifecycle).
+- Persistence layer is `pypost/core/storage.py` (collection JSON files).
+- There is currently no collection item context menu in `MainWindow`.
+- Existing flow already uses confirmation dialogs for destructive/overwrite actions (`QMessageBox`).
 
-### Current codebase findings
+### External References
 
-1. Tab container is `self.tabs = QTabWidget()` in `pypost/ui/main_window.py`.
-2. New tab behavior is centralized:
-   - `Ctrl+N` -> `_setup_shortcuts()` -> `handle_new_tab()`
-   - `handle_new_tab()` -> `add_new_tab()`
-3. `add_new_tab()` constructs `RequestTab`, wires signals, sets title, and persists state.
-4. Hotkeys UI lists `Ctrl+N` as new-tab shortcut in `pypost/ui/dialogs/hotkeys_dialog.py`.
+- Qt `QTreeView` docs for tree interaction and extension points:
+  https://doc.qt.io/qt-6/qtreeview.html
+- Qt `QWidget` context menu policy and `customContextMenuRequested` signal:
+  https://doc.qt.io/qt-6/qwidget.html#contextMenuPolicy-prop
+- Qt `QMessageBox` docs for confirmation patterns:
+  https://doc.qt.io/qt-6/qmessagebox.html
 
 ## Implementation Plan
 
-1. Keep current business flow unchanged by reusing `MainWindow.handle_new_tab()`.
-2. Add one UI control (`+`) in the tab area as a corner widget of `QTabWidget`.
-3. Wire `+` button click directly to `handle_new_tab()`, matching `Ctrl+N` behavior.
-4. Keep `Ctrl+N` shortcut mapping unchanged.
-5. Limit change surface to `MainWindow` tab-area setup; no request data model changes.
+1. Add a collection-tree context menu entry point in `MainWindow`.
+2. Resolve clicked tree item into a domain target (`Collection` or `RequestData`).
+3. Build menu actions dynamically; include `Delete` for supported collection item types.
+4. On `Delete`, show confirmation dialog and stop if user cancels.
+5. Delegate deletion to `RequestManager` as the business layer boundary.
+6. Persist via `StorageManager`, reload tree model, and restore UI state.
+7. Keep UI behavior consistent for all in-scope item types.
 
 ## Architecture
 
-### Module Diagram
+### System Module Diagram
 
 ```mermaid
 flowchart LR
-    U[User] -->|Click '+'| PTB[Plus Tab Button]
-    U -->|Ctrl+N| NS[QShortcut Ctrl+N]
-    PTB --> HNT[MainWindow.handle_new_tab]
-    NS --> HNT
-    HNT --> ANT[MainWindow.add_new_tab]
-    ANT --> RT[RequestTab]
-    ANT --> QT[QTabWidget]
-    ANT --> SS[MainWindow.save_tabs_state]
+    User --> UI[MainWindow / Collection Tree]
+    UI --> CM[Context Menu Controller]
+    CM --> CONF[Confirmation Dialog Service]
+    CM --> APP[RequestManager]
+    APP --> PERSIST[StorageManager]
+    PERSIST --> FS[(Collection JSON Files)]
+    APP --> MODELS[Collection + RequestData Models]
+    UI --> TREE[QStandardItemModel / QTreeView]
 ```
 
 ### Modules and Responsibilities
 
-1. `MainWindow` (`pypost/ui/main_window.py`)
-   - Owns tab container and global shortcuts.
-   - Owns new-tab orchestration (`handle_new_tab`, `add_new_tab`).
-   - Will own creation and placement of the `+` tab button.
-2. Tab container (`QTabWidget` in `MainWindow`)
-   - Displays tabs and handles close/select behavior.
-   - Hosts corner widget for global tab action entry point.
-3. New-tab trigger inputs
-   - Keyboard path: `QShortcut("Ctrl+N")`.
-   - Mouse path: new `+` button click.
-   - Both converge to the same handler.
-4. `RequestTab` (`main_window.py`)
-   - Concrete content created by `add_new_tab()`.
+- `MainWindow` (presentation):
+  Owns `QTreeView`, maps UI item selection, opens context menu, triggers refresh.
+- `Context Menu Controller` (presentation helper inside `MainWindow`):
+  Creates actions by item type and routes action handlers.
+- `Confirmation Dialog Service` (`QMessageBox` usage):
+  Enforces explicit user confirmation before destructive operation.
+- `RequestManager` (application/business layer):
+  Provides delete operations for collection items and keeps request index consistent.
+- `StorageManager` (infrastructure layer):
+  Persists updated collection state to JSON storage.
+- `Collection/RequestData` models (domain data):
+  Business entities affected by delete operations.
 
-### Dependencies
+### Dependencies Between Modules
 
-1. `MainWindow` depends on Qt widgets (`QTabWidget`, button widget) and Qt shortcuts.
-2. New `+` control depends only on `MainWindow.handle_new_tab` public behavior.
-3. Existing tabs state persistence remains in `MainWindow.save_tabs_state()`.
+- UI depends on `RequestManager` for business actions.
+- `RequestManager` depends on `StorageManager` for persistence.
+- `StorageManager` depends on filesystem JSON storage.
+- UI depends on Qt widgets/dialogs (`QTreeView`, `QMenu`, `QMessageBox`) for interaction.
 
-### Selected Patterns and Justification
+Dependency direction remains one-way:
+`UI -> Application -> Infrastructure`.
 
-1. Single-entry action handler pattern
-   - Keep one source of truth for new-tab behavior: `handle_new_tab()`.
-   - Ensures mouse and keyboard produce identical outcomes.
-2. Signal-slot event pattern (Qt)
-   - Button click and shortcut activation are both event sources routed via slots.
-3. Contained UI extension
-   - Add button as tab-area extension, avoiding tab business-flow refactoring.
+### Selected Architectural Patterns
+
+- Layered architecture:
+  Keep event handling in UI, decision/rules in manager, persistence in storage.
+- Controller-like UI action routing:
+  `MainWindow` action handlers map user intent to business operations.
+- Confirmation gateway for destructive action:
+  Centralize delete confirmation so safety behavior is uniform.
+
+Why this fits Python/PySide6 here:
+- Minimal change to current class layout.
+- Explicit method boundaries match readable, direct Python style.
+- Avoids duplicating storage logic in UI code.
+
+### Module Interaction Scheme
+
+1. User right-clicks collection tree item.
+2. UI resolves item type and opens context menu.
+3. User selects `Delete`.
+4. UI asks for confirmation.
+5. If confirmed, UI calls `RequestManager.delete_*`.
+6. `RequestManager` mutates in-memory entities and persists via `StorageManager`.
+7. UI reloads tree model and restores expanded/selection state where possible.
 
 ### Main Interfaces / APIs
 
-1. `MainWindow.handle_new_tab()`
-   - Input: none (UI event).
-   - Output: calls `add_new_tab()` once.
-2. `MainWindow.add_new_tab(request_data: RequestData = None, save_state: bool = True)`
-   - Input: optional request seed.
-   - Output: creates a new tab and optionally persists open tabs state.
-3. `QShortcut("Ctrl+N").activated -> MainWindow.handle_new_tab`
-4. `PlusButton.clicked -> MainWindow.handle_new_tab`
+Presentation (`MainWindow`):
+- `show_collection_item_context_menu(pos) -> None`
+- `build_collection_item_actions(item_data) -> list[ActionSpec]`
+- `confirm_delete(item_label: str) -> bool`
+- `handle_delete_collection_item(item_data) -> None`
 
-### Interaction Scheme
+Application (`RequestManager`):
+- `delete_request(request_id: str) -> bool`
+- `delete_collection(collection_id: str) -> bool`
+- `delete_collection_item(item_id: str, item_type: str) -> bool`
 
-1. User clicks `+` in tab area (right of last tab).
-2. UI emits click signal to `MainWindow.handle_new_tab()`.
-3. Handler calls `add_new_tab()` (same as `Ctrl+N` path).
-4. New `RequestTab` is added, selected, and state is saved.
+Infrastructure (`StorageManager`):
+- `save_collection(collection: Collection) -> None`
+- Optional extension if needed by implementation:
+  `delete_collection(collection_name: str) -> None`
+
+Contract expectations:
+- Return `True` on successful deletion, `False` when target does not exist.
+- Raise only unexpected runtime errors (IO, serialization), handled in UI with error message.
 
 ## Q&A
 
-- Q: Why not implement a second new-tab code path for the `+` button?
-  - A: Reusing `handle_new_tab()` guarantees behavior parity with `Ctrl+N`.
-- Q: Why prefer a tab-area corner widget over per-tab button injection?
-  - A: Requirement is one global button right of tab list, not per-tab controls.
-- Q: Does this architecture change request/save/send flows?
-  - A: No. Changes are isolated to tab creation entry point UI.
+- Q: Why place delete business logic in `RequestManager` instead of `MainWindow`?
+  A: To keep UI thin and avoid persistence/business rule duplication.
+- Q: Why include confirmation at UI boundary?
+  A: Confirmation is user-interaction policy and must occur before state mutation.
+- Q: Will this support all collection item types in scope?
+  A: Yes, action mapping is item-type based and designed to cover all scoped types.

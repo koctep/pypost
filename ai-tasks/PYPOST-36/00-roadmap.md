@@ -3,17 +3,21 @@
 ## Task Metadata
 
 - Programming language: Python
-- Recommended branch: fix/PYPOST-36-ci-makefile-reliability
+- Recommended branch: feature/PYPOST-36-context-menu-rename
 
 ## Step Status
 
 - [x] **STEP 1: Requirements Gathering and Documentation**
 - [x] **STEP 2: High-Level Architecture Design**
 - [x] **STEP 3: Development**
-  - [x] Iteration 1: Updated Makefile to use `.venv`, enforce single-environment execution
-    for `run/test/lint`, and align targets to deterministic dependency/bootstrap flow.
-  - [x] Iteration 2: Refactored `venv` target to depend on `$(VENV_MARKER)` and moved
-    environment initialization to marker target for clearer Make dependency behavior.
+  - [x] Added `RequestManager` rename APIs for request/collection/item and
+    non-empty-name validation, including storage file rewrite for collection rename.
+  - [x] Added unit tests for request rename, collection rename, and empty-name rejection.
+  - [x] Added `Rename` action to collection tree context menu with inline rename flow for
+    collection/request items and non-empty validation in UI.
+  - [x] Fixed rename editor lifecycle in tree view to avoid crashes on collection rename selection.
+  - [x] Refactored rename commit handling to process rename only on editor close and avoid model
+    mutation during in-progress edit events.
 - [x] **STEP 4: Code Cleanup**
 - [x] **STEP 5: Observability**
 - [x] **STEP 6: Review and Technical Debt**

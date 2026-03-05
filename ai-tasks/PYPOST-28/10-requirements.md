@@ -1,24 +1,19 @@
-# Requirements: PYPOST-28 - MCP Testing Collection
+# Requirements: PYPOST-28 - Fix Crash on Request Retry
 
 ## Goals
-Create a set of test data (collection and environment) to verify the functionality of the MCP server. This will allow developers and users to quickly check if the integration with AI agents works.
+Fix a critical bug where the application crashes when attempting to resend a request (e.g., by pressing Enter in the URL bar or F5) if the request was initiated not by clicking the "Send" button.
 
 ## User Stories
-- As a developer, I want to have a ready-made collection of requests that I can use to test the MCP server.
-- As a developer, I want to have a pre-configured environment with variables for test requests.
+- As a user, I want to be able to resend a request using hotkeys (Ctrl+Enter, F5) without the application crashing.
 
 ## Acceptance Criteria
-- [ ] **Collection**: Created `MCP_Test.json` collection containing:
-    - GET request (e.g., `httpbin.org/get`).
-    - POST request with JSON body (e.g., `httpbin.org/post`).
-    - Request using variables.
-    - Request with post-request script.
-- [ ] **Environment**: Created `Test Env` environment containing variables used in the collection.
-- [ ] **Configuration**: Requests in the collection have `expose_as_mcp=True`.
+- [ ] The application does not crash when sending a request via hotkeys.
+- [ ] The request is sent correctly from the active tab.
 
 ## Task Description
-Create JSON files for the collection and environment manually or via PyPost interface and commit them to the repository.
+Investigate `handle_send_request` in `MainWindow`.
+The problem is likely that `self.sender()` returns `None` or an object that is not a button when called via a hotkey, causing `sender_tab` to not be found.
 
 ### Technical Details
-- **Path**: `collections/MCP_Test.json`, `environments.json`.
-- **Content**: Valid JSON matching PyPost models.
+- **Component**: `MainWindow`.
+- **Method**: `handle_send_request`.

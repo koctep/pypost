@@ -1,132 +1,85 @@
-# PYPOST-21: Unify Jinja2 Environment Usage (TemplateService)
+# PYPOST-21: Fix TypeError in SSE connection handling
 
 ## Research
 
-- **Jinja2 Environment:** The `jinja2.Environment` class is thread-safe (usually) if templates are
-  not modified dynamically. It is the central place for configuration, filters, tests and global
-  variables.
-- **Current implementation:**
-  - `TemplateEngine.render` (in `pypost/core/template_engine.py`) creates `Template(content)` on
-    each call. This is inefficient as it does not reuse Environment.
-  - `MCPServerImpl` (in `pypost/core/mcp_server_impl.py`) creates `self.env = Environment()`.
-  - `HTTPClient` uses `TemplateEngine.render`.
-  - `RequestService` indirectly uses `HTTPClient`.
+1.  **Starlette Routing and ASGI**: Starlette determines if an endpoint is an ASGI application using
+    `starlette._utils.is_asgi`. If `is_asgi` returns `False`, Starlette wraps the endpoint in
+    `request_response`, which expects a `Response` return value.
+2.  **`is_asgi` issue**: For class instances `is_asgi` may return `False` if the `__call__`
+    signature does not look exactly like ASGI (`scope`, `receive`, `send`).
+3.  **Mount vs Route**: `Route` is for HTTP endpoints and has wrapping logic. `Mount` is for
+    mounting ASGI sub-applications. Using `Mount` for a single endpoint (e.g. `/sse`) is a valid
+    pattern if we want to work in pure ASGI mode.
 
 ## Implementation Plan
 
-1.  **Create `TemplateService`**:
-    - Create file `pypost/core/template_service.py`.
-    - Implement `TemplateService` class as Singleton (or use global module instance) to guarantee
-      single `Environment` usage.
-    - Initialize `jinja2.Environment` in constructor.
-    - Add methods `render_string(template_str: str, context: dict) -> str` and
-      `parse(template_str: str) -> AST`.
+1.  **Change route registration**:
+    Use `Mount("/sse", app=SSEEndpoint(...))` instead of `Route("/sse", endpoint=SSEEndpoint(...))`.
+    Same for `/messages`.
 
-2.  **Refactor `TemplateEngine`**:
-    - Deprecate `TemplateEngine` or redirect its methods to `TemplateService` to minimize caller
-      changes initially, but better to replace calls directly.
-    - Requirements say "remove or rewrite". Better to rewrite `TemplateEngine` as a facade for
-      `TemplateService` for backward compatibility if needed, or fully replace usage. Given
-      project size, better to replace usage directly.
+2.  **Implementation details**:
+    In `pypost/core/mcp_server_impl.py`:
+    - Import `Mount` from `starlette.routing`.
+    - Replace `Route` with `Mount` for `/sse` and `/messages`.
 
-3.  **Integrate in `MCPServerImpl`**:
-    - Remove `self.env = Environment()`.
-    - Use `TemplateService.get_instance().parse(...)` (or injected instance).
-
-4.  **Integrate in `HTTPClient`**:
-    - Replace `TemplateEngine.render` calls with `TemplateService.get_instance().render_string`.
+3.  **Explanation**: `Mount` expects an ASGI application. A class instance with method
+    `__call__(self, scope, receive, send)` is a valid ASGI application. `Mount` does not try to
+    wrap it in request/response cycle, which should fix the expected `Response` return value issue
+    (and subsequent `await None` error).
 
 ## Architecture
 
-### Components
+### Changes in `pypost/core/mcp_server_impl.py`
 
-```mermaid
-classDiagram
-    class TemplateService {
-        -Environment _env
-        +_instance: TemplateService
-        +get_instance() TemplateService
-        +render_string(template_str: str, context: dict) str
-        +parse(template_str: str) AST
-    }
-
-    class HTTPClient {
-        +send_request(request_data, variables)
-    }
-
-    class MCPServerImpl {
-        -TemplateService template_service
-        +list_tools()
-        -_extract_mcp_variables()
-    }
-
-    HTTPClient ..> TemplateService : uses
-    MCPServerImpl ..> TemplateService : uses
-```
-
-### Implementation Details
-
-- **Singleton Pattern:** For `TemplateService` the Singleton pattern will be used via class method
-  `get_instance()` or simply a module with global `_instance` variable initialized on first use. In
-  Python modules are singletons anyway, so a simple class instantiated once in the module, or a
-  class with `@lru_cache` on the factory, will work. Simplest option:
-
+Before:
 ```python
-# pypost/core/template_service.py
-from jinja2 import Environment
-
-class TemplateService:
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(TemplateService, cls).__new__(cls)
-            cls._instance.env = Environment()
-        return cls._instance
-
-    def render_string(self, content: str, variables: dict) -> str:
-        if not content:
-            return ""
-        try:
-            template = self.env.from_string(content)
-            return template.render(**variables)
-        except Exception as e:
-            print(f"Template rendering error: {e}")
-            return content
-
-    def parse(self, content: str):
-        return self.env.parse(content)
+routes=[
+    Route("/sse", endpoint=SSEEndpoint(self.server, sse)),
+    Route("/messages", endpoint=MessagesEndpoint(sse), methods=["POST"]),
+],
 ```
 
-Or even simpler — create an instance in the module:
-
+After:
 ```python
-# pypost/core/template_service.py
-from jinja2 import Environment
-
-class TemplateService:
-    def __init__(self):
-        self.env = Environment()
-
-    def render_string(self, content: str, variables: dict) -> str:
-        # ... implementation
-        pass
-    
-    def parse(self, content: str):
-        return self.env.parse(content)
-
-# Global instance
-template_service = TemplateService()
+routes=[
+    Mount("/sse", app=SSEEndpoint(self.server, sse)),
+    Mount("/messages", app=MessagesEndpoint(sse)),
+],
 ```
+*Note*: `Mount` does not accept a `methods` parameter. For `/messages` we need to ensure only POST
+requests are handled. This can be done inside `MessagesEndpoint` or keep `Route` but rewrite the
+endpoint to return `Response` (harder, since `mcp` works with ASGI), or use `WebSocketRoute` (not
+suitable, this is not websocket).
+However, `SseServerTransport.handle_post_message` likely expects POST.
+If using `Mount` for `/messages`, it will intercept all methods. Better to check the method inside
+`MessagesEndpoint`.
 
-We choose the variant with global `template_service` instance in module
-`pypost/core/template_service.py`, as it is the pythonic way.
+Alternative for `/messages`: Keep `Route` but wrap `handle_post_message` to return `Response`. But
+`handle_post_message` writes directly to `send`.
+If `mcp` writes to `send`, it must be an ASGI application.
+
+**Refined plan**:
+1. Use `Mount` for `/sse`. This fixes the long-lived connection and `None` return issue.
+2. For `/messages`:
+   - Either `Mount("/messages", ...)` and check `scope['method'] == 'POST'`.
+   - Or figure out why `Route` does not see ASGI.
+
+Starlette `is_asgi` check is fairly simple. It inspects the signature.
+```python
+def is_asgi(app: typing.Any) -> bool:
+    if inspect.isclass(app):
+        return False
+    if hasattr(app, "__call__"):
+        app = app.__call__
+    ...
+```
+Most likely the issue was that `SSEEndpoint` was a class *instance* inside a method.
+
+**The Mount solution seems most reliable for integrating low-level ASGI applications (such as
+wrappers over `mcp`).**
 
 ## Q&A
 
-- **Why Singleton?**
-  - To guarantee a single configuration point for Jinja2 Environment (e.g. if we want to add
-    global filters or change syntax settings).
-- **How will this affect tests?**
-  - Tests can mock `template_service` or use the real one. Since `Environment` has no external
-    side effects (except CPU/RAM usage), using a real instance in tests is acceptable.
+- **Q:** Will `Mount` work correctly for the exact path `/sse`?
+  - **A:** Yes, `Mount("/sse", ...)` matches requests starting with `/sse`. This includes `/sse`
+    (with empty path remainder).

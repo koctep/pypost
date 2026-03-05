@@ -5,10 +5,15 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Updated `HTTPClient` to support `stream=True`.
-  - [x] Implemented chunk reading loop in `HTTPClient`.
-  - [x] Verified correct handling of chunked responses.
-- [x] **STEP 4: Review and Technical Debt**
+  - [x] Create StateManager
+  - [x] Create RequestManager
+  - [x] Create VariableHoverMixin
+  - [x] Refactor widgets to use Mixin
+  - [x] Integrate managers into MainWindow
+- [x] **STEP 4: Review and technical debt**
+
+## Programming Language
+Python
 
 ## Status Legend
 

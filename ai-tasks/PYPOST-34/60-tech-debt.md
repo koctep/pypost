@@ -2,33 +2,31 @@
 
 ## Shortcuts Taken
 
-- No architectural shortcuts were introduced in the save action relocation itself.
-- Validation was limited to syntax checks and manual behavior assumptions due to absent
-  runnable test suite in current environment (`unittest` discovers zero tests; `pytest`
-  is unavailable here).
+- Reused existing `SaveRequestDialog` for the save-as flow to minimize UI surface changes.
 
 ## Code Quality Issues
 
-- Observability logging in `RequestWidget.on_save` uses key/value text structure instead of a
-  dedicated structured logging formatter shared across the project.
-- `RequestWidget` continues to contain both UI composition and interaction handling. Future refactor
-  could separate action wiring from widget layout for easier testing.
+- Repository-wide flake8 baseline remains noisy across many files unrelated to this task,
+  reducing value of global lint as a strict quality gate.
+- `MainWindow` continues to aggregate multiple UI orchestration responsibilities; save and save-as
+  flows are still controller-heavy in one class.
 
 ## Missing Tests
 
-- No automated GUI tests for the new `Actions -> Save` path.
-- No automated test asserting `Ctrl+S` and menu save both trigger identical save workflow.
-- No automated metric assertion for `gui_save_actions_total{source=...}` labels.
+- No automated tests currently verify the `Save As...` behavior:
+  - new entity ID creation
+  - source request immutability after save-as
+  - correct tab rebinding to the newly created request
+- Test suite currently has zero collected tests in this repository context.
 
 ## Performance Concerns
 
-- No material performance risk identified for this change.
-- Added metric counter increment and single `INFO` log per save action are negligible overhead.
+- `Save As...` triggers full collections reload and tree restore; acceptable for current scale but
+  may become noticeable with large collection sets.
 
 ## Follow-up Tasks
 
-- Add UI interaction tests (Qt-level) for:
-  - `Actions` menu visibility and `Save` action availability.
-  - Save trigger parity between menu action and `Ctrl+S`.
-- Add integration test for metrics endpoint verifying `gui_save_actions_total` increments by source.
-- Standardize logging format for UI modules to a shared structured logger configuration.
+- Add GUI-level tests for save and save-as behavior (happy path and cancel path).
+- Add regression test ensuring save-as never overwrites original request ID.
+- Consider extracting save orchestration from `MainWindow` into a dedicated service/controller.
+- Plan a separate repository-wide lint debt reduction task to restore useful global lint gates.

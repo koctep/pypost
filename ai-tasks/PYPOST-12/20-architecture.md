@@ -1,48 +1,58 @@
-# Architecture: PYPOST-12 - Saving Tree View State
+# Architecture: PYPOST-12 - Auto-indentation and JSON Auto-formatting
 
 ## Research
-In `PySide6`, `QTreeView` has methods `expand(index)`, `collapse(index)`, and `isExpanded(index)`.
-The data model (`QStandardItemModel`) stores data. Top-level items (collections) have `Qt.UserRole` with the collection ID (UUID).
 
-To track expansion/collapse state changes, signals `expanded(QModelIndex)` and `collapsed(QModelIndex)` of `QTreeView` itself can be used.
+### PySide6 QPlainTextEdit Event Overriding
 
-Settings storage is already implemented via `AppSettings` and `ConfigManager`. We need to add a new field to `AppSettings`.
+To implement auto-indentation and paste handling, it is necessary to override event methods in a class inheriting `QPlainTextEdit`:
+
+*   Intercept `Qt.Key_Return` (or `Qt.Key_Enter`) press.
+*   Analyze text before cursor to determine indentation.
+*   Implement logic for increasing/preserving indentation.
+*   Intercept `}` or `]` press to decrease indentation (might require `textChanged` processing or input filtering, but `keyPressEvent` is simpler for start).
+
+*   This is the standard method for handling Paste in Qt widgets.
+*   Text can be obtained from `source.text()`.
+*   Try to parse as JSON.
+*   If valid JSON -> format (`json.dumps(data, indent=4)`) and insert.
+*   If not -> call `super().insertFromMimeData(source)` (standard paste).
+
+### Architectural Patterns
+
+*   **Inheritance**: Creating a specialized widget `CodeEditor` (or `JsonEditor`) inheriting `QPlainTextEdit`.
+*   **Composition**: `RequestWidget` will use `CodeEditor` instead of `QPlainTextEdit`.
+*   **Separation of Concerns**: Formatting and input handling logic is encapsulated in `CodeEditor`, not cluttering `RequestWidget`.
 
 ## Implementation Plan
-1.  **Data Model**:
-    *   Update `pypost/models/settings.py`: add field `expanded_collections: List[str] = []` to `AppSettings` class.
 
-2.  **UI Logic (`MainWindow`)**:
-    *   In `__init__` or `load_collections`:
-    *   After loading data, iterate through model items.
-    *   If collection ID is in `settings.expanded_collections`, call `self.collections_view.expand(index)`.
-    *   Connect `QTreeView.expanded` and `QTreeView.collapsed` signals to new slots.
-    *   In signal handling slots:
-    *   Get collection ID from index.
-    *   Update `expanded_collections` list in `self.settings`.
-    *   Save settings via `self.config_manager.save_config(self.settings)`.
+1.  Create `CodeEditor` class in `pypost/ui/widgets/code_editor.py`.
+2.  Implement `keyPressEvent` method to handle `Enter` (indentation calculation).
+3.  Implement `insertFromMimeData` method to intercept paste and auto-format.
+4.  Replace `QPlainTextEdit` with `CodeEditor` in `pypost/ui/widgets/request_editor.py`.
+5.  Test manual entry and paste.
 
 ## Architecture
 
-### 1. Models (`pypost/models/settings.py`)
-Change settings schema to store list of expanded collection IDs.
+### Class Diagram
+[Diagram]
 
-### 2. UI (`pypost/ui/main_window.py`)
-Add logic for handling tree signals and restoring state.
+### Modules
 
-*   **New Methods**:
-    *   `on_tree_expanded(index: QModelIndex)`: Adds ID to settings.
-    *   `on_tree_collapsed(index: QModelIndex)`: Removes ID from settings.
-    *   `restore_tree_state()`: Applies settings to tree after loading.
+*   **Class `CodeEditor`**:
+    *   Inherits from `QPlainTextEdit`.
+    *   **Responsibility**: Provide a convenient interface for editing code (JSON) with support for auto-indentation and formatting.
+    *   **Methods**:
+        *   `keyPressEvent`: "Smart" Enter logic.
+        *   `insertFromMimeData`: "Smart" paste logic.
 
-*   **Changes in `load_collections`**:
-    *   Call `restore_tree_state()` after populating the model.
-
-### 3. Interaction
-[Diagram describing interaction]
+*   **Class `RequestWidget`**:
+    *   Existing class.
+    *   **Change**: Replace `self.body_edit = QPlainTextEdit()` with `self.body_edit = CodeEditor()`.
+    *   Connection of `JsonHighlighter` to the new editor remains unchanged (it works with `QTextDocument`, which both have).
 
 ## Q&A
-*   **Q: What if a collection ID is in settings, but the collection itself no longer exists?**
-    *   A: `restore_tree_state` will simply ignore IDs not present in the model. On next save (if user collapses/expands something), the list will be overwritten with actual data (or cleanup can be done on load, but "lazy" update on save is simpler).
-*   **Q: When to save settings?**
-    *   A: Can save immediately on every click (simple and reliable for desktop app with local config).
+
+*   **How to handle `Tab`?**
+    *   By default, `QPlainTextEdit` inserts a tab character. We can override to insert 4 spaces, but requirements don't explicitly state this. Leave standard behavior or 4 spaces (Python/JSON standard). *Decision: use 4 spaces for consistency.*
+*   **Is a separate file needed for CodeEditor?**
+    *   Yes, better to move to a separate file `code_editor.py` for reuse and code cleanliness.

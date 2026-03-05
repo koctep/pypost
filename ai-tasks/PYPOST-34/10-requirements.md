@@ -1,82 +1,81 @@
-# PYPOST-34: Consolidate Save Action into Actions Menu Near Send
+# PYPOST-34: Add "Save As..." Action for Request Duplication
 
 ## Goals
 
-Improve the main screen user interface by reducing button clutter near the request execution
-area and preparing the UI for action list growth in one consistent place.
-
-## Programming Language
-
-Python
+Allow users to take an existing request, adjust it, and save it as a new request entity.
+This protects the original request while supporting reuse and faster workflow iteration.
 
 ## User Stories
 
-- As a user of the main screen, I want to access `Save` from an actions menu next to `Send` so the
-  action area is more compact and consistent.
-- As a user of the main screen, I want the `Save` action behavior to remain unchanged so my current
-  workflow is preserved.
-- As a keyboard user, I want `Save` to remain reachable through keyboard navigation and shortcuts so
-  accessibility and speed are not degraded.
+- As a user, I want to open an existing request, modify it, and save it as a new request,
+  so I can create variants without changing the original.
+- As a user, I want to access `Save As...` from the `Actions` menu before `Save`, so the action
+  appears in the expected save-related location.
 
 ## Definition of Done
 
-1. On the main screen, there is no standalone `Save` button to the left of `Send`.
-2. On the main screen, an actions control is placed to the right of `Send`.
-3. The actions control opens a list that currently contains one action: `Save`.
-4. Triggering `Save` from the actions list performs the same user-visible flow and result as the
-   previous standalone `Save` button.
-5. Keyboard accessibility and existing `Save` shortcuts/navigation behavior are preserved.
+- `Save As...` is available in the `Actions` menu before `Save`.
+- `Save As...` is available via shortcut `Ctrl+Shift+S`.
+- User can trigger `Save As...` for a request and provide data for a new save.
+- The operation always creates a new request entity.
+- The original request remains unchanged after `Save As...` completes.
+- User can continue working with the newly created request after save.
 
 ## Task Description
 
 ### Problem Statement
 
-The current main screen action area contains a standalone `Save` button near `Send`. The interface
-should be simplified and aligned with a menu-based action model.
+Users need to create modified versions of existing requests. Current workflow does not provide a
+clear action to save a modified copy as a new entity.
 
-### Scope
+### Programming Language
 
-- In scope:
-  - Main screen request action area.
-  - Relocation of `Save` from standalone button to actions menu near `Send`.
-  - Preservation of existing `Save` user behavior.
-  - Preservation of keyboard accessibility and shortcuts for `Save`.
-- Out of scope:
-  - Other screens and contexts outside the main screen.
-  - Changes to business logic of saving.
-  - Adding new actions beyond `Save` in this task.
+Python
+
+### Functional Requirements
+
+- The system must provide a `Save As...` action in the `Actions` menu before `Save`.
+- The system must support `Ctrl+Shift+S` as a shortcut to trigger `Save As...`.
+- The system must show a dialog to perform saving as a new item when `Save As...` is selected.
+- The system must create a new request entity during `Save As...`.
+- The system must not overwrite or mutate the source request during `Save As...`.
+- The system should keep user flow clear after save by making the new entity available for
+  continued work.
+
+### Non-Functional Requirements
+
+- Usability: action location and naming must be clear to users.
+- Data safety: original request data must remain intact.
+- Consistency: behavior of save as new must be predictable every time.
 
 ### Constraints and Assumptions
 
-- Constraint: Only main screen UI is affected.
-- Constraint: No behavior change for save operation.
-- Assumption: Existing users rely on current save flow and keyboard usage; this must remain intact.
+- Scope is limited to adding and defining behavior of `Save As...` in request workflow.
+- Existing `Send` action remains unchanged.
+- Existing regular save behavior (if any) is out of scope unless required for consistency.
 
-### Main Business Entities and Interactions
+### System Boundaries (Scope)
 
-- User: initiates request-related actions on the main screen.
-- Main Screen Action Area: exposes request actions to the user.
-- Action Menu: grouped entry point for available actions near `Send`.
-- Save Action: persists current request state using the existing business flow.
+- In scope: user-facing action placement, invocation flow, and business behavior for saving a
+  modified request as a new entity.
+- Out of scope: unrelated request execution behavior, networking behavior, and non-request UI
+  areas.
 
-Interaction flow:
-1. User opens actions menu near `Send`.
-2. User selects `Save`.
-3. System executes the same save outcome as before.
+### Main Entities and Interactions
 
-## Non-Functional Requirements
+- User: initiates `Save As...` while working with a request.
+- Request: source business object being modified.
+- New Request Entity: newly created business object produced by `Save As...`.
+- Actions Menu: UI access point for user-triggered request actions.
 
-- Usability: action controls are clear and discoverable on the main screen.
-- Consistency: action placement is consistent with a menu-based model.
-- Accessibility: keyboard navigation and shortcut behavior for `Save` remain available.
+Interaction summary: user edits a request, uses `Actions -> Save As...`, and obtains a separate
+new request while the original remains unchanged.
 
 ## Q&A
 
-- Q: Why is this change needed?
-  - A: To improve the user interface by reducing clutter and moving to an expandable actions list.
-- Q: Where should the change be applied?
-  - A: Only on the main screen.
-- Q: Should `Save` behavior change?
-  - A: No. It must remain the same.
-- Q: Should keyboard support be preserved?
-  - A: Yes.
+- Q: Why is `Save As...` needed?
+  A: User wants to modify a request and save it as a new one.
+- Q: Where should the action be placed?
+  A: In the `Actions` menu before `Save`.
+- Q: What should happen to unsaved changes/source request during `Save As...`?
+  A: Changes must be saved only to the new entity; source request must not be overwritten.

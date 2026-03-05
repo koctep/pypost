@@ -1,40 +1,19 @@
 # PYPOST-16: Technical Debt Analysis
 
-## Status: FIXED
-Addressed in PYPOST-32 by implementing `VariableHoverMixin`.
-
 ## Shortcuts Taken
 
-- **Variable Parsing Logic**: A simple regex `\{\{([a-zA-Z0-9_]+)\}\}` is used to find
-  variables. This works for most cases but might give false positives inside string literals if they
-  accidentally contain such a pattern, or not support complex expressions (if planned in future).
-- **Hardcoded Colors/Styles**: Tooltip styling is standard for now. Customization via QSS might be
-  needed in future.
-- **Single Level Resolution**: Variable resolution happens only one level deep. If a variable refers
-  to another variable (`VAR_A = {{VAR_B}}`), this is not handled recursively for tooltip (although
-  `TemplateEngine` might support it).
-
-## Code Quality Issues
-
-- **[FIXED] Duplication of Logic**: Variable search logic (`find_variable_at_index`) was moved to a helper
-  but duplicated in `mouseMoveEvent`. Now `VariableHoverMixin` is used in `pypost/ui/widgets/mixins.py`.
-- **Direct Variable Injection**: The `set_variables` method injects dictionary directly. Perhaps using
-  `Property` or signal-slot mechanism for more reactive update would be better, but sufficient for
-  current goals.
+- **No Arguments Support**: Tools exposed via MCP do not accept arguments. They execute the request exactly as configured in PyPost (with current environment variables). This limits flexibility (agent cannot pass ID dynamically).
+    - *Future*: Parse `{{variable}}` in request and generate JSON Schema for tool arguments.
+- **Restart on Update**: When the list of tools (requests) changes, the server might need a restart or explicit update notification to clients (if supported by MCP). Currently, we might rely on the agent polling `list_tools`.
+- **Single Environment**: The server uses the currently active environment in PyPost. If the user switches environment in UI, the server starts using new variables. This might be unexpected for the agent if it relies on state.
+- **Thread Safety**: We are running `asyncio` server in a thread and calling PyPost core logic (which might be synchronous or use Qt). Need to ensure `HTTPClient` is thread-safe or instantiated per request.
 
 ## Missing Tests
 
-- **Unit Tests**: Unit tests for `VariableHoverHelper` and widgets are missing. Need to add tests to verify correctness of variable detection in string and text.
-- **UI Tests**: No automatic UI tests checking tooltip appearance on mouse hover.
-
-## Performance Concerns
-
-- **MouseMoveEvent**: `mouseMoveEvent` processing happens frequently. Current implementation (regex search) is fast enough for small strings (URL) and visible text area, but with very large text volumes in Body and many variables, ensure `find_variable_at_index` is not called too often or doesn't scan entire text every time (currently scans entire widget text `QLineEdit` and `toPlainText` for `QPlainTextEdit`).
-- *Mitigation*: For `QPlainTextEdit`, optimize search by scanning only current line or visible block, not entire `toPlainText()`. Currently entire text is taken for simplicity, which might be slow for large JSONs.
+- No automated tests for MCP server interaction. Testing is manual via MCP Inspector or Cursor.
 
 ## Follow-up Tasks
 
-- [ ] Write unit tests for `VariableHoverHelper`.
-- [ ] Optimize `VariableAwarePlainTextEdit` for large documents (scan only line under cursor).
-- [ ] Add support for recursive variable resolution in tooltips.
-- [ ] Implement variable highlighting in `JsonHighlighter` (PYPOST-XX).
+- Implement argument parsing for tools.
+- Add logging/inspection of MCP calls in UI.
+- Add tests using an MCP client mock.

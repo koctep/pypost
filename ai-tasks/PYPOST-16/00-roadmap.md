@@ -5,10 +5,11 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Created `pypost/ui/widgets/variable_aware_widgets.py` module with basic widget implementation.
-  - [x] Updated `pypost/ui/widgets/request_editor.py` to use `VariableAwareLineEdit` and `CodeEditor`.
-  - [x] Updated `pypost/ui/widgets/code_editor.py` to inherit from `VariableAwarePlainTextEdit`.
-  - [x] Updated `pypost/ui/main_window.py` to pass environment variables to `RequestWidget` on environment change and tab creation.
+  - [x] Implemented `MCPServerManager` and `MCPServerImpl` with SSE transport
+  - [x] Updated `RequestData` and `Environment` models for MCP settings
+  - [x] Added UI controls for enabling MCP and exposing tools
+  - [x] Integrated server lifecycle into `MainWindow`
+  - [x] Added user and developer documentation
 - [x] **STEP 4: Review and Technical Debt**
 
 ## Status Legend

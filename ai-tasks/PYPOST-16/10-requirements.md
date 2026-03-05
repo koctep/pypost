@@ -1,36 +1,42 @@
-# Requirements: PYPOST-16 - Variable Tooltips
+# Requirements: PYPOST-16 - Model Context Protocol (MCP) Integration
 
 ## Goals
-Improve the experience of using environment variables by allowing the user to quickly view variable values without switching to the environment manager. Hovering over a variable placeholder (e.g., `{{baseUrl}}`) should display a tooltip with its current value.
+Integrate support for Model Context Protocol (MCP) into PyPost. This will allow PyPost to act as an MCP server, exposing saved requests as tools for AI agents (e.g., Claude, Cursor). This enables agents to execute HTTP requests configured in PyPost directly from their context.
 
 ## User Stories
-- As a user, I want to see the value of the `{{baseUrl}}` variable when hovering over it in the address bar to ensure I am sending the request to the correct address.
-- As a user, I want to see variable values in the request body (JSON body) to verify correct data substitution.
-- As a user, I want tooltips to work for request headers and parameters.
-- As a user, I want to see "Variable not found" or a similar message if the variable is not defined in the current environment.
+- As a user, I want to be able to enable the MCP server in PyPost settings so that my AI agent can connect to it.
+- As a user, I want to mark specific requests as "Expose as Tool" so that only selected requests are available to the agent.
+- As a user, I want the agent to be able to call my requests, passing parameters (if any), and receive the response.
+- As a user, I want to see the status of the MCP server (running/stopped) in the interface.
 
 ## Acceptance Criteria
-- [ ] **URL Input**: Hovering over `{{variable}}` in the URL bar displays a tooltip with the value.
-- [ ] **Request Body**: Hovering over `{{variable}}` in the request body editor displays a tooltip with the value.
-- [ ] **Headers/Params**: (Optional/Nice-to-have) Tooltips in header and parameter tables.
-- [ ] **Dynamic Update**: When changing the environment, tooltips should show values from the new environment.
-- [ ] **Missing Variable Handling**: If a variable is not found, an appropriate message is displayed (e.g., `<not defined>`).
+- [ ] **MCP Server**:
+    - Implemented MCP server supporting SSE (Server-Sent Events) transport.
+    - Server runs on a configurable port (default 8000).
+- [ ] **Data Model**:
+    - `RequestData` has an `expose_as_mcp` (bool) field.
+    - `Environment` has `enable_mcp` (bool) field.
+- [ ] **UI**:
+    - Checkbox "Expose as MCP Tool" in request editor.
+    - Checkbox "Enable MCP Server" in environment settings (or global settings).
+    - Server status indicator in the main window.
+- [ ] **Functionality**:
+    - When the server is enabled, it exposes a list of tools corresponding to requests with `expose_as_mcp=True`.
+    - Tool name corresponds to request name (sanitized).
+    - Tool execution performs the HTTP request using PyPost logic (including variable substitution).
+    - Execution result is returned to the agent.
 
 ## Task Description
-Implement a mechanism to detect `{{name}}` variable tokens under the mouse cursor in various editing widgets.
+Implement an MCP server inside PyPost using the `mcp` SDK (python).
 
 ### Technical Details
-- **Language**: Python (PySide6).
-- **Components**:
-    - `RequestWidget`: must receive current environment variables from `MainWindow`.
-    - `QLineEdit` (URL): Requires custom `mouseMoveEvent` handling and `fontMetrics` to determine text under cursor.
-    - `QPlainTextEdit` (Body): Use `cursorForPosition` and `document().find()` or text analysis around cursor.
-- **Integration**:
-    - `MainWindow` must pass the variable dictionary to `RequestWidget` when the environment changes.
-    - `RequestWidget` must propagate these variables to its child components (URL bar, Body editor).
+- **Protocol**: MCP (Model Context Protocol).
+- **Transport**: SSE (easiest for local integration).
+- **SDK**: `mcp` (Python).
+- **Integration**: The server must run in a separate thread/process or use `asyncio` loop, integrated with the Qt event loop (e.g., via `qasync` or running in a separate thread).
 
 ## Q&A
-- **Should syntax highlighting be shown for variables?**
-    - This is useful, but the focus of this task is on tooltips. If it's easy to add (e.g., in Body via Highlighter) — good.
-- **How to handle nested variables?**
-    - Show only the first-level value (as `TemplateEngine.render` does for a single pass).
+- **How to handle parameters?**
+    - For the first version, tools will not accept arguments (execute "as is" with current environment variables). In the future, we can add parameter parsing from `{{variable}}`.
+- **Security?**
+    - The server runs on localhost. Access is open to local processes. This is standard for local MCP servers.

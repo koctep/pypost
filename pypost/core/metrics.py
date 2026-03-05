@@ -71,6 +71,12 @@ class MetricsManager:
             ['item_type', 'status'],
             registry=self.registry
         )
+        self.gui_collection_rename_actions = Counter(
+            'gui_collection_rename_actions_total',
+            'Number of rename actions from collection context menu',
+            ['item_type', 'status'],
+            registry=self.registry
+        )
 
         self.requests_sent = Counter(
             'requests_sent_total',
@@ -239,6 +245,9 @@ class MetricsManager:
 
     def track_gui_collection_delete_action(self, item_type: str, status: str):
         self.gui_collection_delete_actions.labels(item_type=item_type, status=status).inc()
+
+    def track_gui_collection_rename_action(self, item_type: str, status: str):
+        self.gui_collection_rename_actions.labels(item_type=item_type, status=status).inc()
 
     def track_request_sent(self, method: str):
         self.requests_sent.labels(method=method).inc()

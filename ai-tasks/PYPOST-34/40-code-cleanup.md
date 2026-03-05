@@ -3,9 +3,10 @@
 ## Linter Fixes
 
 Describe fixed linter errors and warnings:
-- Fixed: split long import from `variable_aware_widgets` into multiline import.
-- Fixed: replaced long inline placeholder string with wrapped `script_hint` variable.
-- Fixed: removed unused imports `Qt` and `VariableAwarePlainTextEdit`.
+- Fixed: removed unused imports (`QLineEdit`, `QTableWidget`) in
+  `pypost/ui/widgets/request_editor.py`.
+- Fixed: reformatted Qt widget import block in `pypost/ui/widgets/request_editor.py` so the
+  file passes local flake8 checks.
 
 ## Code Formatting
 
@@ -32,9 +33,9 @@ Validation results:
 
 ## Notes
 
-- Static analyzer tools are not installed in current environment:
-  - `pyflakes`, `flake8`, `ruff`, `pylint`, `mypy`.
-- Syntax check passed:
-  - `venv/bin/python -m py_compile pypost/ui/widgets/request_editor.py`.
-- Test discovery currently finds no tests:
-  - `venv/bin/python -m unittest discover -q` -> `Ran 0 tests`.
+- `make lint` fails in the current repository due to large pre-existing lint debt outside the
+  scope of this task (many files under `pypost/core/` and `pypost/ui/`).
+- Focused lint check on changed file `pypost/ui/widgets/request_editor.py` passes.
+- `make test` returns non-zero because test collection is empty (`collected 0 items`), so there
+  are no runnable tests to confirm behavior.
+- Syntax validation succeeded for changed modules via `python3 -m compileall -q pypost`.

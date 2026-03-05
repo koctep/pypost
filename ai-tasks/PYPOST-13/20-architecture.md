@@ -1,69 +1,81 @@
-# Architecture: PYPOST-13 - JSON Syntax Highlighting
+# Architecture: PYPOST-13 - Variable Tooltips
 
 ## Research
-To implement syntax highlighting in Qt (PySide6), the `QSyntaxHighlighter` class is used.
-It allows applying formatting to text in `QTextDocument` (used in `QTextEdit` and `QPlainTextEdit`) without changing the text itself.
 
-Key points:
-1. Inherit from `QSyntaxHighlighter`.
-2. Override `highlightBlock(text)` method.
-3. Inside the method, use regular expressions to find patterns (keys, strings, numbers, etc.).
-4. Apply `setFormat(start, length, format)` for found matches.
+To implement tooltips when hovering over `{{variable}}` variables, the following approaches in PySide6/Qt were considered:
 
-There are ready-made examples of JSON highlighter implementation for Qt. Usually, they use several regular expressions with different priorities.
+1.  **Standard Tooltip (`setToolTip`)**:
+    -   Standard `setToolTip` sets static text for the entire widget.
+    -   For dynamic content, `event` or `mouseMoveEvent` needs to be overridden.
 
-Order of rule application matters. For example, first find strings, then numbers, then keywords.
-For JSON, the specifics are:
-- Strings (in double quotes).
-- Keys (strings followed by a colon, possibly separated by spaces).
-- Numbers.
-- Literals (`true`, `false`, `null`).
+2.  **`QLineEdit` (URL Bar)**:
+    -   Using `fontMetrics` and cursor position (`cursorPositionAt`) allows determining the character under the mouse.
+    -   Need to find boundaries of the `{{...}}` token around the character under the cursor.
+    -   To display the tooltip, `QToolTip.showText(global_pos, value, widget)` can be used.
+
+3.  **`QPlainTextEdit` (Body Editor)**:
+    -   Has `cursorForPosition(pos)` method which returns `QTextCursor` for a given pixel position.
+    -   Can get text block and analyze word under cursor.
+    -   Similarly, need to search for `{{...}}` pattern.
+    -   Overriding `mouseMoveEvent` requires enabling `setMouseTracking(True)`.
 
 ## Implementation Plan
-1. Create file `pypost/ui/widgets/json_highlighter.py`.
-2. Implement `JsonHighlighter(QSyntaxHighlighter)` class.
-    - Define colors and styles for different tokens.
-    - Implement `highlightBlock` logic.
-3. Integrate highlighter into `RequestWidget` (`pypost/ui/widgets/request_editor.py`).
-    - Connect to `self.body_edit.document()`.
-4. Integrate highlighter into `ResponseView` (`pypost/ui/widgets/response_view.py`).
-    - Connect to `self.body_view.document()`.
+
+1.  **Extend `RequestWidget` Interface**:
+    -   Add `set_variables(variables: dict)` method.
+    -   Store variables in `self.variables` attribute.
+
+2.  **Update `MainWindow`**:
+    -   On environment change (`on_env_changed`), call `set_variables` for the active (or all) `RequestWidget`.
+
+3.  **Create `VariableHoverMixin`**:
+    -   To avoid code duplication for variable search logic.
+    -   Methods:
+        -   `find_variable_at_index(text, index)`: Returns variable name or None.
+        -   `get_variable_value(name)`: Returns value from stored dictionary.
+
+4.  **Customize `QLineEdit` (UrlInput)**:
+    -   Create `VariableAwareLineEdit(QLineEdit)` class.
+    -   Enable `setMouseTracking(True)`.
+    -   Override `mouseMoveEvent`.
+    -   Logic: get cursor position -> find token -> if token == variable -> show tooltip.
+
+5.  **Customize `QPlainTextEdit` (BodyEditor)**:
+    -   Create `VariableAwarePlainTextEdit(QPlainTextEdit)` class.
+    -   Enable `setMouseTracking(True)`.
+    -   Override `mouseMoveEvent`.
+    -   Use `cursorForPosition` to determine position in text.
 
 ## Architecture
 
-### New Component: `JsonHighlighter`
-Location: `pypost/ui/widgets/json_highlighter.py`
+### New Classes
 
-**Responsibilities:**
-- Storing highlighting rules (Regex + TextCharFormat).
-- Parsing text blocks and applying formatting.
+*   `VariableHoverHelper`: Helper class/mixin containing logic for finding variables in string by index.
+    ```python
+    class VariableHoverHelper:
+        def find_variable_at_index(self, text: str, index: int) -> str | None:
+            # Logic to find {{name}} around index
+            pass
+    ```
 
-**Interface:**
-```python
-class JsonHighlighter(QSyntaxHighlighter):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        # Initialize rules and formats
-    
-    def highlightBlock(self, text):
-        # Apply rules
-```
+*   `VariableAwareLineEdit(QLineEdit, VariableHoverHelper)`
+*   `VariableAwarePlainTextEdit(QPlainTextEdit, VariableHoverHelper)`
 
-### Changes in `RequestWidget`
-In `init_ui` method after creating `self.body_edit`:
-```python
-self.json_highlighter = JsonHighlighter(self.body_edit.document())
-```
+### Changes in Existing Classes
 
-### Changes in `ResponseView`
-In `init_ui` method after creating `self.body_view`:
-```python
-self.json_highlighter = JsonHighlighter(self.body_view.document())
-```
+*   `RequestWidget`:
+    -   Replace `QLineEdit` with `VariableAwareLineEdit`.
+    -   Replace `QPlainTextEdit` (for Body) with `VariableAwarePlainTextEdit`.
+    -   Add `set_variables(variables)` method.
+    -   Pass variables to child widgets during initialization and update.
 
-### Interaction
-The highlighter automatically reacts to changes in the document. For `ResponseView`, which is `ReadOnly`, highlighting will apply once when text is set. For `RequestWidget` - in real-time during typing.
+*   `MainWindow`:
+    -   In `on_env_changed`, get variables and update current tab (and other open ones).
+    -   In `on_tab_changed` (if needed), update variables for new tab (though they should already be updated on env change).
 
 ## Q&A
-- **Do we need to handle complex cases (nested quotes)?**
-    - JSON standard is quite simple, strings are always in double quotes. Escaped quotes `\"` need to be accounted for in string regex.
+
+-   **How to handle nested variables?**
+    -   Show value "as is" in dictionary. If value itself contains a variable, can (optionally) try to resolve it too, but direct mapping is enough for first version.
+-   **`mouseMoveEvent` performance?**
+    -   Event fires frequently. Checks must be fast. Show tooltip only if value changed or if we entered variable zone.

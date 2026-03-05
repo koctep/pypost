@@ -5,11 +5,10 @@
 - [x] **STEP 1: Requirements gathering and documentation**
 - [x] **STEP 2: High-level architectural design**
 - [x] **STEP 3: Development**
-  - [x] Implemented `TemplateService` as Singleton for Jinja2 Environment management.
-  - [x] `HTTPClient` updated to use `TemplateService`.
-  - [x] `MCPServerImpl` updated to use `TemplateService`.
-  - [x] `TemplateEngine` removed.
-- [x] **STEP 4: Review and technical debt**
+  - [x] Used `Mount` instead of `Route` for `/sse` and `/messages` endpoints to avoid Starlette
+    wrapper that expected Response return.
+  - [x] Added POST method check in `MessagesEndpoint`.
+- [/] **STEP 4: Review and technical debt**
 
 ## Status Legend
 

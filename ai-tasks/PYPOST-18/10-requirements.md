@@ -1,32 +1,53 @@
-# Requirements: PYPOST-18 - Variable Tooltips in Tables
+# PYPOST-18: Unify Jinja2 Environment Usage (TemplateService)
 
 ## Goals
-Extend variable tooltip functionality (implemented in PYPOST-16) to header and parameter tables. This will allow users to see variable values without needing to switch context, even when working with tabular data.
+
+Eliminate duplication of Jinja2 `Environment` creation. Currently `MCPServerImpl` creates its own
+instance and `TemplateEngine` (used in `HTTPClient`) creates templates ad-hoc. Create a unified
+`TemplateService` that will manage Jinja2 configuration and be used across the application.
 
 ## User Stories
-- As a user, I want to see the value of the `{{token}}` variable in the Headers table when hovering over the corresponding cell.
-- As a user, I want to see variable values in the Params table to verify correct substitution.
-- As a user, if a cell contains multiple variables, I want to see all of them (or the fully resolved string) in the tooltip.
+
+- **As a developer**, I want template configuration to be centralized so I can easily add custom
+  filters or change settings in one place.
+- **As a developer**, I want to avoid creating redundant `Environment` objects for resource
+  optimization.
 
 ## Acceptance Criteria
-- [ ] **Headers Table**: Hovering over a cell in the headers table containing `{{variable}}` displays a tooltip.
-- [ ] **Params Table**: Hovering over a cell in the parameters table containing `{{variable}}` displays a tooltip.
-- [ ] **Content Resolution**: The tooltip shows the resolved value of variables. If there are multiple variables, show either a list or (preferably) the resulting string with substituted values.
-- [ ] **Dynamic Updates**: Tooltips use current values from the active environment.
+
+- [ ] `TemplateService` class is created in `pypost/core/template_service.py` (or
+  `template_engine.py` is updated).
+- [ ] `TemplateService` initializes and stores a single `jinja2.Environment` instance.
+- [ ] `MCPServerImpl` uses `TemplateService` for AST parsing (method `parse` or env access).
+- [ ] `HTTPClient` uses `TemplateService` for string rendering.
+- [ ] Old `TemplateEngine` is removed or rewritten as a wrapper over `TemplateService`.
+- [ ] Request rendering (URL, headers, body) works as before.
+- [ ] Variable detection in MCP server works as before.
 
 ## Task Description
-It is necessary to refine `KeyValueTable` (or create `VariableAwareTableWidget`) by adding mouse event handling to display tooltips.
+
+Current `TemplateEngine` implementation uses a static `render` method that creates a new
+`jinja2.Template` on each call. `MCPServerImpl` creates its own `Environment` for variable
+analysis.
+
+Required:
+
+1. Create `TemplateService` that encapsulates `jinja2.Environment`.
+2. Implement methods `render(template_str, context)` and `parse(template_str)`.
+3. Integrate `TemplateService` usage in `MCPServerImpl` and `HTTPClient`.
 
 ### Technical Details
-- **Components**:
-    - `KeyValueTable` (in `pypost/ui/widgets/request_editor.py`): Add inheritance or mixin to support variables.
-    - `VariableHoverHelper`: Use existing helper for finding/resolving variables.
-- **Challenges**:
-    - In `QTableWidget` it is difficult to determine the exact character under the cursor without entering edit mode.
-- **Solution**: When hovering over a cell, check its text. If the text contains variables, show a tooltip with a preview of the substitution result (e.g., `Bearer {{token}}` -> `Bearer secret_123`).
+
+- `TemplateService` can be implemented as a Singleton or simply instantiated in `main` and passed
+  to dependencies. Given current architecture (where `RequestService` creates `HTTPClient`
+  internally), it may be simpler to make `TemplateService` globally available as a singleton or
+  module, or pass it through constructors (DI preferred if refactoring is not too complex).
+- To start, `TemplateService` can have a `get_instance()` method or simply one instance in the
+  module.
 
 ## Q&A
-- **Should variables be highlighted inside the cell?**
-    - No, standard `QTableWidget` rendering is sufficient.
-- **What to show in the tooltip?**
-    - The fully resolved string.
+
+- **Is async rendering support needed?**
+  - Not yet, current `render` is synchronous.
+- **Should custom filters be added now?**
+  - No, the task is only for structure refactoring.

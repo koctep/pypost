@@ -1,143 +1,127 @@
-# PYPOST-36: Architecture for Reliable Python Automation in CI
+# PYPOST-36: Add Rename Action to Context Menu
 
 ## Research
 
-### External research
+### Project Baseline
 
-1. Python `venv` docs define virtual environments as isolated Python runtimes and document
-   direct invocation through the environment interpreter.
-   Source: https://docs.python.org/3/library/venv.html
-2. Python tutorial documents `.venv` as a common virtual environment directory location.
-   Source: https://docs.python.org/3/tutorial/venv.html
-3. GNU Make documentation confirms `.PHONY` usage for command-like targets to avoid file name
-   conflicts and force explicit execution.
-   Source: https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
-4. pip user guide documents `python -m pip install -r requirements.txt` as the standard
-   requirements-based installation flow.
-   Source: https://pip.pypa.io/en/stable/user_guide/
-5. pytest good practices recommend isolated environments and dependency installation through pip
-   for reproducible test behavior.
-   Source: https://docs.pytest.org/en/stable/explanation/goodpractices.html
+- UI stack is PySide6 (`requirements.txt`).
+- Tree UI is implemented in `pypost/ui/main_window.py` with `QTreeView` and
+  `QStandardItemModel`.
+- Existing collection item context menu in `MainWindow` currently supports only `Delete`.
+- Business operations for collection/request mutations are centralized in
+  `pypost/core/request_manager.py`.
+- Persistence is handled by `pypost/core/storage.py` using collection JSON files.
 
-### Current codebase findings
+### External References
 
-1. Project automation is centralized in `Makefile` with targets: `venv`, `venv-test`, `install`,
-   `run`, `test`, `lint`, and `clean`.
-2. Runtime code is launched from `pypost/main.py`, and quality checks target `tests/` and
-   `pypost/`.
-3. Existing reliability risk is split execution context, where test and lint may use either venv
-   or global tools.
-4. Step 1 requires CI reliability as the primary business goal and records `.venv` as the
-   environment convention.
+- Qt docs: `QAbstractItemView` edit triggers and item editing lifecycle.
+  https://doc.qt.io/qt-6/qabstractitemview.html
+- Qt docs: `QTreeView` API including edit entry points.
+  https://doc.qt.io/qt-6/qtreeview.html
+- Qt docs: `QStandardItem` editable behavior and item flags.
+  https://doc.qt.io/qt-6/qstandarditem.html
 
 ## Implementation Plan
 
-1. Define one canonical execution boundary for all automation commands: project virtual
-   environment.
-2. Align command dependencies so environment setup and dependency installation happen before
-   runtime and quality-check commands.
-3. Remove split-context behavior in command execution paths and require one deterministic tool
-   chain for CI and local usage.
-4. Keep user-facing make target names unchanged per Step 1 constraints.
-5. Preserve functional application behavior; scope is automation reliability only.
+1. Extend collection item context menu composition in `MainWindow` with `Rename`.
+2. Keep item-type resolution unified for all tree entities in scope.
+3. Trigger inline editing for the selected tree index through `QTreeView` APIs.
+4. Validate rename result: reject empty names before persisting.
+5. Delegate actual rename persistence to `RequestManager`.
+6. Reload collections and restore tree/tabs state after successful rename.
+7. Keep behavior identical across collection and request items.
 
 ## Architecture
 
-### Module Diagram
+### System Module Diagram
 
 ```mermaid
 flowchart LR
-    U[DevOps or Developer] --> M[Makefile Command Layer]
-    C[CI Pipeline] --> M
-
-    M --> EC[Environment Control Module]
-    M --> DI[Dependency Install Module]
-    M --> QE[Quality Execution Module]
-    M --> AR[Application Run Module]
-    M --> CL[Cleanup Module]
-
-    EC --> VENV[.venv Python Interpreter]
-    DI --> PIP[pip Requirements Installer]
-    QE --> PYTEST[pytest]
-    QE --> FLAKE8[flake8]
-    AR --> APP[pypost/main.py]
-
-    VENV --> PIP
-    VENV --> PYTEST
-    VENV --> FLAKE8
-    VENV --> APP
+    User --> UI[MainWindow / Collection Tree]
+    UI --> CM[Context Menu Handler]
+    CM --> EDIT[Inline Edit Flow]
+    EDIT --> VALID[Non-Empty Name Validation]
+    VALID --> APP[RequestManager Rename API]
+    APP --> PERSIST[StorageManager]
+    PERSIST --> FS[(Collection JSON Files)]
+    APP --> MODELS[Collection + RequestData Models]
 ```
 
 ### Modules and Responsibilities
 
-1. Environment Control Module
-   - Owns virtual environment lifecycle and readiness checks.
-   - Establishes `.venv` as the single project environment location.
-2. Dependency Install Module
-   - Installs project dependencies required for execution and validation.
-   - Provides deterministic dependency state for CI and local runs.
-3. Quality Execution Module
-   - Executes test and lint quality gates as CI reliability controls.
-   - Uses one tool context and one interpreter boundary.
-4. Application Run Module
-   - Starts the application in the same environment boundary used by CI checks.
-5. Cleanup Module
-   - Removes generated runtime and cache artifacts to reset local workspace state.
+- `MainWindow` (presentation):
+  handles context menu invocation, starts inline rename, displays validation feedback.
+- `Context Menu Handler` (presentation helper in `MainWindow`):
+  maps selected tree item to available actions (`Rename`, existing `Delete`).
+- `Inline Edit Flow` (presentation interaction):
+  enters edit mode on the selected tree node and captures user-submitted name.
+- `RequestManager` (application/business layer):
+  executes rename for supported item types and coordinates persistence.
+- `StorageManager` (infrastructure layer):
+  stores updated collection/request names in file storage.
+- Domain models (`Collection`, `RequestData`):
+  carry renamed business entities.
 
 ### Dependencies Between Modules
 
-1. Dependency Install Module depends on Environment Control Module.
-2. Quality Execution Module depends on Environment Control Module and Dependency Install Module.
-3. Application Run Module depends on Environment Control Module and Dependency Install Module.
-4. Cleanup Module is independent and can be invoked explicitly when reset is needed.
+- `MainWindow` depends on Qt widgets and `RequestManager`.
+- `RequestManager` depends on `StorageManager`.
+- `StorageManager` depends on filesystem JSON storage.
 
-### Selected Architectural Patterns and Justification
+Dependency direction remains:
+`UI -> Application -> Infrastructure`.
 
-1. Command-Orchestrator pattern (Makefile as coordinator)
-   - Centralizes operational entry points used by both CI and local users.
-2. Single Runtime Boundary pattern
-   - Forces all quality and runtime commands through the same virtual environment to eliminate
-     split-context failures.
-3. Fail-Fast validation pattern
-   - Stops execution when prerequisites are missing, reducing false-positive pipeline states.
+### Selected Architectural Patterns
 
-### Main Interfaces Between Modules
+- Layered architecture:
+  UI handles interactions; `RequestManager` holds business rules; `StorageManager` handles IO.
+- Event-driven UI controller:
+  context menu actions route to specific handlers in `MainWindow`.
+- Validation gate before mutation:
+  empty-name rejection happens before calling business rename operation.
 
-1. `venv` interface
-   - Purpose: prepare and validate project environment in `.venv`.
-   - Consumer modules: dependency install, quality execution, application run.
-2. `install` interface
-   - Purpose: install project dependencies from requirements definitions.
-   - Consumer modules: quality execution, application run.
-3. `test` interface
-   - Purpose: run project test suite and return CI-consumable exit status.
-   - Consumer: CI pipeline and local pre-commit checks.
-4. `lint` interface
-   - Purpose: run static style and quality checks and return CI-consumable exit status.
-   - Consumer: CI pipeline and local pre-commit checks.
-5. `run` interface
-   - Purpose: run the application with the same interpreter context as automation checks.
-   - Consumer: local developer workflow.
-6. `clean` interface
-   - Purpose: remove environment and cache artifacts.
-   - Consumer: local recovery and troubleshooting workflows.
+Why this fits current Python/PySide6 project:
+- Reuses existing `MainWindow` and manager boundaries without introducing new subsystem complexity.
+- Keeps business mutations out of UI event code.
+- Preserves consistency with recent delete-flow architecture.
 
-### Interaction Scheme
+### Module Interaction Scheme
 
-1. Actor invokes `make <target>` from local shell or CI job.
-2. Makefile resolves module dependencies for the target.
-3. Environment Control confirms `.venv` availability.
-4. Dependency Install ensures required packages are present.
-5. Target-specific module executes (`test`, `lint`, or `run`) within one runtime boundary.
-6. Exit code is returned to actor, where CI interprets pass or fail deterministically.
+1. User right-clicks any tree item and selects `Rename`.
+2. UI starts inline editor on the selected item.
+3. User submits edited name.
+4. UI validates non-empty name.
+5. UI calls `RequestManager` rename API with `(item_id, item_type, new_name)`.
+6. Manager updates model and persists through `StorageManager`.
+7. UI reloads collections and restores tree/tabs state.
+
+### Main Interfaces / APIs
+
+Presentation (`MainWindow`):
+- `show_collection_item_context_menu(pos) -> None`
+- `start_collection_item_rename(index) -> None`
+- `handle_collection_item_rename(item_id: str, item_type: str, new_name: str) -> None`
+- `validate_collection_item_name(name: str) -> bool`
+
+Application (`RequestManager`):
+- `rename_collection(collection_id: str, new_name: str) -> bool`
+- `rename_request(request_id: str, new_name: str) -> bool`
+- `rename_collection_item(item_id: str, item_type: str, new_name: str) -> bool`
+
+Infrastructure (`StorageManager`):
+- `save_collection(collection: Collection) -> None`
+
+Contract expectations:
+- `new_name` must be non-empty.
+- Duplicate names under same parent are allowed.
+- Rename APIs return `True` on success, `False` if target item is not found.
+- Unexpected runtime/storage errors are surfaced to UI for user-visible feedback.
 
 ## Q&A
 
-- Q: Why keep make target names unchanged?
-  A: Step 1 constraints require interface stability for existing user and CI workflows.
-- Q: Why enforce one environment boundary?
-  A: CI reliability depends on removing inconsistent tool resolution between global and project
-  environments.
-- Q: Why include `.venv` at architecture level?
-  A: Step 1 requirements define it as the project environment convention for consistent
-  operations.
+- Q: Why keep rename logic in `RequestManager`?
+  A: To keep UI thin and centralize business mutations and persistence flow.
+- Q: Why inline editing in UI instead of a dialog?
+  A: Inline rename is an explicit requirement for faster, low-friction interaction.
+- Q: Why allow duplicates?
+  A: Requirement explicitly allows duplicate names under one parent.

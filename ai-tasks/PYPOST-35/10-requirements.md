@@ -1,77 +1,76 @@
-# PYPOST-35: Add New-Tab Plus Button Next to Tabs
+# PYPOST-35: Add Delete Action in Collection Item Context Menu
 
 ## Goals
 
-Improve user experience by making tab creation more discoverable through a dedicated `+` button in
-the tab bar.
-
-## Programming Language
-
-Python
+Improve user experience by allowing users to delete any collection item directly from its context
+menu.
 
 ## User Stories
 
-- As a user, I want to see a `+` button next to tabs so I can quickly discover how to create a new
-  tab.
-- As a user, I want clicking the `+` button to behave exactly like `Ctrl+N` so tab creation is
-  consistent across mouse and keyboard flows.
+- As an API user, I want to delete a collection item from the context menu so that I can manage
+  collections without extra navigation or workarounds.
+- As an API user, I want a confirmation before deletion so that I can avoid accidental data loss.
 
 ## Definition of Done
 
-1. A `+` button is visible in the tab area, positioned immediately to the right of the last tab.
-2. Clicking the `+` button triggers the same user-visible behavior as `Ctrl+N`.
-3. Existing `Ctrl+N` behavior remains unchanged.
-4. Existing tab behavior (open/select/close current tabs) remains unchanged by this task.
+- Every collection item supports a context menu action named `Delete`.
+- Deletion is available for all collection item types within scope.
+- Before deletion is executed, the system asks for user confirmation.
+- If the user confirms, the selected item is deleted.
+- If the user cancels, the selected item remains unchanged.
 
 ## Task Description
 
 ### Problem Statement
 
-Creating a new tab is currently less discoverable in the tab interface, which negatively impacts UX.
+Users currently have no way to delete collection items from the interface.
 
-### Scope
+### Programming Language
 
-- In scope:
-  - Add a `+` button in the tab area.
-  - Position it right of the last tab.
-  - Ensure it performs the same action as `Ctrl+N`.
-- Out of scope:
-  - Changes to the business behavior of tab creation.
-  - Redesign of the overall tab system.
-  - Any change unrelated to new-tab entry point UX.
+Python
+
+### Functional Requirements
+
+- The system must provide a context menu for collection items.
+- The context menu must include a `Delete` action.
+- The `Delete` action must be available for all collection item types.
+- The system must request user confirmation before item deletion.
+- The system must perform deletion only after explicit confirmation.
+- The system must keep the item unchanged when deletion is not confirmed.
+
+### Non-Functional Requirements
+
+- UX clarity: the delete flow must be obvious and understandable to end users.
+- Safety: destructive action must require explicit user confirmation.
+- Consistency: behavior must be uniform across all collection item types.
 
 ### Constraints and Assumptions
 
-- Constraint: The `+` button action must be behaviorally equivalent to `Ctrl+N`.
-- Constraint: Existing new-tab shortcut behavior must be preserved.
-- Assumption: Primary impacted role is a general application user.
+- Scope is limited to collection item deletion through the context menu.
+- No additional UX constraints were provided beyond confirmation requirement.
+- No extra role-based or policy restrictions were provided.
 
-### Main Business Entities and Interactions
+### System Boundaries (Scope)
 
-- User: interacts with tabs and creates new tabs.
-- Tab Bar: area where existing tabs and tab actions are shown.
-- New Tab Action: business action that creates a new tab session.
+- In scope: user interaction for deleting collection items via context menu with confirmation.
+- Out of scope: unrelated collection management features and other UI flows.
 
-Interaction flow:
-1. User clicks the `+` button in the tab bar.
-2. System executes the same business action as `Ctrl+N`.
-3. User gets the same outcome as keyboard-based new-tab creation.
+### Main Entities and Interactions
 
-## Non-Functional Requirements
+- User: initiates item deletion from a collection.
+- Collection item: business object selected for deletion.
+- Confirmation prompt: asks the user to approve or cancel deletion.
 
-- Usability: the new-tab action is easy to find in the tab area.
-- Consistency: mouse-triggered `+` and keyboard-triggered `Ctrl+N` produce the same result.
-- Stability: no regression in existing tab usage behavior.
+Interaction summary: the user selects `Delete` for a collection item, sees a confirmation prompt,
+and then either confirms deletion or cancels it.
 
 ## Q&A
 
-- Q: What should be changed?
-  - A: Add a `+` button next to tabs.
-- Q: Where should the button be placed?
-  - A: Immediately to the right of the last tab.
-- Q: What should happen on click?
-  - A: It should perform the same action as `Ctrl+N`.
-- Q: Why is this needed?
-  - A: To improve UX.
-- Q: Who is the primary user?
-  - A: User.
+- Q: Why is this task needed?
+  A: Users currently cannot delete collection items.
+- Q: Which collection item types are in scope?
+  A: All collection item types.
+- Q: Is confirmation required before deletion?
+  A: Yes, confirmation is mandatory.
+- Q: Are there additional UX or policy constraints?
+  A: No additional constraints were specified.

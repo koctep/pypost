@@ -1,40 +1,42 @@
-# PYPOST-30: Fix AttributeError: 'MainWindow' object has no attribute 'on_env_update'
+# PYPOST-30: Refactoring Technical Debt
 
 ## Goals
 
-Fix the runtime error that occurs when updating environment variables from request scripts by
-implementing the missing `on_env_update` method in the application main window.
+Eliminate technical debt accumulated in previous development iterations (PYPOST-14, PYPOST-9, PYPOST-14) to improve performance, code readability, and project maintainability.
 
 ## User Stories
 
-- As a developer, I want environment variable updates from scripts to work correctly so request
-  automation runs without failures.
-- As a user, I don't want to see an error dialog when running requests that modify the
-  environment.
+- As a developer, I want request search to be faster (O(1)) so the application scales with the growth of collections.
+- As a developer, I want `HTTPClient` code to be cleaner and split into methods so it's easier to test and maintain.
+- As a developer, I want request completion logic in UI not to be duplicated to avoid errors during changes.
 
 ## Acceptance Criteria
 
-- No `AttributeError` when running a script that updates environment variables.
-- Environment variables are correctly updated in the currently selected environment.
-- Updated variables are shown in the UI (if management dialog is open or tabs are refreshed).
-- Changes are saved to the environments file.
+1. `RequestManager` uses an internal dictionary for request lookup by ID in O(1).
+2. `HTTPClient.send_request` method is split into sub-methods (parameter preparation extracted).
+3. `MainWindow` has and uses `_reset_tab_state` (or similar) method for clearing tab state after request completion.
+4. Existing functionality is not broken (regression testing).
 
 ## Task Description
 
-When executing a request, if the script tries to update environment variables (e.g. via
-`pypost.env.set`), `RequestWorker` emits the `env_update` signal. This signal is connected to
-`self.on_env_update` in `MainWindow` (file `pypost/ui/main_window.py`). However, this method is not
-implemented in the `MainWindow` class, causing the application to crash with:
-`AttributeError: 'MainWindow' object has no attribute 'on_env_update'`.
+Based on the analysis of technical debt files (`40-tech-debt.md`), the following areas for improvement were identified:
 
-This method must be implemented.
+1.  **RequestManager Lookup Optimization (from PYPOST-14)**:
+    - Current: Request search iterates through all collections (O(N)).
+    - Required: Implement a hash map (dictionary) `id -> (RequestData, Collection)` for fast lookup. The index must be updated on load and save.
+
+2.  **HTTPClient Complexity (from PYPOST-14)**:
+    - Current: `send_request` method is overloaded with templating and parameter preparation logic.
+    - Required: Extract template rendering and `requests` arguments preparation logic into a separate private method.
+
+3.  **UI Code Duplication (from PYPOST-9)**:
+    - Current: `on_request_finished` and `on_request_error` duplicate UI reset code (Send button, worker cleanup).
+    - Required: Extract common cleanup code into `_on_request_completed` or `_reset_tab_state` method.
 
 ## Q&A
 
-- **Q:** How should the method behave if no environment is selected (No Environment)?
-- **A:** If no environment is selected, variable updates should be ignored or a warning shown (in
-  current implementation `RequestWorker` passes variables, but `MainWindow` must decide where to
-  write them). It makes sense to write only to the active environment. If there is none — do
-  nothing or notify the user. *Decision:* If no environment is selected, do nothing (safe option),
-  as scripts usually assume context exists.
+- **Should new tests be added?**
+  - It is desirable to verify refactoring with existing manual tests, as automated infrastructure is currently limited. The main focus is on preserving current behavior.
+
+- **Programming Language**: Python.
 
