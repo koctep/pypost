@@ -27,7 +27,7 @@ This class contains the actual business logic of the MCP server.
 *   **Framework**: Uses `Starlette` + `mcp` SDK + `uvicorn`.
 *   **Transport**: Implements **SSE (Server-Sent Events)** over HTTP.
     *   GET `/sse`: Establishes the connection.
-    *   POST `/messages`: Receives client messages.
+    *   POST `/sse/messages`: Receives client messages.
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
 *   **Schema Generation**: Automatically generates JSON Schema for tools by parsing the request URL, headers, and body using `TemplateService` (Jinja2 AST) to find variables matching the pattern `{{ mcp.request.VAR_NAME }}`.
 *   **Execution**: Delegates request execution to `RequestService`.
