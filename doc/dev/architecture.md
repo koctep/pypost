@@ -60,7 +60,9 @@ Built with **PySide6** (Qt for Python).
 
 - **MainWindow**: The central hub, managing the layout. Delegates logic to `RequestManager` and `StateManager`.
 - **Widgets**: Specialized components like `RequestEditor` for composing requests and `ResponseView`
-  for displaying results. `VariableAware` widgets use `VariableHoverMixin` for shared tooltip logic.
+  for displaying results. `ResponseView` includes a status bar, search bar (plain-text search with
+  Previous/Next, match case, counter), and read-only body. `VariableAware` widgets use
+  `VariableHoverMixin` for shared tooltip logic.
 - **Dialogs**: Separate windows for specific tasks like editing environment variables
   (`env_dialog.py`).
 

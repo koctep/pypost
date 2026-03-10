@@ -78,6 +78,13 @@ class MetricsManager:
             registry=self.registry
         )
 
+        self.gui_response_search_actions = Counter(
+            'gui_response_search_actions_total',
+            'Number of response body search actions',
+            ['source', 'has_matches'],
+            registry=self.registry
+        )
+
         self.requests_sent = Counter(
             'requests_sent_total',
             'Number of HTTP requests sent',
@@ -248,6 +255,13 @@ class MetricsManager:
 
     def track_gui_collection_rename_action(self, item_type: str, status: str):
         self.gui_collection_rename_actions.labels(item_type=item_type, status=status).inc()
+
+    def track_gui_response_search_action(
+        self, source: str, has_matches: bool
+    ):
+        self.gui_response_search_actions.labels(
+            source=source, has_matches=str(has_matches).lower()
+        ).inc()
 
     def track_request_sent(self, method: str):
         self.requests_sent.labels(method=method).inc()
