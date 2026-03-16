@@ -1,4 +1,4 @@
-.PHONY: venv venv-test install run clean test lint
+.PHONY: venv venv-test install run clean test test-cov lint
 
 PYTHON := python3
 PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])')
@@ -17,7 +17,7 @@ $(VENV_MARKER):
 
 # Create test virtual environment tools
 venv-test: $(VENV_MARKER)
-	$(BIN)/python -m pip install pytest flake8
+	$(BIN)/python -m pip install pytest flake8 pytest-cov
 
 # Install dependencies
 install: $(VENV_MARKER) venv-test
@@ -30,6 +30,11 @@ run: $(VENV_MARKER)
 # Run tests
 test: $(VENV_MARKER)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/
+
+# Run tests with coverage report (requires pytest-cov)
+test-cov: $(VENV_MARKER)
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/ \
+		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov
 
 # Linting
 lint: $(VENV_MARKER)

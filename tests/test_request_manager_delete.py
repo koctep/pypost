@@ -9,24 +9,9 @@ except ModuleNotFoundError:
     platformdirs_stub.user_data_dir = lambda app_name, app_author=None: "/tmp"
     sys.modules["platformdirs"] = platformdirs_stub
 
+from tests.helpers import FakeStorageManager
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import Collection, RequestData
-
-
-class FakeStorageManager:
-    def __init__(self, collections):
-        self._collections = collections
-        self.saved_collections = []
-        self.deleted_collection_names = []
-
-    def load_collections(self):
-        return self._collections
-
-    def save_collection(self, collection):
-        self.saved_collections.append(collection.name)
-
-    def delete_collection(self, collection_name: str):
-        self.deleted_collection_names.append(collection_name)
 
 
 class RequestManagerDeleteTests(unittest.TestCase):
