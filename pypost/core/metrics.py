@@ -85,6 +85,13 @@ class MetricsManager:
             registry=self.registry
         )
 
+        self.gui_method_body_autoswitches = Counter(
+            'gui_method_body_autoswitches_total',
+            'Number of times the Body tab was auto-selected due to method change',
+            ['method'],
+            registry=self.registry
+        )
+
         self.requests_sent = Counter(
             'requests_sent_total',
             'Number of HTTP requests sent',
@@ -262,6 +269,9 @@ class MetricsManager:
         self.gui_response_search_actions.labels(
             source=source, has_matches=str(has_matches).lower()
         ).inc()
+
+    def track_gui_method_body_autoswitch(self, method: str):
+        self.gui_method_body_autoswitches.labels(method=method).inc()
 
     def track_request_sent(self, method: str):
         self.requests_sent.labels(method=method).inc()

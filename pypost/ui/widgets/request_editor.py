@@ -35,6 +35,7 @@ class RequestWidget(QWidget):
 
     def __init__(self, request_data: RequestData = None):
         super().__init__()
+        self._loading = False
         self.request_data = request_data or RequestData()
         self.init_ui()
 
@@ -44,8 +45,11 @@ class RequestWidget(QWidget):
         url_layout = QHBoxLayout()
 
         self.method_combo = QComboBox()
-        self.method_combo.addItems(["GET", "POST", "PUT", "DELETE", "PATCH"])
+        self.method_combo.addItems(
+            ["GET", "POST", "PUT", "DELETE", "PATCH", "MCP"]
+        )
         self.method_combo.setCurrentText(self.request_data.method)
+        self.method_combo.currentTextChanged.connect(self._on_method_changed)
 
         self.url_input = VariableAwareLineEdit(self.request_data.url)
         self.url_input.setPlaceholderText("Enter request URL")
@@ -89,6 +93,7 @@ class RequestWidget(QWidget):
         self.body_edit = CodeEditor()
         self.json_highlighter = JsonHighlighter(self.body_edit.document())
         self.detail_tabs.addTab(self.body_edit, "Body")
+        self._on_method_changed(self.method_combo.currentText())
 
         self.script_edit = QPlainTextEdit()
         script_hint = (
@@ -111,14 +116,30 @@ class RequestWidget(QWidget):
         if hasattr(self.body_edit, 'set_variables'):
             self.body_edit.set_variables(variables)
 
+    def _on_method_changed(self, method: str):
+        if method == "MCP":
+            self.body_edit.setPlaceholderText(
+                "Empty = list tools. JSON {name, arguments} = call tool."
+            )
+        else:
+            self.body_edit.setPlaceholderText("")
+        if not self._loading and method in ("POST", "PUT"):
+            self.detail_tabs.setCurrentWidget(self.body_edit)
+            MetricsManager().track_gui_method_body_autoswitch(method)
+
     def load_data(self):
-        self.url_input.setText(self.request_data.url)
-        self.method_combo.setCurrentText(self.request_data.method)
-        self.params_table.set_data(self.request_data.params)
-        self.headers_table.set_data(self.request_data.headers)
-        self.body_edit.setPlainText(self.request_data.body)
-        self.script_edit.setPlainText(self.request_data.post_script)
-        self.mcp_check.setChecked(self.request_data.expose_as_mcp)
+        self._loading = True
+        try:
+            self.url_input.setText(self.request_data.url)
+            self.method_combo.setCurrentText(self.request_data.method)
+            self._on_method_changed(self.request_data.method)
+            self.params_table.set_data(self.request_data.params)
+            self.headers_table.set_data(self.request_data.headers)
+            self.body_edit.setPlainText(self.request_data.body)
+            self.script_edit.setPlainText(self.request_data.post_script)
+            self.mcp_check.setChecked(self.request_data.expose_as_mcp)
+        finally:
+            self._loading = False
 
     def update_request_data(self):
         self.request_data.url = self.url_input.text()

@@ -29,7 +29,7 @@ run: $(VENV_MARKER)
 
 # Run tests
 test: $(VENV_MARKER)
-	$(BIN)/python -m pytest tests/
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/
 
 # Linting
 lint: $(VENV_MARKER)
