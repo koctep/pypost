@@ -14,10 +14,11 @@ from pypost.core.metrics import MetricsManager
 
 
 class MCPServerImpl:
-    def __init__(self, name: str = "pypost-server"):
+    def __init__(self, name: str = "pypost-server", metrics: MetricsManager | None = None):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
-        self.request_service = RequestService()
+        self._metrics = metrics
+        self.request_service = RequestService(metrics=self._metrics)
 
         # Register handlers
         self.server.list_tools()(self.list_tools)
@@ -41,7 +42,8 @@ class MCPServerImpl:
         request_data = self.tools_map[name]
 
         # Track MCP request
-        MetricsManager().track_mcp_request_received(request_data.method)
+        if self._metrics:
+            self._metrics.track_mcp_request_received(request_data.method)
 
         # Execute request in threadpool since RequestService is synchronous
         try:
@@ -62,16 +64,18 @@ class MCPServerImpl:
                 output_text += "\n\n--- Script Error ---\n" + err
 
             # Track MCP response success
-            MetricsManager().track_mcp_response_sent(
-                request_data.method, "success"
-            )
+            if self._metrics:
+                self._metrics.track_mcp_response_sent(
+                    request_data.method, "success"
+                )
 
             return [TextContent(type="text", text=output_text)]
         except Exception as e:
             # Track MCP response error
-            MetricsManager().track_mcp_response_sent(
-                request_data.method, "error"
-            )
+            if self._metrics:
+                self._metrics.track_mcp_response_sent(
+                    request_data.method, "error"
+                )
             return [TextContent(
                 type="text", text=f"Error executing request: {str(e)}"
             )]

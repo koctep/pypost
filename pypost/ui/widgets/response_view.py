@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 class ResponseView(QWidget):
     variable_set_requested = Signal(object, str)
 
-    def __init__(self, indent_size=2):
+    def __init__(self, indent_size=2, metrics: MetricsManager | None = None):
         super().__init__()
         self.indent_size = indent_size
+        self._metrics = metrics
         self.current_env_keys = None
         self.init_ui()
 
@@ -102,9 +103,10 @@ class ResponseView(QWidget):
             return
         self.body_view.find(text, self._search_flags(backward=False))
         total = self._update_match_count()
-        MetricsManager().track_gui_response_search_action(
-            source=source, has_matches=(total > 0)
-        )
+        if self._metrics:
+            self._metrics.track_gui_response_search_action(
+                source=source, has_matches=(total > 0)
+            )
         logger.debug(
             "response_search_find source=%s matches=%d",
             source, total
@@ -117,9 +119,10 @@ class ResponseView(QWidget):
             return
         self.body_view.find(text, self._search_flags(backward=True))
         total = self._update_match_count()
-        MetricsManager().track_gui_response_search_action(
-            source=source, has_matches=(total > 0)
-        )
+        if self._metrics:
+            self._metrics.track_gui_response_search_action(
+                source=source, has_matches=(total > 0)
+            )
         logger.debug(
             "response_search_find source=%s matches=%d",
             source, total
@@ -188,9 +191,10 @@ class ResponseView(QWidget):
         self.body_view.moveCursor(QTextCursor.Start)
         self.body_view.find(text, self._search_flags(backward=False))
         total = self._update_match_count()
-        MetricsManager().track_gui_response_search_action(
-            source="typed", has_matches=(total > 0)
-        )
+        if self._metrics:
+            self._metrics.track_gui_response_search_action(
+                source="typed", has_matches=(total > 0)
+            )
         logger.debug(
             "response_search_typed query_len=%d matches=%d",
             len(text), total

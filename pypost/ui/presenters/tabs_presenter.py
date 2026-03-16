@@ -23,14 +23,18 @@ logger = logging.getLogger(__name__)
 class RequestTab(QWidget):
     """Container for a single RequestWidget + ResponseView pair."""
 
-    def __init__(self, request_data: RequestData | None = None) -> None:
+    def __init__(
+        self,
+        request_data: RequestData | None = None,
+        metrics: MetricsManager | None = None,
+    ) -> None:
         super().__init__()
         self.request_data = request_data
         self.layout = QVBoxLayout(self)
         self.splitter = QSplitter(Qt.Vertical)
 
-        self.request_editor = RequestWidget(request_data)
-        self.response_view = ResponseView()
+        self.request_editor = RequestWidget(request_data, metrics=metrics)
+        self.response_view = ResponseView(metrics=metrics)
 
         self.splitter.addWidget(self.request_editor)
         self.splitter.addWidget(self.response_view)
@@ -65,12 +69,14 @@ class TabsPresenter(QObject):
         request_manager: RequestManager,
         state_manager: StateManager,
         settings: AppSettings,
+        metrics: MetricsManager | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._request_manager = request_manager
         self._state_manager = state_manager
         self._settings = settings
+        self._metrics = metrics
         self._current_variables: dict = {}
 
         self._tab_bar = TabBarWithAddButton()
@@ -95,7 +101,7 @@ class TabsPresenter(QObject):
     def add_new_tab(
         self, request_data: RequestData | None = None, save_state: bool = True
     ) -> None:
-        tab = RequestTab(request_data)
+        tab = RequestTab(request_data, metrics=self._metrics)
 
         if hasattr(tab.request_editor, 'body_edit'):
             tab.request_editor.body_edit.update_indent_size(self._settings.indent_size)
@@ -201,7 +207,8 @@ class TabsPresenter(QObject):
     def handle_new_tab(self, source: str = "unknown") -> None:
         tabs_before = self._tabs.count()
         logger.info("new_tab_action_triggered source=%s tabs_before=%d", source, tabs_before)
-        MetricsManager().track_gui_new_tab_action(source)
+        if self._metrics:
+            self._metrics.track_gui_new_tab_action(source)
         self.add_new_tab()
 
     def handle_close_tab(self) -> None:
@@ -290,12 +297,13 @@ class TabsPresenter(QObject):
             "request_send_initiated method=%s url=%s request_id=%s",
             request_data.method, request_data.url, request_data.id,
         )
-        MetricsManager().track_request_sent(request_data.method)
+        if self._metrics:
+            self._metrics.track_request_sent(request_data.method)
 
         sender_tab.response_view.clear_body()
         sender_tab.request_editor.send_btn.setText("Stop")
 
-        worker = RequestWorker(request_data, variables=self._current_variables)
+        worker = RequestWorker(request_data, variables=self._current_variables, metrics=self._metrics)
         worker.finished.connect(lambda resp: self._on_request_finished(sender_tab, resp))
         worker.error.connect(lambda err: self._on_request_error(sender_tab, err))
         worker.env_update.connect(lambda vars: self.env_update_requested.emit(vars))
@@ -317,7 +325,8 @@ class TabsPresenter(QObject):
             "request_finished method=%s status_code=%s elapsed_time=%.3fs size=%s",
             method, response.status_code, response.elapsed_time, response.size,
         )
-        MetricsManager().track_response_received(method, str(response.status_code))
+        if self._metrics:
+            self._metrics.track_response_received(method, str(response.status_code))
         tab.response_view.display_response(response)
         self._reset_tab_ui_state(tab)
         tab.response_view.status_label.setText(f"Status: {response.status_code}")
@@ -399,7 +408,8 @@ class TabsPresenter(QObject):
                 "save_request_overwrite_succeeded request_id=%s collection_id=%s",
                 request_data.id, found_collection.id,
             )
-            MetricsManager().track_gui_save_action("overwrite")
+            if self._metrics:
+                self._metrics.track_gui_save_action("overwrite")
 
             for i in range(self._tabs.count()):
                 tab = self._tabs.widget(i)
@@ -432,7 +442,8 @@ class TabsPresenter(QObject):
             "save_request_new_succeeded request_id=%s name=%s collection_id=%s",
             request_data.id, request_data.name, target_collection_id,
         )
-        MetricsManager().track_gui_save_action("new")
+        if self._metrics:
+            self._metrics.track_gui_save_action("new")
 
         current_expanded = self._state_manager.get_expanded_collections()
         if target_collection_id not in current_expanded:

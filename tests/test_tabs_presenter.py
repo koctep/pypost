@@ -61,7 +61,7 @@ class TestTabsPresenter(unittest.TestCase):
         rm = FakeRequestManager(requests)
         sm = FakeStateManager(open_tabs)
         settings = AppSettings()
-        return TabsPresenter(rm, sm, settings)
+        return TabsPresenter(rm, sm, settings, metrics=MagicMock())
 
     def test_widget_is_qtab_widget(self):
         from PySide6.QtWidgets import QTabWidget
@@ -221,7 +221,7 @@ class TestTabsPresenter(unittest.TestCase):
         col_mock.id = "c1"
         rm._requests["r1"] = (req, col_mock)
         sm = FakeStateManager()
-        p = TabsPresenter(rm, sm, AppSettings())
+        p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
         p.add_new_tab(req)
 
         received = []

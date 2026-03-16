@@ -1,3 +1,4 @@
+import logging
 import threading
 import asyncio
 import uvicorn
@@ -8,24 +9,11 @@ from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp.types import Resource, TextResourceContents
 
+logger = logging.getLogger(__name__)
+
 
 class MetricsManager:
-    _instance = None
-    _lock = threading.Lock()
-
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super(MetricsManager, cls).__new__(cls)
-                    cls._instance._initialized = False
-        return cls._instance
-
     def __init__(self):
-        if self._initialized:
-            return
-
-        self._initialized = True
         self.registry = CollectorRegistry()
         self.server_instance = None
         self.thread = None
@@ -205,7 +193,7 @@ class MetricsManager:
 
             self.thread = threading.Thread(target=self._run_uvicorn, daemon=True)
             self.thread.start()
-            print(f"Metrics server started on {host}:{port}")
+            logger.info("Metrics server started on %s:%d", host, port)
 
     def _run_uvicorn(self):
         app = self._create_app()
@@ -237,7 +225,7 @@ class MetricsManager:
                 self.thread.join(timeout=2.0)
                 self.thread = None
                 self.server_instance = None
-                print("Metrics server stopped")
+                logger.info("Metrics server stopped")
 
     def restart_server(self, host: str, port: int):
         """Restart the metrics server with new settings."""

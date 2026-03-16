@@ -2,9 +2,9 @@ import logging
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QPushButton, QApplication, QShortcut,
+    QPushButton, QApplication,
 )
-from PySide6.QtGui import QIcon, QKeySequence
+from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtCore import Qt
 from pathlib import Path
 
@@ -24,22 +24,25 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, metrics: MetricsManager) -> None:
         super().__init__()
         self.setWindowTitle("PyPost")
         self.resize(1200, 800)
+        self.metrics = metrics
         self.storage = StorageManager()
         self.config_manager = ConfigManager()
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
         self.style_manager = StyleManager()
-        self.mcp_manager = MCPServerManager()
+        self.mcp_manager = MCPServerManager(metrics=self.metrics)
         self.settings = self.state_manager.settings
         self.icons = self._load_icons()
         self.collections = CollectionsPresenter(
-            self.request_manager, self.state_manager, MetricsManager(), self.icons,
+            self.request_manager, self.state_manager, self.metrics, self.icons,
         )
-        self.tabs = TabsPresenter(self.request_manager, self.state_manager, self.settings)
+        self.tabs = TabsPresenter(
+            self.request_manager, self.state_manager, self.settings, metrics=self.metrics
+        )
         self.env = EnvPresenter(
             self.storage, self.config_manager, self.mcp_manager,
             self.settings, self.request_manager.get_collections,
@@ -160,7 +163,7 @@ class MainWindow(QMainWindow):
                 "metrics_server_restarting host=%s port=%d",
                 self.settings.metrics_host, self.settings.metrics_port,
             )
-            MetricsManager().restart_server(self.settings.metrics_host, self.settings.metrics_port)
+            self.metrics.restart_server(self.settings.metrics_host, self.settings.metrics_port)
         logger.info("settings_applied font_size=%d indent_size=%d", self.settings.font_size,
                     self.settings.indent_size)
         self.env._on_env_changed(self.env.env_selector.currentIndex())

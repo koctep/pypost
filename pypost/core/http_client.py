@@ -1,3 +1,4 @@
+import logging
 import requests
 import time
 import json
@@ -7,14 +8,17 @@ from pypost.models.response import ResponseData
 from pypost.core.template_service import template_service
 from pypost.core.metrics import MetricsManager
 
+logger = logging.getLogger(__name__)
+
 SSE_PROBE_TIMEOUT = 10.0
 SSE_PROBE_CONNECT_TIMEOUT = 3.0
 SSE_PROBE_MAX_EVENTS = 5
 
 
 class HTTPClient:
-    def __init__(self):
+    def __init__(self, metrics: MetricsManager | None = None):
         self.session = requests.Session()
+        self._metrics = metrics
 
     def _prepare_request_kwargs(self, request_data: RequestData, variables: Dict[str, str]) -> Dict[str, Any]:
         """Prepares the arguments for requests.request by rendering templates."""
@@ -135,7 +139,8 @@ class HTTPClient:
             variables = {}
 
         start_time = time.time()
-        MetricsManager().track_request_sent(request_data.method)
+        if self._metrics:
+            self._metrics.track_request_sent(request_data.method)
 
         url = template_service.render_string(request_data.url, variables)
         is_sse_endpoint = (
@@ -151,7 +156,11 @@ class HTTPClient:
                 kwargs["headers"] = headers
             response = self.session.request(**kwargs)
         except Exception as e:
-            raise e
+            logger.error(
+                "Request failed: %s %s — %s",
+                request_data.method, url, e,
+            )
+            raise
 
         if headers_callback:
             headers_callback(response.status_code, dict(response.headers))
@@ -187,7 +196,8 @@ class HTTPClient:
         end_time = time.time()
 
         # 3. Process response
-        MetricsManager().track_response_received(request_data.method, str(response.status_code))
+        if self._metrics:
+            self._metrics.track_response_received(request_data.method, str(response.status_code))
         
         return ResponseData(
             status_code=response.status_code,

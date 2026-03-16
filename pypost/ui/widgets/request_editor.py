@@ -33,9 +33,10 @@ class RequestWidget(QWidget):
     save_requested = Signal(RequestData)
     save_as_requested = Signal(RequestData)
 
-    def __init__(self, request_data: RequestData = None):
+    def __init__(self, request_data: RequestData = None, metrics: MetricsManager | None = None):
         super().__init__()
         self._loading = False
+        self._metrics = metrics
         self.request_data = request_data or RequestData()
         self.init_ui()
 
@@ -125,7 +126,8 @@ class RequestWidget(QWidget):
             self.body_edit.setPlaceholderText("")
         if not self._loading and method in ("POST", "PUT"):
             self.detail_tabs.setCurrentWidget(self.body_edit)
-            MetricsManager().track_gui_method_body_autoswitch(method)
+            if self._metrics:
+                self._metrics.track_gui_method_body_autoswitch(method)
 
     def load_data(self):
         self._loading = True
@@ -162,14 +164,16 @@ class RequestWidget(QWidget):
         return request_data
 
     def on_send(self):
-        MetricsManager().track_gui_send_click()
+        if self._metrics:
+            self._metrics.track_gui_send_click()
         current_request = self.get_request_data_from_ui()
         self.request_data = current_request
         self.send_requested.emit(current_request)
 
     def on_save(self, source: str = "unknown"):
         logger.info("save_action_triggered source=%s", source)
-        MetricsManager().track_gui_save_action(source)
+        if self._metrics:
+            self._metrics.track_gui_save_action(source)
         current_request = self.get_request_data_from_ui()
         self.request_data = current_request
         self.save_requested.emit(current_request)
@@ -191,7 +195,8 @@ class RequestWidget(QWidget):
 
     def on_save_as(self, source: str = "unknown"):
         logger.info("save_as_action_triggered source=%s", source)
-        MetricsManager().track_gui_save_as_action(source)
+        if self._metrics:
+            self._metrics.track_gui_save_as_action(source)
         current_request = self.get_request_data_from_ui()
         self.save_as_requested.emit(current_request)
 

@@ -1,8 +1,12 @@
+import logging
 from PySide6.QtCore import QThread, Signal, QObject
 from typing import Dict, List, Optional
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.request_service import RequestService
+from pypost.core.metrics import MetricsManager
+
+logger = logging.getLogger(__name__)
 
 class RequestWorker(QThread):
     finished = Signal(ResponseData)
@@ -12,11 +16,16 @@ class RequestWorker(QThread):
     chunk_received = Signal(str)
     headers_received = Signal(int, dict)
 
-    def __init__(self, request_data: RequestData, variables: dict = None):
+    def __init__(
+        self,
+        request_data: RequestData,
+        variables: dict = None,
+        metrics: MetricsManager | None = None,
+    ):
         super().__init__()
         self.request_data = request_data
         self.variables = variables or {}
-        self.service = RequestService()
+        self.service = RequestService(metrics=metrics)
         self._is_stopped = False
 
     def stop(self):
@@ -54,4 +63,5 @@ class RequestWorker(QThread):
             
             self.finished.emit(result.response)
         except Exception as e:
+            logger.error("RequestWorker failed: %s", e, exc_info=True)
             self.error.emit(str(e))

@@ -32,7 +32,7 @@ test: $(VENV_MARKER)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/
 
 # Run tests with coverage report (requires pytest-cov)
-test-cov: $(VENV_MARKER)
+test-cov: $(VENV_MARKER) venv-test
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/ \
 		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov
 

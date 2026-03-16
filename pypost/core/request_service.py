@@ -19,8 +19,9 @@ class ExecutionResult:
     script_error: Optional[str]
 
 class RequestService:
-    def __init__(self):
-        self.http_client = HTTPClient()
+    def __init__(self, metrics: MetricsManager | None = None):
+        self._metrics = metrics
+        self.http_client = HTTPClient(metrics=self._metrics)
         self.mcp_client = MCPClientService()
 
     def _execute_mcp(
@@ -47,11 +48,13 @@ class RequestService:
             except json.JSONDecodeError:
                 pass
 
-        MetricsManager().track_request_sent(request.method)
+        if self._metrics:
+            self._metrics.track_request_sent(request.method)
         response = self.mcp_client.run(url, operation, call_params)
-        MetricsManager().track_response_received(
-            request.method, str(response.status_code)
-        )
+        if self._metrics:
+            self._metrics.track_response_received(
+                request.method, str(response.status_code)
+            )
         if headers_callback:
             headers_callback(response.status_code, response.headers)
         return response

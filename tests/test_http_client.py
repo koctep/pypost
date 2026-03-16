@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import requests as requests_lib
 
 from pypost.core.http_client import HTTPClient
@@ -17,14 +17,9 @@ def _make_response(status=200, headers=None, chunks=None):
 
 class TestHTTPClientSendRequest(unittest.TestCase):
     def setUp(self):
-        self.metrics_patcher = patch("pypost.core.http_client.MetricsManager")
-        self.metrics_patcher.start()
-        self.client = HTTPClient()
+        self.client = HTTPClient(metrics=MagicMock())
         self.mock_session = MagicMock()
         self.client.session = self.mock_session
-
-    def tearDown(self):
-        self.metrics_patcher.stop()
 
     def test_get_200_returns_response_data_with_correct_fields(self):
         self.mock_session.request.return_value = _make_response(

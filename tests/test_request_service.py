@@ -14,14 +14,9 @@ def _make_response(status=200, body="OK"):
 
 class TestRequestServiceExecuteHTTP(unittest.TestCase):
     def setUp(self):
-        self.metrics_patcher = patch("pypost.core.request_service.MetricsManager")
-        self.metrics_patcher.start()
-        self.svc = RequestService()
+        self.svc = RequestService(metrics=MagicMock())
         self.svc.http_client = MagicMock()
         self.svc.mcp_client = MagicMock()
-
-    def tearDown(self):
-        self.metrics_patcher.stop()
 
     def test_execute_http_success_returns_execution_result(self):
         self.svc.http_client.send_request.return_value = _make_response(200)
@@ -56,15 +51,10 @@ class TestRequestServiceExecuteHTTP(unittest.TestCase):
 
 class TestRequestServicePostScript(unittest.TestCase):
     def setUp(self):
-        self.metrics_patcher = patch("pypost.core.request_service.MetricsManager")
-        self.metrics_patcher.start()
-        self.svc = RequestService()
+        self.svc = RequestService(metrics=MagicMock())
         self.svc.http_client = MagicMock()
         self.svc.mcp_client = MagicMock()
         self.svc.http_client.send_request.return_value = _make_response(200)
-
-    def tearDown(self):
-        self.metrics_patcher.stop()
 
     def test_execute_post_script_populates_logs_and_variables(self):
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
@@ -84,14 +74,9 @@ class TestRequestServicePostScript(unittest.TestCase):
 
 class TestRequestServiceMCP(unittest.TestCase):
     def setUp(self):
-        self.metrics_patcher = patch("pypost.core.request_service.MetricsManager")
-        self.metrics_patcher.start()
-        self.svc = RequestService()
+        self.svc = RequestService(metrics=MagicMock())
         self.svc.http_client = MagicMock()
         self.svc.mcp_client = MagicMock()
-
-    def tearDown(self):
-        self.metrics_patcher.stop()
 
     def test_execute_mcp_request_delegates_to_mcp_client(self):
         self.svc.mcp_client.run.return_value = _make_response(200)
