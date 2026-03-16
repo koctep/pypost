@@ -7,6 +7,7 @@ set up your development environment, and contribute to the project.
 
 1. [Setup and Installation](setup.md)
 1. [Architecture Overview](architecture.md)
+1. [SOLID and Maintainability Audit](solid_audit.md)
 1. [MCP Integration](mcp_integration.md)
 1. [Testing via MCP and Prometheus](testing.md)
 1. [Request Actions](request_actions.md)
