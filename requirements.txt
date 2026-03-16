@@ -7,3 +7,4 @@ mcp
 starlette
 uvicorn
 prometheus_client
+sseclient-py

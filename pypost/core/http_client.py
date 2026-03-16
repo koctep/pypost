@@ -1,11 +1,16 @@
 import requests
 import time
 import json
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, List
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.template_service import template_service
 from pypost.core.metrics import MetricsManager
+
+SSE_PROBE_TIMEOUT = 10.0
+SSE_PROBE_CONNECT_TIMEOUT = 3.0
+SSE_PROBE_MAX_EVENTS = 5
+
 
 class HTTPClient:
     def __init__(self):
@@ -50,37 +55,113 @@ class HTTPClient:
             
         return kwargs
 
-    def send_request(self, request_data: RequestData, variables: Dict[str, str] = None, 
+    def _handle_sse_response(
+        self, response, request_data: RequestData, start_time: float
+    ) -> ResponseData:
+        import sseclient
+
+        elapsed = time.time() - start_time
+        resp_headers = dict(response.headers)
+
+        if response.status_code != 200:
+            try:
+                body = response.text
+            except Exception:
+                body = f"HTTP {response.status_code}"
+            response.close()
+            return ResponseData(
+                status_code=response.status_code,
+                headers=resp_headers,
+                body=body,
+                elapsed_time=elapsed,
+                size=len(body.encode("utf-8")),
+            )
+
+        events: List[str] = []
+        try:
+            client = sseclient.SSEClient(response)
+            for i, event in enumerate(client.events()):
+                if i >= SSE_PROBE_MAX_EVENTS:
+                    break
+                desc = event.event or "message"
+                if event.data:
+                    data = event.data or ""
+                    desc += (
+                        f": {data[:100]}..." if len(data) > 100 else f": {data}"
+                    )
+                events.append(desc)
+        except Exception as e:
+            response.close()
+            err_str = str(e)
+            if "timed out" in err_str or "ReadTimeout" in type(e).__name__:
+                body = (
+                    "SSE stream opened. Connection established. "
+                    "Server may not send events until client sends InitializeRequest."
+                )
+            else:
+                body = f"SSE probe: connection opened, parse error: {e}"
+            return ResponseData(
+                status_code=200,
+                headers=resp_headers,
+                body=body,
+                elapsed_time=time.time() - start_time,
+                size=len(body.encode("utf-8")),
+            )
+        finally:
+            response.close()
+
+        count = len(events)
+        if count > 0:
+            summary = f"SSE stream opened. Received {count} event(s)."
+            summary += f" First: {events[0]}"
+        else:
+            summary = (
+                "SSE stream opened. No events received within timeout. "
+                "Connection may be idle."
+            )
+        return ResponseData(
+            status_code=200,
+            headers=resp_headers,
+            body=summary,
+            elapsed_time=elapsed,
+            size=len(summary.encode("utf-8")),
+        )
+
+    def send_request(self, request_data: RequestData, variables: Dict[str, str] = None,
                     stream_callback: Callable[[str], None] = None,
                     stop_flag: Callable[[], bool] = None,
                     headers_callback: Callable[[int, Dict], None] = None) -> ResponseData:
         if variables is None:
             variables = {}
 
-        # 1. Prepare data (render templates and build kwargs)
-        # 2. Execute request
         start_time = time.time()
-        
-        # Track request sent
         MetricsManager().track_request_sent(request_data.method)
-        
+
+        url = template_service.render_string(request_data.url, variables)
+        is_sse_endpoint = (
+            request_data.method == "GET" and "/sse" in url.rstrip("/")
+        )
+
         try:
             kwargs = self._prepare_request_kwargs(request_data, variables)
+            if is_sse_endpoint:
+                kwargs["timeout"] = (SSE_PROBE_CONNECT_TIMEOUT, SSE_PROBE_TIMEOUT)
+                headers = dict(kwargs.get("headers", {}))
+                headers.setdefault("Accept", "text/event-stream")
+                kwargs["headers"] = headers
             response = self.session.request(**kwargs)
-            
         except Exception as e:
             raise e
 
         if headers_callback:
             headers_callback(response.status_code, dict(response.headers))
 
-        # Check for Transfer-Encoding: chunked. If so, and if we want to stream, we do so.
-        # But 'requests' always returns a Response object immediately if stream=True.
-        # So we can emit headers/status HERE if we had a callback for it.
-        # But we don't have a callback for headers yet in send_request signature (only stream_callback for body).
-        # We could add on_response_started callback.
+        content_type = response.headers.get("Content-Type", "")
+        if request_data.method == "GET" and (
+            "text/event-stream" in content_type or is_sse_endpoint
+        ):
+            return self._handle_sse_response(response, request_data, start_time)
 
-        # Stream content
         content_parts = []
         # iter_content with None uses optimal chunk size from server (or fallback)
         # decode_unicode=True yields strings instead of bytes

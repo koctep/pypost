@@ -1,12 +1,12 @@
 {
-  "id": "e98e2124-7836-4c4f-96a8-f9b5c2a1c22e",
-  "name": "MCP Test Collection",
+  "id": "test-collection-mcp",
+  "name": "MCP",
   "requests": [
     {
-      "id": "adefb075-3b27-4094-94b5-6928ec7b45bd",
-      "name": "Get Metrics",
+      "id": "sse-probe-metrics",
+      "name": "SSE Probe Metrics",
       "method": "GET",
-      "url": "http://localhost:9080/metrics",
+      "url": "http://127.0.0.1:9080/sse",
       "headers": {},
       "params": {},
       "body": "",
@@ -15,10 +15,10 @@
       "expose_as_mcp": true
     },
     {
-      "id": "4a863403-d1a2-411e-8675-20701f0f6daa",
-      "name": "Metrics: MCP Connect (SSE)",
+      "id": "sse-probe-main",
+      "name": "SSE Probe Main",
       "method": "GET",
-      "url": "http://localhost:9080/sse",
+      "url": "http://127.0.0.1:1080/sse",
       "headers": {},
       "params": {},
       "body": "",
@@ -27,30 +27,16 @@
       "expose_as_mcp": true
     },
     {
-      "id": "62749a4c-b649-4c5b-bb6c-9cf368308772",
-      "name": "Metrics: List Resources",
-      "method": "POST",
-      "url": "http://localhost:9080/messages",
-      "headers": {
-        "Content-Type": "application/json"
-      },
-      "params": {},
-      "body": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"resources/list\",\n  \"params\": {}\n}",
-      "body_type": "json",
-      "post_script": "",
-      "expose_as_mcp": true
-    },
-    {
-      "id": "d0c599dd-d0de-40f2-88ba-a39006cce7bb",
-      "name": "Main: MCP Connect (SSE)",
-      "method": "GET",
-      "url": "http://localhost:1080/sse",
+      "id": "mcp-list-tools",
+      "name": "List Tools",
+      "method": "MCP",
+      "url": "http://127.0.0.1:1080/sse",
       "headers": {},
       "params": {},
       "body": "",
       "body_type": "json",
       "post_script": "",
-      "expose_as_mcp": true
+      "expose_as_mcp": false
     }
   ]
 }

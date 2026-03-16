@@ -35,6 +35,9 @@ ENV/
 # VS Code
 .vscode/
 
+# Cursor
+.cursor
+
 # PyPost Data (local dev)
 collections/
 environments.json

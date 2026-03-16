@@ -262,8 +262,10 @@ class ResponseView(QWidget):
         self.search_input.clear()
         self.search_status_label.setText("")
 
-    def append_body(self, text: str):
+    def append_body(self, text):
         """Appends text to the response body."""
+        if not isinstance(text, str):
+            text = text.decode("utf-8", errors="replace")
         self.body_view.moveCursor(QTextCursor.End)
         self.body_view.insertPlainText(text)
         self.body_view.moveCursor(QTextCursor.End)
@@ -275,10 +277,14 @@ class ResponseView(QWidget):
         self.search_input.clear()
         self.search_status_label.setText("")
 
-        # Try pretty print JSON
+        body_str = (
+            response.body
+            if isinstance(response.body, str)
+            else response.body.decode("utf-8", errors="replace")
+        )
         try:
-            parsed = json.loads(response.body)
+            parsed = json.loads(body_str)
             pretty_json = json.dumps(parsed, indent=self.indent_size)
             self.body_view.setText(pretty_json)
         except Exception:
-            self.body_view.setText(response.body)
+            self.body_view.setText(body_str)

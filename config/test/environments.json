@@ -1,0 +1,8 @@
+[
+  {
+    "id": "test-env-mcp",
+    "name": "MCP Test",
+    "variables": {},
+    "enable_mcp": true
+  }
+]
