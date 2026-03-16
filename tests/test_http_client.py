@@ -81,5 +81,27 @@ class TestHTTPClientSendRequest(unittest.TestCase):
             self.client.send_request(req)
 
 
+class TestHTTPClientInjection(unittest.TestCase):
+    def test_injected_template_service_is_used_not_default(self):
+        """A TemplateService passed at construction is the one called during send_request."""
+        mock_ts = MagicMock()
+        mock_ts.render_string.side_effect = lambda s, v: s  # passthrough
+        client = HTTPClient(template_service=mock_ts)
+        client.session = MagicMock()
+        client.session.request.return_value = _make_response(200, chunks=["ok"])
+        req = RequestData(method="GET", url="http://x/{{ path }}")
+        client.send_request(req, variables={"path": "items"})
+        mock_ts.render_string.assert_called()
+
+    def test_no_injection_creates_own_template_service(self):
+        """HTTPClient() with no template_service still works (uses internal default)."""
+        client = HTTPClient()
+        client.session = MagicMock()
+        client.session.request.return_value = _make_response(200)
+        req = RequestData(method="GET", url="http://x")
+        result = client.send_request(req)
+        self.assertEqual(200, result.status_code)
+
+
 if __name__ == "__main__":
     unittest.main()

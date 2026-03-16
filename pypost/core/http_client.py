@@ -5,7 +5,7 @@ import json
 from typing import Dict, Any, Callable, List
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
-from pypost.core.template_service import template_service
+from pypost.core.template_service import TemplateService
 from pypost.core.metrics import MetricsManager
 
 logger = logging.getLogger(__name__)
@@ -16,28 +16,35 @@ SSE_PROBE_MAX_EVENTS = 5
 
 
 class HTTPClient:
-    def __init__(self, metrics: MetricsManager | None = None):
+    def __init__(self, metrics: MetricsManager | None = None,
+                 template_service: TemplateService | None = None):
         self.session = requests.Session()
         self._metrics = metrics
+        if template_service is not None:
+            self._template_service = template_service
+            logger.debug("HTTPClient: using injected TemplateService id=%d", id(template_service))
+        else:
+            self._template_service = TemplateService()
+            logger.debug("HTTPClient: created default TemplateService id=%d", id(self._template_service))
 
     def _prepare_request_kwargs(self, request_data: RequestData, variables: Dict[str, str]) -> Dict[str, Any]:
         """Prepares the arguments for requests.request by rendering templates."""
         # Render templates
-        url = template_service.render_string(request_data.url, variables)
+        url = self._template_service.render_string(request_data.url, variables)
         
         headers = {}
         for k, v in request_data.headers.items():
-            rendered_k = template_service.render_string(k, variables)
-            rendered_v = template_service.render_string(v, variables)
+            rendered_k = self._template_service.render_string(k, variables)
+            rendered_v = self._template_service.render_string(v, variables)
             headers[rendered_k] = rendered_v
 
         params = {}
         for k, v in request_data.params.items():
-            rendered_k = template_service.render_string(k, variables)
-            rendered_v = template_service.render_string(v, variables)
+            rendered_k = self._template_service.render_string(k, variables)
+            rendered_v = self._template_service.render_string(v, variables)
             params[rendered_k] = rendered_v
 
-        body = template_service.render_string(request_data.body, variables)
+        body = self._template_service.render_string(request_data.body, variables)
 
         # Prepare kwargs
         kwargs = {
@@ -142,7 +149,7 @@ class HTTPClient:
         if self._metrics:
             self._metrics.track_request_sent(request_data.method)
 
-        url = template_service.render_string(request_data.url, variables)
+        url = self._template_service.render_string(request_data.url, variables)
         is_sse_endpoint = (
             request_data.method == "GET" and "/sse" in url.rstrip("/")
         )

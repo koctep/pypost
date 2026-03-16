@@ -91,5 +91,20 @@ class TestRequestServiceMCP(unittest.TestCase):
         self.svc.http_client.send_request.assert_not_called()
 
 
+class TestRequestServiceInjection(unittest.TestCase):
+    def test_injected_template_service_forwarded_to_http_client(self):
+        """TemplateService passed to RequestService is the same instance in http_client."""
+        from pypost.core.template_service import TemplateService
+        ts = TemplateService()
+        svc = RequestService(template_service=ts)
+        self.assertIs(ts, svc._template_service)
+        self.assertIs(ts, svc.http_client._template_service)
+
+    def test_no_injection_creates_own_template_service(self):
+        """RequestService() with no template_service still works."""
+        svc = RequestService()
+        self.assertIsNotNone(svc._template_service)
+
+
 if __name__ == "__main__":
     unittest.main()

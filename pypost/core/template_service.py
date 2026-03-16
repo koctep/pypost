@@ -1,4 +1,8 @@
+import logging
 from jinja2 import Environment
+
+logger = logging.getLogger(__name__)
+
 
 class TemplateService:
     def __init__(self):
@@ -22,8 +26,7 @@ class TemplateService:
             template = self.env.from_string(content)
             return template.render(**variables)
         except Exception as e:
-            # In case of error (e.g. invalid syntax), return original content or log
-            print(f"Template rendering error: {e}")
+            logger.warning("Template rendering error (returning original): %s", e)
             return content
 
     def parse(self, content: str):
@@ -32,5 +35,3 @@ class TemplateService:
         """
         return self.env.parse(content)
 
-# Global instance
-template_service = TemplateService()

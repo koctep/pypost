@@ -1,13 +1,16 @@
 import json
+import logging
 from dataclasses import dataclass
 from typing import Dict, Any, List, Optional, Callable
+
+logger = logging.getLogger(__name__)
 
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.http_client import HTTPClient
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.script_executor import ScriptExecutor
-from pypost.core.template_service import template_service
+from pypost.core.template_service import TemplateService
 from pypost.core.metrics import MetricsManager
 
 
@@ -19,9 +22,18 @@ class ExecutionResult:
     script_error: Optional[str]
 
 class RequestService:
-    def __init__(self, metrics: MetricsManager | None = None):
+    def __init__(self, metrics: MetricsManager | None = None,
+                 template_service: TemplateService | None = None):
         self._metrics = metrics
-        self.http_client = HTTPClient(metrics=self._metrics)
+        if template_service is not None:
+            self._template_service = template_service
+            logger.debug("RequestService: using injected TemplateService id=%d", id(template_service))
+        else:
+            self._template_service = TemplateService()
+            logger.debug(
+                "RequestService: created default TemplateService id=%d", id(self._template_service)
+            )
+        self.http_client = HTTPClient(metrics=self._metrics, template_service=self._template_service)
         self.mcp_client = MCPClientService()
 
     def _execute_mcp(
@@ -30,8 +42,8 @@ class RequestService:
         variables: Dict[str, Any],
         headers_callback: Callable[[int, Dict], None] | None,
     ) -> ResponseData:
-        url = template_service.render_string(request.url, variables)
-        body = template_service.render_string(request.body, variables).strip()
+        url = self._template_service.render_string(request.url, variables)
+        body = self._template_service.render_string(request.body, variables).strip()
 
         operation = "list_tools"
         call_params: Dict[str, Any] | None = None

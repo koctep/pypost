@@ -1,5 +1,8 @@
+import logging
 from typing import List, Dict, Any, Set
 from starlette.applications import Starlette
+
+logger = logging.getLogger(__name__)
 from starlette.responses import Response
 from starlette.routing import Mount, Route
 from mcp.server import Server
@@ -7,18 +10,28 @@ from mcp.server.sse import SseServerTransport
 from mcp.types import Tool, TextContent
 from pypost.models.models import RequestData
 import jinja2
-from pypost.core.template_service import template_service
+from pypost.core.template_service import TemplateService
 from starlette.concurrency import run_in_threadpool
 from pypost.core.request_service import RequestService
 from pypost.core.metrics import MetricsManager
 
 
 class MCPServerImpl:
-    def __init__(self, name: str = "pypost-server", metrics: MetricsManager | None = None):
+    def __init__(self, name: str = "pypost-server", metrics: MetricsManager | None = None,
+                 template_service: TemplateService | None = None):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
         self._metrics = metrics
-        self.request_service = RequestService(metrics=self._metrics)
+        if template_service is not None:
+            self._template_service = template_service
+            logger.debug("MCPServerImpl: using injected TemplateService id=%d", id(template_service))
+        else:
+            self._template_service = TemplateService()
+            logger.debug(
+                "MCPServerImpl: created default TemplateService id=%d", id(self._template_service)
+            )
+        self.request_service = RequestService(metrics=self._metrics,
+                                              template_service=self._template_service)
 
         # Register handlers
         self.server.list_tools()(self.list_tools)
@@ -129,7 +142,7 @@ class MCPServerImpl:
             if not content:
                 continue
             try:
-                ast = template_service.parse(content)
+                ast = self._template_service.parse(content)
                 meta_vars = jinja2.meta.find_undeclared_variables(ast)
                 for var in meta_vars:
                     # check for mcp.request.x pattern
