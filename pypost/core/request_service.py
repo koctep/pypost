@@ -1,17 +1,19 @@
 import json
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
 
 logger = logging.getLogger(__name__)
 
-from pypost.models.models import RequestData
+from pypost.models.models import RequestData, HistoryEntry
 from pypost.models.response import ResponseData
 from pypost.core.http_client import HTTPClient
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.script_executor import ScriptExecutor
 from pypost.core.template_service import TemplateService
 from pypost.core.metrics import MetricsManager
+from pypost.core.history_manager import HistoryManager
 
 
 @dataclass
@@ -22,9 +24,14 @@ class ExecutionResult:
     script_error: Optional[str]
 
 class RequestService:
-    def __init__(self, metrics: MetricsManager | None = None,
-                 template_service: TemplateService | None = None):
+    def __init__(
+        self,
+        metrics: MetricsManager | None = None,
+        template_service: TemplateService | None = None,
+        history_manager: HistoryManager | None = None,
+    ) -> None:
         self._metrics = metrics
+        self._history_manager = history_manager
         if template_service is not None:
             self._template_service = template_service
             logger.debug("RequestService: using injected TemplateService id=%d", id(template_service))
@@ -71,13 +78,17 @@ class RequestService:
             headers_callback(response.status_code, response.headers)
         return response
 
-    def execute(self, request: RequestData, variables: Dict[str, Any] = None, 
-                stream_callback: Callable[[str], None] = None,
-                stop_flag: Callable[[], bool] = None,
-                headers_callback: Callable[[int, Dict], None] = None) -> ExecutionResult:
-        """
-        Executes a request with the given context.
-        """
+    def execute(
+        self,
+        request: RequestData,
+        variables: Dict[str, Any] = None,
+        stream_callback: Callable[[str], None] = None,
+        stop_flag: Callable[[], bool] = None,
+        headers_callback: Callable[[int, Dict], None] = None,
+        collection_name: str | None = None,
+        request_name: str | None = None,
+    ) -> ExecutionResult:
+        """Executes a request with the given context."""
         if variables is None:
             variables = {}
 
@@ -102,9 +113,43 @@ class RequestService:
                 variables
             )
 
-        return ExecutionResult(
+        result = ExecutionResult(
             response=response,
             updated_variables=updated_variables,
             script_logs=script_logs,
-            script_error=script_error
+            script_error=script_error,
         )
+
+        # 3. Record history entry (must not raise)
+        if self._history_manager:
+            try:
+                resolved_url = self._template_service.render_string(request.url, variables)
+                resolved_headers = {
+                    self._template_service.render_string(k, variables):
+                    self._template_service.render_string(v, variables)
+                    for k, v in request.headers.items()
+                }
+                resolved_body = self._template_service.render_string(request.body, variables)
+                entry = HistoryEntry(
+                    timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
+                    method=request.method,
+                    url=resolved_url,
+                    headers=resolved_headers,
+                    body=resolved_body,
+                    status_code=result.response.status_code,
+                    response_time_ms=result.response.elapsed_time * 1000.0,
+                    collection_name=collection_name,
+                    request_name=request_name,
+                )
+                self._history_manager.append(entry)
+                logger.debug(
+                    "history_entry_recorded method=%s url=%s status=%d"
+                    " response_time_ms=%.1f",
+                    entry.method, entry.url, entry.status_code, entry.response_time_ms,
+                )
+                if self._metrics:
+                    self._metrics.track_history_entry_appended(entry.method)
+            except Exception as exc:
+                logger.error("history_record_failed error=%s", exc)
+
+        return result

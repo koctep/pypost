@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.request_service import RequestService
+from pypost.core.history_manager import HistoryManager
 
 
 def _make_response(status=200, body="OK"):
@@ -104,6 +105,53 @@ class TestRequestServiceInjection(unittest.TestCase):
         """RequestService() with no template_service still works."""
         svc = RequestService()
         self.assertIsNotNone(svc._template_service)
+
+
+class TestRequestServiceHistory(unittest.TestCase):
+    def setUp(self):
+        self.history_manager = MagicMock(spec=HistoryManager)
+        self.svc = RequestService(metrics=MagicMock(), history_manager=self.history_manager)
+        self.svc.http_client = MagicMock()
+        self.svc.mcp_client = MagicMock()
+        self.svc.http_client.send_request.return_value = _make_response(200)
+
+    def test_history_entry_recorded_after_execute(self):
+        req = RequestData(method="GET", url="http://example.com", post_script="")
+        self.svc.execute(req)
+        self.history_manager.append.assert_called_once()
+        entry = self.history_manager.append.call_args[0][0]
+        self.assertEqual("GET", entry.method)
+        self.assertEqual(200, entry.status_code)
+
+    def test_history_records_resolved_url(self):
+        from pypost.core.template_service import TemplateService
+        ts = TemplateService()
+        self.svc._template_service = ts
+        req = RequestData(method="GET", url="http://{{host}}/api", post_script="")
+        self.svc.execute(req, variables={"host": "myserver.com"})
+        entry = self.history_manager.append.call_args[0][0]
+        self.assertEqual("http://myserver.com/api", entry.url)
+
+    def test_history_not_recorded_on_exception(self):
+        self.svc.http_client.send_request.side_effect = RuntimeError("network error")
+        req = RequestData(method="GET", url="http://example.com", post_script="")
+        with self.assertRaises(RuntimeError):
+            self.svc.execute(req)
+        self.history_manager.append.assert_not_called()
+
+    def test_no_history_manager_no_error(self):
+        svc = RequestService()
+        svc.http_client = MagicMock()
+        svc.http_client.send_request.return_value = _make_response(200)
+        req = RequestData(method="GET", url="http://example.com", post_script="")
+        result = svc.execute(req)
+        self.assertEqual(200, result.response.status_code)
+
+    def test_collection_name_propagated(self):
+        req = RequestData(method="GET", url="http://example.com", post_script="")
+        self.svc.execute(req, collection_name="MyCol")
+        entry = self.history_manager.append.call_args[0][0]
+        self.assertEqual("MyCol", entry.collection_name)
 
 
 if __name__ == "__main__":

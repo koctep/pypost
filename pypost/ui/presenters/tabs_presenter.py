@@ -13,6 +13,7 @@ from pypost.core.worker import RequestWorker
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.core.metrics import MetricsManager
+from pypost.core.history_manager import HistoryManager
 from pypost.models.models import RequestData, Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
@@ -63,6 +64,7 @@ class TabsPresenter(QObject):
     variable_set_requested = Signal(object, str)   # (key: str | None, value: str)
     env_update_requested = Signal(object)           # payload: dict (from RequestWorker)
     request_saved = Signal()                        # after save, triggers collections reload
+    request_executed = Signal()                     # emitted after each completed request
 
     def __init__(
         self,
@@ -70,6 +72,7 @@ class TabsPresenter(QObject):
         state_manager: StateManager,
         settings: AppSettings,
         metrics: MetricsManager | None = None,
+        history_manager: HistoryManager | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -77,6 +80,7 @@ class TabsPresenter(QObject):
         self._state_manager = state_manager
         self._settings = settings
         self._metrics = metrics
+        self._history_manager = history_manager
         self._current_variables: dict = {}
 
         self._tab_bar = TabBarWithAddButton()
@@ -303,7 +307,19 @@ class TabsPresenter(QObject):
         sender_tab.response_view.clear_body()
         sender_tab.request_editor.send_btn.setText("Stop")
 
-        worker = RequestWorker(request_data, variables=self._current_variables, metrics=self._metrics)
+        collection_name = None
+        result = self._request_manager.find_request(request_data.id)
+        if result:
+            _, found_collection = result
+            collection_name = found_collection.name
+
+        worker = RequestWorker(
+            request_data,
+            variables=self._current_variables,
+            metrics=self._metrics,
+            history_manager=self._history_manager,
+            collection_name=collection_name,
+        )
         worker.finished.connect(lambda resp: self._on_request_finished(sender_tab, resp))
         worker.error.connect(lambda err: self._on_request_error(sender_tab, err))
         worker.env_update.connect(lambda vars: self.env_update_requested.emit(vars))
@@ -319,6 +335,16 @@ class TabsPresenter(QObject):
         worker.start()
         sender_tab.worker = worker
 
+    def load_request_from_history(self, request_data: RequestData) -> None:
+        """Opens a new scratch tab pre-populated with data from a history entry."""
+        logger.info(
+            "history_request_loaded_into_editor method=%s url=%s",
+            request_data.method, request_data.url,
+        )
+        if self._metrics:
+            self._metrics.track_history_load_into_editor()
+        self.add_new_tab(request_data)
+
     def _on_request_finished(self, tab: RequestTab, response) -> None:
         method = tab.request_data.method if tab.request_data else "UNKNOWN"
         logger.info(
@@ -332,6 +358,7 @@ class TabsPresenter(QObject):
         tab.response_view.status_label.setText(f"Status: {response.status_code}")
         tab.response_view.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
         tab.response_view.size_label.setText(f"Size: {response.size} bytes")
+        self.request_executed.emit()
 
     def _on_request_error(self, tab: RequestTab, error_msg: str) -> None:
         self._reset_tab_ui_state(tab)

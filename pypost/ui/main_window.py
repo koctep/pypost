@@ -15,10 +15,12 @@ from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
+from pypost.core.history_manager import HistoryManager
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.ui.presenters import CollectionsPresenter, TabsPresenter, EnvPresenter
+from pypost.ui.widgets.history_panel import HistoryPanel
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +39,14 @@ class MainWindow(QMainWindow):
         self.mcp_manager = MCPServerManager(metrics=self.metrics)
         self.settings = self.state_manager.settings
         self.icons = self._load_icons()
+        self.history_manager = HistoryManager()
         self.collections = CollectionsPresenter(
             self.request_manager, self.state_manager, self.metrics, self.icons,
         )
         self.tabs = TabsPresenter(
-            self.request_manager, self.state_manager, self.settings, metrics=self.metrics
+            self.request_manager, self.state_manager, self.settings,
+            metrics=self.metrics,
+            history_manager=self.history_manager,
         )
         self.env = EnvPresenter(
             self.storage, self.config_manager, self.mcp_manager,
@@ -70,6 +75,7 @@ class MainWindow(QMainWindow):
         }
 
     def _build_layout(self) -> None:
+        from PySide6.QtWidgets import QTabWidget
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
@@ -80,7 +86,11 @@ class MainWindow(QMainWindow):
         top_bar.addWidget(self.settings_btn)
         main_layout.addLayout(top_bar)
         splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self.collections.widget)
+        self.history_panel = HistoryPanel(self.history_manager, icons=self.icons)
+        sidebar = QTabWidget()
+        sidebar.addTab(self.collections.widget, "Collections")
+        sidebar.addTab(self.history_panel, "History")
+        splitter.addWidget(sidebar)
         splitter.addWidget(self.tabs.widget)
         splitter.setSizes([300, 900])
         main_layout.addWidget(splitter)
@@ -95,6 +105,8 @@ class MainWindow(QMainWindow):
         self.tabs.env_update_requested.connect(self.env.on_env_update)
         self.tabs.request_saved.connect(self.collections.load_collections)
         self.tabs.request_saved.connect(self.collections.restore_tree_state)
+        self.tabs.request_executed.connect(self.history_panel.refresh)
+        self.history_panel.load_into_editor.connect(self.tabs.load_request_from_history)
 
     def _create_menu_bar(self) -> None:
         menubar = self.menuBar()

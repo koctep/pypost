@@ -108,6 +108,18 @@ class MetricsManager:
             registry=self.registry
         )
 
+        self.history_entries_appended = Counter(
+            'history_entries_appended_total',
+            'Number of request history entries recorded',
+            ['method'],
+            registry=self.registry
+        )
+        self.history_entries_loaded_into_editor = Counter(
+            'history_entries_loaded_into_editor_total',
+            'Number of history entries loaded into the request editor',
+            registry=self.registry
+        )
+
     # MCP Resource Handlers
     async def list_resources(self) -> list[Resource]:
         return [Resource(
@@ -272,3 +284,9 @@ class MetricsManager:
 
     def track_mcp_response_sent(self, method: str, status: str):
         self.mcp_responses_sent.labels(method=method, status=status).inc()
+
+    def track_history_entry_appended(self, method: str):
+        self.history_entries_appended.labels(method=method).inc()
+
+    def track_history_load_into_editor(self):
+        self.history_entries_loaded_into_editor.inc()

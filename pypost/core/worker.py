@@ -5,6 +5,7 @@ from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.request_service import RequestService
 from pypost.core.metrics import MetricsManager
+from pypost.core.history_manager import HistoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +22,14 @@ class RequestWorker(QThread):
         request_data: RequestData,
         variables: dict = None,
         metrics: MetricsManager | None = None,
+        history_manager: HistoryManager | None = None,
+        collection_name: str | None = None,
     ):
         super().__init__()
         self.request_data = request_data
         self.variables = variables or {}
-        self.service = RequestService(metrics=metrics)
+        self._collection_name = collection_name
+        self.service = RequestService(metrics=metrics, history_manager=history_manager)
         self._is_stopped = False
 
     def stop(self):
@@ -48,11 +52,13 @@ class RequestWorker(QThread):
                 self.headers_received.emit(status, headers)
 
             result = self.service.execute(
-                self.request_data, 
-                self.variables, 
+                self.request_data,
+                self.variables,
                 stream_callback=on_chunk,
                 stop_flag=check_stop,
-                headers_callback=on_headers
+                headers_callback=on_headers,
+                collection_name=self._collection_name,
+                request_name=self.request_data.name,
             )
             
             if result.script_logs or result.script_error:
