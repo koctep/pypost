@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class RequestWorker(QThread):
     finished = Signal(ResponseData)
     error = Signal(object)  # carries ExecutionError; falls back to str for cancellation
+    retry_attempt = Signal(int, int, object)  # attempt, max_retries, ExecutionError
     env_update = Signal(dict)
     script_output = Signal(list, str) # logs, error_message
     chunk_received = Signal(str)
@@ -65,6 +66,10 @@ class RequestWorker(QThread):
             def on_headers(status, headers):
                 self.headers_received.emit(status, headers)
 
+            # Define callback for retry progress
+            def on_retry(attempt: int, max_retries: int, err: ExecutionError) -> None:
+                self.retry_attempt.emit(attempt, max_retries, err)
+
             result = self.service.execute(
                 self.request_data,
                 self.variables,
@@ -73,6 +78,7 @@ class RequestWorker(QThread):
                 headers_callback=on_headers,
                 collection_name=self._collection_name,
                 request_name=self.request_data.name,
+                retry_callback=on_retry,
             )
             
             if result.script_logs or result.script_error:

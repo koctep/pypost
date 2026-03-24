@@ -135,6 +135,19 @@ class MetricsManager:
             registry=self.registry
         )
 
+        self._request_retries_total = Counter(
+            'request_retries_total',
+            'Number of retry attempts made',
+            ['method', 'status_category'],
+            registry=self.registry,
+        )
+        self._email_notification_failures_total = Counter(
+            'email_notification_failures_total',
+            'Number of requests that exhausted all retries',
+            ['endpoint'],
+            registry=self.registry,
+        )
+
     # MCP Resource Handlers
     async def list_resources(self) -> list[Resource]:
         return [Resource(
@@ -311,3 +324,11 @@ class MetricsManager:
 
     def track_history_record_error(self) -> None:
         self.history_record_errors.inc()
+
+    def track_retry_attempt(self, method: str, status_category: str) -> None:
+        self._request_retries_total.labels(
+            method=method.upper(), status_category=status_category
+        ).inc()
+
+    def track_email_notification_failure(self, endpoint: str) -> None:
+        self._email_notification_failures_total.labels(endpoint=endpoint).inc()

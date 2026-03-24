@@ -2,6 +2,8 @@ import uuid
 from typing import Dict, Optional, List
 from pydantic import BaseModel, Field
 
+from pypost.models.retry import RetryPolicy
+
 
 class RequestData(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -14,6 +16,7 @@ class RequestData(BaseModel):
     body_type: str = "json"  # json, text, etc.
     post_script: str = ""  # Python script to execute after response
     expose_as_mcp: bool = False  # Expose this request as an MCP tool
+    retry_policy: Optional[RetryPolicy] = None
 
 class Collection(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))

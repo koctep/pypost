@@ -363,6 +363,11 @@ class TabsPresenter(QObject):
         worker.headers_received.connect(
             lambda status, headers: self._on_headers_received(sender_tab, status, headers)
         )
+        worker.retry_attempt.connect(
+            lambda attempt, max_r, _err, tab=sender_tab: self._on_retry_attempt(
+                tab, attempt, max_r
+            )
+        )
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
         sender_tab.worker = worker
@@ -440,6 +445,11 @@ class TabsPresenter(QObject):
         current_text = tab.response_view.body_view.toPlainText()
         size_bytes = len(current_text.encode('utf-8'))
         tab.response_view.size_label.setText(f"Size: {size_bytes} bytes")
+
+    def _on_retry_attempt(self, tab: RequestTab, attempt: int, max_retries: int) -> None:
+        tab.request_editor.send_btn.setText(
+            f"Retrying\u2026 ({attempt} of {max_retries})"
+        )
 
     def _reset_tab_ui_state(self, tab: RequestTab) -> None:
         tab.request_editor.send_btn.setEnabled(True)

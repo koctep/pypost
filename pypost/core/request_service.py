@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
@@ -9,6 +10,8 @@ logger = logging.getLogger(__name__)
 from pypost.models.models import RequestData, HistoryEntry
 from pypost.models.response import ResponseData
 from pypost.models.errors import ErrorCategory, ExecutionError
+from pypost.models.retry import RetryPolicy
+from pypost.core.alert_manager import AlertManager, AlertPayload
 from pypost.core.http_client import HTTPClient
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.script_executor import ScriptExecutor
@@ -44,10 +47,12 @@ class RequestService:
         metrics: MetricsManager | None = None,
         template_service: TemplateService | None = None,
         history_manager: HistoryManager | None = None,
+        alert_manager: AlertManager | None = None,
     ) -> None:
         self._metrics = metrics
         self._history_manager = history_manager
         self._template_service = template_service
+        self._alert_manager = alert_manager
         if template_service is not None:
             logger.debug("RequestService: using injected TemplateService id=%d", id(template_service))
         self.http_client = HTTPClient(metrics=self._metrics, template_service=self._template_service)
@@ -88,6 +93,122 @@ class RequestService:
             headers_callback(response.status_code, response.headers)
         return response
 
+    def _execute_http_with_retry(
+        self,
+        request: RequestData,
+        variables: Dict[str, Any],
+        stream_callback: Callable[[str], None] | None,
+        stop_flag: Callable[[], bool] | None,
+        headers_callback: Callable[[int, Dict], None] | None,
+        retry_callback: Callable[[int, int, ExecutionError], None] | None,
+        request_name: str,
+    ) -> ResponseData:
+        """Execute HTTP request with optional retry and exponential back-off."""
+        policy: RetryPolicy | None = request.retry_policy
+        max_retries = policy.max_retries if policy else 0
+        delay = policy.retry_delay_seconds if policy else 1.0
+        multiplier = policy.retry_backoff_multiplier if policy else 2.0
+        retryable_codes = set(policy.retryable_status_codes) if policy else set()
+
+        last_error: ExecutionError | None = None
+
+        for attempt in range(max_retries + 1):  # attempt 0 = first try
+            if stop_flag and stop_flag():
+                raise ExecutionError(
+                    category=ErrorCategory.NETWORK,
+                    message="Request cancelled",
+                    detail="Cancelled during retry delay",
+                )
+
+            logger.debug(
+                "http_attempt method=%s url=%r attempt=%d max_retries=%d",
+                request.method, request.url, attempt, max_retries,
+            )
+
+            try:
+                response = self.http_client.send_request(
+                    request, variables, stream_callback, stop_flag, headers_callback
+                )
+                if response.status_code not in retryable_codes or attempt == max_retries:
+                    return response
+                # Retryable status code and retries remain
+                logger.warning(
+                    "retryable_status method=%s url=%r status=%d attempt=%d max_retries=%d",
+                    request.method, request.url, response.status_code, attempt, max_retries,
+                )
+                last_error = ExecutionError(
+                    category=ErrorCategory.NETWORK,
+                    message=f"HTTP {response.status_code}",
+                    detail=f"retries_attempted: {attempt}",
+                )
+            except ExecutionError as exc:
+                last_error = exc
+                if attempt == max_retries:
+                    last_error.detail = f"retries_attempted: {attempt}"
+                    self._emit_exhaustion_alert(request, request_name, max_retries, last_error)
+                    raise last_error
+                logger.warning(
+                    "retryable_error method=%s url=%r category=%s attempt=%d max_retries=%d"
+                    " error=%s",
+                    request.method, request.url, exc.category, attempt, max_retries, exc.message,
+                )
+
+            # Emit retry signal and track metrics
+            if self._metrics:
+                self._metrics.track_retry_attempt(request.method, last_error.category.value)
+            if retry_callback:
+                retry_callback(attempt + 1, max_retries, last_error)
+
+            # Exponential back-off (capped at 60 s)
+            wait = min(delay * (multiplier ** attempt), 60.0)
+            logger.debug(
+                "retry_backoff method=%s url=%r attempt=%d wait_seconds=%.2f",
+                request.method, request.url, attempt, wait,
+            )
+            end = time.monotonic() + wait
+            while time.monotonic() < end:
+                if stop_flag and stop_flag():
+                    logger.debug(
+                        "retry_cancelled_during_backoff method=%s url=%r attempt=%d",
+                        request.method, request.url, attempt,
+                    )
+                    raise ExecutionError(
+                        category=ErrorCategory.NETWORK,
+                        message="Request cancelled",
+                        detail="Cancelled during retry delay",
+                    )
+                time.sleep(0.1)
+
+        # Exhaustion — emit alert (retryable status code exhausted all retries)
+        assert last_error is not None
+        last_error.detail = f"retries_attempted: {max_retries}"
+        self._emit_exhaustion_alert(request, request_name, max_retries, last_error)
+        raise last_error
+
+    def _emit_exhaustion_alert(
+        self,
+        request: RequestData,
+        request_name: str,
+        retries_attempted: int,
+        error: ExecutionError,
+    ) -> None:
+        logger.warning(
+            "retry_exhausted method=%s url=%r request_name=%r retries=%d"
+            " error_category=%s error=%s",
+            request.method, request.url, request_name, retries_attempted,
+            error.category, error.message,
+        )
+        if self._metrics:
+            self._metrics.track_email_notification_failure(request.url)
+        if self._alert_manager:
+            self._alert_manager.emit(AlertPayload(
+                request_name=request_name or request.name,
+                endpoint=request.url,
+                retries_attempted=retries_attempted,
+                final_error_category=error.category.value,
+                final_error_message=error.message,
+            ))
+
     def execute(
         self,
         request: RequestData,
@@ -97,6 +218,7 @@ class RequestService:
         headers_callback: Callable[[int, Dict], None] = None,
         collection_name: str | None = None,
         request_name: str | None = None,
+        retry_callback: Callable[[int, int, ExecutionError], None] | None = None,
     ) -> ExecutionResult:
         """Executes a request with the given context."""
         if variables is None:
@@ -122,8 +244,14 @@ class RequestService:
             if request.method == "MCP":
                 response = self._execute_mcp(request, variables, headers_callback)
             else:
-                response = self.http_client.send_request(
-                    request, variables, stream_callback, stop_flag, headers_callback
+                response = self._execute_http_with_retry(
+                    request,
+                    variables,
+                    stream_callback,
+                    stop_flag,
+                    headers_callback,
+                    retry_callback,
+                    request_name or request.name,
                 )
         except ExecutionError as exc:
             logger.error(

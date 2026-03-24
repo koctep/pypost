@@ -57,5 +57,45 @@ class TestRequestWorkerError(unittest.TestCase):
         self.assertEqual(finished[0].status_code, 200)
 
 
+class TestRequestWorkerRetrySignal(unittest.TestCase):
+
+    def _make_worker(self):
+        req = RequestData(method="GET", url="http://x")
+        return RequestWorker(req, variables={}, metrics=MagicMock())
+
+    def test_worker_emits_retry_attempt_signal(self):
+        from pypost.core.request_service import ExecutionResult
+        from pypost.models.response import ResponseData
+        from pypost.models.retry import RetryPolicy
+
+        worker = self._make_worker()
+        retry_events = []
+        worker.retry_attempt.connect(
+            lambda attempt, max_r, err: retry_events.append((attempt, max_r, err))
+        )
+
+        # Simulate service.execute calling retry_callback once
+        def fake_execute(request, variables=None, **kwargs):
+            cb = kwargs.get("retry_callback")
+            if cb:
+                err = ExecutionError(category=ErrorCategory.NETWORK, message="fail")
+                cb(1, 2, err)
+            resp = ResponseData(
+                status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2
+            )
+            return ExecutionResult(
+                response=resp, updated_variables={}, script_logs=[], script_error=None
+            )
+
+        with patch.object(worker.service, "execute", side_effect=fake_execute):
+            worker.run()
+
+        self.assertEqual(len(retry_events), 1)
+        attempt, max_r, err = retry_events[0]
+        self.assertEqual(attempt, 1)
+        self.assertEqual(max_r, 2)
+        self.assertIsInstance(err, ExecutionError)
+
+
 if __name__ == "__main__":
     unittest.main()
