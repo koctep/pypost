@@ -312,7 +312,14 @@ class TabsPresenter(QObject):
         if not sender_tab:
             return
 
-        if sender_tab.worker and sender_tab.worker.isRunning():
+        if sender_tab.worker is not None and not sender_tab.worker.isRunning():
+            logger.debug(
+                "stale_worker_cleared method=%s url=%s",
+                request_data.method, request_data.url,
+            )
+            sender_tab.worker = None
+
+        if sender_tab.worker is not None and sender_tab.worker.isRunning():
             logger.info(
                 "request_stop_requested method=%s url=%s",
                 request_data.method, request_data.url,
@@ -358,8 +365,8 @@ class TabsPresenter(QObject):
         )
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
-        worker.start()
         sender_tab.worker = worker
+        worker.start()
 
     def load_request_from_history(self, request_data: RequestData) -> None:
         """Opens a new scratch tab pre-populated with data from a history entry."""

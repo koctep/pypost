@@ -1,4 +1,5 @@
 import logging
+import threading
 from PySide6.QtCore import QThread, Signal, QObject
 from typing import Dict, List, Optional
 from pypost.models.models import RequestData
@@ -36,22 +37,29 @@ class RequestWorker(QThread):
             logger.debug("RequestWorker: propagating TemplateService id=%d", id(template_service))
         self.service = RequestService(metrics=metrics, history_manager=history_manager,
                                       template_service=template_service)
-        self._is_stopped = False
+        self._stop_event = threading.Event()
 
     def stop(self):
         """Request the worker to stop processing."""
-        self._is_stopped = True
+        logger.debug(
+            "worker_stop_requested method=%s url=%s",
+            self.request_data.method, self.request_data.url,
+        )
+        self._stop_event.set()
 
     def run(self):
-        self._is_stopped = False
+        logger.debug(
+            "worker_run_started method=%s url=%s request_id=%s",
+            self.request_data.method, self.request_data.url, self.request_data.id,
+        )
         try:
             # Define callback for streaming
             def on_chunk(chunk: str):
                 self.chunk_received.emit(chunk)
-            
+
             # Define callback for checking stop flag
             def check_stop():
-                return self._is_stopped
+                return self._stop_event.is_set()
 
             # Define callback for headers
             def on_headers(status, headers):
@@ -72,7 +80,12 @@ class RequestWorker(QThread):
             
             if result.updated_variables:
                 self.env_update.emit(result.updated_variables)
-            
+
+            stopped = self._stop_event.is_set()
+            logger.debug(
+                "worker_run_completed method=%s url=%s stopped=%s",
+                self.request_data.method, self.request_data.url, stopped,
+            )
             self.finished.emit(result.response)
         except ExecutionError as exc:
             logger.error(
