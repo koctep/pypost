@@ -1,8 +1,27 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QListWidget,
-                               QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QMessageBox, QInputDialog, QCheckBox)
+import logging
 from typing import List
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QListWidget,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+)
+
+from pypost.core.environment_ops import clone_environment
 from pypost.models.models import Environment
+
+logger = logging.getLogger(__name__)
+
 
 class EnvironmentDialog(QDialog):
     def __init__(self, environments: List[Environment], parent=None, current_env_name: str = None):
@@ -21,6 +40,10 @@ class EnvironmentDialog(QDialog):
         left_layout = QVBoxLayout()
         self.env_list = QListWidget()
         self.env_list.currentRowChanged.connect(self.on_env_selected)
+        self.env_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.env_list.customContextMenuRequested.connect(
+            self._on_env_list_context_menu
+        )
 
         add_btn = QPushButton("Add")
         add_btn.clicked.connect(self.add_environment)
@@ -44,7 +67,7 @@ class EnvironmentDialog(QDialog):
         self.mcp_check = QCheckBox("Enable MCP (Model Context Protocol)")
         self.mcp_check.toggled.connect(self.on_mcp_toggled)
         # Initially disabled until env is selected
-        self.mcp_check.setEnabled(False) 
+        self.mcp_check.setEnabled(False)
 
         right_layout.addWidget(self.vars_table)
         right_layout.addWidget(self.mcp_check)
@@ -76,6 +99,55 @@ class EnvironmentDialog(QDialog):
         if row >= 0:
             del self.environments[row]
             self.env_list.takeItem(row)
+
+    def _on_env_list_context_menu(self, pos) -> None:
+        item = self.env_list.itemAt(pos)
+        if item is None:
+            return
+        row = self.env_list.row(item)
+        menu = QMenu(self)
+        copy_action = menu.addAction("Copy")
+        chosen = menu.exec(self.env_list.mapToGlobal(pos))
+        if chosen == copy_action:
+            self._duplicate_environment_at_row(row)
+
+    def _duplicate_environment_at_row(self, row: int) -> None:
+        if row < 0 or row >= len(self.environments):
+            return
+        source = self.environments[row]
+        default_name = f"Copy of {source.name}"
+        while True:
+            name, ok = QInputDialog.getText(
+                self, "Copy Environment", "Name:", text=default_name
+            )
+            if not ok:
+                return
+            stripped = name.strip()
+            if not stripped:
+                QMessageBox.warning(
+                    self, "Copy Environment", "Name cannot be empty."
+                )
+                default_name = name
+                continue
+            if any(e.name == stripped for e in self.environments):
+                QMessageBox.warning(
+                    self,
+                    "Copy Environment",
+                    f'An environment named "{stripped}" already exists.',
+                )
+                default_name = stripped
+                continue
+            break
+        new_env = clone_environment(source, stripped)
+        logger.info(
+            "environment_copied source_name=%s new_name=%s",
+            source.name,
+            stripped,
+        )
+        insert_at = row + 1
+        self.environments.insert(insert_at, new_env)
+        self.load_list()
+        self.env_list.setCurrentRow(insert_at)
 
     def on_env_selected(self, row):
         if row < 0 or row >= len(self.environments):
