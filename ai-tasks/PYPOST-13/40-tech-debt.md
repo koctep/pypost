@@ -1,40 +1,51 @@
 # PYPOST-13: Technical Debt Analysis
 
+
 ## Status: FIXED
 Addressed in PYPOST-14 by implementing `VariableHoverMixin`.
 
 ## Shortcuts Taken
 
-- **Variable Parsing Logic**: A simple regex `\{\{([a-zA-Z0-9_]+)\}\}` is used to find
-  variables. This works for most cases but might give false positives inside string literals if they
-  accidentally contain such a pattern, or not support complex expressions (if planned in future).
-- **Hardcoded Colors/Styles**: Tooltip styling is standard for now. Customization via QSS might be
-  needed in future.
-- **Single Level Resolution**: Variable resolution happens only one level deep. If a variable refers
-  to another variable (`VAR_A = {{VAR_B}}`), this is not handled recursively for tooltip (although
-  `TemplateEngine` might support it).
+- **Variable regex scope** ([PYPOST-113](https://pypost.atlassian.net/browse/PYPOST-113)):
+  A simple regex `\{\{([a-zA-Z0-9_]+)\}\}` finds variables. It can false-positive inside string
+  literals and does not cover complex expressions if those are added later.
+- **Default tooltip styling** ([PYPOST-114](https://pypost.atlassian.net/browse/PYPOST-114)):
+  Styling is standard QSS for now; customization may be needed later.
+- **One-level tooltip vars** ([PYPOST-115](https://pypost.atlassian.net/browse/PYPOST-115)):
+  Resolution is one level deep. Chains like `VAR_A = {{VAR_B}}` are not expanded recursively in
+  tooltips (though `TemplateEngine` may handle them elsewhere).
 
 ## Code Quality Issues
 
-- **[FIXED] Duplication of Logic**: Variable search logic (`find_variable_at_index`) was moved to a helper
-  but duplicated in `mouseMoveEvent`. Now `VariableHoverMixin` is used in `pypost/ui/widgets/mixins.py`.
-- **Direct Variable Injection**: The `set_variables` method injects dictionary directly. Perhaps using
-  `Property` or signal-slot mechanism for more reactive update would be better, but sufficient for
-  current goals.
+- **[FIXED] Duplication**: Variable search used `find_variable_at_index` in a helper and again in
+  `mouseMoveEvent`. Replaced with `VariableHoverMixin` in `pypost/ui/widgets/mixins.py`.
+- **Direct variable injection** ([PYPOST-116](https://pypost.atlassian.net/browse/PYPOST-116)):
+  `set_variables` injects a dict directly; `Property` or signals could make updates more reactive
+  but current scope is sufficient.
 
 ## Missing Tests
 
-- **Unit Tests**: Unit tests for `VariableHoverHelper` and widgets are missing. Need to add tests to verify correctness of variable detection in string and text.
-- **UI Tests**: No automatic UI tests checking tooltip appearance on mouse hover.
+- **VariableHoverHelper tests** ([PYPOST-117](https://pypost.atlassian.net/browse/PYPOST-117)):
+  Unit tests are missing for variable detection in strings and text fields.
+- **Tooltip UI** ([PYPOST-118](https://pypost.atlassian.net/browse/PYPOST-118)):
+  No automated UI tests for tooltip appearance on hover.
 
 ## Performance Concerns
 
-- **MouseMoveEvent**: `mouseMoveEvent` processing happens frequently. Current implementation (regex search) is fast enough for small strings (URL) and visible text area, but with very large text volumes in Body and many variables, ensure `find_variable_at_index` is not called too often or doesn't scan entire text every time (currently scans entire widget text `QLineEdit` and `toPlainText` for `QPlainTextEdit`).
-- *Mitigation*: For `QPlainTextEdit`, optimize search by scanning only current line or visible block, not entire `toPlainText()`. Currently entire text is taken for simplicity, which might be slow for large JSONs.
+- **Mouse move + regex** ([PYPOST-119](https://pypost.atlassian.net/browse/PYPOST-119)):
+  `mouseMoveEvent` runs often; regex over full `QLineEdit` / `QPlainTextEdit` text is fine for small
+  content but may matter for very large body text and many variables.
+- **Mitigation: scan less text** ([PYPOST-120](https://pypost.atlassian.net/browse/PYPOST-120)):
+  For `QPlainTextEdit`, scan only the current line or visible block instead of full `toPlainText()`
+  (today the whole buffer is scanned for simplicity).
 
 ## Follow-up Tasks
 
-- [ ] Write unit tests for `VariableHoverHelper`.
-- [ ] Optimize `VariableAwarePlainTextEdit` for large documents (scan only line under cursor).
-- [ ] Add support for recursive variable resolution in tooltips.
-- [ ] Implement variable highlighting in `JsonHighlighter` (PYPOST-XX).
+- Write unit tests for `VariableHoverHelper`.
+  — [PYPOST-121](https://pypost.atlassian.net/browse/PYPOST-121)
+- Optimize `VariableAwarePlainTextEdit` for large documents (scan only line under cursor).
+  — [PYPOST-122](https://pypost.atlassian.net/browse/PYPOST-122)
+- Add support for recursive variable resolution in tooltips.
+  — [PYPOST-123](https://pypost.atlassian.net/browse/PYPOST-123)
+- Implement variable highlighting in `JsonHighlighter`.
+  — [PYPOST-124](https://pypost.atlassian.net/browse/PYPOST-124)

@@ -1,8 +1,12 @@
 # PYPOST-17: Technical Debt Analysis
 
+Hyphen bullets match other task debt files. This folder stays out of `tech_debt_jira_manifest.py`
+export (`SKIP_TASK_DIRS`) so PYPOST-90…399 order matches Jira. Create Debt issues separately if
+needed.
+
 ## Shortcuts Taken
 
-* **Synchronous Execution in MCP:** `RequestService` was made synchronous because `HTTPClient` is
+- **Synchronous Execution in MCP:** `RequestService` was made synchronous because `HTTPClient` is
   built on `requests`. In `MCPServerImpl` this is handled via `run_in_threadpool`. In the future,
   when switching to an async HTTP client (e.g. `httpx`), `RequestService` will need to be updated.
 
@@ -12,13 +16,13 @@
   `TemplateEngine` (used inside `HTTPClient` and indirectly `RequestService`) may use another (or
   recreate it). This is not critical in this iteration, but having a unified `TemplateService` is
   preferable.
-* **Variable Extraction Logic:** The `_extract_mcp_variables` logic in `MCPServerImpl` still
+- **Variable Extraction Logic:** The `_extract_mcp_variables` logic in `MCPServerImpl` still
   duplicates template parsing logic that partially exists in `TemplateEngine`.
 
 ## Missing Tests
 
-* **Unit Tests for RequestService:** The class was created but no dedicated unit tests were added.
-* **Integration Tests for MCP:** No automated tests verifying script execution via MCP.
+- **Unit Tests for RequestService:** The class was created but no dedicated unit tests were added.
+- **Integration Tests for MCP:** No automated tests verifying script execution via MCP.
 
 ## Performance Concerns
 
@@ -27,5 +31,5 @@
 
 ## Follow-up Tasks
 
-* **PYPOST-8:** Add unit tests for `RequestService`.
-* **PYPOST-9:** Refactor `TemplateEngine` to eliminate Jinja2 usage duplication.
+- **PYPOST-8:** Add unit tests for `RequestService`.
+- **PYPOST-9:** Refactor `TemplateEngine` to eliminate Jinja2 usage duplication.

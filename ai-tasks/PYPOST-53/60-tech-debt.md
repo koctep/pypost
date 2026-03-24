@@ -4,7 +4,7 @@
 
 The implementation successfully adds the "Copy" functionality to the environment context menu, but it highlights a few existing architectural patterns that could be considered technical debt:
 
-1. **State Mutation in UI Components** ([PYPOST-54](https://pypost.atlassian.net/browse/PYPOST-54)): 
+1. **State Mutation in UI Components** ([PYPOST-54](https://pypost.atlassian.net/browse/PYPOST-54)):
    - `EnvironmentDialog` receives a reference to the `environments` list and mutates it directly (`self.environments.insert`, `del self.environments[row]`, etc.).
    - This tightly couples the dialog to the presenter's state. `EnvPresenter` relies on the side effects produced by `EnvironmentDialog` and immediately saves to storage after `dialog.exec()`.
    - *Recommendation for future refactoring*: The dialog should ideally work on a deep copy of the environment list and return the modified list (or emit signals for mutations), keeping state management strictly within the presenter or a dedicated state manager.

@@ -1,5 +1,6 @@
 # PYPOST-38: Technical Debt Analysis
 
+
 ## Code Review Summary
 
 **Reviewed:** `mcp_server_impl.py`, `do-testing.md`, `doc/dev/testing.md`
@@ -23,13 +24,17 @@ None. Routing fix and E501 cleanup completed.
 
 ## Code Quality Issues
 
-- `_extract_mcp_variables`: Unused Jinja2 AST branch (see above).
+- `_extract_mcp_variables`: unused Jinja2 AST branch (see above).
+  — [PYPOST-366](https://pypost.atlassian.net/browse/PYPOST-366)
 
 ## Missing Tests
 
 - No unit tests for `MCPServerImpl` or MCP routing.
+  — [PYPOST-367](https://pypost.atlassian.net/browse/PYPOST-367)
 - No integration tests that start the MCP server and verify tool invocation.
+  — [PYPOST-368](https://pypost.atlassian.net/browse/PYPOST-368)
 - `do-testing.md` describes manual/AI-driven verification, not automated pytest.
+  — [PYPOST-369](https://pypost.atlassian.net/browse/PYPOST-369)
 
 ## Performance Concerns
 
@@ -38,5 +43,8 @@ None identified.
 ## Follow-up Tasks
 
 - Consider adding automated integration tests for MCP tools and metrics (out of scope).
+  — [PYPOST-370](https://pypost.atlassian.net/browse/PYPOST-370)
 - If `do-testing.md` rules are extended, ensure `doc/dev/testing.md` stays in sync.
+  — [PYPOST-371](https://pypost.atlassian.net/browse/PYPOST-371)
 - Optionally simplify `_extract_mcp_variables` by removing the dead Jinja2 branch.
+  — [PYPOST-372](https://pypost.atlassian.net/browse/PYPOST-372)

@@ -1,5 +1,6 @@
 # PYPOST-41 Tech Debt Review
 
+
 ## Summary
 
 The PYPOST-41 implementation is solid overall. It is consistent with the established
@@ -9,7 +10,7 @@ none of which block the current delivery.
 
 ---
 
-## TD-1 — Test infrastructure bypasses `HistoryManager` constructor (HIGH)
+## TD-1 — Test infrastructure bypasses `HistoryManager` constructor (HIGH) — [PYPOST-58](https://pypost.atlassian.net/browse/PYPOST-58)
 
 **File:** `tests/test_history_manager.py`, `_manager_at()` helper (line 143)
 
@@ -24,7 +25,7 @@ then call `HistoryManager(history_path=Path(tmp_dir) / "history.json")` directly
 
 ---
 
-## TD-2 — Repeated `import tempfile` inside every test method (LOW)
+## TD-2 — Repeated `import tempfile` inside every test method (LOW) — [PYPOST-59](https://pypost.atlassian.net/browse/PYPOST-59)
 
 **File:** `tests/test_history_manager.py` (lines 28, 33, 44, 54, 65, 79, 94, 104, 120)
 
@@ -36,7 +37,7 @@ file.
 
 ---
 
-## TD-3 — Vestigial `tmp_path=None` parameter on `test_load_missing_file` (LOW)
+## TD-3 — Vestigial `tmp_path=None` parameter on `test_load_missing_file` (LOW) — [PYPOST-60](https://pypost.atlassian.net/browse/PYPOST-60)
 
 **File:** `tests/test_history_manager.py`, line 26
 
@@ -48,7 +49,7 @@ not have extra parameters; this only works because the default is `None`.
 
 ---
 
-## TD-4 — Deferred `QTabWidget` import inside method body (LOW)
+## TD-4 — Deferred `QTabWidget` import inside method body (LOW) — [PYPOST-61](https://pypost.atlassian.net/browse/PYPOST-61)
 
 **File:** `pypost/ui/main_window.py`, `_build_layout()` (line 78)
 
@@ -61,7 +62,7 @@ in `main_window.py`.
 
 ---
 
-## TD-5 — `_selected_entry()` performs a linear scan (LOW)
+## TD-5 — `_selected_entry()` performs a linear scan (LOW) — [PYPOST-62](https://pypost.atlassian.net/browse/PYPOST-62)
 
 **File:** `pypost/ui/widgets/history_panel.py`, `_selected_entry()` (line 178)
 
@@ -74,7 +75,7 @@ and use it for O(1) lookups in `_selected_entry()`.
 
 ---
 
-## TD-6 — Duplicate template rendering for HTTP requests (LOW)
+## TD-6 — Duplicate template rendering for HTTP requests (LOW) — [PYPOST-63](https://pypost.atlassian.net/browse/PYPOST-63)
 
 **File:** `pypost/core/request_service.py`, `execute()` (lines 126–132)
 
@@ -89,7 +90,7 @@ requires a `HTTPClient` interface change and is best deferred until a refactorin
 
 ---
 
-## TD-7 — Fixed heights on detail-pane text fields prevent flexible resizing (LOW)
+## TD-7 — Fixed heights on detail-pane text fields prevent flexible resizing (LOW) — [PYPOST-64](https://pypost.atlassian.net/browse/PYPOST-64)
 
 **File:** `pypost/ui/widgets/history_panel.py`, lines 69, 71
 
@@ -103,7 +104,7 @@ of `fixedHeight` so the user can still drag the splitter.
 
 ---
 
-## TD-8 — Duplicate `QPoint` import (LOW)
+## TD-8 — Duplicate `QPoint` import (LOW) — [PYPOST-65](https://pypost.atlassian.net/browse/PYPOST-65)
 
 **File:** `pypost/ui/widgets/history_panel.py`, line 9
 

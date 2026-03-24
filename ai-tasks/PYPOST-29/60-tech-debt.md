@@ -1,40 +1,47 @@
 # PYPOST-29: Technical Debt Analysis
 
+
 ## Shortcuts Taken
 
-- The `+` button position is calculated manually in `MainWindow._position_add_tab_button()` using
-  pixel offsets (`+6`) and fixed button size (`24x24`) instead of a layout-managed tab action
-  area.
-- New-tab trigger source is passed as a free-form string to metrics/logging; current callers are
-  controlled, but there is no strict enum/validation at the API boundary.
+- **Manual `+` button geometry** ([PYPOST-253](https://pypost.atlassian.net/browse/PYPOST-253)):
+  `MainWindow._position_add_tab_button()` uses pixel offsets (`+6`) and fixed size (`24x24`)
+  instead of a layout-managed tab action area.
+- **Untyped new-tab source field** ([PYPOST-254](https://pypost.atlassian.net/browse/PYPOST-254)):
+  Metrics/logging take a string source; callers are controlled but there is no enum or validation
+  at the API boundary.
 
 ## Code Quality Issues
 
-- `pypost/ui/main_window.py` continues to accumulate UI orchestration logic in one class, including
-  tab action UI placement, metrics calls, and request workflows.
-- Hardcoded spacing constants for button placement reduce adaptability for style/font changes and
-  high-DPI differences.
+- **MainWindow still a god object** ([PYPOST-255](https://pypost.atlassian.net/browse/PYPOST-255)):
+  `main_window.py` keeps accumulating UI logic in one class, including tab placement, metrics, and
+  request workflows.
+- **Hardcoded tab-button spacing** ([PYPOST-256](https://pypost.atlassian.net/browse/PYPOST-256)):
+  Magic spacing constants limit adaptability for fonts, styles, and high-DPI layouts.
 
 ## Missing Tests
 
 - No automated UI test verifies that clicking `+` produces the same behavior as `Ctrl+N`.
+  — [PYPOST-257](https://pypost.atlassian.net/browse/PYPOST-257)
 - No regression test covers `+` button placement after tab add/close/resize operations.
-- No test validates `gui_new_tab_actions_total{source=...}` increments for both `plus_button` and
-  `shortcut`.
+  — [PYPOST-258](https://pypost.atlassian.net/browse/PYPOST-258)
+- **New-tab metrics coverage** ([PYPOST-259](https://pypost.atlassian.net/browse/PYPOST-259)):
+  No test asserts `gui_new_tab_actions_total{source=...}` for both `plus_button` and `shortcut`.
 
 ## Performance Concerns
 
-- `_position_add_tab_button()` runs on tab layout changes and resize events. This is low cost for
-  current usage, but should be profiled if tab counts become very large or if extra relayout work
-  is added later.
+- **Tab button reposition cost** ([PYPOST-260](https://pypost.atlassian.net/browse/PYPOST-260)):
+  `_position_add_tab_button()` runs on tab layout changes and resize; cheap today but worth
+  profiling if tab counts or relayout work grow.
 
 ## Follow-up Tasks
 
-- Add Qt UI tests for:
+- **Qt UI tests for new tab** ([PYPOST-261](https://pypost.atlassian.net/browse/PYPOST-261)):
   - `+` click path creating one tab.
   - `Ctrl+N` and `+` parity.
   - Button positioning after resize and tab lifecycle operations.
-- Refactor tab action controls into a dedicated tab-header component to reduce `MainWindow`
-  responsibilities.
+- **Tab-header component** ([PYPOST-262](https://pypost.atlassian.net/browse/PYPOST-262)):
+  Refactor tab controls out of `MainWindow` into a dedicated tab-header component.
 - Replace magic spacing constants with named constants and document expected geometry behavior.
+  — [PYPOST-263](https://pypost.atlassian.net/browse/PYPOST-263)
 - Add a narrow source validation layer for new-tab metrics (`plus_button`, `shortcut`, `unknown`).
+  — [PYPOST-264](https://pypost.atlassian.net/browse/PYPOST-264)

@@ -1,5 +1,6 @@
 # PYPOST-52: Tech Debt Analysis
 
+
 ## Overview
 
 PYPOST-52 introduced 5 new files under `tests/` and updated 2 existing files
@@ -11,7 +12,7 @@ debt to address before or during the planned refactoring tasks (PYPOST-43–51).
 
 ## Findings
 
-### HIGH — Fragile positional argument indexing in `test_request_service.py`
+### HIGH — Fragile positional argument indexing in `test_request_service.py` — [PYPOST-83](https://pypost.atlassian.net/browse/PYPOST-83)
 
 **Location**: `tests/test_request_service.py:38, 46, 54`
 
@@ -35,7 +36,7 @@ or `call_args[1]` (kwargs dict) after verifying the call uses keyword passing.
 
 ---
 
-### MEDIUM — `ScriptExecutor` patch targets class, not instance
+### MEDIUM — `ScriptExecutor` patch targets class, not instance — [PYPOST-84](https://pypost.atlassian.net/browse/PYPOST-84)
 
 **Location**: `tests/test_request_service.py:70–82`
 
@@ -53,7 +54,7 @@ assumption should be made explicit with a comment or corrected.
 
 ---
 
-### MEDIUM — Private attribute mutation in reload test
+### MEDIUM — Private attribute mutation in reload test — [PYPOST-85](https://pypost.atlassian.net/browse/PYPOST-85)
 
 **Location**: `tests/test_request_manager.py:88`
 
@@ -71,7 +72,7 @@ the start, or add a `set_collections()` helper to `FakeStorageManager`.
 
 ---
 
-### LOW — `FakeStorageManager.saved_collections` stores names, not objects
+### LOW — `FakeStorageManager.saved_collections` stores names, not objects — [PYPOST-86](https://pypost.atlassian.net/browse/PYPOST-86)
 
 **Location**: `tests/helpers.py:11`
 
@@ -90,7 +91,7 @@ alongside the existing name list.
 
 ---
 
-### LOW — `iter_content` mock returns strings, not bytes
+### LOW — `iter_content` mock returns strings, not bytes — [PYPOST-87](https://pypost.atlassian.net/browse/PYPOST-87)
 
 **Location**: `tests/test_http_client.py:13`
 
@@ -107,7 +108,7 @@ wrong.
 
 ---
 
-### LOW — No `--cov-fail-under` threshold
+### LOW — No `--cov-fail-under` threshold — [PYPOST-88](https://pypost.atlassian.net/browse/PYPOST-88)
 
 **Location**: `Makefile` / `pytest.ini`
 
@@ -120,7 +121,7 @@ floor (e.g. 70%) and add `--cov-fail-under=70` to the `test-cov` target.
 
 ---
 
-### LOW — No CI integration
+### LOW — No CI integration — [PYPOST-89](https://pypost.atlassian.net/browse/PYPOST-89)
 
 The `pytest.ini` and `make test-cov` improvements are local-only. No pipeline
 runs tests on every push or PR.

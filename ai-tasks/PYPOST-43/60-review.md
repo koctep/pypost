@@ -1,5 +1,6 @@
 # PYPOST-43: Tech Debt Review
 
+
 ## Summary
 
 The decomposition of `MainWindow` into three focused presenters is functionally complete and
@@ -12,7 +13,7 @@ presenter layer from accumulating its own cruft.
 
 ## Findings
 
-### TD-1 — `main_window.py` exceeds the ≤ 150 LOC target (LOW)
+### TD-1 — `main_window.py` exceeds the ≤ 150 LOC target (LOW) — [PYPOST-66](https://pypost.atlassian.net/browse/PYPOST-66)
 
 **File:** `pypost/ui/main_window.py`
 **Actual:** 183 LOC (175 non-blank)
@@ -30,7 +31,7 @@ widgets.
 
 ---
 
-### TD-2 — `MainWindow.open_settings` calls a private method on `EnvPresenter` (HIGH)
+### TD-2 — `MainWindow.open_settings` calls a private method on `EnvPresenter` (HIGH) — [PYPOST-67](https://pypost.atlassian.net/browse/PYPOST-67)
 
 **File:** `pypost/ui/main_window.py:166`
 **Code:** `self.env._on_env_changed(self.env.env_selector.currentIndex())`
@@ -44,7 +45,7 @@ become stale or break.
 
 ---
 
-### TD-3 — `EnvPresenter` leaks internal widget references via properties (MEDIUM)
+### TD-3 — `EnvPresenter` leaks internal widget references via properties (MEDIUM) — [PYPOST-68](https://pypost.atlassian.net/browse/PYPOST-68)
 
 **File:** `pypost/ui/presenters/env_presenter.py:81-95`
 **Properties:** `env_selector`, `manage_btn`, `mcp_status_label`, `env_label`
@@ -58,7 +59,7 @@ internal widgets itself. Remove the four widget-exposure properties.
 
 ---
 
-### TD-4 — `Environment` import is unused in `tabs_presenter.py` (LOW)
+### TD-4 — `Environment` import is unused in `tabs_presenter.py` (LOW) — [PYPOST-69](https://pypost.atlassian.net/browse/PYPOST-69)
 
 **File:** `pypost/ui/presenters/tabs_presenter.py:17`
 **Code:** `from pypost.models.models import RequestData, Environment`
@@ -70,7 +71,7 @@ internal widgets itself. Remove the four widget-exposure properties.
 
 ---
 
-### TD-5 — `RequestTab.layout` shadows the inherited `QWidget.layout()` method (MEDIUM)
+### TD-5 — `RequestTab.layout` shadows the inherited `QWidget.layout()` method (MEDIUM) — [PYPOST-70](https://pypost.atlassian.net/browse/PYPOST-70)
 
 **File:** `pypost/ui/presenters/tabs_presenter.py:29`
 **Code:** `self.layout = QVBoxLayout(self)`
@@ -85,7 +86,7 @@ unreachable. The code works by accident today because the layout is passed to th
 
 ---
 
-### TD-6 — `_handle_send_request` locates the sending tab via `self.sender()` (MEDIUM)
+### TD-6 — `_handle_send_request` locates the sending tab via `self.sender()` (MEDIUM) — [PYPOST-71](https://pypost.atlassian.net/browse/PYPOST-71)
 
 **File:** `pypost/ui/presenters/tabs_presenter.py:270-277`
 **Pattern:**
@@ -110,7 +111,7 @@ Then change the signature to `_handle_send_request(self, sender_tab, request_dat
 
 ---
 
-### TD-7 — `MetricsManager` singleton called inside presenters rather than injected (LOW)
+### TD-7 — `MetricsManager` singleton called inside presenters rather than injected (LOW) — [PYPOST-72](https://pypost.atlassian.net/browse/PYPOST-72)
 
 **File:** `pypost/ui/presenters/tabs_presenter.py:204, 293, 320, 402, 435`
 **Code:** `MetricsManager().track_*(...)`
@@ -124,7 +125,7 @@ patching the singleton, and was explicitly flagged as R2 out of scope in the req
 
 ---
 
-### TD-8 — `_handle_save_request` uses `currentIndex()` after a modal dialog (LOW)
+### TD-8 — `_handle_save_request` uses `currentIndex()` after a modal dialog (LOW) — [PYPOST-73](https://pypost.atlassian.net/browse/PYPOST-73)
 
 **File:** `pypost/ui/presenters/tabs_presenter.py:443`
 **Code:** `current_index = self._tabs.currentIndex()`

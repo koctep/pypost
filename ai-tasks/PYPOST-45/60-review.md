@@ -1,5 +1,6 @@
 # PYPOST-45 Tech Debt Review
 
+
 ## Summary
 
 PYPOST-45 successfully removes the `template_service` module-level singleton and replaces it with
@@ -18,7 +19,7 @@ achieves its stated goal without side-effects.
 
 ## Findings
 
-### TD-1 — Trailing whitespace in `http_client.py` (Pre-existing, Low)
+### TD-1 — Trailing whitespace in `http_client.py` (Pre-existing, Low) — [PYPOST-81](https://pypost.atlassian.net/browse/PYPOST-81)
 
 **File**: `pypost/core/http_client.py`, lines 34, 51, 57
 **Type**: Style / pre-existing
@@ -28,7 +29,7 @@ achieves its stated goal without side-effects.
 
 ---
 
-### TD-2 — `logger` placement in `mcp_server_impl.py` (Pre-existing, Low)
+### TD-2 — `logger` placement in `mcp_server_impl.py` (Pre-existing, Low) — [PYPOST-82](https://pypost.atlassian.net/browse/PYPOST-82)
 
 **File**: `pypost/core/mcp_server_impl.py`, lines 5–6
 **Observation**: `logger = logging.getLogger(__name__)` is declared between two `import` blocks

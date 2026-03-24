@@ -1,34 +1,34 @@
 # PYPOST-18: Technical Debt Analysis
 
+
 ## Shortcuts Taken
 
-- **Global Instance for Singleton**: `TemplateService` is implemented as a module with global
-  instance (`template_service`). This is the "pythonic" way to implement Singleton, but in larger
-  systems a Dependency Injection container for managing dependency lifecycle may be preferable. For
-  current project size this is acceptable.
+- **Global TemplateService** ([PYPOST-143](https://pypost.atlassian.net/browse/PYPOST-143)):
+  Global `template_service` is idiomatic for this codebase size; larger systems might prefer a DI
+  container for lifecycle control.
 
 ## Code Quality Issues
 
-- **Direct Global Access**: `HTTPClient` and `MCPServerImpl` import global `template_service`
-  directly. This creates tight coupling. In the future, passing `TemplateService` through the
-  constructor (DI) could be considered if mocking is needed for `HTTPClient` unit tests.
+- **template_service imports** ([PYPOST-144](https://pypost.atlassian.net/browse/PYPOST-144)):
+  `HTTPClient` and `MCPServerImpl` import the global directly, which tightens coupling; constructor
+  injection would help if mocking `HTTPClient` becomes important.
 
 ## Missing Tests
 
-- **Unit Tests for TemplateService**: Although functionality is verified integrationally
-  (application starts and works), there are no isolated unit tests for `TemplateService` (testing
-  `render_string` with different variable types, testing template syntax error handling).
+- **TemplateService unit tests** ([PYPOST-145](https://pypost.atlassian.net/browse/PYPOST-145)):
+  Behavior is verified at integration level only; no isolated tests for `render_string`, variable
+  types, or template error handling.
 
 ## Performance Concerns
 
-- **Improvement**: Using a single `Environment` should positively affect performance via Jinja2
-  internal caching (though by default compiled template cache works only with `env.get_template`,
-  and here we use `env.from_string` which can also cache depending on settings). In this
-  implementation we simply avoid creating redundant `Environment` and `Template` objects (via old
-  `TemplateEngine`), which is already good.
+- **Shared Jinja2 Environment** ([PYPOST-146](https://pypost.atlassian.net/browse/PYPOST-146)):
+  One `Environment` helps via Jinja2 caching (note `from_string` vs `get_template` behavior).
+  Avoiding redundant `Environment`/`Template` construction versus the old `TemplateEngine` path is
+  already an improvement.
 
 ## Follow-up Tasks
 
 - Create unit tests for `pypost/core/template_service.py`.
-- Consider using `lru_cache` or built-in Jinja2 cache for `from_string` if slowdown is observed
-  when rendering the same strings repeatedly.
+  — [PYPOST-147](https://pypost.atlassian.net/browse/PYPOST-147)
+- **Jinja2 `from_string` caching** ([PYPOST-148](https://pypost.atlassian.net/browse/PYPOST-148)):
+  Consider `lru_cache` or Jinja2 cache for repeated identical templates if profiling shows need.

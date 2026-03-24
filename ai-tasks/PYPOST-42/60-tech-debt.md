@@ -1,5 +1,6 @@
 # PYPOST-42: Technical Debt Analysis
 
+
 ## Code Review Summary
 
 **Reviewed:** `pypost/ui/widgets/request_editor.py`, `pypost/core/metrics.py`,
@@ -40,12 +41,14 @@ None. All requirements implemented as designed.
 |-------|----------|------|-------|
 | No `.flake8` config | Low | project root | E501 pre-existing; affects whole codebase |
 | `QT_QPA_PLATFORM` not in Makefile `test` | Low | `Makefile` | UI tests fail in CI without it |
-| HTTP method strings not constants | Low | multiple | Pre-existing pattern; tracked since PYPOST-40 audit |
+| HTTP method strings not constants | Low | multiple | Pre-existing; see PYPOST-40 audit |
 
 ## Missing Tests
 
-- No test verifying that the Prometheus counter increments on auto-switch. Would require
-  resetting `MetricsManager` singleton between tests — non-trivial. Low priority.
+- **Auto-switch metric untested** ([PYPOST-385](https://pypost.atlassian.net/browse/PYPOST-385)):
+  No test asserts that the counter increments when the body tab auto-switches; that would
+  require resetting the `MetricsManager` singleton between tests (non-trivial). Low
+  priority.
 
 ## Performance Concerns
 

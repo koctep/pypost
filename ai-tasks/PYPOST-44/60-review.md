@@ -1,5 +1,6 @@
 # PYPOST-44: Tech Debt Review
 
+
 ## Summary
 
 PYPOST-44 successfully removes the `MetricsManager` singleton pattern and replaces it with
@@ -24,7 +25,7 @@ This document records residual tech debt and recommendations for future work.
 
 ## 2. Residual Tech Debt
 
-### TD-1: No `IMetricsManager` protocol/interface (Low — deferred by design)
+### TD-1: No `IMetricsManager` protocol/interface (Low — deferred by design) — [PYPOST-74](https://pypost.atlassian.net/browse/PYPOST-74)
 
 **Location:** All consumers of `MetricsManager`.
 
@@ -41,7 +42,7 @@ type-hint against the protocol, and `MetricsManager` would implicitly satisfy it
 
 ---
 
-### TD-2: `None`-guard pattern repeated at every call site (Low)
+### TD-2: `None`-guard pattern repeated at every call site (Low) — [PYPOST-75](https://pypost.atlassian.net/browse/PYPOST-75)
 
 **Location:** `tabs_presenter.py`, `request_editor.py`, `response_view.py`, `http_client.py`,
 `request_service.py`, `mcp_server_impl.py`.
@@ -58,7 +59,7 @@ implementation could replace the `None` guards entirely, simplifying call sites 
 
 ---
 
-### TD-3: `MetricsManager` bundles two unrelated concerns (Medium)
+### TD-3: `MetricsManager` bundles two unrelated concerns (Medium) — [PYPOST-76](https://pypost.atlassian.net/browse/PYPOST-76)
 
 **Location:** `pypost/core/metrics.py`.
 
@@ -79,7 +80,7 @@ make `MetricsManager` harder to test in isolation and harder to reason about.
 
 ---
 
-### TD-4: `_extract_mcp_variables` dead-code path in `MCPServerImpl` (Low)
+### TD-4: `_extract_mcp_variables` dead-code path in `MCPServerImpl` (Low) — [PYPOST-77](https://pypost.atlassian.net/browse/PYPOST-77)
 
 **Location:** `pypost/core/mcp_server_impl.py`, lines 117–147.
 
@@ -94,7 +95,7 @@ regex path.
 
 ---
 
-### TD-5: `import re` inside method body in `MCPServerImpl` (Low)
+### TD-5: `import re` inside method body in `MCPServerImpl` (Low) — [PYPOST-78](https://pypost.atlassian.net/browse/PYPOST-78)
 
 **Location:** `pypost/core/mcp_server_impl.py`, line 150.
 
@@ -107,7 +108,7 @@ PEP 8 requires all imports at the top of the file.
 
 ---
 
-### TD-6: Trailing whitespace in `pypost/core/http_client.py` (Low)
+### TD-6: Trailing whitespace in `pypost/core/http_client.py` (Low) — [PYPOST-79](https://pypost.atlassian.net/browse/PYPOST-79)
 
 **Location:** Lines 51, 59 (blank lines with trailing spaces).
 
@@ -120,7 +121,7 @@ but were present before.
 
 ---
 
-### TD-7: No unit tests for `MetricsManager` tracking methods (Medium)
+### TD-7: No unit tests for `MetricsManager` tracking methods (Medium) — [PYPOST-80](https://pypost.atlassian.net/browse/PYPOST-80)
 
 **Location:** `tests/` — no `test_metrics.py` exists.
 
