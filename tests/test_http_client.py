@@ -5,6 +5,7 @@ import requests as requests_lib
 from pypost.core.http_client import HTTPClient
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
+from pypost.models.errors import ErrorCategory, ExecutionError
 
 
 def _make_response(status=200, headers=None, chunks=None):
@@ -75,11 +76,33 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         result = self.client.send_request(req)
         self.assertEqual(404, result.status_code)
 
-    def test_connection_error_propagates(self):
+    def test_connection_error_raises_execution_error_network(self):
         self.mock_session.request.side_effect = requests_lib.ConnectionError("refused")
         req = RequestData(method="GET", url="http://x")
-        with self.assertRaises(requests_lib.ConnectionError):
+        with self.assertRaises(ExecutionError) as ctx:
             self.client.send_request(req)
+        self.assertEqual(ctx.exception.category, ErrorCategory.NETWORK)
+
+    def test_timeout_raises_execution_error_timeout(self):
+        self.mock_session.request.side_effect = requests_lib.Timeout("timed out")
+        req = RequestData(method="GET", url="http://x")
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client.send_request(req)
+        self.assertEqual(ctx.exception.category, ErrorCategory.TIMEOUT)
+
+    def test_request_exception_raises_execution_error_unknown(self):
+        self.mock_session.request.side_effect = requests_lib.RequestException("fail")
+        req = RequestData(method="GET", url="http://x")
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client.send_request(req)
+        self.assertEqual(ctx.exception.category, ErrorCategory.UNKNOWN)
+
+    def test_execution_error_detail_contains_original_message(self):
+        self.mock_session.request.side_effect = requests_lib.ConnectionError("conn refused")
+        req = RequestData(method="GET", url="http://x")
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client.send_request(req)
+        self.assertIn("conn refused", ctx.exception.detail)
 
 
 class TestHTTPClientInjection(unittest.TestCase):

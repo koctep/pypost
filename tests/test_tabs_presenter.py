@@ -230,5 +230,91 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(len(received), 1)
 
 
+class TestOnRequestError(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _make_presenter_with_tab(self):
+        from pypost.models.errors import ErrorCategory, ExecutionError
+        from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab
+
+        rm = FakeRequestManager()
+        sm = FakeStateManager()
+        p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
+        req = _make_request("r1", "Test", "GET")
+        p.add_new_tab(req)
+        tab = p.widget.widget(0)
+        return p, tab
+
+    def test_str_cancellation_message_no_dialog(self):
+        p, tab = self._make_presenter_with_tab()
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            p._on_request_error(tab, "request cancelled")
+            mock_mb.critical.assert_not_called()
+
+    def test_str_error_shows_dialog(self):
+        p, tab = self._make_presenter_with_tab()
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            p._on_request_error(tab, "connection refused")
+            mock_mb.critical.assert_called_once()
+
+    def test_execution_error_network_shows_category_message(self):
+        from pypost.models.errors import ErrorCategory, ExecutionError
+        p, tab = self._make_presenter_with_tab()
+        exc = ExecutionError(
+            category=ErrorCategory.NETWORK,
+            message="no conn",
+            detail="connection refused",
+        )
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            p._on_request_error(tab, exc)
+            mock_mb.critical.assert_called_once()
+            args = mock_mb.critical.call_args[0]
+            self.assertIn("Request Error", args[1])
+            self.assertIn("server is running", args[2])
+
+    def test_execution_error_timeout_shows_timeout_message(self):
+        from pypost.models.errors import ErrorCategory, ExecutionError
+        p, tab = self._make_presenter_with_tab()
+        exc = ExecutionError(
+            category=ErrorCategory.TIMEOUT,
+            message="timed out",
+            detail="ReadTimeout",
+        )
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            p._on_request_error(tab, exc)
+            args = mock_mb.critical.call_args[0]
+            self.assertIn("timed out", args[2])
+
+    def test_execution_error_cancelled_no_dialog(self):
+        from pypost.models.errors import ErrorCategory, ExecutionError
+        p, tab = self._make_presenter_with_tab()
+        exc = ExecutionError(
+            category=ErrorCategory.UNKNOWN,
+            message="something",
+            detail="request aborted by user",
+        )
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            p._on_request_error(tab, exc)
+            mock_mb.critical.assert_not_called()
+
+    def test_execution_error_message_does_not_expose_raw_detail_for_network(self):
+        """NETWORK message uses URL not raw detail."""
+        from pypost.models.errors import ErrorCategory, ExecutionError
+        p, tab = self._make_presenter_with_tab()
+        raw_detail = "HTTPSConnectionPool(host='secret', port=443): Max retries exceeded"
+        exc = ExecutionError(
+            category=ErrorCategory.NETWORK,
+            message="no conn",
+            detail=raw_detail,
+        )
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            p._on_request_error(tab, exc)
+            args = mock_mb.critical.call_args[0]
+            # The NETWORK template uses {url}, not {detail}
+            self.assertNotIn(raw_detail, args[2])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,7 @@ import json
 from typing import Dict, Any, Callable, List
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
+from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.core.template_service import TemplateService
 from pypost.core.metrics import MetricsManager
 
@@ -159,12 +160,27 @@ class HTTPClient:
                 headers.setdefault("Accept", "text/event-stream")
                 kwargs["headers"] = headers
             response = self.session.request(**kwargs)
-        except Exception as e:
-            logger.error(
-                "Request failed: %s %s — %s",
-                request_data.method, url, e,
-            )
-            raise
+        except requests.Timeout as exc:
+            logger.error("Request timed out: %s %s", request_data.method, url)
+            raise ExecutionError(
+                category=ErrorCategory.TIMEOUT,
+                message=f"Request to {url} timed out.",
+                detail=str(exc),
+            ) from exc
+        except requests.ConnectionError as exc:
+            logger.error("Connection failed: %s %s", request_data.method, url)
+            raise ExecutionError(
+                category=ErrorCategory.NETWORK,
+                message=f"Could not connect to {url}.",
+                detail=str(exc),
+            ) from exc
+        except requests.RequestException as exc:
+            logger.error("Request failed: %s %s — %s", request_data.method, url, exc)
+            raise ExecutionError(
+                category=ErrorCategory.UNKNOWN,
+                message="An unexpected request error occurred.",
+                detail=str(exc),
+            ) from exc
 
         if headers_callback:
             headers_callback(response.status_code, dict(response.headers))

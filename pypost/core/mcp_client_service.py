@@ -1,6 +1,7 @@
 """MCP client service for testing MCP endpoints via full protocol handshake."""
 import asyncio
 import json
+import logging
 import time
 from typing import Any
 
@@ -8,6 +9,9 @@ from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 
 from pypost.models.response import ResponseData
+from pypost.models.errors import ErrorCategory, ExecutionError
+
+logger = logging.getLogger(__name__)
 
 MCP_CONNECT_TIMEOUT = 3.0
 MCP_SSE_READ_TIMEOUT = 10.0
@@ -35,6 +39,7 @@ class MCPClientService:
             ResponseData with JSON body (tools list or call result) or error message.
         """
         start_time = time.time()
+        logger.debug("mcp_operation_start url=%s operation=%s", url, operation)
         try:
             result = asyncio.run(
                 asyncio.wait_for(
@@ -42,50 +47,38 @@ class MCPClientService:
                     timeout=MCP_TOTAL_TIMEOUT,
                 )
             )
-        except asyncio.TimeoutError:
-            elapsed = time.time() - start_time
-            err_body = json.dumps(
-                {
-                    "error": f"Timeout after {MCP_TOTAL_TIMEOUT}s",
-                    "hint": (
-                        "Ensure MCP server is running (enable_mcp in environment) "
-                        "and reachable at the given URL."
-                    ),
-                }
+        except asyncio.TimeoutError as exc:
+            logger.error(
+                "mcp_operation_timeout url=%s operation=%s timeout=%.1f",
+                url, operation, MCP_TOTAL_TIMEOUT,
             )
-            return ResponseData(
-                status_code=504,
-                headers={},
-                body=err_body,
-                elapsed_time=elapsed,
-                size=len(err_body.encode("utf-8")),
-            )
-        except Exception as e:
-            elapsed = time.time() - start_time
-            err_msg = str(e)
-            if isinstance(e, BaseExceptionGroup):
-                err_msg = "; ".join(str(x) for x in e.exceptions)
-            hint = ""
-            err_type = type(e).__name__
+            raise ExecutionError(
+                category=ErrorCategory.TIMEOUT,
+                message=f"MCP request timed out after {MCP_TOTAL_TIMEOUT}s.",
+                detail=str(exc),
+            ) from exc
+        except Exception as exc:
+            err_msg = str(exc)
+            if isinstance(exc, BaseExceptionGroup):
+                err_msg = "; ".join(str(x) for x in exc.exceptions)
+            err_type = type(exc).__name__
             if "ConnectError" in err_type or "connection" in err_msg.lower():
-                hint = " Is the MCP server running? Select environment with enable_mcp."
+                category = ErrorCategory.NETWORK
+                message = "Could not connect to MCP server. Is it running?"
             elif "Timeout" in err_type or "timeout" in err_msg.lower():
-                hint = (
-                    " Server may not send endpoint event. Check server is MCP SSE "
-                    "compatible."
-                )
-            body = json.dumps(
-                {"error": err_msg, "hint": hint} if hint else {"error": err_msg}
+                category = ErrorCategory.TIMEOUT
+                message = "MCP server did not respond in time."
+            else:
+                category = ErrorCategory.UNKNOWN
+                message = "MCP operation failed."
+            logger.error(
+                "mcp_operation_failed url=%s operation=%s category=%s detail=%s",
+                url, operation, category, err_msg,
             )
-            return ResponseData(
-                status_code=500,
-                headers={},
-                body=body,
-                elapsed_time=elapsed,
-                size=len(body.encode("utf-8")),
-            )
+            raise ExecutionError(category=category, message=message, detail=err_msg) from exc
 
         elapsed = time.time() - start_time
+        logger.debug("mcp_operation_success url=%s operation=%s elapsed=%.3f", url, operation, elapsed)
         body_str = result if isinstance(result, str) else json.dumps(result)
         return ResponseData(
             status_code=200,

@@ -3,6 +3,7 @@ from PySide6.QtCore import QThread, Signal, QObject
 from typing import Dict, List, Optional
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
+from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.core.request_service import RequestService
 from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class RequestWorker(QThread):
     finished = Signal(ResponseData)
-    error = Signal(str)
+    error = Signal(object)  # carries ExecutionError; falls back to str for cancellation
     env_update = Signal(dict)
     script_output = Signal(list, str) # logs, error_message
     chunk_received = Signal(str)
@@ -73,6 +74,15 @@ class RequestWorker(QThread):
                 self.env_update.emit(result.updated_variables)
             
             self.finished.emit(result.response)
-        except Exception as e:
-            logger.error("RequestWorker failed: %s", e, exc_info=True)
-            self.error.emit(str(e))
+        except ExecutionError as exc:
+            logger.error(
+                "RequestWorker failed category=%s detail=%s", exc.category, exc.detail
+            )
+            self.error.emit(exc)
+        except Exception as exc:
+            logger.error("RequestWorker unexpected error: %s", exc, exc_info=True)
+            self.error.emit(ExecutionError(
+                category=ErrorCategory.UNKNOWN,
+                message="An unexpected error occurred.",
+                detail=str(exc),
+            ))

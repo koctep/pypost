@@ -9,6 +9,8 @@ from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp.types import Resource, TextResourceContents
 
+from pypost.models.errors import ErrorCategory
+
 logger = logging.getLogger(__name__)
 
 
@@ -117,6 +119,19 @@ class MetricsManager:
         self.history_entries_loaded_into_editor = Counter(
             'history_entries_loaded_into_editor_total',
             'Number of history entries loaded into the request editor',
+            registry=self.registry
+        )
+
+        self.request_errors = Counter(
+            'request_errors_total',
+            'Number of request execution errors by category',
+            ['category'],
+            registry=self.registry
+        )
+
+        self.history_record_errors = Counter(
+            'history_record_errors_total',
+            'Number of history recording failures',
             registry=self.registry
         )
 
@@ -290,3 +305,9 @@ class MetricsManager:
 
     def track_history_load_into_editor(self):
         self.history_entries_loaded_into_editor.inc()
+
+    def track_request_error(self, category: ErrorCategory) -> None:
+        self.request_errors.labels(category=category).inc()
+
+    def track_history_record_error(self) -> None:
+        self.history_record_errors.inc()

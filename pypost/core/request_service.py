@@ -1,6 +1,6 @@
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
 
@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 from pypost.models.models import RequestData, HistoryEntry
 from pypost.models.response import ResponseData
+from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.core.http_client import HTTPClient
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.script_executor import ScriptExecutor
@@ -22,6 +23,20 @@ class ExecutionResult:
     updated_variables: Dict[str, Any]
     script_logs: List[str]
     script_error: Optional[str]
+    execution_error: Optional[ExecutionError] = field(default=None)
+
+
+def _error_response(exc: ExecutionError) -> ResponseData:
+    """Synthesises a ResponseData placeholder for failed requests."""
+    body = json.dumps({"error": exc.message, "detail": exc.detail})
+    return ResponseData(
+        status_code=0,
+        headers={},
+        body=body,
+        elapsed_time=0.0,
+        size=len(body.encode("utf-8")),
+    )
+
 
 class RequestService:
     def __init__(
@@ -87,19 +102,49 @@ class RequestService:
         if variables is None:
             variables = {}
 
-        # 1. Execute request
-        if request.method == "MCP":
-            response = self._execute_mcp(request, variables, headers_callback)
-        else:
-            response = self.http_client.send_request(
-                request, variables, stream_callback, stop_flag, headers_callback
+        # 1. Template render guard — convert Jinja2 errors to ExecutionError(TEMPLATE)
+        if self._template_service:
+            try:
+                self._template_service.render_string(request.url, variables)
+            except Exception as exc:
+                logger.error(
+                    "template_render_failed url=%r detail=%s",
+                    request.url, exc,
+                )
+                raise ExecutionError(
+                    category=ErrorCategory.TEMPLATE,
+                    message="Template rendering failed.",
+                    detail=str(exc),
+                ) from exc
+
+        # 2. Execute request, catching structured errors
+        try:
+            if request.method == "MCP":
+                response = self._execute_mcp(request, variables, headers_callback)
+            else:
+                response = self.http_client.send_request(
+                    request, variables, stream_callback, stop_flag, headers_callback
+                )
+        except ExecutionError as exc:
+            logger.error(
+                "request_execution_failed method=%s url=%r category=%s detail=%s",
+                request.method, request.url, exc.category, exc.detail,
+            )
+            if self._metrics:
+                self._metrics.track_request_error(exc.category)
+            return ExecutionResult(
+                response=_error_response(exc),
+                updated_variables={},
+                script_logs=[],
+                script_error=None,
+                execution_error=exc,
             )
 
         updated_variables = {}
         script_logs = []
         script_error = None
 
-        # 2. Execute post-request script if exists
+        # 3. Execute post-request script if exists
         if request.post_script:
             updated_variables, script_logs, script_error = ScriptExecutor.execute(
                 request.post_script,
@@ -108,14 +153,25 @@ class RequestService:
                 variables
             )
 
+        exec_error_from_script = None
+        if script_error:
+            exec_error_from_script = ExecutionError(
+                category=ErrorCategory.SCRIPT,
+                message="Post-script execution failed.",
+                detail=script_error,
+            )
+            if self._metrics:
+                self._metrics.track_request_error(ErrorCategory.SCRIPT)
+
         result = ExecutionResult(
             response=response,
             updated_variables=updated_variables,
             script_logs=script_logs,
             script_error=script_error,
+            execution_error=exec_error_from_script,
         )
 
-        # 3. Record history entry (must not raise)
+        # 4. Record history entry (must not raise)
         if self._history_manager:
             try:
                 resolved_url = self._template_service.render_string(request.url, variables)
@@ -146,5 +202,7 @@ class RequestService:
                     self._metrics.track_history_entry_appended(entry.method)
             except Exception as exc:
                 logger.error("history_record_failed error=%s", exc)
+                if self._metrics:
+                    self._metrics.track_history_record_error()
 
         return result
