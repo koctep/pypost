@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import requests as requests_lib
 
 from pypost.core.http_client import HTTPClient
+from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 
 
@@ -17,7 +18,7 @@ def _make_response(status=200, headers=None, chunks=None):
 
 class TestHTTPClientSendRequest(unittest.TestCase):
     def setUp(self):
-        self.client = HTTPClient(metrics=MagicMock())
+        self.client = HTTPClient(metrics=MagicMock(), template_service=TemplateService())
         self.mock_session = MagicMock()
         self.client.session = self.mock_session
 
@@ -93,14 +94,10 @@ class TestHTTPClientInjection(unittest.TestCase):
         client.send_request(req, variables={"path": "items"})
         mock_ts.render_string.assert_called()
 
-    def test_no_injection_creates_own_template_service(self):
-        """HTTPClient() with no template_service still works (uses internal default)."""
+    def test_no_injection_sets_template_service_to_none(self):
+        """HTTPClient() with no template_service stores None (no silent fallback)."""
         client = HTTPClient()
-        client.session = MagicMock()
-        client.session.request.return_value = _make_response(200)
-        req = RequestData(method="GET", url="http://x")
-        result = client.send_request(req)
-        self.assertEqual(200, result.status_code)
+        self.assertIsNone(client._template_service)
 
 
 if __name__ == "__main__":

@@ -32,14 +32,9 @@ class RequestService:
     ) -> None:
         self._metrics = metrics
         self._history_manager = history_manager
+        self._template_service = template_service
         if template_service is not None:
-            self._template_service = template_service
             logger.debug("RequestService: using injected TemplateService id=%d", id(template_service))
-        else:
-            self._template_service = TemplateService()
-            logger.debug(
-                "RequestService: created default TemplateService id=%d", id(self._template_service)
-            )
         self.http_client = HTTPClient(metrics=self._metrics, template_service=self._template_service)
         self.mcp_client = MCPClientService()
 

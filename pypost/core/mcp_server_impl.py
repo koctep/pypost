@@ -22,14 +22,9 @@ class MCPServerImpl:
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
         self._metrics = metrics
+        self._template_service = template_service
         if template_service is not None:
-            self._template_service = template_service
             logger.debug("MCPServerImpl: using injected TemplateService id=%d", id(template_service))
-        else:
-            self._template_service = TemplateService()
-            logger.debug(
-                "MCPServerImpl: created default TemplateService id=%d", id(self._template_service)
-            )
         self.request_service = RequestService(metrics=self._metrics,
                                               template_service=self._template_service)
 

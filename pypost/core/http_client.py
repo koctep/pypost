@@ -20,12 +20,9 @@ class HTTPClient:
                  template_service: TemplateService | None = None):
         self.session = requests.Session()
         self._metrics = metrics
+        self._template_service = template_service
         if template_service is not None:
-            self._template_service = template_service
             logger.debug("HTTPClient: using injected TemplateService id=%d", id(template_service))
-        else:
-            self._template_service = TemplateService()
-            logger.debug("HTTPClient: created default TemplateService id=%d", id(self._template_service))
 
     def _prepare_request_kwargs(self, request_data: RequestData, variables: Dict[str, str]) -> Dict[str, Any]:
         """Prepares the arguments for requests.request by rendering templates."""

@@ -6,6 +6,7 @@ from pypost.models.response import ResponseData
 from pypost.core.request_service import RequestService
 from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
+from pypost.core.template_service import TemplateService
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +25,16 @@ class RequestWorker(QThread):
         metrics: MetricsManager | None = None,
         history_manager: HistoryManager | None = None,
         collection_name: str | None = None,
+        template_service: TemplateService | None = None,
     ):
         super().__init__()
         self.request_data = request_data
         self.variables = variables or {}
         self._collection_name = collection_name
-        self.service = RequestService(metrics=metrics, history_manager=history_manager)
+        if template_service is not None:
+            logger.debug("RequestWorker: propagating TemplateService id=%d", id(template_service))
+        self.service = RequestService(metrics=metrics, history_manager=history_manager,
+                                      template_service=template_service)
         self._is_stopped = False
 
     def stop(self):

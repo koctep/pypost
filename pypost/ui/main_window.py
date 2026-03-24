@@ -16,6 +16,7 @@ from pypost.core.state_manager import StateManager
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
+from pypost.core.template_service import TemplateService
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.about_dialog import AboutDialog
@@ -26,17 +27,19 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, metrics: MetricsManager) -> None:
+    def __init__(self, metrics: MetricsManager, template_service: TemplateService) -> None:
         super().__init__()
         self.setWindowTitle("PyPost")
         self.resize(1200, 800)
         self.metrics = metrics
+        self.template_service = template_service
         self.storage = StorageManager()
         self.config_manager = ConfigManager()
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
         self.style_manager = StyleManager()
-        self.mcp_manager = MCPServerManager(metrics=self.metrics)
+        self.mcp_manager = MCPServerManager(metrics=self.metrics,
+                                            template_service=self.template_service)
         self.settings = self.state_manager.settings
         self.icons = self._load_icons()
         self.history_manager = HistoryManager()
@@ -47,6 +50,7 @@ class MainWindow(QMainWindow):
             self.request_manager, self.state_manager, self.settings,
             metrics=self.metrics,
             history_manager=self.history_manager,
+            template_service=self.template_service,
         )
         self.env = EnvPresenter(
             self.storage, self.config_manager, self.mcp_manager,

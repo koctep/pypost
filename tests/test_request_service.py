@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.request_service import RequestService
+from pypost.core.template_service import TemplateService
 from pypost.core.history_manager import HistoryManager
 
 
@@ -75,7 +76,7 @@ class TestRequestServicePostScript(unittest.TestCase):
 
 class TestRequestServiceMCP(unittest.TestCase):
     def setUp(self):
-        self.svc = RequestService(metrics=MagicMock())
+        self.svc = RequestService(metrics=MagicMock(), template_service=TemplateService())
         self.svc.http_client = MagicMock()
         self.svc.mcp_client = MagicMock()
 
@@ -101,16 +102,20 @@ class TestRequestServiceInjection(unittest.TestCase):
         self.assertIs(ts, svc._template_service)
         self.assertIs(ts, svc.http_client._template_service)
 
-    def test_no_injection_creates_own_template_service(self):
-        """RequestService() with no template_service still works."""
+    def test_no_injection_sets_template_service_to_none(self):
+        """RequestService() with no template_service stores None (no silent fallback)."""
         svc = RequestService()
-        self.assertIsNotNone(svc._template_service)
+        self.assertIsNone(svc._template_service)
 
 
 class TestRequestServiceHistory(unittest.TestCase):
     def setUp(self):
         self.history_manager = MagicMock(spec=HistoryManager)
-        self.svc = RequestService(metrics=MagicMock(), history_manager=self.history_manager)
+        self.svc = RequestService(
+            metrics=MagicMock(),
+            history_manager=self.history_manager,
+            template_service=TemplateService(),
+        )
         self.svc.http_client = MagicMock()
         self.svc.mcp_client = MagicMock()
         self.svc.http_client.send_request.return_value = _make_response(200)
