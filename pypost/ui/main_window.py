@@ -112,6 +112,7 @@ class MainWindow(QMainWindow):
 
     def _wire_signals(self) -> None:
         self.collections.open_request_in_tab.connect(self.tabs.add_new_tab)
+        self.collections.open_request_in_isolated_tab.connect(self.tabs.add_new_tab)
         self.collections.collections_changed.connect(self.env.load_environments)
         self.collections.request_renamed.connect(self.tabs.rename_request_tabs)
         self.env.env_variables_changed.connect(self.tabs.on_env_variables_changed)

@@ -168,7 +168,7 @@ class TabsPresenter(QObject):
             result = self._request_manager.find_request(request_id)
             if result:
                 found_request, _ = result
-                self.add_new_tab(found_request, save_state=False)
+                self.add_new_tab(found_request.model_copy(deep=True), save_state=False)
                 tabs_restored = True
                 restored_count += 1
             else:

@@ -18,6 +18,7 @@ class CollectionsPresenter(QObject):
     """Owns the collections tree view: loading, rendering, rename, delete, and tab opening."""
 
     open_request_in_tab = Signal(object)   # payload: RequestData
+    open_request_in_isolated_tab = Signal(object)  # payload: RequestData (deep copy)
     collections_changed = Signal()         # after create / delete / rename
     request_renamed = Signal(str, str)     # (request_id, new_name)
 
@@ -119,14 +120,31 @@ class CollectionsPresenter(QObject):
             return
 
         item = self._model.itemFromIndex(index)
-        item_type, item_id, item_label, _ = self._resolve_collection_item_target(item)
+        item_type, item_id, item_label, data = self._resolve_collection_item_target(item)
         if not item_type or not item_id:
             return
 
         menu = QMenu(self._view)
+
+        new_tab_action = None
+        if item_type == "request" and isinstance(data, RequestData):
+            new_tab_action = menu.addAction("New tab")
+            new_tab_action.setToolTip(
+                "Open a separate copy of this request; edits in other tabs won't apply here."
+            )
+
         rename_action = menu.addAction("Rename")
         delete_action = menu.addAction("Delete")
         selected_action = menu.exec(self._view.viewport().mapToGlobal(pos))
+
+        if new_tab_action and selected_action == new_tab_action:
+            logger.info(
+                "collection_request_open_new_tab request_id=%s request_name=%s",
+                data.id, data.name,
+            )
+            self._metrics.track_gui_new_tab_action("collections_context")
+            self.open_request_in_isolated_tab.emit(data.model_copy(deep=True))
+            return
 
         if selected_action == rename_action:
             logger.info(
