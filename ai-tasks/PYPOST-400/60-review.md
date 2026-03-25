@@ -27,7 +27,7 @@ and minor improvement opportunities for future sprints.
 
 ## Residual Tech Debt
 
-### TD-1 — `script_error: Optional[str]` is now partially redundant
+### TD-1 — `script_error: Optional[str]` is now partially redundant ([PYPOST-409](https://pypost.atlassian.net/browse/PYPOST-409))
 
 **File:** `pypost/core/request_service.py`
 
@@ -41,7 +41,7 @@ but it creates a dual-source-of-truth for script failures.
 
 ---
 
-### TD-2 — Template render guard duplicates work
+### TD-2 — Template render guard duplicates work ([PYPOST-410](https://pypost.atlassian.net/browse/PYPOST-410))
 
 **File:** `pypost/core/request_service.py`, lines 106–118
 
@@ -56,7 +56,7 @@ will be raised naturally during execution.
 
 ---
 
-### TD-3 — `MCPClientService` heuristic error classification is fragile
+### TD-3 — `MCPClientService` heuristic error classification is fragile ([PYPOST-411](https://pypost.atlassian.net/browse/PYPOST-411))
 
 **File:** `pypost/core/mcp_client_service.py`, lines 65–73
 
@@ -70,7 +70,7 @@ pattern used in `http_client.py`.
 
 ---
 
-### TD-4 — `worker.py` `ExecutionError` handler is dead code
+### TD-4 — `worker.py` `ExecutionError` handler is dead code ([PYPOST-412](https://pypost.atlassian.net/browse/PYPOST-412))
 
 **File:** `pypost/core/worker.py`, lines 77–81
 
@@ -84,7 +84,7 @@ correct but not covered by the worker tests.
 
 ---
 
-### TD-5 — `_on_request_error` cancellation check on `ExecutionError.detail` is imprecise
+### TD-5 — `_on_request_error` cancellation check on `ExecutionError.detail` is imprecise ([PYPOST-413](https://pypost.atlassian.net/browse/PYPOST-413))
 
 **File:** `pypost/ui/presenters/tabs_presenter.py`, lines 403–407
 
@@ -97,7 +97,7 @@ cancellations will surface as error dialogs.
 
 ---
 
-### TD-6 — Pre-existing test failures not addressed
+### TD-6 — Pre-existing test failures not addressed ([PYPOST-414](https://pypost.atlassian.net/browse/PYPOST-414))
 
 **Files:** `tests/test_http_client_sse_probe.py`, `tests/test_history_manager.py`
 

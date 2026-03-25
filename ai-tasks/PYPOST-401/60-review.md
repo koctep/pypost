@@ -17,7 +17,7 @@ temporary flags, or skipped requirements were introduced.
 
 ## Pre-existing Debt Surfaced During Review
 
-### TD-1: `_reset_tab_ui_state` clears `sender_tab.worker = None` asynchronously via Qt signals
+### TD-1: `_reset_tab_ui_state` clears `sender_tab.worker = None` asynchronously via Qt signals ([PYPOST-415](https://pypost.atlassian.net/browse/PYPOST-415))
 
 **Location:** `pypost/ui/presenters/tabs_presenter.py` — `_reset_tab_ui_state`
 
@@ -36,7 +36,7 @@ dependency. No code change required now. Track as minor debt.
 
 ---
 
-### TD-2: No test for the `stale_worker_cleared` log path (RC-3 observable path)
+### TD-2: No test for the `stale_worker_cleared` log path (RC-3 observable path) ([PYPOST-416](https://pypost.atlassian.net/browse/PYPOST-416))
 
 **Location:** `tests/test_worker_race.py`
 
@@ -53,7 +53,7 @@ log provides a runtime signal. A unit test would be straightforward to add.
 
 ---
 
-### TD-3: `RequestWorker` is not reusable after `stop()`
+### TD-3: `RequestWorker` is not reusable after `stop()` ([PYPOST-417](https://pypost.atlassian.net/browse/PYPOST-417))
 
 **Location:** `pypost/core/worker.py`
 

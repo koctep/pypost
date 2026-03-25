@@ -16,7 +16,7 @@ maintenance risk.
 
 ## Critical Issues
 
-### TD-1: `AlertManager` never injected into `RequestWorker`
+### TD-1: `AlertManager` never injected into `RequestWorker` ([PYPOST-418](https://pypost.atlassian.net/browse/PYPOST-418))
 
 **File:** `pypost/core/worker.py` — `RequestWorker.__init__`
 
@@ -37,7 +37,7 @@ through to `RequestService`.
 
 ---
 
-### TD-2: `AppSettings.default_retry_policy` is persisted but never applied
+### TD-2: `AppSettings.default_retry_policy` is persisted but never applied ([PYPOST-419](https://pypost.atlassian.net/browse/PYPOST-419))
 
 **Files:** `pypost/models/settings.py`, `pypost/core/worker.py`
 
@@ -55,7 +55,7 @@ execution: use `request.retry_policy` if set, otherwise fall back to
 
 ## Significant Issues
 
-### TD-3: Logger accumulation in `AlertManager`
+### TD-3: Logger accumulation in `AlertManager` ([PYPOST-420](https://pypost.atlassian.net/browse/PYPOST-420))
 
 **File:** `pypost/core/alert_manager.py`
 
@@ -75,7 +75,7 @@ or replace the private logger with a `RotatingFileHandler` written to directly.
 
 ---
 
-### TD-4: Bare `assert` in production retry path
+### TD-4: Bare `assert` in production retry path ([PYPOST-421](https://pypost.atlassian.net/browse/PYPOST-421))
 
 **File:** `pypost/core/request_service.py:183`
 
@@ -98,7 +98,7 @@ if last_error is None:
 
 ## Minor Issues
 
-### TD-5: `email_notification_failures_total` metric name is misleading
+### TD-5: `email_notification_failures_total` metric name is misleading ([PYPOST-422](https://pypost.atlassian.net/browse/PYPOST-422))
 
 **File:** `pypost/core/metrics.py`
 
@@ -111,7 +111,7 @@ metric description clarifying the broader scope.
 
 ---
 
-### TD-6: `retryable_codes_edit` silently drops invalid input
+### TD-6: `retryable_codes_edit` silently drops invalid input ([PYPOST-423](https://pypost.atlassian.net/browse/PYPOST-423))
 
 **File:** `pypost/ui/dialogs/settings_dialog.py` — `_parse_retryable_codes()`
 
@@ -123,7 +123,7 @@ or at least normalise whitespace before splitting.
 
 ---
 
-### TD-7: `request_timeout` spin box created but never added to form layout
+### TD-7: `request_timeout` spin box created but never added to form layout ([PYPOST-424](https://pypost.atlassian.net/browse/PYPOST-424))
 
 **File:** `pypost/ui/dialogs/settings_dialog.py`
 

@@ -22,7 +22,7 @@ regressions (191 passed, 0 failed).
 
 ## 2. Tech Debt Identified
 
-### TD-1 — Explicit widget font loop is now belt-and-suspenders only (Low severity)
+### TD-1 — Explicit widget font loop is now belt-and-suspenders only (Low severity) ([PYPOST-425](https://pypost.atlassian.net/browse/PYPOST-425))
 
 **Location**: `pypost/ui/main_window.py` — `apply_settings`, lines ~163-170
 
@@ -42,7 +42,7 @@ widgets.
 
 ---
 
-### TD-2 — `apply_settings` accepts `settings` as a plain positional argument (Low severity)
+### TD-2 — `apply_settings` accepts `settings` as a plain positional argument (Low severity) ([PYPOST-426](https://pypost.atlassian.net/browse/PYPOST-426))
 
 **Location**: `pypost/ui/main_window.py` — `def apply_settings(self, settings) -> None`
 
@@ -56,7 +56,7 @@ coverage and IDE support.
 
 ---
 
-### TD-3 — `main.py` creates `ConfigManager` before knowing it will be consumed (Very low severity)
+### TD-3 — `main.py` creates `ConfigManager` before knowing it will be consumed (Very low severity) ([PYPOST-427](https://pypost.atlassian.net/browse/PYPOST-427))
 
 **Location**: `pypost/main.py` — `main()`
 

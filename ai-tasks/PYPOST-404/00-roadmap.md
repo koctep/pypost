@@ -38,7 +38,7 @@ is not applied. The application should persist and restore font size preferences
 
 ## Project Manager Update
 
-**Date**: 2026-03-25 (re-verified — observability_ready trigger, all phases already complete)
+**Date**: 2026-03-25 (re-verified — finalization phase trigger, all phases already complete)
 **Phase**: CLOSED — all phases complete and confirmed.
 
 ### Completed Milestones

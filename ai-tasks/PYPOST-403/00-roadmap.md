@@ -3,7 +3,7 @@
 **Type**: Debt
 **Priority**: Highest
 **Labels**: high-priority, tech-debt, tests
-**Status**: In Progress
+**Status**: Done
 
 ## Summary
 
@@ -31,7 +31,7 @@ and green for the default pipeline.
 ## Project Manager Update
 
 **Date**: 2026-03-25
-**Phase**: complete — All phases done; final commit applied.
+**Phase**: finalization confirmed — All 8 phases verified complete.
 
 ### Completed Milestones
 - Phase 0 — Roadmap initialized; Jira PYPOST-403 transitioned to In Progress.
@@ -55,11 +55,15 @@ and green for the default pipeline.
   - `http_client.py`: default `TemplateService` construction DEBUG log; SSE detection DEBUG log;
     successful response DEBUG log (`request_complete method/status/elapsed_ms/size`).
   - 24 affected tests continue to pass; log lines are non-breaking (DEBUG/WARNING only).
+- Phase 7 — Review & Docs complete (`60-review.md`, `70-dev-docs.md`): no new debt; two
+  minor low-severity items noted for backlog (crash root cause investigation, SSE heuristic
+  improvement); all code quality dimensions rated Good/Excellent.
+- Phase 8 — Final commit applied (`afd2a58`); all deliverables shipped.
 
 ### Active Risks / Blockers
-- No blockers. All 5 failures resolved, observability instrumentation complete, 191 tests green.
+- None. All 5 failures resolved, all acceptance criteria met, 191 tests green, commit applied.
 
 ### Next Action
-- Phase 7 — Review & Docs complete (`60-review.md`, `70-dev-docs.md`): no new debt; two
-  minor low-severity items noted for backlog; all code quality dimensions rated Good/Excellent.
-- Phase 8 — Final commit applied; PYPOST-403 closed.
+- Finalization complete. Jira PYPOST-403 transitioned to Done.
+- Backlog items to consider: (1) investigate root cause of deleted `core` crash dump;
+  (2) replace SSE URL heuristic with content-type-based detection (low priority).

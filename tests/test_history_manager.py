@@ -59,6 +59,7 @@ class TestHistoryManagerAppend(unittest.TestCase):
             self.assertEqual(500, len(entries))
             # Most recent is first
             self.assertEqual("https://example.com/500", entries[0].url)
+            hm.flush()
 
     def test_get_entries_newest_first(self):
         import tempfile
@@ -88,6 +89,7 @@ class TestHistoryManagerDelete(unittest.TestCase):
             entries = hm.get_entries()
             self.assertEqual(1, len(entries))
             self.assertEqual(e2.id, entries[0].id)
+            hm.flush()
 
 
 class TestHistoryManagerClear(unittest.TestCase):
@@ -99,6 +101,7 @@ class TestHistoryManagerClear(unittest.TestCase):
             hm.append(_make_entry())
             hm.clear()
             self.assertEqual([], hm.get_entries())
+            hm.flush()
 
 
 class TestHistoryManagerPersistence(unittest.TestCase):
@@ -108,8 +111,7 @@ class TestHistoryManagerPersistence(unittest.TestCase):
             hm1 = _manager_at(td)
             entry = _make_entry(url="https://persist.com", status_code=201)
             hm1.append(entry)
-            # Wait for async write to complete
-            time.sleep(0.2)
+            hm1.flush()
 
             hm2 = _manager_at(td)
             entries = hm2.get_entries()
@@ -134,8 +136,7 @@ class TestHistoryManagerConcurrency(unittest.TestCase):
                 t.start()
             for t in threads:
                 t.join()
-            # Allow debounced save thread to finish before temp dir cleanup
-            time.sleep(0.3)
+            hm.flush()
             entries = hm.get_entries()
             self.assertEqual(50, len(entries))
             urls = {e.url for e in entries}
