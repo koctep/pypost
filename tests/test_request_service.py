@@ -33,7 +33,7 @@ class TestRequestServiceExecuteHTTP(unittest.TestCase):
         req = RequestData(method="GET", url="http://x")
         self.svc.execute(req, variables={"k": "v"})
         call_kwargs = self.svc.http_client.send_request.call_args
-        self.assertEqual({"k": "v"}, call_kwargs[0][1])
+        self.assertEqual({"k": "v"}, call_kwargs.kwargs["variables"])
 
     def test_execute_stream_callback_forwarded_to_http_client(self):
         self.svc.http_client.send_request.return_value = _make_response(200)
@@ -41,7 +41,7 @@ class TestRequestServiceExecuteHTTP(unittest.TestCase):
         cb = MagicMock()
         self.svc.execute(req, stream_callback=cb)
         call_kwargs = self.svc.http_client.send_request.call_args
-        self.assertEqual(cb, call_kwargs[0][2])
+        self.assertEqual(cb, call_kwargs.kwargs["stream_callback"])
 
     def test_execute_headers_callback_forwarded_to_http_client(self):
         self.svc.http_client.send_request.return_value = _make_response(200)
@@ -49,7 +49,7 @@ class TestRequestServiceExecuteHTTP(unittest.TestCase):
         cb = MagicMock()
         self.svc.execute(req, headers_callback=cb)
         call_kwargs = self.svc.http_client.send_request.call_args
-        self.assertEqual(cb, call_kwargs[0][4])
+        self.assertEqual(cb, call_kwargs.kwargs["headers_callback"])
 
 
 class TestRequestServicePostScript(unittest.TestCase):

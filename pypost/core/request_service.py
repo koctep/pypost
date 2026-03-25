@@ -127,7 +127,11 @@ class RequestService:
 
             try:
                 response = self.http_client.send_request(
-                    request, variables, stream_callback, stop_flag, headers_callback
+                    request,
+                    variables=variables,
+                    stream_callback=stream_callback,
+                    stop_flag=stop_flag,
+                    headers_callback=headers_callback,
                 )
                 if response.status_code not in retryable_codes or attempt == max_retries:
                     return response
