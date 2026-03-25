@@ -60,6 +60,28 @@ jobs:
             echo "_junit.xml not found — pytest may have failed before producing output._" \
               >> "$GITHUB_STEP_SUMMARY"
           fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Coverage — Python ${{ matrix.python-version }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f coverage.xml ]; then
+            COV=$(python -c \
+              "import xml.etree.ElementTree as ET; \
+               r = ET.parse('coverage.xml').getroot().get('line-rate','0'); \
+               print(f'{float(r)*100:.1f}')")
+            THRESHOLD=50
+            if python -c "exit(0 if float('$COV') >= $THRESHOLD else 1)"; then
+              STATUS=":white_check_mark: PASS"
+            else
+              STATUS=":x: FAIL (below ${THRESHOLD}% threshold)"
+            fi
+            echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Line coverage | ${COV}% |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Threshold (--cov-fail-under) | ${THRESHOLD}% |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Status | ${STATUS} |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "_coverage.xml not found — coverage report unavailable._" \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload test results
         if: always()
