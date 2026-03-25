@@ -61,6 +61,10 @@ class TestRequestServicePostScript(unittest.TestCase):
 
     def test_execute_post_script_populates_logs_and_variables(self):
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
+            # ScriptExecutor.execute is a @staticmethod, so mock_executor.execute (not
+            # mock_executor.return_value.execute) is the correct target. If execute is ever
+            # converted to an instance method, change this to:
+            #   mock_executor.return_value.execute.return_value = (...)
             mock_executor.execute.return_value = ({"x": 1}, ["log"], None)
             req = RequestData(method="GET", url="http://x", post_script="x=1")
             result = self.svc.execute(req)
@@ -69,6 +73,10 @@ class TestRequestServicePostScript(unittest.TestCase):
 
     def test_execute_post_script_error_sets_script_error_field(self):
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
+            # ScriptExecutor.execute is a @staticmethod, so mock_executor.execute (not
+            # mock_executor.return_value.execute) is the correct target. If execute is ever
+            # converted to an instance method, change this to:
+            #   mock_executor.return_value.execute.return_value = (...)
             mock_executor.execute.return_value = ({}, [], "SyntaxError")
             req = RequestData(method="GET", url="http://x", post_script="bad")
             result = self.svc.execute(req)
@@ -214,6 +222,10 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
     def test_script_error_populates_execution_error_script_category(self):
         self.svc.http_client.send_request.return_value = _make_response(200)
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
+            # ScriptExecutor.execute is a @staticmethod, so mock_executor.execute (not
+            # mock_executor.return_value.execute) is the correct target. If execute is ever
+            # converted to an instance method, change this to:
+            #   mock_executor.return_value.execute.return_value = (...)
             mock_executor.execute.return_value = ({}, [], "NameError: x not defined")
             req = RequestData(method="GET", url="http://x", post_script="bad")
             result = self.svc.execute(req)
@@ -234,6 +246,10 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
         self.svc._metrics = mock_metrics
         self.svc.http_client.send_request.return_value = _make_response(200)
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
+            # ScriptExecutor.execute is a @staticmethod, so mock_executor.execute (not
+            # mock_executor.return_value.execute) is the correct target. If execute is ever
+            # converted to an instance method, change this to:
+            #   mock_executor.return_value.execute.return_value = (...)
             mock_executor.execute.return_value = ({}, [], "err")
             req = RequestData(method="GET", url="http://x", post_script="bad")
             self.svc.execute(req)
