@@ -38,8 +38,8 @@ is not applied. The application should persist and restore font size preferences
 
 ## Project Manager Update
 
-**Date**: 2026-03-25
-**Phase**: Observability Complete — Review & Docs phase now active (Phase 7).
+**Date**: 2026-03-25 (re-verified — observability_ready trigger, all phases already complete)
+**Phase**: CLOSED — all phases complete and confirmed.
 
 ### Completed Milestones
 - Phase 0 — Roadmap created; Jira PYPOST-404 transitioned to In Progress.
@@ -62,12 +62,17 @@ is not applied. The application should persist and restore font size preferences
        font size; divergence in logs signals a regression.
     2. `config_manager_source` — confirms FR-4 injection is active at runtime.
   - No metrics additions required; fix is a synchronous call-order correction.
+- Phase 7 — Review & Docs complete.
+  - `60-review.md`: 3 low-severity tech debt items identified (TD-1 explicit widget loop,
+    TD-2 missing type annotation, TD-3 early ConfigManager creation). None require immediate
+    action. Fix assessed as production-ready.
+  - `70-dev-docs.md`: full developer documentation covering root cause, call-order change,
+    FR-4 injection, observability log entries, and Qt 6 behaviour reference.
+- Phase 8 — Final commit delivered (git: `4ac96b8 feature(ui): PYPOST-404 fix font size not
+  applied on application startup`). Jira closure comment added.
 
 ### Active Risks / Blockers
-- None blocking. All code changes, tests, and observability are in place.
-- `60-review.md` and `70-dev-docs.md` not yet produced — hand-off needed to `team_lead`.
+- None. All deliverables complete and committed.
 
 ### Next Action
-- Hand off to `team_lead` to produce `60-review.md` and `70-dev-docs.md`, then perform final
-  commit (Phases 7–8).
-- `project_manager` to close Jira PYPOST-404 after Phase 8 completes.
+- No action required. PYPOST-404 is fully closed. All deliverables committed and verified.

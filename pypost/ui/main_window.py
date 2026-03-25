@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QPushButton, QApplication,
 )
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from pathlib import Path
 
 from pypost.core.storage import StorageManager
@@ -74,6 +74,7 @@ class MainWindow(QMainWindow):
         self.env.load_environments()
         self.tabs.restore_tabs()
         self.collections.restore_tree_state()
+        self._startup_settings_reapplied = False
         self.apply_settings(self.settings)
         logger.info("main_window_initialized")
 
@@ -212,3 +213,11 @@ class MainWindow(QMainWindow):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if self._startup_settings_reapplied:
+            return
+        self._startup_settings_reapplied = True
+        # Re-apply settings after first show to survive Qt post-show style polish.
+        QTimer.singleShot(0, lambda: self.apply_settings(self.settings))

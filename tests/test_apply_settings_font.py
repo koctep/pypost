@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QShowEvent
 from pypost.models.settings import AppSettings
 
 
@@ -72,3 +73,14 @@ class TestApplySettingsFont:
             window.apply_settings(AppSettings(font_size=14))
             window.apply_settings(AppSettings(font_size=20))
         assert qapp.font().pointSize() == 20
+
+    def test_show_event_reapplies_settings_once(self, qapp):
+        window = _make_window(qapp)
+        with patch("pypost.ui.main_window.QTimer.singleShot") as single_shot:
+            window.showEvent(QShowEvent())
+            window.showEvent(QShowEvent())
+
+        assert single_shot.call_count == 1
+        delay_ms, scheduled = single_shot.call_args[0]
+        assert delay_ms == 0
+        assert callable(scheduled)
