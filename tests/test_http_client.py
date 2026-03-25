@@ -117,10 +117,11 @@ class TestHTTPClientInjection(unittest.TestCase):
         client.send_request(req, variables={"path": "items"})
         mock_ts.render_string.assert_called()
 
-    def test_no_injection_sets_template_service_to_none(self):
-        """HTTPClient() with no template_service stores None (no silent fallback)."""
+    def test_no_injection_creates_default_template_service(self):
+        """HTTPClient() with no template_service creates a default TemplateService instance."""
+        from pypost.core.template_service import TemplateService
         client = HTTPClient()
-        self.assertIsNone(client._template_service)
+        self.assertIsInstance(client._template_service, TemplateService)
 
 
 if __name__ == "__main__":

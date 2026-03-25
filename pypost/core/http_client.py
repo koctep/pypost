@@ -21,9 +21,12 @@ class HTTPClient:
                  template_service: TemplateService | None = None):
         self.session = requests.Session()
         self._metrics = metrics
-        self._template_service = template_service
+        self._template_service = template_service if template_service is not None \
+            else TemplateService()
         if template_service is not None:
             logger.debug("HTTPClient: using injected TemplateService id=%d", id(template_service))
+        else:
+            logger.debug("HTTPClient: using default TemplateService")
 
     def _prepare_request_kwargs(self, request_data: RequestData, variables: Dict[str, str]) -> Dict[str, Any]:
         """Prepares the arguments for requests.request by rendering templates."""
@@ -151,6 +154,8 @@ class HTTPClient:
         is_sse_endpoint = (
             request_data.method == "GET" and "/sse" in url.rstrip("/")
         )
+        if is_sse_endpoint:
+            logger.debug("sse_probe_detected method=%s url=%s", request_data.method, url)
 
         try:
             kwargs = self._prepare_request_kwargs(request_data, variables)
@@ -218,7 +223,13 @@ class HTTPClient:
         # 3. Process response
         if self._metrics:
             self._metrics.track_response_received(request_data.method, str(response.status_code))
-        
+        logger.debug(
+            "request_complete method=%s status=%d elapsed_ms=%.0f size=%d",
+            request_data.method,
+            response.status_code,
+            (end_time - start_time) * 1000,
+            len(content.encode("utf-8")),
+        )
         return ResponseData(
             status_code=response.status_code,
             headers=dict(response.headers),

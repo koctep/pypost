@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import List
 
@@ -20,6 +21,7 @@ class HistoryManager:
         self._save_lock = threading.Lock()
         self._save_running = False
         self._save_pending = False
+        self._save_thread: threading.Thread | None = None
         self._entries: List[HistoryEntry] = []
         self._history_path = Path(user_data_dir(app_name)) / "history.json"
         self._load()
@@ -37,12 +39,17 @@ class HistoryManager:
         """Thread-safe. Insert entry at front. Drops oldest when cap exceeded. Async save."""
         with self._lock:
             self._entries.insert(0, entry)
-            if len(self._entries) > self._max_entries:
+            cap_enforced = len(self._entries) > self._max_entries
+            if cap_enforced:
                 self._entries = self._entries[: self._max_entries]
             count = len(self._entries)
         logger.debug(
             "history_entry_appended method=%s url=%s count=%d", entry.method, entry.url, count
         )
+        if cap_enforced:
+            logger.warning(
+                "history_cap_enforced max=%d oldest_entry_dropped=True", self._max_entries
+            )
         self._save_async()
 
     def delete_entry(self, entry_id: str) -> None:
@@ -91,19 +98,42 @@ class HistoryManager:
             while True:
                 with self._lock:
                     snapshot = list(self._entries)
+                _t0 = time.monotonic()
                 try:
                     self._history_path.parent.mkdir(parents=True, exist_ok=True)
                     data = [e.model_dump() for e in snapshot]
                     with open(self._history_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, indent=2)
-                    logger.debug("history_manager_saved count=%d", len(snapshot))
+                    logger.debug(
+                        "history_manager_saved count=%d elapsed_ms=%.1f",
+                        len(snapshot),
+                        (time.monotonic() - _t0) * 1000,
+                    )
                 except Exception as exc:
-                    logger.error("history_manager_save_failed error=%s", exc)
+                    logger.error(
+                        "history_manager_save_failed elapsed_ms=%.1f error=%s",
+                        (time.monotonic() - _t0) * 1000,
+                        exc,
+                    )
                 with self._save_lock:
                     if not self._save_pending:
                         self._save_running = False
                         return
                     self._save_pending = False
 
-        t = threading.Thread(target=_run, daemon=True)
+        self._save_thread = t = threading.Thread(target=_run, daemon=True)
         t.start()
+
+    def flush(self) -> None:
+        """Block until any in-progress async save has completed.
+
+        Safe to call even if no save has been triggered. Intended for tests
+        and teardown code that must synchronize before the storage path is
+        cleaned up.
+        """
+        with self._save_lock:
+            thread = self._save_thread
+        if thread is not None:
+            logger.debug("history_manager_flush waiting thread_id=%s", thread.ident)
+            thread.join()
+            logger.debug("history_manager_flush complete")

@@ -45,3 +45,7 @@ ENV/
 # PyPost Data (local dev)
 collections/
 environments.json
+
+# ELF core dumps
+/core
+/core.*

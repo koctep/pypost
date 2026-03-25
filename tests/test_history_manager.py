@@ -47,6 +47,7 @@ class TestHistoryManagerAppend(unittest.TestCase):
             entries = hm.get_entries()
             self.assertEqual(1, len(entries))
             self.assertEqual("https://a.com", entries[0].url)
+            hm.flush()
 
     def test_append_enforces_cap(self):
         import tempfile
@@ -71,6 +72,7 @@ class TestHistoryManagerAppend(unittest.TestCase):
             self.assertEqual("https://third.com", entries[0].url)
             self.assertEqual("https://second.com", entries[1].url)
             self.assertEqual("https://first.com", entries[2].url)
+            hm.flush()
 
 
 class TestHistoryManagerDelete(unittest.TestCase):
@@ -150,6 +152,7 @@ def _manager_at(tmp_dir: str, max_entries: int = 500, path: Path | None = None) 
     hm._save_lock = threading.Lock()
     hm._save_running = False
     hm._save_pending = False
+    hm._save_thread = None
     hm._entries = []
     if path is not None:
         hm._history_path = path

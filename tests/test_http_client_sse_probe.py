@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from pypost.core.http_client import HTTPClient
+from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 
 
@@ -29,6 +30,7 @@ class HTTPClientSSEProbeTests(unittest.TestCase):
             return_value=MagicMock(),
         )
         self.metrics_patcher.start()
+        self.client = HTTPClient(template_service=TemplateService())
 
     def tearDown(self):
         self.metrics_patcher.stop()
@@ -44,7 +46,7 @@ class HTTPClientSSEProbeTests(unittest.TestCase):
             def __next__(self):
                 raise requests.exceptions.ReadTimeout("Read timed out")
 
-        client = HTTPClient()
+        client = self.client
         req = RequestData(method="GET", url="http://localhost:9080/sse")
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -61,7 +63,7 @@ class HTTPClientSSEProbeTests(unittest.TestCase):
 
     def test_auto_detects_sse_by_url_and_content_type(self):
         """When GET to /sse URL, use SSE handling (URL or Content-Type)."""
-        client = HTTPClient()
+        client = self.client
         req = RequestData(method="GET", url="http://localhost:9080/sse")
         mock_response = _make_sse_response([("endpoint", "http://localhost:9080")])
 
@@ -77,7 +79,7 @@ class HTTPClientSSEProbeTests(unittest.TestCase):
 
     def test_handles_non_200_sse_response(self):
         """When SSE endpoint returns non-200, return that status."""
-        client = HTTPClient()
+        client = self.client
         req = RequestData(method="GET", url="http://localhost:1080/sse")
         mock_response = MagicMock()
         mock_response.status_code = 404
