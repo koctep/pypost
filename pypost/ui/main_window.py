@@ -27,14 +27,24 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, metrics: MetricsManager, template_service: TemplateService) -> None:
+    def __init__(
+        self,
+        metrics: MetricsManager,
+        template_service: TemplateService,
+        config_manager: ConfigManager | None = None,
+    ) -> None:
         super().__init__()
         self.setWindowTitle("PyPost")
         self.resize(1200, 800)
         self.metrics = metrics
         self.template_service = template_service
         self.storage = StorageManager()
-        self.config_manager = ConfigManager()
+        if config_manager is not None:
+            logger.debug("config_manager_source source=injected")
+            self.config_manager = config_manager
+        else:
+            logger.debug("config_manager_source source=new")
+            self.config_manager = ConfigManager()
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
         self.style_manager = StyleManager()
@@ -144,12 +154,14 @@ class MainWindow(QMainWindow):
 
     def apply_settings(self, settings) -> None:
         self.settings = settings
+        logger.debug("apply_settings_start font_size=%d", settings.font_size)
         app = QApplication.instance()
         if app:
+            self.style_manager.apply_styles(app)
             font = app.font()
             font.setPointSize(settings.font_size)
             app.setFont(font)
-            self.style_manager.apply_styles(app)
+            logger.debug("apply_settings_font_applied point_size=%d", app.font().pointSize())
             for w in [
                 self.collections.widget, self.env.env_selector, self.tabs.widget,
                 self.env.manage_btn, self.settings_btn, self.env.env_label,

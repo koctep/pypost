@@ -34,7 +34,11 @@ def main():
     custom_style.set_close_button_size(48)
     app.setStyle(custom_style)
 
-    window = MainWindow(metrics=metrics_manager, template_service=template_service)
+    window = MainWindow(
+        metrics=metrics_manager,
+        template_service=template_service,
+        config_manager=config_manager,
+    )
     window.show()
 
     exit_code = app.exec()
