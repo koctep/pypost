@@ -48,7 +48,7 @@
 | 20 | PYPOST-117 | [PYPOST-13] Unit tests for VariableHoverHelper and widgets are missing | Done |
 | 21 | PYPOST-118 | [PYPOST-13] UI Tests: No automatic UI tests checking tooltip appearance | Done |
 | 22 | PYPOST-121 | [PYPOST-13] Write unit tests for VariableHoverHelper | Done |
-| 23 | PYPOST-125 | [PYPOST-14] No unit tests for save logic or settings persistence | To Do |
+| 23 | PYPOST-125 | [PYPOST-14] No unit tests for save logic or settings persistence | Done |
 | 24 | PYPOST-130 | [PYPOST-15] Unit tests for VariableHoverHelper.resolve_text are missing | To Do |
 | 25 | PYPOST-131 | [PYPOST-15] UI Tests: No automated UI tests to verify tooltip appearance | To Do |
 | 26 | PYPOST-133 | [PYPOST-15] Write and commit unit tests for VariableHoverHelper | To Do |
@@ -247,9 +247,9 @@
 
 ##### PYPOST-125 · No unit tests for save logic or settings persistence
 
-- [ ] **Junior Engineer** — write unit tests for save logic and settings persistence
-- [ ] **Senior Engineer** — review
-- [ ] **Team Lead** — final commit
+- [x] **Junior Engineer** — write unit tests for save logic and settings persistence
+- [x] **Senior Engineer** — review
+- [x] **Team Lead** — final commit (`366543d`)
 
 #### Group I — VariableHoverHelper Tests Batch 2 (PYPOST-15)
 
@@ -296,12 +296,12 @@
 ## Project Manager Update
 
 **Date**: 2026-03-26
-**Phase**: `wave2_in_progress` — Group G (VariableHoverHelper batch 1) **complete**; next: Group H
-  (PYPOST-125 settings save logic).
+**Phase**: `wave2_in_progress` — Group H (settings persistence) **complete**; next: Group I
+  (PYPOST-130/131/133 VariableHoverHelper batch 2).
 
 ### Status
 
-Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (22/29 done).
+Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (23/29 done).
 
 #### Wave 1 — Closed
 
@@ -311,7 +311,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (22/29 done
 | PYPOST-404 | team_lead | `4ac96b8`, `cf45465` | Done — Qt font-order bug fixed; 191 passed |
 | PYPOST-405 | team_lead | `061a590` | Done — isolated-tab feature shipped |
 
-#### Wave 2 — In Progress (22/29 done)
+#### Wave 2 — In Progress (23/29 done)
 
 | Group | Issues | Status |
 |-------|--------|--------|
@@ -322,7 +322,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (22/29 done
 | E — JsonHighlighter Tests (PYPOST-11) | PYPOST-100 ✓, 103 ✓ | Done |
 | F — CodeEditor Tests (PYPOST-12) | PYPOST-104 ✓, 108 ✓, 110 ✓ | Done |
 | G — VariableHoverHelper Batch 1 (PYPOST-13) | PYPOST-117 ✓, 118 ✓, 121 ✓ | Done |
-| H — Settings Save Logic (PYPOST-14) | PYPOST-125 | To Do |
+| H — Settings Save Logic (PYPOST-14) | PYPOST-125 ✓ | Done |
 | I — VariableHoverHelper Batch 2 (PYPOST-15) | PYPOST-130, 131, 133 | To Do |
 | J — MCP Server Tests (PYPOST-16) | PYPOST-139, 142 | To Do |
 | K — EnvironmentDialog UI Tests | PYPOST-56 | To Do |
@@ -344,6 +344,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (22/29 done
 | PYPOST-100/103 | `cc171c3` | Done — JsonHighlighter tests via QTextLayout format ranges |
 | PYPOST-104/108/110 | `f2b240c` | Done — CodeEditor reformat, paste, key indent/dedent tests |
 | PYPOST-117/118/121 | `827f16d` | Done — VariableHoverHelper unit tests + QToolTip mouseMove tests |
+| PYPOST-125 | `TBD` | Done — ConfigManager round-trip / corrupt file; StateManager persist + no-op |
 
 ### Carry-Forward Risks
 
@@ -367,5 +368,5 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (22/29 done
 
 ### Next Action
 
-- **Active**: PYPOST-125 — unit tests for settings save logic / persistence (Group H).
+- **Active**: PYPOST-130 / PYPOST-131 / PYPOST-133 — VariableHoverHelper batch 2 (Group I).
 - Carry-forward: schedule PYPOST-402 TD-1 and TD-2 (AlertManager wiring, retry policy runtime).
