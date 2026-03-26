@@ -1,7 +1,7 @@
 # Sprint 134 — Backlog
 
 > Date: 2026-03-26
-> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 14/29 tech-debt items done (Groups A–D
+> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 16/29 tech-debt items done (Groups A–E
 > complete)
 > Priority: Highest / High / Medium
 
@@ -33,8 +33,8 @@
 | 12 | PYPOST-92 | [PYPOST-10] Unit tests for tree state save/restore logic are missing | Debt | Medium | Done |
 | 13 | PYPOST-93 | [PYPOST-10] No tests for edge cases (ID exists in settings but not in collection) | Debt | Medium | Done |
 | 14 | PYPOST-95 | [PYPOST-10] Write tests to verify UI state preservation | Debt | Medium | Done |
-| 15 | PYPOST-100 | [PYPOST-11] Unit tests for JsonHighlighter are missing | Debt | Medium | To Do |
-| 16 | PYPOST-103 | [PYPOST-11] Add tests for JsonHighlighter | Debt | Medium | To Do |
+| 15 | PYPOST-100 | [PYPOST-11] Unit tests for JsonHighlighter are missing | Debt | Medium | Done |
+| 16 | PYPOST-103 | [PYPOST-11] Add tests for JsonHighlighter | Debt | Medium | Done |
 | 17 | PYPOST-104 | [PYPOST-12] No tests: creation of automated tests was skipped by user request | Debt | Medium | To Do |
 | 18 | PYPOST-108 | [PYPOST-12] Tests for CodeEditor | Debt | Medium | To Do |
 | 19 | PYPOST-110 | [PYPOST-12] Create tests for CodeEditor | Debt | Medium | To Do |

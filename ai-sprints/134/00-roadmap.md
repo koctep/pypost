@@ -40,8 +40,8 @@
 | 12 | PYPOST-92 | [PYPOST-10] Unit tests for tree state save/restore logic are missing | Done |
 | 13 | PYPOST-93 | [PYPOST-10] No tests for edge cases | Done |
 | 14 | PYPOST-95 | [PYPOST-10] Write tests to verify UI state preservation | Done |
-| 15 | PYPOST-100 | [PYPOST-11] Unit tests for JsonHighlighter are missing | To Do |
-| 16 | PYPOST-103 | [PYPOST-11] Add tests for JsonHighlighter | To Do |
+| 15 | PYPOST-100 | [PYPOST-11] Unit tests for JsonHighlighter are missing | Done |
+| 16 | PYPOST-103 | [PYPOST-11] Add tests for JsonHighlighter | Done |
 | 17 | PYPOST-104 | [PYPOST-12] No tests: automated tests skipped | To Do |
 | 18 | PYPOST-108 | [PYPOST-12] Tests for CodeEditor | To Do |
 | 19 | PYPOST-110 | [PYPOST-12] Create tests for CodeEditor | To Do |
@@ -196,14 +196,14 @@
 
 ##### PYPOST-100 · Unit tests for JsonHighlighter are missing
 
-- [ ] **Junior Engineer** — document gap, prepare test plan
-- [ ] **Team Lead** — final commit (can batch with PYPOST-103)
+- [x] **Junior Engineer** — document gap, prepare test plan (module docstring in test file)
+- [x] **Team Lead** — final commit (batched with PYPOST-103)
 
 ##### PYPOST-103 · Add tests for JsonHighlighter
 
-- [ ] **Junior Engineer** — implement JsonHighlighter tests
-- [ ] **Senior Engineer** — review
-- [ ] **Team Lead** — final commit
+- [x] **Junior Engineer** — implement JsonHighlighter tests
+- [x] **Senior Engineer** — review
+- [x] **Team Lead** — final commit (`cc171c3`)
 
 #### Group F — CodeEditor Tests (PYPOST-12)
 
@@ -296,12 +296,12 @@
 ## Project Manager Update
 
 **Date**: 2026-03-26
-**Phase**: `wave2_in_progress` — Group D (tree state) **complete**; next: Group E
-  (PYPOST-100/103 JsonHighlighter).
+**Phase**: `wave2_in_progress` — Group E (JsonHighlighter) **complete**; next: Group F
+  (PYPOST-104/108/110 CodeEditor tests).
 
 ### Status
 
-Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (14/29 done).
+Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (16/29 done).
 
 #### Wave 1 — Closed
 
@@ -311,7 +311,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (14/29 done
 | PYPOST-404 | team_lead | `4ac96b8`, `cf45465` | Done — Qt font-order bug fixed; 191 passed |
 | PYPOST-405 | team_lead | `061a590` | Done — isolated-tab feature shipped |
 
-#### Wave 2 — In Progress (14/29 done)
+#### Wave 2 — In Progress (16/29 done)
 
 | Group | Issues | Status |
 |-------|--------|--------|
@@ -319,7 +319,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (14/29 done
 | B — HistoryManager Tests (PYPOST-41) | PYPOST-58 ✓, 59 ✓, 60 ✓ | Done |
 | C — MetricsManager Tests (PYPOST-44) | PYPOST-79 ✓ | Done |
 | D — Tree State Tests (PYPOST-10) | PYPOST-92 ✓, 93 ✓, 95 ✓ | Done |
-| E — JsonHighlighter Tests (PYPOST-11) | PYPOST-100, 103 | To Do |
+| E — JsonHighlighter Tests (PYPOST-11) | PYPOST-100 ✓, 103 ✓ | Done |
 | F — CodeEditor Tests (PYPOST-12) | PYPOST-104, 108, 110 | To Do |
 | G — VariableHoverHelper Batch 1 (PYPOST-13) | PYPOST-117, 118, 121 | To Do |
 | H — Settings Save Logic (PYPOST-14) | PYPOST-125 | To Do |
@@ -341,6 +341,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (14/29 done
 | PYPOST-58/59/60 | `a321608` | Done — `history_path` injection; tests use constructor; tempfile import deduped |
 | PYPOST-79 | `064eaa0` | Done — MetricsManager tracking tests; `request_errors` label uses category.value |
 | PYPOST-92/93/95 | `51b9ab1` | Done — tree expand/restore round-trip, stale ids, subset `isExpanded` |
+| PYPOST-100/103 | `cc171c3` | Done — JsonHighlighter tests via QTextLayout format ranges |
 
 ### Carry-Forward Risks
 
@@ -364,5 +365,6 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (14/29 done
 
 ### Next Action
 
-- **Active**: PYPOST-100 / PYPOST-103 — JsonHighlighter gap + tests (Group E).
+- **Active**: PYPOST-104 / PYPOST-108 / PYPOST-110 — CodeEditor test gap + implementation
+  (Group F).
 - Carry-forward: schedule PYPOST-402 TD-1 and TD-2 (AlertManager wiring, retry policy runtime).
