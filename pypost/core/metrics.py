@@ -320,7 +320,7 @@ class MetricsManager:
         self.history_entries_loaded_into_editor.inc()
 
     def track_request_error(self, category: ErrorCategory) -> None:
-        self.request_errors.labels(category=category).inc()
+        self.request_errors.labels(category=category.value).inc()
 
     def track_history_record_error(self) -> None:
         self.history_record_errors.inc()
