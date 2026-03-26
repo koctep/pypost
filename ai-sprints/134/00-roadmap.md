@@ -33,9 +33,9 @@
 | 5 | PYPOST-85 | [PYPOST-52] Private _collections mutation in reload test | Done |
 | 6 | PYPOST-86 | [PYPOST-52] FakeStorageManager.saved_collections names only | Done |
 | 7 | PYPOST-87 | [PYPOST-52] iter_content mock returns strings not bytes | Done |
-| 8 | PYPOST-58 | [PYPOST-41 TD-1] HistoryManager tests bypass constructor via __new__ | To Do |
-| 9 | PYPOST-59 | [PYPOST-41 TD-2] Repeated import tempfile in test_history_manager | To Do |
-| 10 | PYPOST-60 | [PYPOST-41 TD-3] Vestigial tmp_path=None on test_load_missing_file | To Do |
+| 8 | PYPOST-58 | [PYPOST-41 TD-1] HistoryManager tests bypass constructor via __new__ | Done |
+| 9 | PYPOST-59 | [PYPOST-41 TD-2] Repeated import tempfile in test_history_manager | Done |
+| 10 | PYPOST-60 | [PYPOST-41 TD-3] Vestigial tmp_path=None on test_load_missing_file | Done |
 | 11 | PYPOST-79 | [PYPOST-44 TD-7] No unit tests for MetricsManager tracking | To Do |
 | 12 | PYPOST-92 | [PYPOST-10] Unit tests for tree state save/restore logic are missing | To Do |
 | 13 | PYPOST-93 | [PYPOST-10] No tests for edge cases | To Do |
@@ -151,19 +151,19 @@
 
 ##### PYPOST-58 · HistoryManager tests bypass constructor via __new__
 
-- [ ] **Junior Engineer** — refactor to use proper constructor/fixture
-- [ ] **Senior Engineer** — review
-- [ ] **Team Lead** — final commit
+- [x] **Junior Engineer** — refactor to use proper constructor/fixture
+- [x] **Senior Engineer** — review
+- [x] **Team Lead** — final commit (`a321608`)
 
 ##### PYPOST-59 · Repeated import tempfile in test_history_manager
 
-- [ ] **Junior Engineer** — deduplicate import
-- [ ] **Team Lead** — final commit (can batch with PYPOST-58/60)
+- [x] **Junior Engineer** — deduplicate import
+- [x] **Team Lead** — final commit (batched with PYPOST-58/60, `a321608`)
 
 ##### PYPOST-60 · Vestigial tmp_path=None on test_load_missing_file
 
-- [ ] **Junior Engineer** — remove dead parameter
-- [ ] **Team Lead** — final commit (can batch with PYPOST-58/59)
+- [x] **Junior Engineer** — remove dead parameter
+- [x] **Team Lead** — final commit (batched with PYPOST-58/59, `a321608`)
 
 #### Group C — MetricsManager Tests (PYPOST-44)
 
@@ -296,12 +296,12 @@
 ## Project Manager Update
 
 **Date**: 2026-03-26
-**Phase**: `wave2_in_progress` — Group A (Test Infrastructure) **complete**; next: Group B
-  (PYPOST-58).
+**Phase**: `wave2_in_progress` — Group B (HistoryManager tests) **complete**; next: Group C
+  (PYPOST-79).
 
 ### Status
 
-Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (7/29 done).
+Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (10/29 done).
 
 #### Wave 1 — Closed
 
@@ -311,12 +311,12 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (7/29 done)
 | PYPOST-404 | team_lead | `4ac96b8`, `cf45465` | Done — Qt font-order bug fixed; 191 passed |
 | PYPOST-405 | team_lead | `061a590` | Done — isolated-tab feature shipped |
 
-#### Wave 2 — In Progress (7/29 done)
+#### Wave 2 — In Progress (10/29 done)
 
 | Group | Issues | Status |
 |-------|--------|--------|
 | A — Test Infrastructure (PYPOST-52) | PYPOST-89 ✓, 88 ✓, 83 ✓, 84 ✓, 85 ✓, 86 ✓, 87 ✓ | Done |
-| B — HistoryManager Tests (PYPOST-41) | PYPOST-58, 59, 60 | To Do |
+| B — HistoryManager Tests (PYPOST-41) | PYPOST-58 ✓, 59 ✓, 60 ✓ | Done |
 | C — MetricsManager Tests (PYPOST-44) | PYPOST-79 | To Do |
 | D — Tree State Tests (PYPOST-10) | PYPOST-92, 93, 95 | To Do |
 | E — JsonHighlighter Tests (PYPOST-11) | PYPOST-100, 103 | To Do |
@@ -338,6 +338,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (7/29 done)
 | PYPOST-85 | `63c1a0d` | Done — `seed_collections()` public API; reload test decoupled from `_collections` |
 | PYPOST-86 | `8830703` | Done — `saved_collections` holds full `Collection` instances |
 | PYPOST-87 | `d3189a0` | Done — `iter_content` mocks yield bytes; HTTPClient decodes UTF-8 in loop |
+| PYPOST-58/59/60 | `a321608` | Done — `history_path` injection; tests use constructor; tempfile import deduped |
 
 ### Carry-Forward Risks
 
@@ -361,6 +362,5 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (7/29 done)
 
 ### Next Action
 
-- **Active**: PYPOST-58 — HistoryManager tests: stop bypassing constructor via `__new__`
-  (batch with PYPOST-59, PYPOST-60 as feasible).
+- **Active**: PYPOST-79 — add unit tests for `MetricsManager` tracking.
 - Carry-forward: schedule PYPOST-402 TD-1 and TD-2 (AlertManager wiring, retry policy runtime).
