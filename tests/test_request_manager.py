@@ -85,7 +85,7 @@ class TestRequestManagerReload(unittest.TestCase):
     def test_reload_collections_rebuilds_index_from_storage(self):
         req = RequestData(id="r1", name="Get users")
         col = Collection(id="c1", name="Team API", requests=[req])
-        self.storage._collections = [col]
+        self.storage.seed_collections([col])
         self.manager.reload_collections()
         result = self.manager.find_request("r1")
         self.assertIsNotNone(result)

@@ -4,6 +4,10 @@ class FakeStorageManager:
         self.saved_collections: list = []
         self.deleted_collection_names: list = []
 
+    def seed_collections(self, collections):
+        """Simulate persisted data changing between load_collections() calls (tests only)."""
+        self._collections = list(collections) if collections else []
+
     def load_collections(self):
         return list(self._collections)
 
