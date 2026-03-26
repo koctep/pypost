@@ -42,9 +42,9 @@
 | 21 | PYPOST-118 | [PYPOST-13] UI Tests: No automatic UI tests checking tooltip appearance | Debt | Medium | Done |
 | 22 | PYPOST-121 | [PYPOST-13] Write unit tests for VariableHoverHelper | Debt | Medium | Done |
 | 23 | PYPOST-125 | [PYPOST-14] No unit tests were added for the save logic or settings persistence | Debt | Medium | Done |
-| 24 | PYPOST-130 | [PYPOST-15] Unit tests for VariableHoverHelper.resolve_text are missing | Debt | Medium | To Do |
-| 25 | PYPOST-131 | [PYPOST-15] UI Tests: No automated UI tests to verify tooltip appearance | Debt | Medium | To Do |
-| 26 | PYPOST-133 | [PYPOST-15] Write and commit unit tests for VariableHoverHelper | Debt | Medium | To Do |
+| 24 | PYPOST-130 | [PYPOST-15] Unit tests for VariableHoverHelper.resolve_text are missing | Debt | Medium | Done |
+| 25 | PYPOST-131 | [PYPOST-15] UI Tests: No automated UI tests to verify tooltip appearance | Debt | Medium | Done |
+| 26 | PYPOST-133 | [PYPOST-15] Write and commit unit tests for VariableHoverHelper | Debt | Medium | Done |
 | 27 | PYPOST-139 | [PYPOST-16] No automated tests for MCP server interaction | Debt | Medium | To Do |
 | 28 | PYPOST-142 | [PYPOST-16] Add tests using an MCP client mock | Debt | Medium | To Do |
 | 29 | PYPOST-56 | Add Qt-level UI tests for EnvironmentDialog | Debt | Medium | To Do |
