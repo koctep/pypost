@@ -22,4 +22,5 @@ class AppSettings(BaseModel):
     default_retry_policy: Optional[RetryPolicy] = None
     alert_webhook_url: Optional[str] = None
     alert_webhook_auth_header: Optional[str] = None
+    alert_log_path: Optional[str] = None
 

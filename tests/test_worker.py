@@ -97,5 +97,20 @@ class TestRequestWorkerRetrySignal(unittest.TestCase):
         self.assertIsInstance(err, ExecutionError)
 
 
+class TestRequestWorkerAlertManagerInjection(unittest.TestCase):
+
+    def test_alert_manager_forwarded_to_service(self):
+        from pypost.core.alert_manager import AlertManager
+        req = RequestData(method="GET", url="http://x")
+        mock_am = MagicMock(spec=AlertManager)
+        worker = RequestWorker(req, alert_manager=mock_am)
+        self.assertIs(worker.service._alert_manager, mock_am)
+
+    def test_alert_manager_none_by_default(self):
+        req = RequestData(method="GET", url="http://x")
+        worker = RequestWorker(req)
+        self.assertIsNone(worker.service._alert_manager)
+
+
 if __name__ == "__main__":
     unittest.main()

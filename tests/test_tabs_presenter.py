@@ -316,5 +316,55 @@ class TestOnRequestError(unittest.TestCase):
             self.assertNotIn(raw_detail, args[2])
 
 
+class TestTabsPresenterAlertManagerPropagation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _make_presenter_with_alert_manager(self, alert_manager=None):
+        rm = FakeRequestManager()
+        sm = FakeStateManager()
+        settings = AppSettings()
+        return TabsPresenter(rm, sm, settings, metrics=MagicMock(), alert_manager=alert_manager)
+
+    def test_alert_manager_passed_to_worker(self):
+        from pypost.core.alert_manager import AlertManager
+        mock_am = MagicMock(spec=AlertManager)
+        p = self._make_presenter_with_alert_manager(alert_manager=mock_am)
+
+        req = _make_request("r1", "Test", "GET")
+        p.add_new_tab(req)
+        tab = p.widget.widget(0)
+
+        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
+            mock_worker_instance = MagicMock()
+            mock_worker_instance.isRunning.return_value = False
+            MockWorker.return_value = mock_worker_instance
+
+            tab.request_editor.send_requested.emit(req)
+
+            self.assertTrue(MockWorker.called)
+            _, kwargs = MockWorker.call_args
+            self.assertIs(kwargs.get("alert_manager"), mock_am)
+
+    def test_no_alert_manager_no_exception(self):
+        p = self._make_presenter_with_alert_manager(alert_manager=None)
+
+        req = _make_request("r2", "Test2", "GET")
+        p.add_new_tab(req)
+        tab = p.widget.widget(0)
+
+        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
+            mock_worker_instance = MagicMock()
+            mock_worker_instance.isRunning.return_value = False
+            MockWorker.return_value = mock_worker_instance
+
+            # Should not raise
+            tab.request_editor.send_requested.emit(req)
+
+            _, kwargs = MockWorker.call_args
+            self.assertIsNone(kwargs.get("alert_manager"))
+
+
 if __name__ == "__main__":
     unittest.main()

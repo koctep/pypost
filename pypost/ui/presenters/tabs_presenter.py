@@ -18,6 +18,7 @@ from pypost.models.models import RequestData, Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 from pypost.core.template_service import TemplateService
+from pypost.core.alert_manager import AlertManager
 from pypost.models.errors import ErrorCategory, ExecutionError
 
 logger = logging.getLogger(__name__)
@@ -97,6 +98,7 @@ class TabsPresenter(QObject):
         metrics: MetricsManager | None = None,
         history_manager: HistoryManager | None = None,
         template_service: TemplateService | None = None,
+        alert_manager: AlertManager | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -106,6 +108,8 @@ class TabsPresenter(QObject):
         self._metrics = metrics
         self._history_manager = history_manager
         self._template_service = template_service
+        self._alert_manager = alert_manager
+        logger.debug("TabsPresenter: alert_manager_injected=%s", alert_manager is not None)
         self._current_variables: dict = {}
 
         self._tab_bar = TabBarWithAddButton()
@@ -352,6 +356,7 @@ class TabsPresenter(QObject):
             history_manager=self._history_manager,
             collection_name=collection_name,
             template_service=self._template_service,
+            alert_manager=self._alert_manager,
         )
         worker.finished.connect(lambda resp: self._on_request_finished(sender_tab, resp))
         worker.error.connect(lambda err: self._on_request_error(sender_tab, err))

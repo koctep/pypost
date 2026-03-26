@@ -9,6 +9,7 @@ from pypost.core.request_service import RequestService
 from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
 from pypost.core.template_service import TemplateService
+from pypost.core.alert_manager import AlertManager
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class RequestWorker(QThread):
         history_manager: HistoryManager | None = None,
         collection_name: str | None = None,
         template_service: TemplateService | None = None,
+        alert_manager: AlertManager | None = None,
     ):
         super().__init__()
         self.request_data = request_data
@@ -36,8 +38,14 @@ class RequestWorker(QThread):
         self._collection_name = collection_name
         if template_service is not None:
             logger.debug("RequestWorker: propagating TemplateService id=%d", id(template_service))
+        logger.debug(
+            "RequestWorker: alert_manager_injected=%s id=%s",
+            alert_manager is not None,
+            id(alert_manager) if alert_manager is not None else "None",
+        )
         self.service = RequestService(metrics=metrics, history_manager=history_manager,
-                                      template_service=template_service)
+                                      template_service=template_service,
+                                      alert_manager=alert_manager)
         self._stop_event = threading.Event()
 
     def stop(self):

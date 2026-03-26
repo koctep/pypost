@@ -17,6 +17,7 @@ from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
 from pypost.core.template_service import TemplateService
+from pypost.core.alert_manager import AlertManager
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.about_dialog import AboutDialog
@@ -32,6 +33,7 @@ class MainWindow(QMainWindow):
         metrics: MetricsManager,
         template_service: TemplateService,
         config_manager: ConfigManager | None = None,
+        alert_manager: AlertManager | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("PyPost")
@@ -45,6 +47,8 @@ class MainWindow(QMainWindow):
         else:
             logger.debug("config_manager_source source=new")
             self.config_manager = ConfigManager()
+        self._alert_manager = alert_manager
+        logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
         self.style_manager = StyleManager()
@@ -61,6 +65,7 @@ class MainWindow(QMainWindow):
             metrics=self.metrics,
             history_manager=self.history_manager,
             template_service=self.template_service,
+            alert_manager=self._alert_manager,
         )
         self.env = EnvPresenter(
             self.storage, self.config_manager, self.mcp_manager,
