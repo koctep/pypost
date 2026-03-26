@@ -24,7 +24,7 @@ alerts) are dead code in production. This was flagged as RISK-1 carry-forward in
 - [x] **60-review.md** — Team Lead tech-debt analysis
 - [x] **70-dev-docs.md** — Team Lead dev docs
 - [x] **Final commit** — Team Lead commits
-- [ ] **Jira closure** — Project Manager closes issue
+- [x] **Jira closure** — Project Manager closes issue
 
 ---
 
@@ -42,7 +42,7 @@ alerts) are dead code in production. This was flagged as RISK-1 carry-forward in
 | 7 | Team Lead | `60-review.md` | **Done** |
 | 7b | Team Lead | `70-dev-docs.md` | **Done** |
 | 7c | Team Lead | Final commit | **Done** |
-| 8 | Project Manager | Jira closure | To Do |
+| 8 | Project Manager | Jira closure | **Done** |
 
 ---
 
@@ -62,7 +62,7 @@ alerts) are dead code in production. This was flagged as RISK-1 carry-forward in
 ## Project Manager Update
 
 **Date**: 2026-03-26
-**Phase**: `observability_ready` — Observability complete; Team Lead review/docs/commit remaining.
+**Phase**: `closed` — All deliverables complete; Jira issue closed.
 
 ### Completed Milestones
 
@@ -80,13 +80,19 @@ alerts) are dead code in production. This was flagged as RISK-1 carry-forward in
 - `50-observability.md` complete — 4 structured log lines added across the full DI chain
   (`main.py` INFO, `main_window.py` DEBUG, `tabs_presenter.py` DEBUG, `worker.py` DEBUG);
   operators can confirm injection state and bisect failures from the log stream alone.
+- `60-review.md` complete — all 7 ACs pass; 3 low-severity non-blocking observations
+  (TD-1/TD-2/TD-3); verdict: APPROVED.
+- `70-dev-docs.md` complete — DI chain diagram, config table, changed-file annotations,
+  observable log stream, and test documentation.
+- Final commit landed: `39eb591` — AlertManager wired into RequestWorker via DI chain.
+- Jira PYPOST-418 transitioned to Done.
 
 ### Active Risks / Blockers
 
-- None. No blockers.
-- Remaining work: TL review (`60-review.md`) → dev docs (`70-dev-docs.md`) → final commit → PM closure.
+- None. Issue fully closed.
+- Carry-forward debt items pre-registered: PYPOST-433 (`close()` at exit).
+- PYPOST-419 (retry policy) is now unblocked.
 
 ### Next Action
 
-- **team_lead** → perform tech-debt analysis (`60-review.md`), write dev docs (`70-dev-docs.md`),
-  and create final commit.
+- **project_manager** → close Sprint 167 PYPOST-418 work; unblock PYPOST-419.

@@ -55,7 +55,7 @@
 
 ## Project Manager Update
 
-**Date**: 2026-03-25 (observability_ready sync)
+**Date**: 2026-03-25 (finalization sync)
 
 ### Completed Milestones
 
@@ -81,17 +81,26 @@
   summary (`test.yml`), surfacing line coverage %, threshold, and PASS/FAIL status without
   extra log expansion. AC-4 corrected: failure simulation confirmed via
   `--cov-fail-under=99` (exits 2, 53% < 99%). No application-code changes required.
+- **STEP 6** (2026-03-25): Tech debt review complete — `ai-tasks/PYPOST-88/60-review.md`
+  produced. All AC-1…AC-5 PASS. Three residual debt items identified: TD-1 (HIGH) threshold
+  gap 50%→70%; TD-2 (LOW) hardcoded threshold in `test.yml` summary; TD-3 (LOW) no branch
+  coverage. No blockers; follow-up ticket for TD-1/TD-2 required.
+- **STEP 7** (2026-03-25): Developer documentation complete —
+  `ai-tasks/PYPOST-88/70-dev-docs.md` produced. Documents threshold mechanics, CI visibility,
+  how to raise the threshold, selection rationale, and related tickets.
+- **STEP 8** (2026-03-25): Final commit complete — `df542ac`
+  `feature(config): PYPOST-88 enforce pytest cov-fail-under threshold at 50%`. All
+  deliverables merged. Jira closure in progress.
 
 ### Active Risks / Blockers
 
-- **Risk**: Baseline may fluctuate slightly between runs. 50% threshold gives a ~4pp buffer
-  above the rounded floor — low probability of false failures.
-- **Follow-up required**: Create a new Jira ticket to raise `--cov-fail-under` from 50% to
-  70% once overall test coverage reaches ≥ 70%.
-- **No blockers** at this time.
+- **No blockers.** All deliverables are complete and committed.
+- **Follow-up required (TD-1/F-1)**: Create a new Jira ticket to raise `--cov-fail-under`
+  from 50% to 70% once overall test coverage reaches ≥ 70%.
+- **Follow-up required (TD-2/F-2)**: When raising threshold, update `THRESHOLD=50` in
+  `.github/workflows/test.yml` summary script to match.
 
 ### Next Action
 
-**STEP 6** (next): Delegate to `team_lead` to produce `60-review.md` — tech debt analysis
-and risk assessment post-implementation. Then proceed to STEP 7 (dev docs) and STEP 8
-(final commit + Jira closure).
+**DONE** — PYPOST-88 is fully complete. Jira issue moved to Done.
+Follow-up: create new ticket for raising `--cov-fail-under` to 70% (TD-1).

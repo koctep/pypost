@@ -21,11 +21,11 @@
        *(no new instrumentation required; existing coverage confirmed complete)*
 - [x] 7. **Team Lead** — tech-debt analysis → `60-review.md`, dev docs → `70-dev-docs.md`,
        final commit
-- [ ] 8. **Project Manager** — final Jira closure & roadmap sync
+- [x] 8. **Project Manager** — final Jira closure & roadmap sync
 
 ---
 
-## Project Manager Update — 2026-03-25 (refresh: observability_ready)
+## Project Manager Update — 2026-03-25 (phase: CLOSED)
 
 **Completed milestones:**
 - Step 0 (PM kickoff): done
@@ -39,8 +39,10 @@
 - Step 5b (Junior Engineer): `40-code-cleanup.md` complete — no style or coverage issues
 - Step 6 (Senior Engineer): `50-observability.md` complete — no new instrumentation required;
   existing logging, metrics, and alerting fully cover the refactored execution path
+- Step 7 (Team Lead): `60-review.md` complete — no residual tech debt; `70-dev-docs.md` complete —
+  future-maintainer guidance documented; final commit `467c300` landed
+- Step 8 (PM): final Jira closure comment added; issue transitioned to Done
 
 **Active risks/blockers:** None
 
-**Next action:** Team Lead → tech-debt analysis (`60-review.md`), dev docs (`70-dev-docs.md`),
-and final commit (Step 7)
+**Next action:** None — task complete and closed.

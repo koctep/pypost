@@ -55,7 +55,7 @@
 
 ## Project Manager Update
 
-**Date**: 2026-03-25 (updated — observability_ready phase)
+**Date**: 2026-03-25 (updated — finalization phase)
 
 ### Completed Milestones
 
@@ -76,14 +76,21 @@
   - Added "Write job summary" step posting markdown test-count table to `$GITHUB_STEP_SUMMARY`.
   - Added `Upload test results` artifact step (`test-results-<py-version>`).
   - Full observability coverage matrix documented across 7 mechanisms.
+- **STEP 6 COMPLETE**: `60-review.md` delivered by Team Lead.
+  - 6 tech debt items identified; all LOW severity except TD-5 (MEDIUM — no coverage threshold).
+  - Verdict: approved with no blocking issues; implementation is production-ready.
+- **STEP 7 COMPLETE**: `70-dev-docs.md` delivered by Team Lead.
+  - Full developer documentation covering pipeline overview, triggers, matrix, steps reference,
+    artifact catalogue, environment variables, local parity, and known limitations.
+- **STEP 8 COMPLETE**: Final commit made — `9f0a52d feature(ci): PYPOST-89 add GitHub Actions
+  CI pipeline for pytest`.
 
 ### Active Risks / Blockers
 
-- No blockers. Steps 1–5 complete.
-- PYPOST-88 (`--cov-fail-under` threshold) remains a follow-on dependency — not blocking.
-- STEP 6 (Review) not yet started — `60-review.md` missing.
+- No blockers. All 8 steps complete.
+- PYPOST-88 (`--cov-fail-under` threshold) remains the highest-priority follow-on — not blocking.
+- Branch-protection rules still require manual configuration in GitHub repository settings.
 
 ### Next Action
 
-Hand off to **Team Lead** (`team_lead`) to produce `60-review.md` (tech debt analysis)
-and subsequently `70-dev-docs.md` (dev documentation) and the final commit.
+All deliverables complete. **Transition PYPOST-89 to Done in Jira.**
