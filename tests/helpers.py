@@ -1,7 +1,7 @@
 class FakeStorageManager:
     def __init__(self, collections=None):
         self._collections = collections or []
-        self.saved_collections: list = []
+        self.saved_collections: list = []  # Collection instances (see save_collection)
         self.deleted_collection_names: list = []
 
     def seed_collections(self, collections):
@@ -12,7 +12,7 @@ class FakeStorageManager:
         return list(self._collections)
 
     def save_collection(self, collection):
-        self.saved_collections.append(collection.name)
+        self.saved_collections.append(collection)
 
     def delete_collection(self, collection_name: str):
         self.deleted_collection_names.append(collection_name)

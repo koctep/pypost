@@ -27,7 +27,7 @@ class TestRequestManagerCreate(unittest.TestCase):
 
     def test_create_collection_persists_via_storage(self):
         self.manager.create_collection("My API")
-        self.assertEqual(["My API"], self.storage.saved_collections)
+        self.assertEqual(["My API"], [c.name for c in self.storage.saved_collections])
 
 
 class TestRequestManagerSaveRequest(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestRequestManagerSaveRequest(unittest.TestCase):
         req = RequestData(id="r_new", name="New req")
         self.manager.save_request(req, "c1")
         self.assertEqual([req], self.collection.requests)
-        self.assertIn("Team API", self.storage.saved_collections)
+        self.assertIn("Team API", [c.name for c in self.storage.saved_collections])
 
     def test_save_existing_request_updates_in_place(self):
         self.collection.requests = [self.req_v1]

@@ -25,7 +25,7 @@ class RequestManagerDeleteTests(unittest.TestCase):
 
         self.assertTrue(deleted)
         self.assertEqual([], collection.requests)
-        self.assertEqual(["Team API"], storage.saved_collections)
+        self.assertEqual(["Team API"], [c.name for c in storage.saved_collections])
         self.assertIsNone(manager.find_request("r1"))
 
     def test_delete_collection_removes_collection_and_deletes_file(self):
@@ -61,7 +61,7 @@ class RequestManagerDeleteTests(unittest.TestCase):
 
         self.assertTrue(renamed)
         self.assertEqual("Get active users", collection.requests[0].name)
-        self.assertEqual(["Team API"], storage.saved_collections)
+        self.assertEqual(["Team API"], [c.name for c in storage.saved_collections])
 
     def test_rename_collection_updates_name_and_rewrites_collection_file(self):
         collection = Collection(id="c1", name="Team API", requests=[])
@@ -73,7 +73,7 @@ class RequestManagerDeleteTests(unittest.TestCase):
         self.assertTrue(renamed)
         self.assertEqual("Team API v2", manager.get_collections()[0].name)
         self.assertEqual(["Team API"], storage.deleted_collection_names)
-        self.assertEqual(["Team API v2"], storage.saved_collections)
+        self.assertEqual(["Team API v2"], [c.name for c in storage.saved_collections])
 
     def test_rename_collection_item_rejects_empty_name(self):
         req = RequestData(id="r1", name="Get users")
