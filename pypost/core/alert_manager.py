@@ -64,7 +64,45 @@ class AlertManager:
         self._logger = logging.getLogger(f"pypost.alerts.{id(self)}")
         self._logger.propagate = False
         self._logger.setLevel(logging.INFO)
+
+        # Guard: remove stale handlers left by a GC'd instance at this address.
+        stale_handlers = list(self._logger.handlers)
+        if stale_handlers:
+            logger.warning(
+                "alert_manager_stale_handlers_evicted count=%d log_path=%s"
+                " — prior AlertManager was not closed; evicting to prevent accumulation",
+                len(stale_handlers),
+                resolved,
+            )
+        for stale in stale_handlers:
+            try:
+                stale.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._logger.removeHandler(stale)
+
         self._logger.addHandler(handler)
+        logger.debug("alert_manager_init log_path=%s webhook=%s", resolved,
+                     "yes" if webhook_url else "no")
+        self._handler = handler  # owned reference for close()
+
+    def close(self) -> None:
+        """Release the log handler and remove it from the logger."""
+        try:
+            self._handler.close()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self._logger.removeHandler(self._handler)
+        except Exception:  # noqa: BLE001
+            pass
+        logger.debug("alert_manager_close logger=%s", self._logger.name)
+
+    def __enter__(self) -> "AlertManager":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
 
     def emit(self, payload: AlertPayload) -> None:
         """Write JSON alert to the rotating log file and optionally send to webhook."""
@@ -83,12 +121,13 @@ class AlertManager:
         if self._webhook_auth_header:
             headers["Authorization"] = self._webhook_auth_header
         try:
-            requests.post(
+            resp = requests.post(
                 self._webhook_url,
                 json=payload.to_dict(),
                 headers=headers,
                 timeout=5.0,
             )
+            logger.debug("alert_webhook_ok url=%r status=%d", self._webhook_url, resp.status_code)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "alert_webhook_failed url=%r error=%s", self._webhook_url, exc

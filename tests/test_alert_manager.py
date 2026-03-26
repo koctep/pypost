@@ -1,4 +1,5 @@
 """Unit tests for AlertManager and AlertPayload."""
+import gc
 import json
 import logging
 import tempfile
@@ -163,6 +164,44 @@ class TestAlertManagerWebhook(unittest.TestCase):
             mgr.emit(_make_payload())
         _, kwargs = mock_post.call_args
         self.assertEqual(kwargs["timeout"], 5.0)
+
+
+class TestAlertManagerAccumulation(unittest.TestCase):
+    """Regression tests for handler accumulation via id() reuse and missing close()."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.log_path = Path(self.tmpdir) / "alerts.log"
+
+    def _line_count(self) -> int:
+        if not self.log_path.exists():
+            return 0
+        return len([l for l in self.log_path.read_text(encoding="utf-8").splitlines() if l.strip()])
+
+    def test_no_accumulation_via_close(self):
+        """Each closed manager writes exactly one line; N+1 managers write N+1 lines."""
+        N = 5
+        for _ in range(N):
+            mgr = AlertManager(log_path=self.log_path)
+            mgr.emit(_make_payload())
+            mgr.close()
+        mgr = AlertManager(log_path=self.log_path)
+        mgr.emit(_make_payload())
+        mgr.close()
+        self.assertEqual(self._line_count(), N + 1)
+
+    def test_no_accumulation_via_gc_id_reuse(self):
+        """Handler guard evicts stale handlers when CPython reuses a memory address."""
+        N = 5
+        for _ in range(N):
+            mgr = AlertManager(log_path=self.log_path)
+            mgr.emit(_make_payload())
+            del mgr
+            gc.collect()
+        mgr = AlertManager(log_path=self.log_path)
+        mgr.emit(_make_payload())
+        mgr.close()
+        self.assertEqual(self._line_count(), N + 1)
 
 
 if __name__ == "__main__":
