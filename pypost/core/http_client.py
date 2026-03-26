@@ -197,16 +197,18 @@ class HTTPClient:
             return self._handle_sse_response(response, request_data, start_time)
 
         content_parts = []
-        # iter_content with None uses optimal chunk size from server (or fallback)
-        # decode_unicode=True yields strings instead of bytes
-        for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+        # iter_content with None uses optimal chunk size from server (or fallback).
+        # Default yields bytes; decode here so mocks and real responses stay aligned.
+        for chunk in response.iter_content(chunk_size=None):
             if stop_flag and stop_flag():
-                # If cancelled, we break the loop. 
+                # If cancelled, we break the loop.
                 # Note: This stops reading, but doesn't necessarily close socket immediately unless we close response.
-                response.close() 
+                response.close()
                 break
-                
+
             if chunk:
+                if isinstance(chunk, bytes):
+                    chunk = chunk.decode("utf-8", errors="replace")
                 content_parts.append(chunk)
                 if stream_callback:
                     stream_callback(chunk)

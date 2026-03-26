@@ -12,7 +12,7 @@ def _make_response(status=200, headers=None, chunks=None):
     resp = MagicMock()
     resp.status_code = status
     resp.headers = {"Content-Type": "application/json", **(headers or {})}
-    resp.iter_content.return_value = iter(chunks or ["body"])
+    resp.iter_content.return_value = iter(chunks or [b"body"])
     resp.close.return_value = None
     return resp
 
@@ -25,7 +25,7 @@ class TestHTTPClientSendRequest(unittest.TestCase):
 
     def test_get_200_returns_response_data_with_correct_fields(self):
         self.mock_session.request.return_value = _make_response(
-            status=200, chunks=['{"ok":true}']
+            status=200, chunks=[b'{"ok":true}']
         )
         req = RequestData(method="GET", url="http://x")
         result = self.client.send_request(req)
@@ -56,7 +56,7 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         self.assertEqual("abc123", call_kwargs["headers"]["X-Key"])
 
     def test_stop_flag_stops_streaming_and_returns_partial_body(self):
-        resp = _make_response(status=200, chunks=["chunk1", "chunk2", "chunk3"])
+        resp = _make_response(status=200, chunks=[b"chunk1", b"chunk2", b"chunk3"])
         self.mock_session.request.return_value = resp
 
         call_count = [0]
@@ -112,7 +112,7 @@ class TestHTTPClientInjection(unittest.TestCase):
         mock_ts.render_string.side_effect = lambda s, v: s  # passthrough
         client = HTTPClient(template_service=mock_ts)
         client.session = MagicMock()
-        client.session.request.return_value = _make_response(200, chunks=["ok"])
+        client.session.request.return_value = _make_response(200, chunks=[b"ok"])
         req = RequestData(method="GET", url="http://x/{{ path }}")
         client.send_request(req, variables={"path": "items"})
         mock_ts.render_string.assert_called()
