@@ -192,6 +192,50 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertEqual(len(received), 1)
         self.assertEqual(received[0], ("r1", "New Name"))
 
+    def test_tree_expansion_saved_and_restored_after_reload(self):
+        """PYPOST-92: expand → persisted → load_collections → restore → UI expanded."""
+        col = _make_collection("c1", "My API")
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        model = presenter.widget.model()
+        index = model.item(0).index()
+        presenter.widget.expand(index)
+        self.assertIn("c1", presenter._state_manager.get_expanded_collections())
+
+        presenter.load_collections()
+        model = presenter.widget.model()
+        index = model.item(0).index()
+        self.assertFalse(presenter.widget.isExpanded(index))
+
+        presenter.restore_tree_state()
+        self.assertTrue(presenter.widget.isExpanded(index))
+
+    def test_restore_tree_state_skips_stale_saved_collection_ids(self):
+        """PYPOST-93: expanded list references unknown ids; valid rows still restore."""
+        col = _make_collection("c1", "My API")
+        presenter = self._make_presenter([col])
+        presenter._state_manager._expanded = ["deleted-collection", "c1"]
+        presenter.load_collections()
+        presenter.restore_tree_state()
+        model = presenter.widget.model()
+        index = model.item(0).index()
+        self.assertTrue(presenter.widget.isExpanded(index))
+        self.assertEqual(["deleted-collection", "c1"], presenter._state_manager._expanded)
+
+    def test_restore_tree_state_expands_only_collections_in_saved_list(self):
+        """PYPOST-95: Qt tree — only ids listed in state are expanded after restore."""
+        c1 = _make_collection("c1", "First")
+        c2 = _make_collection("c2", "Second")
+        presenter = self._make_presenter([c1, c2])
+        presenter._state_manager._expanded = ["c2"]
+        presenter.load_collections()
+        presenter.restore_tree_state()
+        model = presenter.widget.model()
+        idx1 = model.item(0).index()
+        idx2 = model.item(1).index()
+        self.assertFalse(presenter.widget.isExpanded(idx1))
+        self.assertTrue(presenter.widget.isExpanded(idx2))
+
 
 if __name__ == "__main__":
     unittest.main()
