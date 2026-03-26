@@ -47,7 +47,7 @@
 | 26 | PYPOST-133 | [PYPOST-15] Write and commit unit tests for VariableHoverHelper | Debt | Medium | Done |
 | 27 | PYPOST-139 | [PYPOST-16] No automated tests for MCP server interaction | Debt | Medium | Done |
 | 28 | PYPOST-142 | [PYPOST-16] Add tests using an MCP client mock | Debt | Medium | Done |
-| 29 | PYPOST-56 | Add Qt-level UI tests for EnvironmentDialog | Debt | Medium | To Do |
+| 29 | PYPOST-56 | Add Qt-level UI tests for EnvironmentDialog | Debt | Medium | Done |
 
 ---
 

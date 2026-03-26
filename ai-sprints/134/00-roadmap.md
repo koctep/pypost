@@ -54,7 +54,7 @@
 | 26 | PYPOST-133 | [PYPOST-15] Write and commit unit tests for VariableHoverHelper | Done |
 | 27 | PYPOST-139 | [PYPOST-16] No automated tests for MCP server interaction | Done |
 | 28 | PYPOST-142 | [PYPOST-16] Add tests using an MCP client mock | Done |
-| 29 | PYPOST-56 | Add Qt-level UI tests for EnvironmentDialog | To Do |
+| 29 | PYPOST-56 | Add Qt-level UI tests for EnvironmentDialog | Done |
 
 ---
 
@@ -298,8 +298,7 @@
 ## Project Manager Update
 
 **Date**: 2026-03-26
-**Phase**: `wave2_in_progress` — Group J (MCP server tests) **complete**; next: Group K
-  (PYPOST-56 EnvironmentDialog UI tests).
+**Phase**: `wave2_complete` — all Wave 2 tech-debt test items **Done** (29/29).
 
 ### Status
 
@@ -313,7 +312,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (28/29 done
 | PYPOST-404 | team_lead | `4ac96b8`, `cf45465` | Done — Qt font-order bug fixed; 191 passed |
 | PYPOST-405 | team_lead | `061a590` | Done — isolated-tab feature shipped |
 
-#### Wave 2 — In Progress (28/29 done)
+#### Wave 2 — Complete (29/29 done)
 
 | Group | Issues | Status |
 |-------|--------|--------|
@@ -327,7 +326,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (28/29 done
 | H — Settings Save Logic (PYPOST-14) | PYPOST-125 ✓ | Done |
 | I — VariableHoverHelper Batch 2 (PYPOST-15) | PYPOST-130 ✓, 131 ✓, 133 ✓ | Done |
 | J — MCP Server Tests (PYPOST-16) | PYPOST-139 ✓, 142 ✓ | Done |
-| K — EnvironmentDialog UI Tests | PYPOST-56 | To Do |
+| K — EnvironmentDialog UI Tests | PYPOST-56 ✓ | Done |
 
 #### Group A Completions (Wave 2)
 
@@ -370,5 +369,5 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (28/29 done
 
 ### Next Action
 
-- **Active**: PYPOST-56 — EnvironmentDialog UI tests (Group K).
+- **Active**: None — Wave 2 backlog cleared for this sprint slice.
 - Carry-forward: schedule PYPOST-402 TD-1 and TD-2 (AlertManager wiring, retry policy runtime).
