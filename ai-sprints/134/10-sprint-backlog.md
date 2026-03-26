@@ -1,7 +1,7 @@
 # Sprint 134 — Backlog
 
 > Date: 2026-03-26
-> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 10/29 tech-debt items done (Groups A–B
+> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 11/29 tech-debt items done (Groups A–C
 > complete)
 > Priority: Highest / High / Medium
 
@@ -29,7 +29,7 @@
 | 8 | PYPOST-58 | [PYPOST-41 TD-1] HistoryManager tests bypass constructor via __new__ | Debt | Medium | Done |
 | 9 | PYPOST-59 | [PYPOST-41 TD-2] Repeated import tempfile in test_history_manager | Debt | Medium | Done |
 | 10 | PYPOST-60 | [PYPOST-41 TD-3] Vestigial tmp_path=None on test_load_missing_file | Debt | Medium | Done |
-| 11 | PYPOST-79 | [PYPOST-44 TD-7] No unit tests for MetricsManager tracking | Debt | Medium | To Do |
+| 11 | PYPOST-79 | [PYPOST-44 TD-7] No unit tests for MetricsManager tracking | Debt | Medium | Done |
 | 12 | PYPOST-92 | [PYPOST-10] Unit tests for tree state save/restore logic are missing | Debt | Medium | To Do |
 | 13 | PYPOST-93 | [PYPOST-10] No tests for edge cases (ID exists in settings but not in collection) | Debt | Medium | To Do |
 | 14 | PYPOST-95 | [PYPOST-10] Write tests to verify UI state preservation | Debt | Medium | To Do |
