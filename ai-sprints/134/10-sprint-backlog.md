@@ -1,7 +1,7 @@
 # Sprint 134 — Backlog
 
 > Date: 2026-03-26
-> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 22/29 tech-debt items done (Groups A–G
+> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 23/29 tech-debt items done (Groups A–H
 > complete)
 > Priority: Highest / High / Medium
 
@@ -41,7 +41,7 @@
 | 20 | PYPOST-117 | [PYPOST-13] Unit tests for VariableHoverHelper and widgets are missing | Debt | Medium | Done |
 | 21 | PYPOST-118 | [PYPOST-13] UI Tests: No automatic UI tests checking tooltip appearance | Debt | Medium | Done |
 | 22 | PYPOST-121 | [PYPOST-13] Write unit tests for VariableHoverHelper | Debt | Medium | Done |
-| 23 | PYPOST-125 | [PYPOST-14] No unit tests were added for the save logic or settings persistence | Debt | Medium | To Do |
+| 23 | PYPOST-125 | [PYPOST-14] No unit tests were added for the save logic or settings persistence | Debt | Medium | Done |
 | 24 | PYPOST-130 | [PYPOST-15] Unit tests for VariableHoverHelper.resolve_text are missing | Debt | Medium | To Do |
 | 25 | PYPOST-131 | [PYPOST-15] UI Tests: No automated UI tests to verify tooltip appearance | Debt | Medium | To Do |
 | 26 | PYPOST-133 | [PYPOST-15] Write and commit unit tests for VariableHoverHelper | Debt | Medium | To Do |
