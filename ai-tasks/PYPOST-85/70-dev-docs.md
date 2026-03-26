@@ -11,6 +11,7 @@ implementation details.
 
 ## Related
 
+- `save_collection` appends the `Collection` instance to `saved_collections` (not only the name).
 - `load_collections()` returns `list(self._collections)`.
 - Constructor `FakeStorageManager([...])` is still appropriate when the manager should load
   data on first `reload` inside `RequestManager.__init__`.

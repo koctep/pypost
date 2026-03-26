@@ -1,57 +1,247 @@
 # Sprint 134 — Backlog
 
-> Date: 2026-03-25
-> Total issues: 3
-> Priority: Highest / High
+> Date: 2026-03-26
+> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 7/29 tech-debt items done (Group A
+> complete)
+> Priority: Highest / High / Medium
 
-## Issues
+## Completed Issues (carry-over, already Done)
 
 | # | Key | Summary | Type | Priority | Status |
 |---|-----|---------|------|----------|--------|
-| 1 | PYPOST-403 | [HP] Fix failing tests in CI | Debt | Highest | Done |
-| 2 | PYPOST-404 | [Bug] Font size settings not applied on application startup | Bug | High | Done |
-| 3 | PYPOST-405 | Open request in new independent tab | Feature | High | Done |
+| — | PYPOST-403 | [HP] Fix failing tests in CI | Debt | Highest | Done |
+| — | PYPOST-404 | [Bug] Font size settings not applied on application startup | Bug | High | Done |
+| — | PYPOST-405 | Open request in new independent tab | Feature | High | Done |
+
+---
+
+## New Issues — Tech Debt (actionable, To Do)
+
+| # | Key | Summary | Type | Priority | Status |
+|---|-----|---------|------|----------|--------|
+| 1 | PYPOST-89 | [PYPOST-52] No CI pipeline for tests | Debt | Medium | Done |
+| 2 | PYPOST-88 | [PYPOST-52] No pytest cov-fail-under threshold | Debt | Medium | Done |
+| 3 | PYPOST-83 | [PYPOST-52] Fragile positional call_args in test_request_service | Debt | Medium | Done |
+| 4 | PYPOST-84 | [PYPOST-52] ScriptExecutor patch targets class not instance | Debt | Medium | Done |
+| 5 | PYPOST-85 | [PYPOST-52] Private _collections mutation in reload test | Debt | Medium | Done |
+| 6 | PYPOST-86 | [PYPOST-52] FakeStorageManager.saved_collections names only | Debt | Medium | Done |
+| 7 | PYPOST-87 | [PYPOST-52] iter_content mock returns strings not bytes | Debt | Medium | Done |
+| 8 | PYPOST-58 | [PYPOST-41 TD-1] HistoryManager tests bypass constructor via __new__ | Debt | Medium | To Do |
+| 9 | PYPOST-59 | [PYPOST-41 TD-2] Repeated import tempfile in test_history_manager | Debt | Medium | To Do |
+| 10 | PYPOST-60 | [PYPOST-41 TD-3] Vestigial tmp_path=None on test_load_missing_file | Debt | Medium | To Do |
+| 11 | PYPOST-79 | [PYPOST-44 TD-7] No unit tests for MetricsManager tracking | Debt | Medium | To Do |
+| 12 | PYPOST-92 | [PYPOST-10] Unit tests for tree state save/restore logic are missing | Debt | Medium | To Do |
+| 13 | PYPOST-93 | [PYPOST-10] No tests for edge cases (ID exists in settings but not in collection) | Debt | Medium | To Do |
+| 14 | PYPOST-95 | [PYPOST-10] Write tests to verify UI state preservation | Debt | Medium | To Do |
+| 15 | PYPOST-100 | [PYPOST-11] Unit tests for JsonHighlighter are missing | Debt | Medium | To Do |
+| 16 | PYPOST-103 | [PYPOST-11] Add tests for JsonHighlighter | Debt | Medium | To Do |
+| 17 | PYPOST-104 | [PYPOST-12] No tests: creation of automated tests was skipped by user request | Debt | Medium | To Do |
+| 18 | PYPOST-108 | [PYPOST-12] Tests for CodeEditor | Debt | Medium | To Do |
+| 19 | PYPOST-110 | [PYPOST-12] Create tests for CodeEditor | Debt | Medium | To Do |
+| 20 | PYPOST-117 | [PYPOST-13] Unit tests for VariableHoverHelper and widgets are missing | Debt | Medium | To Do |
+| 21 | PYPOST-118 | [PYPOST-13] UI Tests: No automatic UI tests checking tooltip appearance | Debt | Medium | To Do |
+| 22 | PYPOST-121 | [PYPOST-13] Write unit tests for VariableHoverHelper | Debt | Medium | To Do |
+| 23 | PYPOST-125 | [PYPOST-14] No unit tests were added for the save logic or settings persistence | Debt | Medium | To Do |
+| 24 | PYPOST-130 | [PYPOST-15] Unit tests for VariableHoverHelper.resolve_text are missing | Debt | Medium | To Do |
+| 25 | PYPOST-131 | [PYPOST-15] UI Tests: No automated UI tests to verify tooltip appearance | Debt | Medium | To Do |
+| 26 | PYPOST-133 | [PYPOST-15] Write and commit unit tests for VariableHoverHelper | Debt | Medium | To Do |
+| 27 | PYPOST-139 | [PYPOST-16] No automated tests for MCP server interaction | Debt | Medium | To Do |
+| 28 | PYPOST-142 | [PYPOST-16] Add tests using an MCP client mock | Debt | Medium | To Do |
+| 29 | PYPOST-56 | Add Qt-level UI tests for EnvironmentDialog | Debt | Medium | To Do |
+
+---
 
 ## Execution Order & Rationale
 
-### 1 · PYPOST-403 — Fix failing CI tests
+### Group A — Test Infrastructure (PYPOST-52)
 
-**Description:** Investigate and fix 5 currently-failing automated tests in CI: 3 `AttributeError`
-failures in SSE probe tests due to `HTTPClient` missing a `TemplateService`, and 2 `OSError`
-failures in `HistoryManager` tests caused by temp-dir cleanup racing the async save thread.
+Foundational test-infrastructure fixes must land first so all subsequent test-writing work
+benefits from a stable, reliable pipeline.
 
-**Rationale:** Foundational. CI must be green before any new feature work. Fixes unblock the
-remaining debt items from Sprint 100 (TD-1 wiring of `AlertManager`, TD-2 runtime retry policy)
-which also rely on a stable test baseline.
+#### 1 · PYPOST-89 — No CI pipeline for tests
+
+**Rationale:** Highest priority among all new items. Without a CI pipeline, all newly added tests
+will only run locally, defeating their purpose. Must be resolved before any other test is written.
+
+#### 2 · PYPOST-88 — No pytest cov-fail-under threshold
+
+**Rationale:** Enforces a coverage floor so future test additions have a quality gate. Set up
+alongside CI (#1) as a one-pass infrastructure change.
+
+#### 3 · PYPOST-83 — Fragile positional call_args in test_request_service
+
+**Rationale:** Brittle assertions break on minor signature changes. Fix before adding more tests
+in the same area to avoid propagating the pattern.
+
+#### 4 · PYPOST-84 — ScriptExecutor patch targets class not instance
+
+**Rationale:** Incorrect mock target means tests pass for the wrong reason. Fix to establish a
+correct mock baseline used by later CodeEditor tests.
+
+#### 5 · PYPOST-85 — Private _collections mutation in reload test
+
+**Rationale:** Tests that mutate internal state are fragile and mask real bugs. Fix before adding
+tree-state and storage tests.
+
+#### 6 · PYPOST-86 — FakeStorageManager.saved_collections names only
+
+**Rationale:** Incomplete fake leads to false-positive tests. Fix the fake before relying on it
+in new tests (#12–#14).
+
+#### 7 · PYPOST-87 — iter_content mock returns strings not bytes
+
+**Rationale:** Type mismatch in mock causes silent failures when response body processing is
+tested. Fix before expanding request-service test coverage.
 
 ---
 
-### 2 · PYPOST-404 — Font size settings not applied on application startup
+### Group B — HistoryManager Tests (PYPOST-41)
 
-**Description:** After the user changes font size settings and restarts the application, the
-selected font size is not applied. Root cause: Qt 6 `setStyleSheet()` re-polishes all widgets and
-resets the app-level font; `apply_settings` called `app.setFont(font)` before
-`style_manager.apply_styles(app)`.
+Clean up existing HistoryManager tests now that CI is stable (PYPOST-403 already fixed the race
+condition; these are code-quality issues in the test suite itself).
 
-**Rationale:** High-visibility UI regression. Directly impacts user trust. Fix is surgical
-(call-order swap + ConfigManager injection; < 20 lines).
+#### 8 · PYPOST-58 — HistoryManager tests bypass constructor via __new__
+
+**Rationale:** Bypassing __init__ hides dependency injection bugs. Refactor to use a proper
+constructor or fixture.
+
+#### 9 · PYPOST-59 — Repeated import tempfile in test_history_manager
+
+**Rationale:** Minor hygiene. Resolved in same pass as #8 to keep the file clean.
+
+#### 10 · PYPOST-60 — Vestigial tmp_path=None on test_load_missing_file
+
+**Rationale:** Dead parameter causes confusion. Remove in the same pass as #8–#9.
 
 ---
 
-### 3 · PYPOST-405 — Open request in new independent tab
+### Group C — MetricsManager Tests (PYPOST-44)
 
-**Description:** Add a "New tab" context menu item on collection request items so a user can open
-duplicate editors for the same saved request. Each new tab must receive a deep copy of
-`RequestData` to prevent inadvertent shared-state mutations.
+#### 11 · PYPOST-79 — No unit tests for MetricsManager tracking
 
-**Rationale:** User-facing feature enabling parallel request editing workflows. Depends on a
-stable test suite (PYPOST-403) to confirm no regressions.
+**Rationale:** MetricsManager is an internal service with no test coverage. Add unit tests to
+establish a baseline before any future changes to metrics collection.
+
+---
+
+### Group D — Tree State Tests (PYPOST-10)
+
+#### 12 · PYPOST-92 — Unit tests for tree state save/restore logic are missing
+
+**Rationale:** Core persistence logic for the tree widget has no unit tests. Start with the
+happy-path save/restore cycle.
+
+#### 13 · PYPOST-93 — No tests for edge cases (ID exists in settings but not in collection)
+
+**Rationale:** Edge-case coverage for mismatched state. Add alongside #12 in the same test module.
+
+#### 14 · PYPOST-95 — Write tests to verify UI state preservation
+
+**Rationale:** Qt-level state preservation tests complement the unit tests in #12–#13.
+
+---
+
+### Group E — JsonHighlighter Tests (PYPOST-11)
+
+#### 15 · PYPOST-100 — Unit tests for JsonHighlighter are missing
+
+**Rationale:** Analysis/discovery ticket — confirms gap. Resolve by writing the tests in #16.
+
+#### 16 · PYPOST-103 — Add tests for JsonHighlighter
+
+**Rationale:** Implementation of the tests identified by #15. Pair together in a single pass.
+
+---
+
+### Group F — CodeEditor Tests (PYPOST-12)
+
+#### 17 · PYPOST-104 — No tests: automated tests skipped by user request
+
+**Rationale:** Documents the coverage gap for CodeEditor. Resolve by writing the tests in #18–#19.
+
+#### 18 · PYPOST-108 — Tests for CodeEditor
+
+**Rationale:** Adds unit-level test coverage for CodeEditor core behaviour.
+
+#### 19 · PYPOST-110 — Create tests for CodeEditor
+
+**Rationale:** Extends #18 with additional test scenarios identified during review.
+
+---
+
+### Group G — VariableHoverHelper Tests — Batch 1 (PYPOST-13)
+
+#### 20 · PYPOST-117 — Unit tests for VariableHoverHelper and widgets are missing
+
+**Rationale:** Gap analysis. Resolves alongside #21–#22.
+
+#### 21 · PYPOST-118 — UI Tests: No automatic UI tests checking tooltip appearance
+
+**Rationale:** Qt-level tooltip tests require a running QApplication. Add as a separate
+test class within the same module.
+
+#### 22 · PYPOST-121 — Write unit tests for VariableHoverHelper
+
+**Rationale:** Implementation of the unit tests from #20–#21.
+
+---
+
+### Group H — Settings Save Logic Tests (PYPOST-14)
+
+#### 23 · PYPOST-125 — No unit tests for save logic or settings persistence
+
+**Rationale:** Settings persistence is user-critical functionality with zero test coverage.
+
+---
+
+### Group I — VariableHoverHelper Tests — Batch 2 (PYPOST-15)
+
+PYPOST-15 introduced resolve_text; tests are missing. Batch 2 may overlap with Group G but
+targets different methods.
+
+#### 24 · PYPOST-130 — Unit tests for VariableHoverHelper.resolve_text are missing
+
+**Rationale:** resolve_text is the key transformation method; must be unit-tested in isolation.
+
+#### 25 · PYPOST-131 — UI Tests: No automated UI tests to verify tooltip appearance
+
+**Rationale:** Qt-level verification for PYPOST-15 tooltip path.
+
+#### 26 · PYPOST-133 — Write and commit unit tests for VariableHoverHelper
+
+**Rationale:** Implementation commit for #24–#25.
+
+---
+
+### Group J — MCP Server Tests (PYPOST-16)
+
+#### 27 · PYPOST-139 — No automated tests for MCP server interaction
+
+**Rationale:** MCP integration is tested only manually. Document gap and introduce mock strategy.
+
+#### 28 · PYPOST-142 — Add tests using an MCP client mock
+
+**Rationale:** Implement the mock-based test suite for MCP server interaction identified in #27.
+
+---
+
+### Group K — EnvironmentDialog UI Tests
+
+#### 29 · PYPOST-56 — Add Qt-level UI tests for EnvironmentDialog
+
+**Rationale:** UI dialog with no automated tests. Placed last as it requires a stable Qt test
+harness established by earlier groups.
 
 ---
 
 ## Notes
 
-- Sprint 100 tech debt (TD-1 `AlertManager` wiring, TD-2 default retry policy) was assessed but
-  is NOT in this sprint — PYPOST-403 made the test suite green, unblocking a future sprint for
-  those items.
-- All three issues are independent and were executed sequentially for CI stability.
+- Items PYPOST-89 through PYPOST-87 (Group A) are **Done**; remaining Wave 2 items are type
+  **Debt**, priority **Medium**, status **To Do** unless noted in
+  [00-roadmap.md](00-roadmap.md).
+- Execution order follows: infrastructure → existing-test cleanup → new unit tests →
+  new UI/integration tests.
+- PYPOST-89 (CI pipeline) is the single highest-priority item; it unblocks the quality
+  gate for all subsequent test work.
+- Groups G and I both target VariableHoverHelper but for different feature branches
+  (PYPOST-13 vs PYPOST-15); keep them in separate test modules to avoid merge conflicts.

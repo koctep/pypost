@@ -14,6 +14,5 @@ Replaced fragile private-attribute mutation in the reload test with `seed_collec
 
 ## Residual Tech Debt
 
-**TD-1 (LOW):** `saved_collections` still records names only until PYPOST-86.
-
-**Owner:** PYPOST-86.
+**TD-1 (LOW, resolved):** `saved_collections` now stores full `Collection` objects (PYPOST-86,
+  `8830703`).
