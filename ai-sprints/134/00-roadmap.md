@@ -42,9 +42,9 @@
 | 14 | PYPOST-95 | [PYPOST-10] Write tests to verify UI state preservation | Done |
 | 15 | PYPOST-100 | [PYPOST-11] Unit tests for JsonHighlighter are missing | Done |
 | 16 | PYPOST-103 | [PYPOST-11] Add tests for JsonHighlighter | Done |
-| 17 | PYPOST-104 | [PYPOST-12] No tests: automated tests skipped | To Do |
-| 18 | PYPOST-108 | [PYPOST-12] Tests for CodeEditor | To Do |
-| 19 | PYPOST-110 | [PYPOST-12] Create tests for CodeEditor | To Do |
+| 17 | PYPOST-104 | [PYPOST-12] No tests: automated tests skipped | Done |
+| 18 | PYPOST-108 | [PYPOST-12] Tests for CodeEditor | Done |
+| 19 | PYPOST-110 | [PYPOST-12] Create tests for CodeEditor | Done |
 | 20 | PYPOST-117 | [PYPOST-13] Unit tests for VariableHoverHelper and widgets are missing | To Do |
 | 21 | PYPOST-118 | [PYPOST-13] UI Tests: No automatic UI tests checking tooltip appearance | To Do |
 | 22 | PYPOST-121 | [PYPOST-13] Write unit tests for VariableHoverHelper | To Do |
@@ -209,20 +209,20 @@
 
 ##### PYPOST-104 · No tests: automated tests skipped by user request
 
-- [ ] **Junior Engineer** — document gap, prepare test plan
-- [ ] **Team Lead** — final commit (can batch with PYPOST-108/110)
+- [x] **Junior Engineer** — document gap, prepare test plan (module docstring)
+- [x] **Team Lead** — final commit (batched with PYPOST-108/110)
 
 ##### PYPOST-108 · Tests for CodeEditor
 
-- [ ] **Junior Engineer** — write CodeEditor unit tests
-- [ ] **Senior Engineer** — review
-- [ ] **Team Lead** — final commit
+- [x] **Junior Engineer** — write CodeEditor unit tests
+- [x] **Senior Engineer** — review
+- [x] **Team Lead** — final commit (`f2b240c`)
 
 ##### PYPOST-110 · Create tests for CodeEditor
 
-- [ ] **Junior Engineer** — extend CodeEditor test suite
-- [ ] **Senior Engineer** — review
-- [ ] **Team Lead** — final commit
+- [x] **Junior Engineer** — extend CodeEditor test suite
+- [x] **Senior Engineer** — review
+- [x] **Team Lead** — final commit (`f2b240c`)
 
 #### Group G — VariableHoverHelper Tests Batch 1 (PYPOST-13)
 
@@ -296,12 +296,12 @@
 ## Project Manager Update
 
 **Date**: 2026-03-26
-**Phase**: `wave2_in_progress` — Group E (JsonHighlighter) **complete**; next: Group F
-  (PYPOST-104/108/110 CodeEditor tests).
+**Phase**: `wave2_in_progress` — Group F (CodeEditor) **complete**; next: Group G
+  (PYPOST-117/118/121 VariableHoverHelper batch 1).
 
 ### Status
 
-Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (16/29 done).
+Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (19/29 done).
 
 #### Wave 1 — Closed
 
@@ -311,7 +311,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (16/29 done
 | PYPOST-404 | team_lead | `4ac96b8`, `cf45465` | Done — Qt font-order bug fixed; 191 passed |
 | PYPOST-405 | team_lead | `061a590` | Done — isolated-tab feature shipped |
 
-#### Wave 2 — In Progress (16/29 done)
+#### Wave 2 — In Progress (19/29 done)
 
 | Group | Issues | Status |
 |-------|--------|--------|
@@ -320,7 +320,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (16/29 done
 | C — MetricsManager Tests (PYPOST-44) | PYPOST-79 ✓ | Done |
 | D — Tree State Tests (PYPOST-10) | PYPOST-92 ✓, 93 ✓, 95 ✓ | Done |
 | E — JsonHighlighter Tests (PYPOST-11) | PYPOST-100 ✓, 103 ✓ | Done |
-| F — CodeEditor Tests (PYPOST-12) | PYPOST-104, 108, 110 | To Do |
+| F — CodeEditor Tests (PYPOST-12) | PYPOST-104 ✓, 108 ✓, 110 ✓ | Done |
 | G — VariableHoverHelper Batch 1 (PYPOST-13) | PYPOST-117, 118, 121 | To Do |
 | H — Settings Save Logic (PYPOST-14) | PYPOST-125 | To Do |
 | I — VariableHoverHelper Batch 2 (PYPOST-15) | PYPOST-130, 131, 133 | To Do |
@@ -342,6 +342,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (16/29 done
 | PYPOST-79 | `064eaa0` | Done — MetricsManager tracking tests; `request_errors` label uses category.value |
 | PYPOST-92/93/95 | `51b9ab1` | Done — tree expand/restore round-trip, stale ids, subset `isExpanded` |
 | PYPOST-100/103 | `cc171c3` | Done — JsonHighlighter tests via QTextLayout format ranges |
+| PYPOST-104/108/110 | `f2b240c` | Done — CodeEditor reformat, paste, key indent/dedent tests |
 
 ### Carry-Forward Risks
 
@@ -365,6 +366,5 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (16/29 done
 
 ### Next Action
 
-- **Active**: PYPOST-104 / PYPOST-108 / PYPOST-110 — CodeEditor test gap + implementation
-  (Group F).
+- **Active**: PYPOST-117 / PYPOST-118 / PYPOST-121 — VariableHoverHelper batch 1 (Group G).
 - Carry-forward: schedule PYPOST-402 TD-1 and TD-2 (AlertManager wiring, retry policy runtime).

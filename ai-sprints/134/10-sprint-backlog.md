@@ -1,7 +1,7 @@
 # Sprint 134 — Backlog
 
 > Date: 2026-03-26
-> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 16/29 tech-debt items done (Groups A–E
+> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 19/29 tech-debt items done (Groups A–F
 > complete)
 > Priority: Highest / High / Medium
 
@@ -35,9 +35,9 @@
 | 14 | PYPOST-95 | [PYPOST-10] Write tests to verify UI state preservation | Debt | Medium | Done |
 | 15 | PYPOST-100 | [PYPOST-11] Unit tests for JsonHighlighter are missing | Debt | Medium | Done |
 | 16 | PYPOST-103 | [PYPOST-11] Add tests for JsonHighlighter | Debt | Medium | Done |
-| 17 | PYPOST-104 | [PYPOST-12] No tests: creation of automated tests was skipped by user request | Debt | Medium | To Do |
-| 18 | PYPOST-108 | [PYPOST-12] Tests for CodeEditor | Debt | Medium | To Do |
-| 19 | PYPOST-110 | [PYPOST-12] Create tests for CodeEditor | Debt | Medium | To Do |
+| 17 | PYPOST-104 | [PYPOST-12] No tests: creation of automated tests was skipped by user request | Debt | Medium | Done |
+| 18 | PYPOST-108 | [PYPOST-12] Tests for CodeEditor | Debt | Medium | Done |
+| 19 | PYPOST-110 | [PYPOST-12] Create tests for CodeEditor | Debt | Medium | Done |
 | 20 | PYPOST-117 | [PYPOST-13] Unit tests for VariableHoverHelper and widgets are missing | Debt | Medium | To Do |
 | 21 | PYPOST-118 | [PYPOST-13] UI Tests: No automatic UI tests checking tooltip appearance | Debt | Medium | To Do |
 | 22 | PYPOST-121 | [PYPOST-13] Write unit tests for VariableHoverHelper | Debt | Medium | To Do |
