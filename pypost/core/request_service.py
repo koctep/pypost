@@ -48,13 +48,20 @@ class RequestService:
         template_service: TemplateService | None = None,
         history_manager: HistoryManager | None = None,
         alert_manager: AlertManager | None = None,
+        default_retry_policy: RetryPolicy | None = None,
     ) -> None:
         self._metrics = metrics
         self._history_manager = history_manager
         self._template_service = template_service
         self._alert_manager = alert_manager
+        self._default_retry_policy = default_retry_policy
         if template_service is not None:
             logger.debug("RequestService: using injected TemplateService id=%d", id(template_service))
+        logger.debug(
+            "RequestService: default_retry_policy_injected=%s max_retries=%s",
+            default_retry_policy is not None,
+            default_retry_policy.max_retries if default_retry_policy is not None else "N/A",
+        )
         self.http_client = HTTPClient(metrics=self._metrics, template_service=self._template_service)
         self.mcp_client = MCPClientService()
 
@@ -105,6 +112,17 @@ class RequestService:
     ) -> ResponseData:
         """Execute HTTP request with optional retry and exponential back-off."""
         policy: RetryPolicy | None = request.retry_policy
+        if policy is None:
+            policy = self._default_retry_policy
+        _policy_source = (
+            "per_request" if request.retry_policy is not None
+            else "app_default" if self._default_retry_policy is not None
+            else "hardcoded_fallback"
+        )
+        logger.debug(
+            "retry_policy_resolved method=%s url=%r source=%s max_retries=%d",
+            request.method, request.url, _policy_source, policy.max_retries if policy else 0,
+        )
         max_retries = policy.max_retries if policy else 0
         delay = policy.retry_delay_seconds if policy else 1.0
         multiplier = policy.retry_backoff_multiplier if policy else 2.0

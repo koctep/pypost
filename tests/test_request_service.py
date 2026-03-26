@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.models.errors import ErrorCategory, ExecutionError
+from pypost.models.retry import RetryPolicy
 from pypost.core.request_service import RequestService, ExecutionResult
 from pypost.core.template_service import TemplateService
 from pypost.core.history_manager import HistoryManager
@@ -254,6 +255,46 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
             req = RequestData(method="GET", url="http://x", post_script="bad")
             self.svc.execute(req)
         mock_metrics.track_request_error.assert_called_once_with(ErrorCategory.SCRIPT)
+
+
+class TestRequestServiceRetryPolicyResolution(unittest.TestCase):
+    """AC-1/AC-2/AC-3: per-request > app default > hardcoded fallback."""
+
+    def _make_svc(self, default_retry_policy=None):
+        svc = RequestService(default_retry_policy=default_retry_policy)
+        svc.http_client = MagicMock()
+        return svc
+
+    def test_per_request_policy_wins_over_app_default(self):
+        """AC-2: per-request policy takes precedence; max_retries=1 → 2 calls total."""
+        svc = self._make_svc(
+            default_retry_policy=RetryPolicy(max_retries=5, retryable_status_codes=[500])
+        )
+        svc.http_client.send_request.return_value = _make_response(500)
+        req = RequestData(
+            method="GET", url="http://x",
+            retry_policy=RetryPolicy(max_retries=1, retryable_status_codes=[500]),
+        )
+        svc.execute(req)
+        self.assertEqual(2, svc.http_client.send_request.call_count)
+
+    def test_app_default_used_when_no_per_request_policy(self):
+        """AC-1: app default applies when request.retry_policy is None; max_retries=2 → 3 calls."""
+        svc = self._make_svc(
+            default_retry_policy=RetryPolicy(max_retries=2, retryable_status_codes=[500])
+        )
+        svc.http_client.send_request.return_value = _make_response(500)
+        req = RequestData(method="GET", url="http://x", retry_policy=None)
+        svc.execute(req)
+        self.assertEqual(3, svc.http_client.send_request.call_count)
+
+    def test_hardcoded_fallback_when_both_policies_none(self):
+        """AC-3: no policy at all → max_retries=0 → exactly 1 call."""
+        svc = self._make_svc()
+        svc.http_client.send_request.return_value = _make_response(500)
+        req = RequestData(method="GET", url="http://x", retry_policy=None)
+        svc.execute(req)
+        self.assertEqual(1, svc.http_client.send_request.call_count)
 
 
 if __name__ == "__main__":

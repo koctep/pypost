@@ -357,6 +357,7 @@ class TabsPresenter(QObject):
             collection_name=collection_name,
             template_service=self._template_service,
             alert_manager=self._alert_manager,
+            default_retry_policy=self._settings.default_retry_policy,
         )
         worker.finished.connect(lambda resp: self._on_request_finished(sender_tab, resp))
         worker.error.connect(lambda err: self._on_request_error(sender_tab, err))

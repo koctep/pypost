@@ -10,6 +10,7 @@ from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
 from pypost.core.template_service import TemplateService
 from pypost.core.alert_manager import AlertManager
+from pypost.models.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class RequestWorker(QThread):
         collection_name: str | None = None,
         template_service: TemplateService | None = None,
         alert_manager: AlertManager | None = None,
+        default_retry_policy: RetryPolicy | None = None,
     ):
         super().__init__()
         self.request_data = request_data
@@ -43,9 +45,15 @@ class RequestWorker(QThread):
             alert_manager is not None,
             id(alert_manager) if alert_manager is not None else "None",
         )
+        logger.debug(
+            "RequestWorker: default_retry_policy_injected=%s max_retries=%s",
+            default_retry_policy is not None,
+            default_retry_policy.max_retries if default_retry_policy is not None else "N/A",
+        )
         self.service = RequestService(metrics=metrics, history_manager=history_manager,
                                       template_service=template_service,
-                                      alert_manager=alert_manager)
+                                      alert_manager=alert_manager,
+                                      default_retry_policy=default_retry_policy)
         self._stop_event = threading.Event()
 
     def stop(self):
