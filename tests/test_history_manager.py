@@ -1,4 +1,5 @@
 import json
+import tempfile
 import threading
 import time
 import unittest
@@ -23,14 +24,12 @@ def _make_entry(**kwargs) -> HistoryEntry:
 
 
 class TestHistoryManagerLoad(unittest.TestCase):
-    def test_load_missing_file(self, tmp_path=None):
-        import tempfile
+    def test_load_missing_file(self):
         with tempfile.TemporaryDirectory() as td:
             hm = _manager_at(td)
             self.assertEqual([], hm.get_entries())
 
     def test_load_corrupt_file(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "history.json"
             p.write_text("not valid json", encoding="utf-8")
@@ -40,7 +39,6 @@ class TestHistoryManagerLoad(unittest.TestCase):
 
 class TestHistoryManagerAppend(unittest.TestCase):
     def test_append_single_entry(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as td:
             hm = _manager_at(td)
             hm.append(_make_entry(url="https://a.com"))
@@ -50,7 +48,6 @@ class TestHistoryManagerAppend(unittest.TestCase):
             hm.flush()
 
     def test_append_enforces_cap(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as td:
             hm = _manager_at(td, max_entries=500)
             for i in range(501):
@@ -62,7 +59,6 @@ class TestHistoryManagerAppend(unittest.TestCase):
             hm.flush()
 
     def test_get_entries_newest_first(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as td:
             hm = _manager_at(td)
             hm.append(_make_entry(url="https://first.com", timestamp="2026-01-01T00:00:00Z"))
@@ -78,7 +74,6 @@ class TestHistoryManagerAppend(unittest.TestCase):
 
 class TestHistoryManagerDelete(unittest.TestCase):
     def test_delete_entry(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as td:
             hm = _manager_at(td)
             e1 = _make_entry(url="https://a.com")
@@ -94,7 +89,6 @@ class TestHistoryManagerDelete(unittest.TestCase):
 
 class TestHistoryManagerClear(unittest.TestCase):
     def test_clear(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as td:
             hm = _manager_at(td)
             hm.append(_make_entry())
@@ -106,7 +100,6 @@ class TestHistoryManagerClear(unittest.TestCase):
 
 class TestHistoryManagerPersistence(unittest.TestCase):
     def test_save_and_reload(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as td:
             hm1 = _manager_at(td)
             entry = _make_entry(url="https://persist.com", status_code=201)
@@ -122,7 +115,6 @@ class TestHistoryManagerPersistence(unittest.TestCase):
 
 class TestHistoryManagerConcurrency(unittest.TestCase):
     def test_concurrent_appends(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as td:
             hm = _manager_at(td, max_entries=500)
             threads = []
@@ -147,20 +139,8 @@ class TestHistoryManagerConcurrency(unittest.TestCase):
 
 def _manager_at(tmp_dir: str, max_entries: int = 500, path: Path | None = None) -> HistoryManager:
     """Create a HistoryManager that stores its file under tmp_dir."""
-    hm = HistoryManager.__new__(HistoryManager)
-    hm._max_entries = max_entries
-    hm._lock = threading.Lock()
-    hm._save_lock = threading.Lock()
-    hm._save_running = False
-    hm._save_pending = False
-    hm._save_thread = None
-    hm._entries = []
-    if path is not None:
-        hm._history_path = path
-    else:
-        hm._history_path = Path(tmp_dir) / "history.json"
-    hm._load()
-    return hm
+    file_path = path if path is not None else Path(tmp_dir) / "history.json"
+    return HistoryManager(max_entries=max_entries, history_path=file_path)
 
 
 if __name__ == "__main__":

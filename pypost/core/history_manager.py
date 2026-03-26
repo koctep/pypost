@@ -15,7 +15,12 @@ logger = logging.getLogger(__name__)
 class HistoryManager:
     DEFAULT_MAX_ENTRIES: int = 500
 
-    def __init__(self, app_name: str = "pypost", max_entries: int = DEFAULT_MAX_ENTRIES) -> None:
+    def __init__(
+        self,
+        app_name: str = "pypost",
+        max_entries: int = DEFAULT_MAX_ENTRIES,
+        history_path: Path | None = None,
+    ) -> None:
         self._max_entries = max_entries
         self._lock = threading.Lock()
         self._save_lock = threading.Lock()
@@ -23,7 +28,10 @@ class HistoryManager:
         self._save_pending = False
         self._save_thread: threading.Thread | None = None
         self._entries: List[HistoryEntry] = []
-        self._history_path = Path(user_data_dir(app_name)) / "history.json"
+        if history_path is not None:
+            self._history_path = Path(history_path)
+        else:
+            self._history_path = Path(user_data_dir(app_name)) / "history.json"
         self._load()
 
     # ── Read ──────────────────────────────────────────────────────────────────
