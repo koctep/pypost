@@ -37,9 +37,9 @@
 | 9 | PYPOST-59 | [PYPOST-41 TD-2] Repeated import tempfile in test_history_manager | Done |
 | 10 | PYPOST-60 | [PYPOST-41 TD-3] Vestigial tmp_path=None on test_load_missing_file | Done |
 | 11 | PYPOST-79 | [PYPOST-44 TD-7] No unit tests for MetricsManager tracking | Done |
-| 12 | PYPOST-92 | [PYPOST-10] Unit tests for tree state save/restore logic are missing | To Do |
-| 13 | PYPOST-93 | [PYPOST-10] No tests for edge cases | To Do |
-| 14 | PYPOST-95 | [PYPOST-10] Write tests to verify UI state preservation | To Do |
+| 12 | PYPOST-92 | [PYPOST-10] Unit tests for tree state save/restore logic are missing | Done |
+| 13 | PYPOST-93 | [PYPOST-10] No tests for edge cases | Done |
+| 14 | PYPOST-95 | [PYPOST-10] Write tests to verify UI state preservation | Done |
 | 15 | PYPOST-100 | [PYPOST-11] Unit tests for JsonHighlighter are missing | To Do |
 | 16 | PYPOST-103 | [PYPOST-11] Add tests for JsonHighlighter | To Do |
 | 17 | PYPOST-104 | [PYPOST-12] No tests: automated tests skipped | To Do |
@@ -177,20 +177,20 @@
 
 ##### PYPOST-92 · Unit tests for tree state save/restore logic are missing
 
-- [ ] **Junior Engineer** — write save/restore unit tests
-- [ ] **Senior Engineer** — review
-- [ ] **Team Lead** — final commit
+- [x] **Junior Engineer** — write save/restore unit tests
+- [x] **Senior Engineer** — review
+- [x] **Team Lead** — final commit (`51b9ab1`)
 
 ##### PYPOST-93 · No tests for edge cases
 
-- [ ] **Junior Engineer** — add edge-case tests
-- [ ] **Team Lead** — final commit (can batch with PYPOST-92/95)
+- [x] **Junior Engineer** — add edge-case tests
+- [x] **Team Lead** — final commit (batched `51b9ab1`)
 
 ##### PYPOST-95 · Write tests to verify UI state preservation
 
-- [ ] **Junior Engineer** — add Qt-level state preservation tests
-- [ ] **Senior Engineer** — review
-- [ ] **Team Lead** — final commit
+- [x] **Junior Engineer** — add Qt-level state preservation tests
+- [x] **Senior Engineer** — review
+- [x] **Team Lead** — final commit (`51b9ab1`)
 
 #### Group E — JsonHighlighter Tests (PYPOST-11)
 
@@ -296,12 +296,12 @@
 ## Project Manager Update
 
 **Date**: 2026-03-26
-**Phase**: `wave2_in_progress` — Group C (MetricsManager) **complete**; next: Group D
-  (PYPOST-92 tree state tests).
+**Phase**: `wave2_in_progress` — Group D (tree state) **complete**; next: Group E
+  (PYPOST-100/103 JsonHighlighter).
 
 ### Status
 
-Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (11/29 done).
+Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (14/29 done).
 
 #### Wave 1 — Closed
 
@@ -311,14 +311,14 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (11/29 done
 | PYPOST-404 | team_lead | `4ac96b8`, `cf45465` | Done — Qt font-order bug fixed; 191 passed |
 | PYPOST-405 | team_lead | `061a590` | Done — isolated-tab feature shipped |
 
-#### Wave 2 — In Progress (11/29 done)
+#### Wave 2 — In Progress (14/29 done)
 
 | Group | Issues | Status |
 |-------|--------|--------|
 | A — Test Infrastructure (PYPOST-52) | PYPOST-89 ✓, 88 ✓, 83 ✓, 84 ✓, 85 ✓, 86 ✓, 87 ✓ | Done |
 | B — HistoryManager Tests (PYPOST-41) | PYPOST-58 ✓, 59 ✓, 60 ✓ | Done |
 | C — MetricsManager Tests (PYPOST-44) | PYPOST-79 ✓ | Done |
-| D — Tree State Tests (PYPOST-10) | PYPOST-92, 93, 95 | To Do |
+| D — Tree State Tests (PYPOST-10) | PYPOST-92 ✓, 93 ✓, 95 ✓ | Done |
 | E — JsonHighlighter Tests (PYPOST-11) | PYPOST-100, 103 | To Do |
 | F — CodeEditor Tests (PYPOST-12) | PYPOST-104, 108, 110 | To Do |
 | G — VariableHoverHelper Batch 1 (PYPOST-13) | PYPOST-117, 118, 121 | To Do |
@@ -340,6 +340,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (11/29 done
 | PYPOST-87 | `d3189a0` | Done — `iter_content` mocks yield bytes; HTTPClient decodes UTF-8 in loop |
 | PYPOST-58/59/60 | `a321608` | Done — `history_path` injection; tests use constructor; tempfile import deduped |
 | PYPOST-79 | `064eaa0` | Done — MetricsManager tracking tests; `request_errors` label uses category.value |
+| PYPOST-92/93/95 | `51b9ab1` | Done — tree expand/restore round-trip, stale ids, subset `isExpanded` |
 
 ### Carry-Forward Risks
 
@@ -363,5 +364,5 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (11/29 done
 
 ### Next Action
 
-- **Active**: PYPOST-92 — unit tests for tree state save/restore (Group D; batch 93/95 as planned).
+- **Active**: PYPOST-100 / PYPOST-103 — JsonHighlighter gap + tests (Group E).
 - Carry-forward: schedule PYPOST-402 TD-1 and TD-2 (AlertManager wiring, retry policy runtime).
