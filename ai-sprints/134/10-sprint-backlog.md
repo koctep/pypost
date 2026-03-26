@@ -1,8 +1,7 @@
 # Sprint 134 — Backlog
 
-> Date: 2026-03-26
-> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 23/29 tech-debt items done (Groups A–H
-> complete)
+> Date: 2026-03-26 (PM closure)
+> Total issues: 32 (3 Wave 1 + 29 Wave 2); **Wave 2 complete** — 29/29 tech-debt items **Done**.
 > Priority: Highest / High / Medium
 
 ## Completed Issues (carry-over, already Done)
@@ -15,7 +14,7 @@
 
 ---
 
-## New Issues — Tech Debt (actionable, To Do)
+## New Issues — Tech Debt (Wave 2, all Done)
 
 | # | Key | Summary | Type | Priority | Status |
 |---|-----|---------|------|----------|--------|
@@ -236,12 +235,10 @@ harness established by earlier groups.
 
 ## Notes
 
-- Items PYPOST-89 through PYPOST-87 (Group A) are **Done**; remaining Wave 2 items are type
-  **Debt**, priority **Medium**, status **To Do** unless noted in
-  [00-roadmap.md](00-roadmap.md).
-- Execution order follows: infrastructure → existing-test cleanup → new unit tests →
+- Wave 2 (PYPOST-89 through PYPOST-56) is **Done**; see [00-roadmap.md](00-roadmap.md) and
+  [90-sprint-report.md](90-sprint-report.md) for PM closure and carry-forward.
+- Execution order followed: infrastructure → existing-test cleanup → new unit tests →
   new UI/integration tests.
-- PYPOST-89 (CI pipeline) is the single highest-priority item; it unblocks the quality
-  gate for all subsequent test work.
+- Follow-up Debt tickets from sprint analysis: PYPOST-429–433 (see roadmap «New Backlog Items»).
 - Groups G and I both target VariableHoverHelper but for different feature branches
   (PYPOST-13 vs PYPOST-15); keep them in separate test modules to avoid merge conflicts.

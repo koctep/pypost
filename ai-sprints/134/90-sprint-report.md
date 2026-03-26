@@ -1,14 +1,23 @@
 # Sprint 134 — Sprint Report
 
-> Date: 2026-03-25
+> Date: 2026-03-26
 > Sprint: 134
 > Reporter: Team Lead
+> PM closure: 2026-03-26 (sprint 134 closed in Jira; docs synced)
 
 ---
 
 ## Result Summary
 
-**3 of 3 issues completed. 0 failed.**
+**32 of 32 planned scope items completed. 0 failed.**
+
+- **Wave 1 (3)**: feature/debt/bug delivery as originally scoped.
+- **Wave 2 (29)**: tech-debt test items from backlog — all **Done** (Groups A–K).
+
+| Wave | Keys (summary) | Result |
+|------|----------------|--------|
+| 1 | PYPOST-403, 404, 405 | Done — see table below |
+| 2 | PYPOST-89 through PYPOST-56 | Done — see [00-roadmap.md](00-roadmap.md) |
 
 | Key | Summary | Result | Commits |
 |-----|---------|--------|---------|
@@ -16,7 +25,8 @@
 | PYPOST-404 | Font size settings not applied on startup | Done | `4ac96b8`, `cf45465` |
 | PYPOST-405 | Open request in new independent tab | Done | `061a590` |
 
-Test suite: **191 passed, 0 failed** across all three issues — baseline restored and maintained.
+Test suite: **191 passed** after Wave 1; **268 passed** at sprint close (Wave 2 included), 2
+DeprecationWarnings (VariableHoverMixin `globalPos` — tracked as PYPOST-431).
 
 ---
 
@@ -47,6 +57,16 @@ request items. Tab opening uses `model_copy(deep=True)` to ensure each tab recei
 `RequestData` graph. `restore_tabs` was hardened to avoid aliasing multiple restored tabs to the
 same model reference. Implementation is fully wired through `CollectionsPresenter` → `MainWindow`
 → `TabsPresenter`. Observability and code cleanup phases completed.
+
+---
+
+## Wave 2 — Test stabilization (summary)
+
+All 29 backlog items type **Debt** completed: CI pipeline and coverage gate, test clean-up,
+HistoryManager / MetricsManager / tree / highlighter / editor / VariableHover / settings / MCP
+impl / EnvironmentDialog. Final reference commits include `aa1b28a` (VariableHover batch 2),
+`7550ad9` (MCPServerImpl tests), `865dcc1` (EnvironmentDialog). Roadmap table:
+[00-roadmap.md — Wave 2](00-roadmap.md).
 
 ---
 
@@ -119,5 +139,19 @@ or `RequestService`. All requests without a per-request policy silently fall bac
    collections-tree work to keep the object-copying contract consistent.
 3. **Schedule PYPOST-408** (stale-tab metadata sync) as a medium-priority follow-up to PYPOST-405
    if the team sees user-facing complaints about stale tab titles/URLs.
-4. **File a bug ticket** for the crash that produced the deleted `core` dump — it may indicate an
-   application-level crash path that needs investigation.
+4. **PYPOST-429** tracks investigation of the deleted `core` dump; schedule when repro data is
+   available.
+
+---
+
+## Project Manager sign-off
+
+Sprint **134** is **closed** as of **2026-03-26**.
+
+- Jira: agile sprint id **134** (`Sprint 1: Test Stabilization`) set to **closed**.
+- Repository: `ai-sprints/134/00-roadmap.md`, `10-sprint-backlog.md`, `40-sprint-execution.md`,
+  this report — aligned with final scope (Wave 1 + Wave 2).
+- Carry-forward: **PYPOST-402** (High), then **406/408**, **425–427**, **429–433** per
+  [00-roadmap.md — Next Action](00-roadmap.md).
+
+*Signed: project_manager (process)*

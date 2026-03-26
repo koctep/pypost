@@ -298,11 +298,12 @@
 ## Project Manager Update
 
 **Date**: 2026-03-26
-**Phase**: `wave2_complete` — all Wave 2 tech-debt test items **Done** (29/29).
+**Phase**: `sprint_134_closed` — Wave 1 and Wave 2 **complete**; PM closure recorded.
+**Sprint closure**: 2026-03-26 (docs + Jira sprint 134 → closed).
 
 ### Status
 
-Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (28/29 done).
+Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 is **complete** (29/29 done).
 
 #### Wave 1 — Closed
 
@@ -346,6 +347,9 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (28/29 done
 | PYPOST-104/108/110 | `f2b240c` | Done — CodeEditor reformat, paste, key indent/dedent tests |
 | PYPOST-117/118/121 | `827f16d` | Done — VariableHoverHelper unit tests + QToolTip mouseMove tests |
 | PYPOST-125 | `366543d` | Done — ConfigManager round-trip / corrupt file; StateManager persist + no-op |
+| PYPOST-130/131/133 | `aa1b28a` | Done — `resolve_text` tests + PlainTextEdit VariableHover tooltips |
+| PYPOST-139/142 | `7550ad9` | Done — `MCPServerImpl` unit tests with mocked `RequestService` |
+| PYPOST-56 | `865dcc1` | Done — `EnvironmentDialog` Qt tests (selection, MCP, add/delete) |
 
 ### Carry-Forward Risks
 
@@ -372,5 +376,6 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (28/29 done
 
 ### Next Action
 
-- **Active**: None — Wave 2 backlog cleared for this sprint slice.
-- Carry-forward: schedule PYPOST-402 TD-1 and TD-2 (AlertManager wiring, retry policy runtime).
+- **Active**: None — Sprint 134 backlog slice **closed**.
+- **Next sprint (suggested order)**: PYPOST-402 (RISK-1/2 wiring) → PYPOST-406 / 408 → PYPOST-425–427
+  → PYPOST-429–433 as capacity allows.
