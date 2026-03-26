@@ -79,10 +79,18 @@ or `RequestService`. All requests without a per-request policy silently fall bac
 
 ### From PYPOST-403
 
-| ID | Severity | Description |
-|----|----------|-------------|
-| — | Low | Investigate root cause of the deleted `core` crash dump (separate backlog item) |
-| — | Low | Replace SSE URL heuristic (`"/sse" in url`) with content-type-based detection |
+| ID | Jira | Severity | Description |
+|----|------|----------|-------------|
+| TD-4 | PYPOST-429 | Low | Investigate root cause of the deleted `core` crash dump |
+| TD-5 | PYPOST-430 | Low | Replace SSE URL heuristic (`"/sse" in url`) with content-type-based detection |
+
+### From Sprint 134 Wave 2 (follow-up)
+
+| ID | Jira | Severity | Description |
+|----|------|----------|-------------|
+| TD-6 | PYPOST-431 | Medium | `QMouseEvent.globalPos()` deprecation in VariableHoverMixin |
+| TD-7 | PYPOST-432 | Medium | Raise `cov-fail-under` from 50% toward 70% target |
+| TD-8 | PYPOST-433 | Low | Extend EnvironmentDialog Qt tests beyond baseline in PYPOST-56 |
 
 ### From PYPOST-404
 

@@ -364,8 +364,11 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 **in progress** (28/29 done
 | PYPOST-425 | Low | Remove redundant widget font loop (PYPOST-404 TD-1) |
 | PYPOST-426 | Low | Add `AppSettings` type annotation to `apply_settings` (PYPOST-404 TD-2) |
 | PYPOST-427 | Very Low | Document ConfigManager early-creation intent (PYPOST-404 TD-3) |
-| — | Low | Investigate crash root cause (PYPOST-403) |
-| — | Low | Replace SSE URL heuristic with content-type detection (PYPOST-403) |
+| PYPOST-429 | Low | Investigate crash root cause — ELF core dump removed in PYPOST-403 |
+| PYPOST-430 | Low | Replace SSE URL heuristic with content-type detection (HTTPClient) |
+| PYPOST-431 | Medium | Migrate VariableHoverMixin off deprecated `QMouseEvent.globalPos()` |
+| PYPOST-432 | Medium | Raise pytest `cov-fail-under` toward 70% (post-PYPOST-88) |
+| PYPOST-433 | Low | Expand EnvironmentDialog Qt tests (copy/duplicate, dialog edge cases) |
 
 ### Next Action
 
