@@ -40,7 +40,8 @@
 - Step 6 (Senior Engineer): `50-observability.md` complete — no new instrumentation required;
   existing logging, metrics, and alerting fully cover the refactored execution path
 - Step 7 (Team Lead): `60-review.md` complete — no residual tech debt; `70-dev-docs.md` complete —
-  future-maintainer guidance documented; final commit `467c300` landed
+  future-maintainer guidance documented; implementation commit `5204f8b` landed;
+  missing step artifacts committed in `1d5bc0f`
 - Step 8 (PM): final Jira closure comment added; issue transitioned to Done
 
 **Active risks/blockers:** None

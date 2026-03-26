@@ -121,7 +121,7 @@
 
 - [x] **Junior Engineer** — refactor call_args assertions to keyword form
 - [x] **Senior Engineer** — review
-- [x] **Team Lead** — final commit (`467c300`)
+- [x] **Team Lead** — final commit (`5204f8b`)
 
 ##### PYPOST-84 · ScriptExecutor patch targets class not instance
 
@@ -335,7 +335,7 @@ Sprint 134 Wave 1 is **complete** (3/3 done). Wave 2 is **complete** (29/29 done
 |-----|--------------|--------|
 | PYPOST-89 | `9f0a52d` | Done — GitHub Actions CI pipeline for pytest added |
 | PYPOST-88 | `df542ac` | Done — cov-fail-under=50 threshold enforced |
-| PYPOST-83 | `467c300` | Done — fragile positional call_args replaced with .kwargs assertions |
+| PYPOST-83 | `5204f8b` | Done — fragile positional call_args replaced with .kwargs assertions |
 | PYPOST-84 | `c65ebcd` | Done — ScriptExecutor @staticmethod mock contract clarified |
 | PYPOST-85 | `63c1a0d` | Done — `seed_collections()` public API; reload test decoupled from `_collections` |
 | PYPOST-86 | `8830703` | Done — `saved_collections` holds full `Collection` instances |
