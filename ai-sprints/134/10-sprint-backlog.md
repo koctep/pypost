@@ -1,7 +1,7 @@
 # Sprint 134 — Backlog
 
 > Date: 2026-03-26
-> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 19/29 tech-debt items done (Groups A–F
+> Total issues: 32 (3 Wave 1 + 29 Wave 2); Wave 2 progress: 22/29 tech-debt items done (Groups A–G
 > complete)
 > Priority: Highest / High / Medium
 
@@ -38,9 +38,9 @@
 | 17 | PYPOST-104 | [PYPOST-12] No tests: creation of automated tests was skipped by user request | Debt | Medium | Done |
 | 18 | PYPOST-108 | [PYPOST-12] Tests for CodeEditor | Debt | Medium | Done |
 | 19 | PYPOST-110 | [PYPOST-12] Create tests for CodeEditor | Debt | Medium | Done |
-| 20 | PYPOST-117 | [PYPOST-13] Unit tests for VariableHoverHelper and widgets are missing | Debt | Medium | To Do |
-| 21 | PYPOST-118 | [PYPOST-13] UI Tests: No automatic UI tests checking tooltip appearance | Debt | Medium | To Do |
-| 22 | PYPOST-121 | [PYPOST-13] Write unit tests for VariableHoverHelper | Debt | Medium | To Do |
+| 20 | PYPOST-117 | [PYPOST-13] Unit tests for VariableHoverHelper and widgets are missing | Debt | Medium | Done |
+| 21 | PYPOST-118 | [PYPOST-13] UI Tests: No automatic UI tests checking tooltip appearance | Debt | Medium | Done |
+| 22 | PYPOST-121 | [PYPOST-13] Write unit tests for VariableHoverHelper | Debt | Medium | Done |
 | 23 | PYPOST-125 | [PYPOST-14] No unit tests were added for the save logic or settings persistence | Debt | Medium | To Do |
 | 24 | PYPOST-130 | [PYPOST-15] Unit tests for VariableHoverHelper.resolve_text are missing | Debt | Medium | To Do |
 | 25 | PYPOST-131 | [PYPOST-15] UI Tests: No automated UI tests to verify tooltip appearance | Debt | Medium | To Do |
