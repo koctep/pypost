@@ -25,6 +25,8 @@ MANIFEST
 # Coverage
 .coverage
 htmlcov/
+coverage.xml
+junit.xml
 
 # Virtual Environment
 venv/
