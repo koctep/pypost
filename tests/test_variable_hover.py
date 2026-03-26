@@ -1,13 +1,13 @@
-"""Variable hover tests (PYPOST-117, PYPOST-118, PYPOST-121).
+"""Variable hover tests (PYPOST-117–121, PYPOST-130–133).
 
-PYPOST-117: VariableHoverHelper + VariableHoverMixin back RequestEditor body/URL fields
+PYPOST-117 / PYPOST-121: VariableHoverHelper + VariableHoverMixin for URL/body fields
 (VariableAwarePlainTextEdit / VariableAwareLineEdit).
 
-PYPOST-121: pure helper behaviour (find, resolve, get_value).
+PYPOST-118: QToolTip + LineEdit (fixed cursor) contract.
 
-PYPOST-118: QToolTip integration via mouseMoveEvent on a LineEdit with the same
-VariableHoverMixin + _get_text_at_cursor contract as VariableAwareLineEdit (patched
-QToolTip.showText / hideText).
+PYPOST-130 / PYPOST-133: resolve_text edge cases (batch 2 / PYPOST-15 path).
+
+PYPOST-131: QToolTip + PlainTextEdit (JSON body) contract, same mixin as CodeEditor body.
 """
 
 import unittest
@@ -15,8 +15,8 @@ from typing import Tuple
 from unittest.mock import patch
 
 from PySide6.QtCore import QEvent, QPoint, Qt
-from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QApplication, QLineEdit
+from PySide6.QtGui import QMouseEvent, QTextCursor
+from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit
 
 from pypost.ui.widgets.mixins import VariableHoverHelper, VariableHoverMixin
 
@@ -39,6 +39,29 @@ class _FixedCursorHoverLineEdit(VariableHoverMixin, QLineEdit):
         pos = event.position().toPoint()
         index = self.cursorPositionAt(pos)
         return text, index
+
+
+class _FixedCursorHoverPlainText(VariableHoverMixin, QPlainTextEdit):
+    """Same pattern as VariableAwarePlainTextEdit; stable cursorForPosition for tests."""
+
+    def __init__(self) -> None:
+        QPlainTextEdit.__init__(self)
+        VariableHoverMixin.__init__(self)
+        self.fixed_document_position = 0
+
+    def cursorForPosition(self, pos):  # noqa: ARG002
+        cur = QTextCursor(self.document())
+        text = self.toPlainText()
+        pos_idx = min(self.fixed_document_position, len(text))
+        cur.setPosition(pos_idx)
+        return cur
+
+    def _get_text_at_cursor(self, event) -> Tuple[str, int]:
+        text = self.toPlainText()
+        if not text:
+            return "", 0
+        cursor = self.cursorForPosition(event.position().toPoint())
+        return text, cursor.position()
 
 
 class TestVariableHoverHelper(unittest.TestCase):
@@ -77,6 +100,27 @@ class TestVariableHoverHelper(unittest.TestCase):
     def test_resolve_text_undefined_placeholder(self):
         out = VariableHoverHelper.resolve_text("{{only}}", {})
         self.assertEqual(out, "<not defined>")
+
+    def test_resolve_text_repeated_variable(self):
+        out = VariableHoverHelper.resolve_text("{{x}}-{{x}}", {"x": "ok"})
+        self.assertEqual(out, "ok-ok")
+
+    def test_resolve_text_adjacent_placeholders(self):
+        out = VariableHoverHelper.resolve_text("{{a}}{{b}}", {"a": "1", "b": "2"})
+        self.assertEqual(out, "12")
+
+    def test_resolve_text_empty_string(self):
+        self.assertEqual(VariableHoverHelper.resolve_text("", {"a": "b"}), "")
+
+    def test_resolve_text_no_placeholders_unchanged(self):
+        self.assertEqual(
+            VariableHoverHelper.resolve_text("plain", {}),
+            "plain",
+        )
+
+    def test_resolve_text_underscore_name(self):
+        out = VariableHoverHelper.resolve_text("{{my_var}}", {"my_var": "v"})
+        self.assertEqual(out, "v")
 
 
 def _mouse_move_event(widget, local_point: QPoint) -> QMouseEvent:
@@ -118,6 +162,37 @@ class TestVariableAwareLineEditTooltips(unittest.TestCase):
         w.set_variables({"x": "y"})
         w.fixed_cursor_index = 3
         w.mouseMoveEvent(_mouse_move_event(w, QPoint(10, 16)))
+        show_mock.assert_not_called()
+        hide_mock.assert_called()
+
+
+class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
+    @patch("pypost.ui.widgets.mixins.QToolTip.showText")
+    def test_mouse_over_variable_in_body_shows_tooltip(self, show_mock, _hide):
+        w = _FixedCursorHoverPlainText()
+        w.resize(480, 120)
+        body = '{\n  "u": "{{base}}/p"\n}'
+        w.setPlainText(body)
+        w.set_variables({"base": "https://api.example"})
+        w.fixed_document_position = body.index("{{base}}") + 2
+        w.mouseMoveEvent(_mouse_move_event(w, QPoint(20, 40)))
+        show_mock.assert_called_once()
+        self.assertEqual(show_mock.call_args[0][1], "https://api.example")
+
+    @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
+    @patch("pypost.ui.widgets.mixins.QToolTip.showText")
+    def test_mouse_over_plain_multiline_hides_tooltip(self, show_mock, hide_mock):
+        w = _FixedCursorHoverPlainText()
+        w.resize(200, 100)
+        w.setPlainText("no {{here}} really")
+        w.set_variables({"here": "x"})
+        w.fixed_document_position = w.toPlainText().index("no ")
+        w.mouseMoveEvent(_mouse_move_event(w, QPoint(5, 10)))
         show_mock.assert_not_called()
         hide_mock.assert_called()
 
