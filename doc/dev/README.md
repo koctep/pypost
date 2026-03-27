@@ -14,6 +14,7 @@ set up your development environment, and contribute to the project.
 1. [Collection Item Delete](collection_item_delete.md)
 1. [Collection Item Rename](collection_item_rename.md)
 1. [Response Body Search](response_search.md)
+1. [Hidden Variables](hidden_variables.md)
 
 ## Quick Start
 

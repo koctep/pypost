@@ -22,6 +22,7 @@ class EnvPresenter(QObject):
 
     env_variables_changed = Signal(object)   # payload: dict[str, str]
     env_keys_changed = Signal(object)        # payload: list[str] | None
+    env_hidden_keys_changed = Signal(object)  # payload: set[str]
 
     def __init__(
         self,
@@ -195,8 +196,13 @@ class EnvPresenter(QObject):
         self._current_env_index = index
 
         keys = list(variables.keys()) if isinstance(selected, Environment) else None
+        hidden_keys = (
+            selected.hidden_keys
+            if isinstance(selected, Environment) else set()
+        )
         self.env_variables_changed.emit(variables)
         self.env_keys_changed.emit(keys)
+        self.env_hidden_keys_changed.emit(hidden_keys)
 
     def _on_mcp_status_changed(self, is_running: bool) -> None:
         if is_running:

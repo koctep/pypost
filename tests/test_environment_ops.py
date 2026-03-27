@@ -34,6 +34,30 @@ class TestCloneEnvironment(unittest.TestCase):
         clone.variables["k"] = "changed"
         self.assertEqual(source.variables["k"], "v")
 
+    def test_copies_hidden_keys_and_is_independent(self) -> None:
+        source = Environment(
+            name="s",
+            variables={"API_KEY": "secret"},
+            hidden_keys={"API_KEY"},
+        )
+        clone = clone_environment(source, "c")
+        self.assertEqual(clone.hidden_keys, {"API_KEY"})
+        clone.hidden_keys.add("ANOTHER")
+        self.assertEqual(source.hidden_keys, {"API_KEY"})
+
+    def test_environment_backward_compat_without_hidden_keys(self) -> None:
+        env = Environment(**{"name": "legacy", "variables": {"A": "1"}})
+        self.assertEqual(env.hidden_keys, set())
+
+    def test_environment_dump_and_load_preserves_hidden_keys(self) -> None:
+        source = Environment(
+            name="prod",
+            variables={"TOKEN": "abc"},
+            hidden_keys={"TOKEN"},
+        )
+        restored = Environment(**source.model_dump())
+        self.assertEqual(restored.hidden_keys, {"TOKEN"})
+
 
 if __name__ == "__main__":
     unittest.main()

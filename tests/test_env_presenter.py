@@ -68,7 +68,10 @@ class TestEnvPresenter(unittest.TestCase):
         config = FakeConfigManager()
         mcp = _make_mcp_manager()
         settings = AppSettings()
-        get_collections = lambda: (collections or [])
+
+        def get_collections():
+            return collections or []
+
         return EnvPresenter(storage, config, mcp, settings, get_collections)
 
     def test_widget_is_qwidget(self):
@@ -118,6 +121,23 @@ class TestEnvPresenter(unittest.TestCase):
         p.env_selector.addItem(env.name, env)
         p._on_env_changed(1)
         self.assertIn(sorted(received[-1]), [["A", "B"]])
+
+    def test_env_hidden_keys_changed_emitted(self):
+        env = Environment(
+            id="e1",
+            name="Dev",
+            variables={"TOKEN": "abc"},
+            hidden_keys={"TOKEN"},
+        )
+        p = self._make_presenter([env])
+        received = []
+        p.env_hidden_keys_changed.connect(received.append)
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.blockSignals(False)
+        p._on_env_changed(1)
+        self.assertEqual(received[-1], {"TOKEN"})
 
     def test_on_env_changed_no_environment_emits_empty_dict(self):
         p = self._make_presenter([])

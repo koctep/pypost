@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set
 from pydantic import BaseModel, Field
 
 from pypost.models.retry import RetryPolicy
@@ -18,15 +18,18 @@ class RequestData(BaseModel):
     expose_as_mcp: bool = False  # Expose this request as an MCP tool
     retry_policy: Optional[RetryPolicy] = None
 
+
 class Collection(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "New Collection"
     requests: List[RequestData] = Field(default_factory=list)
 
+
 class Environment(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "New Environment"
     variables: Dict[str, str] = Field(default_factory=dict)
+    hidden_keys: Set[str] = Field(default_factory=set)
     enable_mcp: bool = False
 
 

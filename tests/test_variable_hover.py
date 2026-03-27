@@ -18,7 +18,11 @@ from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QMouseEvent, QTextCursor
 from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit
 
-from pypost.ui.widgets.mixins import VariableHoverHelper, VariableHoverMixin
+from pypost.ui.widgets.mixins import (
+    HIDDEN_MASK,
+    VariableHoverHelper,
+    VariableHoverMixin,
+)
 
 
 class _FixedCursorHoverLineEdit(VariableHoverMixin, QLineEdit):
@@ -90,6 +94,16 @@ class TestVariableHoverHelper(unittest.TestCase):
             "<not defined>",
         )
 
+    def test_get_variable_value_hidden_returns_mask(self):
+        self.assertEqual(
+            VariableHoverHelper.get_variable_value(
+                "token",
+                {"token": "abc"},
+                {"token"},
+            ),
+            HIDDEN_MASK,
+        )
+
     def test_resolve_text_replaces_all(self):
         out = VariableHoverHelper.resolve_text(
             "{{a}} and {{b}}",
@@ -121,6 +135,14 @@ class TestVariableHoverHelper(unittest.TestCase):
     def test_resolve_text_underscore_name(self):
         out = VariableHoverHelper.resolve_text("{{my_var}}", {"my_var": "v"})
         self.assertEqual(out, "v")
+
+    def test_resolve_text_hidden_placeholder_returns_mask(self):
+        out = VariableHoverHelper.resolve_text(
+            "token={{token}}",
+            {"token": "abc"},
+            {"token"},
+        )
+        self.assertEqual(out, f"token={HIDDEN_MASK}")
 
 
 def _mouse_move_event(widget, local_point: QPoint) -> QMouseEvent:

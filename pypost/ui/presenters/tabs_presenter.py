@@ -3,7 +3,7 @@ import uuid
 
 from PySide6.QtWidgets import (
     QTabWidget, QWidget, QVBoxLayout, QSplitter,
-    QPushButton, QTabBar, QMessageBox, QApplication,
+    QPushButton, QTabBar, QMessageBox,
 )
 from PySide6.QtCore import QObject, Qt, Signal
 
@@ -14,7 +14,7 @@ from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
-from pypost.models.models import RequestData, Environment
+from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 from pypost.core.template_service import TemplateService
@@ -111,6 +111,7 @@ class TabsPresenter(QObject):
         self._alert_manager = alert_manager
         logger.debug("TabsPresenter: alert_manager_injected=%s", alert_manager is not None)
         self._current_variables: dict = {}
+        self._current_hidden_keys: set = set()
 
         self._tab_bar = TabBarWithAddButton()
         self._tab_bar.setExpanding(False)
@@ -145,7 +146,14 @@ class TabsPresenter(QObject):
             if hasattr(tab.request_editor, 'set_variables'):
                 tab.request_editor.set_variables(self._current_variables)
             if hasattr(tab.response_view, 'set_env_keys'):
-                tab.response_view.set_env_keys(list(self._current_variables.keys()))
+                tab.response_view.set_env_keys(
+                    list(self._current_variables.keys()),
+                )
+        if self._current_hidden_keys:
+            if hasattr(tab.request_editor, 'set_hidden_keys'):
+                tab.request_editor.set_hidden_keys(
+                    self._current_hidden_keys,
+                )
 
         self._wire_tab_signals(tab)
 
@@ -212,6 +220,17 @@ class TabsPresenter(QObject):
             if isinstance(tab, RequestTab):
                 if hasattr(tab.response_view, 'set_env_keys'):
                     tab.response_view.set_env_keys(keys)
+
+    def on_env_hidden_keys_changed(
+        self, hidden_keys: set,
+    ) -> None:
+        """Pushes hidden-key set to all open tabs."""
+        self._current_hidden_keys = hidden_keys
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            if isinstance(tab, RequestTab):
+                if hasattr(tab.request_editor, 'set_hidden_keys'):
+                    tab.request_editor.set_hidden_keys(hidden_keys)
 
     def rename_request_tabs(self, request_id: str, new_name: str) -> None:
         """Updates tab labels after a request rename."""

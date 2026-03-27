@@ -117,6 +117,13 @@ class RequestWidget(QWidget):
         if hasattr(self.body_edit, 'set_variables'):
             self.body_edit.set_variables(variables)
 
+    def set_hidden_keys(self, hidden_keys: set):
+        self.url_input.set_hidden_keys(hidden_keys)
+        self.params_table.set_hidden_keys(hidden_keys)
+        self.headers_table.set_hidden_keys(hidden_keys)
+        if hasattr(self.body_edit, 'set_hidden_keys'):
+            self.body_edit.set_hidden_keys(hidden_keys)
+
     def _on_method_changed(self, method: str):
         if method == "MCP":
             self.body_edit.setPlaceholderText(

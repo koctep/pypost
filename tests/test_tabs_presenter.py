@@ -144,6 +144,15 @@ class TestTabsPresenter(unittest.TestCase):
         keys = ["KEY1", "KEY2"]
         p.on_env_keys_changed(keys)
 
+    def test_on_env_hidden_keys_changed_pushes_to_request_editor(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        tab.request_editor.set_hidden_keys = MagicMock()
+        hidden_keys = {"TOKEN"}
+        p.on_env_hidden_keys_changed(hidden_keys)
+        tab.request_editor.set_hidden_keys.assert_called_once_with(hidden_keys)
+
     def test_handle_new_tab_opens_tab(self):
         p = self._make_presenter()
         p.handle_new_tab("test_source")
@@ -236,9 +245,6 @@ class TestOnRequestError(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def _make_presenter_with_tab(self):
-        from pypost.models.errors import ErrorCategory, ExecutionError
-        from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab
-
         rm = FakeRequestManager()
         sm = FakeStateManager()
         p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())

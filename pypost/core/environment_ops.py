@@ -11,5 +11,6 @@ def clone_environment(source: Environment, new_name: str) -> Environment:
     return Environment(
         name=new_name.strip(),
         variables=dict(source.variables),
+        hidden_keys=set(source.hidden_keys),
         enable_mcp=source.enable_mcp,
     )

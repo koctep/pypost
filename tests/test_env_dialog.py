@@ -2,10 +2,11 @@
 import pytest
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QTableWidgetItem
 
 from pypost.models.models import Environment
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
+from pypost.ui.widgets.mixins import HIDDEN_MASK
 
 
 @pytest.fixture(scope="module")
@@ -89,5 +90,74 @@ class TestEnvironmentDialog:
             dlg.add_environment()
             assert len(envs) == 2
             assert envs[1].name == "Staging"
+        finally:
+            dlg.close()
+
+    def test_hidden_column_and_mask_loaded_from_environment(self, qapp):
+        env = Environment(
+            name="Dev",
+            variables={"API_KEY": "secret"},
+            hidden_keys={"API_KEY"},
+        )
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            assert dlg.vars_table.columnCount() == 3
+            assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
+            hidden_cb = dlg._get_hidden_checkbox(0)
+            assert hidden_cb is not None
+            assert hidden_cb.isChecked()
+        finally:
+            dlg.close()
+
+    def test_hidden_toggle_updates_model_and_value_cell(self, qapp):
+        env = Environment(name="Dev", variables={"API_KEY": "secret"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            hidden_cb = dlg._get_hidden_checkbox(0)
+            assert hidden_cb is not None
+            hidden_cb.setChecked(True)
+            assert "API_KEY" in env.hidden_keys
+            assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
+            hidden_cb.setChecked(False)
+            assert "API_KEY" not in env.hidden_keys
+            assert dlg.vars_table.item(0, 1).text() == "secret"
+        finally:
+            dlg.close()
+
+    def test_edit_hidden_value_keeps_real_value_and_masks_display(self, qapp):
+        env = Environment(
+            name="Dev",
+            variables={"API_KEY": "old"},
+            hidden_keys={"API_KEY"},
+        )
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg.vars_table.setItem(0, 1, QTableWidgetItem("new"))
+            assert env.variables["API_KEY"] == "new"
+            assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
+            hidden_cb = dlg._get_hidden_checkbox(0)
+            assert hidden_cb is not None
+            hidden_cb.setChecked(False)
+            assert dlg.vars_table.item(0, 1).text() == "new"
+            assert env.hidden_keys == set()
+        finally:
+            dlg.close()
+
+    def test_rename_hidden_key_keeps_real_value_and_hidden_flag(self, qapp):
+        env = Environment(
+            name="Dev",
+            variables={"API_KEY": "secret"},
+            hidden_keys={"API_KEY"},
+        )
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg.vars_table.setItem(0, 0, QTableWidgetItem("NEW_KEY"))
+            assert env.variables == {"NEW_KEY": "secret"}
+            assert env.hidden_keys == {"NEW_KEY"}
+            assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
         finally:
             dlg.close()

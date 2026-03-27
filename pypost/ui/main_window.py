@@ -122,6 +122,9 @@ class MainWindow(QMainWindow):
         self.collections.request_renamed.connect(self.tabs.rename_request_tabs)
         self.env.env_variables_changed.connect(self.tabs.on_env_variables_changed)
         self.env.env_keys_changed.connect(self.tabs.on_env_keys_changed)
+        self.env.env_hidden_keys_changed.connect(
+            self.tabs.on_env_hidden_keys_changed,
+        )
         self.tabs.variable_set_requested.connect(self.env.handle_variable_set_request)
         self.tabs.env_update_requested.connect(self.env.on_env_update)
         self.tabs.request_saved.connect(self.collections.load_collections)
