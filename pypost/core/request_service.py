@@ -5,8 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
 
-logger = logging.getLogger(__name__)
-
 from pypost.models.models import RequestData, HistoryEntry
 from pypost.models.response import ResponseData
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -18,6 +16,8 @@ from pypost.core.script_executor import ScriptExecutor
 from pypost.core.template_service import TemplateService
 from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -56,13 +56,18 @@ class RequestService:
         self._alert_manager = alert_manager
         self._default_retry_policy = default_retry_policy
         if template_service is not None:
-            logger.debug("RequestService: using injected TemplateService id=%d", id(template_service))
+            logger.debug(
+                "RequestService: using injected TemplateService id=%d",
+                id(template_service),
+            )
         logger.debug(
             "RequestService: default_retry_policy_injected=%s max_retries=%s",
             default_retry_policy is not None,
             default_retry_policy.max_retries if default_retry_policy is not None else "N/A",
         )
-        self.http_client = HTTPClient(metrics=self._metrics, template_service=self._template_service)
+        self.http_client = HTTPClient(
+            metrics=self._metrics, template_service=self._template_service
+        )
         self.mcp_client = MCPClientService()
 
     def _execute_mcp(
@@ -151,18 +156,6 @@ class RequestService:
                     stop_flag=stop_flag,
                     headers_callback=headers_callback,
                 )
-                if response.status_code not in retryable_codes or attempt == max_retries:
-                    return response
-                # Retryable status code and retries remain
-                logger.warning(
-                    "retryable_status method=%s url=%r status=%d attempt=%d max_retries=%d",
-                    request.method, request.url, response.status_code, attempt, max_retries,
-                )
-                last_error = ExecutionError(
-                    category=ErrorCategory.NETWORK,
-                    message=f"HTTP {response.status_code}",
-                    detail=f"retries_attempted: {attempt}",
-                )
             except ExecutionError as exc:
                 last_error = exc
                 if attempt == max_retries:
@@ -173,6 +166,29 @@ class RequestService:
                     "retryable_error method=%s url=%r category=%s attempt=%d max_retries=%d"
                     " error=%s",
                     request.method, request.url, exc.category, attempt, max_retries, exc.message,
+                )
+            else:
+                # Response path — raises here are not caught by the handler above
+                if response.status_code not in retryable_codes:
+                    return response
+                if attempt == max_retries:
+                    last_error = ExecutionError(
+                        category=ErrorCategory.NETWORK,
+                        message=f"HTTP {response.status_code}",
+                        detail=f"retries_attempted: {attempt}",
+                    )
+                    self._emit_exhaustion_alert(
+                        request, request_name, max_retries, last_error
+                    )
+                    raise last_error
+                logger.warning(
+                    "retryable_status method=%s url=%r status=%d attempt=%d max_retries=%d",
+                    request.method, request.url, response.status_code, attempt, max_retries,
+                )
+                last_error = ExecutionError(
+                    category=ErrorCategory.NETWORK,
+                    message=f"HTTP {response.status_code}",
+                    detail=f"retries_attempted: {attempt}",
                 )
 
             # Emit retry signal and track metrics
@@ -201,11 +217,16 @@ class RequestService:
                     )
                 time.sleep(0.1)
 
-        # Exhaustion — emit alert (retryable status code exhausted all retries)
-        assert last_error is not None
-        last_error.detail = f"retries_attempted: {max_retries}"
-        self._emit_exhaustion_alert(request, request_name, max_retries, last_error)
-        raise last_error
+        # Defensive: loop should always return or raise (e.g. empty range(max_retries+1))
+        logger.error(
+            "retry_loop_invariant_failed method=%s url=%r max_retries=%d",
+            request.method, request.url, max_retries,
+        )
+        raise ExecutionError(
+            category=ErrorCategory.NETWORK,
+            message="HTTP retry exhausted without recorded error",
+            detail=f"retries_attempted: {max_retries}",
+        )
 
     def _emit_exhaustion_alert(
         self,
@@ -216,9 +237,9 @@ class RequestService:
     ) -> None:
         logger.warning(
             "retry_exhausted method=%s url=%r request_name=%r retries=%d"
-            " error_category=%s error=%s",
+            " error_category=%s error=%s detail=%s",
             request.method, request.url, request_name, retries_attempted,
-            error.category, error.message,
+            error.category, error.message, error.detail,
         )
         if self._metrics:
             self._metrics.track_email_notification_failure(request.url)

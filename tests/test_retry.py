@@ -1,8 +1,8 @@
 """Unit tests for retry logic in RequestService._execute_http_with_retry."""
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 
-from pypost.core.request_service import RequestService, ExecutionResult
+from pypost.core.request_service import RequestService
 from pypost.core.alert_manager import AlertManager
 from pypost.models.models import RequestData
 from pypost.models.retry import RetryPolicy
@@ -101,7 +101,7 @@ class TestRetryOnRetryableStatusCode(unittest.TestCase):
         svc = _make_service()
         svc.http_client.send_request.return_value = _make_response(200)
         req = _make_request(max_retries=3)
-        result = svc.execute(req)
+        svc.execute(req)
         self.assertEqual(svc.http_client.send_request.call_count, 1)
 
 
@@ -268,6 +268,52 @@ class TestExhaustionAlert(unittest.TestCase):
         svc.execute(req)
         alert_manager.emit.assert_not_called()
         metrics.track_email_notification_failure.assert_not_called()
+
+
+class TestRetryableStatusExhaustion(unittest.TestCase):
+    """Retry exhaustion after retryable HTTP status codes (not only exceptions)."""
+
+    def test_exhausted_status_retries_returns_execution_error(self):
+        svc = _make_service()
+        svc.http_client.send_request.return_value = _make_response(503)
+        req = _make_request(max_retries=1)
+        result = svc.execute(req)
+        self.assertIsNotNone(result.execution_error)
+        self.assertEqual(result.execution_error.category, ErrorCategory.NETWORK)
+        self.assertEqual(result.execution_error.message, "HTTP 503")
+        self.assertEqual(svc.http_client.send_request.call_count, 2)
+
+    def test_detail_contains_retries_attempted_on_status_exhaustion(self):
+        svc = _make_service()
+        svc.http_client.send_request.side_effect = [
+            _make_response(503),
+            _make_response(503),
+            _make_response(503),
+        ]
+        req = _make_request(max_retries=2)
+        result = svc.execute(req)
+        self.assertIn("retries_attempted: 2", result.execution_error.detail)
+
+    def test_track_email_notification_failure_on_status_exhaustion(self):
+        metrics = MagicMock()
+        svc = _make_service(metrics=metrics)
+        svc.http_client.send_request.return_value = _make_response(502)
+        req = _make_request(max_retries=0)
+        svc.execute(req)
+        metrics.track_email_notification_failure.assert_called_once_with(req.url)
+
+    def test_alert_manager_emit_on_status_exhaustion(self):
+        alert_manager = MagicMock(spec=AlertManager)
+        svc = _make_service(alert_manager=alert_manager)
+        svc.http_client.send_request.return_value = _make_response(503)
+        req = _make_request(max_retries=0)
+        svc.execute(req)
+        alert_manager.emit.assert_called_once()
+        payload = alert_manager.emit.call_args[0][0]
+        self.assertEqual(payload.endpoint, req.url)
+        self.assertEqual(payload.retries_attempted, 0)
+        self.assertEqual(payload.final_error_category, "network")
+        self.assertEqual(payload.final_error_message, "HTTP 503")
 
 
 class TestRetryPolicyModel(unittest.TestCase):

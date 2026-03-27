@@ -17,40 +17,51 @@
 ### Done (Sprint 167 — Wave 1)
 
 | # | Key | Summary | Type | Priority | Status |
-|---|-----|---------|------|----------|--------|
+| --- | --- | --- | --- | --- | --- |
 | 1 | PYPOST-420 | [PYPOST-402] Logger accumulation in AlertManager | Debt | Medium | Done |
 | 2 | PYPOST-418 | [PYPOST-402] AlertManager never injected into RequestWorker | Debt | High | Done |
 | 3 | PYPOST-419 | [PYPOST-402] AppSettings.default_retry_policy is persisted but never applied | Debt | High | Done |
 
 ---
 
+### Open (Sprint 167 — Remaining Scope)
+
+| # | Key | Summary | Type | Priority | Status |
+| --- | --- | --- | --- | --- | --- |
+| 4 | PYPOST-421 | [PYPOST-402] Bare assert in production retry path | Debt | Low | To Do |
+| 5 | PYPOST-422 | [PYPOST-402] email_notification_failures_total metric name is misleading | Debt | Low | To Do |
+| 6 | PYPOST-423 | [PYPOST-402] retryable_codes_edit silently drops invalid input | Debt | Low | To Do |
+| 7 | PYPOST-424 | [PYPOST-402] request_timeout spin box created but never added to form layout | Debt | Low | To Do |
+
+---
+
 ## Execution Checklist
 
-### PYPOST-418 · AlertManager never injected into RequestWorker
+### PYPOST-418 · AlertManager never injected into RequestWorker ✓ DONE
 
-- [ ] **Analyst** — gather requirements → `ai-tasks/PYPOST-418/10-requirements.md`
-- [ ] **Product Owner** — review requirements for business logic
-- [ ] **Senior Engineer** — create architecture → `ai-tasks/PYPOST-418/20-architecture.md`
-- [ ] **Team Lead** — review architecture
-- [ ] **Junior Engineer** — implement code (inner loop with Senior review)
-- [ ] **Junior Engineer** — code cleanup → `ai-tasks/PYPOST-418/40-code-cleanup.md`
-- [ ] **Senior Engineer** — observability → `ai-tasks/PYPOST-418/50-observability.md`
-- [ ] **Team Lead** — tech debt analysis → `ai-tasks/PYPOST-418/60-review.md`
-- [ ] **Team Lead** — dev docs → `ai-tasks/PYPOST-418/70-dev-docs.md`
-- [ ] **Team Lead** — final commit
+- [x] **Analyst** — gather requirements → `ai-tasks/PYPOST-418/10-requirements.md`
+- [x] **Product Owner** — review requirements for business logic
+- [x] **Senior Engineer** — create architecture → `ai-tasks/PYPOST-418/20-architecture.md`
+- [x] **Team Lead** — review architecture
+- [x] **Junior Engineer** — implement code (inner loop with Senior review)
+- [x] **Junior Engineer** — code cleanup → `ai-tasks/PYPOST-418/40-code-cleanup.md`
+- [x] **Senior Engineer** — observability → `ai-tasks/PYPOST-418/50-observability.md`
+- [x] **Team Lead** — tech debt analysis → `ai-tasks/PYPOST-418/60-review.md`
+- [x] **Team Lead** — dev docs → `ai-tasks/PYPOST-418/70-dev-docs.md`
+- [x] **Team Lead** — final commit (`39eb591`)
 
-### PYPOST-419 · AppSettings.default_retry_policy is persisted but never applied
+### PYPOST-419 · AppSettings.default_retry_policy is persisted but never applied ✓ DONE
 
-- [ ] **Analyst** — gather requirements → `ai-tasks/PYPOST-419/10-requirements.md`
-- [ ] **Product Owner** — review requirements for business logic
-- [ ] **Senior Engineer** — create architecture → `ai-tasks/PYPOST-419/20-architecture.md`
-- [ ] **Team Lead** — review architecture
-- [ ] **Junior Engineer** — implement code (inner loop with Senior review)
-- [ ] **Junior Engineer** — code cleanup → `ai-tasks/PYPOST-419/40-code-cleanup.md`
-- [ ] **Senior Engineer** — observability → `ai-tasks/PYPOST-419/50-observability.md`
-- [ ] **Team Lead** — tech debt analysis → `ai-tasks/PYPOST-419/60-review.md`
-- [ ] **Team Lead** — dev docs → `ai-tasks/PYPOST-419/70-dev-docs.md`
-- [ ] **Team Lead** — final commit
+- [x] **Analyst** — gather requirements → `ai-tasks/PYPOST-419/10-requirements.md`
+- [x] **Product Owner** — review requirements for business logic
+- [x] **Senior Engineer** — create architecture → `ai-tasks/PYPOST-419/20-architecture.md`
+- [x] **Team Lead** — review architecture
+- [x] **Junior Engineer** — implement code (inner loop with Senior review)
+- [x] **Junior Engineer** — code cleanup → `ai-tasks/PYPOST-419/40-code-cleanup.md`
+- [x] **Senior Engineer** — observability → `ai-tasks/PYPOST-419/50-observability.md`
+- [x] **Team Lead** — tech debt analysis → `ai-tasks/PYPOST-419/60-review.md`
+- [x] **Team Lead** — dev docs → `ai-tasks/PYPOST-419/70-dev-docs.md`
+- [x] **Team Lead** — final commit (`24a7656`)
 
 ### PYPOST-420 · Logger accumulation in AlertManager ✓ DONE
 
@@ -67,20 +78,78 @@
 
 ---
 
+### PYPOST-421 · Bare assert in production retry path
+
+- [ ] **Analyst** — gather requirements → `ai-tasks/PYPOST-421/10-requirements.md`
+- [ ] **Product Owner** — review requirements for business logic
+- [ ] **Senior Engineer** — create architecture → `ai-tasks/PYPOST-421/20-architecture.md`
+- [ ] **Team Lead** — review architecture
+- [ ] **Junior Engineer** — implement code (inner loop with Senior review)
+- [ ] **Junior Engineer** — code cleanup → `ai-tasks/PYPOST-421/40-code-cleanup.md`
+- [ ] **Senior Engineer** — observability → `ai-tasks/PYPOST-421/50-observability.md`
+- [ ] **Team Lead** — tech debt analysis → `ai-tasks/PYPOST-421/60-review.md`
+- [ ] **Team Lead** — dev docs → `ai-tasks/PYPOST-421/70-dev-docs.md`
+- [ ] **Team Lead** — final commit
+
+### PYPOST-422 · email_notification_failures_total metric name is misleading
+
+- [ ] **Analyst** — gather requirements → `ai-tasks/PYPOST-422/10-requirements.md`
+- [ ] **Product Owner** — review requirements for business logic
+- [ ] **Senior Engineer** — create architecture → `ai-tasks/PYPOST-422/20-architecture.md`
+- [ ] **Team Lead** — review architecture
+- [ ] **Junior Engineer** — implement code (inner loop with Senior review)
+- [ ] **Junior Engineer** — code cleanup → `ai-tasks/PYPOST-422/40-code-cleanup.md`
+- [ ] **Senior Engineer** — observability → `ai-tasks/PYPOST-422/50-observability.md`
+- [ ] **Team Lead** — tech debt analysis → `ai-tasks/PYPOST-422/60-review.md`
+- [ ] **Team Lead** — dev docs → `ai-tasks/PYPOST-422/70-dev-docs.md`
+- [ ] **Team Lead** — final commit
+
+### PYPOST-423 · retryable_codes_edit silently drops invalid input
+
+- [ ] **Analyst** — gather requirements → `ai-tasks/PYPOST-423/10-requirements.md`
+- [ ] **Product Owner** — review requirements for business logic
+- [ ] **Senior Engineer** — create architecture → `ai-tasks/PYPOST-423/20-architecture.md`
+- [ ] **Team Lead** — review architecture
+- [ ] **Junior Engineer** — implement code (inner loop with Senior review)
+- [ ] **Junior Engineer** — code cleanup → `ai-tasks/PYPOST-423/40-code-cleanup.md`
+- [ ] **Senior Engineer** — observability → `ai-tasks/PYPOST-423/50-observability.md`
+- [ ] **Team Lead** — tech debt analysis → `ai-tasks/PYPOST-423/60-review.md`
+- [ ] **Team Lead** — dev docs → `ai-tasks/PYPOST-423/70-dev-docs.md`
+- [ ] **Team Lead** — final commit
+
+### PYPOST-424 · request_timeout spin box created but never added to form layout
+
+- [ ] **Analyst** — gather requirements → `ai-tasks/PYPOST-424/10-requirements.md`
+- [ ] **Product Owner** — review requirements for business logic
+- [ ] **Senior Engineer** — create architecture → `ai-tasks/PYPOST-424/20-architecture.md`
+- [ ] **Team Lead** — review architecture
+- [ ] **Junior Engineer** — implement code (inner loop with Senior review)
+- [ ] **Junior Engineer** — code cleanup → `ai-tasks/PYPOST-424/40-code-cleanup.md`
+- [ ] **Senior Engineer** — observability → `ai-tasks/PYPOST-424/50-observability.md`
+- [ ] **Team Lead** — tech debt analysis → `ai-tasks/PYPOST-424/60-review.md`
+- [ ] **Team Lead** — dev docs → `ai-tasks/PYPOST-424/70-dev-docs.md`
+- [ ] **Team Lead** — final commit
+
+---
+
 ## Project Manager Update
 
-**Date**: 2026-03-26
-**Phase**: `execution_complete` — all 3 issues done; STEP 2 complete.
+**Date**: 2026-03-27
+**Phase**: `execution_partial` — wave 1 complete; sprint scope still active.
 
 ### Status
 
-Sprint 167 has **3 issues**: all **Done**.
+Sprint 167 has **7 issues**: 3 **Done**, 4 **To Do**.
 
 | # | Key | Summary | Priority | Status | Commit |
-|---|-----|---------|----------|--------|--------|
+| --- | --- | --- | --- | --- | --- |
 | 1 | PYPOST-420 | Logger accumulation in AlertManager | Medium | **Done** | `a397a18` |
 | 2 | PYPOST-418 | AlertManager never injected into RequestWorker | High | **Done** | `39eb591` |
 | 3 | PYPOST-419 | default_retry_policy persisted but never applied | High | **Done** | `24a7656` |
+| 4 | PYPOST-421 | Bare assert in production retry path | Low | **To Do** | — |
+| 5 | PYPOST-422 | email_notification_failures_total metric name is misleading | Low | **To Do** | — |
+| 6 | PYPOST-423 | retryable_codes_edit silently drops invalid input | Low | **To Do** | — |
+| 7 | PYPOST-424 | request_timeout spin box created but never added to form layout | Low | **To Do** | — |
 
 ### Completed Milestones
 
@@ -91,9 +160,10 @@ Sprint 167 has **3 issues**: all **Done**.
 
 ### Active Risks / Blockers
 
-- Jira `jira_get_transitions` permission was denied during execution. All three issues require
-  manual transition to **Done** in Jira (or grant the permission for the next sprint).
+- No active blockers on completed wave.
+- Sprint is not closed: PYPOST-421/422/423/424 are still in `To Do`.
 
 ### Next Action
 
-- **team_lead** → sprint report → `ai-sprints/167/90-sprint-report.md` (STEP 3).
+- **analyst** → prepare independent task flow for PYPOST-421..424 (step 1 artifacts per task).
+- Keep **STEP 3** open until all sprint-scope issues are finished or formally de-scoped.
