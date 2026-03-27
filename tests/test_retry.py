@@ -226,14 +226,14 @@ class TestRetryMetrics(unittest.TestCase):
 class TestExhaustionAlert(unittest.TestCase):
     """AC-5/AC-6: metrics and alert_manager called on exhaustion."""
 
-    def test_track_email_notification_failure_called_on_exhaustion(self):
+    def test_track_request_retry_exhaustion_called_on_exhaustion(self):
         metrics = MagicMock()
         svc = _make_service(metrics=metrics)
         exc = ExecutionError(category=ErrorCategory.NETWORK, message="fail")
         svc.http_client.send_request.side_effect = exc
         req = _make_request(max_retries=1)
         svc.execute(req)
-        metrics.track_email_notification_failure.assert_called_once_with(req.url)
+        metrics.track_request_retry_exhaustion.assert_called_once_with(req.url)
 
     def test_alert_manager_emit_called_on_exhaustion(self):
         alert_manager = MagicMock(spec=AlertManager)
@@ -267,7 +267,7 @@ class TestExhaustionAlert(unittest.TestCase):
         req = _make_request(max_retries=1)
         svc.execute(req)
         alert_manager.emit.assert_not_called()
-        metrics.track_email_notification_failure.assert_not_called()
+        metrics.track_request_retry_exhaustion.assert_not_called()
 
 
 class TestRetryableStatusExhaustion(unittest.TestCase):
@@ -294,13 +294,13 @@ class TestRetryableStatusExhaustion(unittest.TestCase):
         result = svc.execute(req)
         self.assertIn("retries_attempted: 2", result.execution_error.detail)
 
-    def test_track_email_notification_failure_on_status_exhaustion(self):
+    def test_track_request_retry_exhaustion_on_status_exhaustion(self):
         metrics = MagicMock()
         svc = _make_service(metrics=metrics)
         svc.http_client.send_request.return_value = _make_response(502)
         req = _make_request(max_retries=0)
         svc.execute(req)
-        metrics.track_email_notification_failure.assert_called_once_with(req.url)
+        metrics.track_request_retry_exhaustion.assert_called_once_with(req.url)
 
     def test_alert_manager_emit_on_status_exhaustion(self):
         alert_manager = MagicMock(spec=AlertManager)

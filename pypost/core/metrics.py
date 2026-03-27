@@ -141,9 +141,9 @@ class MetricsManager:
             ['method', 'status_category'],
             registry=self.registry,
         )
-        self._email_notification_failures_total = Counter(
-            'email_notification_failures_total',
-            'Number of requests that exhausted all retries',
+        self._request_retry_exhaustions_total = Counter(
+            'request_retry_exhaustions_total',
+            'Outbound HTTP requests where all configured retries were exhausted',
             ['endpoint'],
             registry=self.registry,
         )
@@ -330,5 +330,5 @@ class MetricsManager:
             method=method.upper(), status_category=status_category
         ).inc()
 
-    def track_email_notification_failure(self, endpoint: str) -> None:
-        self._email_notification_failures_total.labels(endpoint=endpoint).inc()
+    def track_request_retry_exhaustion(self, endpoint: str) -> None:
+        self._request_retry_exhaustions_total.labels(endpoint=endpoint).inc()

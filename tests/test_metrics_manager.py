@@ -86,7 +86,7 @@ class TestMetricsManagerHistoryAndErrors(unittest.TestCase):
         self.assertIn('request_errors_total{category="timeout"} 1.0', out)
 
 
-class TestMetricsManagerRetryAndNotifications(unittest.TestCase):
+class TestMetricsManagerRetryExhaustion(unittest.TestCase):
     def test_track_retry_attempt_uppercases_method(self):
         mm = MetricsManager()
         mm.track_retry_attempt("post", "timeout")
@@ -96,12 +96,12 @@ class TestMetricsManagerRetryAndNotifications(unittest.TestCase):
             out,
         )
 
-    def test_track_email_notification_failure(self):
+    def test_track_request_retry_exhaustion(self):
         mm = MetricsManager()
-        mm.track_email_notification_failure("https://api.example/x")
+        mm.track_request_retry_exhaustion("https://api.example/x")
         out = _scrape(mm)
         self.assertIn(
-            'email_notification_failures_total{endpoint="https://api.example/x"} 1.0',
+            'request_retry_exhaustions_total{endpoint="https://api.example/x"} 1.0',
             out,
         )
 

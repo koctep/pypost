@@ -242,7 +242,7 @@ class RequestService:
             error.category, error.message, error.detail,
         )
         if self._metrics:
-            self._metrics.track_email_notification_failure(request.url)
+            self._metrics.track_request_retry_exhaustion(request.url)
         if self._alert_manager:
             self._alert_manager.emit(AlertPayload(
                 request_name=request_name or request.name,
