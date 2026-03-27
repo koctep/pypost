@@ -1,9 +1,24 @@
+import logging
+
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout,
-    QSpinBox, QDoubleSpinBox, QDialogButtonBox, QCheckBox, QLineEdit,
+    QDialog,
+    QVBoxLayout,
+    QFormLayout,
+    QSpinBox,
+    QDoubleSpinBox,
+    QDialogButtonBox,
+    QCheckBox,
+    QLineEdit,
+    QMessageBox,
+)
+from pypost.models.retry import (
+    RetryPolicy,
+    RetryableCodesValidationFailure,
+    parse_retryable_status_codes,
 )
 from pypost.models.settings import AppSettings
-from pypost.models.retry import RetryPolicy
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsDialog(QDialog):
@@ -105,23 +120,24 @@ class SettingsDialog(QDialog):
         self.buttons.rejected.connect(self.reject)
         self.layout.addWidget(self.buttons)
 
-    def _parse_retryable_codes(self) -> list:
-        raw = self.retryable_codes_edit.text().strip()
-        if not raw:
-            return []
-        codes = []
-        for part in raw.split(","):
-            part = part.strip()
-            if part.isdigit():
-                codes.append(int(part))
-        return codes
-
     def accept(self):
+        parsed_codes = parse_retryable_status_codes(self.retryable_codes_edit.text())
+        if isinstance(parsed_codes, RetryableCodesValidationFailure):
+            logger.warning(
+                "retryable_codes_settings_validation_failed reason=%s",
+                parsed_codes.reason,
+            )
+            QMessageBox.warning(
+                self,
+                "Invalid retryable status codes",
+                parsed_codes.message,
+            )
+            return
         retry_policy = RetryPolicy(
             max_retries=self.max_retries_spin.value(),
             retry_delay_seconds=self.retry_delay_spin.value(),
             retry_backoff_multiplier=self.retry_backoff_spin.value(),
-            retryable_status_codes=self._parse_retryable_codes(),
+            retryable_status_codes=parsed_codes,
         )
         webhook_url = self.alert_webhook_url_edit.text().strip() or None
         webhook_auth = self.alert_webhook_auth_edit.text().strip() or None
