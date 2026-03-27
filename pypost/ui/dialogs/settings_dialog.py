@@ -99,6 +99,7 @@ class SettingsDialog(QDialog):
 
         self.form_layout.addRow("Application Font Size:", self.font_size_spin)
         self.form_layout.addRow("JSON Indent Size:", self.indent_size_spin)
+        self.form_layout.addRow("Request Timeout (seconds):", self.timeout_spin)
         self.form_layout.addRow("MCP Server Port:", self.mcp_port_spin)
         self.form_layout.addRow("MCP Server Host:", self.mcp_host_edit)
         self.form_layout.addRow("Metrics Server Port:", self.metrics_port_spin)

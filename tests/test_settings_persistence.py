@@ -31,12 +31,14 @@ class TestConfigManagerPersistence(unittest.TestCase):
                 s = cm.load_config()
                 s.font_size = 22
                 s.metrics_port = 9099
+                s.request_timeout = 120
                 cm.save_config(s)
 
                 cm2 = ConfigManager()
                 s2 = cm2.load_config()
                 self.assertEqual(s2.font_size, 22)
                 self.assertEqual(s2.metrics_port, 9099)
+                self.assertEqual(s2.request_timeout, 120)
                 self.assertEqual(s2.revision, 1)
 
     def test_each_save_increments_revision(self):

@@ -199,8 +199,12 @@ class MainWindow(QMainWindow):
                 self.settings.metrics_host, self.settings.metrics_port,
             )
             self.metrics.restart_server(self.settings.metrics_host, self.settings.metrics_port)
-        logger.info("settings_applied font_size=%d indent_size=%d", self.settings.font_size,
-                    self.settings.indent_size)
+        logger.info(
+            "settings_applied font_size=%d indent_size=%d request_timeout=%d",
+            self.settings.font_size,
+            self.settings.indent_size,
+            self.settings.request_timeout,
+        )
         self.env._on_env_changed(self.env.env_selector.currentIndex())
 
     def handle_exit(self) -> None:
