@@ -1,6 +1,8 @@
 from typing import Dict, Optional, Set, Tuple
 from PySide6.QtWidgets import QToolTip, QWidget
 import re
+from pypost.core.template_service import TemplateService
+from pypost.core.metrics import MetricsManager
 
 HIDDEN_MASK = "********"
 
@@ -10,6 +12,15 @@ class VariableHoverHelper:
 
     # Regex to find {{variable}} pattern
     VARIABLE_PATTERN = re.compile(r'\{\{([a-zA-Z0-9_]+)\}\}')
+    EXPRESSION_PATTERN = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
+    _template_service = TemplateService()
+
+    @classmethod
+    def set_metrics(cls, metrics: MetricsManager | None) -> None:
+        """
+        Rebuild helper TemplateService so hover path exports observability metrics.
+        """
+        cls._template_service = TemplateService(metrics=metrics)
 
     @staticmethod
     def find_variable_at_index(
@@ -22,6 +33,17 @@ class VariableHoverHelper:
         for match in VariableHoverHelper.VARIABLE_PATTERN.finditer(text):
             if match.start() <= index < match.end():
                 return match.group(1)
+        return None
+
+    @staticmethod
+    def find_expression_at_index(text: str, index: int) -> Optional[str]:
+        """
+        Finds full `{{...}}` function placeholder token (e.g. {{urlencode(db)}}) under index.
+        Returns full token with braces or None.
+        """
+        for match in VariableHoverHelper.EXPRESSION_PATTERN.finditer(text):
+            if match.start() <= index < match.end():
+                return match.group(0)
         return None
 
     @staticmethod
@@ -41,13 +63,36 @@ class VariableHoverHelper:
         variables: Dict[str, str],
         hidden_keys: Optional[Set[str]] = None,
     ) -> str:
-        """Replaces all {{variable}} occurrences with their values."""
+        """Replaces all supported {{...}} occurrences with hover values."""
         def replace(match):
-            var_name = match.group(1)
-            return VariableHoverHelper.get_variable_value(
-                var_name, variables, hidden_keys,
+            expression = match.group(0)
+            if VariableHoverHelper.VARIABLE_PATTERN.fullmatch(expression):
+                return VariableHoverHelper._resolve_plain_variable(
+                    expression, variables, hidden_keys,
+                )
+            return VariableHoverHelper._resolve_expression_token(
+                expression, variables,
             )
-        return VariableHoverHelper.VARIABLE_PATTERN.sub(replace, text)
+        return VariableHoverHelper.EXPRESSION_PATTERN.sub(replace, text)
+
+    @staticmethod
+    def _resolve_plain_variable(
+        expression: str,
+        variables: Dict[str, str],
+        hidden_keys: Optional[Set[str]] = None,
+    ) -> str:
+        match = VariableHoverHelper.VARIABLE_PATTERN.fullmatch(expression)
+        if not match:
+            return expression
+        return VariableHoverHelper.get_variable_value(
+            match.group(1), variables, hidden_keys,
+        )
+
+    @staticmethod
+    def _resolve_expression_token(expression: str, variables: Dict[str, str]) -> str:
+        return VariableHoverHelper._template_service.render_string(
+            expression, variables, render_path="hover",
+        )
 
 
 class VariableHoverMixin:
@@ -88,20 +133,23 @@ class VariableHoverMixin:
         if not text:
             return
 
-        var_name = VariableHoverHelper.find_variable_at_index(
-            text, index,
-        )
-        if not var_name and index > 0:
-            var_name = VariableHoverHelper.find_variable_at_index(
-                text, index - 1,
-            )
+        expression = self._find_hover_expression(text, index)
+        self._show_or_hide_tooltip(event, expression)
 
-        if var_name:
-            value = VariableHoverHelper.get_variable_value(
-                var_name, self._variables, self._hidden_keys,
-            )
-            QToolTip.showText(
-                event.globalPos(), value, self,  # type: ignore
-            )
-        else:
+    def _find_hover_expression(self, text: str, index: int) -> Optional[str]:
+        expression = VariableHoverHelper.find_expression_at_index(text, index)
+        if expression or index <= 0:
+            return expression
+        return VariableHoverHelper.find_expression_at_index(text, index - 1)
+
+    def _show_or_hide_tooltip(self, event, expression: Optional[str]) -> None:
+        if not expression:
             QToolTip.hideText()
+            return
+
+        value = VariableHoverHelper.resolve_text(
+            expression, self._variables, self._hidden_keys,
+        )
+        QToolTip.showText(
+            event.globalPos(), value, self,  # type: ignore
+        )

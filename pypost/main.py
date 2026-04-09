@@ -28,7 +28,7 @@ def main():
     metrics_manager = MetricsManager()
     metrics_manager.start_server(settings.metrics_host, settings.metrics_port)
 
-    template_service = TemplateService()
+    template_service = TemplateService(metrics=metrics_manager)
     logger.info("template_service_created id=%d", id(template_service))
 
     log_path = Path(settings.alert_log_path) if settings.alert_log_path else None
@@ -63,6 +63,7 @@ def main():
     metrics_manager.stop_server()
 
     sys.exit(exit_code)
+
 
 if __name__ == "__main__":
     main()

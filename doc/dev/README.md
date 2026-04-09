@@ -15,6 +15,7 @@ set up your development environment, and contribute to the project.
 1. [Collection Item Rename](collection_item_rename.md)
 1. [Response Body Search](response_search.md)
 1. [Hidden Variables](hidden_variables.md)
+1. [Template Expression Functions (PYPOST-450)](template_expression_functions.md)
 
 ## Quick Start
 

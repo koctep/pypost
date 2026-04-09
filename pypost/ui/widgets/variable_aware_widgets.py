@@ -55,7 +55,7 @@ class VariableAwareTableWidget(QTableWidget):
         item = self.itemAt(event.pos())
         if item:
             text = item.text()
-            if VariableHoverHelper.VARIABLE_PATTERN.search(text):
+            if VariableHoverHelper.EXPRESSION_PATTERN.search(text):
                 resolved = VariableHoverHelper.resolve_text(
                     text, self._variables, self._hidden_keys,
                 )

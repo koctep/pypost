@@ -23,6 +23,7 @@ from pypost.ui.widgets.variable_aware_widgets import (
     VariableAwareLineEdit,
     VariableAwareTableWidget,
 )
+from pypost.ui.widgets.mixins import VariableHoverHelper
 from pypost.core.metrics import MetricsManager
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class RequestWidget(QWidget):
         super().__init__()
         self._loading = False
         self._metrics = metrics
+        VariableHoverHelper.set_metrics(metrics)
         self.request_data = request_data or RequestData()
         self.init_ui()
 

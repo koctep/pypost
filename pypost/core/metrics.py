@@ -147,6 +147,18 @@ class MetricsManager:
             ['endpoint'],
             registry=self.registry,
         )
+        self.template_expression_render_attempts = Counter(
+            'template_expression_render_attempts_total',
+            'TemplateService render attempts for function placeholders in {{...}}',
+            ['render_path', 'outcome'],
+            registry=self.registry,
+        )
+        self.template_expression_validation_failures = Counter(
+            'template_expression_validation_failures_total',
+            'TemplateService function-placeholder validation failures',
+            ['render_path', 'code', 'function_name'],
+            registry=self.registry,
+        )
 
     # MCP Resource Handlers
     async def list_resources(self) -> list[Resource]:
@@ -332,3 +344,19 @@ class MetricsManager:
 
     def track_request_retry_exhaustion(self, endpoint: str) -> None:
         self._request_retry_exhaustions_total.labels(endpoint=endpoint).inc()
+
+    def track_template_expression_render_attempt(
+        self, render_path: str, outcome: str,
+    ) -> None:
+        self.template_expression_render_attempts.labels(
+            render_path=render_path, outcome=outcome,
+        ).inc()
+
+    def track_template_expression_validation_failure(
+        self, render_path: str, code: str, function_name: str | None = None,
+    ) -> None:
+        self.template_expression_validation_failures.labels(
+            render_path=render_path,
+            code=code,
+            function_name=function_name or "n/a",
+        ).inc()

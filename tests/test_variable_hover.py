@@ -12,17 +12,18 @@ PYPOST-131: QToolTip + PlainTextEdit (JSON body) contract, same mixin as CodeEdi
 
 import unittest
 from typing import Tuple
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QMouseEvent, QTextCursor
-from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit
+from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit, QTableWidgetItem
 
 from pypost.ui.widgets.mixins import (
     HIDDEN_MASK,
     VariableHoverHelper,
     VariableHoverMixin,
 )
+from pypost.ui.widgets.variable_aware_widgets import VariableAwareTableWidget
 
 
 class _FixedCursorHoverLineEdit(VariableHoverMixin, QLineEdit):
@@ -68,6 +69,23 @@ class _FixedCursorHoverPlainText(VariableHoverMixin, QPlainTextEdit):
         return text, cursor.position()
 
 
+class _FixedHoverTableWidget(VariableAwareTableWidget):
+    """Table widget with deterministic itemAt behavior for hover tests."""
+
+    def __init__(self) -> None:
+        super().__init__(1, 1)
+        self._item_for_hover = None
+
+    def set_hover_text(self, text: str) -> None:
+        self._item_for_hover = QTableWidgetItem(text)
+
+    def clear_hover_item(self) -> None:
+        self._item_for_hover = None
+
+    def itemAt(self, pos):  # noqa: ARG002
+        return self._item_for_hover
+
+
 class TestVariableHoverHelper(unittest.TestCase):
     def test_find_variable_at_index_inside_name(self):
         text = "x{{foo}}y"
@@ -81,6 +99,14 @@ class TestVariableHoverHelper(unittest.TestCase):
 
     def test_find_variable_at_index_outside_returns_none(self):
         self.assertIsNone(VariableHoverHelper.find_variable_at_index("plain", 2))
+
+    def test_find_expression_at_index_for_variant_b_function(self):
+        text = "x{{urlencode(db)}}y"
+        idx = text.index("urlencode")
+        self.assertEqual(
+            VariableHoverHelper.find_expression_at_index(text, idx),
+            "{{urlencode(db)}}",
+        )
 
     def test_get_variable_value_defined(self):
         self.assertEqual(
@@ -144,6 +170,34 @@ class TestVariableHoverHelper(unittest.TestCase):
         )
         self.assertEqual(out, f"token={HIDDEN_MASK}")
 
+    def test_resolve_text_variant_b_function_uses_runtime_resolution(self):
+        out = VariableHoverHelper.resolve_text(
+            "db={{urlencode(db)}}",
+            {"db": "a b/c"},
+        )
+        self.assertEqual(out, "db=a%20b%2Fc")
+
+    def test_resolve_text_invalid_variant_b_function_keeps_token(self):
+        out = VariableHoverHelper.resolve_text(
+            "x={{not_allowed(db)}}",
+            {"db": "a"},
+        )
+        self.assertEqual(out, "x={{not_allowed(db)}}")
+
+    def test_resolve_text_variant_b_function_marks_hover_render_path(self):
+        original_service = VariableHoverHelper._template_service
+        try:
+            fake_service = MagicMock()
+            fake_service.render_string.return_value = "resolved"
+            VariableHoverHelper._template_service = fake_service
+            out = VariableHoverHelper.resolve_text("{{urlencode(db)}}", {"db": "a b"})
+            self.assertEqual(out, "resolved")
+            fake_service.render_string.assert_called_once_with(
+                "{{urlencode(db)}}", {"db": "a b"}, render_path="hover",
+            )
+        finally:
+            VariableHoverHelper._template_service = original_service
+
 
 def _mouse_move_event(widget, local_point: QPoint) -> QMouseEvent:
     return QMouseEvent(
@@ -187,6 +241,18 @@ class TestVariableAwareLineEditTooltips(unittest.TestCase):
         show_mock.assert_not_called()
         hide_mock.assert_called()
 
+    @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
+    @patch("pypost.ui.widgets.mixins.QToolTip.showText")
+    def test_mouse_over_variant_b_function_shows_runtime_value(self, show_mock, _hide):
+        w = _FixedCursorHoverLineEdit()
+        w.resize(400, 32)
+        w.setText("https://{{urlencode(path)}}")
+        w.set_variables({"path": "a b/c"})
+        w.fixed_cursor_index = w.text().index("urlencode")
+        w.mouseMoveEvent(_mouse_move_event(w, QPoint(10, 16)))
+        show_mock.assert_called_once()
+        self.assertEqual(show_mock.call_args[0][1], "a%20b%2Fc")
+
 
 class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
     @classmethod
@@ -215,6 +281,51 @@ class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
         w.set_variables({"here": "x"})
         w.fixed_document_position = w.toPlainText().index("no ")
         w.mouseMoveEvent(_mouse_move_event(w, QPoint(5, 10)))
+        show_mock.assert_not_called()
+        hide_mock.assert_called()
+
+    @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
+    @patch("pypost.ui.widgets.mixins.QToolTip.showText")
+    def test_mouse_over_variant_b_function_in_body_shows_runtime_value(
+        self, show_mock, _hide,
+    ):
+        w = _FixedCursorHoverPlainText()
+        w.resize(480, 120)
+        body = '{\n  "p": "{{base64(path)}}"\n}'
+        w.setPlainText(body)
+        w.set_variables({"path": "hello"})
+        w.fixed_document_position = body.index("base64")
+        w.mouseMoveEvent(_mouse_move_event(w, QPoint(20, 40)))
+        show_mock.assert_called_once()
+        self.assertEqual(show_mock.call_args[0][1], "aGVsbG8=")
+
+
+class TestVariableAwareTableWidgetTooltips(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    @patch("pypost.ui.widgets.variable_aware_widgets.QToolTip.hideText")
+    @patch("pypost.ui.widgets.variable_aware_widgets.QToolTip.showText")
+    def test_mouse_over_variant_b_function_in_table_cell_shows_runtime_value(
+        self, show_mock, _hide,
+    ):
+        w = _FixedHoverTableWidget()
+        w.resize(300, 100)
+        w.set_hover_text("{{base64(path)}}")
+        w.set_variables({"path": "hello"})
+        w.mouseMoveEvent(_mouse_move_event(w, QPoint(10, 10)))
+        show_mock.assert_called_once()
+        self.assertEqual(show_mock.call_args[0][1], "aGVsbG8=")
+
+    @patch("pypost.ui.widgets.variable_aware_widgets.QToolTip.hideText")
+    @patch("pypost.ui.widgets.variable_aware_widgets.QToolTip.showText")
+    def test_mouse_over_plain_table_cell_hides_tooltip(self, show_mock, hide_mock):
+        w = _FixedHoverTableWidget()
+        w.resize(300, 100)
+        w.set_hover_text("plain text")
+        w.set_variables({"path": "hello"})
+        w.mouseMoveEvent(_mouse_move_event(w, QPoint(10, 10)))
         show_mock.assert_not_called()
         hide_mock.assert_called()
 
