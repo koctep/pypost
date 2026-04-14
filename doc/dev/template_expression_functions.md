@@ -1,10 +1,13 @@
-# Template Expression Functions (PYPOST-450)
+# Template Expression Functions (PYPOST-450, PYPOST-451)
 
 ## Overview
 
 PYPOST-450 adds function expressions to template placeholders in all variable-enabled request
 surfaces. Canonical syntax: function calls appear only inside `{{...}}`, for example
 `{{urlencode(db)}}`.
+
+PYPOST-451 extracts the **function catalog** into `pypost/core/function_registry.py`
+(`FunctionRegistry`); `TemplateService` keeps validation and render orchestration.
 
 Implemented behavior is backward compatible:
 
@@ -16,18 +19,22 @@ Implemented behavior is backward compatible:
 
 Main components:
 
-- `pypost/core/template_service.py`
+- `pypost/core/function_registry.py` (`FunctionRegistry`)
+  - Single source of truth for allow-listed template-callable names and implementations:
+    `urlencode`, `md5`, `base64`.
+  - Exposes `allowed_names()`, `is_allowed()`, `get()`, and `register_into_env(env)` to bind
+    those callables onto `jinja2.Environment.globals` (catalog keys only).
+- `pypost/core/template_service.py` (`TemplateService`)
   - Owns expression validation and render execution.
-  - Registers allow-listed functions in Jinja globals: `urlencode`, `md5`, `base64`.
-  - Supports one top-level argument per function and allows nested function expressions.
+  - Constructs a default `FunctionRegistry` per instance and registers its catalog into
+    `self.env` during `__init__`.
+  - Validates placeholders using the registry for function-name membership; parser helpers
+    (arity, nested calls) remain here until further refactors.
 - `pypost/ui/widgets/mixins.py` (`VariableHoverHelper`)
   - Reuses `TemplateService.render_string(..., render_path="hover")` for function hover parity.
   - Keeps hidden-variable masking for plain variables via `HIDDEN_MASK`.
 - `pypost/core/metrics.py` (`MetricsManager`)
   - Exposes counters for expression render attempts and validation failures.
-
-Current allow-list and validation rules are implemented inside `TemplateService` as
-`_ALLOWED_FUNCTIONS` plus parser/validator helpers (not yet extracted into a separate registry).
 
 ### Known Deviation
 
@@ -68,7 +75,9 @@ There are no end-user settings or environment variables for this feature in curr
 
 Developer-facing configuration points:
 
-- Function catalog is hardcoded in `TemplateService._ALLOWED_FUNCTIONS`.
+- The default function catalog lives in `FunctionRegistry` (`pypost/core/function_registry.py`).
+  To add or rename functions, extend the registry module and keep `TemplateService` wiring in
+  sync (see also [PYPOST-452](https://pypost.atlassian.net/browse/PYPOST-452)).
 - Runtime observability is active when `TemplateService` is constructed with
   `metrics=MetricsManager` (wired in `pypost/main.py`).
 - Hover-path observability is active when `VariableHoverHelper.set_metrics(metrics)` is called
@@ -90,7 +99,7 @@ Observability additions:
 Expression does not render and stays unchanged:
 
 - Check expression uses the canonical form: function name and argument inside `{{...}}`.
-- Confirm function is allow-listed (`urlencode`, `md5`, `base64`).
+- Confirm function is allow-listed (`urlencode`, `md5`, `base64`) via `FunctionRegistry`.
 - Confirm only one top-level argument is passed.
 - Confirm argument is an identifier or a nested allow-listed function expression.
 

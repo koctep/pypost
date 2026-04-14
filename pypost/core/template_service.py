@@ -1,10 +1,10 @@
 import logging
-import base64
-import hashlib
 import re
 from dataclasses import dataclass
-from urllib.parse import quote
+
 from jinja2 import Environment
+
+from pypost.core.function_registry import FunctionRegistry
 from pypost.core.metrics import MetricsManager
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,6 @@ class ValidationResult:
 
 
 class TemplateService:
-    _ALLOWED_FUNCTIONS = {"urlencode", "md5", "base64"}
     _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
     _FUNCTION_SIGNATURE_RE = re.compile(
         r"^(?P<func>[a-zA-Z_][a-zA-Z0-9_]*)\((?P<args>.*)\)$"
@@ -41,40 +40,8 @@ class TemplateService:
     def __init__(self, metrics: MetricsManager | None = None):
         self.env = Environment()
         self._metrics = metrics
-        self._register_allowed_functions()
-
-    def _register_allowed_functions(self) -> None:
-        """
-        Register only approved template-callable functions.
-        """
-        self.env.globals.update({
-            "urlencode": self._urlencode,
-            "md5": self._md5,
-            "base64": self._base64_encode,
-        })
-
-    @staticmethod
-    def _urlencode(value) -> str:
-        """
-        URL-encode a value for safe usage in paths/query.
-        """
-        return quote(str(value), safe="")
-
-    @staticmethod
-    def _md5(value) -> str:
-        """
-        Return hex MD5 digest of the provided value.
-        """
-        raw = str(value).encode("utf-8")
-        return hashlib.md5(raw).hexdigest()
-
-    @staticmethod
-    def _base64_encode(value) -> str:
-        """
-        Return Base64-encoded string for the provided value.
-        """
-        raw = str(value).encode("utf-8")
-        return base64.b64encode(raw).decode("utf-8")
+        self._function_registry = FunctionRegistry()
+        self._function_registry.register_into_env(self.env)
 
     def validate_function_expressions(self, content: str) -> ValidationResult:
         """
@@ -109,7 +76,7 @@ class TemplateService:
             return ValidationResult.error("invalid_syntax")
 
         function_name = function_match.group("func")
-        if function_name not in self._ALLOWED_FUNCTIONS:
+        if not self._function_registry.is_allowed(function_name):
             return ValidationResult.error("unknown_function", function_name)
 
         return function_name, function_match.group("args").strip()

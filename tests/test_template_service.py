@@ -1,6 +1,8 @@
 import unittest
-import jinja2.nodes
 from unittest.mock import MagicMock
+
+import jinja2.nodes
+
 from pypost.core.template_service import TemplateService
 
 
@@ -117,6 +119,7 @@ class TestTemplateServiceValidationOutcomes(unittest.TestCase):
         result = self.svc.validate_function_expressions("{{not_allowed(db)}}")
         self.assertFalse(result.is_valid)
         self.assertEqual("unknown_function", result.code)
+        self.assertEqual(result.function_name, "not_allowed")
 
     def test_validate_reports_invalid_arity(self):
         result = self.svc.validate_function_expressions("{{urlencode(db, host)}}")
