@@ -1,35 +1,17 @@
 import logging
 import re
-from dataclasses import dataclass
 
 from jinja2 import Environment
 
+from pypost.core.function_expression_resolver import FunctionExpressionResolver
 from pypost.core.function_registry import FunctionRegistry
 from pypost.core.metrics import MetricsManager
+from pypost.core.template_expression_types import ValidationResult
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ValidationResult:
-    is_valid: bool
-    code: str | None = None
-    function_name: str | None = None
-
-    @classmethod
-    def valid(cls) -> "ValidationResult":
-        return cls(is_valid=True)
-
-    @classmethod
-    def error(cls, code: str, function_name: str | None = None) -> "ValidationResult":
-        return cls(is_valid=False, code=code, function_name=function_name)
-
-
 class TemplateService:
-    _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-    _FUNCTION_SIGNATURE_RE = re.compile(
-        r"^(?P<func>[a-zA-Z_][a-zA-Z0-9_]*)\((?P<args>.*)\)$"
-    )
     _VALIDATION_MESSAGES = {
         "unknown_function": "Unknown function: {function_name}",
         "invalid_arity": "Invalid function arity",
@@ -42,6 +24,9 @@ class TemplateService:
         self._metrics = metrics
         self._function_registry = FunctionRegistry()
         self._function_registry.register_into_env(self.env)
+        self._function_expression_resolver = FunctionExpressionResolver(
+            self._function_registry,
+        )
 
     def validate_function_expressions(self, content: str) -> ValidationResult:
         """
@@ -49,72 +34,7 @@ class TemplateService:
         - {{identifier}}
         - {{allowed_function(identifier)}}
         """
-        expressions = re.findall(r"\{\{\s*(.*?)\s*\}\}", content)
-        for expression in expressions:
-            validation_error = self._validate_expression(expression.strip())
-            if validation_error:
-                return validation_error
-
-        return ValidationResult.valid()
-
-    def _validate_expression(self, expression: str) -> ValidationResult | None:
-        if self._IDENTIFIER_RE.fullmatch(expression):
-            return None
-
-        parsed_expression = self._parse_function_expression(expression)
-        if isinstance(parsed_expression, ValidationResult):
-            return parsed_expression
-
-        function_name, args = parsed_expression
-        return self._validate_function_args(function_name, args)
-
-    def _parse_function_expression(
-        self, expression: str,
-    ) -> tuple[str, str] | ValidationResult:
-        function_match = self._FUNCTION_SIGNATURE_RE.fullmatch(expression)
-        if not function_match:
-            return ValidationResult.error("invalid_syntax")
-
-        function_name = function_match.group("func")
-        if not self._function_registry.is_allowed(function_name):
-            return ValidationResult.error("unknown_function", function_name)
-
-        return function_name, function_match.group("args").strip()
-
-    def _validate_function_args(
-        self, function_name: str, args: str,
-    ) -> ValidationResult | None:
-        argument = self._extract_single_argument(args)
-        if argument is None:
-            return ValidationResult.error("invalid_arity", function_name)
-
-        if self._IDENTIFIER_RE.fullmatch(argument):
-            return None
-
-        if not self._FUNCTION_SIGNATURE_RE.fullmatch(argument):
-            return ValidationResult.error("invalid_argument", function_name)
-
-        validation_error = self._validate_expression(argument)
-        if validation_error:
-            if validation_error.code == "invalid_arity":
-                return ValidationResult.error("invalid_argument", function_name)
-            return validation_error
-        return None
-
-    def _extract_single_argument(self, args: str) -> str | None:
-        """
-        Returns single argument preserving nested call expression support.
-        Returns None when there are multiple top-level arguments.
-        """
-        depth = 0
-        for char in args:
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth = max(0, depth - 1)
-            elif char == "," and depth == 0:
-                return None
-        return args.strip()
+        return self._function_expression_resolver.validate_content(content)
 
     def _validation_message(self, result: ValidationResult) -> str:
         template = self._VALIDATION_MESSAGES.get(
@@ -145,7 +65,7 @@ class TemplateService:
 
         expression_count = len(re.findall(r"\{\{\s*(.*?)\s*\}\}", content))
         try:
-            validation = self.validate_function_expressions(content)
+            validation = self._function_expression_resolver.validate_content(content)
             if not validation.is_valid:
                 logger.info(
                     "template_expression_validation_failed "
@@ -177,6 +97,15 @@ class TemplateService:
                 expression_count,
             )
             return rendered
+        except ValueError:
+            logger.warning(
+                "template_render_fallback_to_original render_path=%s error_type=%s "
+                "token_count=%d",
+                render_path,
+                "ValueError",
+                expression_count,
+            )
+            return content
         except Exception as e:
             if self._metrics:
                 self._metrics.track_template_expression_render_attempt(
