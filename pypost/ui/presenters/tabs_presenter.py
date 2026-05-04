@@ -371,6 +371,7 @@ class TabsPresenter(QObject):
         worker = RequestWorker(
             request_data,
             variables=self._current_variables,
+            hidden_keys=self._current_hidden_keys,
             metrics=self._metrics,
             history_manager=self._history_manager,
             collection_name=collection_name,

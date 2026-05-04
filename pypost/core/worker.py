@@ -27,6 +27,7 @@ class RequestWorker(QThread):
         self,
         request_data: RequestData,
         variables: dict = None,
+        hidden_keys: set[str] | None = None,
         metrics: MetricsManager | None = None,
         history_manager: HistoryManager | None = None,
         collection_name: str | None = None,
@@ -37,6 +38,7 @@ class RequestWorker(QThread):
         super().__init__()
         self.request_data = request_data
         self.variables = variables or {}
+        self.hidden_keys = hidden_keys or set()
         self._collection_name = collection_name
         if template_service is not None:
             logger.debug("RequestWorker: propagating TemplateService id=%d", id(template_service))
@@ -95,6 +97,7 @@ class RequestWorker(QThread):
                 collection_name=self._collection_name,
                 request_name=self.request_data.name,
                 retry_callback=on_retry,
+                hidden_keys=self.hidden_keys,
             )
             
             if result.script_logs or result.script_error:

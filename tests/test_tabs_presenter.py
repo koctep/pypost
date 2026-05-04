@@ -372,5 +372,40 @@ class TestTabsPresenterAlertManagerPropagation(unittest.TestCase):
             self.assertIsNone(kwargs.get("alert_manager"))
 
 
+class TestTabsPresenterHiddenKeysForwarding(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_hidden_keys_forwarded_to_worker_after_env_hidden_keys_changed(self):
+        from pypost.core.template_service import TemplateService
+        rm = FakeRequestManager()
+        sm = FakeStateManager()
+        settings = AppSettings()
+        p = TabsPresenter(rm, sm, settings,
+                          metrics=MagicMock(),
+                          template_service=TemplateService())
+
+        req = _make_request("r1", "Test", "GET")
+        p.add_new_tab(req)
+        tab = p.widget.widget(0)
+
+        p.on_env_hidden_keys_changed({"token"})
+
+        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
+            mock_instance = MagicMock()
+            mock_instance.isRunning.return_value = False
+            MockWorker.return_value = mock_instance
+
+            tab.request_editor.send_requested.emit(req)
+
+            _, kwargs = MockWorker.call_args
+            self.assertEqual(
+                {"token"},
+                kwargs.get("hidden_keys"),
+                "RequestWorker must receive hidden_keys from _current_hidden_keys",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -112,5 +112,24 @@ class TestRequestWorkerAlertManagerInjection(unittest.TestCase):
         self.assertIsNone(worker.service._alert_manager)
 
 
+class TestRequestWorkerHiddenKeys(unittest.TestCase):
+
+    def test_hidden_keys_forwarded_to_service_execute(self):
+        from pypost.models.response import ResponseData
+        from pypost.core.request_service import ExecutionResult
+
+        req = RequestData(method="GET", url="http://x")
+        worker = RequestWorker(req, variables={}, hidden_keys={"token"})
+        resp = ResponseData(
+            status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2
+        )
+        result = ExecutionResult(
+            response=resp, updated_variables={}, script_logs=[], script_error=None
+        )
+        with patch.object(worker.service, "execute", return_value=result) as exec_mock:
+            worker.run()
+        self.assertEqual({"token"}, exec_mock.call_args.kwargs["hidden_keys"])
+
+
 if __name__ == "__main__":
     unittest.main()

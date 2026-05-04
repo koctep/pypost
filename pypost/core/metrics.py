@@ -134,6 +134,12 @@ class MetricsManager:
             'Number of history recording failures',
             registry=self.registry
         )
+        self.hidden_value_masks_applied = Counter(
+            'hidden_value_masks_applied_total',
+            'Number of hidden-variable masking operations applied',
+            ['surface'],
+            registry=self.registry,
+        )
 
         self._request_retries_total = Counter(
             'request_retries_total',
@@ -336,6 +342,9 @@ class MetricsManager:
 
     def track_history_record_error(self) -> None:
         self.history_record_errors.inc()
+
+    def track_hidden_value_mask_applied(self, surface: str) -> None:
+        self.hidden_value_masks_applied.labels(surface=surface).inc()
 
     def track_retry_attempt(self, method: str, status_category: str) -> None:
         self._request_retries_total.labels(

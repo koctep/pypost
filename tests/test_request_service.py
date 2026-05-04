@@ -176,6 +176,50 @@ class TestRequestServiceHistory(unittest.TestCase):
         entry = self.history_manager.append.call_args[0][0]
         self.assertEqual("MyCol", entry.collection_name)
 
+    def test_history_masks_hidden_variable_values(self):
+        req = RequestData(
+            method="POST",
+            url="http://{{host}}/api?token={{token}}",
+            headers={"Authorization": "Bearer {{token}}"},
+            body='{"token":"{{token}}","host":"{{host}}"}',
+            post_script="",
+        )
+        self.svc.execute(
+            req,
+            variables={"host": "myserver.com", "token": "supersecret"},
+            hidden_keys={"token"},
+        )
+        entry = self.history_manager.append.call_args[0][0]
+        self.assertEqual("http://myserver.com/api?token=***", entry.url)
+        self.assertEqual("Bearer ***", entry.headers["Authorization"])
+        self.assertEqual('{"token":"***","host":"myserver.com"}', entry.body)
+
+    def test_history_masking_metric_recorded_when_hidden_keys_present(self):
+        req = RequestData(method="GET", url="http://{{host}}?token={{token}}", post_script="")
+        self.svc.execute(
+            req,
+            variables={"host": "example.com", "token": "secret"},
+            hidden_keys={"token"},
+        )
+        self.svc._metrics.track_hidden_value_mask_applied.assert_called_once_with("history")
+
+    def test_masking_metric_not_tracked_when_no_hidden_keys(self):
+        req = RequestData(method="GET", url="http://{{host}}", post_script="")
+        self.svc.execute(req, variables={"host": "example.com"})
+        self.svc._metrics.track_hidden_value_mask_applied.assert_not_called()
+
+    def test_history_stores_raw_template_when_no_template_service(self):
+        from pypost.core.history_manager import HistoryManager
+        history_manager = MagicMock(spec=HistoryManager)
+        svc = RequestService(history_manager=history_manager)
+        svc.http_client = MagicMock()
+        svc.http_client.send_request.return_value = _make_response(200)
+        req = RequestData(method="GET", url="http://{{host}}/api", post_script="")
+        svc.execute(req, variables={"host": "myserver.com"})
+        entry = history_manager.append.call_args[0][0]
+        # FAILS with current code: else-branch stores raw template, not rendered value
+        self.assertEqual("http://myserver.com/api", entry.url)
+
 
 class TestRequestServiceErrorHandling(unittest.TestCase):
     def setUp(self):
@@ -279,7 +323,10 @@ class TestRequestServiceRetryPolicyResolution(unittest.TestCase):
         self.assertEqual(2, svc.http_client.send_request.call_count)
 
     def test_app_default_used_when_no_per_request_policy(self):
-        """AC-1: app default applies when request.retry_policy is None; max_retries=2 → 3 calls."""
+        """AC-1: app default applies when request.retry_policy is None.
+
+        max_retries=2 means 3 calls total.
+        """
         svc = self._make_svc(
             default_retry_policy=RetryPolicy(max_retries=2, retryable_status_codes=[500])
         )

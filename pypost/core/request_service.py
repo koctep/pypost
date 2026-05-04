@@ -13,6 +13,7 @@ from pypost.core.alert_manager import AlertManager, AlertPayload
 from pypost.core.http_client import HTTPClient
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.script_executor import ScriptExecutor
+from pypost.core.sensitive_data_masking_policy import SensitiveDataMaskingPolicy
 from pypost.core.template_service import TemplateService
 from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
@@ -55,6 +56,8 @@ class RequestService:
         self._template_service = template_service
         self._alert_manager = alert_manager
         self._default_retry_policy = default_retry_policy
+        _effective_ts = template_service or TemplateService()
+        self._masking_policy = SensitiveDataMaskingPolicy(_effective_ts)
         if template_service is not None:
             logger.debug(
                 "RequestService: using injected TemplateService id=%d",
@@ -262,6 +265,7 @@ class RequestService:
         collection_name: str | None = None,
         request_name: str | None = None,
         retry_callback: Callable[[int, int, ExecutionError], None] | None = None,
+        hidden_keys: set[str] | None = None,
     ) -> ExecutionResult:
         """Executes a request with the given context."""
         if variables is None:
@@ -345,13 +349,22 @@ class RequestService:
         # 4. Record history entry (must not raise)
         if self._history_manager:
             try:
-                resolved_url = self._template_service.render_string(request.url, variables)
-                resolved_headers = {
-                    self._template_service.render_string(k, variables):
-                    self._template_service.render_string(v, variables)
-                    for k, v in request.headers.items()
-                }
-                resolved_body = self._template_service.render_string(request.body, variables)
+                hidden_key_count = len(hidden_keys or set())
+                masked = self._masking_policy.build_history_safe_fields(
+                    request=request,
+                    variables=variables,
+                    hidden_keys=hidden_keys,
+                )
+                resolved_url = masked.url
+                resolved_headers = masked.headers
+                resolved_body = masked.body
+                logger.debug(
+                    "history_masking_applied method=%s hidden_key_count=%d",
+                    request.method,
+                    hidden_key_count,
+                )
+                if self._metrics and hidden_key_count > 0:
+                    self._metrics.track_hidden_value_mask_applied("history")
                 entry = HistoryEntry(
                     timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
                     method=request.method,
