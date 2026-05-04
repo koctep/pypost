@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Any
 
 from jinja2 import Environment
 
@@ -44,10 +45,20 @@ class TemplateService:
         return template.format(function_name=result.function_name)
 
     def render_string(
-        self, content: str, variables: dict, render_path: str = "runtime",
+        self, content: str, variables: dict[str, Any], render_path: str = "runtime",
     ) -> str:
         """
         Renders a string template with provided variables using Jinja2.
+
+        Orchestration stages:
+        1. Empty content: record empty_content attempt when metrics exist; return "".
+        2. Count `{{ ... }}` placeholders for logs and metrics.
+        3. Validate function-style placeholders via the resolver.
+        4. If invalid: validation observability; raise ValueError inside the try (caught
+           below; original content is returned).
+        5. Build template and render with Jinja; on success, record success observability.
+        6. On any Exception inside the try (including that ValueError): warning log; for
+           non-ValueError, record render_error when metrics exist; return original content.
 
         Args:
             content: The string containing variables like {{ var_name }}
@@ -57,68 +68,99 @@ class TemplateService:
             The rendered string with variables substituted.
         """
         if not content:
-            if self._metrics:
-                self._metrics.track_template_expression_render_attempt(
-                    render_path=render_path, outcome="empty_content",
-                )
+            self._record_empty_render_attempt(render_path)
             return ""
 
-        expression_count = len(re.findall(r"\{\{\s*(.*?)\s*\}\}", content))
+        expression_count = self._count_placeholder_expressions(content)
         try:
-            validation = self._function_expression_resolver.validate_content(content)
+            validation = self._validate_template_content(content)
             if not validation.is_valid:
-                logger.info(
-                    "template_expression_validation_failed "
-                    "render_path=%s code=%s function_name=%s token_count=%d",
-                    render_path,
-                    validation.code,
-                    validation.function_name or "n/a",
-                    expression_count,
+                self._emit_validation_failure_observability(
+                    validation, render_path, expression_count,
                 )
-                if self._metrics:
-                    self._metrics.track_template_expression_render_attempt(
-                        render_path=render_path, outcome="validation_error",
-                    )
-                    self._metrics.track_template_expression_validation_failure(
-                        render_path=render_path,
-                        code=validation.code or "unknown",
-                        function_name=validation.function_name,
-                    )
                 raise ValueError(self._validation_message(validation))
-            template = self.env.from_string(content)
-            rendered = template.render(**variables)
-            if self._metrics:
-                self._metrics.track_template_expression_render_attempt(
-                    render_path=render_path, outcome="success",
-                )
-            logger.debug(
-                "template_expression_render_succeeded render_path=%s token_count=%d",
-                render_path,
-                expression_count,
-            )
+            rendered = self._render_with_jinja(content, variables)
+            self._emit_render_success_observability(render_path, expression_count)
             return rendered
-        except ValueError:
-            logger.warning(
-                "template_render_fallback_to_original render_path=%s error_type=%s "
-                "token_count=%d",
-                render_path,
-                "ValueError",
-                expression_count,
-            )
-            return content
         except Exception as e:
-            if self._metrics:
-                self._metrics.track_template_expression_render_attempt(
-                    render_path=render_path, outcome="render_error",
-                )
-            logger.warning(
-                "template_render_fallback_to_original render_path=%s error_type=%s "
-                "token_count=%d",
-                render_path,
-                type(e).__name__,
-                expression_count,
+            return self._fallback_content_after_render_exception(
+                e, content, render_path, expression_count,
             )
-            return content
+
+    def _count_placeholder_expressions(self, content: str) -> int:
+        return len(re.findall(r"\{\{\s*(.*?)\s*\}\}", content))
+
+    def _record_empty_render_attempt(self, render_path: str) -> None:
+        if self._metrics:
+            self._metrics.track_template_expression_render_attempt(
+                render_path=render_path, outcome="empty_content",
+            )
+
+    def _validate_template_content(self, content: str) -> ValidationResult:
+        return self._function_expression_resolver.validate_content(content)
+
+    def _emit_validation_failure_observability(
+        self,
+        validation: ValidationResult,
+        render_path: str,
+        expression_count: int,
+    ) -> None:
+        logger.info(
+            "template_expression_validation_failed "
+            "render_path=%s code=%s function_name=%s token_count=%d",
+            render_path,
+            validation.code,
+            validation.function_name or "n/a",
+            expression_count,
+        )
+        if self._metrics:
+            self._metrics.track_template_expression_render_attempt(
+                render_path=render_path, outcome="validation_error",
+            )
+            self._metrics.track_template_expression_validation_failure(
+                render_path=render_path,
+                code=validation.code or "unknown",
+                function_name=validation.function_name,
+            )
+
+    def _render_with_jinja(self, content: str, variables: dict[str, Any]) -> str:
+        template = self.env.from_string(content)
+        return template.render(**variables)
+
+    def _emit_render_success_observability(
+        self,
+        render_path: str,
+        expression_count: int,
+    ) -> None:
+        if self._metrics:
+            self._metrics.track_template_expression_render_attempt(
+                render_path=render_path, outcome="success",
+            )
+        logger.debug(
+            "template_expression_render_succeeded render_path=%s token_count=%d",
+            render_path,
+            expression_count,
+        )
+
+    def _fallback_content_after_render_exception(
+        self,
+        exc: Exception,
+        content: str,
+        render_path: str,
+        expression_count: int,
+    ) -> str:
+        if not isinstance(exc, ValueError) and self._metrics:
+            self._metrics.track_template_expression_render_attempt(
+                render_path=render_path, outcome="render_error",
+            )
+        logger.warning(
+            "template_render_fallback_to_original render_path=%s error_type=%s "
+            "token_count=%d",
+            render_path,
+            type(exc).__name__,
+            expression_count,
+        )
+        return content
 
     def parse(self, content: str):
         """

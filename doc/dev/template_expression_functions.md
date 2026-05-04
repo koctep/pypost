@@ -130,6 +130,30 @@ Observability behavior:
 - `FunctionExpressionResolver` remains observability-free by design; it returns structured
   `ValidationResult` only.
 
+## Rendering Orchestration Stages (PYPOST-459)
+
+`TemplateService.render_string()` delegates each stage to a private helper method. The stages
+execute in this order:
+
+| # | Helper | Responsibility |
+|---|--------|---------------|
+| 1 | `_record_empty_render_attempt()` | Short-circuit on empty content; emit `empty_content` metric |
+| 2 | `_count_placeholder_expressions()` | Count `{{ ... }}` tokens for log context |
+| 3 | `_validate_template_content()` | Delegate validation to `FunctionExpressionResolver` |
+| 4 | `_emit_validation_failure_observability()` | Log + emit `validation_error` metric on invalid input |
+| 5 | `_render_with_jinja()` | Execute Jinja2 rendering with provided variables |
+| 6 | `_emit_render_success_observability()` | Log + emit `success` metric on successful render |
+| 7 | `_fallback_content_after_render_exception()` | On exception: emit `render_error` (non-ValueError only); return original content |
+
+The following are intentionally unchanged by PYPOST-459 (parity contract):
+
+- Metric names, outcome strings, and label values
+- Log message formats and fields
+- Fallback semantics: `ValueError` (from validation) does not emit `render_error`; all other
+  exceptions do
+- Token counting regex pattern: `\{\{\s*(.*?)\s*\}\}`
+- `FunctionExpressionResolver` contract
+
 ## Troubleshooting
 
 Expression does not render and stays unchanged:

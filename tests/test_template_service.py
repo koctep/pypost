@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call, patch
 
 import jinja2.nodes
 
@@ -160,6 +160,10 @@ class TestTemplateServiceObservability(unittest.TestCase):
         self.metrics.track_template_expression_render_attempt.assert_any_call(
             render_path="runtime", outcome="validation_error",
         )
+        self.assertNotIn(
+            call(render_path="runtime", outcome="render_error"),
+            self.metrics.track_template_expression_render_attempt.call_args_list,
+        )
         self.metrics.track_template_expression_validation_failure.assert_called_with(
             render_path="runtime", code="unknown_function", function_name="not_allowed",
         )
@@ -170,6 +174,97 @@ class TestTemplateServiceObservability(unittest.TestCase):
         self.metrics.track_template_expression_render_attempt.assert_called_with(
             render_path="hover", outcome="empty_content",
         )
+
+
+class TestTemplateServiceRenderStages(unittest.TestCase):
+    def setUp(self):
+        self.metrics = MagicMock()
+        self.svc = TemplateService(metrics=self.metrics)
+
+    def test_stage_empty_returns_empty_string_and_tracks_empty_content(self):
+        result = self.svc.render_string("", {}, render_path="hover")
+
+        self.assertEqual("", result)
+        self.metrics.track_template_expression_render_attempt.assert_called_once_with(
+            render_path="hover", outcome="empty_content",
+        )
+        self.metrics.track_template_expression_validation_failure.assert_not_called()
+
+    def test_stage_invalid_returns_original_content_without_render_error(self):
+        content = "{{not_allowed(db)}}"
+
+        result = self.svc.render_string(content, {"db": "x"}, render_path="runtime")
+
+        self.assertEqual(content, result)
+        self.metrics.track_template_expression_render_attempt.assert_any_call(
+            render_path="runtime", outcome="validation_error",
+        )
+        self.assertNotIn(
+            call(render_path="runtime", outcome="render_error"),
+            self.metrics.track_template_expression_render_attempt.call_args_list,
+        )
+
+    def test_stage_success_tracks_success_metric(self):
+        result = self.svc.render_string("{{urlencode(db)}}", {"db": "a b"}, render_path="runtime")
+
+        self.assertEqual("a%20b", result)
+        self.metrics.track_template_expression_render_attempt.assert_called_with(
+            render_path="runtime", outcome="success",
+        )
+        self.metrics.track_template_expression_validation_failure.assert_not_called()
+
+    def test_stage_render_error_returns_original_content_and_tracks_render_error(self):
+        content = "{{urlencode(db)}}"
+
+        with patch.object(
+            self.svc,
+            "_render_with_jinja",
+            side_effect=RuntimeError("boom"),
+        ):
+            result = self.svc.render_string(content, {"db": "alice"}, render_path="hover")
+
+        self.assertEqual(content, result)
+        self.metrics.track_template_expression_render_attempt.assert_called_with(
+            render_path="hover", outcome="render_error",
+        )
+        self.metrics.track_template_expression_validation_failure.assert_not_called()
+
+
+class TestTemplateServiceHelperStages(unittest.TestCase):
+    def setUp(self):
+        self.metrics = MagicMock()
+        self.svc = TemplateService(metrics=self.metrics)
+
+    def test_count_placeholder_expressions_counts_all_tokens(self):
+        content = "{{name}}/{{urlencode(db)}}/{{ missing }}"
+
+        result = self.svc._count_placeholder_expressions(content)
+
+        self.assertEqual(3, result)
+
+    def test_fallback_helper_tracks_render_error_for_non_value_error(self):
+        result = self.svc._fallback_content_after_render_exception(
+            RuntimeError("boom"),
+            "{{name.upper(}}",
+            "runtime",
+            1,
+        )
+
+        self.assertEqual("{{name.upper(}}", result)
+        self.metrics.track_template_expression_render_attempt.assert_called_once_with(
+            render_path="runtime", outcome="render_error",
+        )
+
+    def test_fallback_helper_skips_render_error_for_value_error(self):
+        result = self.svc._fallback_content_after_render_exception(
+            ValueError("bad validation"),
+            "{{not_allowed(db)}}",
+            "runtime",
+            1,
+        )
+
+        self.assertEqual("{{not_allowed(db)}}", result)
+        self.metrics.track_template_expression_render_attempt.assert_not_called()
 
 
 if __name__ == "__main__":
