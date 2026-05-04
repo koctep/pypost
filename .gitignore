@@ -44,6 +44,9 @@ ENV/
 # Cursor
 .cursor
 
+# Zed
+.zed/
+
 # PyPost Data (local dev)
 collections/
 environments.json
@@ -51,3 +54,7 @@ environments.json
 # ELF core dumps
 /core
 /core.*
+
+# Local agent runner (not versioned; purged from git history)
+scripts/agent-do.sh
+scripts/agent-sprint.sh

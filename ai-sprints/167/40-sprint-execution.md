@@ -4,6 +4,7 @@
 > Executor: junior_engineer
 > Method: `./scripts/agent-do.sh <ISSUE_KEY>` per issue, in dependency order
 > Scope refresh: 2026-03-27 against Jira sprint composition
+> Final refresh: 2026-03-27 after PYPOST-421..424 closure
 
 ---
 
@@ -14,17 +15,10 @@
 | 1 | PYPOST-420 | Logger accumulation in AlertManager | `a397a18` | 17/17 pass |
 | 2 | PYPOST-418 | AlertManager never injected into RequestWorker | `39eb591` | 274/274 pass |
 | 3 | PYPOST-419 | AppSettings.default_retry_policy persisted but never applied | `24a7656` | 26/26 pass |
-
----
-
-## Remaining Issues In Sprint 167
-
-| # | Key | Summary | Priority | Jira Status |
-| --- | --- | --- | --- | --- |
-| 1 | PYPOST-421 | [PYPOST-402] Bare assert in production retry path | Low | To Do |
-| 2 | PYPOST-422 | [PYPOST-402] email_notification_failures_total metric name is misleading | Low | To Do |
-| 3 | PYPOST-423 | [PYPOST-402] retryable_codes_edit silently drops invalid input | Low | To Do |
-| 4 | PYPOST-424 | [PYPOST-402] request_timeout spin box created but never added to form layout | Low | To Do |
+| 4 | PYPOST-421 | Bare assert in production retry path | `231a24c` | 49/49 pass |
+| 5 | PYPOST-422 | email_notification_failures_total metric name is misleading | `0c19432` | 42/42 pass |
+| 6 | PYPOST-423 | retryable_codes_edit silently drops invalid input | `b897782` | 49/49 pass |
+| 7 | PYPOST-424 | request_timeout spin box created but never added to form layout | `d644190` | 292/292 pass |
 
 ---
 
@@ -36,14 +30,19 @@ None.
 
 ## Blockers
 
-- No technical blockers for completed items.
-- Sprint-level completion is pending because 4 scope items remain in Jira (`To Do`).
+- None.
 
 ---
 
 ## Retries Performed
 
 None. All three issues completed on first attempt.
+
+---
+
+## Retries Performed (Final Wave)
+
+None. PYPOST-421/422/423/424 each completed on first attempt.
 
 ---
 
@@ -78,3 +77,34 @@ None. All three issues completed on first attempt.
   `pypost/ui/presenters/tabs_presenter.py`, `tests/test_request_service.py`
 - **New tests**: `TestRequestServiceRetryPolicyResolution` (3 — all 3 resolution branches)
 - **Dependency**: Required PYPOST-418 (shared wiring surface) to land first — satisfied.
+
+### PYPOST-421 — Bare assert in production retry path
+
+- **Fix**: Replaced assertion-based exhaustion branch with explicit `ExecutionError` handling
+  for retryable status exhaustion; aligned exhaustion flow with existing alert/metric path.
+- **Files changed**: `pypost/core/request_service.py`, `tests/test_retry.py`
+- **New tests**: `TestRetryableStatusExhaustion` and related exhaustion assertions.
+
+### PYPOST-422 — Misleading metric name
+
+- **Fix**: Renamed exhaustion metric and tracker from email-specific naming to request-retry
+  semantics (`request_retry_exhaustions_total`, `track_request_retry_exhaustion`).
+- **Files changed**: `pypost/core/metrics.py`, `pypost/core/request_service.py`,
+  `tests/test_metrics_manager.py`, `tests/test_retry.py`
+- **New tests**: Metric scrape assertion and updated retry exhaustion metric assertions.
+
+### PYPOST-423 — Silent invalid input drop in `retryable_codes_edit`
+
+- **Fix**: Added explicit parser/validator for retryable codes and blocked settings save with
+  user feedback on invalid input; removed silent token drops.
+- **Files changed**: `pypost/models/retry.py`, `pypost/ui/dialogs/settings_dialog.py`,
+  `tests/test_retryable_status_codes_parse.py`
+- **New tests**: Parser validation matrix (valid, empty segment, invalid token, range, separator).
+
+### PYPOST-424 — `request_timeout` control not visible in settings
+
+- **Fix**: Added request-timeout control to settings form layout and extended `settings_applied`
+  log snapshot with `request_timeout` for post-save observability.
+- **Files changed**: `pypost/ui/dialogs/settings_dialog.py`, `pypost/ui/main_window.py`,
+  `tests/test_settings_dialog.py`, `tests/test_settings_persistence.py`
+- **New tests**: Settings dialog layout/load/accept checks and persistence round-trip extension.

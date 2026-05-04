@@ -11,10 +11,10 @@
 | 1 | PYPOST-418 | [PYPOST-402] AlertManager never injected into RequestWorker | Debt | High | Done |
 | 2 | PYPOST-419 | [PYPOST-402] AppSettings.default_retry_policy is persisted but never applied | Debt | High | Done |
 | 3 | PYPOST-420 | [PYPOST-402] Logger accumulation in AlertManager | Debt | Medium | Done |
-| 4 | PYPOST-421 | [PYPOST-402] Bare assert in production retry path | Debt | Low | To Do |
-| 5 | PYPOST-422 | [PYPOST-402] email_notification_failures_total metric name is misleading | Debt | Low | To Do |
-| 6 | PYPOST-423 | [PYPOST-402] retryable_codes_edit silently drops invalid input | Debt | Low | To Do |
-| 7 | PYPOST-424 | [PYPOST-402] request_timeout spin box created but never added to form layout | Debt | Low | To Do |
+| 4 | PYPOST-421 | [PYPOST-402] Bare assert in production retry path | Debt | Low | Done |
+| 5 | PYPOST-422 | [PYPOST-402] email_notification_failures_total metric name is misleading | Debt | Low | Done |
+| 6 | PYPOST-423 | [PYPOST-402] retryable_codes_edit silently drops invalid input | Debt | Low | Done |
+| 7 | PYPOST-424 | [PYPOST-402] request_timeout spin box created but never added to form layout | Debt | Low | Done |
 
 ---
 
@@ -64,22 +64,22 @@ it before each request (or at worker initialisation).
 **Dependency**: Best landed after PYPOST-418 so both wiring changes land in the same area
 in one coordinated pass.
 
-### Group B — Remaining PYPOST-402 debt (open)
+### Group B — Remaining PYPOST-402 debt (Done)
 
-#### 4 · PYPOST-421 — Bare assert in production retry path
+#### 4 · PYPOST-421 — Bare assert in production retry path (Done)
 
 Replace production `assert` usage in retry flow with explicit runtime checks and
 controlled error handling.
 
-#### 5 · PYPOST-422 — Misleading metric name
+#### 5 · PYPOST-422 — Misleading metric name (Done)
 
 Align metric naming with actual semantics to avoid observability confusion and false
 interpretation in dashboards.
 
-#### 6 · PYPOST-423 — Silent invalid input drop in `retryable_codes_edit`
+#### 6 · PYPOST-423 — Silent invalid input drop in `retryable_codes_edit` (Done)
 
 Surface validation errors to users instead of silently dropping invalid values.
 
-#### 7 · PYPOST-424 — `request_timeout` spin box not added to layout
+#### 7 · PYPOST-424 — `request_timeout` spin box not added to layout (Done)
 
 Ensure timeout control is visible and connected in the settings form layout.
