@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         self.env = EnvPresenter(
             self.storage, self.config_manager, self.mcp_manager,
             self.settings, self.request_manager.get_collections,
+            self.metrics,
         )
         self._build_layout()
         self._wire_signals()

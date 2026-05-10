@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QWidget, QInputDialog, QMessageBox
 
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.models.models import Environment, Collection, RequestData
@@ -68,11 +68,12 @@ class TestEnvPresenter(unittest.TestCase):
         config = FakeConfigManager()
         mcp = _make_mcp_manager()
         settings = AppSettings()
+        metrics = MagicMock()  # Mock metrics manager
 
         def get_collections():
             return collections or []
 
-        return EnvPresenter(storage, config, mcp, settings, get_collections)
+        return EnvPresenter(storage, config, mcp, settings, get_collections, metrics)
 
     def test_widget_is_qwidget(self):
         p = self._make_presenter()
@@ -223,6 +224,144 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter([])
         p._on_mcp_status_changed(False)
         self.assertEqual(p.mcp_status_label.text(), "MCP: OFF")
+
+    def test_handle_variable_set_request_valid_name(self):
+        """Test that valid variable names are accepted"""
+        env = _make_env("e1", "Dev", {})
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.setCurrentIndex(1)
+        p.env_selector.blockSignals(False)
+
+        # Mock QInputDialog to return a valid name
+        original_getText = QInputDialog.getText
+        QInputDialog.getText = lambda *args, **kwargs: ("valid_name", True)
+
+        try:
+            p.handle_variable_set_request(None, "test_value")
+            self.assertIn("valid_name", env.variables)
+            self.assertEqual(env.variables["valid_name"], "test_value")
+        finally:
+            QInputDialog.getText = original_getText
+
+    def test_handle_variable_set_request_empty_name(self):
+        """Test that empty variable names are rejected"""
+        env = _make_env("e1", "Dev", {})
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.setCurrentIndex(1)
+        p.env_selector.blockSignals(False)
+
+        # Mock QInputDialog to return empty string after stripping
+        original_getText = QInputDialog.getText
+        QInputDialog.getText = lambda *args, **kwargs: ("   ", True)  # spaces only
+
+        # Mock QMessageBox to capture the warning
+        original_warning = QMessageBox.warning
+        warning_called = []
+        def mock_warning(*args, **kwargs):
+            warning_called.append(args)
+        QMessageBox.warning = mock_warning
+
+        try:
+            p.handle_variable_set_request(None, "test_value")
+            # Should not have added the variable
+            self.assertNotIn("", env.variables)
+            # Should have shown warning
+            self.assertTrue(len(warning_called) > 0)
+            self.assertIn("Variable name cannot be empty.", warning_called[0][2])
+        finally:
+            QInputDialog.getText = original_getText
+            QMessageBox.warning = original_warning
+
+    def test_handle_variable_set_request_starts_with_digit(self):
+        """Test that variable names starting with digit are rejected"""
+        env = _make_env("e1", "Dev", {})
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.setCurrentIndex(1)
+        p.env_selector.blockSignals(False)
+
+        # Mock QInputDialog to return name starting with digit
+        original_getText = QInputDialog.getText
+        QInputDialog.getText = lambda *args, **kwargs: ("1invalid", True)
+
+        # Mock QMessageBox to capture the warning
+        original_warning = QMessageBox.warning
+        warning_called = []
+        def mock_warning(*args, **kwargs):
+            warning_called.append(args)
+        QMessageBox.warning = mock_warning
+
+        try:
+            p.handle_variable_set_request(None, "test_value")
+            # Should not have added the variable
+            self.assertNotIn("1invalid", env.variables)
+            # Should have shown warning
+            self.assertTrue(len(warning_called) > 0)
+            self.assertIn("Variable name cannot start with a digit.", warning_called[0][2])
+        finally:
+            QInputDialog.getText = original_getText
+            QMessageBox.warning = original_warning
+
+    def test_handle_variable_set_request_invalid_chars(self):
+        """Test that variable names with invalid characters are rejected"""
+        env = _make_env("e1", "Dev", {})
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.setCurrentIndex(1)
+        p.env_selector.blockSignals(False)
+
+        # Mock QInputDialog to return name with invalid chars
+        original_getText = QInputDialog.getText
+        QInputDialog.getText = lambda *args, **kwargs: ("valid-name", True)  # hyphen is invalid
+
+        # Mock QMessageBox to capture the warning
+        original_warning = QMessageBox.warning
+        warning_called = []
+        def mock_warning(*args, **kwargs):
+            warning_called.append(args)
+        QMessageBox.warning = mock_warning
+
+        try:
+            p.handle_variable_set_request(None, "test_value")
+            # Should not have added the variable
+            self.assertNotIn("valid-name", env.variables)
+            # Should have shown warning
+            self.assertTrue(len(warning_called) > 0)
+            self.assertIn("Variable name can only contain letters, numbers, and underscores.", warning_called[0][2])
+        finally:
+            QInputDialog.getText = original_getText
+            QMessageBox.warning = original_warning
+
+    def test_handle_variable_set_request_cancelled_dialog(self):
+        """Test that cancelled dialog does nothing"""
+        env = _make_env("e1", "Dev", {})
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.setCurrentIndex(1)
+        p.env_selector.blockSignals(False)
+
+        # Mock QInputDialog to return cancelled
+        original_getText = QInputDialog.getText
+        QInputDialog.getText = lambda *args, **kwargs: ("", False)
+
+        try:
+            p.handle_variable_set_request(None, "test_value")
+            # Should not have added the variable
+            self.assertEqual(len(env.variables), 0)
+        finally:
+            QInputDialog.getText = original_getText
 
     def test_load_environments_emits_no_signal_for_no_env(self):
         p = self._make_presenter([])

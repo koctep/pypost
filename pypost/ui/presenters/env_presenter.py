@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, Signal
 from pypost.core.storage import StorageManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.mcp_server import MCPServerManager
+from pypost.core.metrics import MetricsManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
@@ -31,6 +32,7 @@ class EnvPresenter(QObject):
         mcp_manager: MCPServerManager,
         settings: AppSettings,
         get_collections: Callable,
+        metrics: MetricsManager,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -39,6 +41,7 @@ class EnvPresenter(QObject):
         self._mcp_manager = mcp_manager
         self._settings = settings
         self._get_collections = get_collections
+        self._metrics = metrics
         self._environments: list[Environment] = []
         self._current_env_index: int = 0
 
@@ -150,6 +153,14 @@ class EnvPresenter(QObject):
                         self._widget, "Invalid Name", "Variable name cannot be empty."
                     )
                     return
+
+                # Validate variable name for Jinja2 compatibility
+                is_valid, error_msg = self._is_valid_variable_name(target_key)
+                if not is_valid:
+                    QMessageBox.warning(
+                        self._widget, "Invalid Variable Name", error_msg
+                    )
+                    return
             else:
                 return
 
@@ -160,6 +171,41 @@ class EnvPresenter(QObject):
         selected.variables[target_key] = value
         self._storage.save_environments(self._environments)
         self._on_env_changed(self._env_selector.currentIndex())
+
+    def _is_valid_variable_name(self, name: str) -> tuple[bool, str]:
+        """Validate variable name for Jinja2 template compatibility.
+
+        Rules:
+        - Cannot be empty
+        - Cannot start with a digit
+        - Can only contain alphanumeric characters and underscore
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not name:
+            self._metrics.track_variable_validation_failure("empty")
+            self._metrics.track_variable_validation("invalid")
+            logger.debug("variable_name_validation_attempt name=%s valid=False error=empty", name)
+            return False, "Variable name cannot be empty."
+
+        # Check if first character is a digit
+        if name[0].isdigit():
+            self._metrics.track_variable_validation_failure("starts_with_digit")
+            self._metrics.track_variable_validation("invalid")
+            logger.debug("variable_name_validation_attempt name=%s valid=False error=starts_with_digit", name)
+            return False, "Variable name cannot start with a digit."
+
+        # Check if all characters are alphanumeric or underscore
+        if not all(c.isalnum() or c == '_' for c in name):
+            self._metrics.track_variable_validation_failure("invalid_chars")
+            self._metrics.track_variable_validation("invalid")
+            logger.debug("variable_name_validation_attempt name=%s valid=False error=invalid_chars", name)
+            return False, "Variable name can only contain letters, numbers, and underscores."
+
+        self._metrics.track_variable_validation("valid")
+        logger.debug("variable_name_validation_attempt name=%s valid=True error=", name)
+        return True, ""
 
     def handle_open_environments(self) -> None:
         """Shortcut handler — opens EnvironmentDialog."""

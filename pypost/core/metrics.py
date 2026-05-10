@@ -75,6 +75,20 @@ class MetricsManager:
             registry=self.registry
         )
 
+        self.gui_variable_validation_total = Counter(
+            'gui_variable_validation_total',
+            'Number of variable name validation attempts',
+            ['result'],
+            registry=self.registry
+        )
+
+        self.gui_variable_validation_failures_total = Counter(
+            'gui_variable_validation_failures_total',
+            'Number of failed variable name validations',
+            ['reason'],
+            registry=self.registry
+        )
+
         self.gui_method_body_autoswitches = Counter(
             'gui_method_body_autoswitches_total',
             'Number of times the Body tab was auto-selected due to method change',
@@ -369,3 +383,19 @@ class MetricsManager:
             code=code,
             function_name=function_name or "n/a",
         ).inc()
+
+    def track_variable_validation(self, result: str) -> None:
+        """Track variable name validation attempt.
+
+        Args:
+            result: Either "valid" or "invalid"
+        """
+        self.gui_variable_validation_total.labels(result=result).inc()
+
+    def track_variable_validation_failure(self, reason: str) -> None:
+        """Track failed variable name validation.
+
+        Args:
+            reason: Reason for failure ("empty", "starts_with_digit", "invalid_chars")
+        """
+        self.gui_variable_validation_failures_total.labels(reason=reason).inc()

@@ -53,6 +53,7 @@ def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa
                     mcp_manager=_FakeMCPManager(),
                     settings=AppSettings(),
                     get_collections=_empty_collections,
+                    metrics=MagicMock(),
                 )
                 presenter.load_environments()
                 presenter.env_selector.setCurrentIndex(1)
@@ -73,6 +74,7 @@ def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa
                     mcp_manager=_FakeMCPManager(),
                     settings=AppSettings(),
                     get_collections=_empty_collections,
+                    metrics=MagicMock(),
                 )
                 presenter_after_restart.load_environments()
                 loaded_env = presenter_after_restart.env_selector.itemData(1)
