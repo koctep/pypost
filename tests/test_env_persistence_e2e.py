@@ -113,3 +113,50 @@ def test_hidden_toggle_persists_and_reveal_keeps_original_value(qapp):  # noqa: 
             assert len(reloaded) == 1
             assert reloaded[0].variables == {"API_KEY": "secret"}
             assert reloaded[0].hidden_keys == set()
+
+
+def test_presenter_load_shows_no_env_when_key_missing_for_encrypted_data(qapp):  # noqa: ARG001
+    fernet = pytest.importorskip("cryptography.fernet")
+    with tempfile.TemporaryDirectory() as td:
+        with patch("pypost.core.storage.user_data_dir", return_value=td):
+            with patch.dict(
+                "os.environ",
+                {
+                    "PYPOST_ENV_ENCRYPTION_ENABLED": "true",
+                    "PYPOST_ENV_ENCRYPTION_KEY": fernet.Fernet.generate_key().decode("utf-8"),
+                },
+                clear=False,
+            ):
+                storage = StorageManager()
+                storage.save_environments(
+                    [
+                        Environment(
+                            id="e1",
+                            name="Dev",
+                            variables={"SECRET": "value"},
+                            hidden_keys={"SECRET"},
+                        )
+                    ]
+                )
+
+            with patch("pypost.core.config_manager.user_config_dir", return_value=td):
+                with patch.dict(
+                    "os.environ",
+                    {
+                        "PYPOST_ENV_ENCRYPTION_ENABLED": "true",
+                        "PYPOST_ENV_ENCRYPTION_KEY": "",
+                    },
+                    clear=False,
+                ):
+                    presenter = EnvPresenter(
+                        storage=storage,
+                        config_manager=ConfigManager(),
+                        mcp_manager=_FakeMCPManager(),
+                        settings=AppSettings(),
+                        get_collections=_empty_collections,
+                        metrics=MagicMock(),
+                    )
+                    presenter.load_environments()
+
+                    assert presenter.env_selector.count() == 1
+                    assert presenter.env_selector.currentIndex() == 0

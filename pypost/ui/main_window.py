@@ -40,7 +40,7 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
         self.metrics = metrics
         self.template_service = template_service
-        self.storage = StorageManager()
+        self.storage = StorageManager(metrics=self.metrics)
         if config_manager is not None:
             logger.debug("config_manager_source source=injected")
             self.config_manager = config_manager

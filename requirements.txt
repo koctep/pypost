@@ -8,3 +8,4 @@ starlette
 uvicorn
 prometheus_client
 sseclient-py
+cryptography

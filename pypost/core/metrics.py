@@ -179,6 +179,22 @@ class MetricsManager:
             ['render_path', 'code', 'function_name'],
             registry=self.registry,
         )
+        self.environment_value_encryptions_total = Counter(
+            'environment_value_encryptions_total',
+            'Number of environment values encrypted before persistence',
+            registry=self.registry,
+        )
+        self.environment_value_decryptions_total = Counter(
+            'environment_value_decryptions_total',
+            'Number of environment values decrypted during load',
+            registry=self.registry,
+        )
+        self.environment_encryption_errors_total = Counter(
+            'environment_encryption_errors_total',
+            'Number of encryption/decryption errors in environment storage flow',
+            ['stage', 'reason'],
+            registry=self.registry,
+        )
 
     # MCP Resource Handlers
     async def list_resources(self) -> list[Resource]:
@@ -399,3 +415,14 @@ class MetricsManager:
             reason: Reason for failure ("empty", "starts_with_digit", "invalid_chars")
         """
         self.gui_variable_validation_failures_total.labels(reason=reason).inc()
+
+    def track_environment_value_encryption(self) -> None:
+        self.environment_value_encryptions_total.inc()
+
+    def track_environment_value_decryption(self) -> None:
+        self.environment_value_decryptions_total.inc()
+
+    def track_environment_encryption_error(self, stage: str, reason: str) -> None:
+        self.environment_encryption_errors_total.labels(
+            stage=stage, reason=reason,
+        ).inc()

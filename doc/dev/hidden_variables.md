@@ -53,7 +53,7 @@ No new runtime settings were introduced for this feature.
 
 ## Security Notes
 
-- Hidden flag does **not** encrypt values at rest.
-- Hidden flag does **not** change request runtime substitution.
-- Follow-up debts for stronger protections are tracked in Jira:
-  - `PYPOST-446`, `PYPOST-447`, `PYPOST-448`, `PYPOST-449`.
+- Hidden flag alone is still a display-level control.
+- At-rest protection is available separately via PYPOST-447 encryption flow.
+- Runtime request substitution still uses real values after load-time resolution.
+- See `doc/dev/environment_encryption_at_rest.md` for encryption configuration and behavior.
