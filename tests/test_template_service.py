@@ -61,6 +61,22 @@ class TestTemplateServiceRenderString(unittest.TestCase):
         result = self.svc.render_string(content, {"db": "a b"})
         self.assertEqual("4c85f5eb3a20b8ad41bddfdd57ff6347", result)
 
+    def test_runtime_hover_parity_nested_valid(self):
+        content = "{{md5(urlencode(db))}}"
+        variables = {"db": "a b"}
+        expected = "4c85f5eb3a20b8ad41bddfdd57ff6347"
+        for render_path in ("runtime", "hover"):
+            with self.subTest(render_path=render_path):
+                result = self.svc.render_string(
+                    content, variables, render_path=render_path,
+                )
+                self.assertEqual(expected, result)
+
+    def test_render_rejects_nested_unknown(self):
+        content = "{{md5(bad(db))}}"
+        result = self.svc.render_string(content, {"db": "a b"})
+        self.assertEqual(content, result)
+
     def test_render_multi_argument_function_returns_original_content(self):
         content = "{{urlencode(db, host)}}"
         result = self.svc.render_string(content, {"db": "hello", "host": "localhost"})
@@ -130,6 +146,12 @@ class TestTemplateServiceValidationOutcomes(unittest.TestCase):
         result = self.svc.validate_function_expressions("{{md5(urlencode(db))}}")
         self.assertTrue(result.is_valid)
 
+    def test_validate_rejects_nested_unknown(self):
+        result = self.svc.validate_function_expressions("{{md5(bad(db))}}")
+        self.assertFalse(result.is_valid)
+        self.assertEqual("unknown_function", result.code)
+        self.assertEqual("bad", result.function_name)
+
     def test_validate_reports_invalid_argument(self):
         result = self.svc.validate_function_expressions("{{urlencode('db')}}")
         self.assertFalse(result.is_valid)
@@ -166,6 +188,30 @@ class TestTemplateServiceObservability(unittest.TestCase):
         )
         self.metrics.track_template_expression_validation_failure.assert_called_with(
             render_path="runtime", code="unknown_function", function_name="not_allowed",
+        )
+
+    def test_render_nested_validation_failure_tracks_validation_metrics(self):
+        content = "{{md5(bad(db))}}"
+        result = self.svc.render_string(content, {"db": "x"}, render_path="hover")
+        self.assertEqual(content, result)
+        self.metrics.track_template_expression_render_attempt.assert_any_call(
+            render_path="hover", outcome="validation_error",
+        )
+        self.assertNotIn(
+            call(render_path="hover", outcome="render_error"),
+            self.metrics.track_template_expression_render_attempt.call_args_list,
+        )
+        self.metrics.track_template_expression_validation_failure.assert_called_with(
+            render_path="hover", code="unknown_function", function_name="bad",
+        )
+
+    def test_render_nested_success_tracks_success_metric(self):
+        result = self.svc.render_string(
+            "{{md5(urlencode(db))}}", {"db": "a b"}, render_path="hover",
+        )
+        self.assertEqual("4c85f5eb3a20b8ad41bddfdd57ff6347", result)
+        self.metrics.track_template_expression_render_attempt.assert_called_with(
+            render_path="hover", outcome="success",
         )
 
     def test_render_empty_content_tracks_metric(self):

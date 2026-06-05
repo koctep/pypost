@@ -34,6 +34,7 @@ class TemplateService:
         Allow only these placeholder forms:
         - {{identifier}}
         - {{allowed_function(identifier)}}
+        - {{allowed_function(nested_func(identifier))}} (recursive allow-list)
         """
         return self._function_expression_resolver.validate_content(content)
 

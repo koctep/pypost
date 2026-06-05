@@ -14,9 +14,9 @@
 - `TemplateService` currently combines rendering, validation, parsing, allow-list ownership,
   logging, and metrics. This centralization increases coupling and makes future function-catalog
   expansion riskier.
-- Nested function support is currently accepted by validation, while architecture documented nested
-  calls as out of scope for this iteration. Behavior and architecture documentation are out of
-  sync.
+- ~~Nested function policy mismatch (architecture vs implementation)~~ — resolved by
+  [PYPOST-453](https://pypost.atlassian.net/browse/PYPOST-453): ALLOW policy codified in
+  `FunctionExpressionResolver`, docs aligned, policy-guard tests added.
 - `_extract_single_argument` implements parenthesis-depth parsing manually; this is workable for
   current scope but brittle for future grammar growth.
 - Hover helper uses a class-level `TemplateService` instance, which is practical for reuse but
@@ -28,8 +28,8 @@
   `_extract_single_argument`.
 - No explicit tests for whitespace-heavy function formatting variants in all contexts
   (runtime + hover + table cells), such as `{{ md5( db ) }}`.
-- No dedicated test asserting architecture intent around nested-call policy (either explicit allow
-  or explicit reject) to prevent future drift.
+- ~~No dedicated test asserting architecture intent around nested-call policy~~ — addressed by
+  PYPOST-453 policy-guard tests (`NESTED_FUNCTION_CALLS_ALLOWED`, nested valid/invalid cases).
 
 ## Performance Concerns
 
@@ -47,9 +47,11 @@
 - [**PYPOST-452**](https://pypost.atlassian.net/browse/PYPOST-452): Introduce
   `FunctionExpressionResolver` module and migrate parsing/validation
   logic out of `TemplateService`.
-- [**PYPOST-453**](https://pypost.atlassian.net/browse/PYPOST-453): Resolve
+- ~~[**PYPOST-453**](https://pypost.atlassian.net/browse/PYPOST-453): Resolve
   nested-function policy mismatch (architecture vs implementation), then
-  enforce with explicit validation rules and tests.
+  enforce with explicit validation rules and tests.~~ — **completed:** ALLOW policy
+  codified (`NESTED_FUNCTION_CALLS_ALLOWED`), docs aligned, policy-guard and parity tests
+  added; see `ai-tasks/PYPOST-453/60-tech-debt.md`.
 - [**PYPOST-454**](https://pypost.atlassian.net/browse/PYPOST-454): Add
   edge-case tests for malformed nested expressions, spacing variants, and
   hover/runtime parity for those variants.

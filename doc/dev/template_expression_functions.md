@@ -1,4 +1,4 @@
-# Template Expression Functions (PYPOST-450, PYPOST-451, PYPOST-452)
+# Template Expression Functions (PYPOST-450–PYPOST-453)
 
 ## Overview
 
@@ -15,6 +15,11 @@ PYPOST-452 splits template-function validation responsibilities:
 - `ValidationResult` lives in `pypost/core/template_expression_types.py` as a shared type.
 - `TemplateService` orchestrates environment setup, rendering, logging, and metrics, while
   delegating expression validation to the resolver.
+
+PYPOST-453 aligns and documents the nested-function policy: allow-listed function calls may
+nest recursively (for example `{{md5(urlencode(db))}}`). Policy is declared by
+`NESTED_FUNCTION_CALLS_ALLOWED` in `function_expression_resolver.py` and enforced by the
+existing recursive validation path.
 
 Implemented behavior is backward compatible:
 
@@ -36,7 +41,8 @@ Main components:
   - Factory methods: `ValidationResult.valid()` and `ValidationResult.error(...)`.
 - `pypost/core/function_expression_resolver.py` (`FunctionExpressionResolver`)
   - Parses and validates expressions inside `{{...}}`.
-  - Uses `FunctionRegistry` for allow-list checks and preserves current nested-call behavior.
+  - Uses `FunctionRegistry` for allow-list checks at every call node, including nested chains.
+  - Exposes `NESTED_FUNCTION_CALLS_ALLOWED` as the declarative nested-call policy constant.
   - Returns `ValidationResult` and does not emit logs or metrics.
 - `pypost/core/template_service.py` (`TemplateService`)
   - Owns `jinja2.Environment`, registry wiring, render orchestration, logging, and metrics.
@@ -48,12 +54,6 @@ Main components:
   - Keeps hidden-variable masking for plain variables via `HIDDEN_MASK`.
 - `pypost/core/metrics.py` (`MetricsManager`)
   - Exposes counters for expression render attempts and validation failures.
-
-### Known Deviation
-
-- Current implementation allows nested function calls (for example `{{md5(urlencode(db))}}`).
-- Architecture notes previously marked nested calls as out of scope for this iteration.
-- Follow-up alignment task: [PYPOST-453](https://pypost.atlassian.net/browse/PYPOST-453).
 
 ## Usage/API
 
@@ -82,7 +82,8 @@ Supported patterns:
 
 - Plain variable: `{{host}}`
 - Function call: `{{urlencode(db)}}`
-- Nested function call (currently implemented): `{{md5(urlencode(db))}}`
+- Nested function call: `{{md5(urlencode(db))}}`
+- Deep chain (no fixed depth limit): `{{base64(md5(urlencode(db)))}}`
 
 Supported functions:
 
@@ -95,13 +96,40 @@ Examples:
 - URL field: `/{{host}}/{{urlencode(db)}}`
 - Header/param/body values: `{{md5(secret)}}`, `{{base64(path)}}`
 - Hover tooltip resolution uses the same render rules as runtime for function placeholders.
+- Nested chain: `{{md5(urlencode(db))}}` with `db="a b"` → MD5 of URL-encoded value.
 
 Invalid examples (kept as original text due fallback behavior):
 
 - Unknown function: `{{not_allowed(db)}}`
+- Unknown function nested: `{{md5(bad(db))}}`
 - Multi-argument call: `{{urlencode(db, host)}}`
+- Multi-argument inside nested call: `{{md5(urlencode(a, b))}}`
 - Literal argument: `{{urlencode('db')}}`
+- Literal inside nested call: `{{md5(urlencode('db'))}}`
 - Malformed signature: `{{urlencode(db}}`
+
+## Nested Function Call Policy (PYPOST-453)
+
+| Rule | Behavior |
+|------|----------|
+| Nested allow-listed calls | **Allowed** — argument is identifier or nested allow-listed call |
+| Depth limit | **None** — each level must satisfy catalog + single-argument rules |
+| Catalog check | `FunctionRegistry.is_allowed` at every call node, recursively |
+| Multi-argument at any level | Rejected (`invalid_arity`; outer may see `invalid_argument`) |
+| Literals / arbitrary expressions | Rejected (`invalid_argument` or `invalid_syntax`) |
+| Unknown function in chain | Rejected (`unknown_function` on the offending name) |
+
+Policy constant: `NESTED_FUNCTION_CALLS_ALLOWED = True` in
+`pypost/core/function_expression_resolver.py`. It is **declarative** (documented intent);
+validation logic does not branch on it in the current release.
+
+**`function_name` on nested errors:** inner validation failures propagate with the
+**innermost** offending function name (for example `urlencode` for
+`{{md5(urlencode('db'))}}`, not `md5`). Only inner `invalid_arity` is remapped to outer
+`invalid_argument`.
+
+Edge-case tests (malformed nesting, spacing variants) are tracked in
+[PYPOST-454](https://pypost.atlassian.net/browse/PYPOST-454).
 
 ## Configuration
 

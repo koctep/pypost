@@ -3,8 +3,17 @@ import re
 from pypost.core.function_registry import FunctionRegistry
 from pypost.core.template_expression_types import ValidationResult
 
+NESTED_FUNCTION_CALLS_ALLOWED: bool = True
+
 
 class FunctionExpressionResolver:
+    """Validates ``{{...}}`` expressions.
+
+    Nested policy: when ``NESTED_FUNCTION_CALLS_ALLOWED`` is True, a function argument may be
+    a plain identifier or another allow-listed single-argument function call, validated
+    recursively via ``FunctionRegistry``. There is no fixed depth limit as long as each call
+    satisfies catalog membership and single-argument rules.
+    """
     _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
     _FUNCTION_SIGNATURE_RE = re.compile(
         r"^(?P<func>[a-zA-Z_][a-zA-Z0-9_]*)\((?P<args>.*)\)$"

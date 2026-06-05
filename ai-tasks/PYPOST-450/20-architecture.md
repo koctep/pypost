@@ -222,8 +222,11 @@ Acceptance policy for matrix:
   - `urlencode`: 1 argument;
   - `md5`: 1 argument;
   - `base64`: 1 argument.
-- Nested function calls and multi-argument calls are not in scope for this iteration and must
-  fail validation with explicit error output.
+- Nested allow-listed function calls **are supported**; a function's single argument may be a
+  plain identifier or another allow-listed single-argument call, validated recursively with
+  the same catalog and arity rules at each level. No fixed depth limit. (Policy aligned in
+  PYPOST-453.)
+- Multi-argument calls are not in scope and must fail validation with explicit error output.
 
 ## Q&A
 
