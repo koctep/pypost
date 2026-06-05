@@ -182,6 +182,7 @@ class MainWindow(QMainWindow):
             if self.menuBar():
                 self.menuBar().setFont(font)
         self.tabs.apply_settings(settings)
+        self.env.apply_settings(settings)
 
     def open_settings(self) -> None:
         dialog = SettingsDialog(self.settings, self)

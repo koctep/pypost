@@ -263,8 +263,10 @@ class TestEnvPresenter(unittest.TestCase):
         # Mock QMessageBox to capture the warning
         original_warning = QMessageBox.warning
         warning_called = []
+
         def mock_warning(*args, **kwargs):
             warning_called.append(args)
+
         QMessageBox.warning = mock_warning
 
         try:
@@ -295,8 +297,10 @@ class TestEnvPresenter(unittest.TestCase):
         # Mock QMessageBox to capture the warning
         original_warning = QMessageBox.warning
         warning_called = []
+
         def mock_warning(*args, **kwargs):
             warning_called.append(args)
+
         QMessageBox.warning = mock_warning
 
         try:
@@ -327,8 +331,10 @@ class TestEnvPresenter(unittest.TestCase):
         # Mock QMessageBox to capture the warning
         original_warning = QMessageBox.warning
         warning_called = []
+
         def mock_warning(*args, **kwargs):
             warning_called.append(args)
+
         QMessageBox.warning = mock_warning
 
         try:
@@ -337,7 +343,10 @@ class TestEnvPresenter(unittest.TestCase):
             self.assertNotIn("valid-name", env.variables)
             # Should have shown warning
             self.assertTrue(len(warning_called) > 0)
-            self.assertIn("Variable name can only contain letters, numbers, and underscores.", warning_called[0][2])
+            self.assertIn(
+                "Variable name can only contain letters, numbers, and underscores.",
+                warning_called[0][2],
+            )
         finally:
             QInputDialog.getText = original_getText
             QMessageBox.warning = original_warning
@@ -370,6 +379,13 @@ class TestEnvPresenter(unittest.TestCase):
         p.load_environments()
         # stays at index 0 (No Environment), on_env_changed NOT triggered for index 0
         self.assertEqual(len(received), 0)
+
+    def test_apply_settings_updates_settings_reference(self):
+        p = self._make_presenter([])
+        new_settings = AppSettings(log_hidden_key_names=True)
+        p.apply_settings(new_settings)
+        self.assertIs(p._settings, new_settings)
+        self.assertTrue(p._settings.log_hidden_key_names)
 
 
 if __name__ == "__main__":

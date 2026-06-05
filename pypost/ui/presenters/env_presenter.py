@@ -98,6 +98,9 @@ class EnvPresenter(QObject):
     def env_label(self) -> QLabel:
         return self._env_label
 
+    def apply_settings(self, settings: AppSettings) -> None:
+        self._settings = settings
+
     def load_environments(self) -> None:
         """Loads from storage, populates combo, emits current vars."""
         self._environments = self._storage.load_environments()
@@ -193,14 +196,22 @@ class EnvPresenter(QObject):
         if name[0].isdigit():
             self._metrics.track_variable_validation_failure("starts_with_digit")
             self._metrics.track_variable_validation("invalid")
-            logger.debug("variable_name_validation_attempt name=%s valid=False error=starts_with_digit", name)
+            logger.debug(
+                "variable_name_validation_attempt name=%s valid=False "
+                "error=starts_with_digit",
+                name,
+            )
             return False, "Variable name cannot start with a digit."
 
         # Check if all characters are alphanumeric or underscore
         if not all(c.isalnum() or c == '_' for c in name):
             self._metrics.track_variable_validation_failure("invalid_chars")
             self._metrics.track_variable_validation("invalid")
-            logger.debug("variable_name_validation_attempt name=%s valid=False error=invalid_chars", name)
+            logger.debug(
+                "variable_name_validation_attempt name=%s valid=False "
+                "error=invalid_chars",
+                name,
+            )
             return False, "Variable name can only contain letters, numbers, and underscores."
 
         self._metrics.track_variable_validation("valid")
@@ -271,7 +282,12 @@ class EnvPresenter(QObject):
             current_env_name = None
 
         logger.info("env_manager_dialog_opened current_env=%s", current_env_name)
-        dialog = EnvironmentDialog(self._environments, self._widget, current_env_name)
+        dialog = EnvironmentDialog(
+            self._environments,
+            self._widget,
+            current_env_name,
+            log_hidden_key_names=self._settings.log_hidden_key_names,
+        )
         dialog.exec()
         logger.info("env_manager_dialog_closed")
         self._storage.save_environments(self._environments)

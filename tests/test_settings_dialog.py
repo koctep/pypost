@@ -37,3 +37,29 @@ class TestSettingsDialogRequestTimeout:
             assert dlg.get_settings().request_timeout == 99
         finally:
             dlg.close()
+
+
+class TestSettingsDialogLogHiddenKeyNames:
+    def test_log_hidden_key_names_checkbox_on_form(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            assert dlg.log_hidden_key_names_check.parent() is dlg
+            assert dlg.form_layout.indexOf(dlg.log_hidden_key_names_check) >= 0
+        finally:
+            dlg.close()
+
+    def test_log_hidden_key_names_loads_from_settings(self, qapp):
+        dlg = SettingsDialog(AppSettings(log_hidden_key_names=True))
+        try:
+            assert dlg.log_hidden_key_names_check.isChecked()
+        finally:
+            dlg.close()
+
+    def test_accept_includes_log_hidden_key_names_in_result(self, qapp):
+        dlg = SettingsDialog(AppSettings(log_hidden_key_names=False))
+        try:
+            dlg.log_hidden_key_names_check.setChecked(True)
+            dlg.accept()
+            assert dlg.get_settings().log_hidden_key_names is True
+        finally:
+            dlg.close()

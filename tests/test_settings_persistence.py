@@ -58,6 +58,18 @@ class TestConfigManagerPersistence(unittest.TestCase):
                 s = ConfigManager().load_config()
                 self.assertEqual(s, AppSettings())
 
+    def test_load_legacy_settings_without_log_hidden_key_names_defaults_false(self):
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "settings.json"
+            cfg.write_text(
+                '{"font_size": 12, "indent_size": 2, "request_timeout": 60, '
+                '"config_version": 1, "revision": 0}',
+                encoding="utf-8",
+            )
+            with patch("pypost.core.config_manager.user_config_dir", return_value=td):
+                s = ConfigManager().load_config()
+                self.assertFalse(s.log_hidden_key_names)
+
 
 class TestStateManagerPersistence(unittest.TestCase):
     def _cm_and_td(self):

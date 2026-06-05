@@ -8,6 +8,9 @@ surfaces to reduce accidental secret exposure during screen sharing and day-to-d
 The feature is display-level only: request execution still uses real values from
 `Environment.variables`.
 
+PYPOST-446 masks hidden-derived values in request history. PYPOST-448 adds a configurable
+logging policy for hidden-flag toggle events (variable key names in diagnostic logs).
+
 ## Architecture
 
 - **Model**: `pypost.models.models.Environment`
@@ -16,6 +19,9 @@ The feature is display-level only: request execution still uses real values from
   - Adds `Hidden` checkbox column.
   - Masks value cell as `********` when hidden.
   - Stores real hidden value in `QTableWidgetItem` `UserRole` to keep edits/renames safe.
+  - Emits `env_hidden_flag_changed` INFO log on toggle (key name policy: PYPOST-448).
+- **Toggle log policy**: `pypost.core.hidden_toggle_log_policy.HiddenToggleLogPolicy`
+  - Formats variable key name for `env_hidden_flag_changed` log events.
 - **Hover resolution**: `pypost.ui.widgets.mixins.VariableHoverHelper`
   - Returns mask for hidden keys in tooltips/preview.
 - **Signal propagation**:
@@ -38,7 +44,38 @@ Cloning environments preserves hidden flags (`clone_environment` copies `hidden_
 
 ## Configuration
 
-No new runtime settings were introduced for this feature.
+### Hidden-flag toggle logging (PYPOST-448)
+
+Setting: `AppSettings.log_hidden_key_names` (persisted in `settings.json`).
+
+| Value | UI checkbox | Toggle log `key` field |
+|-------|-------------|-------------------------|
+| `False` (default) | unchecked | `********` (`HIDDEN_MASK`) |
+| `True` | checked | actual variable name |
+
+Enable in **Settings** → **Log variable key names when hidden flag is toggled**.
+
+**Breaking change vs PYPOST-437**: key names were always logged before PYPOST-448. Default is
+now redacted; enable the checkbox for full key-name diagnostics.
+
+Policy is snapshotted when **Manage Environments** opens. Change the setting, save, then
+reopen the dialog for the new policy to apply.
+
+Variable values are never written to toggle logs in either mode.
+
+### API
+
+```python
+from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
+
+# Default (suppressed)
+HiddenToggleLogPolicy.format_key_name("API_KEY", log_hidden_key_names=False)
+# -> "********"
+
+# Opt-in full visibility
+HiddenToggleLogPolicy.format_key_name("API_KEY", log_hidden_key_names=True)
+# -> "API_KEY"
+```
 
 ## Troubleshooting
 
@@ -50,10 +87,23 @@ No new runtime settings were introduced for this feature.
 - **Hidden value lost after rename/edit**
   - Check `EnvironmentDialog` value-cell `UserRole` handling and related tests:
     - `tests/test_env_dialog.py`
+- **Toggle logs show `********` instead of key names**
+  - Expected default (`log_hidden_key_names=False`). Enable the Settings checkbox if your
+    org policy allows key-name logging for diagnostics.
+- **Setting change does not affect an open Manage Environments dialog**
+  - Close and reopen the dialog; policy is read at construction time.
 
 ## Security Notes
 
 - Hidden flag alone is still a display-level control.
 - At-rest protection is available separately via PYPOST-447 encryption flow.
 - Runtime request substitution still uses real values after load-time resolution.
+- Toggle logs never include variable values; key names are redacted by default (PYPOST-448).
 - See `doc/dev/environment_encryption_at_rest.md` for encryption configuration and behavior.
+
+## Related Tests
+
+- `tests/test_hidden_toggle_log_policy.py`
+- `tests/test_env_dialog.py` (caplog: masked vs readable key)
+- `tests/test_settings_dialog.py` (checkbox load/save)
+- `tests/test_settings_persistence.py` (legacy settings without field)

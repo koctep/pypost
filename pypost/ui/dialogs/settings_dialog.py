@@ -63,6 +63,13 @@ class SettingsDialog(QDialog):
         self.confirm_overwrite_check = QCheckBox()
         self.confirm_overwrite_check.setChecked(current_settings.confirm_overwrite_request)
 
+        self.log_hidden_key_names_check = QCheckBox(
+            "Log variable key names when hidden flag is toggled",
+        )
+        self.log_hidden_key_names_check.setChecked(
+            current_settings.log_hidden_key_names,
+        )
+
         # Retry policy defaults
         default_policy = RetryPolicy()
         current_policy = current_settings.default_retry_policy or default_policy
@@ -107,6 +114,7 @@ class SettingsDialog(QDialog):
         self.form_layout.addRow(
             "Confirm before overwriting requests:", self.confirm_overwrite_check
         )
+        self.form_layout.addRow("", self.log_hidden_key_names_check)
         self.form_layout.addRow("Max Retries (0 = disabled):", self.max_retries_spin)
         self.form_layout.addRow("Retry Delay (seconds):", self.retry_delay_spin)
         self.form_layout.addRow("Retry Backoff Multiplier:", self.retry_backoff_spin)
@@ -153,6 +161,7 @@ class SettingsDialog(QDialog):
             open_tabs=self.current_settings.open_tabs,
             expanded_collections=self.current_settings.expanded_collections,
             confirm_overwrite_request=self.confirm_overwrite_check.isChecked(),
+            log_hidden_key_names=self.log_hidden_key_names_check.isChecked(),
             mcp_port=self.mcp_port_spin.value(),
             mcp_host=self.mcp_host_edit.text(),
             metrics_port=self.metrics_port_spin.value(),
@@ -160,6 +169,7 @@ class SettingsDialog(QDialog):
             default_retry_policy=retry_policy,
             alert_webhook_url=webhook_url,
             alert_webhook_auth_header=webhook_auth,
+            alert_log_path=self.current_settings.alert_log_path,
         )
         super().accept()
 

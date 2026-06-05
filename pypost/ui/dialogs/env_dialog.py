@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.core.environment_ops import clone_environment
+from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.models.models import Environment
 from pypost.ui.widgets.mixins import HIDDEN_MASK
 
@@ -35,12 +36,14 @@ class EnvironmentDialog(QDialog):
         environments: List[Environment],
         parent=None,
         current_env_name: str = None,
+        log_hidden_key_names: bool = False,
     ):
         super().__init__(parent)
         self.setWindowTitle("Manage Environments")
         self.resize(800, 600)
         self.environments = environments
         self.current_env_name = current_env_name
+        self._log_hidden_key_names = log_hidden_key_names
 
         self.init_ui()
 
@@ -284,7 +287,10 @@ class EnvironmentDialog(QDialog):
                 logger.info(
                     "env_hidden_flag_changed env_name=%s key=%s hidden=%s",
                     env.name,
-                    key,
+                    HiddenToggleLogPolicy.format_key_name(
+                        key,
+                        log_hidden_key_names=self._log_hidden_key_names,
+                    ),
                     checked,
                 )
                 return

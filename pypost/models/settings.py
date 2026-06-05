@@ -23,4 +23,4 @@ class AppSettings(BaseModel):
     alert_webhook_url: Optional[str] = None
     alert_webhook_auth_header: Optional[str] = None
     alert_log_path: Optional[str] = None
-
+    log_hidden_key_names: bool = False

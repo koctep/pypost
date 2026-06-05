@@ -1,4 +1,6 @@
 """Qt-level tests for EnvironmentDialog (manage environments UI)."""
+import logging
+
 import pytest
 from unittest.mock import patch
 
@@ -159,5 +161,38 @@ class TestEnvironmentDialog:
             assert env.variables == {"NEW_KEY": "secret"}
             assert env.hidden_keys == {"NEW_KEY"}
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
+        finally:
+            dlg.close()
+
+    def test_hidden_toggle_logs_masked_key_by_default(self, qapp, caplog):
+        env = Environment(name="Dev", variables={"API_KEY": "secret"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            hidden_cb = dlg._get_hidden_checkbox(0)
+            assert hidden_cb is not None
+            with caplog.at_level(logging.INFO):
+                hidden_cb.setChecked(True)
+            assert any(
+                "env_hidden_flag_changed env_name=Dev key=******** hidden=True" in r.message
+                for r in caplog.records
+            )
+            assert not any("API_KEY" in r.message for r in caplog.records)
+        finally:
+            dlg.close()
+
+    def test_hidden_toggle_logs_readable_key_when_enabled(self, qapp, caplog):
+        env = Environment(name="Dev", variables={"API_KEY": "secret"})
+        dlg = EnvironmentDialog([env], log_hidden_key_names=True)
+        try:
+            dlg.on_env_selected(0)
+            hidden_cb = dlg._get_hidden_checkbox(0)
+            assert hidden_cb is not None
+            with caplog.at_level(logging.INFO):
+                hidden_cb.setChecked(True)
+            assert any(
+                "env_hidden_flag_changed env_name=Dev key=API_KEY hidden=True" in r.message
+                for r in caplog.records
+            )
         finally:
             dlg.close()
