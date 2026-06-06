@@ -1,4 +1,4 @@
-# Template Expression Functions (PYPOST-450–PYPOST-453)
+# Template Expression Functions (PYPOST-450–PYPOST-454)
 
 ## Overview
 
@@ -20,6 +20,10 @@ PYPOST-453 aligns and documents the nested-function policy: allow-listed functio
 nest recursively (for example `{{md5(urlencode(db))}}`). Policy is declared by
 `NESTED_FUNCTION_CALLS_ALLOWED` in `function_expression_resolver.py` and enforced by the
 existing recursive validation path.
+
+PYPOST-454 adds acceptance tests for malformed nested expressions, whitespace-heavy
+variants, and runtime/hover parity for those forms. Delivery is tests-only; observed
+validation codes and fallback behavior are documented in the edge-case section below.
 
 Implemented behavior is backward compatible:
 
@@ -128,8 +132,84 @@ validation logic does not branch on it in the current release.
 `{{md5(urlencode('db'))}}`, not `md5`). Only inner `invalid_arity` is remapped to outer
 `invalid_argument`.
 
-Edge-case tests (malformed nesting, spacing variants) are tracked in
-[PYPOST-454](https://pypost.atlassian.net/browse/PYPOST-454).
+Edge-case acceptance tests for malformed nesting and spacing variants were added in
+[PYPOST-454](https://pypost.atlassian.net/browse/PYPOST-454) — see **Edge-Case Expression
+Variants (PYPOST-454)** below.
+
+## Edge-Case Expression Variants (PYPOST-454)
+
+PYPOST-454 closes PYPOST-450 missing-test debt with **tests-only** delivery. Acceptance
+checks lock observed resolver and render behavior for malformed nested expressions,
+whitespace-heavy variants, and runtime/hover parity. No production code changed.
+
+### Malformed nested expressions (M1–M4)
+
+Unbalanced or incomplete nesting at depth (not empty-argument or standalone
+closing-paren patterns — see PYPOST-461 boundary below).
+
+| ID | Example | Validation code | `function_name` | Render fallback |
+| --- | --- | --- | --- | --- |
+| M1 | `{{ md5(urlencode(db) }}` | `invalid_argument` | `md5` | original content |
+| M2 | `{{ md5(urlencode(db))) }}` | `invalid_argument` | `urlencode` | original content |
+| M3 | `{{ md5((urlencode(db))) }}` | `invalid_argument` | `md5` | original content |
+| M4 | `{{ base64(md5(urlencode(db) }}` | `invalid_argument` | `base64` | original content |
+
+Codes are **observed and locked** — the resolver surfaces malformed nesting as
+`invalid_argument` with outer or inner `function_name` depending on where recursive
+validation fails, not always `invalid_syntax`. Both `runtime` and `hover` render paths
+return original content.
+
+### Spacing variants (S1–S5)
+
+Inner delimiter whitespace and argument spacing inside `{{ ... }}` are tolerated when the
+grammar accepts the form. Space between function name and opening paren is rejected.
+
+| ID | Example | Valid? | Validation code | `function_name` | Parity expectation |
+| --- | --- | --- | --- | --- | --- |
+| S1 | `{{  md5( db )  }}` | yes | valid | — | same hash as tight `{{md5(db)}}` |
+| S2 | `{{  md5( urlencode( db ) )  }}` | yes | valid | — | same hash as tight nested form |
+| S3 | `{{md5( urlencode(db))}}` | yes | valid | — | same hash as tight nested form |
+| S4 | `{{ md5 ( urlencode ( db ) ) }}` | no | `invalid_syntax` | — | original content |
+| S5 | `{{md5(urlencode (db))}}` | no | `invalid_argument` | `md5` | original content |
+
+### Runtime / hover parity
+
+Edge-case parity is proven at `TemplateService.render_string(..., render_path=...)`.
+For each valid spaced row (S1–S3), `runtime` and `hover` produce identical resolved output.
+For each malformed nested row (M1–M4) and invalid spacing row (S4–S5), both paths return
+**original content** unchanged.
+
+Table-cell tooltips delegate through `VariableAwareTableWidget` →
+`VariableHoverHelper.resolve_text` → `TemplateService.render_string(...,
+render_path="hover")`. No separate table parsing path; hover-parity at `TemplateService`
+satisfies table-cell equivalence (PYPOST-453 precedent).
+
+### Where tests live
+
+**Resolver validation** (`tests/test_function_expression_resolver.py`):
+
+- `test_malformed_nested_expressions` — M1–M4 matrix
+- `test_nested_spacing_variants` — S1–S5 matrix
+
+**Render and parity** (`tests/test_template_service.py`):
+
+- `test_runtime_hover_parity_valid_spaced_nested` — S1–S3
+- `test_runtime_hover_parity_malformed_nested` — M1–M4 fallback
+- `test_runtime_hover_parity_invalid_spacing` — S4–S5 fallback
+- `test_validate_malformed_nested_alignment` — resolver ↔ delegate codes for M1–M4
+
+Shared case data: `MALFORMED_NESTED_EXPRESSION_CASES` in
+`tests/test_function_expression_resolver.py` (imported by `test_template_service.py`).
+
+### PYPOST-461 boundary
+
+PYPOST-454 owns **nested-structure** malformation and **whitespace-heavy** variants plus
+parity for those forms. Remaining out of scope (tracked in
+[PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461)):
+
+- Empty-argument calls (`{{md5()}}`)
+- Multi-placeholder first-failure stability
+- Standalone malformed closing-paren / arity patterns not primarily about nesting or spacing
 
 ## Configuration
 

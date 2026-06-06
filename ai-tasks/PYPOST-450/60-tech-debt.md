@@ -24,10 +24,14 @@
 
 ## Missing Tests
 
-- No focused tests for deeply nested malformed expressions (e.g. unbalanced depth edge cases) in
-  `_extract_single_argument`.
-- No explicit tests for whitespace-heavy function formatting variants in all contexts
-  (runtime + hover + table cells), such as `{{ md5( db ) }}`.
+- ~~No focused tests for deeply nested malformed expressions (e.g. unbalanced depth edge cases) in
+  `_extract_single_argument`.~~ — **resolved** by
+  [PYPOST-454](https://pypost.atlassian.net/browse/PYPOST-454): M1–M4 matrix in resolver and
+  `TemplateService` parity/validation tests; see `ai-tasks/PYPOST-454/60-tech-debt.md`.
+- ~~No explicit tests for whitespace-heavy function formatting variants in all contexts
+  (runtime + hover + table cells), such as `{{ md5( db ) }}`.~~ — **resolved** by PYPOST-454:
+  S1–S5 spacing matrix, runtime/hover parity for valid and invalid spaced forms; table-cell
+  coverage via hover pipeline equivalence.
 - ~~No dedicated test asserting architecture intent around nested-call policy~~ — addressed by
   PYPOST-453 policy-guard tests (`NESTED_FUNCTION_CALLS_ALLOWED`, nested valid/invalid cases).
 
@@ -52,9 +56,11 @@
   enforce with explicit validation rules and tests.~~ — **completed:** ALLOW policy
   codified (`NESTED_FUNCTION_CALLS_ALLOWED`), docs aligned, policy-guard and parity tests
   added; see `ai-tasks/PYPOST-453/60-tech-debt.md`.
-- [**PYPOST-454**](https://pypost.atlassian.net/browse/PYPOST-454): Add
+- ~~[**PYPOST-454**](https://pypost.atlassian.net/browse/PYPOST-454): Add
   edge-case tests for malformed nested expressions, spacing variants, and
-  hover/runtime parity for those variants.
+  hover/runtime parity for those variants.~~ — **completed:** tests-only delivery; M1–M4 and
+  S1–S5 matrices with runtime/hover parity and validation alignment; see
+  `ai-tasks/PYPOST-454/60-tech-debt.md`.
 - [**PYPOST-455**](https://pypost.atlassian.net/browse/PYPOST-455): Evaluate
   lightweight template/expression caching for repeated render paths after
   collecting usage metrics from current observability counters.

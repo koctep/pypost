@@ -50,8 +50,9 @@ observability on hover).
 
 **Still out of scope (tracked elsewhere):**
 
-- Malformed nested expressions, unbalanced depth edge cases, and spacing variants across all
-  contexts — [PYPOST-454](https://pypost.atlassian.net/browse/PYPOST-454).
+- ~~Malformed nested expressions, unbalanced depth edge cases, and spacing variants across all
+  contexts — [PYPOST-454](https://pypost.atlassian.net/browse/PYPOST-454).~~ — **resolved** by
+  PYPOST-454; see `ai-tasks/PYPOST-454/60-tech-debt.md`.
 - Empty-argument calls (`{{md5()}}`), malformed closing-paren patterns, and multi-placeholder
   first-failure stability — [PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461)
   (overlaps partially with PYPOST-454).
@@ -78,8 +79,9 @@ observability on hover).
 
 ## Follow-up Tasks
 
-- [**PYPOST-454**](https://pypost.atlassian.net/browse/PYPOST-454): Edge-case tests for
-  malformed nested expressions, spacing variants, and hover/runtime parity for those forms.
+- ~~[**PYPOST-454**](https://pypost.atlassian.net/browse/PYPOST-454): Edge-case tests for
+  malformed nested expressions, spacing variants, and hover/runtime parity for those forms.~~ —
+  **completed:** see `ai-tasks/PYPOST-454/60-tech-debt.md`.
 - [**PYPOST-459**](https://pypost.atlassian.net/browse/PYPOST-459): Refactor
   `TemplateService.render_string` into smaller helpers (validation, observability, render).
 - [**PYPOST-460**](https://pypost.atlassian.net/browse/PYPOST-460): Single tokenization

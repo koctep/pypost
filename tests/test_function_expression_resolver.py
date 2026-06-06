@@ -6,6 +6,13 @@ from pypost.core.function_expression_resolver import (
 )
 from pypost.core.function_registry import FunctionRegistry
 
+MALFORMED_NESTED_EXPRESSION_CASES = [
+    ("M1", "{{ md5(urlencode(db) }}", "invalid_argument", "md5"),
+    ("M2", "{{ md5(urlencode(db))) }}", "invalid_argument", "urlencode"),
+    ("M3", "{{ md5((urlencode(db))) }}", "invalid_argument", "md5"),
+    ("M4", "{{ base64(md5(urlencode(db) }}", "invalid_argument", "base64"),
+]
+
 
 class TestFunctionExpressionResolver(unittest.TestCase):
     def setUp(self):
@@ -70,6 +77,36 @@ class TestFunctionExpressionResolver(unittest.TestCase):
         r = self.resolver.validate_content("{{ urlencode('db') }}")
         self.assertFalse(r.is_valid)
         self.assertEqual("invalid_argument", r.code)
+
+    def test_malformed_nested_expressions(self):
+        for label, content, expected_code, expected_fn in MALFORMED_NESTED_EXPRESSION_CASES:
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertFalse(r.is_valid)
+                self.assertEqual(expected_code, r.code)
+                self.assertEqual(expected_fn, r.function_name)
+
+    def test_nested_spacing_variants(self):
+        valid_cases = [
+            ("S1", "{{  md5( db )  }}"),
+            ("S2", "{{  md5( urlencode( db ) )  }}"),
+            ("S3", "{{md5( urlencode(db))}}"),
+        ]
+        for label, content in valid_cases:
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertTrue(r.is_valid)
+
+        invalid_cases = [
+            ("S4", "{{ md5 ( urlencode ( db ) ) }}", "invalid_syntax", None),
+            ("S5", "{{md5(urlencode (db))}}", "invalid_argument", "md5"),
+        ]
+        for label, content, expected_code, expected_fn in invalid_cases:
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertFalse(r.is_valid)
+                self.assertEqual(expected_code, r.code)
+                self.assertEqual(expected_fn, r.function_name)
 
 
 if __name__ == "__main__":

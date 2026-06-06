@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, call, patch
 import jinja2.nodes
 
 from pypost.core.template_service import TemplateService
+from tests.test_function_expression_resolver import MALFORMED_NESTED_EXPRESSION_CASES
 
 
 class TestTemplateServiceRenderString(unittest.TestCase):
@@ -71,6 +72,46 @@ class TestTemplateServiceRenderString(unittest.TestCase):
                     content, variables, render_path=render_path,
                 )
                 self.assertEqual(expected, result)
+
+    def test_runtime_hover_parity_valid_spaced_nested(self):
+        nested_hash = "4c85f5eb3a20b8ad41bddfdd57ff6347"
+        cases = [
+            ("S1", "{{  md5( db )  }}", "0cc9cd4dd26c5137b675a0d819cb9ab0"),
+            ("S2", "{{  md5( urlencode( db ) )  }}", nested_hash),
+            ("S3", "{{md5( urlencode(db))}}", nested_hash),
+        ]
+        variables = {"db": "a b"}
+        for label, content, expected in cases:
+            for render_path in ("runtime", "hover"):
+                with self.subTest(label=label, render_path=render_path):
+                    result = self.svc.render_string(
+                        content, variables, render_path=render_path,
+                    )
+                    self.assertEqual(expected, result)
+
+    def test_runtime_hover_parity_malformed_nested(self):
+        variables = {"db": "a b"}
+        for label, content, *_ in MALFORMED_NESTED_EXPRESSION_CASES:
+            for render_path in ("runtime", "hover"):
+                with self.subTest(label=label, render_path=render_path):
+                    result = self.svc.render_string(
+                        content, variables, render_path=render_path,
+                    )
+                    self.assertEqual(content, result)
+
+    def test_runtime_hover_parity_invalid_spacing(self):
+        cases = [
+            ("S4", "{{ md5 ( urlencode ( db ) ) }}"),
+            ("S5", "{{md5(urlencode (db))}}"),
+        ]
+        variables = {"db": "a b"}
+        for label, content in cases:
+            for render_path in ("runtime", "hover"):
+                with self.subTest(label=label, render_path=render_path):
+                    result = self.svc.render_string(
+                        content, variables, render_path=render_path,
+                    )
+                    self.assertEqual(content, result)
 
     def test_render_rejects_nested_unknown(self):
         content = "{{md5(bad(db))}}"
@@ -162,6 +203,14 @@ class TestTemplateServiceValidationOutcomes(unittest.TestCase):
         self.assertFalse(result.is_valid)
         self.assertEqual("invalid_syntax", result.code)
 
+    def test_validate_malformed_nested_alignment(self):
+        for label, content, expected_code, expected_fn in MALFORMED_NESTED_EXPRESSION_CASES:
+            with self.subTest(label=label, content=content):
+                result = self.svc.validate_function_expressions(content)
+                self.assertFalse(result.is_valid)
+                self.assertEqual(expected_code, result.code)
+                self.assertEqual(expected_fn, result.function_name)
+
 
 class TestTemplateServiceObservability(unittest.TestCase):
     def setUp(self):
@@ -208,6 +257,59 @@ class TestTemplateServiceObservability(unittest.TestCase):
     def test_render_nested_success_tracks_success_metric(self):
         result = self.svc.render_string(
             "{{md5(urlencode(db))}}", {"db": "a b"}, render_path="hover",
+        )
+        self.assertEqual("4c85f5eb3a20b8ad41bddfdd57ff6347", result)
+        self.metrics.track_template_expression_render_attempt.assert_called_with(
+            render_path="hover", outcome="success",
+        )
+
+    def test_render_malformed_nested_validation_failure_tracks_validation_metrics_on_hover(
+        self,
+    ):
+        content = "{{ md5(urlencode(db) }}"
+        result = self.svc.render_string(content, {"db": "x"}, render_path="hover")
+        self.assertEqual(content, result)
+        self.metrics.track_template_expression_render_attempt.assert_any_call(
+            render_path="hover", outcome="validation_error",
+        )
+        self.assertNotIn(
+            call(render_path="hover", outcome="render_error"),
+            self.metrics.track_template_expression_render_attempt.call_args_list,
+        )
+        self.metrics.track_template_expression_validation_failure.assert_called_with(
+            render_path="hover", code="invalid_argument", function_name="md5",
+        )
+
+    def test_render_invalid_spacing_validation_failure_tracks_validation_metrics_on_hover(
+        self,
+    ):
+        cases = [
+            ("S4", "{{ md5 ( urlencode ( db ) ) }}", "invalid_syntax", None),
+            ("S5", "{{md5(urlencode (db))}}", "invalid_argument", "md5"),
+        ]
+        for label, content, expected_code, expected_fn in cases:
+            with self.subTest(label=label):
+                self.metrics.reset_mock()
+                result = self.svc.render_string(
+                    content, {"db": "x"}, render_path="hover",
+                )
+                self.assertEqual(content, result)
+                self.metrics.track_template_expression_render_attempt.assert_any_call(
+                    render_path="hover", outcome="validation_error",
+                )
+                self.assertNotIn(
+                    call(render_path="hover", outcome="render_error"),
+                    self.metrics.track_template_expression_render_attempt.call_args_list,
+                )
+                self.metrics.track_template_expression_validation_failure.assert_called_with(
+                    render_path="hover",
+                    code=expected_code,
+                    function_name=expected_fn,
+                )
+
+    def test_render_spaced_nested_success_tracks_success_metric_on_hover(self):
+        result = self.svc.render_string(
+            "{{  md5( urlencode( db ) )  }}", {"db": "a b"}, render_path="hover",
         )
         self.assertEqual("4c85f5eb3a20b8ad41bddfdd57ff6347", result)
         self.metrics.track_template_expression_render_attempt.assert_called_with(
