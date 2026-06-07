@@ -158,6 +158,16 @@ class TestTemplateServiceRenderString(unittest.TestCase):
         result = self.svc.render_string(content, {})
         self.assertEqual(content, result)
 
+    def test_render_jinja_filter_form_returns_original_content(self):
+        content = "{{ db|upper }}"
+        result = self.svc.render_string(content, {"db": "secret"})
+        self.assertEqual(content, result)
+
+    def test_render_attribute_access_form_returns_original_content(self):
+        content = "{{ db.__class__ }}"
+        result = self.svc.render_string(content, {"db": "secret"})
+        self.assertEqual(content, result)
+
 
 class TestTemplateServiceParse(unittest.TestCase):
     def setUp(self):
@@ -200,6 +210,16 @@ class TestTemplateServiceValidationOutcomes(unittest.TestCase):
 
     def test_validate_reports_invalid_syntax(self):
         result = self.svc.validate_function_expressions("{{urlencode(db}}")
+        self.assertFalse(result.is_valid)
+        self.assertEqual("invalid_syntax", result.code)
+
+    def test_validate_rejects_jinja_filter_form(self):
+        result = self.svc.validate_function_expressions("{{ db|md5 }}")
+        self.assertFalse(result.is_valid)
+        self.assertEqual("invalid_syntax", result.code)
+
+    def test_validate_rejects_attribute_access_form(self):
+        result = self.svc.validate_function_expressions("{{ db.__class__ }}")
         self.assertFalse(result.is_valid)
         self.assertEqual("invalid_syntax", result.code)
 

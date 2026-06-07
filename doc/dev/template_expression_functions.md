@@ -58,6 +58,30 @@ Main components:
   - Keeps hidden-variable masking for plain variables via `HIDDEN_MASK`.
 - `pypost/core/metrics.py` (`MetricsManager`)
   - Exposes counters for expression render attempts and validation failures.
+- `pypost/core/http_client.py` (`HTTPClient`)
+  - Renders URL, header keys/values, param keys/values, and body via
+    `TemplateService.render_string` before outbound requests.
+- `pypost/core/request_service.py` (`RequestService`)
+  - MCP/history paths render URL and body only (headers/params are not in the MCP model).
+
+### Context coverage matrix
+
+Every variable-enabled surface uses the same validation + render pipeline. Header and param
+name/value columns are separate render/hover surfaces.
+
+| Context | UI surface | Render path | Hover path |
+| --- | --- | --- | --- |
+| Request URL | `RequestWidget.url_input` | `HTTPClient` → `render_string(url)` | `VariableAwareLineEdit` → `VariableHoverHelper` |
+| Header names | `RequestWidget.headers_table` key column | `render_string(k)` per row | Table cell hover |
+| Header values | `RequestWidget.headers_table` value column | `render_string(v)` per row | Table cell hover |
+| Param names | `RequestWidget.params_table` key column | `render_string(k)` per row | Table cell hover |
+| Param values | `RequestWidget.params_table` value column | `render_string(v)` per row | Table cell hover |
+| Request body | `RequestWidget.body_edit` | `render_string(body)` | `CodeEditor` hover mixin |
+| Hover preview | All editors above | N/A (preview only) | `VariableHoverHelper.resolve_text` |
+
+UI propagation: `env_presenter.py` → `tabs_presenter.py` → `RequestWidget` supplies variable
+maps and hidden keys to editors. Expression parsing happens only in core modules, not in
+presenters.
 
 ## Usage/API
 
@@ -111,6 +135,51 @@ Invalid examples (kept as original text due fallback behavior):
 - Literal argument: `{{urlencode('db')}}`
 - Literal inside nested call: `{{md5(urlencode('db'))}}`
 - Malformed signature: `{{urlencode(db}}`
+
+### Invalid expression fallback
+
+On validation or render failure, `render_string` returns the **original field content**
+unchanged. This is intentional backward-compatible behavior — one bad expression must not
+break unrelated fields or plain `{{var}}` placeholders.
+
+| Path | User-visible outcome | Diagnostics |
+| --- | --- | --- |
+| Runtime (send) | Entire field kept as typed literal | `INFO` validation + `WARNING` fallback logs;
+  `validation_error` metric |
+| Hover preview | Tooltip shows original `{{...}}` token | Same render path with `render_path="hover"` |
+| Render exception | Original content returned | `WARNING` fallback log; `render_error` metric (non-`ValueError` only) |
+
+There is no inline error UI in PYPOST-450 scope. Structured codes appear in logs and
+Prometheus labels via `TemplateService._VALIDATION_MESSAGES` (logging only).
+
+Flow:
+
+```text
+validate_content → invalid? → log/metrics → raise ValueError inside try
+render_with_jinja → exception? → log/metrics → except handler
+except → return original content string unchanged
+```
+
+## Security
+
+Function execution is restricted to the catalog in `FunctionRegistry`. Enforcement points:
+
+1. `FunctionExpressionResolver` — grammar and catalog membership before render.
+2. `FunctionRegistry.register_into_env` — only catalog keys bound to `env.globals`.
+3. Jinja `Environment` — not a `SandboxedEnvironment`; security relies on allow-list +
+   pre-render validation, not template sandboxing.
+
+Rejected non-catalog Jinja constructs (original content returned):
+
+- Jinja filters: `{{ db|md5 }}`
+- Attribute access: `{{ db.__class__ }}`
+
+Negative tests in `tests/test_template_service.py`:
+
+- `test_validate_rejects_jinja_filter_form`
+- `test_validate_rejects_attribute_access_form`
+- `test_render_jinja_filter_form_returns_original_content`
+- `test_render_attribute_access_form_returns_original_content`
 
 ## Nested Function Call Policy (PYPOST-453)
 
@@ -184,22 +253,45 @@ Table-cell tooltips delegate through `VariableAwareTableWidget` →
 render_path="hover")`. No separate table parsing path; hover-parity at `TemplateService`
 satisfies table-cell equivalence (PYPOST-453 precedent).
 
-### Where tests live
+### Test coverage
 
 **Resolver validation** (`tests/test_function_expression_resolver.py`):
 
+- Catalog, nesting, multi-arg rejection, unknown functions
 - `test_malformed_nested_expressions` — M1–M4 matrix
 - `test_nested_spacing_variants` — S1–S5 matrix
 
-**Render and parity** (`tests/test_template_service.py`):
+**Render, parity, security, observability** (`tests/test_template_service.py`):
 
-- `test_runtime_hover_parity_valid_spaced_nested` — S1–S3
-- `test_runtime_hover_parity_malformed_nested` — M1–M4 fallback
-- `test_runtime_hover_parity_invalid_spacing` — S4–S5 fallback
+- Catalog functions, nested chains, fallback on invalid forms
+- Jinja filter/attribute rejection (security negatives)
+- `test_runtime_hover_parity_*` — valid/malformed/spacing parity (runtime vs hover)
 - `test_validate_malformed_nested_alignment` — resolver ↔ delegate codes for M1–M4
+- Metrics tests for `success`, `validation_error`, and hover-path labels
+
+**HTTPClient integration** (`tests/test_http_client.py`, class
+`TestHTTPClientFunctionExpressions`):
+
+| Test | Surface | What it proves |
+| --- | --- | --- |
+| `test_function_expression_substituted_in_url` | URL | `urlencode` in outbound URL |
+| `test_function_expression_substituted_in_header_value` | Header value | `md5` in header |
+| `test_function_expression_substituted_in_param_key_and_value` | Param key + value | `urlencode` key, `base64` value |
+| `test_invalid_function_expression_passthrough_in_params` | Param key + value | Invalid expressions kept literal |
+
+**Optional HTTPClient gaps** (same pipeline, thinner end-to-end coverage):
+
+- Request body function expression through `HTTPClient.send_request`
+- Header name (key column) function expression through HTTPClient
+
+Body and header-name surfaces are covered at `TemplateService` and hover/widget layers.
+
+**Hover widgets** (`tests/test_variable_hover.py`): URL, body, and table-cell tooltips.
 
 Shared case data: `MALFORMED_NESTED_EXPRESSION_CASES` in
 `tests/test_function_expression_resolver.py` (imported by `test_template_service.py`).
+
+Full PYPOST-450 suite (STEP 6, 2026-06-06): 109 passed, 39 subtests across the files above.
 
 ### PYPOST-461 boundary
 
@@ -262,6 +354,26 @@ The following are intentionally unchanged by PYPOST-459 (parity contract):
 - Token counting regex pattern: `\{\{\s*(.*?)\s*\}\}`
 - `FunctionExpressionResolver` contract
 
+## Known gaps and follow-ups
+
+PYPOST-450 is functionally complete. Remaining items are maintainability and optional
+hardening — not release blockers.
+
+| Item | Jira | Notes |
+| --- | --- | --- |
+| Expression/template caching | [PYPOST-455](https://pypost.atlassian.net/browse/PYPOST-455) | No cache today; revisit after usage metrics |
+| Registry vs `env.globals` parity test | [PYPOST-457](https://pypost.atlassian.net/browse/PYPOST-457) | Explicit test not yet added |
+| Shared tokenization dedup | [PYPOST-460](https://pypost.atlassian.net/browse/PYPOST-460) | Counting and validation each scan `{{...}}` |
+| Empty-arg / multi-placeholder / closing-paren edge cases | [PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461) | Boundary with PYPOST-454 M1–M4 matrix |
+| Hover regex vs resolver identifier rules | — | Hover `VARIABLE_PATTERN` vs resolver `_IDENTIFIER_RE` mismatch for digit-leading names |
+| HTTPClient body / header-name integration | — | Optional; shared `render_string` path already proven |
+| Table tooltip malformed/spacing variants | — | Hover pipeline proven at `TemplateService`; table tests cover valid function cells only |
+| Class-level hover `TemplateService` | — | `VariableHoverHelper` uses class-level instance via `set_metrics()` |
+
+Completed follow-ups referenced in this doc: PYPOST-451 (registry), PYPOST-452 (resolver),
+PYPOST-453 (nested policy), PYPOST-454 (edge-case tests), PYPOST-456 (doc polish),
+PYPOST-459 (orchestration stage helpers in `TemplateService`).
+
 ## Troubleshooting
 
 Expression does not render and stays unchanged:
@@ -275,6 +387,15 @@ Hover tooltip differs from expectation:
 
 - Ensure `RequestWidget` has called `VariableHoverHelper.set_metrics(...)` and variables are set.
 - Plain hidden variables are masked; function-derived outputs are currently shown as resolved text.
+- Digit-leading plain variables (for example `{{0db}}`) may resolve in hover via the fast
+  lookup path but fail resolver validation at runtime — see Known gaps above.
+
+Field unchanged after send but expression looks valid:
+
+- Confirm the function name is in the catalog (`urlencode`, `md5`, `base64`).
+- Check logs for `validation_error` with `code` and `function_name` labels.
+- Multi-arg calls (`{{urlencode(a, b)}}`) and literal arguments (`{{urlencode('db')}}`)
+  are rejected by design.
 
 Need to inspect failures in detail:
 

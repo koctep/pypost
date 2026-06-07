@@ -105,6 +105,60 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         self.assertIn("conn refused", ctx.exception.detail)
 
 
+class TestHTTPClientFunctionExpressions(unittest.TestCase):
+    """Integration: function expressions through HTTPClient → TemplateService render path."""
+
+    def setUp(self):
+        self.client = HTTPClient(metrics=MagicMock(), template_service=TemplateService())
+        self.mock_session = MagicMock()
+        self.client.session = self.mock_session
+        self.mock_session.request.return_value = _make_response(status=200)
+        self.variables = {"db": "a b/c", "host": "api.example"}
+
+    def test_function_expression_substituted_in_url(self):
+        req = RequestData(method="GET", url="https://{{host}}/{{urlencode(db)}}")
+        self.client.send_request(req, variables=self.variables)
+        call_kwargs = self.mock_session.request.call_args[1]
+        self.assertEqual("https://api.example/a%20b%2Fc", call_kwargs["url"])
+
+    def test_function_expression_substituted_in_header_value(self):
+        req = RequestData(
+            method="GET",
+            url="http://x",
+            headers={"Authorization": "Bearer {{md5(db)}}"},
+        )
+        self.client.send_request(req, variables=self.variables)
+        headers = self.mock_session.request.call_args[1]["headers"]
+        self.assertEqual(
+            "Bearer 22ce5bc570ab75c20edf638fd60f61b9",
+            headers["Authorization"],
+        )
+
+    def test_function_expression_substituted_in_param_key_and_value(self):
+        req = RequestData(
+            method="GET",
+            url="http://x",
+            params={
+                "{{urlencode(db)}}": "{{base64(db)}}",
+            },
+        )
+        self.client.send_request(req, variables=self.variables)
+        params = self.mock_session.request.call_args[1]["params"]
+        self.assertEqual({"a%20b%2Fc": "YSBiL2M="}, params)
+
+    def test_invalid_function_expression_passthrough_in_params(self):
+        literal_key = "{{not_allowed(db)}}"
+        literal_val = "{{urlencode(db, host)}}"
+        req = RequestData(
+            method="GET",
+            url="http://x",
+            params={literal_key: literal_val},
+        )
+        self.client.send_request(req, variables=self.variables)
+        params = self.mock_session.request.call_args[1]["params"]
+        self.assertEqual({literal_key: literal_val}, params)
+
+
 class TestHTTPClientInjection(unittest.TestCase):
     def test_injected_template_service_is_used_not_default(self):
         """A TemplateService passed at construction is the one called during send_request."""

@@ -4,304 +4,374 @@
 
 ### Current codebase findings
 
-1. Request rendering already goes through `TemplateService.render_string()` that uses
-   Jinja2 (`pypost/core/template_service.py`).
-2. Runtime request execution depends on rendered values from `TemplateService` in both
-   `HTTPClient` and MCP execution paths (`pypost/core/http_client.py`,
-   `pypost/core/request_service.py`).
-3. Hover preview for editor widgets currently supports only plain variable pattern
-   `{{name}}` via regex in `VariableHoverHelper` (`pypost/ui/widgets/mixins.py`).
-4. Environment-to-editor propagation already exists:
-   `EnvPresenter -> TabsPresenter -> RequestWidget` with `set_variables(...)` and hidden-key
-   propagation (`pypost/ui/presenters/env_presenter.py`,
-   `pypost/ui/presenters/tabs_presenter.py`, `pypost/ui/widgets/request_editor.py`).
-5. Existing requirements for this task fix canonical UX syntax (functions only inside `{{...}}`):
-   function expression inside braces, e.g. `{{urlencode(db)}}`
+1. **Runtime rendering gateway** — `TemplateService.render_string()` in
+   `pypost/core/template_service.py` is the single entry point for substituting `{{...}}`
+   placeholders. `HTTPClient._prepare_request_kwargs()` renders URL, header keys/values,
+   param keys/values, and body through this API (`pypost/core/http_client.py`). MCP/history
+   paths use the same service via `RequestService` (`pypost/core/request_service.py`).
+
+2. **Dedicated expression modules (implemented)** — Allow-list ownership lives in
+   `FunctionRegistry` (`pypost/core/function_registry.py`) with catalog entries
+   `urlencode`, `md5`, and `base64`. Syntax validation lives in
+   `FunctionExpressionResolver` (`pypost/core/function_expression_resolver.py`).
+   `TemplateService` orchestrates validation, Jinja2 render, observability, and fallback.
+   PYPOST-451/452 originally planned this split; the modules now exist, though
+   `TemplateService` still combines orchestration concerns (tracked in PYPOST-459).
+
+3. **Hover preview** — `VariableHoverHelper` in `pypost/ui/widgets/mixins.py` resolves
+   function expressions by delegating to `TemplateService.render_string(...,
+   render_path="hover")`, giving runtime/hover parity. Plain variables still use direct lookup
+   with hidden-key masking (`HIDDEN_MASK`). Widgets in `request_editor.py` (URL line edit,
+   params/headers tables, body editor) propagate variables via `set_variables()` /
+   `set_hidden_keys()` from the env presenter chain.
+
+4. **Canonical UX syntax** — Function calls appear only inside `{{...}}`, e.g.
+   `{{urlencode(db)}}` or chained `{{md5(urlencode(db))}}`. Requirements forbid
+   multi-argument comma-separated calls and arbitrary user-defined code
    (`ai-tasks/PYPOST-450/10-requirements.md`).
+
+5. **Invalid-expression behavior (locked)** — On validation or render failure,
+   `render_string` logs observability events and **returns the original content** unchanged.
+   This preserves backward compatibility for existing variable workflows and prevents one bad
+   field from breaking unrelated request parts.
 
 ### External security and design references
 
-- OWASP classifies direct dynamic code evaluation (`eval`) as injection risk; user input must
-  not be executed as arbitrary code.
-- CWE-95 documents risks of improper neutralization in dynamically evaluated code:
+- **CWE-95 (Eval Injection)** — Dynamic evaluation of untrusted input without neutralization
+  enables arbitrary code execution. Mitigations emphasize canonicalization before validation
+  and avoiding `eval` on user strings.
   [CWE-95](https://cwe.mitre.org/data/definitions/95.html)
-- Safe expression libraries based on restricted AST exist, but for this scope we need only a
-  narrow controlled function catalog and should keep expression grammar intentionally small:
-  [simpleeval](https://github.com/danthedeckie/simpleeval),
-  [asteval](https://lmfit.github.io/asteval/)
+
+- **Python `eval`/`exec` warnings (CPython 3.13+)** — Official docs state that calling
+  `eval`/`exec` with untrusted input leads to security vulnerabilities; overriding
+  `__builtins__` is **not** a security mechanism because evaluated code can still reach
+  builtins. See
+  [CPython GH-145773](https://github.com/python/cpython/commit/3b5c4a2).
+
+- **Deny-list vs allow-list** — Restricted expression engines (e.g. `simpleeval`) moved
+  toward explicit allow-lists: only declared node types, functions, and operators run; all
+  other constructs fail closed.
+  [simpleeval PR #81](https://github.com/danthedeckie/simpleeval/pull/81),
+  [AST allow-list overview](https://medium.com/@laurentkubaski/using-an-ast-to-make-eval-secure-211545f53e6c)
+
+- **Design choice for pypost** — Requirements need only three string transforms inside
+  `{{...}}`. A **custom grammar + catalog registry + Jinja globals binding** is narrower
+  than a general AST evaluator and avoids `eval`, `exec`, and user-supplied callables.
+  Libraries like [simpleeval](https://github.com/danthedeckie/simpleeval) or
+  [asteval](https://lmfit.github.io/asteval/) remain reference material, not dependencies.
 
 ## Implementation Plan
 
-1. Introduce a dedicated expression layer for template function calls in canonical form
-   `{{func(arg)}}`.
-2. Add a function catalog with explicit allow-list entries:
-   `urlencode`, `md5`, `base64`.
-3. Integrate catalog into `TemplateService` as Jinja2 filters/functions, preserving existing
-   `{{var}}` behavior and backward compatibility.
-4. Extend hover resolution so function expressions render preview values consistently with
-   runtime rendering and hidden-key masking.
-5. Keep security boundary strict: no `eval`, no arbitrary function names, no userspace Python.
-6. Add architecture-level interfaces to isolate parser/registry from UI and request execution.
-7. Add a context coverage matrix and acceptance checks for each variable-enabled surface.
-8. Enforce canonical syntax: function calls only inside `{{...}}`.
-9. Define formal argument grammar and error model for deterministic validation.
+1. **Keep `TemplateService` as the rendering gateway** for all variable-enabled surfaces.
+2. **Validate before render** — Scan every `{{...}}` token with `FunctionExpressionResolver`;
+   reject unknown functions, multi-arg calls, and non-canonical inner forms.
+3. **Execute only via catalog** — `FunctionRegistry.register_into_env()` binds approved
+   names to implementations on the Jinja2 `Environment`; no other user-callable globals.
+4. **Support nested allow-listed calls** — Single-argument recursion per PYPOST-453 policy
+   (`NESTED_FUNCTION_CALLS_ALLOWED = True`); no fixed depth cap while each level stays
+   catalog-valid.
+5. **Reject multi-arg calls** — Top-level comma at parenthesis depth 0 yields
+   `invalid_arity`.
+6. **Fallback on invalid expressions** — Return original field content; emit structured
+   validation observability for diagnostics without breaking the request editor.
+7. **Hover parity** — Route function-expression preview through the same `render_string`
+   path with `render_path="hover"`; keep plain-variable hidden-key masking unchanged.
+8. **Context matrix acceptance** — Positive/negative checks for every enumerated context
+   (URL, header name/value, param name/value, body, hover preview).
+9. **Documentation (DoD #5)** — Catalog syntax, examples (`urlencode`, `md5`, `base64`),
+   context list, and edge cases are documented in
+   [`doc/dev/template_expression_functions.md`](../../doc/dev/template_expression_functions.md)
+   (STEP 7). PYPOST-456 covers optional polish only.
+10. **Follow-up hardening (out of PYPOST-450 scope)** — Orchestration refactor (PYPOST-459),
+    shared tokenization (PYPOST-460), explicit registry/globals parity test (PYPOST-457).
 
 ## Architecture
 
-### Module Diagram
+### Module diagram
 
 ```mermaid
 flowchart TD
-    ENV[Environment Variables] --> EP[EnvPresenter]
-    EP --> TP[TabsPresenter]
-    TP --> RW[RequestWidget]
-    RW --> VH[VariableHoverHelper]
+    subgraph UI["UI layer"]
+        EP[EnvPresenter]
+        TP[TabsPresenter]
+        RW[RequestWidget]
+        VA[VariableAware widgets]
+        VH[VariableHoverHelper]
+    end
 
-    ENV --> TS[TemplateService]
-    FR[FunctionRegistry AllowList] --> TS
-    FE[FunctionExpressionResolver] --> TS
-    TS --> HC[HTTPClient]
-    TS --> RS[RequestService MCP/History]
+    subgraph Core["Core expression layer"]
+        TS[TemplateService]
+        FR[FunctionRegistry]
+        FE[FunctionExpressionResolver]
+        VT[ValidationResult types]
+    end
 
-    VH --> FE
+    subgraph Runtime["Request execution"]
+        HC[HTTPClient]
+        RS[RequestService]
+    end
+
+    ENV[Environment variables] --> EP
+    EP --> TP --> RW --> VA
+    VA --> VH
+    ENV --> TS
+    FR --> TS
+    FE --> TS
+    VT --> FE
+    FR --> FE
+    VH -->|render_path=hover| TS
+    TS --> HC
+    TS --> RS
 ```
 
-### Modules and Responsibilities
+### Modules and responsibilities
 
-1. **`TemplateService`** (`pypost/core/template_service.py`)
-   - Remains the single rendering entry point for request URL/headers/params/body.
-   - Hosts integration with function expression resolution for `{{...}}` placeholders.
-   - Ensures backward-compatible rendering for plain variables.
+| Module | Path | Responsibility |
+| --- | --- | --- |
+| `TemplateService` | `pypost/core/template_service.py` | Orchestrates placeholder counting, pre-render validation, Jinja2 render, metrics/logging, and backward-compatible fallback. Public API: `render_string`, `validate_function_expressions`. |
+| `FunctionRegistry` | `pypost/core/function_registry.py` | Single source of truth for allowed function names and implementations (`urlencode`, `md5`, `base64`). Exposes `is_allowed`, `get`, `register_into_env`. |
+| `FunctionExpressionResolver` | `pypost/core/function_expression_resolver.py` | Parses/validates inner `{{...}}` text: plain identifiers, single-arg catalog calls, nested catalog calls. No execution. |
+| `ValidationResult` | `pypost/core/template_expression_types.py` | Typed validation outcomes (`code`, optional `function_name`). |
+| `VariableHoverHelper` | `pypost/ui/widgets/mixins.py` | Detects tokens under cursor; resolves plain variables with masking; resolves function expressions via `TemplateService`. |
+| UI propagation | `env_presenter.py`, `tabs_presenter.py`, `request_editor.py` | Supplies variable map and hidden keys to all editors; no expression parsing here. |
+| `HTTPClient` / `RequestService` | `pypost/core/http_client.py`, `request_service.py` | Consumers of rendered strings; depend on `TemplateService` only. |
 
-2. **`FunctionRegistry`** (new core module)
-   - Declares the approved function catalog and maps names to implementations.
-   - Initial catalog: `urlencode`, `md5`, `base64`.
-   - Rejects unknown function names deterministically.
+**Current vs planned:** Core split (`FunctionRegistry`, `FunctionExpressionResolver`) is
+implemented. Remaining tech debt is orchestration density inside `TemplateService` and
+class-level hover service instantiation (PYPOST-459, hover DI polish).
 
-3. **`FunctionExpressionResolver`** (new core module)
-   - Parses allowed expression subset inside `{{...}}`.
-   - Resolves variable references and validates function call signatures.
-   - Delegates execution only to `FunctionRegistry`; never executes arbitrary code.
-
-4. **`VariableHoverHelper`** (`pypost/ui/widgets/mixins.py`)
-   - Extends from variable-only hover resolution to function-expression-aware previews.
-   - Reuses the same resolver path (or equivalent contract) as runtime template rendering.
-   - Preserves hidden-key masking behavior for direct variable values.
-
-5. **UI propagation chain**
-   (`pypost/ui/presenters/env_presenter.py`,
-   `pypost/ui/presenters/tabs_presenter.py`,
-   `pypost/ui/widgets/request_editor.py`)
-   - No structural redesign needed.
-   - Continues supplying environment variables to all request editors.
-   - Provides stable input context for function argument resolution.
-
-### Interaction Scheme
+### Interaction scheme
 
 #### Runtime request rendering
 
-1. User enters expression, e.g. `"/{{host}}/{{urlencode(db)}}"`.
-2. `RequestService`/`HTTPClient` calls `TemplateService.render_string(...)`.
-3. `TemplateService` resolves variable and function expression via allow-listed catalog.
-4. Rendered value is passed to transport layer unchanged.
+1. User enters expressions in a request field, e.g. `"/{{host}}/{{urlencode(db)}}"`.
+2. On send, `HTTPClient` (or MCP path) calls `TemplateService.render_string(field, variables)`.
+3. Resolver validates every `{{...}}` token against catalog and grammar rules.
+4. On success, Jinja2 renders with variables plus catalog globals from `FunctionRegistry`.
+5. Rendered strings become the outbound URL, headers, params, and body.
 
-#### Canonical syntax enforcement
-
-1. Expression parser accepts function calls only inside braces: `{{func(arg)}}`.
-2. Alternative forms (for example Jinja filter form or free-form calls outside braces) are
-   rejected as invalid user input.
-3. Validation failures produce explicit, non-executable error paths for UI/runtime handling.
+**HTTP vs MCP render scope:** `HTTPClient` renders all six field surfaces (URL, header/param
+keys and values, body). `RequestService` MCP/history paths render URL and body only; headers
+and params are not part of the MCP request model.
 
 #### Hover preview rendering
 
-1. User hovers expression in editor field.
-2. `VariableHoverHelper` detects expression token under cursor.
-3. Helper resolves expression using the same function catalog rules.
-4. Tooltip shows resolved value or controlled fallback message.
+1. User hovers a `{{...}}` token in URL, params table, headers table, or body editor.
+2. `VariableHoverHelper.find_expression_at_index()` locates the token.
+3. Plain `{{var}}` → direct lookup with hidden-key mask when applicable.
+4. Function form → `TemplateService.render_string(token, variables, render_path="hover")`.
+5. Tooltip shows resolved value, or original token text when validation/render fails
+   (fallback parity with runtime).
 
-### Dependencies Between Modules
+#### Invalid-expression fallback
 
-1. `FunctionRegistry` is a foundational dependency for expression support.
-2. `FunctionExpressionResolver` depends on registry and variables context.
-3. `TemplateService` depends on resolver/registry contracts.
-4. Runtime modules (`HTTPClient`, `RequestService`) depend on `TemplateService` only.
-5. Hover module depends on resolver contract for UX parity with runtime rendering.
+```text
+validate_content → invalid? → log/metrics → raise ValueError inside try
+render_with_jinja → exception? → log/metrics
+finally: return original content string unchanged
+```
 
-### Selected Architectural Patterns and Justification
+Predictable feedback: the field keeps the user's literal expression; observability records
+`validation_error` or `render_error`. Unrelated fields and plain `{{var}}` behavior stay
+stable.
 
-1. **Allow-list registry pattern**
-   - Explicitly controls executable functions.
-   - Matches security requirement to avoid arbitrary userspace execution.
+**User-visible feedback:** Hover tooltips show the resolved value on success, or the original
+`{{...}}` token when validation/render fails (same text the user typed). At request send,
+invalid expressions leave the **entire field** unchanged rather than partially substituting.
+Structured validation codes appear in logs/metrics (`TemplateService._VALIDATION_MESSAGES`);
+there is no separate inline error UI in PYPOST-450 scope.
 
-2. **Single rendering gateway**
-   - Keep `TemplateService` as canonical render boundary.
-   - Prevents duplicated parsing logic across transport paths.
+### Expression grammar and nesting policy
 
-3. **Shared resolver contract**
-   - Aligns runtime and hover behavior.
-   - Reduces UX drift between preview and final rendered request.
+**Allowed forms inside `{{...}}`:**
 
-4. **Additive extension**
-   - Extends current variable template behavior without breaking existing expressions.
-   - Supports incremental rollout and safer regression testing.
+| Form | Example | Notes |
+| --- | --- | --- |
+| Plain variable | `{{db}}` | Identifier `[a-zA-Z_][a-zA-Z0-9_]*`; unchanged from pre-feature behavior. |
+| Single-arg function | `{{urlencode(db)}}` | `functionName` must be in catalog; one argument only. |
+| Nested function chain | `{{md5(urlencode(db))}}` | **Allowed** (PYPOST-453). Argument may be identifier or nested single-arg catalog call; validated recursively. No fixed depth limit. |
+| Spaced variants | `{{ md5( db ) }}` | Inner text is trimmed per token; outer `{{` / `}}` required. |
 
-### Main Interfaces / APIs
+**Rejected forms:**
 
-1. `TemplateService.render_string(content: str, variables: dict) -> str`
-   - Existing API; behavior extended for function expressions inside `{{...}}`.
+| Form | Validation outcome | Runtime/hover behavior |
+| --- | --- | --- |
+| Unknown function | `unknown_function`, `function_name` set | Original content returned |
+| Multi-arg call (`{{md5(a,b)}}`) | `invalid_arity` | Original content returned |
+| Malformed signature / non-identifier arg | `invalid_syntax` or `invalid_argument` | Original content returned |
+| Unbalanced nested parens | Typically `invalid_argument` on outer function | Original content returned |
+| Calls outside `{{...}}` | Not part of placeholder grammar; Jinja may treat as literal text | Unchanged legacy behavior |
+| Jinja filters / arbitrary Python | Not in catalog; resolver rejects non-canonical inner calls | Original content returned |
 
-2. `FunctionRegistry.get(name: str) -> Callable`
-   - Returns implementation for approved function.
-   - Raises controlled error for unknown names.
+**Multi-arg rejection:** `_extract_single_argument()` scans for `,` at parenthesis depth 0;
+any top-level comma rejects the call as multi-argument (out of scope per requirements).
 
-3. `FunctionExpressionResolver.resolve(expr: str, variables: dict[str, str]) -> str`
-   - Resolves allowed expression forms (variables + allow-listed function calls).
+### Context coverage matrix
 
-4. `VariableHoverHelper.resolve_text(text: str, variables: Dict[str, str], hidden_keys=...)`
-   - Extended to resolve function expressions in addition to variable placeholders.
+Every row maps a requirements expression context to the same core pipeline. Requirements
+list six context groups; this matrix enumerates seven render/hover surfaces (header/param
+name and value columns separately).
 
-5. `FunctionExpressionResolver.validate(expr: str) -> ValidationResult`
-   - Validates syntax and argument contract before resolution.
+| Context | UI surface | Render path | Hover path | Owner modules |
+| --- | --- | --- | --- | --- |
+| Request URL | `RequestWidget.url_input` | `HTTPClient` → `render_string(url)` | `VariableAwareLineEdit` → `VariableHoverHelper` | `request_editor.py`, `http_client.py`, `template_service.py`, `mixins.py` |
+| Header names | `RequestWidget.headers_table` key column | `render_string(k)` per header row | Table cell hover via `VariableAwareTableWidget` | same |
+| Header values | `RequestWidget.headers_table` value column | `render_string(v)` per header row | Table cell hover | same |
+| Param names | `RequestWidget.params_table` key column | `render_string(k)` per param row | Table cell hover | same |
+| Param values | `RequestWidget.params_table` value column | `render_string(v)` per param row | Table cell hover | same |
+| Request body | `RequestWidget.body_edit` | `render_string(body)` | `CodeEditor` hover mixin | same |
+| Variable hover preview | All supported editors above | N/A (preview only) | `VariableHoverHelper.resolve_text` | `mixins.py`, `variable_aware_widgets.py` |
 
-### Context Coverage Matrix
+**Acceptance policy per context:**
 
-- Context: request URL field
-  - Existing variable path: `RequestWidget.url_input` + `TemplateService`
-  - Planned function path: canonical `{{...}}` parse in `TemplateService` + resolver
-  - Owner modules: `pypost/ui/widgets/request_editor.py`,
-    `pypost/core/template_service.py`
-- Context: query params table
-  - Existing variable path: `RequestWidget.params_table` + `TemplateService`
-  - Planned function path: same render pipeline with function-placeholder support
-  - Owner modules: `pypost/ui/widgets/request_editor.py`,
-    `pypost/core/template_service.py`
-- Context: headers table
-  - Existing variable path: `RequestWidget.headers_table` + `TemplateService`
-  - Planned function path: same render pipeline with function-placeholder support
-  - Owner modules: `pypost/ui/widgets/request_editor.py`,
-    `pypost/core/template_service.py`
-- Context: request body editor
-  - Existing variable path: `RequestWidget.body_edit` + `TemplateService`
-  - Planned function path: same render pipeline with function-placeholder support
-  - Owner modules: `pypost/ui/widgets/request_editor.py`,
-    `pypost/core/template_service.py`
-- Context: hover preview in URL/params/headers/body
-  - Existing variable path: regex resolve in `VariableHoverHelper`
-  - Planned function path: resolver-backed preview with same catalog
-  - Owner module: `pypost/ui/widgets/mixins.py`
+- Positive: `{{urlencode(db)}}`, `{{md5(db)}}`, `{{base64(db)}}`, nested
+  `{{md5(urlencode(db))}}`.
+- Negative: unknown function, multi-arg, malformed nesting — field content unchanged;
+  validation codes recorded where applicable.
 
-Acceptance policy for matrix:
+### Dependencies between modules
 
-- Each context must pass positive tests for `{{urlencode(db)}}`, `{{md5(db)}}`,
-  `{{base64(db)}}`.
-- Each context must pass negative tests for unsupported syntax and unknown function names.
+```text
+FunctionRegistry          (no upstream deps)
+    ↓
+FunctionExpressionResolver
+    ↓
+TemplateService           ← MetricsManager (optional)
+    ↓
+HTTPClient, RequestService, VariableHoverHelper (hover-only)
 
-### Security Boundaries
+UI presenters → RequestWidget → variable maps → hover/render inputs
+```
 
-- Explicitly prohibited: evaluating userspace expressions with Python `eval`/`exec`.
-- Function execution path is only through `FunctionRegistry` allow-list.
-- Unknown functions or invalid argument arity produce controlled validation outcomes.
-- Scope is limited to initial catalog (`urlencode`, `md5`, `base64`) from requirements.
-- Jinja environment must expose only approved function call surface and no dynamic user-bound
-  callables outside the registry.
-- Attribute traversal and non-catalog invocation chains are rejected by parser validation.
-- Security test set must include negative cases for:
-  - unknown function names;
-  - malformed argument lists;
-  - nested unsafe constructs;
-  - attempts to execute arbitrary Python snippets.
+Runtime modules must not import resolver/registry directly; they call `TemplateService` only.
 
-### Function Argument Contract
+### Architectural patterns and justification
 
-- Canonical grammar (current scope):
-  - `{{identifier}}` for plain variable;
-  - `{{functionName(identifier)}}` for one-argument function calls.
-- `identifier` format: `[a-zA-Z_][a-zA-Z0-9_]*`.
-- `functionName` must exist in `FunctionRegistry`.
-- Current catalog arity:
-  - `urlencode`: 1 argument;
-  - `md5`: 1 argument;
-  - `base64`: 1 argument.
-- Nested allow-listed function calls **are supported**; a function's single argument may be a
-  plain identifier or another allow-listed single-argument call, validated recursively with
-  the same catalog and arity rules at each level. No fixed depth limit. (Policy aligned in
-  PYPOST-453.)
-- Multi-argument calls are not in scope and must fail validation with explicit error output.
+| Pattern | Application | Why |
+| --- | --- | --- |
+| Allow-list registry | `FunctionRegistry` + resolver `is_allowed` checks | Meets security NFR: no arbitrary user-defined execution. |
+| Gateway / façade | `TemplateService.render_string` | One validation+render contract for HTTP, MCP, hover, masking. |
+| Fail-open field fallback | Return original content on error | Backward compatibility; invalid call does not break unrelated fields. |
+| Validate-then-execute | Resolver before Jinja render | Prevents non-catalog constructs from reaching template engine. |
+| Shared hover/runtime path | `render_path="hover"` | UX consistency between tooltip and executed request. |
+
+### Main interfaces / APIs
+
+```python
+# pypost/core/template_service.py
+def render_string(
+    content: str,
+    variables: dict[str, Any],
+    render_path: str = "runtime",
+) -> str: ...
+
+def validate_function_expressions(content: str) -> ValidationResult: ...
+```
+
+```python
+# pypost/core/function_registry.py
+class FunctionRegistry:
+    def allowed_names(self) -> frozenset[str]: ...
+    def is_allowed(self, name: str) -> bool: ...
+    def get(self, name: str) -> Callable[..., Any] | None: ...
+    def register_into_env(self, env: Environment) -> None: ...
+```
+
+```python
+# pypost/core/function_expression_resolver.py
+class FunctionExpressionResolver:
+    def validate_content(self, content: str) -> ValidationResult: ...
+```
+
+```python
+# pypost/ui/widgets/mixins.py — signatures match implementation (typing module)
+class VariableHoverHelper:
+    @staticmethod
+    def resolve_text(
+        text: str,
+        variables: Dict[str, str],
+        hidden_keys: Optional[Set[str]] = None,
+    ) -> str: ...
+
+    @staticmethod
+    def find_expression_at_index(text: str, index: int) -> Optional[str]: ...
+```
+
+**Validation codes** (`ValidationResult.code`):
+
+| Code | Meaning |
+| --- | --- |
+| `unknown_function` | Name not in catalog |
+| `invalid_arity` | More than one top-level argument |
+| `invalid_argument` | Bad nested arg or recursive validation failure |
+| `invalid_syntax` | Inner text is neither identifier nor parseable single-arg call |
+
+User-visible messages are mapped in `TemplateService._VALIDATION_MESSAGES` for logging;
+fields still fall back to original content at render time.
+
+### Security boundaries
+
+- **Prohibited:** `eval`, `exec`, `compile` on user template text; dynamic import of user
+  modules; exposing non-catalog callables on the Jinja environment.
+- **Enforcement points:**
+  1. `FunctionExpressionResolver` — grammar and catalog membership before render.
+  2. `FunctionRegistry.register_into_env` — only catalog keys bound to `env.globals`.
+  3. Jinja `Environment` — Catalog callables bound via `FunctionRegistry.register_into_env`
+     only; resolver rejects non-canonical inner expressions before `from_string` / `render`.
+     This is not `SandboxedEnvironment`; security relies on allow-list + grammar validation,
+     not template sandboxing.
+- **Negative test themes:** unknown functions, multi-arg attempts, nested unsafe constructs,
+  Jinja injection snippets that are not canonical function-call forms.
+- **Masking:** Direct hidden variables remain masked in plain-variable hover; function outputs
+  show resolved values (derived-output redaction is a separate follow-up if needed).
+
+### Documentation
+
+Developer documentation for DoD #5 lives in
+[`doc/dev/template_expression_functions.md`](../../doc/dev/template_expression_functions.md).
+It covers:
+
+- Canonical `{{...}}` syntax and the initial catalog (`urlencode`, `md5`, `base64`)
+- Nested-call policy (`NESTED_FUNCTION_CALLS_ALLOWED`) and rejected forms
+- Context list aligned with the coverage matrix above
+- Acceptance-test matrices (malformed nesting, spacing variants, hover/runtime parity)
+
+PYPOST-456 tracks optional polish beyond this document.
 
 ## Q&A
 
-- Q: Why not use generic Python expression evaluation for flexibility?
-  - A: Security posture and product scope require strict control. `eval`-style execution is
-    an injection risk and violates agreed requirements.
-- Q: How do we keep UX consistent between preview and real requests?
-  - A: Use one resolver contract shared by `TemplateService` (runtime) and hover helper
-    (preview).
-- Q: Can users call any Python function if syntax looks valid?
-  - A: No. Only functions in the application-managed allow-list are executable.
+- Q: Why not use Python `eval` or a general expression library?
+  - A: CWE-95 and CPython guidance treat dynamic evaluation of user strings as high risk.
+    Product scope needs only three catalog functions with a fixed grammar; a dedicated resolver
+    plus allow-list registry is smaller and easier to audit than `eval` or full AST engines.
 
-## Review Notes (Subagent + Assistant)
+- Q: How is UX kept consistent between hover and executed requests?
+  - A: Function expressions share `TemplateService.render_string`; hover passes
+    `render_path="hover"` for observability only. Plain variables keep the fast masked path.
 
-### Finding 1
+- Q: What happens when a function call is invalid?
+  - A: Validation fails, observability records the outcome, and the original field content is
+    returned unchanged. Hover shows the original `{{...}}` token; send leaves the entire field
+    literal. Other fields and plain `{{var}}` expressions are unaffected. No inline error UI
+    in PYPOST-450 scope.
 
-- Severity: high
-- Title: Incomplete coverage proof for all variable-enabled contexts
-- Subagent note:
-  - Architecture does not explicitly map every variable-enabled context to the function path.
-  - This may violate parity and acceptance expectations.
-  - Recommendation: add a context coverage matrix.
-- Assistant comment: agree
-  - I agree because the architecture currently describes key flows but does not include a
-    complete surface inventory table. Without that mapping, parity can be missed during STEP 3.
+- Q: Are nested calls like `{{md5(urlencode(db))}}` supported?
+  - A: Yes. PYPOST-453 policy allows recursive single-argument catalog calls with no fixed
+    depth limit, validated by `FunctionExpressionResolver`.
 
-### Finding 2
+- Q: Are multi-argument calls like `{{md5(a,b)}}` supported?
+  - A: No. Requirements exclude comma-separated arguments; resolver returns `invalid_arity`.
 
-- Severity: medium
-- Title: Canonical syntax is stated, but exclusivity is not enforced
-- Subagent note:
-  - Canonical syntax is documented, but engine-level acceptance of alternative forms is not
-    constrained.
-  - Recommendation: define acceptance/rejection policy for non-canonical syntax.
-- Assistant comment: agree
-  - I agree because the document declares UX canon but does not define enforcement gates.
-    Architecture should explicitly state if non-canonical forms are rejected or tolerated.
+- Q: Which contexts must support functions?
+  - A: All variable-enabled contexts from requirements: URL, header names and values, param
+    names and values, body, and hover preview in supported editors (see context matrix).
 
-### Finding 3
+- Q: Can users run arbitrary Python through template fields?
+  - A: No. Only catalog functions registered in `FunctionRegistry` may execute; resolver
+    rejects non-canonical inner expressions before Jinja render.
 
-- Severity: medium
-- Title: Security boundary needs stricter enforcement details
-- Subagent note:
-  - No `eval` and allow-list are declared, but hardening details are not explicit.
-  - Recommendation: define Jinja hardening boundaries and negative security tests.
-- Assistant comment: agree
-  - I agree because current security statements are correct but high-level.
-    Architecture should name concrete enforcement points to prevent bypass paths.
-
-### Finding 4
-
-- Severity: low
-- Title: Function argument model is under-specified for future compatibility
-- Subagent note:
-  - Initial set is single-argument, while requirements say functions accept arguments.
-  - Recommendation: define grammar and validation contract.
-- Assistant comment: agree
-  - I agree because even with one-arg initial catalog, documenting argument grammar now will
-    reduce ambiguity for future extensions and testing.
-
-### Open Questions From Review
-
-- Resolved: variable-enabled contexts and owners are fixed in the context coverage matrix.
-- Resolved: non-canonical syntax is explicitly rejected.
-- Resolved: use restricted resolver contract integrated with `TemplateService`; do not evaluate
-  arbitrary expressions.
-- Resolved masking policy:
-  - direct hidden variable preview remains masked;
-  - derived function output may be shown only as resolved output in scope of this task;
-  - additional redaction policies for derived outputs can be tracked as a separate follow-up.
-
-### Overall Verdict
-
-- Subagent verdict: architecture direction is solid, but constraints are not strict enough yet
-  to guarantee parity and security outcomes.
-- Assistant verdict: agree
-  - I agree with this verdict and consider the review actionable for tightening STEP 2 before
-    final approval.
+- Q: Where is follow-up work tracked?
+  - A: Orchestration refactor (PYPOST-459), tokenization dedup (PYPOST-460), registry parity
+    tests (PYPOST-457), developer doc polish beyond
+    [`doc/dev/template_expression_functions.md`](../../doc/dev/template_expression_functions.md)
+    (PYPOST-456). Core module split is already landed.

@@ -2,9 +2,12 @@
 
 ## Goals
 
-Provide users with a consistent way to use functions in every place where variables are
-currently supported. This expands expression capabilities while keeping existing user
-workflows simple and predictable.
+Enable users to use functions in all places where variables are currently supported, so
+dynamic values can be expressed with the same user experience expectations. This expands
+expression capabilities while keeping existing user workflows simple and predictable.
+
+Source: [PYPOST-450](https://pypost.atlassian.net/browse/PYPOST-450) (Jira, type: Debt,
+priority: Medium).
 
 ## Programming Language
 
@@ -24,27 +27,29 @@ Python
   setups remain stable.
 - As a UX designer, I want a clear and consistent function usage pattern, so users can easily
   understand how to write function calls with arguments in each supported context.
+- As a user, I want clear feedback when a function call is invalid, so I can correct
+  expressions without breaking my request.
 - As a security reviewer, I want function execution to be controlled by product rules, so users
-  cannot run arbitrary Python code.
+  cannot run arbitrary user-defined code.
 
 ## Definition of Done
 
-1. Functions are available in all user-facing contexts where variables are currently
-   available.
+1. Functions are available in every expression context where variables are supported today
+   (request URL, header names and values, parameter names and values, request body, and
+   variable hover preview in supported editors).
 2. User interaction and expectations for functions are consistent with existing variable
    usage patterns.
 3. Users can provide arguments when using functions.
 4. Existing variable-based scenarios remain operational and unchanged in behavior.
 5. Documentation and examples clearly describe when and how users can use functions with
-   arguments.
-6. Acceptance checks confirm the new function capability works across the full existing
-   variable usage surface.
+   arguments, including catalog examples for `urlencode`, `md5`, and `base64`.
+6. Acceptance checks confirm the new function capability works across every expression
+   context listed in criterion 1.
 7. UX acceptance defines and approves a single user-visible function call format (including
    argument format) for all variable-enabled contexts.
 8. Security acceptance confirms that function execution uses only an approved function catalog
-   and does not execute arbitrary user-provided Python code via `eval`.
-9. Canonical syntax: functions are written inside `{{...}}`, for example
-   `{{urlencode(db)}}`.
+   and does not allow arbitrary user-defined code execution.
+9. Canonical user-visible syntax matches the approved UX format defined in Scope.
 
 ## Task Description
 
@@ -57,19 +62,26 @@ look for workarounds when they need derived values.
 ### Scope
 
 - In scope:
-  - Enable function usage everywhere variable usage is currently available.
+  - Enable function usage everywhere variable usage is currently available, including
+    request URL, header names and values, parameter names and values, request body, and
+    variable hover preview in supported editors.
   - Ensure function usage follows the same user-level behavior model as variables.
-  - Support passing arguments to functions.
+  - Support passing a single argument per function call, referencing an existing variable
+    name (for example, `{{urlencode(db)}}`).
+  - Support chaining allow-listed functions so one function's argument may be another
+    allow-listed function call (for example, `{{md5(urlencode(db))}}`).
   - Preserve existing variable-based user scenarios.
   - Define a single UX pattern for function syntax and argument usage across contexts.
-  - Canonical syntax: function calls are placed only inside `{{...}}`.
-  - Use only a controlled, application-defined list of user-available functions.
+  - Canonical syntax: function calls are placed only inside `{{...}}`, for example
+    `{{urlencode(db)}}`.
+  - Use only a controlled, product-defined list of user-available functions.
   - Include an initial function set available to users: `urlencode(Var)`, `md5(Var)`,
     `base64(Var)`.
 - Out of scope:
   - New unrelated user workflows outside current variable-enabled contexts.
   - Changes not required for enabling function usage parity with variables.
-  - Execution of arbitrary user-provided Python code.
+  - Multiple comma-separated arguments in a single function call.
+  - Execution of arbitrary user-defined code.
 
 ### Constraints and Assumptions
 
@@ -89,9 +101,18 @@ look for workarounds when they need derived values.
 
 - **User**: configures and uses expressions in product contexts that already support
   variables.
-- **Expression Context**: any product location where variable usage is currently available.
-- **Function Call**: user-provided function with optional arguments used in an expression.
-- **Evaluation Result**: value shown or applied after resolving variable/function usage.
+  - Attributes: expression text; chosen expression context; expectation of stable variable
+    behavior.
+- **Expression Context**: a product location where variable usage is currently available.
+  - Attributes: context type (URL, header name/value, parameter name/value, body, hover
+    preview); supports `{{...}}` placeholders.
+- **Function Call**: an approved function name with one argument used inside `{{...}}`.
+  - Attributes: function name from the catalog; single argument (variable name or chained
+    allow-listed call); user-visible syntax form.
+- **Evaluation Result**: value shown or applied after resolving variable and function usage.
+  - Attributes: resolved string value; must not alter outcomes for plain-variable
+    expressions; invalid calls surface predictable feedback without breaking unrelated
+    fields.
 
 Interaction flow:
 
@@ -111,10 +132,15 @@ Interaction flow:
 - Clarity: user-facing guidance should make argument usage understandable and predictable.
 - Compatibility: existing data and user scenarios that use variables must remain valid.
 - Security: function execution must be restricted to a predefined allow-list of supported
-  functions, without generic code evaluation from userspace.
+  functions, without arbitrary user-defined code execution.
 
 ## Q&A
 
+- Q: What does the Jira issue specify at a business level?
+  - A: Functions are available in every user-facing context that already accepts variables;
+    function usage is perceived and handled similarly to variable usage; functions can accept
+    arguments. Users can apply function-based expressions without switching workflows, and
+    existing variable-based workflows remain valid.
 - Q: Why is this task needed from a business perspective?
   - A: Users need richer expression capabilities while preserving current workflows and
     reducing friction in adoption.
@@ -126,6 +152,18 @@ Interaction flow:
 - Q: Which functions are available to users?
   - A: Initial supported catalog is `urlencode(Var)`, `md5(Var)`, and `base64(Var)`.
     Additional functions may be added later through product-managed updates.
-- Q: Will userspace expressions be executed with Python `eval`?
-  - A: No. Arbitrary userspace code evaluation is out of scope and prohibited by the security
-    requirement.
+- Q: What argument forms are supported?
+  - A: One argument per function call, referencing an existing variable name (for example,
+    `{{urlencode(db)}}`). Chaining allow-listed functions is supported (for example,
+    `{{md5(urlencode(db))}}`). Multiple comma-separated arguments in one call are out of
+    scope.
+- Q: Which expression contexts must support functions?
+  - A: Every context where variables work today: request URL, header names and values,
+    parameter names and values, request body, and variable hover preview in supported
+    editors.
+- Q: What happens when a function call is invalid or unknown?
+  - A: The user receives predictable feedback consistent with existing variable expression
+    handling; invalid calls must not break unrelated fields or existing variable behavior.
+- Q: Can users execute arbitrary code through function expressions?
+  - A: No. Only predefined catalog functions may run; arbitrary user-defined code execution
+    is out of scope.
