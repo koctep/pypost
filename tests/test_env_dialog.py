@@ -196,3 +196,95 @@ class TestEnvironmentDialog:
             )
         finally:
             dlg.close()
+
+    def test_delete_variable_via_handler_removes_from_model(self, qapp):
+        env = Environment(name="Dev", variables={"a": "1", "b": "2"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            # Find row for "a"
+            row = 0 if dlg.vars_table.item(0, 0).text() == "a" else 1
+            dlg._delete_variable_at_row(row)
+            assert "a" not in env.variables
+            assert "b" in env.variables
+            assert dlg.vars_table.rowCount() == 2  # 1 var + 1 empty trailing row
+        finally:
+            dlg.close()
+
+    def test_delete_hidden_variable_clears_hidden_keys(self, qapp):
+        env = Environment(name="Dev", variables={"secret": "val"}, hidden_keys={"secret"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg._delete_variable_at_row(0)
+            assert "secret" not in env.variables
+            assert "secret" not in env.hidden_keys
+        finally:
+            dlg.close()
+
+    def test_delete_variable_keeps_trailing_add_row(self, qapp):
+        env = Environment(name="Dev", variables={"k": "v"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            assert dlg.vars_table.rowCount() == 2
+            dlg._delete_variable_at_row(0)
+            assert dlg.vars_table.rowCount() == 1
+            assert not dlg.vars_table.item(0, 0) or not dlg.vars_table.item(0, 0).text()
+        finally:
+            dlg.close()
+
+    @patch("pypost.ui.dialogs.env_dialog.QMenu.exec")
+    def test_vars_table_context_menu_ignores_trailing_row(self, mock_exec, qapp):
+        env = Environment(name="Dev", variables={})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            # Context menu requested on trailing empty row
+            from PySide6.QtCore import QPoint
+            # Use rowAt mock or just ensure it returns the valid empty row
+            with patch.object(dlg.vars_table, "rowAt", return_value=0):
+                dlg._on_vars_table_context_menu(QPoint(0, 0))
+            # QMenu should not be executed
+            mock_exec.assert_not_called()
+        finally:
+            dlg.close()
+
+    def test_delete_variable_logs_masked_key_by_default(self, qapp, caplog):
+        env = Environment(name="Dev", variables={"API_KEY": "secret"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            with caplog.at_level(logging.INFO):
+                dlg._delete_variable_at_row(0)
+            assert any(
+                "env_variable_deleted env_name=Dev key=********" in r.message
+                for r in caplog.records
+            )
+            assert not any("API_KEY" in r.message for r in caplog.records)
+        finally:
+            dlg.close()
+
+    def test_delete_variable_logs_readable_key_when_enabled(self, qapp, caplog):
+        env = Environment(name="Dev", variables={"API_KEY": "secret"})
+        dlg = EnvironmentDialog([env], log_hidden_key_names=True)
+        try:
+            dlg.on_env_selected(0)
+            with caplog.at_level(logging.INFO):
+                dlg._delete_variable_at_row(0)
+            assert any(
+                "env_variable_deleted env_name=Dev key=API_KEY" in r.message
+                for r in caplog.records
+            )
+        finally:
+            dlg.close()
+
+    def test_clear_name_still_removes_variable(self, qapp):
+        env = Environment(name="Dev", variables={"k": "v"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg.vars_table.item(0, 0).setText("")
+            assert "k" not in env.variables
+        finally:
+            dlg.close()

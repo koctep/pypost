@@ -86,6 +86,8 @@ class EnvironmentDialog(QDialog):
             COL_HIDDEN, QHeaderView.ResizeToContents,
         )
         self.vars_table.itemChanged.connect(self.on_var_changed)
+        self.vars_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.vars_table.customContextMenuRequested.connect(self._on_vars_table_context_menu)
 
         self.mcp_check = QCheckBox(
             "Enable MCP (Model Context Protocol)",
@@ -123,6 +125,47 @@ class EnvironmentDialog(QDialog):
         if row >= 0:
             del self.environments[row]
             self.env_list.takeItem(row)
+
+    def _on_vars_table_context_menu(self, pos) -> None:
+        row = self.vars_table.rowAt(pos.y())
+        if row < 0:
+            return
+
+        k_item = self.vars_table.item(row, COL_VAR)
+        if not k_item or not k_item.text():
+            return
+
+        menu = QMenu(self)
+        delete_action = menu.addAction("Delete")
+        chosen = menu.exec(self.vars_table.mapToGlobal(pos))
+        if chosen == delete_action:
+            self._delete_variable_at_row(row)
+
+    def _delete_variable_at_row(self, row: int) -> None:
+        env_row = self.env_list.currentRow()
+        if env_row < 0:
+            return
+
+        env = self.environments[env_row]
+        k_item = self.vars_table.item(row, COL_VAR)
+        if not k_item or not k_item.text():
+            return
+
+        key = k_item.text()
+
+        env.variables.pop(key, None)
+        env.hidden_keys.discard(key)
+
+        logger.info(
+            "env_variable_deleted env_name=%s key=%s",
+            env.name,
+            HiddenToggleLogPolicy.format_key_name(
+                key,
+                log_hidden_key_names=self._log_hidden_key_names,
+            ),
+        )
+
+        self.on_env_selected(env_row)
 
     def _on_env_list_context_menu(self, pos) -> None:
         item = self.env_list.itemAt(pos)
@@ -226,6 +269,7 @@ class EnvironmentDialog(QDialog):
         self.mcp_check.blockSignals(False)
 
         self.vars_table.blockSignals(True)
+        self.vars_table.setRowCount(0)
         self.vars_table.setRowCount(len(env.variables) + 1)
 
         for i, (k, v) in enumerate(env.variables.items()):
