@@ -64,12 +64,8 @@ class EnvironmentDialog(QDialog):
         add_btn = QPushButton("Add")
         add_btn.clicked.connect(self.add_environment)
 
-        del_btn = QPushButton("Delete")
-        del_btn.clicked.connect(self.delete_environment)
-
         left_layout.addWidget(self.env_list)
         left_layout.addWidget(add_btn)
-        left_layout.addWidget(del_btn)
 
         layout.addLayout(left_layout, 1)
 
@@ -120,9 +116,12 @@ class EnvironmentDialog(QDialog):
             self.env_list.addItem(name)
             self.env_list.setCurrentRow(len(self.environments) - 1)
 
-    def delete_environment(self):
-        row = self.env_list.currentRow()
+    def delete_environment(self, row: int | None = None) -> None:
+        if row is None:
+            row = self.env_list.currentRow()
         if row >= 0:
+            deleted_env = self.environments[row]
+            logger.info("environment_deleted env_name=%s", deleted_env.name)
             del self.environments[row]
             self.env_list.takeItem(row)
 
@@ -174,9 +173,12 @@ class EnvironmentDialog(QDialog):
         row = self.env_list.row(item)
         menu = QMenu(self)
         copy_action = menu.addAction("Copy")
+        delete_action = menu.addAction("Delete")
         chosen = menu.exec(self.env_list.mapToGlobal(pos))
         if chosen == copy_action:
             self._duplicate_environment_at_row(row)
+        elif chosen == delete_action:
+            self.delete_environment(row)
 
     def _duplicate_environment_at_row(self, row: int) -> None:
         if row < 0 or row >= len(self.environments):
