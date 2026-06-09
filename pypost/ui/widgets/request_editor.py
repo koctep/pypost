@@ -33,6 +33,7 @@ class RequestWidget(QWidget):
     send_requested = Signal(RequestData)
     save_requested = Signal(RequestData)
     save_as_requested = Signal(RequestData)
+    copy_curl_requested = Signal(RequestData)
 
     def __init__(self, request_data: RequestData = None, metrics: MetricsManager | None = None):
         super().__init__()
@@ -48,9 +49,7 @@ class RequestWidget(QWidget):
         url_layout = QHBoxLayout()
 
         self.method_combo = QComboBox()
-        self.method_combo.addItems(
-            ["GET", "POST", "PUT", "DELETE", "PATCH", "MCP"]
-        )
+        self.method_combo.addItems(["GET", "POST", "PUT", "DELETE", "PATCH", "MCP"])
         self.method_combo.setCurrentText(self.request_data.method)
         self.method_combo.currentTextChanged.connect(self._on_method_changed)
 
@@ -71,6 +70,9 @@ class RequestWidget(QWidget):
         self.save_action = QAction("Save", self)
         self.save_action.triggered.connect(self.handle_save_menu_action)
         self.actions_menu.addAction(self.save_action)
+        self.copy_curl_action = QAction("Copy cURL", self)
+        self.copy_curl_action.triggered.connect(self.handle_copy_curl_menu_action)
+        self.actions_menu.addAction(self.copy_curl_action)
         self.actions_btn.setMenu(self.actions_menu)
 
         url_layout.addWidget(self.method_combo)
@@ -116,14 +118,14 @@ class RequestWidget(QWidget):
         self.url_input.set_variables(variables)
         self.params_table.set_variables(variables)
         self.headers_table.set_variables(variables)
-        if hasattr(self.body_edit, 'set_variables'):
+        if hasattr(self.body_edit, "set_variables"):
             self.body_edit.set_variables(variables)
 
     def set_hidden_keys(self, hidden_keys: set):
         self.url_input.set_hidden_keys(hidden_keys)
         self.params_table.set_hidden_keys(hidden_keys)
         self.headers_table.set_hidden_keys(hidden_keys)
-        if hasattr(self.body_edit, 'set_hidden_keys'):
+        if hasattr(self.body_edit, "set_hidden_keys"):
             self.body_edit.set_hidden_keys(hidden_keys)
 
     def _on_method_changed(self, method: str):
@@ -211,6 +213,13 @@ class RequestWidget(QWidget):
 
     def handle_save_as_menu_action(self):
         self.on_save_as("menu")
+
+    def handle_copy_curl_menu_action(self):
+        logger.info("copy_curl_action_triggered")
+        if self._metrics:
+            self._metrics.track_gui_copy_curl_action()
+        current_request = self.get_request_data_from_ui()
+        self.copy_curl_requested.emit(current_request)
 
 
 class KeyValueTable(VariableAwareTableWidget):

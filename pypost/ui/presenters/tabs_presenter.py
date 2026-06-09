@@ -2,8 +2,14 @@ import logging
 import uuid
 
 from PySide6.QtWidgets import (
-    QTabWidget, QWidget, QVBoxLayout, QSplitter,
-    QPushButton, QTabBar, QMessageBox,
+    QTabWidget,
+    QWidget,
+    QVBoxLayout,
+    QSplitter,
+    QPushButton,
+    QTabBar,
+    QMessageBox,
+    QApplication,
 )
 from PySide6.QtCore import QObject, Qt, Signal
 
@@ -20,6 +26,7 @@ from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 from pypost.core.template_service import TemplateService
 from pypost.core.alert_manager import AlertManager
 from pypost.models.errors import ErrorCategory, ExecutionError
+from pypost.core.curl_generator import CurlGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -33,15 +40,9 @@ _ERROR_MESSAGES = {
     ErrorCategory.TEMPLATE: (
         "Template rendering failed: {detail}. Check variable names and syntax."
     ),
-    ErrorCategory.SCRIPT: (
-        "Post-script execution failed: {detail}. Review the script for errors."
-    ),
-    ErrorCategory.HISTORY: (
-        "History could not be recorded: {detail}."
-    ),
-    ErrorCategory.UNKNOWN: (
-        "An unexpected error occurred: {detail}."
-    ),
+    ErrorCategory.SCRIPT: ("Post-script execution failed: {detail}. Review the script for errors."),
+    ErrorCategory.HISTORY: ("History could not be recorded: {detail}."),
+    ErrorCategory.UNKNOWN: ("An unexpected error occurred: {detail}."),
 }
 
 
@@ -85,10 +86,10 @@ class TabBarWithAddButton(QTabBar):
 class TabsPresenter(QObject):
     """Owns the QTabWidget: opening, closing, restoring tabs and worker lifecycle."""
 
-    variable_set_requested = Signal(object, str)   # (key: str | None, value: str)
-    env_update_requested = Signal(object)           # payload: dict (from RequestWorker)
-    request_saved = Signal()                        # after save, triggers collections reload
-    request_executed = Signal()                     # emitted after each completed request
+    variable_set_requested = Signal(object, str)  # (key: str | None, value: str)
+    env_update_requested = Signal(object)  # payload: dict (from RequestWorker)
+    request_saved = Signal()  # after save, triggers collections reload
+    request_executed = Signal()  # emitted after each completed request
 
     def __init__(
         self,
@@ -132,25 +133,23 @@ class TabsPresenter(QObject):
     def widget(self) -> QTabWidget:
         return self._tabs
 
-    def add_new_tab(
-        self, request_data: RequestData | None = None, save_state: bool = True
-    ) -> None:
+    def add_new_tab(self, request_data: RequestData | None = None, save_state: bool = True) -> None:
         tab = RequestTab(request_data, metrics=self._metrics)
 
-        if hasattr(tab.request_editor, 'body_edit'):
+        if hasattr(tab.request_editor, "body_edit"):
             tab.request_editor.body_edit.update_indent_size(self._settings.indent_size)
-        if hasattr(tab.response_view, 'set_indent_size'):
+        if hasattr(tab.response_view, "set_indent_size"):
             tab.response_view.set_indent_size(self._settings.indent_size)
 
         if self._current_variables:
-            if hasattr(tab.request_editor, 'set_variables'):
+            if hasattr(tab.request_editor, "set_variables"):
                 tab.request_editor.set_variables(self._current_variables)
-            if hasattr(tab.response_view, 'set_env_keys'):
+            if hasattr(tab.response_view, "set_env_keys"):
                 tab.response_view.set_env_keys(
                     list(self._current_variables.keys()),
                 )
         if self._current_hidden_keys:
-            if hasattr(tab.request_editor, 'set_hidden_keys'):
+            if hasattr(tab.request_editor, "set_hidden_keys"):
                 tab.request_editor.set_hidden_keys(
                     self._current_hidden_keys,
                 )
@@ -207,9 +206,9 @@ class TabsPresenter(QObject):
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
-                if hasattr(tab.request_editor, 'set_variables'):
+                if hasattr(tab.request_editor, "set_variables"):
                     tab.request_editor.set_variables(variables)
-                if hasattr(tab.response_view, 'set_env_keys'):
+                if hasattr(tab.response_view, "set_env_keys"):
                     keys = list(variables.keys()) if variables else None
                     tab.response_view.set_env_keys(keys)
 
@@ -218,18 +217,19 @@ class TabsPresenter(QObject):
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
-                if hasattr(tab.response_view, 'set_env_keys'):
+                if hasattr(tab.response_view, "set_env_keys"):
                     tab.response_view.set_env_keys(keys)
 
     def on_env_hidden_keys_changed(
-        self, hidden_keys: set,
+        self,
+        hidden_keys: set,
     ) -> None:
         """Pushes hidden-key set to all open tabs."""
         self._current_hidden_keys = hidden_keys
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
-                if hasattr(tab.request_editor, 'set_hidden_keys'):
+                if hasattr(tab.request_editor, "set_hidden_keys"):
                     tab.request_editor.set_hidden_keys(hidden_keys)
 
     def rename_request_tabs(self, request_id: str, new_name: str) -> None:
@@ -250,10 +250,10 @@ class TabsPresenter(QObject):
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
-                if hasattr(tab.request_editor, 'body_edit'):
+                if hasattr(tab.request_editor, "body_edit"):
                     tab.request_editor.body_edit.update_indent_size(settings.indent_size)
                     tab.request_editor.body_edit.reformat_text()
-                if hasattr(tab.response_view, 'set_indent_size'):
+                if hasattr(tab.response_view, "set_indent_size"):
                     tab.response_view.set_indent_size(settings.indent_size)
 
     def handle_new_tab(self, source: str = "unknown") -> None:
@@ -322,6 +322,7 @@ class TabsPresenter(QObject):
         tab.request_editor.send_requested.connect(self._handle_send_request)
         tab.request_editor.save_requested.connect(self._handle_save_request)
         tab.request_editor.save_as_requested.connect(self._handle_save_as_request)
+        tab.request_editor.copy_curl_requested.connect(self._handle_copy_curl_request)
         tab.response_view.variable_set_requested.connect(self.variable_set_requested)
 
     def _handle_send_request(self, request_data: RequestData) -> None:
@@ -338,14 +339,16 @@ class TabsPresenter(QObject):
         if sender_tab.worker is not None and not sender_tab.worker.isRunning():
             logger.debug(
                 "stale_worker_cleared method=%s url=%s",
-                request_data.method, request_data.url,
+                request_data.method,
+                request_data.url,
             )
             sender_tab.worker = None
 
         if sender_tab.worker is not None and sender_tab.worker.isRunning():
             logger.info(
                 "request_stop_requested method=%s url=%s",
-                request_data.method, request_data.url,
+                request_data.method,
+                request_data.url,
             )
             sender_tab.worker.stop()
             sender_tab.request_editor.send_btn.setEnabled(False)
@@ -354,7 +357,9 @@ class TabsPresenter(QObject):
 
         logger.info(
             "request_send_initiated method=%s url=%s request_id=%s",
-            request_data.method, request_data.url, request_data.id,
+            request_data.method,
+            request_data.url,
+            request_data.id,
         )
         if self._metrics:
             self._metrics.track_request_sent(request_data.method)
@@ -390,9 +395,7 @@ class TabsPresenter(QObject):
             lambda status, headers: self._on_headers_received(sender_tab, status, headers)
         )
         worker.retry_attempt.connect(
-            lambda attempt, max_r, _err, tab=sender_tab: self._on_retry_attempt(
-                tab, attempt, max_r
-            )
+            lambda attempt, max_r, _err, tab=sender_tab: self._on_retry_attempt(tab, attempt, max_r)
         )
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
@@ -403,7 +406,8 @@ class TabsPresenter(QObject):
         """Opens a new scratch tab pre-populated with data from a history entry."""
         logger.info(
             "history_request_loaded_into_editor method=%s url=%s",
-            request_data.method, request_data.url,
+            request_data.method,
+            request_data.url,
         )
         if self._metrics:
             self._metrics.track_history_load_into_editor()
@@ -413,7 +417,10 @@ class TabsPresenter(QObject):
         method = tab.request_data.method if tab.request_data else "UNKNOWN"
         logger.info(
             "request_finished method=%s status_code=%s elapsed_time=%.3fs size=%s",
-            method, response.status_code, response.elapsed_time, response.size,
+            method,
+            response.status_code,
+            response.elapsed_time,
+            response.size,
         )
         if self._metrics:
             self._metrics.track_response_received(method, str(response.status_code))
@@ -445,14 +452,14 @@ class TabsPresenter(QObject):
                 return
 
             url = tab.request_data.url if tab.request_data else ""
-            template = _ERROR_MESSAGES.get(
-                error.category, _ERROR_MESSAGES[ErrorCategory.UNKNOWN]
-            )
+            template = _ERROR_MESSAGES.get(error.category, _ERROR_MESSAGES[ErrorCategory.UNKNOWN])
             user_msg = template.format(url=url, detail=error.detail or error.message)
 
             logger.error(
                 "request_error category=%s message=%s detail=%s",
-                error.category, error.message, error.detail,
+                error.category,
+                error.message,
+                error.detail,
             )
             QMessageBox.critical(self._tabs, "Request Error", user_msg)
 
@@ -469,13 +476,11 @@ class TabsPresenter(QObject):
     def _on_chunk_received(self, tab: RequestTab, chunk: str) -> None:
         tab.response_view.append_body(chunk)
         current_text = tab.response_view.body_view.toPlainText()
-        size_bytes = len(current_text.encode('utf-8'))
+        size_bytes = len(current_text.encode("utf-8"))
         tab.response_view.size_label.setText(f"Size: {size_bytes} bytes")
 
     def _on_retry_attempt(self, tab: RequestTab, attempt: int, max_retries: int) -> None:
-        tab.request_editor.send_btn.setText(
-            f"Retrying\u2026 ({attempt} of {max_retries})"
-        )
+        tab.request_editor.send_btn.setText(f"Retrying\u2026 ({attempt} of {max_retries})")
 
     def _reset_tab_ui_state(self, tab: RequestTab) -> None:
         tab.request_editor.send_btn.setEnabled(True)
@@ -515,18 +520,18 @@ class TabsPresenter(QObject):
                         "This will overwrite the existing request "
                         f"'{existing_request.name}'. Continue?"
                     ),
-                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
                 )
                 if reply == QMessageBox.No:
-                    logger.info(
-                        "save_request_overwrite_cancelled request_id=%s", request_data.id
-                    )
+                    logger.info("save_request_overwrite_cancelled request_id=%s", request_data.id)
                     return
 
             self._request_manager.save_request(request_data, found_collection.id)
             logger.info(
                 "save_request_overwrite_succeeded request_id=%s collection_id=%s",
-                request_data.id, found_collection.id,
+                request_data.id,
+                found_collection.id,
             )
             if self._metrics:
                 self._metrics.track_gui_save_action("overwrite")
@@ -560,7 +565,9 @@ class TabsPresenter(QObject):
         self._request_manager.save_request(request_data, target_collection_id)
         logger.info(
             "save_request_new_succeeded request_id=%s name=%s collection_id=%s",
-            request_data.id, request_data.name, target_collection_id,
+            request_data.id,
+            request_data.name,
+            target_collection_id,
         )
         if self._metrics:
             self._metrics.track_gui_save_action("new")
@@ -604,7 +611,9 @@ class TabsPresenter(QObject):
         logger.info(
             "save_as_flow_completed source_request_id=%s new_request_id=%s"
             " target_collection_id=%s",
-            request_data.id, new_request.id, target_collection_id,
+            request_data.id,
+            new_request.id,
+            target_collection_id,
         )
 
         current_expanded = self._state_manager.get_expanded_collections()
@@ -621,3 +630,15 @@ class TabsPresenter(QObject):
 
         self.save_tabs_state()
         self.request_saved.emit()
+
+    def _handle_copy_curl_request(self, request_data: RequestData) -> None:
+        try:
+            curl_cmd = CurlGenerator.generate(
+                request_data, self._current_variables, self._template_service
+            )
+            QApplication.clipboard().setText(curl_cmd)
+            self._tabs.window().statusBar().showMessage("cURL copied to clipboard", 3000)
+            logger.info("copy_curl_success request_id=%s length=%d", request_data.id, len(curl_cmd))
+        except Exception as e:
+            logger.error("copy_curl_failed request_id=%s error=%s", request_data.id, e)
+            self._tabs.window().statusBar().showMessage(f"Failed to copy cURL: {str(e)}", 5000)

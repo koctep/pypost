@@ -55,6 +55,11 @@ class MetricsManager:
             ['source'],
             registry=self.registry
         )
+        self.gui_copy_curl_actions = Counter(
+            'gui_copy_curl_actions_total',
+            'Number of times Copy cURL action was triggered in GUI',
+            registry=self.registry
+        )
         self.gui_collection_delete_actions = Counter(
             'gui_collection_delete_actions_total',
             'Number of delete actions from collection context menu',
@@ -332,6 +337,9 @@ class MetricsManager:
 
     def track_gui_new_tab_action(self, source: str):
         self.gui_new_tab_actions.labels(source=source).inc()
+
+    def track_gui_copy_curl_action(self):
+        self.gui_copy_curl_actions.inc()
 
     def track_gui_collection_delete_action(self, item_type: str, status: str):
         self.gui_collection_delete_actions.labels(item_type=item_type, status=status).inc()
