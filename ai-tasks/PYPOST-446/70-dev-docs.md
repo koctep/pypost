@@ -91,6 +91,7 @@ TabsPresenter._current_hidden_keys
 | `pypost/core/metrics.py` | `track_hidden_value_mask_applied` counter |
 | `tests/test_sensitive_data_masking_policy.py` | Policy unit tests |
 | `tests/test_request_service.py` | History masking integration tests |
+| `tests/test_history_masking_e2e.py` | End-to-end execute → persist → reload → HistoryPanel (PYPOST-462) |
 | `tests/test_worker.py` | `hidden_keys` forwarding tests |
 | `tests/test_tabs_presenter.py` | Presenter wiring tests |
 | `doc/dev/sensitive_data_masking_policy.md` | Long-form dev reference |
@@ -99,8 +100,12 @@ TabsPresenter._current_hidden_keys
 
 ## 7. Testing
 
+Unit and service-level integration:
+
 ```bash
-pytest tests/test_sensitive_data_masking_policy.py tests/test_request_service.py -v
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_sensitive_data_masking_policy.py \
+  tests/test_request_service.py -v
 ```
 
 Key test cases in `TestRequestServiceHistory`:
@@ -111,6 +116,16 @@ Key test cases in `TestRequestServiceHistory`:
   injected `TemplateService`
 - `test_history_records_resolved_url` — non-hidden variables still render normally
 
+End-to-end acceptance (PYPOST-462):
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_history_masking_e2e.py -v
+```
+
+`test_hidden_values_stay_masked_after_history_reload_in_panel` verifies execute → persist →
+reload → HistoryPanel display; see `doc/dev/sensitive_data_masking_policy.md` for scope detail.
+
 ---
 
 ## 8. Related Tickets
@@ -118,6 +133,6 @@ Key test cases in `TestRequestServiceHistory`:
 | Ticket | Description |
 |--------|-------------|
 | PYPOST-437 | Introduced `hidden_keys` on `Environment`; display-level masking |
-| PYPOST-462 | Follow-up: integration test for mask → persist → reload → display cycle |
+| PYPOST-462 | End-to-end integration test for mask → persist → reload → display cycle (done) |
 | PYPOST-463 | Follow-up: refactor history-recording block in `RequestService.execute` |
 | PYPOST-464 | Follow-up: explicit metric tests for empty vs non-empty `hidden_keys` |

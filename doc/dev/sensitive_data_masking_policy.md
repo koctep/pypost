@@ -58,3 +58,52 @@ TabsPresenter (hidden_keys)
 | Metric | Labels | Description |
 |---|---|---|
 | `hidden_value_masks_applied_total` | `surface` | Incremented when hidden keys are present during history write |
+
+## Testing
+
+### Unit and integration tests
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_sensitive_data_masking_policy.py \
+  tests/test_request_service.py \
+  tests/test_worker.py \
+  tests/test_tabs_presenter.py -v
+```
+
+Key cases in `TestRequestServiceHistory`:
+
+- `test_history_masks_hidden_variable_values` — hidden key value replaced with `***`
+- `test_history_masking_metric_recorded_when_hidden_keys_present` — metric counter fires
+- `test_history_stores_raw_template_when_no_template_service` — URL rendered even without
+  injected `TemplateService`
+- `test_history_records_resolved_url` — non-hidden variables still render normally
+
+### End-to-end acceptance test (PYPOST-462)
+
+`tests/test_history_masking_e2e.py` covers the connected flow that unit tests split across
+components: execute request with hidden and non-hidden variables → persist history → reload
+from disk (simulated restart) → display entry in `HistoryPanel`.
+
+The test asserts:
+
+- Persisted `HistoryEntry` URL, headers, and body contain `***` for hidden-derived values.
+- Non-hidden variable values remain visible after reload.
+- History panel list label and detail widgets (URL, headers, body) never contain the secret
+  and show the same masked content as persisted storage.
+
+Run the acceptance check alone:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_history_masking_e2e.py -v
+```
+
+Broader history-masking regression:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_sensitive_data_masking_policy.py \
+  tests/test_request_service.py \
+  tests/test_history_masking_e2e.py -v
+```
