@@ -23,6 +23,7 @@ Instead of main UI buttons, actions on existing environments are handled via a r
 - **Delete**: Triggered via `_on_env_list_context_menu`, it calls `delete_environment(row)` to remove the selected environment from the list and data model.
 
 ### Context Menu Actions (Variables Table)
+- **Move Up / Move Down**: Right-clicking a populated variable row allows users to change its relative order in the table using `_move_variable_at_row(row, direction)`. This swaps adjacent items in the ordered `Environment.variables` dict and reloads the table.
 - **Delete**: Right-clicking a variable row opens a context menu to delete that specific variable using `_delete_variable_at_row(row)`.
 
 ### Variable Editing

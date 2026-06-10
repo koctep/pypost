@@ -288,3 +288,95 @@ class TestEnvironmentDialog:
             assert "k" not in env.variables
         finally:
             dlg.close()
+
+    def test_move_variable_up_reorders_model(self, qapp):
+        env = Environment(name="Dev", variables={"a": "1", "b": "2", "c": "3"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg._move_variable_at_row(1, "up")
+            assert list(env.variables.keys()) == ["b", "a", "c"]
+        finally:
+            dlg.close()
+
+    def test_move_variable_down_reorders_model(self, qapp):
+        env = Environment(name="Dev", variables={"a": "1", "b": "2", "c": "3"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg._move_variable_at_row(1, "down")
+            assert list(env.variables.keys()) == ["a", "c", "b"]
+        finally:
+            dlg.close()
+
+    def test_move_up_at_first_row_is_noop(self, qapp):
+        env = Environment(name="Dev", variables={"a": "1", "b": "2"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg._move_variable_at_row(0, "up")
+            assert list(env.variables.keys()) == ["a", "b"]
+        finally:
+            dlg.close()
+
+    def test_move_down_at_last_populated_row_is_noop(self, qapp):
+        env = Environment(name="Dev", variables={"a": "1", "b": "2"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg._move_variable_at_row(1, "down")
+            assert list(env.variables.keys()) == ["a", "b"]
+        finally:
+            dlg.close()
+
+    def test_move_hidden_variable_preserves_hidden_keys_and_mask(self, qapp):
+        env = Environment(name="Dev", variables={"a": "1", "b": "2"}, hidden_keys={"a"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg._move_variable_at_row(0, "down")
+            assert list(env.variables.keys()) == ["b", "a"]
+            assert env.hidden_keys == {"a"}
+            assert dlg.vars_table.item(1, 1).text() == HIDDEN_MASK
+        finally:
+            dlg.close()
+
+    def test_move_variable_keeps_trailing_add_row(self, qapp):
+        env = Environment(name="Dev", variables={"a": "1", "b": "2"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg._move_variable_at_row(0, "down")
+            assert dlg.vars_table.rowCount() == 3
+        finally:
+            dlg.close()
+
+    def test_move_variable_switch_env_and_back(self, qapp):
+        envs = [
+            Environment(name="Dev", variables={"a": "1", "b": "2"}),
+            Environment(name="Prod", variables={"x": "9"}),
+        ]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg.on_env_selected(0)
+            dlg._move_variable_at_row(0, "down")
+            dlg.on_env_selected(1)
+            dlg.on_env_selected(0)
+            assert list(envs[0].variables.keys()) == ["b", "a"]
+        finally:
+            dlg.close()
+
+    def test_move_variable_logs_masked_key_by_default(self, qapp, caplog):
+        env = Environment(name="Dev", variables={"a": "1", "b": "2"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            with caplog.at_level(logging.INFO):
+                dlg._move_variable_at_row(0, "down")
+            assert any(
+                "env_variable_moved env_name=Dev key=******** direction=down" in r.message
+                for r in caplog.records
+            )
+        finally:
+            dlg.close()
+

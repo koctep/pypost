@@ -134,11 +134,67 @@ class EnvironmentDialog(QDialog):
         if not k_item or not k_item.text():
             return
 
+        env_row = self.env_list.currentRow()
+        if env_row < 0:
+            return
+
+        env = self.environments[env_row]
+        var_count = len(env.variables)
+
         menu = QMenu(self)
+
+        move_up_action = menu.addAction("Move Up")
+        move_up_action.setEnabled(0 < row < var_count)
+
+        move_down_action = menu.addAction("Move Down")
+        move_down_action.setEnabled(0 <= row < var_count - 1)
+
+        menu.addSeparator()
+
         delete_action = menu.addAction("Delete")
         chosen = menu.exec(self.vars_table.mapToGlobal(pos))
         if chosen == delete_action:
             self._delete_variable_at_row(row)
+        elif chosen == move_up_action:
+            self._move_variable_at_row(row, "up")
+        elif chosen == move_down_action:
+            self._move_variable_at_row(row, "down")
+
+    def _move_variable_at_row(self, row: int, direction: str) -> None:
+        env_row = self.env_list.currentRow()
+        if env_row < 0:
+            return
+
+        env = self.environments[env_row]
+
+        if row < 0 or row >= len(env.variables):
+            return
+
+        items = list(env.variables.items())
+
+        if direction == "up" and row > 0:
+            items[row], items[row - 1] = items[row - 1], items[row]
+        elif direction == "down" and row < len(items) - 1:
+            items[row], items[row + 1] = items[row + 1], items[row]
+        else:
+            return
+
+        env.variables = dict(items)
+
+        # The key we moved is now at row - 1 or row + 1
+        key = items[row - 1][0] if direction == "up" else items[row + 1][0]
+
+        logger.info(
+            "env_variable_moved env_name=%s key=%s direction=%s",
+            env.name,
+            HiddenToggleLogPolicy.format_key_name(
+                key,
+                log_hidden_key_names=self._log_hidden_key_names,
+            ),
+            direction,
+        )
+
+        self.on_env_selected(env_row)
 
     def _delete_variable_at_row(self, row: int) -> None:
         env_row = self.env_list.currentRow()
