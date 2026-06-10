@@ -2,10 +2,12 @@ import logging
 
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QSpinBox,
@@ -20,6 +22,12 @@ from pypost.models.retry import (
 from pypost.models.settings import AppSettings
 
 logger = logging.getLogger(__name__)
+
+ENCRYPTION_MODE_DEFAULT = "default"
+ENCRYPTION_MODE_ENABLED = "enabled"
+ENCRYPTION_MODE_DISABLED = "disabled"
+
+KEY_SOURCE_ENVIRONMENT = "environment"
 
 
 class SettingsDialog(QDialog):
@@ -71,6 +79,37 @@ class SettingsDialog(QDialog):
             current_settings.log_hidden_key_names,
         )
 
+        self.env_encryption_mode_combo = QComboBox()
+        self.env_encryption_mode_combo.addItem(
+            "Use environment variable default",
+            ENCRYPTION_MODE_DEFAULT,
+        )
+        self.env_encryption_mode_combo.addItem("Enabled", ENCRYPTION_MODE_ENABLED)
+        self.env_encryption_mode_combo.addItem("Disabled", ENCRYPTION_MODE_DISABLED)
+        if current_settings.env_encryption_enabled is True:
+            self.env_encryption_mode_combo.setCurrentIndex(1)
+        elif current_settings.env_encryption_enabled is False:
+            self.env_encryption_mode_combo.setCurrentIndex(2)
+        else:
+            self.env_encryption_mode_combo.setCurrentIndex(0)
+
+        self.env_encryption_key_source_combo = QComboBox()
+        self.env_encryption_key_source_combo.addItem(
+            "Environment variable (PYPOST_ENV_ENCRYPTION_KEY)",
+            KEY_SOURCE_ENVIRONMENT,
+        )
+        key_source = current_settings.env_encryption_key_source or KEY_SOURCE_ENVIRONMENT
+        source_index = self.env_encryption_key_source_combo.findData(key_source)
+        self.env_encryption_key_source_combo.setCurrentIndex(
+            source_index if source_index >= 0 else 0,
+        )
+
+        self.env_encryption_help_label = QLabel(
+            "Store the Fernet key in PYPOST_ENV_ENCRYPTION_KEY (shell or service env). "
+            "Do not put key material in settings.json.",
+        )
+        self.env_encryption_help_label.setWordWrap(True)
+
         # Retry policy defaults
         default_policy = RetryPolicy()
         current_policy = current_settings.default_retry_policy or default_policy
@@ -116,6 +155,15 @@ class SettingsDialog(QDialog):
             "Confirm before overwriting requests:", self.confirm_overwrite_check
         )
         self.form_layout.addRow("", self.log_hidden_key_names_check)
+        self.form_layout.addRow(
+            "Environment encryption at rest:",
+            self.env_encryption_mode_combo,
+        )
+        self.form_layout.addRow(
+            "Encryption key source:",
+            self.env_encryption_key_source_combo,
+        )
+        self.form_layout.addRow("", self.env_encryption_help_label)
         self.form_layout.addRow("Max Retries (0 = disabled):", self.max_retries_spin)
         self.form_layout.addRow("Retry Delay (seconds):", self.retry_delay_spin)
         self.form_layout.addRow("Retry Backoff Multiplier:", self.retry_backoff_spin)
@@ -151,6 +199,13 @@ class SettingsDialog(QDialog):
         )
         webhook_url = self.alert_webhook_url_edit.text().strip() or None
         webhook_auth = self.alert_webhook_auth_edit.text().strip() or None
+        encryption_mode = self.env_encryption_mode_combo.currentData()
+        if encryption_mode == ENCRYPTION_MODE_ENABLED:
+            env_encryption_enabled = True
+        elif encryption_mode == ENCRYPTION_MODE_DISABLED:
+            env_encryption_enabled = False
+        else:
+            env_encryption_enabled = None
 
         self.new_settings = AppSettings(
             font_size=self.font_size_spin.value(),
@@ -171,6 +226,8 @@ class SettingsDialog(QDialog):
             alert_webhook_url=webhook_url,
             alert_webhook_auth_header=webhook_auth,
             alert_log_path=self.current_settings.alert_log_path,
+            env_encryption_enabled=env_encryption_enabled,
+            env_encryption_key_source=self.env_encryption_key_source_combo.currentData(),
         )
         super().accept()
 

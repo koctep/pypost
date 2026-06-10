@@ -7,6 +7,7 @@ from pypost.core.metrics import MetricsManager
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
+from pypost.models.settings import AppSettings
 
 
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:
@@ -158,6 +159,47 @@ def test_load_environments_with_missing_key_returns_empty(tmp_path, monkeypatch)
     monkeypatch.delenv("PYPOST_ENV_ENCRYPTION_KEY", raising=False)
     reloaded = storage.load_environments()
     assert reloaded == []
+
+
+def test_save_environments_encrypts_hidden_keys_from_app_settings(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+
+    env = Environment(
+        name="Dev",
+        variables={"SECRET": "s3cr3t", "VISIBLE": "public"},
+        hidden_keys={"SECRET"},
+    )
+    storage.save_environments([env])
+
+    with open(storage.environments_file, "r") as f:
+        payload = json.load(f)
+
+    secret_payload = payload[0]["variables"]["SECRET"]
+    assert isinstance(secret_payload, dict)
+    assert secret_payload["enc"] is True
+    assert payload[0]["variables"]["VISIBLE"] == "public"
+
+
+def test_app_settings_disabled_overrides_env_enabled(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_ENABLED", "true")
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=False))
+
+    env = Environment(
+        name="Dev",
+        variables={"SECRET": "plain", "VISIBLE": "public"},
+        hidden_keys={"SECRET"},
+    )
+    storage.save_environments([env])
+
+    with open(storage.environments_file, "r") as f:
+        payload = json.load(f)
+
+    assert payload[0]["variables"]["SECRET"] == "plain"
 
 
 def test_metrics_track_encryption_and_decryption_counters(tmp_path, monkeypatch):

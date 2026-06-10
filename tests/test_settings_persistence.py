@@ -70,6 +70,19 @@ class TestConfigManagerPersistence(unittest.TestCase):
                 s = ConfigManager().load_config()
                 self.assertFalse(s.log_hidden_key_names)
 
+    def test_load_legacy_settings_without_encryption_fields_default_none(self):
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "settings.json"
+            cfg.write_text(
+                '{"font_size": 12, "indent_size": 2, "request_timeout": 60, '
+                '"config_version": 1, "revision": 0, "log_hidden_key_names": false}',
+                encoding="utf-8",
+            )
+            with patch("pypost.core.config_manager.user_config_dir", return_value=td):
+                s = ConfigManager().load_config()
+                self.assertIsNone(s.env_encryption_enabled)
+                self.assertIsNone(s.env_encryption_key_source)
+
 
 class TestStateManagerPersistence(unittest.TestCase):
     def _cm_and_td(self):

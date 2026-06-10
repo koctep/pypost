@@ -6,9 +6,15 @@ from typing import TYPE_CHECKING, Any, List
 
 from platformdirs import user_data_dir
 
+from pypost.core.encryption_config import (
+    build_key_provider,
+    resolve_encryption_enabled,
+    resolve_key_source,
+)
 from pypost.core.environment_secrets_codec import EnvironmentSecretsCodec
-from pypost.core.key_provider import EnvironmentEncryptionError, LocalKeyProvider
+from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.models.models import Collection, Environment
+from pypost.models.settings import AppSettings
 
 if TYPE_CHECKING:
     from pypost.core.metrics import MetricsManager
@@ -17,8 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class StorageManager:
-    ENCRYPTION_FLAG_ENV = "PYPOST_ENV_ENCRYPTION_ENABLED"
-
     def __init__(
         self,
         app_name: str = "pypost",
@@ -29,8 +33,28 @@ class StorageManager:
         self.collections_path = self.data_dir / "collections"
         self.environments_file = self.data_dir / "environments.json"
         self._metrics = metrics
-        self._codec = EnvironmentSecretsCodec(LocalKeyProvider())
+        self._encryption_settings: AppSettings | None = None
+        self._secrets_codec = EnvironmentSecretsCodec(
+            build_key_provider(resolve_key_source(None))
+        )
         self._ensure_paths()
+
+    def apply_encryption_settings(self, settings: AppSettings | None) -> None:
+        self._encryption_settings = settings
+        key_source = resolve_key_source(settings)
+        self._secrets_codec = EnvironmentSecretsCodec(build_key_provider(key_source))
+        enabled = resolve_encryption_enabled(settings)
+        policy_source = (
+            "settings"
+            if settings is not None and settings.env_encryption_enabled is not None
+            else "env_fallback"
+        )
+        logger.info(
+            "storage_encryption_config_applied enabled=%s key_source=%s policy_source=%s",
+            enabled,
+            key_source,
+            policy_source,
+        )
 
     def _ensure_paths(self):
         if not self.data_dir.exists():
@@ -138,10 +162,8 @@ class StorageManager:
             )
             return []
 
-    @classmethod
-    def _is_encryption_enabled(cls) -> bool:
-        value = os.getenv(cls.ENCRYPTION_FLAG_ENV, "").strip().lower()
-        return value in {"1", "true", "yes", "on"}
+    def _is_encryption_enabled(self) -> bool:
+        return resolve_encryption_enabled(self._encryption_settings)
 
     def _serialize_environment(self, env: Environment) -> dict[str, Any]:
         payload = env.model_dump(mode="json")
@@ -154,7 +176,7 @@ class StorageManager:
         for key, value in variables.items():
             if should_encrypt and key in hidden_keys:
                 try:
-                    envelope = self._codec.encrypt(str(value))
+                    envelope = self._secrets_codec.encrypt(str(value))
                     serialized_variables[key] = envelope.to_json()
                     encrypted_count += 1
                     if self._metrics:
@@ -211,7 +233,7 @@ class StorageManager:
             return value, False
         if isinstance(value, dict) and value.get("enc") is True:
             try:
-                decoded = self._codec.decrypt(value)
+                decoded = self._secrets_codec.decrypt(value)
                 if self._metrics:
                     self._metrics.track_environment_value_decryption()
                 return decoded, True

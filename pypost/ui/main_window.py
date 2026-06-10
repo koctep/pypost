@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
+        self.storage.apply_encryption_settings(self.state_manager.settings)
         self.style_manager = StyleManager()
         self.mcp_manager = MCPServerManager(
             metrics=self.metrics, template_service=self.template_service
@@ -223,6 +224,7 @@ class MainWindow(QMainWindow):
         )
         self.settings = new_settings
         self.config_manager.save_config(self.settings)
+        self.storage.apply_encryption_settings(self.settings)
         self.apply_settings(self.settings)
         if metrics_changed:
             logger.info(
@@ -234,10 +236,13 @@ class MainWindow(QMainWindow):
                 self.settings.metrics_host, self.settings.metrics_port
             )
         logger.info(
-            "settings_applied font_size=%d indent_size=%d request_timeout=%d",
+            "settings_applied font_size=%d indent_size=%d request_timeout=%d "
+            "env_encryption_enabled=%s env_encryption_key_source=%s",
             self.settings.font_size,
             self.settings.indent_size,
             self.settings.request_timeout,
+            self.settings.env_encryption_enabled,
+            self.settings.env_encryption_key_source,
         )
         self.env._on_env_changed(self.env.env_selector.currentIndex())
 
