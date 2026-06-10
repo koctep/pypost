@@ -1,30 +1,28 @@
 import logging
 
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
+    QCheckBox,
     QComboBox,
+    QHBoxLayout,
+    QHeaderView,
+    QMenu,
+    QPlainTextEdit,
     QPushButton,
     QTableWidgetItem,
-    QHeaderView,
-    QPlainTextEdit,
     QTabWidget,
-    QCheckBox,
     QToolButton,
-    QMenu,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtGui import QShortcut, QKeySequence, QAction
-from PySide6.QtCore import Signal
-from pypost.models.models import RequestData
-from pypost.ui.widgets.json_highlighter import JsonHighlighter
-from pypost.ui.widgets.code_editor import CodeEditor
-from pypost.ui.widgets.variable_aware_widgets import (
-    VariableAwareLineEdit,
-    VariableAwareTableWidget,
-)
-from pypost.ui.widgets.mixins import VariableHoverHelper
+
 from pypost.core.metrics import MetricsManager
+from pypost.models.models import RequestData
+from pypost.ui.widgets.code_editor import CodeEditor
+from pypost.ui.widgets.json_highlighter import JsonHighlighter
+from pypost.ui.widgets.mixins import VariableHoverHelper
+from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwareTableWidget
 
 logger = logging.getLogger(__name__)
 

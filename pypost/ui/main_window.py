@@ -1,27 +1,32 @@
 import logging
-
-from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QPushButton, QApplication,
-)
-from PySide6.QtGui import QIcon, QKeySequence, QShortcut
-from PySide6.QtCore import Qt, QTimer
 from pathlib import Path
 
-from pypost.core.storage import StorageManager
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QIcon, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QMainWindow,
+    QPushButton,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+)
+
+from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
-from pypost.core.style_manager import StyleManager
-from pypost.core.request_manager import RequestManager
-from pypost.core.state_manager import StateManager
+from pypost.core.history_manager import HistoryManager
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
-from pypost.core.history_manager import HistoryManager
+from pypost.core.request_manager import RequestManager
+from pypost.core.state_manager import StateManager
+from pypost.core.storage import StorageManager
+from pypost.core.style_manager import StyleManager
 from pypost.core.template_service import TemplateService
-from pypost.core.alert_manager import AlertManager
-from pypost.ui.dialogs.settings_dialog import SettingsDialog
-from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.about_dialog import AboutDialog
-from pypost.ui.presenters import CollectionsPresenter, TabsPresenter, EnvPresenter
+from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
+from pypost.ui.dialogs.settings_dialog import SettingsDialog
+from pypost.ui.presenters import CollectionsPresenter, EnvPresenter, TabsPresenter
 from pypost.ui.widgets.history_panel import HistoryPanel
 
 logger = logging.getLogger(__name__)
@@ -52,24 +57,33 @@ class MainWindow(QMainWindow):
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
         self.style_manager = StyleManager()
-        self.mcp_manager = MCPServerManager(metrics=self.metrics,
-                                            template_service=self.template_service)
+        self.mcp_manager = MCPServerManager(
+            metrics=self.metrics, template_service=self.template_service
+        )
         self.settings = self.state_manager.settings
         self.icons = self._load_icons()
         self.history_manager = HistoryManager()
         self.collections = CollectionsPresenter(
-            self.request_manager, self.state_manager, self.metrics, self.icons,
+            self.request_manager,
+            self.state_manager,
+            self.metrics,
+            self.icons,
         )
         self.tabs = TabsPresenter(
-            self.request_manager, self.state_manager, self.settings,
+            self.request_manager,
+            self.state_manager,
+            self.settings,
             metrics=self.metrics,
             history_manager=self.history_manager,
             template_service=self.template_service,
             alert_manager=self._alert_manager,
         )
         self.env = EnvPresenter(
-            self.storage, self.config_manager, self.mcp_manager,
-            self.settings, self.request_manager.get_collections,
+            self.storage,
+            self.config_manager,
+            self.mcp_manager,
+            self.settings,
+            self.request_manager.get_collections,
             self.metrics,
         )
         self._build_layout()
@@ -85,18 +99,19 @@ class MainWindow(QMainWindow):
         logger.info("main_window_initialized")
 
     def _load_icons(self) -> dict:
-        d = Path(__file__).parent / 'resources' / 'icons'
+        d = Path(__file__).parent / "resources" / "icons"
         return {
-            'collection': QIcon(str(d / 'collection.svg')),
-            'GET': QIcon(str(d / 'method-get.svg')),
-            'POST': QIcon(str(d / 'method-post.svg')),
-            'PUT': QIcon(str(d / 'method-put.svg')),
-            'DELETE': QIcon(str(d / 'method-delete.svg')),
-            'PATCH': QIcon(str(d / 'method-patch.svg')),
+            "collection": QIcon(str(d / "collection.svg")),
+            "GET": QIcon(str(d / "method-get.svg")),
+            "POST": QIcon(str(d / "method-post.svg")),
+            "PUT": QIcon(str(d / "method-put.svg")),
+            "DELETE": QIcon(str(d / "method-delete.svg")),
+            "PATCH": QIcon(str(d / "method-patch.svg")),
         }
 
     def _build_layout(self) -> None:
         from PySide6.QtWidgets import QTabWidget
+
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
@@ -146,6 +161,7 @@ class MainWindow(QMainWindow):
     def _setup_shortcuts(self) -> None:
         def sc(key, slot):
             QShortcut(QKeySequence(key), self).activated.connect(slot)
+
         sc("Ctrl+N", lambda: self.tabs.handle_new_tab("shortcut"))
         sc("Ctrl+W", self.tabs.handle_close_tab)
         sc("Ctrl+Tab", self.tabs.handle_next_tab)
@@ -174,8 +190,12 @@ class MainWindow(QMainWindow):
             app.setFont(font)
             logger.debug("apply_settings_font_applied point_size=%d", app.font().pointSize())
             for w in [
-                self.collections.widget, self.env.env_selector, self.tabs.widget,
-                self.env.manage_btn, self.settings_btn, self.env.env_label,
+                self.collections.widget,
+                self.env.env_selector,
+                self.tabs.widget,
+                self.env.manage_btn,
+                self.settings_btn,
+                self.env.env_label,
                 self.tabs.widget.tabBar(),
             ]:
                 w.setFont(font)
@@ -201,7 +221,8 @@ class MainWindow(QMainWindow):
         if metrics_changed:
             logger.info(
                 "metrics_server_restarting host=%s port=%d",
-                self.settings.metrics_host, self.settings.metrics_port,
+                self.settings.metrics_host,
+                self.settings.metrics_port,
             )
             self.metrics.restart_server(self.settings.metrics_host, self.settings.metrics_port)
         logger.info(

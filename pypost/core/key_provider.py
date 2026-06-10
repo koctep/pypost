@@ -40,9 +40,7 @@ class LocalKeyProvider(KeyProvider):
         key = os.getenv(self.ENV_KEY, "").strip()
         if not key:
             logger.error("env_encryption_key_missing env_var=%s", self.ENV_KEY)
-            raise EnvironmentEncryptionError(
-                f"Missing encryption key in env var {self.ENV_KEY}."
-            )
+            raise EnvironmentEncryptionError(f"Missing encryption key in env var {self.ENV_KEY}.")
         logger.debug("env_encryption_key_loaded source=env_var")
         return key
 

@@ -3,6 +3,7 @@ import shlex
 import subprocess
 import sys
 import urllib.parse
+
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 

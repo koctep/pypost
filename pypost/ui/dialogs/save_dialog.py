@@ -1,7 +1,17 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
-                               QComboBox, QDialogButtonBox, QMessageBox)
 from typing import List
+
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QVBoxLayout,
+)
+
 from pypost.models.models import Collection
+
 
 class SaveRequestDialog(QDialog):
     def __init__(self, collections: List[Collection], parent=None):
@@ -70,7 +80,7 @@ class SaveRequestDialog(QDialog):
                 QMessageBox.warning(self, "Error", "Please enter a new collection name")
                 return
             self.new_collection_name = new_col_name
-            self.selected_collection_id = None # Signal to create new
+            self.selected_collection_id = None  # Signal to create new
         else:
             self.selected_collection_id = self.collection_combo.currentData()
             self.new_collection_name = None

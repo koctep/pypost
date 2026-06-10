@@ -1,8 +1,10 @@
-from typing import Dict, Optional, Set, Tuple
-from PySide6.QtWidgets import QToolTip, QWidget
 import re
-from pypost.core.template_service import TemplateService
+from typing import Dict, Optional, Set, Tuple
+
+from PySide6.QtWidgets import QToolTip, QWidget
+
 from pypost.core.metrics import MetricsManager
+from pypost.core.template_service import TemplateService
 
 HIDDEN_MASK = "********"
 
@@ -11,7 +13,7 @@ class VariableHoverHelper:
     """Helper class to find variables in text and manage tooltip display."""
 
     # Regex to find {{variable}} pattern
-    VARIABLE_PATTERN = re.compile(r'\{\{([a-zA-Z0-9_]+)\}\}')
+    VARIABLE_PATTERN = re.compile(r"\{\{([a-zA-Z0-9_]+)\}\}")
     EXPRESSION_PATTERN = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
     _template_service = TemplateService()
 
@@ -24,7 +26,8 @@ class VariableHoverHelper:
 
     @staticmethod
     def find_variable_at_index(
-        text: str, index: int,
+        text: str,
+        index: int,
     ) -> Optional[str]:
         """
         Finds a variable name under the given index in text.
@@ -64,15 +67,20 @@ class VariableHoverHelper:
         hidden_keys: Optional[Set[str]] = None,
     ) -> str:
         """Replaces all supported {{...}} occurrences with hover values."""
+
         def replace(match):
             expression = match.group(0)
             if VariableHoverHelper.VARIABLE_PATTERN.fullmatch(expression):
                 return VariableHoverHelper._resolve_plain_variable(
-                    expression, variables, hidden_keys,
+                    expression,
+                    variables,
+                    hidden_keys,
                 )
             return VariableHoverHelper._resolve_expression_token(
-                expression, variables,
+                expression,
+                variables,
             )
+
         return VariableHoverHelper.EXPRESSION_PATTERN.sub(replace, text)
 
     @staticmethod
@@ -85,13 +93,17 @@ class VariableHoverHelper:
         if not match:
             return expression
         return VariableHoverHelper.get_variable_value(
-            match.group(1), variables, hidden_keys,
+            match.group(1),
+            variables,
+            hidden_keys,
         )
 
     @staticmethod
     def _resolve_expression_token(expression: str, variables: Dict[str, str]) -> str:
         return VariableHoverHelper._template_service.render_string(
-            expression, variables, render_path="hover",
+            expression,
+            variables,
+            render_path="hover",
         )
 
 
@@ -100,6 +112,7 @@ class VariableHoverMixin:
     Mixin for QWidgets to support hovering over {{variables}}.
     Requires the host class to be a QWidget subclass.
     """
+
     def __init__(self):
         self._variables: Dict[str, str] = {}
         self._hidden_keys: Set[str] = set()
@@ -118,9 +131,7 @@ class VariableHoverMixin:
         Must be implemented by subclasses.
         Returns (full_text, cursor_index)
         """
-        raise NotImplementedError(
-            "Subclasses must implement _get_text_at_cursor"
-        )
+        raise NotImplementedError("Subclasses must implement _get_text_at_cursor")
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)  # type: ignore
@@ -148,8 +159,12 @@ class VariableHoverMixin:
             return
 
         value = VariableHoverHelper.resolve_text(
-            expression, self._variables, self._hidden_keys,
+            expression,
+            self._variables,
+            self._hidden_keys,
         )
         QToolTip.showText(
-            event.globalPos(), value, self,  # type: ignore
+            event.globalPos(),
+            value,
+            self,  # type: ignore
         )

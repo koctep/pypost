@@ -1,8 +1,10 @@
 import json
-import os
 from pathlib import Path
+
 from platformdirs import user_config_dir
+
 from pypost.models.settings import AppSettings
+
 
 class ConfigManager:
     def __init__(self, app_name="pypost", app_author=None):
@@ -20,9 +22,9 @@ class ConfigManager:
     def load_config(self) -> AppSettings:
         if not self.config_path.exists():
             return AppSettings()
-        
+
         try:
-            with open(self.config_path, 'r') as f:
+            with open(self.config_path, "r") as f:
                 data = json.load(f)
                 return AppSettings(**data)
         except Exception as e:
@@ -33,8 +35,8 @@ class ConfigManager:
         try:
             # Increment revision before saving
             settings.revision += 1
-            
-            with open(self.config_path, 'w') as f:
+
+            with open(self.config_path, "w") as f:
                 json.dump(settings.model_dump(), f, indent=4)
         except Exception as e:
             print(f"Error saving config: {e}")

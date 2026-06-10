@@ -1,16 +1,21 @@
 import logging
 from typing import Callable
 
-from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QComboBox, QLabel, QPushButton,
-    QInputDialog, QMessageBox,
-)
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QWidget,
+)
 
-from pypost.core.storage import StorageManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
+from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
@@ -21,8 +26,8 @@ logger = logging.getLogger(__name__)
 class EnvPresenter(QObject):
     """Owns the environment selector: loading envs, propagating vars, managing MCP lifecycle."""
 
-    env_variables_changed = Signal(object)   # payload: dict[str, str]
-    env_keys_changed = Signal(object)        # payload: list[str] | None
+    env_variables_changed = Signal(object)  # payload: dict[str, str]
+    env_keys_changed = Signal(object)  # payload: list[str] | None
     env_hidden_keys_changed = Signal(object)  # payload: set[str]
 
     def __init__(
@@ -129,7 +134,9 @@ class EnvPresenter(QObject):
         if isinstance(selected, Environment):
             logger.info(
                 "env_variables_updated_from_script env_id=%s env_name=%s var_count=%d",
-                selected.id, selected.name, len(vars),
+                selected.id,
+                selected.name,
+                len(vars),
             )
             selected.variables.update(vars)
             self._storage.save_environments(self._environments)
@@ -141,7 +148,8 @@ class EnvPresenter(QObject):
         if not isinstance(selected, Environment):
             logger.warning("variable_set_request_no_env_selected")
             QMessageBox.warning(
-                self._widget, "No Environment",
+                self._widget,
+                "No Environment",
                 "Please select an environment to set variables.",
             )
             return
@@ -160,16 +168,16 @@ class EnvPresenter(QObject):
                 # Validate variable name for Jinja2 compatibility
                 is_valid, error_msg = self._is_valid_variable_name(target_key)
                 if not is_valid:
-                    QMessageBox.warning(
-                        self._widget, "Invalid Variable Name", error_msg
-                    )
+                    QMessageBox.warning(self._widget, "Invalid Variable Name", error_msg)
                     return
             else:
                 return
 
         logger.info(
             "variable_set_in_env env_id=%s env_name=%s key=%s",
-            selected.id, selected.name, target_key,
+            selected.id,
+            selected.name,
+            target_key,
         )
         selected.variables[target_key] = value
         self._storage.save_environments(self._environments)
@@ -197,19 +205,17 @@ class EnvPresenter(QObject):
             self._metrics.track_variable_validation_failure("starts_with_digit")
             self._metrics.track_variable_validation("invalid")
             logger.debug(
-                "variable_name_validation_attempt name=%s valid=False "
-                "error=starts_with_digit",
+                "variable_name_validation_attempt name=%s valid=False " "error=starts_with_digit",
                 name,
             )
             return False, "Variable name cannot start with a digit."
 
         # Check if all characters are alphanumeric or underscore
-        if not all(c.isalnum() or c == '_' for c in name):
+        if not all(c.isalnum() or c == "_" for c in name):
             self._metrics.track_variable_validation_failure("invalid_chars")
             self._metrics.track_variable_validation("invalid")
             logger.debug(
-                "variable_name_validation_attempt name=%s valid=False "
-                "error=invalid_chars",
+                "variable_name_validation_attempt name=%s valid=False " "error=invalid_chars",
                 name,
             )
             return False, "Variable name can only contain letters, numbers, and underscores."
@@ -230,7 +236,10 @@ class EnvPresenter(QObject):
         if isinstance(selected, Environment):
             logger.info(
                 "env_selected env_id=%s env_name=%s mcp_enabled=%s var_count=%d",
-                selected.id, selected.name, selected.enable_mcp, len(selected.variables),
+                selected.id,
+                selected.name,
+                selected.enable_mcp,
+                len(selected.variables),
             )
             self._settings.last_environment_id = selected.id
             variables = selected.variables
@@ -253,10 +262,7 @@ class EnvPresenter(QObject):
         self._current_env_index = index
 
         keys = list(variables.keys()) if isinstance(selected, Environment) else None
-        hidden_keys = (
-            selected.hidden_keys
-            if isinstance(selected, Environment) else set()
-        )
+        hidden_keys = selected.hidden_keys if isinstance(selected, Environment) else set()
         self.env_variables_changed.emit(variables)
         self.env_keys_changed.emit(keys)
         self.env_hidden_keys_changed.emit(hidden_keys)
@@ -265,7 +271,8 @@ class EnvPresenter(QObject):
         if is_running:
             logger.info(
                 "mcp_server_started host=%s port=%d",
-                self._settings.mcp_host, self._settings.mcp_port,
+                self._settings.mcp_host,
+                self._settings.mcp_port,
             )
             self._mcp_status_label.setText(
                 f"MCP: ON ({self._settings.mcp_host}:{self._settings.mcp_port})"

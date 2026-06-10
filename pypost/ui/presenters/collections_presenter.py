@@ -1,15 +1,13 @@
 import logging
 
-from PySide6.QtWidgets import (
-    QTreeView, QMenu, QMessageBox, QAbstractItemDelegate,
-)
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon
 from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtGui import QStandardItem, QStandardItemModel
+from PySide6.QtWidgets import QAbstractItemDelegate, QMenu, QMessageBox, QTreeView
 
-from pypost.models.models import RequestData
+from pypost.core.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
-from pypost.core.metrics import MetricsManager
+from pypost.models.models import RequestData
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +15,10 @@ logger = logging.getLogger(__name__)
 class CollectionsPresenter(QObject):
     """Owns the collections tree view: loading, rendering, rename, delete, and tab opening."""
 
-    open_request_in_tab = Signal(object)   # payload: RequestData
+    open_request_in_tab = Signal(object)  # payload: RequestData
     open_request_in_isolated_tab = Signal(object)  # payload: RequestData (deep copy)
-    collections_changed = Signal()         # after create / delete / rename
-    request_renamed = Signal(str, str)     # (request_id, new_name)
+    collections_changed = Signal()  # after create / delete / rename
+    request_renamed = Signal(str, str)  # (request_id, new_name)
 
     def __init__(
         self,
@@ -61,15 +59,16 @@ class CollectionsPresenter(QObject):
         total_requests = sum(len(col.requests) for col in collections)
         logger.info(
             "load_collections_completed collection_count=%d request_count=%d",
-            len(collections), total_requests,
+            len(collections),
+            total_requests,
         )
 
         for col in collections:
             col_item = QStandardItem(col.name)
             col_item.setData(col.id, Qt.UserRole)
             col_item.setEditable(False)
-            if 'collection' in self._icons:
-                col_item.setIcon(self._icons['collection'])
+            if "collection" in self._icons:
+                col_item.setIcon(self._icons["collection"])
 
             for req in col.requests:
                 req_item = QStandardItem(f"{req.method} {req.name}")
@@ -105,7 +104,8 @@ class CollectionsPresenter(QObject):
         if isinstance(data, RequestData):
             logger.info(
                 "collection_request_opened request_id=%s request_name=%s",
-                data.id, data.name,
+                data.id,
+                data.name,
             )
             self.open_request_in_tab.emit(data)
         else:
@@ -140,7 +140,8 @@ class CollectionsPresenter(QObject):
         if new_tab_action and selected_action == new_tab_action:
             logger.info(
                 "collection_request_open_new_tab request_id=%s request_name=%s",
-                data.id, data.name,
+                data.id,
+                data.name,
             )
             self._metrics.track_gui_new_tab_action("collections_context")
             self.open_request_in_isolated_tab.emit(data.model_copy(deep=True))
@@ -149,7 +150,9 @@ class CollectionsPresenter(QObject):
         if selected_action == rename_action:
             logger.info(
                 "collection_item_rename_selected item_type=%s item_id=%s item_label=%s",
-                item_type, item_id, item_label,
+                item_type,
+                item_id,
+                item_label,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "selected")
             self._start_rename(index)
@@ -160,18 +163,24 @@ class CollectionsPresenter(QObject):
 
         logger.info(
             "collection_item_delete_selected item_type=%s item_id=%s item_label=%s",
-            item_type, item_id, item_label,
+            item_type,
+            item_id,
+            item_label,
         )
         self._metrics.track_gui_collection_delete_action(item_type, "selected")
 
         reply = QMessageBox.question(
-            self._view, "Confirm Delete", f"Delete '{item_label}'?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            self._view,
+            "Confirm Delete",
+            f"Delete '{item_label}'?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             logger.info(
                 "collection_item_delete_cancelled item_type=%s item_id=%s",
-                item_type, item_id,
+                item_type,
+                item_id,
             )
             self._metrics.track_gui_collection_delete_action(item_type, "cancelled")
             return
@@ -204,7 +213,8 @@ class CollectionsPresenter(QObject):
         if hint == QAbstractItemDelegate.EndEditHint.RevertModelCache:
             logger.info(
                 "collection_item_rename_cancelled item_type=%s item_id=%s",
-                item_type, item_id,
+                item_type,
+                item_id,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "cancelled")
             self._pending_rename = None
@@ -218,7 +228,8 @@ class CollectionsPresenter(QObject):
         if item is None:
             logger.warning(
                 "collection_item_rename_not_found_in_model item_type=%s item_id=%s",
-                item_type, item_id,
+                item_type,
+                item_id,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "not_found")
             self.load_collections()
@@ -229,7 +240,8 @@ class CollectionsPresenter(QObject):
         if not new_name:
             logger.warning(
                 "collection_item_rename_rejected_empty item_type=%s item_id=%s",
-                item_type, item_id,
+                item_type,
+                item_id,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "rejected_empty")
             QMessageBox.warning(self._view, "Rename Error", "Name cannot be empty.")
@@ -242,7 +254,10 @@ class CollectionsPresenter(QObject):
         except Exception as exc:
             logger.error(
                 "collection_item_rename_failed item_type=%s item_id=%s new_name=%s error=%s",
-                item_type, item_id, new_name, exc,
+                item_type,
+                item_id,
+                new_name,
+                exc,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "error")
             QMessageBox.critical(
@@ -255,19 +270,21 @@ class CollectionsPresenter(QObject):
         if not renamed:
             logger.warning(
                 "collection_item_rename_not_found item_type=%s item_id=%s new_name=%s",
-                item_type, item_id, new_name,
+                item_type,
+                item_id,
+                new_name,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "not_found")
-            QMessageBox.warning(
-                self._view, "Rename Error", f"Could not rename '{item.text()}'."
-            )
+            QMessageBox.warning(self._view, "Rename Error", f"Could not rename '{item.text()}'.")
             self.load_collections()
             self.restore_tree_state()
             return
 
         logger.info(
             "collection_item_rename_succeeded item_type=%s item_id=%s new_name=%s",
-            item_type, item_id, new_name,
+            item_type,
+            item_id,
+            new_name,
         )
         self._metrics.track_gui_collection_rename_action(item_type, "succeeded")
 
@@ -286,11 +303,7 @@ class CollectionsPresenter(QObject):
             for child_row in range(col_item.rowCount()):
                 req_item = col_item.child(child_row)
                 data = req_item.data(Qt.UserRole)
-                if (
-                    item_type == "request"
-                    and isinstance(data, RequestData)
-                    and data.id == item_id
-                ):
+                if item_type == "request" and isinstance(data, RequestData) and data.id == item_id:
                     return req_item
         return None
 
@@ -300,7 +313,9 @@ class CollectionsPresenter(QObject):
         except Exception as exc:
             logger.error(
                 "collection_item_delete_failed item_type=%s item_id=%s error=%s",
-                item_type, item_id, exc,
+                item_type,
+                item_id,
+                exc,
             )
             self._metrics.track_gui_collection_delete_action(item_type, "error")
             QMessageBox.critical(
@@ -311,17 +326,17 @@ class CollectionsPresenter(QObject):
         if not deleted:
             logger.warning(
                 "collection_item_delete_not_found item_type=%s item_id=%s",
-                item_type, item_id,
+                item_type,
+                item_id,
             )
             self._metrics.track_gui_collection_delete_action(item_type, "not_found")
-            QMessageBox.warning(
-                self._view, "Delete Error", f"Could not delete '{item_label}'."
-            )
+            QMessageBox.warning(self._view, "Delete Error", f"Could not delete '{item_label}'.")
             return
 
         logger.info(
             "collection_item_delete_succeeded item_type=%s item_id=%s",
-            item_type, item_id,
+            item_type,
+            item_id,
         )
         self._metrics.track_gui_collection_delete_action(item_type, "succeeded")
         self.load_collections()

@@ -14,10 +14,9 @@ class FunctionExpressionResolver:
     recursively via ``FunctionRegistry``. There is no fixed depth limit as long as each call
     satisfies catalog membership and single-argument rules.
     """
+
     _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-    _FUNCTION_SIGNATURE_RE = re.compile(
-        r"^(?P<func>[a-zA-Z_][a-zA-Z0-9_]*)\((?P<args>.*)\)$"
-    )
+    _FUNCTION_SIGNATURE_RE = re.compile(r"^(?P<func>[a-zA-Z_][a-zA-Z0-9_]*)\((?P<args>.*)\)$")
 
     def __init__(self, registry: FunctionRegistry) -> None:
         self._registry = registry
@@ -44,7 +43,8 @@ class FunctionExpressionResolver:
         return self._validate_function_args(function_name, args)
 
     def _parse_function_expression(
-        self, expression: str,
+        self,
+        expression: str,
     ) -> tuple[str, str] | ValidationResult:
         function_match = self._FUNCTION_SIGNATURE_RE.fullmatch(expression)
         if not function_match:
@@ -57,7 +57,9 @@ class FunctionExpressionResolver:
         return function_name, function_match.group("args").strip()
 
     def _validate_function_args(
-        self, function_name: str, args: str,
+        self,
+        function_name: str,
+        args: str,
     ) -> ValidationResult | None:
         argument = self._extract_single_argument(args)
         if argument is None:

@@ -1,14 +1,13 @@
-import os
 from pathlib import Path
-from PySide6.QtWidgets import QApplication
+
 
 class StyleManager:
     def __init__(self):
         # Path to pypost/ui/styles
         # This file is in pypost/core/style_manager.py, so parent.parent is pypost/
         self.root_dir = Path(__file__).parent.parent
-        self.styles_dir = self.root_dir / 'ui' / 'styles'
-        self.icons_dir = self.root_dir / 'ui' / 'resources' / 'icons'
+        self.styles_dir = self.root_dir / "ui" / "styles"
+        self.icons_dir = self.root_dir / "ui" / "resources" / "icons"
 
     def load_styles(self) -> str:
         """Reads all .qss files from the styles directory and returns the combined stylesheet."""
@@ -19,15 +18,15 @@ class StyleManager:
         try:
             # Sort files to ensure deterministic loading order (e.g. alphabetical)
             qss_files = sorted(self.styles_dir.glob("*.qss"))
-            
+
             for file_path in qss_files:
                 try:
-                    with open(file_path, 'r') as f:
+                    with open(file_path, "r") as f:
                         content = f.read()
                         combined_style += f"\n/* File: {file_path.name} */\n{content}\n"
                 except Exception as e:
                     print(f"Error reading style file {file_path}: {e}")
-                    
+
         except Exception as e:
             print(f"Error scanning styles directory: {e}")
 

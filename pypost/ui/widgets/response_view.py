@@ -2,15 +2,22 @@ import json
 import logging
 from functools import partial
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QTextEdit, QLabel, QHBoxLayout,
-    QMenu, QLineEdit, QPushButton, QCheckBox
-)
-from PySide6.QtGui import QTextCursor, QShortcut, QKeySequence, QTextDocument
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor, QTextDocument
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
-from pypost.models.response import ResponseData
 from pypost.core.metrics import MetricsManager
+from pypost.models.response import ResponseData
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
 logger = logging.getLogger(__name__)
@@ -46,17 +53,11 @@ class ResponseView(QWidget):
         self.search_input.setPlaceholderText("Search...")
         self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self._on_search_text_changed)
-        self.search_input.returnPressed.connect(
-            lambda: self._find_next(source="enter")
-        )
+        self.search_input.returnPressed.connect(lambda: self._find_next(source="enter"))
         self.search_prev_btn = QPushButton("Previous")
-        self.search_prev_btn.clicked.connect(
-            lambda: self._find_previous(source="previous")
-        )
+        self.search_prev_btn.clicked.connect(lambda: self._find_previous(source="previous"))
         self.search_next_btn = QPushButton("Next")
-        self.search_next_btn.clicked.connect(
-            lambda: self._find_next(source="next")
-        )
+        self.search_next_btn.clicked.connect(lambda: self._find_next(source="next"))
         self.search_case_cb = QCheckBox("Match case")
         self.search_case_cb.toggled.connect(self._on_search_text_changed)
         self.search_status_label = QLabel("")
@@ -71,17 +72,13 @@ class ResponseView(QWidget):
         layout.addLayout(self.status_layout)
 
         # Ctrl+F to focus search
-        QShortcut(
-            QKeySequence("Ctrl+F"), self, self.search_input.setFocus
-        )
+        QShortcut(QKeySequence("Ctrl+F"), self, self.search_input.setFocus)
 
         # Body View
         self.body_view = QTextEdit()
         self.body_view.setReadOnly(True)
         self.body_view.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.body_view.customContextMenuRequested.connect(
-            self.show_context_menu
-        )
+        self.body_view.customContextMenuRequested.connect(self.show_context_menu)
         self.json_highlighter = JsonHighlighter(self.body_view.document())
         layout.addWidget(self.body_view)
 
@@ -104,13 +101,8 @@ class ResponseView(QWidget):
         self.body_view.find(text, self._search_flags(backward=False))
         total = self._update_match_count()
         if self._metrics:
-            self._metrics.track_gui_response_search_action(
-                source=source, has_matches=(total > 0)
-            )
-        logger.debug(
-            "response_search_find source=%s matches=%d",
-            source, total
-        )
+            self._metrics.track_gui_response_search_action(source=source, has_matches=(total > 0))
+        logger.debug("response_search_find source=%s matches=%d", source, total)
 
     def _find_previous(self, source: str = "previous") -> None:
         text = self.search_input.text()
@@ -120,13 +112,8 @@ class ResponseView(QWidget):
         self.body_view.find(text, self._search_flags(backward=True))
         total = self._update_match_count()
         if self._metrics:
-            self._metrics.track_gui_response_search_action(
-                source=source, has_matches=(total > 0)
-            )
-        logger.debug(
-            "response_search_find source=%s matches=%d",
-            source, total
-        )
+            self._metrics.track_gui_response_search_action(source=source, has_matches=(total > 0))
+        logger.debug("response_search_find source=%s matches=%d", source, total)
 
     def _count_matches(self) -> int:
         text = self.search_input.text()
@@ -192,13 +179,8 @@ class ResponseView(QWidget):
         self.body_view.find(text, self._search_flags(backward=False))
         total = self._update_match_count()
         if self._metrics:
-            self._metrics.track_gui_response_search_action(
-                source="typed", has_matches=(total > 0)
-            )
-        logger.debug(
-            "response_search_typed query_len=%d matches=%d",
-            len(text), total
-        )
+            self._metrics.track_gui_response_search_action(source="typed", has_matches=(total > 0))
+        logger.debug("response_search_typed query_len=%d matches=%d", len(text), total)
 
     def show_context_menu(self, pos):
         cursor = self.body_view.textCursor()
@@ -216,9 +198,7 @@ class ResponseView(QWidget):
             if self.current_env_keys:
                 for key in self.current_env_keys:
                     action = env_menu.addAction(key)
-                    action.triggered.connect(
-                        partial(self.emit_variable_set, key, clean_text)
-                    )
+                    action.triggered.connect(partial(self.emit_variable_set, key, clean_text))
                 env_menu.addSeparator()
 
             # New variable option

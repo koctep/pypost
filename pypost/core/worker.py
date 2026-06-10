@@ -1,25 +1,27 @@
 import logging
 import threading
-from PySide6.QtCore import QThread, Signal, QObject
-from typing import Dict, List, Optional
+
+from PySide6.QtCore import QThread, Signal
+
+from pypost.core.alert_manager import AlertManager
+from pypost.core.history_manager import HistoryManager
+from pypost.core.metrics import MetricsManager
+from pypost.core.request_service import RequestService
+from pypost.core.template_service import TemplateService
+from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
-from pypost.models.errors import ErrorCategory, ExecutionError
-from pypost.core.request_service import RequestService
-from pypost.core.metrics import MetricsManager
-from pypost.core.history_manager import HistoryManager
-from pypost.core.template_service import TemplateService
-from pypost.core.alert_manager import AlertManager
 from pypost.models.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
+
 
 class RequestWorker(QThread):
     finished = Signal(ResponseData)
     error = Signal(object)  # carries ExecutionError; falls back to str for cancellation
     retry_attempt = Signal(int, int, object)  # attempt, max_retries, ExecutionError
     env_update = Signal(dict)
-    script_output = Signal(list, str) # logs, error_message
+    script_output = Signal(list, str)  # logs, error_message
     chunk_received = Signal(str)
     headers_received = Signal(int, dict)
 
@@ -52,24 +54,30 @@ class RequestWorker(QThread):
             default_retry_policy is not None,
             default_retry_policy.max_retries if default_retry_policy is not None else "N/A",
         )
-        self.service = RequestService(metrics=metrics, history_manager=history_manager,
-                                      template_service=template_service,
-                                      alert_manager=alert_manager,
-                                      default_retry_policy=default_retry_policy)
+        self.service = RequestService(
+            metrics=metrics,
+            history_manager=history_manager,
+            template_service=template_service,
+            alert_manager=alert_manager,
+            default_retry_policy=default_retry_policy,
+        )
         self._stop_event = threading.Event()
 
     def stop(self):
         """Request the worker to stop processing."""
         logger.debug(
             "worker_stop_requested method=%s url=%s",
-            self.request_data.method, self.request_data.url,
+            self.request_data.method,
+            self.request_data.url,
         )
         self._stop_event.set()
 
     def run(self):
         logger.debug(
             "worker_run_started method=%s url=%s request_id=%s",
-            self.request_data.method, self.request_data.url, self.request_data.id,
+            self.request_data.method,
+            self.request_data.url,
+            self.request_data.id,
         )
         try:
             # Define callback for streaming
@@ -99,28 +107,30 @@ class RequestWorker(QThread):
                 retry_callback=on_retry,
                 hidden_keys=self.hidden_keys,
             )
-            
+
             if result.script_logs or result.script_error:
                 self.script_output.emit(result.script_logs, result.script_error)
-            
+
             if result.updated_variables:
                 self.env_update.emit(result.updated_variables)
 
             stopped = self._stop_event.is_set()
             logger.debug(
                 "worker_run_completed method=%s url=%s stopped=%s",
-                self.request_data.method, self.request_data.url, stopped,
+                self.request_data.method,
+                self.request_data.url,
+                stopped,
             )
             self.finished.emit(result.response)
         except ExecutionError as exc:
-            logger.error(
-                "RequestWorker failed category=%s detail=%s", exc.category, exc.detail
-            )
+            logger.error("RequestWorker failed category=%s detail=%s", exc.category, exc.detail)
             self.error.emit(exc)
         except Exception as exc:
             logger.error("RequestWorker unexpected error: %s", exc, exc_info=True)
-            self.error.emit(ExecutionError(
-                category=ErrorCategory.UNKNOWN,
-                message="An unexpected error occurred.",
-                detail=str(exc),
-            ))
+            self.error.emit(
+                ExecutionError(
+                    category=ErrorCategory.UNKNOWN,
+                    message="An unexpected error occurred.",
+                    detail=str(exc),
+                )
+            )

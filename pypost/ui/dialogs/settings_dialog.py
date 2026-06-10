@@ -1,19 +1,20 @@
 import logging
 
 from PySide6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QFormLayout,
-    QSpinBox,
-    QDoubleSpinBox,
-    QDialogButtonBox,
     QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
     QLineEdit,
     QMessageBox,
+    QSpinBox,
+    QVBoxLayout,
 )
+
 from pypost.models.retry import (
-    RetryPolicy,
     RetryableCodesValidationFailure,
+    RetryPolicy,
     parse_retryable_status_codes,
 )
 from pypost.models.settings import AppSettings

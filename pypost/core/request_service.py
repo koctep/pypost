@@ -3,20 +3,20 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
 
-from pypost.models.models import RequestData, HistoryEntry
-from pypost.models.response import ResponseData
-from pypost.models.errors import ErrorCategory, ExecutionError
-from pypost.models.retry import RetryPolicy
 from pypost.core.alert_manager import AlertManager, AlertPayload
+from pypost.core.history_manager import HistoryManager
 from pypost.core.http_client import HTTPClient
 from pypost.core.mcp_client_service import MCPClientService
+from pypost.core.metrics import MetricsManager
 from pypost.core.script_executor import ScriptExecutor
 from pypost.core.sensitive_data_masking_policy import SensitiveDataMaskingPolicy
 from pypost.core.template_service import TemplateService
-from pypost.core.metrics import MetricsManager
-from pypost.core.history_manager import HistoryManager
+from pypost.models.errors import ErrorCategory, ExecutionError
+from pypost.models.models import HistoryEntry, RequestData
+from pypost.models.response import ResponseData
+from pypost.models.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -101,9 +101,7 @@ class RequestService:
             self._metrics.track_request_sent(request.method)
         response = self.mcp_client.run(url, operation, call_params)
         if self._metrics:
-            self._metrics.track_response_received(
-                request.method, str(response.status_code)
-            )
+            self._metrics.track_response_received(request.method, str(response.status_code))
         if headers_callback:
             headers_callback(response.status_code, response.headers)
         return response
@@ -123,13 +121,16 @@ class RequestService:
         if policy is None:
             policy = self._default_retry_policy
         _policy_source = (
-            "per_request" if request.retry_policy is not None
-            else "app_default" if self._default_retry_policy is not None
-            else "hardcoded_fallback"
+            "per_request"
+            if request.retry_policy is not None
+            else "app_default" if self._default_retry_policy is not None else "hardcoded_fallback"
         )
         logger.debug(
             "retry_policy_resolved method=%s url=%r source=%s max_retries=%d",
-            request.method, request.url, _policy_source, policy.max_retries if policy else 0,
+            request.method,
+            request.url,
+            _policy_source,
+            policy.max_retries if policy else 0,
         )
         max_retries = policy.max_retries if policy else 0
         delay = policy.retry_delay_seconds if policy else 1.0
@@ -148,7 +149,10 @@ class RequestService:
 
             logger.debug(
                 "http_attempt method=%s url=%r attempt=%d max_retries=%d",
-                request.method, request.url, attempt, max_retries,
+                request.method,
+                request.url,
+                attempt,
+                max_retries,
             )
 
             try:
@@ -168,7 +172,12 @@ class RequestService:
                 logger.warning(
                     "retryable_error method=%s url=%r category=%s attempt=%d max_retries=%d"
                     " error=%s",
-                    request.method, request.url, exc.category, attempt, max_retries, exc.message,
+                    request.method,
+                    request.url,
+                    exc.category,
+                    attempt,
+                    max_retries,
+                    exc.message,
                 )
             else:
                 # Response path — raises here are not caught by the handler above
@@ -180,13 +189,15 @@ class RequestService:
                         message=f"HTTP {response.status_code}",
                         detail=f"retries_attempted: {attempt}",
                     )
-                    self._emit_exhaustion_alert(
-                        request, request_name, max_retries, last_error
-                    )
+                    self._emit_exhaustion_alert(request, request_name, max_retries, last_error)
                     raise last_error
                 logger.warning(
                     "retryable_status method=%s url=%r status=%d attempt=%d max_retries=%d",
-                    request.method, request.url, response.status_code, attempt, max_retries,
+                    request.method,
+                    request.url,
+                    response.status_code,
+                    attempt,
+                    max_retries,
                 )
                 last_error = ExecutionError(
                     category=ErrorCategory.NETWORK,
@@ -201,17 +212,22 @@ class RequestService:
                 retry_callback(attempt + 1, max_retries, last_error)
 
             # Exponential back-off (capped at 60 s)
-            wait = min(delay * (multiplier ** attempt), 60.0)
+            wait = min(delay * (multiplier**attempt), 60.0)
             logger.debug(
                 "retry_backoff method=%s url=%r attempt=%d wait_seconds=%.2f",
-                request.method, request.url, attempt, wait,
+                request.method,
+                request.url,
+                attempt,
+                wait,
             )
             end = time.monotonic() + wait
             while time.monotonic() < end:
                 if stop_flag and stop_flag():
                     logger.debug(
                         "retry_cancelled_during_backoff method=%s url=%r attempt=%d",
-                        request.method, request.url, attempt,
+                        request.method,
+                        request.url,
+                        attempt,
                     )
                     raise ExecutionError(
                         category=ErrorCategory.NETWORK,
@@ -223,7 +239,9 @@ class RequestService:
         # Defensive: loop should always return or raise (e.g. empty range(max_retries+1))
         logger.error(
             "retry_loop_invariant_failed method=%s url=%r max_retries=%d",
-            request.method, request.url, max_retries,
+            request.method,
+            request.url,
+            max_retries,
         )
         raise ExecutionError(
             category=ErrorCategory.NETWORK,
@@ -241,19 +259,26 @@ class RequestService:
         logger.warning(
             "retry_exhausted method=%s url=%r request_name=%r retries=%d"
             " error_category=%s error=%s detail=%s",
-            request.method, request.url, request_name, retries_attempted,
-            error.category, error.message, error.detail,
+            request.method,
+            request.url,
+            request_name,
+            retries_attempted,
+            error.category,
+            error.message,
+            error.detail,
         )
         if self._metrics:
             self._metrics.track_request_retry_exhaustion(request.url)
         if self._alert_manager:
-            self._alert_manager.emit(AlertPayload(
-                request_name=request_name or request.name,
-                endpoint=request.url,
-                retries_attempted=retries_attempted,
-                final_error_category=error.category.value,
-                final_error_message=error.message,
-            ))
+            self._alert_manager.emit(
+                AlertPayload(
+                    request_name=request_name or request.name,
+                    endpoint=request.url,
+                    retries_attempted=retries_attempted,
+                    final_error_category=error.category.value,
+                    final_error_message=error.message,
+                )
+            )
 
     def execute(
         self,
@@ -278,7 +303,8 @@ class RequestService:
             except Exception as exc:
                 logger.error(
                     "template_render_failed url=%r detail=%s",
-                    request.url, exc,
+                    request.url,
+                    exc,
                 )
                 raise ExecutionError(
                     category=ErrorCategory.TEMPLATE,
@@ -303,7 +329,10 @@ class RequestService:
         except ExecutionError as exc:
             logger.error(
                 "request_execution_failed method=%s url=%r category=%s detail=%s",
-                request.method, request.url, exc.category, exc.detail,
+                request.method,
+                request.url,
+                exc.category,
+                exc.detail,
             )
             if self._metrics:
                 self._metrics.track_request_error(exc.category)
@@ -322,10 +351,7 @@ class RequestService:
         # 3. Execute post-request script if exists
         if request.post_script:
             updated_variables, script_logs, script_error = ScriptExecutor.execute(
-                request.post_script,
-                request,
-                response,
-                variables
+                request.post_script, request, response, variables
             )
 
         exec_error_from_script = None
@@ -378,9 +404,11 @@ class RequestService:
                 )
                 self._history_manager.append(entry)
                 logger.debug(
-                    "history_entry_recorded method=%s url=%s status=%d"
-                    " response_time_ms=%.1f",
-                    entry.method, entry.url, entry.status_code, entry.response_time_ms,
+                    "history_entry_recorded method=%s url=%s status=%d" " response_time_ms=%.1f",
+                    entry.method,
+                    entry.url,
+                    entry.status_code,
+                    entry.response_time_ms,
                 )
                 if self._metrics:
                     self._metrics.track_history_entry_appended(entry.method)

@@ -1,13 +1,14 @@
+import asyncio
 import logging
 import threading
-import asyncio
+
 import uvicorn
-from starlette.applications import Starlette
-from starlette.routing import Mount
-from prometheus_client import make_asgi_app, CollectorRegistry, Counter, generate_latest
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp.types import Resource, TextResourceContents
+from prometheus_client import CollectorRegistry, Counter, generate_latest, make_asgi_app
+from starlette.applications import Starlette
+from starlette.routing import Mount
 
 from pypost.models.errors import ErrorCategory
 
@@ -32,196 +33,194 @@ class MetricsManager:
     def _init_metrics(self):
         """Initialize all Prometheus metrics."""
         self.gui_send_clicks = Counter(
-            'gui_send_clicks_total',
-            'Number of times Send button was clicked',
-            registry=self.registry
+            "gui_send_clicks_total",
+            "Number of times Send button was clicked",
+            registry=self.registry,
         )
 
         self.gui_save_actions = Counter(
-            'gui_save_actions_total',
-            'Number of times Save action was triggered in GUI',
-            ['source'],
-            registry=self.registry
+            "gui_save_actions_total",
+            "Number of times Save action was triggered in GUI",
+            ["source"],
+            registry=self.registry,
         )
         self.gui_save_as_actions = Counter(
-            'gui_save_as_actions_total',
-            'Number of times Save As action was triggered in GUI',
-            ['source'],
-            registry=self.registry
+            "gui_save_as_actions_total",
+            "Number of times Save As action was triggered in GUI",
+            ["source"],
+            registry=self.registry,
         )
         self.gui_new_tab_actions = Counter(
-            'gui_new_tab_actions_total',
-            'Number of times New Tab action was triggered in GUI',
-            ['source'],
-            registry=self.registry
+            "gui_new_tab_actions_total",
+            "Number of times New Tab action was triggered in GUI",
+            ["source"],
+            registry=self.registry,
         )
         self.gui_copy_curl_actions = Counter(
-            'gui_copy_curl_actions_total',
-            'Number of times Copy cURL action was triggered in GUI',
-            registry=self.registry
+            "gui_copy_curl_actions_total",
+            "Number of times Copy cURL action was triggered in GUI",
+            registry=self.registry,
         )
         self.gui_collection_delete_actions = Counter(
-            'gui_collection_delete_actions_total',
-            'Number of delete actions from collection context menu',
-            ['item_type', 'status'],
-            registry=self.registry
+            "gui_collection_delete_actions_total",
+            "Number of delete actions from collection context menu",
+            ["item_type", "status"],
+            registry=self.registry,
         )
         self.gui_collection_rename_actions = Counter(
-            'gui_collection_rename_actions_total',
-            'Number of rename actions from collection context menu',
-            ['item_type', 'status'],
-            registry=self.registry
+            "gui_collection_rename_actions_total",
+            "Number of rename actions from collection context menu",
+            ["item_type", "status"],
+            registry=self.registry,
         )
 
         self.gui_response_search_actions = Counter(
-            'gui_response_search_actions_total',
-            'Number of response body search actions',
-            ['source', 'has_matches'],
-            registry=self.registry
+            "gui_response_search_actions_total",
+            "Number of response body search actions",
+            ["source", "has_matches"],
+            registry=self.registry,
         )
 
         self.gui_variable_validation_total = Counter(
-            'gui_variable_validation_total',
-            'Number of variable name validation attempts',
-            ['result'],
-            registry=self.registry
+            "gui_variable_validation_total",
+            "Number of variable name validation attempts",
+            ["result"],
+            registry=self.registry,
         )
 
         self.gui_variable_validation_failures_total = Counter(
-            'gui_variable_validation_failures_total',
-            'Number of failed variable name validations',
-            ['reason'],
-            registry=self.registry
+            "gui_variable_validation_failures_total",
+            "Number of failed variable name validations",
+            ["reason"],
+            registry=self.registry,
         )
 
         self.gui_method_body_autoswitches = Counter(
-            'gui_method_body_autoswitches_total',
-            'Number of times the Body tab was auto-selected due to method change',
-            ['method'],
-            registry=self.registry
+            "gui_method_body_autoswitches_total",
+            "Number of times the Body tab was auto-selected due to method change",
+            ["method"],
+            registry=self.registry,
         )
 
         self.requests_sent = Counter(
-            'requests_sent_total',
-            'Number of HTTP requests sent',
-            ['method'],
-            registry=self.registry
+            "requests_sent_total",
+            "Number of HTTP requests sent",
+            ["method"],
+            registry=self.registry,
         )
 
         self.responses_received = Counter(
-            'responses_received_total',
-            'Number of HTTP responses received',
-            ['method', 'status_code'],
-            registry=self.registry
+            "responses_received_total",
+            "Number of HTTP responses received",
+            ["method", "status_code"],
+            registry=self.registry,
         )
 
         self.mcp_requests_received = Counter(
-            'mcp_requests_received_total',
-            'Number of requests received by MCP server',
-            ['method'],
-            registry=self.registry
+            "mcp_requests_received_total",
+            "Number of requests received by MCP server",
+            ["method"],
+            registry=self.registry,
         )
 
         self.mcp_responses_sent = Counter(
-            'mcp_responses_sent_total',
-            'Number of responses sent by MCP server',
-            ['method', 'status'],
-            registry=self.registry
+            "mcp_responses_sent_total",
+            "Number of responses sent by MCP server",
+            ["method", "status"],
+            registry=self.registry,
         )
 
         self.history_entries_appended = Counter(
-            'history_entries_appended_total',
-            'Number of request history entries recorded',
-            ['method'],
-            registry=self.registry
+            "history_entries_appended_total",
+            "Number of request history entries recorded",
+            ["method"],
+            registry=self.registry,
         )
         self.history_entries_loaded_into_editor = Counter(
-            'history_entries_loaded_into_editor_total',
-            'Number of history entries loaded into the request editor',
-            registry=self.registry
+            "history_entries_loaded_into_editor_total",
+            "Number of history entries loaded into the request editor",
+            registry=self.registry,
         )
 
         self.request_errors = Counter(
-            'request_errors_total',
-            'Number of request execution errors by category',
-            ['category'],
-            registry=self.registry
+            "request_errors_total",
+            "Number of request execution errors by category",
+            ["category"],
+            registry=self.registry,
         )
 
         self.history_record_errors = Counter(
-            'history_record_errors_total',
-            'Number of history recording failures',
-            registry=self.registry
+            "history_record_errors_total",
+            "Number of history recording failures",
+            registry=self.registry,
         )
         self.hidden_value_masks_applied = Counter(
-            'hidden_value_masks_applied_total',
-            'Number of hidden-variable masking operations applied',
-            ['surface'],
+            "hidden_value_masks_applied_total",
+            "Number of hidden-variable masking operations applied",
+            ["surface"],
             registry=self.registry,
         )
 
         self._request_retries_total = Counter(
-            'request_retries_total',
-            'Number of retry attempts made',
-            ['method', 'status_category'],
+            "request_retries_total",
+            "Number of retry attempts made",
+            ["method", "status_category"],
             registry=self.registry,
         )
         self._request_retry_exhaustions_total = Counter(
-            'request_retry_exhaustions_total',
-            'Outbound HTTP requests where all configured retries were exhausted',
-            ['endpoint'],
+            "request_retry_exhaustions_total",
+            "Outbound HTTP requests where all configured retries were exhausted",
+            ["endpoint"],
             registry=self.registry,
         )
         self.template_expression_render_attempts = Counter(
-            'template_expression_render_attempts_total',
-            'TemplateService render attempts for function placeholders in {{...}}',
-            ['render_path', 'outcome'],
+            "template_expression_render_attempts_total",
+            "TemplateService render attempts for function placeholders in {{...}}",
+            ["render_path", "outcome"],
             registry=self.registry,
         )
         self.template_expression_validation_failures = Counter(
-            'template_expression_validation_failures_total',
-            'TemplateService function-placeholder validation failures',
-            ['render_path', 'code', 'function_name'],
+            "template_expression_validation_failures_total",
+            "TemplateService function-placeholder validation failures",
+            ["render_path", "code", "function_name"],
             registry=self.registry,
         )
         self.environment_value_encryptions_total = Counter(
-            'environment_value_encryptions_total',
-            'Number of environment values encrypted before persistence',
+            "environment_value_encryptions_total",
+            "Number of environment values encrypted before persistence",
             registry=self.registry,
         )
         self.environment_value_decryptions_total = Counter(
-            'environment_value_decryptions_total',
-            'Number of environment values decrypted during load',
+            "environment_value_decryptions_total",
+            "Number of environment values decrypted during load",
             registry=self.registry,
         )
         self.environment_encryption_errors_total = Counter(
-            'environment_encryption_errors_total',
-            'Number of encryption/decryption errors in environment storage flow',
-            ['stage', 'reason'],
+            "environment_encryption_errors_total",
+            "Number of encryption/decryption errors in environment storage flow",
+            ["stage", "reason"],
             registry=self.registry,
         )
 
     # MCP Resource Handlers
     async def list_resources(self) -> list[Resource]:
-        return [Resource(
-            uri="metrics://all",
-            name="All Metrics",
-            description="Prometheus metrics in text format",
-            mimeType="text/plain"
-        )]
+        return [
+            Resource(
+                uri="metrics://all",
+                name="All Metrics",
+                description="Prometheus metrics in text format",
+                mimeType="text/plain",
+            )
+        ]
 
     async def read_resource(self, uri: str) -> list[TextResourceContents]:
         if uri == "metrics://all":
             # Track access via existing metric
             self.track_mcp_request_received("read_resource:metrics")
             try:
-                data = generate_latest(self.registry).decode('utf-8')
+                data = generate_latest(self.registry).decode("utf-8")
                 self.track_mcp_response_sent("read_resource:metrics", "success")
-                return [TextResourceContents(
-                    uri=uri,
-                    mimeType="text/plain",
-                    text=data
-                )]
+                return [TextResourceContents(uri=uri, mimeType="text/plain", text=data)]
             except Exception:
                 self.track_mcp_response_sent("read_resource:metrics", "error")
                 raise
@@ -258,22 +257,28 @@ class MetricsManager:
                 await self.sse_transport.handle_post_message(scope, receive, send)
 
             async def _send_response(self, send, status, body):
-                await send({
-                    "type": "http.response.start",
-                    "status": status,
-                    "headers": [(b"content-type", b"text/plain")],
-                })
-                await send({
-                    "type": "http.response.body",
-                    "body": body,
-                })
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": status,
+                        "headers": [(b"content-type", b"text/plain")],
+                    }
+                )
+                await send(
+                    {
+                        "type": "http.response.body",
+                        "body": body,
+                    }
+                )
 
         # 3. Combine in Starlette
-        return Starlette(routes=[
-            Mount("/metrics", app=prometheus_app),
-            Mount("/sse", app=SSEEndpoint(self.mcp_server, sse)),
-            Mount("/messages", app=MessagesEndpoint(sse))
-        ])
+        return Starlette(
+            routes=[
+                Mount("/metrics", app=prometheus_app),
+                Mount("/sse", app=SSEEndpoint(self.mcp_server, sse)),
+                Mount("/messages", app=MessagesEndpoint(sse)),
+            ]
+        )
 
     def start_server(self, host: str, port: int):
         """Start the metrics server (Prometheus + MCP)."""
@@ -347,9 +352,7 @@ class MetricsManager:
     def track_gui_collection_rename_action(self, item_type: str, status: str):
         self.gui_collection_rename_actions.labels(item_type=item_type, status=status).inc()
 
-    def track_gui_response_search_action(
-        self, source: str, has_matches: bool
-    ):
+    def track_gui_response_search_action(self, source: str, has_matches: bool):
         self.gui_response_search_actions.labels(
             source=source, has_matches=str(has_matches).lower()
         ).inc()
@@ -393,14 +396,20 @@ class MetricsManager:
         self._request_retry_exhaustions_total.labels(endpoint=endpoint).inc()
 
     def track_template_expression_render_attempt(
-        self, render_path: str, outcome: str,
+        self,
+        render_path: str,
+        outcome: str,
     ) -> None:
         self.template_expression_render_attempts.labels(
-            render_path=render_path, outcome=outcome,
+            render_path=render_path,
+            outcome=outcome,
         ).inc()
 
     def track_template_expression_validation_failure(
-        self, render_path: str, code: str, function_name: str | None = None,
+        self,
+        render_path: str,
+        code: str,
+        function_name: str | None = None,
     ) -> None:
         self.template_expression_validation_failures.labels(
             render_path=render_path,
@@ -432,5 +441,6 @@ class MetricsManager:
 
     def track_environment_encryption_error(self, stage: str, reason: str) -> None:
         self.environment_encryption_errors_total.labels(
-            stage=stage, reason=reason,
+            stage=stage,
+            reason=reason,
         ).inc()

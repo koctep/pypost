@@ -1,32 +1,42 @@
 import logging
-from typing import List, Dict, Any, Set
+from typing import Any, Dict, List, Set
+
 from starlette.applications import Starlette
 
-logger = logging.getLogger(__name__)
-from starlette.responses import Response
-from starlette.routing import Mount, Route
+import jinja2
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
-from mcp.types import Tool, TextContent
-from pypost.models.models import RequestData
-import jinja2
-from pypost.core.template_service import TemplateService
+from mcp.types import TextContent, Tool
 from starlette.concurrency import run_in_threadpool
-from pypost.core.request_service import RequestService
+from starlette.responses import Response
+from starlette.routing import Mount, Route
+
 from pypost.core.metrics import MetricsManager
+from pypost.core.request_service import RequestService
+from pypost.core.template_service import TemplateService
+from pypost.models.models import RequestData
+
+logger = logging.getLogger(__name__)
 
 
 class MCPServerImpl:
-    def __init__(self, name: str = "pypost-server", metrics: MetricsManager | None = None,
-                 template_service: TemplateService | None = None):
+    def __init__(
+        self,
+        name: str = "pypost-server",
+        metrics: MetricsManager | None = None,
+        template_service: TemplateService | None = None,
+    ):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
         self._metrics = metrics
         self._template_service = template_service
         if template_service is not None:
-            logger.debug("MCPServerImpl: using injected TemplateService id=%d", id(template_service))
-        self.request_service = RequestService(metrics=self._metrics,
-                                              template_service=self._template_service)
+            logger.debug(
+                "MCPServerImpl: using injected TemplateService id=%d", id(template_service)
+            )
+        self.request_service = RequestService(
+            metrics=self._metrics, template_service=self._template_service
+        )
 
         # Register handlers
         self.server.list_tools()(self.list_tools)
@@ -36,11 +46,9 @@ class MCPServerImpl:
         tools = []
         for name, req in self.tools_map.items():
             schema = self._generate_schema(req)
-            tools.append(Tool(
-                name=name,
-                description=req.name or "No description",
-                inputSchema=schema
-            ))
+            tools.append(
+                Tool(name=name, description=req.name or "No description", inputSchema=schema)
+            )
         return tools
 
     async def call_tool(self, name: str, arguments: dict) -> List[Any]:
@@ -55,9 +63,7 @@ class MCPServerImpl:
 
         # Execute request in threadpool since RequestService is synchronous
         try:
-            result = await run_in_threadpool(
-                self._execute_request_sync, request_data, arguments
-            )
+            result = await run_in_threadpool(self._execute_request_sync, request_data, arguments)
 
             # Format output
             output_text = result.response.body
@@ -73,20 +79,14 @@ class MCPServerImpl:
 
             # Track MCP response success
             if self._metrics:
-                self._metrics.track_mcp_response_sent(
-                    request_data.method, "success"
-                )
+                self._metrics.track_mcp_response_sent(request_data.method, "success")
 
             return [TextContent(type="text", text=output_text)]
         except Exception as e:
             # Track MCP response error
             if self._metrics:
-                self._metrics.track_mcp_response_sent(
-                    request_data.method, "error"
-                )
-            return [TextContent(
-                type="text", text=f"Error executing request: {str(e)}"
-            )]
+                self._metrics.track_mcp_response_sent(request_data.method, "error")
+            return [TextContent(type="text", text=f"Error executing request: {str(e)}")]
 
     def _execute_request_sync(self, request_data: RequestData, args: dict):
         # Prepare context
@@ -116,11 +116,7 @@ class MCPServerImpl:
             properties[var] = {"type": "string"}
             required.append(var)
 
-        return {
-            "type": "object",
-            "properties": properties,
-            "required": required
-        }
+        return {"type": "object", "properties": properties, "required": required}
 
     def _extract_mcp_variables(self, req: RequestData) -> Set[str]:
         vars_found = set()
@@ -156,6 +152,7 @@ class MCPServerImpl:
 
         # Regex fallback for deep variable extraction
         import re
+
         # Pattern: {{ mcp.request.VAR_NAME }} or {{ mcp.request['VAR_NAME'] }}
         # Simple dot notation support
         pat = r"\{\{\s*mcp\.request\.([a-zA-Z0-9_]+)\s*\}\}"
@@ -179,19 +176,21 @@ class MCPServerImpl:
 
             async def __call__(self, scope, receive, send):
                 if scope.get("method") != "GET":
-                    await send({
-                        "type": "http.response.start",
-                        "status": 405,
-                        "headers": [(b"content-type", b"text/plain")],
-                    })
-                    await send({
-                        "type": "http.response.body",
-                        "body": b"Method Not Allowed",
-                    })
+                    await send(
+                        {
+                            "type": "http.response.start",
+                            "status": 405,
+                            "headers": [(b"content-type", b"text/plain")],
+                        }
+                    )
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": b"Method Not Allowed",
+                        }
+                    )
                     return
-                async with self.sse_transport.connect_sse(
-                    scope, receive, send
-                ) as streams:
+                async with self.sse_transport.connect_sse(scope, receive, send) as streams:
                     opts = self.server.create_initialization_options()
                     await self.server.run(streams[0], streams[1], opts)
 
@@ -202,26 +201,26 @@ class MCPServerImpl:
             async def __call__(self, scope, receive, send):
                 # Ensure we only handle POST requests if it's HTTP
                 if scope["type"] == "http" and scope["method"] != "POST":
-                    await self._send_response(
-                        send, 405, b"Method Not Allowed"
-                    )
+                    await self._send_response(send, 405, b"Method Not Allowed")
                     return
-                await self.sse_transport.handle_post_message(
-                    scope, receive, send
-                )
+                await self.sse_transport.handle_post_message(scope, receive, send)
 
             async def _send_response(self, send, status, body):
-                await send({
-                    "type": "http.response.start",
-                    "status": status,
-                    "headers": [
-                        (b"content-type", b"text/plain"),
-                    ],
-                })
-                await send({
-                    "type": "http.response.body",
-                    "body": body,
-                })
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": status,
+                        "headers": [
+                            (b"content-type", b"text/plain"),
+                        ],
+                    }
+                )
+                await send(
+                    {
+                        "type": "http.response.body",
+                        "body": body,
+                    }
+                )
 
         # MCP client POSTs to /sse/messages (root_path + endpoint).
         # Both under Mount("/sse") so scope["root_path"]="/sse".

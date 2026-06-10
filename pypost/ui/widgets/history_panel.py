@@ -1,12 +1,22 @@
 import logging
 from typing import List
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem,
-    QLabel, QSplitter, QPushButton, QFormLayout, QTextEdit, QMessageBox, QMenu,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import QPoint
 
 from pypost.core.history_manager import HistoryManager
 from pypost.models.models import HistoryEntry, RequestData
@@ -19,8 +29,9 @@ class HistoryPanel(QWidget):
 
     load_into_editor = Signal(RequestData)
 
-    def __init__(self, history_manager: HistoryManager, icons: dict | None = None,
-                 parent=None) -> None:
+    def __init__(
+        self, history_manager: HistoryManager, icons: dict | None = None, parent=None
+    ) -> None:
         super().__init__(parent)
         self._history_manager = history_manager
         self._icons = icons or {}
@@ -139,9 +150,7 @@ class HistoryPanel(QWidget):
             headers=entry.headers,
             body=entry.body,
         )
-        logger.info(
-            "history_load_into_editor method=%s url=%s", entry.method, entry.url
-        )
+        logger.info("history_load_into_editor method=%s url=%s", entry.method, entry.url)
         self.load_into_editor.emit(request_data)
 
     def _on_clear_history(self) -> None:

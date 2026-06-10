@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from typing import List, Optional
 
-from typing import Optional, List
+from pydantic import BaseModel
 
 from pypost.models.retry import RetryPolicy
 

@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout
+
 
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
@@ -23,7 +24,9 @@ class AboutDialog(QDialog):
         layout.addWidget(version_label)
 
         # Description
-        desc_label = QLabel("A lightweight HTTP client for testing APIs.\nBuilt with Python and PySide6.")
+        desc_label = QLabel(
+            "A lightweight HTTP client for testing APIs.\nBuilt with Python and PySide6."
+        )
         desc_label.setWordWrap(True)
         desc_label.setAlignment(Qt.AlignCenter)
         desc_label.setStyleSheet("margin: 10px 0;")
@@ -35,4 +38,3 @@ class AboutDialog(QDialog):
         close_btn = QPushButton("OK")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
-

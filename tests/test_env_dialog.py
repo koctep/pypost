@@ -380,3 +380,52 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
+    def test_rename_environment_updates_model_and_list(self, qapp):
+        envs = [Environment(name="Dev", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg.env_list.setCurrentRow(0)
+            item = dlg.env_list.item(0)
+            item.setText("Staging")
+            assert envs[0].name == "Staging"
+            assert dlg.env_list.item(0).text() == "Staging"
+        finally:
+            dlg.close()
+
+    @patch("pypost.ui.dialogs.env_dialog.QMessageBox.warning")
+    def test_rename_environment_empty_name_shows_warning(self, mock_warning, qapp):
+        envs = [Environment(name="Dev", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg.env_list.setCurrentRow(0)
+            item = dlg.env_list.item(0)
+            item.setText("")
+            assert envs[0].name == "Dev"
+            mock_warning.assert_called_once()
+        finally:
+            dlg.close()
+
+    @patch("pypost.ui.dialogs.env_dialog.QMessageBox.warning")
+    def test_rename_environment_duplicate_name_shows_warning(self, mock_warning, qapp):
+        envs = [Environment(name="Dev", variables={}), Environment(name="Prod", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg.env_list.setCurrentRow(0)
+            item = dlg.env_list.item(0)
+            item.setText("Prod")
+            assert envs[0].name == "Dev"
+            mock_warning.assert_called_once()
+        finally:
+            dlg.close()
+
+    def test_rename_environment_same_name_is_noop(self, qapp):
+        envs = [Environment(name="Dev", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg.env_list.setCurrentRow(0)
+            item = dlg.env_list.item(0)
+            item.setText("Dev")
+            assert envs[0].name == "Dev"
+        finally:
+            dlg.close()
+

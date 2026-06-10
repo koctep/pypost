@@ -1,14 +1,15 @@
-from dataclasses import dataclass
-from typing import Dict, Any
 import json
+from dataclasses import dataclass
+from typing import Any, Dict
+
 
 @dataclass
 class ResponseData:
     status_code: int
     headers: Dict[str, str]
     body: str
-    elapsed_time: float # seconds
-    size: int # bytes
+    elapsed_time: float  # seconds
+    size: int  # bytes
 
     def json(self) -> Any:
         """Parses the body as JSON."""

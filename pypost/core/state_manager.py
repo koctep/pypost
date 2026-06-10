@@ -1,11 +1,14 @@
 from typing import List, Optional
+
 from pypost.core.config_manager import ConfigManager
 from pypost.models.settings import AppSettings
+
 
 class StateManager:
     """
     Manages the persistent state of the UI, abstracting the AppSettings structure.
     """
+
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
         # We assume settings are already loaded or load them on demand.
@@ -40,4 +43,3 @@ class StateManager:
         if self.settings.last_environment_id != env_id:
             self.settings.last_environment_id = env_id
             self.save()
-

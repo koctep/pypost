@@ -2,11 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from pypost.core.key_provider import (
-    EncryptionKey,
-    EnvironmentEncryptionError,
-    KeyProvider,
-)
+from pypost.core.key_provider import EncryptionKey, EnvironmentEncryptionError, KeyProvider
 
 try:
     from cryptography.fernet import Fernet, InvalidToken

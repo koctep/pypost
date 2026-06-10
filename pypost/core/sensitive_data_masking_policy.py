@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Set
 
-from pypost.models.models import RequestData
 from pypost.core.template_service import TemplateService
+from pypost.models.models import RequestData
 
 HIDDEN_PLACEHOLDER = "***"
 
@@ -36,8 +36,9 @@ class SensitiveDataMaskingPolicy:
         return MaskedRequestData(
             url=self._template_service.render_string(request.url, masked_variables),
             headers={
-                self._template_service.render_string(k, masked_variables):
-                self._template_service.render_string(v, masked_variables)
+                self._template_service.render_string(
+                    k, masked_variables
+                ): self._template_service.render_string(v, masked_variables)
                 for k, v in request.headers.items()
             },
             body=self._template_service.render_string(request.body, masked_variables),

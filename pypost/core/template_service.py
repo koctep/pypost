@@ -46,7 +46,10 @@ class TemplateService:
         return template.format(function_name=result.function_name)
 
     def render_string(
-        self, content: str, variables: dict[str, Any], render_path: str = "runtime",
+        self,
+        content: str,
+        variables: dict[str, Any],
+        render_path: str = "runtime",
     ) -> str:
         """
         Renders a string template with provided variables using Jinja2.
@@ -77,7 +80,9 @@ class TemplateService:
             validation = self._validate_template_content(content)
             if not validation.is_valid:
                 self._emit_validation_failure_observability(
-                    validation, render_path, expression_count,
+                    validation,
+                    render_path,
+                    expression_count,
                 )
                 raise ValueError(self._validation_message(validation))
             rendered = self._render_with_jinja(content, variables)
@@ -85,7 +90,10 @@ class TemplateService:
             return rendered
         except Exception as e:
             return self._fallback_content_after_render_exception(
-                e, content, render_path, expression_count,
+                e,
+                content,
+                render_path,
+                expression_count,
             )
 
     def _count_placeholder_expressions(self, content: str) -> int:
@@ -94,7 +102,8 @@ class TemplateService:
     def _record_empty_render_attempt(self, render_path: str) -> None:
         if self._metrics:
             self._metrics.track_template_expression_render_attempt(
-                render_path=render_path, outcome="empty_content",
+                render_path=render_path,
+                outcome="empty_content",
             )
 
     def _validate_template_content(self, content: str) -> ValidationResult:
@@ -116,7 +125,8 @@ class TemplateService:
         )
         if self._metrics:
             self._metrics.track_template_expression_render_attempt(
-                render_path=render_path, outcome="validation_error",
+                render_path=render_path,
+                outcome="validation_error",
             )
             self._metrics.track_template_expression_validation_failure(
                 render_path=render_path,
@@ -135,7 +145,8 @@ class TemplateService:
     ) -> None:
         if self._metrics:
             self._metrics.track_template_expression_render_attempt(
-                render_path=render_path, outcome="success",
+                render_path=render_path,
+                outcome="success",
             )
         logger.debug(
             "template_expression_render_succeeded render_path=%s token_count=%d",
@@ -152,11 +163,11 @@ class TemplateService:
     ) -> str:
         if not isinstance(exc, ValueError) and self._metrics:
             self._metrics.track_template_expression_render_attempt(
-                render_path=render_path, outcome="render_error",
+                render_path=render_path,
+                outcome="render_error",
             )
         logger.warning(
-            "template_render_fallback_to_original render_path=%s error_type=%s "
-            "token_count=%d",
+            "template_render_fallback_to_original render_path=%s error_type=%s " "token_count=%d",
             render_path,
             type(exc).__name__,
             expression_count,

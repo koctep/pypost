@@ -1,32 +1,32 @@
 import logging
 import uuid
 
-from PySide6.QtWidgets import (
-    QTabWidget,
-    QWidget,
-    QVBoxLayout,
-    QSplitter,
-    QPushButton,
-    QTabBar,
-    QMessageBox,
-    QApplication,
-)
 from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtWidgets import (
+    QApplication,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QTabBar,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
-from pypost.ui.widgets.request_editor import RequestWidget
-from pypost.ui.widgets.response_view import ResponseView
-from pypost.core.worker import RequestWorker
+from pypost.core.alert_manager import AlertManager
+from pypost.core.curl_generator import CurlGenerator
+from pypost.core.history_manager import HistoryManager
+from pypost.core.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
-from pypost.core.metrics import MetricsManager
-from pypost.core.history_manager import HistoryManager
+from pypost.core.template_service import TemplateService
+from pypost.core.worker import RequestWorker
+from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
-from pypost.core.template_service import TemplateService
-from pypost.core.alert_manager import AlertManager
-from pypost.models.errors import ErrorCategory, ExecutionError
-from pypost.core.curl_generator import CurlGenerator
+from pypost.ui.widgets.request_editor import RequestWidget
+from pypost.ui.widgets.response_view import ResponseView
 
 logger = logging.getLogger(__name__)
 

@@ -19,6 +19,7 @@ Initializes the dialog.
 
 ### Context Menu Actions (Environment List)
 Instead of main UI buttons, actions on existing environments are handled via a right-click context menu on the `env_list`:
+- **Rename**: Triggered via `_on_env_list_context_menu` or the `F2` hotkey, it calls `_rename_environment_at_row(row)` to trigger inline editing of the list item. The `itemChanged` signal handles validation and updates the selected environment.
 - **Copy**: Triggered via `_on_env_list_context_menu`, it calls `_duplicate_environment_at_row(row)` to create a clone of the selected environment, prompting for a new name.
 - **Delete**: Triggered via `_on_env_list_context_menu`, it calls `delete_environment(row)` to remove the selected environment from the list and data model.
 

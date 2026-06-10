@@ -1,13 +1,15 @@
-import sys
 import logging
+import sys
 from pathlib import Path
+
 from PySide6.QtWidgets import QApplication
-from pypost.ui.main_window import MainWindow
-from pypost.ui.styles.custom_style import PyPostStyle
+
+from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
-from pypost.core.alert_manager import AlertManager
+from pypost.ui.main_window import MainWindow
+from pypost.ui.styles.custom_style import PyPostStyle
 
 logging.basicConfig(
     level=logging.INFO,

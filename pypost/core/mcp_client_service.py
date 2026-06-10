@@ -1,15 +1,16 @@
 """MCP client service for testing MCP endpoints via full protocol handshake."""
+
 import asyncio
 import json
 import logging
 import time
 from typing import Any
 
-from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
+from mcp.client.sse import sse_client
 
-from pypost.models.response import ResponseData
 from pypost.models.errors import ErrorCategory, ExecutionError
+from pypost.models.response import ResponseData
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,9 @@ class MCPClientService:
         except asyncio.TimeoutError as exc:
             logger.error(
                 "mcp_operation_timeout url=%s operation=%s timeout=%.1f",
-                url, operation, MCP_TOTAL_TIMEOUT,
+                url,
+                operation,
+                MCP_TOTAL_TIMEOUT,
             )
             raise ExecutionError(
                 category=ErrorCategory.TIMEOUT,
@@ -73,12 +76,17 @@ class MCPClientService:
                 message = "MCP operation failed."
             logger.error(
                 "mcp_operation_failed url=%s operation=%s category=%s detail=%s",
-                url, operation, category, err_msg,
+                url,
+                operation,
+                category,
+                err_msg,
             )
             raise ExecutionError(category=category, message=message, detail=err_msg) from exc
 
         elapsed = time.time() - start_time
-        logger.debug("mcp_operation_success url=%s operation=%s elapsed=%.3f", url, operation, elapsed)
+        logger.debug(
+            "mcp_operation_success url=%s operation=%s elapsed=%.3f", url, operation, elapsed
+        )
         body_str = result if isinstance(result, str) else json.dumps(result)
         return ResponseData(
             status_code=200,

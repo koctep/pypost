@@ -1,8 +1,9 @@
-import os
 import json
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List
+
 from platformdirs import user_data_dir
 
 from pypost.core.environment_secrets_codec import EnvironmentSecretsCodec
@@ -50,7 +51,7 @@ class StorageManager:
 
         if not self.environments_file.exists():
             try:
-                with open(self.environments_file, 'w') as f:
+                with open(self.environments_file, "w") as f:
                     json.dump([], f)
             except Exception as e:
                 logger.error(
@@ -66,7 +67,7 @@ class StorageManager:
 
         # Simplification: using collection name as filename.
         file_path = self.collections_path / f"{collection.name}.json"
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             f.write(collection.model_dump_json(indent=2))
 
     def delete_collection(self, collection_name: str):
@@ -82,7 +83,7 @@ class StorageManager:
         for filename in os.listdir(self.collections_path):
             if filename.endswith(".json"):
                 try:
-                    with open(self.collections_path / filename, 'r') as f:
+                    with open(self.collections_path / filename, "r") as f:
                         data = json.load(f)
                         collections.append(Collection(**data))
                 except Exception as e:
@@ -96,7 +97,7 @@ class StorageManager:
     def save_environments(self, environments: List[Environment]):
         data = [self._serialize_environment(env) for env in environments]
         tmp_file = self.environments_file.with_suffix(".json.tmp")
-        with open(tmp_file, 'w') as f:
+        with open(tmp_file, "w") as f:
             json.dump(data, f, indent=2)
         try:
             os.replace(tmp_file, self.environments_file)
@@ -120,7 +121,7 @@ class StorageManager:
         if not self.environments_file.exists():
             return []
         try:
-            with open(self.environments_file, 'r') as f:
+            with open(self.environments_file, "r") as f:
                 data = json.load(f)
                 environments = [self._deserialize_environment(item) for item in data]
                 logger.info(
@@ -161,7 +162,8 @@ class StorageManager:
                 except EnvironmentEncryptionError as exc:
                     if self._metrics:
                         self._metrics.track_environment_encryption_error(
-                            "save", "encrypt_failed",
+                            "save",
+                            "encrypt_failed",
                         )
                     logger.error(
                         "environment_value_encrypt_failed env_name=%s key=%s error=%s",
@@ -216,14 +218,16 @@ class StorageManager:
             except EnvironmentEncryptionError as exc:
                 if self._metrics:
                     self._metrics.track_environment_encryption_error(
-                        "load", "decrypt_failed",
+                        "load",
+                        "decrypt_failed",
                     )
                 raise EnvironmentEncryptionError(
                     f"Failed to decrypt environment variable '{key}': {exc}"
                 ) from exc
         if self._metrics:
             self._metrics.track_environment_encryption_error(
-                "load", "unsupported_format",
+                "load",
+                "unsupported_format",
             )
         raise EnvironmentEncryptionError(
             f"Unsupported value format for environment variable '{key}'."

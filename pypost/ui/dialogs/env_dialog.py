@@ -2,6 +2,7 @@ import logging
 from typing import List
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QListWidget,
+    QListWidgetItem,
     QMenu,
     QMessageBox,
     QPushButton,
@@ -54,12 +56,17 @@ class EnvironmentDialog(QDialog):
         left_layout = QVBoxLayout()
         self.env_list = QListWidget()
         self.env_list.currentRowChanged.connect(self.on_env_selected)
+        self.env_list.itemChanged.connect(self._on_env_item_changed)
         self.env_list.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu,
         )
         self.env_list.customContextMenuRequested.connect(
             self._on_env_list_context_menu,
         )
+
+        rename_shortcut = QShortcut(QKeySequence("F2"), self.env_list)
+        rename_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        rename_shortcut.activated.connect(self._rename_current_environment)
 
         add_btn = QPushButton("Add")
         add_btn.clicked.connect(self.add_environment)
@@ -79,7 +86,8 @@ class EnvironmentDialog(QDialog):
         header.setSectionResizeMode(COL_VAR, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_VAL, QHeaderView.Stretch)
         header.setSectionResizeMode(
-            COL_HIDDEN, QHeaderView.ResizeToContents,
+            COL_HIDDEN,
+            QHeaderView.ResizeToContents,
         )
         self.vars_table.itemChanged.connect(self.on_var_changed)
         self.vars_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -98,23 +106,31 @@ class EnvironmentDialog(QDialog):
         self.load_list()
 
     def load_list(self):
+        self.env_list.blockSignals(True)
         self.env_list.clear()
         target_row = 0
         for i, env in enumerate(self.environments):
-            self.env_list.addItem(env.name)
+            item = QListWidgetItem(env.name)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            self.env_list.addItem(item)
             if self.current_env_name and env.name == self.current_env_name:
                 target_row = i
 
         if self.environments:
             self.env_list.setCurrentRow(target_row)
+        self.env_list.blockSignals(False)
 
     def add_environment(self):
         name, ok = QInputDialog.getText(self, "New Environment", "Name:")
         if ok and name:
             env = Environment(name=name)
             self.environments.append(env)
-            self.env_list.addItem(name)
+            self.env_list.blockSignals(True)
+            item = QListWidgetItem(name)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            self.env_list.addItem(item)
             self.env_list.setCurrentRow(len(self.environments) - 1)
+            self.env_list.blockSignals(False)
 
     def delete_environment(self, row: int | None = None) -> None:
         if row is None:
@@ -228,13 +244,69 @@ class EnvironmentDialog(QDialog):
             return
         row = self.env_list.row(item)
         menu = QMenu(self)
+        rename_action = menu.addAction("Rename")
         copy_action = menu.addAction("Copy")
         delete_action = menu.addAction("Delete")
         chosen = menu.exec(self.env_list.mapToGlobal(pos))
-        if chosen == copy_action:
+        if chosen == rename_action:
+            self._rename_environment_at_row(row)
+        elif chosen == copy_action:
             self._duplicate_environment_at_row(row)
         elif chosen == delete_action:
             self.delete_environment(row)
+
+    def _rename_current_environment(self) -> None:
+        row = self.env_list.currentRow()
+        if row >= 0:
+            self._rename_environment_at_row(row)
+
+    def _rename_environment_at_row(self, row: int) -> None:
+        item = self.env_list.item(row)
+        if item:
+            self.env_list.editItem(item)
+
+    def _on_env_item_changed(self, item: QListWidgetItem) -> None:
+        row = self.env_list.row(item)
+        if row < 0 or row >= len(self.environments):
+            return
+            
+        env = self.environments[row]
+        old_name = env.name
+        new_name = item.text().strip()
+        
+        if not new_name:
+            QMessageBox.warning(self, "Rename Environment", "Name cannot be empty.")
+            self.env_list.blockSignals(True)
+            item.setText(old_name)
+            self.env_list.blockSignals(False)
+            return
+            
+        if new_name == old_name:
+            self.env_list.blockSignals(True)
+            item.setText(old_name)
+            self.env_list.blockSignals(False)
+            return
+            
+        if any(e.name == new_name and i != row for i, e in enumerate(self.environments)):
+            QMessageBox.warning(
+                self,
+                "Rename Environment",
+                f'An environment named "{new_name}" already exists.',
+            )
+            self.env_list.blockSignals(True)
+            item.setText(old_name)
+            self.env_list.blockSignals(False)
+            return
+            
+        env.name = new_name
+        if self.current_env_name == old_name:
+            self.current_env_name = new_name
+            
+        logger.info(
+            "environment_renamed old_name=%s new_name=%s",
+            old_name,
+            new_name,
+        )
 
     def _duplicate_environment_at_row(self, row: int) -> None:
         if row < 0 or row >= len(self.environments):
@@ -242,16 +314,12 @@ class EnvironmentDialog(QDialog):
         source = self.environments[row]
         default_name = f"Copy of {source.name}"
         while True:
-            name, ok = QInputDialog.getText(
-                self, "Copy Environment", "Name:", text=default_name
-            )
+            name, ok = QInputDialog.getText(self, "Copy Environment", "Name:", text=default_name)
             if not ok:
                 return
             stripped = name.strip()
             if not stripped:
-                QMessageBox.warning(
-                    self, "Copy Environment", "Name cannot be empty."
-                )
+                QMessageBox.warning(self, "Copy Environment", "Name cannot be empty.")
                 default_name = name
                 continue
             if any(e.name == stripped for e in self.environments):
@@ -323,7 +391,7 @@ class EnvironmentDialog(QDialog):
         env = self.environments[row]
         self.mcp_check.setEnabled(True)
         self.mcp_check.blockSignals(True)
-        self.mcp_check.setChecked(getattr(env, 'enable_mcp', False))
+        self.mcp_check.setChecked(getattr(env, "enable_mcp", False))
         self.mcp_check.blockSignals(False)
 
         self.vars_table.blockSignals(True)
@@ -336,12 +404,15 @@ class EnvironmentDialog(QDialog):
             value_item = self._make_value_item(v, is_hidden)
             self.vars_table.setItem(i, COL_VAL, value_item)
             self.vars_table.setCellWidget(
-                i, COL_HIDDEN, self._make_hidden_checkbox(is_hidden),
+                i,
+                COL_HIDDEN,
+                self._make_hidden_checkbox(is_hidden),
             )
 
         # Empty last row for adding new variables
         self.vars_table.setCellWidget(
-            len(env.variables), COL_HIDDEN,
+            len(env.variables),
+            COL_HIDDEN,
             self._make_hidden_checkbox(False),
         )
 
@@ -373,7 +444,9 @@ class EnvironmentDialog(QDialog):
                     )
                     masked_item = self._make_value_item(real_val, True)
                     self.vars_table.setItem(
-                        i, COL_VAL, masked_item,
+                        i,
+                        COL_VAL,
+                        masked_item,
                     )
                 else:
                     env.hidden_keys.discard(key)
@@ -383,7 +456,9 @@ class EnvironmentDialog(QDialog):
                         env.variables.get(key, ""),
                     )
                     self.vars_table.setItem(
-                        i, COL_VAL, self._make_value_item(real_val, False),
+                        i,
+                        COL_VAL,
+                        self._make_value_item(real_val, False),
                     )
                 self.vars_table.blockSignals(False)
                 logger.info(
@@ -435,10 +510,7 @@ class EnvironmentDialog(QDialog):
                         v_item,
                         env.variables.get(key, ""),
                     )
-                    if (
-                        item.column() == COL_VAL
-                        and item.row() == i
-                    ):
+                    if item.column() == COL_VAL and item.row() == i:
                         # User just edited the value cell
                         typed = v_item.text() if v_item else ""
                         if typed != HIDDEN_MASK:
@@ -446,7 +518,8 @@ class EnvironmentDialog(QDialog):
                         # Re-mask the display
                         self.vars_table.blockSignals(True)
                         self.vars_table.setItem(
-                            i, COL_VAL,
+                            i,
+                            COL_VAL,
                             self._make_value_item(val, True),
                         )
                         self.vars_table.blockSignals(False)

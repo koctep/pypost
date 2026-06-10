@@ -1,5 +1,14 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QDialog,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+)
+
 
 class HotkeysDialog(QDialog):
     def __init__(self, parent=None):

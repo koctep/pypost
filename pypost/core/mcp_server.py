@@ -1,30 +1,34 @@
+import asyncio
 import logging
 import threading
-import uvicorn
-import asyncio
-import time
 from typing import List, Optional
+
+import uvicorn
 from PySide6.QtCore import QObject, Signal
 
-from pypost.models.models import RequestData
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
+from pypost.models.models import RequestData
 
 logger = logging.getLogger(__name__)
+
 
 class MCPServerManager(QObject):
     status_changed = Signal(bool)  # True = running, False = stopped
 
-    def __init__(self, metrics: MetricsManager | None = None,
-                 template_service: TemplateService | None = None):
+    def __init__(
+        self, metrics: MetricsManager | None = None, template_service: TemplateService | None = None
+    ):
         super().__init__()
         self._server_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._server_instance: Optional[uvicorn.Server] = None
         self._impl = MCPServerImpl(metrics=metrics, template_service=template_service)
         if template_service is not None:
-            logger.debug("MCPServerManager: propagating TemplateService id=%d", id(template_service))
+            logger.debug(
+                "MCPServerManager: propagating TemplateService id=%d", id(template_service)
+            )
         self._current_port = 1080
         self._current_host = "127.0.0.1"
 
@@ -74,11 +78,13 @@ class MCPServerManager(QObject):
         # Ensure we run a new event loop for this thread
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
-        config = uvicorn.Config(app=app, host=self._current_host, port=self._current_port, loop="asyncio")
+
+        config = uvicorn.Config(
+            app=app, host=self._current_host, port=self._current_port, loop="asyncio"
+        )
         self._server_instance = uvicorn.Server(config)
-        
+
         # Override install_signal_handlers because we are not in main thread
         self._server_instance.install_signal_handlers = lambda: None
-        
+
         loop.run_until_complete(self._server_instance.serve())

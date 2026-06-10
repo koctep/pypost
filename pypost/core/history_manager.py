@@ -89,9 +89,7 @@ class HistoryManager:
             self._entries = [HistoryEntry(**item) for item in data]
             logger.debug("history_manager_loaded count=%d", len(self._entries))
         except Exception as exc:
-            logger.warning(
-                "history_manager_load_failed path=%s error=%s", self._history_path, exc
-            )
+            logger.warning("history_manager_load_failed path=%s error=%s", self._history_path, exc)
             self._entries = []
 
     def _save_async(self) -> None:

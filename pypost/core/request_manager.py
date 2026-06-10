@@ -1,5 +1,6 @@
 import logging
-from typing import List, Optional, Tuple, Dict
+from typing import Dict, List, Optional, Tuple
+
 from pypost.core.storage import StorageManager
 from pypost.models.models import Collection, RequestData
 
@@ -10,6 +11,7 @@ class RequestManager:
     """
     Manages the lifecycle of requests and collections, abstracting storage operations.
     """
+
     def __init__(self, storage_manager: StorageManager):
         self.storage = storage_manager
         self.collections: List[Collection] = []
@@ -73,6 +75,7 @@ class RequestManager:
         """Creates a new collection."""
         # Note: in a real app we may check duplicate names before persisting.
         import uuid
+
         new_col = Collection(id=str(uuid.uuid4()), name=name, requests=[])
         self.collections.append(new_col)
         self.storage.save_collection(new_col)

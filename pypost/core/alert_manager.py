@@ -21,9 +21,7 @@ class AlertPayload:
     retries_attempted: int
     final_error_category: str
     final_error_message: str
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict:
         return {
@@ -82,8 +80,9 @@ class AlertManager:
             self._logger.removeHandler(stale)
 
         self._logger.addHandler(handler)
-        logger.debug("alert_manager_init log_path=%s webhook=%s", resolved,
-                     "yes" if webhook_url else "no")
+        logger.debug(
+            "alert_manager_init log_path=%s webhook=%s", resolved, "yes" if webhook_url else "no"
+        )
         self._handler = handler  # owned reference for close()
 
     def close(self) -> None:
@@ -108,10 +107,12 @@ class AlertManager:
         """Write JSON alert to the rotating log file and optionally send to webhook."""
         self._logger.info(json.dumps(payload.to_dict()))
         logger.warning(
-            "alert_emitted request_name=%r endpoint=%r retries=%d"
-            " error_category=%s webhook=%s",
-            payload.request_name, payload.endpoint, payload.retries_attempted,
-            payload.final_error_category, "yes" if self._webhook_url else "no",
+            "alert_emitted request_name=%r endpoint=%r retries=%d" " error_category=%s webhook=%s",
+            payload.request_name,
+            payload.endpoint,
+            payload.retries_attempted,
+            payload.final_error_category,
+            "yes" if self._webhook_url else "no",
         )
         if self._webhook_url:
             self._send_webhook(payload)
@@ -129,6 +130,4 @@ class AlertManager:
             )
             logger.debug("alert_webhook_ok url=%r status=%d", self._webhook_url, resp.status_code)
         except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "alert_webhook_failed url=%r error=%s", self._webhook_url, exc
-            )
+            logger.warning("alert_webhook_failed url=%r error=%s", self._webhook_url, exc)
