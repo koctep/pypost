@@ -109,3 +109,5 @@ HiddenToggleLogPolicy.format_key_name("API_KEY", log_hidden_key_names=True)
 - `tests/test_env_dialog.py` (caplog: masked vs readable key)
 - `tests/test_settings_dialog.py` (checkbox load/save)
 - `tests/test_settings_persistence.py` (legacy settings without field)
+- `tests/test_settings_hidden_toggle_logging_e2e.py` (PYPOST-490: Settings →
+  `apply_settings` → env manager → toggle log; default masked and opt-in readable key)
