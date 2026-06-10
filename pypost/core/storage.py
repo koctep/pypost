@@ -10,6 +10,7 @@ from pypost.core.encryption_config import (
     build_key_provider,
     resolve_encryption_enabled,
     resolve_key_source,
+    resolve_key_source_chain,
 )
 from pypost.core.environment_secrets_codec import EnvironmentSecretsCodec
 from pypost.core.key_provider import EnvironmentEncryptionError
@@ -34,15 +35,14 @@ class StorageManager:
         self.environments_file = self.data_dir / "environments.json"
         self._metrics = metrics
         self._encryption_settings: AppSettings | None = None
-        self._secrets_codec = EnvironmentSecretsCodec(
-            build_key_provider(resolve_key_source(None))
-        )
+        self._secrets_codec = EnvironmentSecretsCodec(build_key_provider(None))
         self._ensure_paths()
 
     def apply_encryption_settings(self, settings: AppSettings | None) -> None:
         self._encryption_settings = settings
         key_source = resolve_key_source(settings)
-        self._secrets_codec = EnvironmentSecretsCodec(build_key_provider(key_source))
+        source_chain = resolve_key_source_chain(settings)
+        self._secrets_codec = EnvironmentSecretsCodec(build_key_provider(settings))
         enabled = resolve_encryption_enabled(settings)
         policy_source = (
             "settings"
@@ -50,9 +50,11 @@ class StorageManager:
             else "env_fallback"
         )
         logger.info(
-            "storage_encryption_config_applied enabled=%s key_source=%s policy_source=%s",
+            "storage_encryption_config_applied enabled=%s key_source=%s "
+            "source_chain=%s policy_source=%s",
             enabled,
             key_source,
+            ",".join(source_chain),
             policy_source,
         )
 

@@ -28,6 +28,38 @@ ENCRYPTION_MODE_ENABLED = "enabled"
 ENCRYPTION_MODE_DISABLED = "disabled"
 
 KEY_SOURCE_ENVIRONMENT = "environment"
+KEY_SOURCE_KEYRING = "keyring"
+KEY_SOURCE_SECRET_STORE = "secret_store"
+
+SUPPORTED_KEY_SOURCES = frozenset(
+    {KEY_SOURCE_ENVIRONMENT, KEY_SOURCE_KEYRING, KEY_SOURCE_SECRET_STORE},
+)
+
+KEY_SOURCE_HELP = {
+    KEY_SOURCE_ENVIRONMENT: (
+        "Store the Fernet key in PYPOST_ENV_ENCRYPTION_KEY (shell or service env). "
+        "Do not put key material in settings.json."
+    ),
+    KEY_SOURCE_KEYRING: (
+        "Store keys in the OS credential store (keyring service pypost/env-encryption, "
+        "entry active for current key). Requires the keyring package."
+    ),
+    KEY_SOURCE_SECRET_STORE: (
+        "Load keys from an operator-managed JSON spec via "
+        "PYPOST_ENV_ENCRYPTION_SECRETS_FILE. Do not put key material in settings.json."
+    ),
+}
+
+
+def parse_key_source_fallback(text: str) -> list[str] | None:
+    if not text.strip():
+        return None
+    result: list[str] = []
+    for part in text.split(","):
+        source = part.strip()
+        if source in SUPPORTED_KEY_SOURCES and source not in result:
+            result.append(source)
+    return result or None
 
 
 class SettingsDialog(QDialog):
@@ -98,17 +130,34 @@ class SettingsDialog(QDialog):
             "Environment variable (PYPOST_ENV_ENCRYPTION_KEY)",
             KEY_SOURCE_ENVIRONMENT,
         )
+        self.env_encryption_key_source_combo.addItem(
+            "OS keyring (pypost/env-encryption)",
+            KEY_SOURCE_KEYRING,
+        )
+        self.env_encryption_key_source_combo.addItem(
+            "Secret store spec file (PYPOST_ENV_ENCRYPTION_SECRETS_FILE)",
+            KEY_SOURCE_SECRET_STORE,
+        )
         key_source = current_settings.env_encryption_key_source or KEY_SOURCE_ENVIRONMENT
         source_index = self.env_encryption_key_source_combo.findData(key_source)
         self.env_encryption_key_source_combo.setCurrentIndex(
             source_index if source_index >= 0 else 0,
         )
 
-        self.env_encryption_help_label = QLabel(
-            "Store the Fernet key in PYPOST_ENV_ENCRYPTION_KEY (shell or service env). "
-            "Do not put key material in settings.json.",
+        self.env_encryption_key_source_fallback_edit = QLineEdit()
+        self.env_encryption_key_source_fallback_edit.setPlaceholderText(
+            "e.g. environment, secret_store",
         )
+        fallback = current_settings.env_encryption_key_source_fallback
+        if fallback:
+            self.env_encryption_key_source_fallback_edit.setText(",".join(fallback))
+
+        self.env_encryption_help_label = QLabel()
         self.env_encryption_help_label.setWordWrap(True)
+        self.env_encryption_key_source_combo.currentIndexChanged.connect(
+            self._update_encryption_key_source_help,
+        )
+        self._update_encryption_key_source_help()
 
         # Retry policy defaults
         default_policy = RetryPolicy()
@@ -163,6 +212,10 @@ class SettingsDialog(QDialog):
             "Encryption key source:",
             self.env_encryption_key_source_combo,
         )
+        self.form_layout.addRow(
+            "Encryption key source fallback:",
+            self.env_encryption_key_source_fallback_edit,
+        )
         self.form_layout.addRow("", self.env_encryption_help_label)
         self.form_layout.addRow("Max Retries (0 = disabled):", self.max_retries_spin)
         self.form_layout.addRow("Retry Delay (seconds):", self.retry_delay_spin)
@@ -177,6 +230,11 @@ class SettingsDialog(QDialog):
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         self.layout.addWidget(self.buttons)
+
+    def _update_encryption_key_source_help(self) -> None:
+        source = self.env_encryption_key_source_combo.currentData()
+        help_text = KEY_SOURCE_HELP.get(source, KEY_SOURCE_HELP[KEY_SOURCE_ENVIRONMENT])
+        self.env_encryption_help_label.setText(help_text)
 
     def accept(self):
         parsed_codes = parse_retryable_status_codes(self.retryable_codes_edit.text())
@@ -228,6 +286,9 @@ class SettingsDialog(QDialog):
             alert_log_path=self.current_settings.alert_log_path,
             env_encryption_enabled=env_encryption_enabled,
             env_encryption_key_source=self.env_encryption_key_source_combo.currentData(),
+            env_encryption_key_source_fallback=parse_key_source_fallback(
+                self.env_encryption_key_source_fallback_edit.text(),
+            ),
         )
         super().accept()
 

@@ -244,13 +244,12 @@ def test_metrics_track_save_encryption_error_when_key_missing(tmp_path, monkeypa
         variables={"SECRET": "s3cr3t"},
         hidden_keys={"SECRET"},
     )
-    with pytest.raises(EnvironmentEncryptionError, match="Missing encryption key"):
+    with pytest.raises(EnvironmentEncryptionError, match="Encryption key is unavailable"):
         storage.save_environments([env])
 
     scraped = _scrape_metrics(metrics)
     assert (
-        'environment_encryption_errors_total{reason="encrypt_failed",stage="save"} 1.0'
-        in scraped
+        'environment_encryption_errors_total{reason="encrypt_failed",stage="save"} 1.0' in scraped
     )
 
 
@@ -281,8 +280,7 @@ def test_metrics_track_load_decryption_error_when_key_mismatch(tmp_path, monkeyp
     assert reloaded == []
     scraped = _scrape_metrics(metrics)
     assert (
-        'environment_encryption_errors_total{reason="decrypt_failed",stage="load"} 1.0'
-        in scraped
+        'environment_encryption_errors_total{reason="decrypt_failed",stage="load"} 1.0' in scraped
     )
 
 

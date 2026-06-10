@@ -26,3 +26,4 @@ class AppSettings(BaseModel):
     log_hidden_key_names: bool = False
     env_encryption_enabled: Optional[bool] = None
     env_encryption_key_source: Optional[str] = None
+    env_encryption_key_source_fallback: Optional[List[str]] = None

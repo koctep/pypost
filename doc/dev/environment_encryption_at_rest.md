@@ -5,6 +5,8 @@
 PYPOST-447 introduces optional encryption-at-rest for sensitive environment variable values.
 PYPOST-481 adds user-facing controls in **Settings** so developers can enable or disable
 encryption and choose a key source strategy without editing process environment variables.
+PYPOST-483 extends key resolution to a provider chain with OS keyring and secret-store sources,
+configurable fallback order, and a rotation-friendly key registry model.
 
 This feature protects hidden-key values in persisted environment storage (`environments.json`).
 Runtime request execution is unchanged: components still consume plain
@@ -13,28 +15,53 @@ Runtime request execution is unchanged: components still consume plain
 ## Architecture
 
 ```mermaid
-flowchart LR
-  UI[SettingsDialog] --> CM[ConfigManager]
-  CM --> AS[AppSettings]
+flowchart TD
+  UI[SettingsDialog] --> AS[AppSettings]
   MW[MainWindow] --> SM[StorageManager]
-  AS --> EC[encryption_config resolver]
-  EC --> SM
-  EC --> KP[KeyProvider factory]
-  KP --> LKP[LocalKeyProvider]
+  AS --> EC[encryption_config]
+  EC --> BKP[build_key_provider]
+  BKP --> CKP[ChainedKeyProvider]
+  CKP --> KSC[KeySourceChain]
+  KSC --> EKS[EnvKeySource]
+  KSC --> KRS[KeyringKeySource]
+  KSC --> SSS[SecretStoreKeySource]
+  SSS --> SBC[SecretBackendChain]
+  SBC --> SBF[FileSecretBackend]
   SM --> ESC[EnvironmentSecretsCodec]
+  ESC --> CKP
   ESC --> ENV[(environments.json)]
 ```
 
 | Component | Module | Responsibility |
 | --- | --- | --- |
-| Settings model | `pypost/models/settings.py` | Persist encryption toggle and key source strategy |
-| Policy resolver | `pypost/core/encryption_config.py` | Resolve enabled flag and key source from settings + env fallback |
+| Settings model | `pypost/models/settings.py` | Encryption toggle, primary source, fallback |
+| Policy resolver | `pypost/core/encryption_config.py` | Enabled flag, chain, provider factory |
+| Key sources | `pypost/core/key_sources/` | Env, keyring, secret-store resolution |
+| Key provider | `pypost/core/key_provider.py` | `ChainedKeyProvider` facade for codec |
 | Storage orchestration | `pypost/core/storage.py` | Apply resolved policy on save/load |
-| Settings UI | `pypost/ui/dialogs/settings_dialog.py` | User-facing encryption controls |
-| Controller wiring | `pypost/ui/main_window.py` | Apply settings to storage on init and after save |
-| Crypto codec | `pypost/core/environment_secrets_codec.py` | Envelope validation and encrypt/decrypt |
-| Key resolution | `pypost/core/key_provider.py` | Resolve Fernet key from configured source |
+| Settings UI | `pypost/ui/dialogs/settings_dialog.py` | Encryption and source controls |
+| Controller wiring | `pypost/ui/main_window.py` | Apply settings on init and after save |
+| Crypto codec | `pypost/core/environment_secrets_codec.py` | Envelope encrypt/decrypt |
 | Observability | `pypost/core/metrics.py` | Encryption counters and error labels |
+
+### Key source chain
+
+Key material is resolved through an ordered **key source chain**. Each source implements the
+`KeySource` protocol (`try_resolve_active`, `try_resolve_by_id`) and returns `None` when
+unavailable rather than raising.
+
+| Source | Class | Active key | Historical key (`kid`) |
+| --- | --- | --- | --- |
+| `environment` | `EnvKeySource` | Env var or registry active id | Registry or env by `kid` |
+| `keyring` | `KeyringKeySource` | Keyring entry `active` | Keyring entry `{key_id}` |
+| `secret_store` | `SecretStoreKeySource` | Spec `active_key_id` | Spec `keys` map by `kid` |
+
+`ChainedKeyProvider` delegates to `KeySourceChain`, which tries sources in order until one
+returns key material. Encrypt paths call `get_current_key()`; decrypt paths call
+`get_key_by_id(kid)` so values encrypted before rotation remain readable when historical keys
+are still registered.
+
+`LocalKeyProvider` remains as a thin backward-compatible subclass wired to an env-only chain.
 
 ### Data flow
 
@@ -56,7 +83,14 @@ applies on the next save or load cycle.
   - `True` / `False` — explicit override persisted in `settings.json`
 - `env_encryption_key_source: Optional[str] = None`
   - `None` — defaults to `"environment"`
-  - `"environment"` — read Fernet key from `PYPOST_ENV_ENCRYPTION_KEY`
+  - `"environment"` — env var and optional env-channel registry file
+  - `"keyring"` — OS credential store via `keyring` package
+  - `"secret_store"` — operator spec file and backend chain
+- `env_encryption_key_source_fallback: Optional[list[str]] = None`
+  - Ordered additional sources to try after the primary source
+  - `None` or empty — only the primary source is attempted
+
+Settings store policy only. **Do not** put Fernet key material in `settings.json`.
 
 ### `resolve_encryption_enabled(settings: AppSettings | None) -> bool`
 
@@ -65,17 +99,24 @@ falls back to the `PYPOST_ENV_ENCRYPTION_ENABLED` process env var.
 
 ### `resolve_key_source(settings: AppSettings | None) -> str`
 
-Returns the key source strategy. Unsupported persisted values log a warning and fall back to
-`"environment"`.
+Returns the primary key source label for logging and telemetry. Unsupported persisted values log
+`encryption_key_source_unsupported` and fall back to `"environment"`.
 
-### `build_key_provider(source: str) -> KeyProvider`
+### `resolve_key_source_chain(settings: AppSettings | None) -> list[str]`
 
-Factory for key providers. Currently supports only `"environment"` (`LocalKeyProvider`).
+Returns the ordered source list used to build the provider: primary source first, then configured
+fallback entries (deduplicated, unsupported names skipped).
+
+### `build_key_provider(settings: AppSettings | None) -> KeyProvider`
+
+Builds a `ChainedKeyProvider` from `resolve_key_source_chain(settings)`. Logs
+`encryption_key_provider_built` with the effective chain.
 
 ### `StorageManager.apply_encryption_settings(settings: AppSettings | None) -> None`
 
 Reconfigures the storage layer when settings change. Rebuilds `EnvironmentSecretsCodec` with the
-resolved key provider and logs the effective policy (`storage_encryption_config_applied`).
+resolved key provider and logs the effective policy (`storage_encryption_config_applied` includes
+`source_chain`).
 
 Call sites:
 
@@ -87,11 +128,16 @@ Call sites:
 `SettingsDialog` exposes:
 
 - **Environment encryption at rest** — `Use environment variable default` / `Enabled` / `Disabled`
-- **Encryption key source** — `Environment variable (PYPOST_ENV_ENCRYPTION_KEY)` (only option in
-  this release)
+- **Encryption key source** — primary strategy:
+  - `Environment variable (PYPOST_ENV_ENCRYPTION_KEY)`
+  - `OS keyring (pypost/env-encryption)`
+  - `Secret store spec file (PYPOST_ENV_ENCRYPTION_SECRETS_FILE)`
+- **Encryption key source fallback** — comma-separated list of additional sources (e.g.
+  `environment, secret_store`). Parsed by `parse_key_source_fallback()`; empty field means no
+  fallback.
 
-A helper label reminds users to keep Fernet key material in the process environment, not in
-`settings.json`.
+A helper label below the source controls shows per-source setup guidance (`KEY_SOURCE_HELP`). Key
+material is never persisted in settings.
 
 ## Configuration
 
@@ -100,23 +146,114 @@ Application settings take precedence when explicitly set; otherwise behavior fol
 
 ### Application settings (`settings.json`)
 
-- **Environment encryption at rest**
-  - `Use environment variable default` — follows `PYPOST_ENV_ENCRYPTION_ENABLED` (backward compatible)
-  - `Enabled` / `Disabled` — explicit override persisted in settings
-- **Encryption key source**
-  - `Environment variable (PYPOST_ENV_ENCRYPTION_KEY)` — only supported source in this release
+| Field | Purpose |
+| --- | --- |
+| `env_encryption_enabled` | `null` (follow env), `true`, or `false` |
+| `env_encryption_key_source` | Primary source: `environment`, `keyring`, `secret_store` |
+| `env_encryption_key_source_fallback` | Optional ordered list of additional sources |
 
-Settings store policy only. **Do not** put Fernet key material in `settings.json`.
+When fallback is unset, only the primary source is attempted (preserves strict env-only setups).
+
+### Fallback order configuration
+
+The effective chain is **primary + fallback list** (deduplicated). Example: primary `keyring`,
+fallback `environment, secret_store` yields chain `["keyring", "environment", "secret_store"]`.
+
+Resolution behavior:
+
+- **Active key** — each source is tried in order until `try_resolve_active()` returns a key.
+- **Historical key** — each source is tried in order until `try_resolve_by_id(kid)` returns a key.
+- A source that is missing, misconfigured, or unavailable returns `None`; the chain continues.
+- If no source succeeds, `EnvironmentEncryptionError` is raised with a safe message (no key bytes).
+
+In Settings, enter fallback sources as a comma-separated list matching supported source names.
 
 ### Process environment variables
 
-- `PYPOST_ENV_ENCRYPTION_ENABLED`
-  - truthy values: `1`, `true`, `yes`, `on`
-  - used when app setting is `Use environment variable default`
-- `PYPOST_ENV_ENCRYPTION_KEY`
-  - Fernet key used for encrypt/decrypt when key source is environment variable
+| Variable | Used by |
+| --- | --- |
+| `PYPOST_ENV_ENCRYPTION_ENABLED` | Encryption toggle fallback when settings field is `None` |
+| `PYPOST_ENV_ENCRYPTION_KEY` | `EnvKeySource` active key (existing path) |
+| `PYPOST_ENV_ENCRYPTION_KEYS_FILE` | Optional env-channel JSON key registry (rotation) |
+| `PYPOST_ENV_ENCRYPTION_SECRETS_FILE` | Path to secret-store spec for `SecretStoreKeySource` |
 
-### Secure setup
+**Operator distinction — `KEYS_FILE` vs `SECRETS_FILE`**
+
+- `PYPOST_ENV_ENCRYPTION_KEYS_FILE` supplements the **environment** source when it is in the
+  configured chain. It points to a JSON registry of Fernet keys (active + historical). It does
+  not drive `SecretStoreKeySource`.
+- `PYPOST_ENV_ENCRYPTION_SECRETS_FILE` is used only by **`SecretStoreKeySource`**. It points to
+  an operator spec with `active_key_id`, `keys`, and ordered `backends` for `SecretBackendChain`.
+
+### Key registry files
+
+Rotation relies on registries that hold multiple keys outside `settings.json`.
+
+**Env-channel registry** (`PYPOST_ENV_ENCRYPTION_KEYS_FILE`, optional):
+
+```json
+{
+  "active_key_id": "abc123def4567890",
+  "keys": {
+    "abc123def4567890": "<fernet-key-active>",
+    "fedcba0987654321": "<fernet-key-historical>"
+  }
+}
+```
+
+When unset, env-only mode uses `PYPOST_ENV_ENCRYPTION_KEY` as the active key; historical lookup
+succeeds only when stored `kid` matches that key.
+
+**Secret-store spec** (`PYPOST_ENV_ENCRYPTION_SECRETS_FILE`):
+
+```json
+{
+  "active_key_id": "abc123def4567890",
+  "keys": {
+    "abc123def4567890": "<fernet-key-active>",
+    "fedcba0987654321": "<fernet-key-historical>"
+  },
+  "backends": [
+    {
+      "type": "file",
+      "path": "/secure/pypost-encryption-keys.json"
+    }
+  ]
+}
+```
+
+v1 implements only the `file` backend (`FileSecretBackend`). The spec's inline `keys` map is used
+when backends succeed; backend files may also contain registry-shaped JSON.
+
+**Keyring conventions**
+
+- Service: `pypost/env-encryption`
+- Username `active`: current Fernet key string
+- Username `{key_id}`: historical Fernet key string
+- Missing `keyring` package or OS backend → source unavailable (chain continues)
+
+### Key rotation workflow
+
+Rotation does not change the envelope format. Each encrypted value stores a `kid` (sha256 prefix
+of key material). New encryption uses the active key; decryption resolves by `kid`.
+
+Operator steps:
+
+1. **Introduce new active key** — generate Fernet material; register as active in the chosen
+   source (env var, keyring `active`, or registry `active_key_id`). New `kid` is derived
+   automatically.
+2. **Retain historical keys** — keep prior key material registered under its `kid` in the same
+   source or a source reachable in the configured chain.
+3. **Verify** — load environments; confirm pre-rotation values decrypt and new saves use the new
+   active key (`kid` on new envelopes matches the new active key).
+4. **Complete** — mixed `kid` values in `environments.json` are expected until optional bulk
+   re-encryption (PYPOST-487). Removing historical key material too soon breaks decrypt for
+   values still referencing that `kid`.
+
+Backward compatibility: deployments with only `PYPOST_ENV_ENCRYPTION_KEY` behave as before — a
+single key serves as active and satisfies `get_key_by_id` when `kid` matches.
+
+### Secure setup (environment source)
 
 1. Generate a Fernet key:
 
@@ -138,8 +275,8 @@ Settings store policy only. **Do not** put Fernet key material in `settings.json
 
 4. Restart PyPost if you changed environment variables outside the app.
 
-If encryption is enabled and the key is missing, save/load error paths are triggered and
-reported via logs and metrics.
+If encryption is enabled and no configured source yields an active key, save/load error paths are
+triggered and reported via logs and metrics.
 
 ## Payload Format
 
@@ -176,49 +313,100 @@ Prometheus counters:
 
 ### Encryption enabled but environments fail to save
 
-**Symptoms:** save errors, `environment_encryption_errors_total{stage="save",reason="encrypt_failed"}`
-increments, logs mention missing or invalid key.
+**Symptoms:** save errors,
+`environment_encryption_errors_total{stage="save",reason="encrypt_failed"}` increments, logs
+mention `encryption_key_unavailable` with `reason=no_source_provided_active_key`.
 
-**Cause:** `PYPOST_ENV_ENCRYPTION_KEY` is unset or not a valid Fernet key while encryption is
-enabled (via Settings or env var).
+**Cause:** No configured source in the chain yields an active key while encryption is enabled.
 
-**Fix:** export a valid Fernet key before launching PyPost, or disable encryption in Settings
-until the key is configured.
+**Fix:** provision key material in the primary source (and fallbacks if configured). For env-only
+setups, export a valid Fernet key in `PYPOST_ENV_ENCRYPTION_KEY`. Disable encryption in Settings
+until key material is configured.
 
-### Environments missing or empty after load
+### Environments missing or empty after load (decrypt failure)
 
-**Symptoms:** load returns no environments, `decrypt_failed` or `unsupported_format` metrics/logs.
+**Symptoms:** load returns no environments, `decrypt_failed` metrics/logs,
+`encryption_key_rotation_lookup_failed` with `reason=no_source_provided_key`.
 
 **Causes:**
 
-- Key changed since data was encrypted (key-id mismatch).
+- Historical key material removed after rotation while stored envelopes still reference old `kid`.
+- Key changed without retaining the prior key in the registry.
 - Corrupt or manually edited envelope in `environments.json`.
 - Encryption disabled in settings but file still contains encrypted envelopes (decrypt still runs
   for envelope-shaped values).
 
-**Fix:** restore the original `PYPOST_ENV_ENCRYPTION_KEY`, repair the payload, or restore
-`environments.json` from backup. Check `kid` in stored envelopes matches the current key.
+**Fix:** restore historical key material under the correct `kid` in a source reachable by the
+configured chain, repair the payload, or restore `environments.json` from backup. Compare stored
+`kid` values with registered keys.
+
+### Key changed since encryption (pre-rotation env-only)
+
+**Symptoms:** decrypt failures after replacing `PYPOST_ENV_ENCRYPTION_KEY` without a registry.
+
+**Cause:** Old envelopes reference the previous key's `kid`; a single env var only satisfies
+lookup when `kid` matches the current key.
+
+**Fix:** use a key registry (`PYPOST_ENV_ENCRYPTION_KEYS_FILE` or keyring/secret-store registry)
+and retain the old key under its `kid`, or restore the original key.
+
+### Primary source unavailable; fallback expected
+
+**Symptoms:** WARNING logs `key_source_chain_active_fallback` or
+`key_source_chain_by_id_fallback`; INFO `key_source_chain_active_resolved_via_fallback` when a
+later source succeeds.
+
+**Cause:** Primary source missing package, file, or credential (e.g. `keyring` not installed,
+secrets spec path wrong).
+
+**Fix:** configure fallback sources in Settings, or fix the primary source. If no source succeeds,
+resolution fails with `encryption_key_unavailable`.
+
+### Keyring selected but not working
+
+**Symptoms:** chain skips keyring; fallback warnings; active key not found when keyring is sole
+source.
+
+**Causes:**
+
+- `keyring` package not installed (`pip install keyring`).
+- OS credential backend unavailable in the runtime environment.
+- Missing entries under service `pypost/env-encryption` (`active` and historical `{key_id}`).
+
+**Fix:** install `keyring`, store keys in the OS credential store, or add `environment` as
+fallback.
+
+### Secret store spec or backend file problems
+
+**Symptoms:** DEBUG logs `secret_spec_missing`, `secret_backend_file_missing`, or WARNING
+`secret_backend_chain_fallback`.
+
+**Cause:** `PYPOST_ENV_ENCRYPTION_SECRETS_FILE` unset, invalid JSON, or backend path in spec not
+readable.
+
+**Fix:** verify spec path, JSON shape (`active_key_id`, `keys`, `backends`), and file backend
+paths. Only `type: file` is supported in v1.
 
 ### Settings change does not re-encrypt existing values immediately
 
 **Expected behavior.** Policy applies on the next save/load. Edit and save an environment (or
 trigger a bulk save) to encrypt plain-text hidden values after enabling encryption.
 
-### Env var changes ignored while app is running
+### Env var or registry file changes ignored while app is running
 
-**Cause:** `LocalKeyProvider` reads `PYPOST_ENV_ENCRYPTION_KEY` at use time, but the enabled flag
-may be cached via settings. Mixed configuration is easiest to reason about after restart.
+**Cause:** `StorageManager.apply_encryption_settings()` rebuilds the provider when Settings are
+saved, but external env or file changes may not be picked up until restart or re-apply.
 
-**Fix:** restart PyPost after changing `PYPOST_ENV_ENCRYPTION_ENABLED` or
-`PYPOST_ENV_ENCRYPTION_KEY` outside the Settings dialog.
+**Fix:** restart PyPost after changing `PYPOST_ENV_ENCRYPTION_*` variables or registry files
+outside the Settings dialog.
 
 ### Unsupported key source in persisted settings
 
 **Symptoms:** warning log `encryption_key_source_unsupported`, fallback to environment variable
 source.
 
-**Fix:** open Settings and confirm key source is `Environment variable (PYPOST_ENV_ENCRYPTION_KEY)`.
-Additional providers are planned in follow-up tasks (PYPOST-483).
+**Fix:** open Settings and select a supported primary source (`environment`, `keyring`, or
+`secret_store`).
 
 ## Tests
 
@@ -228,6 +416,7 @@ Primary coverage files:
 - `tests/test_settings_encryption.py`
 - `tests/test_environment_secrets_codec.py`
 - `tests/test_key_provider.py`
+- `tests/test_key_sources_secret_store.py`
 - `tests/test_storage_environments.py`
 - `tests/test_env_persistence_e2e.py`
 
