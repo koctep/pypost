@@ -2,7 +2,9 @@ import logging
 from typing import List
 
 from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QApplication,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -18,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.curl_generator import CurlGenerator
 from pypost.core.history_manager import HistoryManager
 from pypost.models.models import HistoryEntry, RequestData
 
@@ -28,6 +31,7 @@ class HistoryPanel(QWidget):
     """Sidebar panel for browsing, filtering, and reloading request history."""
 
     load_into_editor = Signal(RequestData)
+    curl_copied = Signal()
 
     def __init__(
         self, history_manager: HistoryManager, icons: dict | None = None, parent=None
@@ -65,6 +69,10 @@ class HistoryPanel(QWidget):
         self._list_widget.customContextMenuRequested.connect(self._on_context_menu)
         self._list_widget.currentRowChanged.connect(self._on_selection_changed)
         splitter.addWidget(self._list_widget)
+
+        # Add shortcut for Copy as cURL
+        self._copy_shortcut = QShortcut(QKeySequence.Copy, self._list_widget)
+        self._copy_shortcut.activated.connect(self._copy_as_curl)
 
         detail_container = QWidget()
         detail_layout = QFormLayout(detail_container)
@@ -150,7 +158,9 @@ class HistoryPanel(QWidget):
             headers=entry.headers,
             body=entry.body,
         )
-        logger.info("history_load_into_editor method=%s url=%s", entry.method, entry.url)
+        logger.info(
+            "history_load_into_editor method=%s url=%s", entry.method, entry.url
+        )
         self.load_into_editor.emit(request_data)
 
     def _on_clear_history(self) -> None:
@@ -169,18 +179,41 @@ class HistoryPanel(QWidget):
         logger.info("history_cleared")
 
     def _on_context_menu(self, pos: QPoint) -> None:
-        """Shows context menu with 'Delete' action for right-clicked entry."""
+        """Shows context menu with 'Copy as cURL' and 'Delete' actions for right-clicked entry."""
         item = self._list_widget.itemAt(pos)
         if item is None:
             return
+
+        # Select the item if it was right-clicked but not currently selected
+        if self._list_widget.currentItem() != item:
+            self._list_widget.setCurrentItem(item)
+
         menu = QMenu(self)
+        copy_curl_action = menu.addAction("Copy as cURL")
         delete_action = menu.addAction("Delete")
+
         action = menu.exec(self._list_widget.mapToGlobal(pos))
-        if action == delete_action:
+        if action == copy_curl_action:
+            self._copy_as_curl()
+        elif action == delete_action:
             entry_id = item.data(Qt.UserRole)
             self._history_manager.delete_entry(entry_id)
             logger.info("history_entry_deleted entry_id=%s", entry_id)
             self.refresh()
+
+    def _copy_as_curl(self) -> None:
+        """Copies the selected history entry as a cURL command to the clipboard."""
+        entry = self._selected_entry()
+        if entry is None:
+            return
+
+        try:
+            curl_cmd = CurlGenerator.generate_from_history(entry)
+            QApplication.clipboard().setText(curl_cmd)
+            logger.info("history_curl_copied method=%s url=%s", entry.method, entry.url)
+            self.curl_copied.emit()
+        except Exception as e:
+            logger.error("history_curl_copy_failed entry_id=%s error=%s", entry.id, str(e), exc_info=True)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

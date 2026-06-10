@@ -1,7 +1,7 @@
 from unittest.mock import patch
 from pypost.core.curl_generator import CurlGenerator
 from pypost.core.template_service import TemplateService
-from pypost.models.models import RequestData
+from pypost.models.models import RequestData, HistoryEntry
 
 
 def test_curl_generator_basic():
@@ -112,5 +112,38 @@ def test_curl_generator_with_complex_body():
         expected = (
             'curl -X POST https://api.example.com/users '
             '-d "{\\"name\\": \\"test\\",\n\\"description\\": \\"multi\\nline\\"}"'
+        )
+        assert curl_cmd == expected
+
+
+def test_curl_generator_from_history():
+    entry = HistoryEntry(
+        id="123",
+        method="POST",
+        url="https://api.example.com/data",
+        headers={"Content-Type": "application/json", "X-Custom": "value"},
+        body='{"key": "value"}',
+        status_code=200,
+        response_time_ms=50,
+        timestamp="2023-01-01T12:00:00Z"
+    )
+
+    with patch("sys.platform", "linux"):
+        curl_cmd = CurlGenerator.generate_from_history(entry)
+        expected = (
+            "curl -X POST https://api.example.com/data "
+            "-H 'Content-Type: application/json' "
+            "-H 'X-Custom: value' "
+            "-d '{\"key\": \"value\"}'"
+        )
+        assert curl_cmd == expected
+
+    with patch("sys.platform", "win32"):
+        curl_cmd = CurlGenerator.generate_from_history(entry)
+        expected = (
+            'curl -X POST https://api.example.com/data '
+            '-H "Content-Type: application/json" '
+            '-H "X-Custom: value" '
+            '-d "{\\"key\\": \\"value\\"}"'
         )
         assert curl_cmd == expected

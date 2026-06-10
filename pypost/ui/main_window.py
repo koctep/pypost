@@ -147,6 +147,10 @@ class MainWindow(QMainWindow):
         self.tabs.request_saved.connect(self.collections.restore_tree_state)
         self.tabs.request_executed.connect(self.history_panel.refresh)
         self.history_panel.load_into_editor.connect(self.tabs.load_request_from_history)
+        self.history_panel.curl_copied.connect(self._on_curl_copied)
+
+    def _on_curl_copied(self) -> None:
+        self.statusBar().showMessage("Copied to clipboard", 3000)
 
     def _create_menu_bar(self) -> None:
         menubar = self.menuBar()
@@ -188,7 +192,9 @@ class MainWindow(QMainWindow):
             font = app.font()
             font.setPointSize(settings.font_size)
             app.setFont(font)
-            logger.debug("apply_settings_font_applied point_size=%d", app.font().pointSize())
+            logger.debug(
+                "apply_settings_font_applied point_size=%d", app.font().pointSize()
+            )
             for w in [
                 self.collections.widget,
                 self.env.env_selector,
@@ -224,7 +230,9 @@ class MainWindow(QMainWindow):
                 self.settings.metrics_host,
                 self.settings.metrics_port,
             )
-            self.metrics.restart_server(self.settings.metrics_host, self.settings.metrics_port)
+            self.metrics.restart_server(
+                self.settings.metrics_host, self.settings.metrics_port
+            )
         logger.info(
             "settings_applied font_size=%d indent_size=%d request_timeout=%d",
             self.settings.font_size,
