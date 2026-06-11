@@ -98,6 +98,7 @@ Patching `client.session` after construction remains valid for legacy tests.
 
 | Module | Class | Focus |
 | --- | --- | --- |
+| `tests/test_http_client.py` | `TestHTTPClientPrepareRequestKwargs` | `_prepare_request_kwargs` in isolation (URL, headers, params, body branches) |
 | `tests/test_http_client.py` | `TestHTTPClientInjection` | TemplateService and session seams |
 | `tests/test_http_client.py` | (other classes) | Transport, SSE, YAML body |
 

@@ -267,6 +267,187 @@ class TestHTTPClientResolvedFields(unittest.TestCase):
         self.assertEqual('{"k":"abc"}', result.resolved.body)
 
 
+class TestHTTPClientPrepareRequestKwargs(unittest.TestCase):
+    """Unit tests for HTTPClient._prepare_request_kwargs in isolation."""
+
+    def setUp(self):
+        self.client = HTTPClient(metrics=MagicMock(), template_service=TemplateService())
+
+    def test_basic_get_sets_method_stream_and_timeout(self):
+        req = RequestData(method="GET", url="http://example.com")
+        kwargs, resolved = self.client._prepare_request_kwargs(req, {})
+        self.assertEqual("GET", kwargs["method"])
+        self.assertEqual("http://example.com", kwargs["url"])
+        self.assertTrue(kwargs["stream"])
+        self.assertEqual(30.0, kwargs["timeout"])
+        self.assertEqual({}, kwargs["headers"])
+        self.assertEqual({}, kwargs["params"])
+        self.assertNotIn("json", kwargs)
+        self.assertNotIn("data", kwargs)
+        self.assertEqual("http://example.com", resolved.url)
+
+    def test_renders_url_from_template(self):
+        req = RequestData(method="GET", url="https://{{ host }}/api")
+        kwargs, _ = self.client._prepare_request_kwargs(req, {"host": "api.example"})
+        self.assertEqual("https://api.example/api", kwargs["url"])
+
+    def test_rendered_url_reused_without_template_render(self):
+        mock_ts = MagicMock()
+        mock_ts.render_string.side_effect = lambda s, v: s
+        client = HTTPClient(template_service=mock_ts)
+        url_template = "http://x/{{ path }}"
+        req = RequestData(method="GET", url=url_template)
+        kwargs, resolved = client._prepare_request_kwargs(
+            req, {"path": "items"}, rendered_url="http://x/items"
+        )
+        self.assertEqual("http://x/items", kwargs["url"])
+        self.assertEqual("http://x/items", resolved.url)
+        url_render_calls = [
+            c for c in mock_ts.render_string.call_args_list if c.args[0] == url_template
+        ]
+        self.assertEqual(0, len(url_render_calls))
+
+    def test_renders_header_keys_and_values(self):
+        req = RequestData(
+            method="GET",
+            url="http://x",
+            headers={"X-{{ role }}": "{{ token }}"},
+        )
+        kwargs, resolved = self.client._prepare_request_kwargs(
+            req, {"role": "Auth", "token": "secret"}
+        )
+        self.assertEqual({"X-Auth": "secret"}, kwargs["headers"])
+        self.assertEqual({"X-Auth": "secret"}, resolved.headers)
+
+    def test_renders_authorization_header(self):
+        req = RequestData(
+            method="GET",
+            url="http://x",
+            headers={"Authorization": "Bearer {{ api_key }}"},
+        )
+        kwargs, _ = self.client._prepare_request_kwargs(req, {"api_key": "tok-42"})
+        self.assertEqual("Bearer tok-42", kwargs["headers"]["Authorization"])
+
+    def test_renders_param_keys_and_values(self):
+        req = RequestData(
+            method="GET",
+            url="http://x",
+            params={"{{ filter }}": "{{ value }}"},
+        )
+        kwargs, _ = self.client._prepare_request_kwargs(
+            req, {"filter": "q", "value": "search"}
+        )
+        self.assertEqual({"q": "search"}, kwargs["params"])
+
+    def test_whitespace_body_omits_json_and_data(self):
+        req = RequestData(method="POST", url="http://x", body="  \n  ", body_type="json")
+        kwargs, resolved = self.client._prepare_request_kwargs(req, {})
+        self.assertNotIn("json", kwargs)
+        self.assertNotIn("data", kwargs)
+        self.assertEqual("  \n  ", resolved.body)
+
+    def test_json_body_type_parses_to_json_kwarg(self):
+        req = RequestData(
+            method="POST", url="http://x", body='{"a": 1}', body_type="json"
+        )
+        kwargs, _ = self.client._prepare_request_kwargs(req, {})
+        self.assertEqual({"a": 1}, kwargs["json"])
+        self.assertNotIn("data", kwargs)
+
+    def test_json_body_type_invalid_json_falls_back_to_data(self):
+        req = RequestData(method="POST", url="http://x", body="not-json", body_type="json")
+        kwargs, _ = self.client._prepare_request_kwargs(req, {})
+        self.assertEqual("not-json", kwargs["data"])
+        self.assertNotIn("json", kwargs)
+
+    def test_text_body_type_uses_data_kwarg(self):
+        body = "plain text"
+        req = RequestData(method="POST", url="http://x", body=body, body_type="text")
+        kwargs, resolved = self.client._prepare_request_kwargs(req, {})
+        self.assertEqual(body, kwargs["data"])
+        self.assertNotIn("json", kwargs)
+        self.assertEqual(body, resolved.body)
+
+    def test_yaml_as_json_converts_to_json_kwarg(self):
+        body = "name: Alice\nage: 30"
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body=body,
+            body_type="yaml",
+            yaml_as_json=True,
+        )
+        kwargs, _ = self.client._prepare_request_kwargs(req, {})
+        self.assertEqual({"name": "Alice", "age": 30}, kwargs["json"])
+        self.assertNotIn("data", kwargs)
+
+    def test_yaml_without_flag_uses_data_kwarg(self):
+        body = "name: Alice"
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body=body,
+            body_type="yaml",
+            yaml_as_json=False,
+        )
+        kwargs, _ = self.client._prepare_request_kwargs(req, {})
+        self.assertEqual(body, kwargs["data"])
+        self.assertNotIn("json", kwargs)
+
+    def test_invalid_yaml_with_flag_raises_body_error(self):
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body="{ invalid",
+            body_type="yaml",
+            yaml_as_json=True,
+        )
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client._prepare_request_kwargs(req, {})
+        self.assertEqual(ctx.exception.category, ErrorCategory.BODY)
+        self.client._metrics.track_yaml_to_json_conversion_failed.assert_called_once()
+
+    def test_body_template_rendered_in_resolved_fields(self):
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body='{"user":"{{ name }}"}',
+            body_type="json",
+        )
+        kwargs, resolved = self.client._prepare_request_kwargs(req, {"name": "Bob"})
+        self.assertEqual({"user": "Bob"}, kwargs["json"])
+        self.assertEqual('{"user":"Bob"}', resolved.body)
+
+    def test_yaml_as_json_ignored_for_json_body_type(self):
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body='{"k":"v"}',
+            body_type="json",
+            yaml_as_json=True,
+        )
+        kwargs, _ = self.client._prepare_request_kwargs(req, {})
+        self.assertEqual({"k": "v"}, kwargs["json"])
+        self.assertNotIn("data", kwargs)
+
+    def test_resolved_fields_capture_rendered_url_headers_and_body(self):
+        req = RequestData(
+            method="POST",
+            url="http://{{ host }}/api",
+            headers={"X-Token": "{{ token }}"},
+            body='{"k":"{{ token }}"}',
+            body_type="json",
+        )
+        kwargs, resolved = self.client._prepare_request_kwargs(
+            req, {"host": "example.com", "token": "abc"}
+        )
+        self.assertEqual("http://example.com/api", resolved.url)
+        self.assertEqual({"X-Token": "abc"}, resolved.headers)
+        self.assertEqual('{"k":"abc"}', resolved.body)
+        self.assertEqual(kwargs["url"], resolved.url)
+        self.assertEqual(kwargs["headers"], resolved.headers)
+
+
 class TestHTTPClientUrlRendering(unittest.TestCase):
     def test_url_template_rendered_once_per_request(self):
         """send_request must not render the URL twice (_prepare_request_kwargs reuses it)."""
