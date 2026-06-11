@@ -172,11 +172,25 @@ Presenter-level save-as coverage in `tests/test_tabs_presenter.py`:
 - `test_save_as_emits_request_save_as_completed_not_request_saved` — save-as emits
   `request_save_as_completed` (not `request_saved`) with the new ID.
 
+GUI integration tests in `tests/test_save_flow_integration.py` (RequestWidget menu/shortcut →
+`TabsPresenter`):
+
+| Test | Behavior verified |
+| ---- | ----------------- |
+| `test_save_menu_action_overwrites_existing_request` | Save menu persists overwrite and emits `request_saved` |
+| `test_save_menu_action_cancelled_when_dialog_dismissed` | New request save cancelled when dialog dismissed |
+| `test_save_shortcut_cancelled_on_overwrite_decline` | `Ctrl+S` cancelled when overwrite confirmation declined |
+| `test_save_as_shortcut_persists_copy_with_new_id` | Save-as shortcut persists copy with new tab ID |
+| `test_save_as_menu_action_cancelled_when_dialog_dismissed` | Save-as menu cancelled; tab identity unchanged |
+
 Run:
 
 ```bash
 QT_QPA_PLATFORM=offscreen python -m pytest \
-  tests/test_request_save_orchestrator.py tests/test_tabs_presenter.py -k save_as -v
+  tests/test_request_save_orchestrator.py \
+  tests/test_tabs_presenter.py \
+  tests/test_save_flow_integration.py \
+  -k "save or save_as" -v
 ```
 
 ## Troubleshooting
