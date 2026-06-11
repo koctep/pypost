@@ -317,15 +317,70 @@ Shared case data: `MALFORMED_NESTED_EXPRESSION_CASES` in
 
 Full PYPOST-450 suite (STEP 6, 2026-06-06): 109 passed, 39 subtests across the files above.
 
-### PYPOST-461 boundary
+### PYPOST-461 boundary (completed)
 
 PYPOST-454 owns **nested-structure** malformation and **whitespace-heavy** variants plus
-parity for those forms. Remaining out of scope (tracked in
-[PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461)):
+parity for those forms. [PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461) closed
+the remaining PYPOST-450 missing-test debt — see **Edge-Case Expression Variants
+(PYPOST-461)** below.
 
-- Empty-argument calls (`{{md5()}}`)
-- Multi-placeholder first-failure stability
-- Standalone malformed closing-paren / arity patterns not primarily about nesting or spacing
+## Edge-Case Expression Variants (PYPOST-461)
+
+PYPOST-461 adds **tests-only** acceptance coverage for empty-argument calls, standalone
+extra-closing-paren patterns, and multi-placeholder **first-failure** validation ordering.
+No production code changed.
+
+### Empty-argument calls (E1–E3)
+
+Omitting the required single argument maps to `invalid_argument` (not `invalid_arity`) because
+the empty argument string fails identifier and nested-call grammar checks.
+
+| ID | Example | Validation code | `function_name` |
+| --- | --- | --- | --- |
+| E1 | `{{ md5() }}` | `invalid_argument` | `md5` |
+| E2 | `{{ urlencode() }}` | `invalid_argument` | `urlencode` |
+| E3 | `{{ base64() }}` | `invalid_argument` | `base64` |
+
+### Standalone extra closing paren (P1–P2)
+
+Top-level extra `)` (not primarily nested-structure malformation — see M1–M4 above):
+
+| ID | Example | Validation code | `function_name` |
+| --- | --- | --- | --- |
+| P1 | `{{ urlencode(db)) }}` | `invalid_argument` | `urlencode` |
+| P2 | `{{ md5(x)) }}` | `invalid_argument` | `md5` |
+
+### First-failure validation ordering (F1–F5, V1–V2)
+
+When content contains multiple `{{ ... }}` placeholders, validation scans placeholders
+**left to right** (tokenization order) and returns the **first** failing expression.
+Later placeholders are not evaluated once a failure is found.
+
+`validate_content` tokenizes then delegates to `validate_expressions`. The render path uses
+the same ordering after a single tokenization pass
+(`TemplateService._validate_template_expressions`).
+
+| ID | Example / expressions | First failure code | `function_name` |
+| --- | --- | --- | --- |
+| F1 | `{{ host }} {{ md5() }}` | `invalid_argument` | `md5` |
+| F2 | `{{ urlencode(x) }} {{ mystery(y) }}` | `unknown_function` | `mystery` |
+| F3 | `{{ mystery(y) }} {{ urlencode(x) }}` | `unknown_function` | `mystery` |
+| F4 | `{{ md5(urlencode(db)) }} {{ md5() }}` | `invalid_argument` | `md5` |
+| F5 | `{{ host }} {{ urlencode(a, b) }}` | `invalid_arity` | `urlencode` |
+| V1 | `["host", "urlencode(x)", "mystery(y)"]` (`validate_expressions`) | `unknown_function` | `mystery` |
+| V2 | `["md5(urlencode(db))", "md5()"]` via `validate_expressions` | `invalid_argument` | `md5` |
+
+### Test coverage (PYPOST-461)
+
+**Resolver validation** (`tests/test_function_expression_resolver.py`):
+
+- `EMPTY_ARGUMENT_CASES` — E1–E3 (`test_empty_argument_calls`)
+- `STANDALONE_MALFORMED_CLOSING_PAREN_CASES` — P1–P2
+  (`test_standalone_malformed_closing_paren`)
+- `MULTI_PLACEHOLDER_FIRST_FAILURE_CASES` — F1–F5 (`test_multi_placeholder_first_failure`)
+- `test_multi_placeholder_first_failure_via_validate_expressions` — V1–V2 direct API contract
+
+Malformed nested M1–M4 remain in `MALFORMED_NESTED_EXPRESSION_CASES` (PYPOST-454).
 
 ## Configuration
 
@@ -388,7 +443,7 @@ hardening — not release blockers.
 | Expression/template caching | — | Evaluated in PYPOST-455; deferred (see Caching evaluation) |
 | Registry vs `env.globals` parity test | — | Done in PYPOST-457 (`test_function_registry`, `test_template_service`) |
 | Shared tokenization dedup | — | Done in PYPOST-460 (`template_expression_tokenizer`) |
-| Empty-arg / multi-placeholder / closing-paren edge cases | [PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461) | Boundary with PYPOST-454 M1–M4 matrix |
+| Empty-arg / multi-placeholder / closing-paren edge cases | — | Done in PYPOST-461 (see PYPOST-461 section) |
 | Hover regex vs resolver identifier rules | — | Hover `VARIABLE_PATTERN` vs resolver `_IDENTIFIER_RE` mismatch for digit-leading names |
 | Hover expression pattern vs tokenizer | — | Done in PYPOST-536 (`EXPRESSION_PATTERN` aliases `TEMPLATE_PLACEHOLDER_PATTERN`) |
 | HTTPClient body / header-name integration | — | Optional; shared `render_string` path already proven |
@@ -398,7 +453,8 @@ hardening — not release blockers.
 Completed follow-ups referenced in this doc: PYPOST-451 (registry), PYPOST-452 (resolver),
 PYPOST-453 (nested policy), PYPOST-454 (edge-case tests), PYPOST-456 (doc polish),
 PYPOST-457 (registry/globals parity test), PYPOST-459 (orchestration stage helpers in
-`TemplateService`), PYPOST-460 (shared tokenization), PYPOST-455 (caching evaluation).
+`TemplateService`), PYPOST-460 (shared tokenization), PYPOST-461 (empty-arg / first-failure
+tests), PYPOST-455 (caching evaluation).
 
 ## Caching evaluation (PYPOST-455)
 

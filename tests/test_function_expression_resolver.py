@@ -17,6 +17,50 @@ MALFORMED_NESTED_EXPRESSION_CASES = [
     ("M4", "{{ base64(md5(urlencode(db) }}", "invalid_argument", "base64"),
 ]
 
+EMPTY_ARGUMENT_CASES = [
+    ("E1", "{{ md5() }}", "invalid_argument", "md5"),
+    ("E2", "{{ urlencode() }}", "invalid_argument", "urlencode"),
+    ("E3", "{{ base64() }}", "invalid_argument", "base64"),
+]
+
+STANDALONE_MALFORMED_CLOSING_PAREN_CASES = [
+    ("P1", "{{ urlencode(db)) }}", "invalid_argument", "urlencode"),
+    ("P2", "{{ md5(x)) }}", "invalid_argument", "md5"),
+]
+
+MULTI_PLACEHOLDER_FIRST_FAILURE_CASES = [
+    (
+        "F1",
+        "{{ host }} {{ md5() }}",
+        "invalid_argument",
+        "md5",
+    ),
+    (
+        "F2",
+        "{{ urlencode(x) }} {{ mystery(y) }}",
+        "unknown_function",
+        "mystery",
+    ),
+    (
+        "F3",
+        "{{ mystery(y) }} {{ urlencode(x) }}",
+        "unknown_function",
+        "mystery",
+    ),
+    (
+        "F4",
+        "{{ md5(urlencode(db)) }} {{ md5() }}",
+        "invalid_argument",
+        "md5",
+    ),
+    (
+        "F5",
+        "{{ host }} {{ urlencode(a, b) }}",
+        "invalid_arity",
+        "urlencode",
+    ),
+]
+
 
 class TestFunctionExpressionResolver(unittest.TestCase):
     def setUp(self):
@@ -108,6 +152,56 @@ class TestFunctionExpressionResolver(unittest.TestCase):
         for label, content, expected_code, expected_fn in invalid_cases:
             with self.subTest(label=label, content=content):
                 r = self.resolver.validate_content(content)
+                self.assertFalse(r.is_valid)
+                self.assertEqual(expected_code, r.code)
+                self.assertEqual(expected_fn, r.function_name)
+
+    def test_empty_argument_calls(self):
+        for label, content, expected_code, expected_fn in EMPTY_ARGUMENT_CASES:
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertFalse(r.is_valid)
+                self.assertEqual(expected_code, r.code)
+                self.assertEqual(expected_fn, r.function_name)
+
+    def test_standalone_malformed_closing_paren(self):
+        for label, content, expected_code, expected_fn in (
+            STANDALONE_MALFORMED_CLOSING_PAREN_CASES
+        ):
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertFalse(r.is_valid)
+                self.assertEqual(expected_code, r.code)
+                self.assertEqual(expected_fn, r.function_name)
+
+    def test_multi_placeholder_first_failure(self):
+        for label, content, expected_code, expected_fn in (
+            MULTI_PLACEHOLDER_FIRST_FAILURE_CASES
+        ):
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertFalse(r.is_valid)
+                self.assertEqual(expected_code, r.code)
+                self.assertEqual(expected_fn, r.function_name)
+
+    def test_multi_placeholder_first_failure_via_validate_expressions(self):
+        cases = [
+            (
+                "V1",
+                ["host", "urlencode(x)", "mystery(y)"],
+                "unknown_function",
+                "mystery",
+            ),
+            (
+                "V2",
+                ["md5(urlencode(db))", "md5()"],
+                "invalid_argument",
+                "md5",
+            ),
+        ]
+        for label, expressions, expected_code, expected_fn in cases:
+            with self.subTest(label=label, expressions=expressions):
+                r = self.resolver.validate_expressions(expressions)
                 self.assertFalse(r.is_valid)
                 self.assertEqual(expected_code, r.code)
                 self.assertEqual(expected_fn, r.function_name)
