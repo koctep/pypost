@@ -288,9 +288,12 @@ class SettingsDialog(QDialog):
 
         self.alert_webhook_auth_edit = QLineEdit()
         self.alert_webhook_auth_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.alert_webhook_auth_edit.setPlaceholderText(
-            WEBHOOK_AUTH_KEEP_PLACEHOLDER if self._had_webhook_auth else WEBHOOK_AUTH_NEW_PLACEHOLDER,
+        auth_placeholder = (
+            WEBHOOK_AUTH_KEEP_PLACEHOLDER
+            if self._had_webhook_auth
+            else WEBHOOK_AUTH_NEW_PLACEHOLDER
         )
+        self.alert_webhook_auth_edit.setPlaceholderText(auth_placeholder)
 
         self.alert_webhook_auth_clear_check = QCheckBox("Remove stored authorization header")
         self.alert_webhook_auth_clear_check.setVisible(self._had_webhook_auth)

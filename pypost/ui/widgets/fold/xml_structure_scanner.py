@@ -76,7 +76,7 @@ def _scan_regions(text: str) -> list[FoldRegion]:
         if cursor >= length:
             return []
 
-        tag_text = text[index : cursor + 1]
+        tag_text = text[index:cursor + 1]
         self_closing = tag_text.rstrip().endswith("/>")
         line = _line_at_offset(text, index)
 

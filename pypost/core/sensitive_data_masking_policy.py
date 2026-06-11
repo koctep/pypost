@@ -55,8 +55,8 @@ class SensitiveDataMaskingPolicy:
         return MaskedRequestData(
             url=self._template_service.render_string(request.url, variables),
             headers={
-                self._template_service.render_string(k, variables): self._template_service.render_string(
-                    v, variables
+                self._template_service.render_string(k, variables): (
+                    self._template_service.render_string(v, variables)
                 )
                 for k, v in request.headers.items()
             },

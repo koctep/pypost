@@ -206,7 +206,12 @@ class HistoryPanel(QWidget):
             logger.info("history_curl_copied method=%s url=%s", entry.method, entry.url)
             self.curl_copied.emit()
         except Exception as e:
-            logger.error("history_curl_copy_failed entry_id=%s error=%s", entry.id, str(e), exc_info=True)
+            logger.error(
+                "history_curl_copy_failed entry_id=%s error=%s",
+                entry.id,
+                str(e),
+                exc_info=True,
+            )
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
