@@ -104,6 +104,33 @@ are still registered.
 Changing encryption settings does **not** immediately re-save all environments. The new policy
 applies on the next save or load cycle.
 
+### Selective re-encrypt benchmark (PYPOST-534)
+
+CI guards regression in selective re-encrypt for large environments (120 hidden keys by
+default):
+
+```bash
+.venv/bin/python -m pytest tests/test_environment_save_selective_reencrypt_benchmark.py -v
+```
+
+| Guard | Assertion |
+| --- | --- |
+| Reuse stats | Second unchanged save: `reused_count == 120`, `encrypted_count == 0` |
+| Single edit | One changed key: `reused_count == 119`, `encrypted_count == 1` |
+| Metrics | `environment_value_encryptions_total` unchanged after reuse save |
+| Timing | Full re-encrypt (cache cleared) ≥ 2× slower than reuse second save |
+| Storage E2E | `StorageManager.save_environments` preserves unchanged envelopes |
+
+Local profiling (optional, not run in CI):
+
+```bash
+.venv/bin/python scripts/benchmark_env_save.py --keys 120 --iterations 5
+```
+
+Example output fields: `first_save_ms`, `reuse_second_save_ms`, `full_reencrypt_ms`,
+`speedup_full_over_reuse`. Requires `cryptography` and `PYPOST_ENV_ENCRYPTION_ENABLED=true`; the
+script generates a temporary key when `PYPOST_ENV_ENCRYPTION_KEY` is unset.
+
 ### Environment load contracts (PYPOST-525)
 
 Two public load methods coexist on `StorageManager`:
