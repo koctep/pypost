@@ -53,14 +53,22 @@ Returns the 1-based index of the match containing the current cursor, or 0 if no
 Updates the status label ("N of M", "N of M+" when capped, "No matches", or "N match(es)").
 Returns total match count (minimum of actual matches and the cap when capped).
 
+### `ResponseView._schedule_search_text_changed()`
+
+Schedules debounced search on large documents (>100KB). Small documents run search immediately.
+Clearing the search input always clears the status label without waiting for the debounce timer.
+
 ### `ResponseView._on_search_text_changed()`
 
-Triggered when the user types or clears the search input. Moves cursor to start, finds first match,
-and updates the counter.
+Runs the search after debounce (large docs) or immediately (small docs). Moves cursor to start,
+finds first match, and updates the counter.
 
 ## Configuration
 
-No configuration. Search is cleared automatically when:
+- `SEARCH_DEBOUNCE_MS` (250 ms): debounce interval for typed search on large documents only
+  (>100KB). Small responses search on every keystroke as before.
+
+Search is cleared automatically when:
 - `clear_body()` is called
 - `display_response()` is called (new response received)
 

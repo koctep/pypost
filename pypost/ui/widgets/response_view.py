@@ -2,7 +2,7 @@ import json
 import logging
 from functools import partial
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor, QTextDocument
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 LARGE_DOC_CHAR_THRESHOLD = 100 * 1024
 MATCH_COUNT_CAP = 1000
+SEARCH_DEBOUNCE_MS = 250
 
 
 class ResponseView(QWidget):
@@ -52,17 +53,22 @@ class ResponseView(QWidget):
         self.status_layout.addWidget(self.size_label)
         self.status_layout.addSpacing(20)
 
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(SEARCH_DEBOUNCE_MS)
+        self._search_timer.timeout.connect(self._on_search_text_changed)
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search...")
         self.search_input.setClearButtonEnabled(True)
-        self.search_input.textChanged.connect(self._on_search_text_changed)
+        self.search_input.textChanged.connect(self._schedule_search_text_changed)
         self.search_input.returnPressed.connect(lambda: self._find_next(source="enter"))
         self.search_prev_btn = QPushButton("Previous")
         self.search_prev_btn.clicked.connect(lambda: self._find_previous(source="previous"))
         self.search_next_btn = QPushButton("Next")
         self.search_next_btn.clicked.connect(lambda: self._find_next(source="next"))
         self.search_case_cb = QCheckBox("Match case")
-        self.search_case_cb.toggled.connect(self._on_search_text_changed)
+        self.search_case_cb.toggled.connect(self._schedule_search_text_changed)
         self.search_status_label = QLabel("")
 
         self.status_layout.addWidget(self.search_input)
@@ -184,6 +190,17 @@ class ResponseView(QWidget):
             self.search_status_label.setText(f"{total}{suffix} match(es)")
         return total
 
+    def _schedule_search_text_changed(self) -> None:
+        if not self.search_input.text():
+            self._search_timer.stop()
+            self._on_search_text_changed()
+            return
+        if self._is_large_document():
+            self._search_timer.start()
+            return
+        self._search_timer.stop()
+        self._on_search_text_changed()
+
     def _on_search_text_changed(self) -> None:
         text = self.search_input.text()
         if not text:
@@ -253,6 +270,7 @@ class ResponseView(QWidget):
 
     def clear_body(self):
         """Clears the response body and status labels."""
+        self._search_timer.stop()
         self.body_view.clear()
         self.status_label.setText("Status: -")
         self.time_label.setText("Time: -")
@@ -269,6 +287,7 @@ class ResponseView(QWidget):
         self.body_view.moveCursor(QTextCursor.End)
 
     def display_response(self, response: ResponseData):
+        self._search_timer.stop()
         self.status_label.setText(f"Status: {response.status_code}")
         self.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
         self.size_label.setText(f"Size: {response.size} bytes")

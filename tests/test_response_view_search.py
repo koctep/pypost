@@ -1,4 +1,4 @@
-"""Qt-level tests for ResponseView search bar (PYPOST-365, PYPOST-37)."""
+"""Qt-level tests for ResponseView search bar (PYPOST-365, PYPOST-37, PYPOST-363)."""
 
 import pytest
 
@@ -6,8 +6,10 @@ pytestmark = pytest.mark.timeout(60)
 
 from unittest.mock import MagicMock
 
+from PySide6.QtTest import QTest
+
 from pypost.models.response import ResponseData
-from pypost.ui.widgets.response_view import ResponseView
+from pypost.ui.widgets.response_view import SEARCH_DEBOUNCE_MS, ResponseView
 
 
 class TestResponseViewSearch:
@@ -137,6 +139,42 @@ class TestResponseViewSearch:
             )
             view.display_response(response)
             assert view.search_input.text() == ""
+            assert view.search_status_label.text() == ""
+        finally:
+            view.close()
+
+    def test_small_document_searches_immediately(self, qapp):
+        view = ResponseView()
+        try:
+            view.body_view.setPlainText("alpha beta alpha")
+            view.search_input.setText("alpha")
+            assert view.search_status_label.text() == "1 of 2"
+        finally:
+            view.close()
+
+    def test_large_document_debounces_search(self, qapp):
+        view = ResponseView()
+        try:
+            body = ("z" * (100 * 1024 + 1)) + "foo bar foo baz foo"
+            view.body_view.setPlainText(body)
+            view.search_input.setText("f")
+            assert view.search_status_label.text() == ""
+            view.search_input.setText("foo")
+            assert view.search_status_label.text() == ""
+            QTest.qWait(SEARCH_DEBOUNCE_MS + 50)
+            assert view.search_status_label.text() == "1 of 3"
+        finally:
+            view.close()
+
+    def test_large_document_clear_is_immediate(self, qapp):
+        view = ResponseView()
+        try:
+            body = ("z" * (100 * 1024 + 1)) + "foo bar foo baz foo"
+            view.body_view.setPlainText(body)
+            view.search_input.setText("foo")
+            QTest.qWait(SEARCH_DEBOUNCE_MS + 50)
+            assert view.search_status_label.text() == "1 of 3"
+            view.search_input.clear()
             assert view.search_status_label.text() == ""
         finally:
             view.close()
