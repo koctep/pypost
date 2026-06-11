@@ -52,9 +52,34 @@ jobs:
       - name: Run tests
         run: |
           python -m pytest tests/ -v --tb=short --cov=pypost \
+            -m "not slow" \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             --junit-xml=junit.xml
+
+  make-install-smoke:
+    name: "make install smoke (slow)"
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install pytest tooling
+        run: python -m pip install pytest pytest-timeout
+
+      - name: Run slow Makefile install smoke
+        run: |
+          python -m pytest tests/test_makefile.py -m slow -v --tb=short
 
       - name: Write job summary
         if: always()

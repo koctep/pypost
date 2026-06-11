@@ -1,4 +1,4 @@
-"""Integration tests for root Makefile automation (PYPOST-307, PYPOST-310)."""
+"""Integration tests for root Makefile automation (PYPOST-307, PYPOST-310, PYPOST-559)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ pytestmark = pytest.mark.timeout(120)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO_ROOT / "Makefile"
+REQUIREMENTS = REPO_ROOT / "requirements.txt"
 PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 MARKER_NAME = f".initialized-{PYTHON_VERSION}"
 MARKER_REL = f".venv/{MARKER_NAME}"
@@ -22,6 +23,7 @@ def _run_make(
     workspace: Path,
     *targets: str,
     check: bool = False,
+    timeout: int = 110,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["make", *targets],
@@ -29,7 +31,7 @@ def _run_make(
         capture_output=True,
         text=True,
         check=check,
-        timeout=110,
+        timeout=timeout,
     )
 
 
@@ -81,6 +83,14 @@ def make_workspace(tmp_path: Path) -> Path:
         "# empty fixture for make install\n",
         encoding="utf-8",
     )
+    _seed_minimal_project(tmp_path)
+    return tmp_path
+
+
+@pytest.fixture
+def make_workspace_full_deps(tmp_path: Path) -> Path:
+    shutil.copy(MAKEFILE, tmp_path / "Makefile")
+    shutil.copy(REQUIREMENTS, tmp_path / "requirements.txt")
     _seed_minimal_project(tmp_path)
     return tmp_path
 
@@ -165,3 +175,28 @@ class TestTargetExecution:
         assert install_result.returncode == 0, install_result.stderr
         lint_result = _run_make(make_workspace, "lint")
         assert lint_result.returncode == 0, lint_result.stderr
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(180)
+class TestSlowInstallSmoke:
+    def test_install_succeeds_with_project_requirements(
+        self,
+        make_workspace_full_deps: Path,
+    ) -> None:
+        result = _run_make(
+            make_workspace_full_deps,
+            "install",
+            timeout=170,
+        )
+        assert result.returncode == 0, result.stderr
+        bin_python = make_workspace_full_deps / ".venv" / "bin" / "python"
+        assert bin_python.is_file()
+        proc = subprocess.run(
+            [str(bin_python), "-c", "import pydantic"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        assert proc.returncode == 0, proc.stderr

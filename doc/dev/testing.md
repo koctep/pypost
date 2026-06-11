@@ -284,6 +284,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | ---- | ----- |
 | [PYPOST-307](https://pypost.atlassian.net/browse/PYPOST-307) | Marker lifecycle, `make -p` prerequisite chains, bare-venv `lint` failure |
 | [PYPOST-310](https://pypost.atlassian.net/browse/PYPOST-310) | Lightweight execution smoke for `install`, `test`, and `lint` exit codes |
+| [PYPOST-559](https://pypost.atlassian.net/browse/PYPOST-559) | Optional slow `make install` with real `requirements.txt` in isolated workspace |
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -291,6 +292,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | Dependency chain | `install` → `venv-test`; `run`/`test`/`lint` depend on the marker only (not `install`) |
 | Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `test`/`lint` without tooling |
 | Target execution | `install` with empty `requirements.txt` succeeds; `test`/`lint` succeed after `install` |
+| Slow install smoke | `make install` with copied project `requirements.txt` succeeds; marked `@pytest.mark.slow` |
 
 Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, minimal
 `tests/test_noop.py`, and `pypost/__init__.py`. Focused run:
@@ -298,6 +300,18 @@ Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, mini
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -v
 ```
+
+Slow install smoke (network-heavy; excluded from default `make test` and main CI job):
+
+```bash
+make test-slow
+# or
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -m slow -v
+```
+
+CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest (`pytest.ini`
+`addopts`) and `make test` exclude `-m slow`. A separate `make-install-smoke` job in
+`.github/workflows/test.yml` runs `-m slow` Makefile tests on Python 3.11 with pip caching.
 
 ## Pytest live logging (`log_cli`) (PYPOST-570)
 
