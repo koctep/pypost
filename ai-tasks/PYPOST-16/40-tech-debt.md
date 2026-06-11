@@ -15,6 +15,6 @@
 
 ## Follow-up Tasks
 
-- Implement argument parsing for tools. — [PYPOST-140](https://pypost.atlassian.net/browse/PYPOST-140)
+- ~~Implement argument parsing for tools.~~ — [PYPOST-140](https://pypost.atlassian.net/browse/PYPOST-140) **Done** (PYPOST-550/553)
 - Add logging/inspection of MCP calls in UI. — [PYPOST-141](https://pypost.atlassian.net/browse/PYPOST-141)
 - Add tests using an MCP client mock. — [PYPOST-142](https://pypost.atlassian.net/browse/PYPOST-142)
