@@ -65,6 +65,10 @@ def _format_migration_report(report: MigrationReport) -> str:
             lines.append(f"  {kid}")
     if report.backup_path is not None:
         lines.append(f"Backup: {report.backup_path}")
+    if report.reencrypt_stats is not None:
+        stats = report.reencrypt_stats
+        lines.append(f"Re-encrypted: {stats.encrypted_count}")
+        lines.append(f"Reused: {stats.reused_count}")
     if report.errors:
         lines.append("")
         lines.append("Errors:")

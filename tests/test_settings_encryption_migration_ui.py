@@ -5,11 +5,12 @@ import pytest
 
 pytestmark = pytest.mark.timeout(120)
 
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from pypost.core.encryption_migration import MigrationReport
+from pypost.core.encryption_migration import MigrationReport, ReencryptStats
 from pypost.core.storage import StorageManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
@@ -28,6 +29,8 @@ def _empty_report(*, success: bool = True) -> MigrationReport:
         environment_count=0,
         hidden_value_count=0,
         encrypted_envelope_count=0,
+        v1_envelope_count=0,
+        v2_envelope_count=0,
         plaintext_hidden_count=0,
         invalid_hidden_count=0,
         kid_histogram={},
@@ -113,6 +116,28 @@ class TestSettingsDialogEncryptionMigration:
         call_kwargs = service.bulk_re_encrypt.call_args.kwargs
         assert call_kwargs["backup"] is True
         mock_info.assert_called_once()
+
+    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.question")
+    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.information")
+    def test_reencrypt_shows_reencrypt_stats(self, mock_info, mock_question, qapp):
+        mock_question.return_value = QMessageBox.StandardButton.Yes
+        storage = MagicMock(spec=StorageManager)
+        dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
+        service = dlg._migration_service
+        report = replace(
+            _empty_report(),
+            reencrypt_stats=ReencryptStats(encrypted_count=2, reused_count=1),
+        )
+        service.bulk_re_encrypt = MagicMock(return_value=report)
+        try:
+            dlg._on_re_encrypt_environments()
+        finally:
+            dlg.close()
+
+        mock_info.assert_called_once()
+        body = mock_info.call_args[0][2]
+        assert "Re-encrypted: 2" in body
+        assert "Reused: 1" in body
 
     @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.warning")
     def test_verify_shows_warning_on_failure(self, mock_warning, qapp):
