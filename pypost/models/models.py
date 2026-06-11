@@ -7,6 +7,15 @@ from pypost.models.retry import RetryPolicy
 
 
 class RequestData(BaseModel):
+    """In-memory request draft for the editor and collection persistence.
+
+    Keep this model lean: editor fields and metadata only. Do not attach HTTP
+    response bodies, history entries, or other large runtime buffers — those
+    belong in ``ResponseView`` and ``HistoryManager``. Tab isolation deep-copies
+    ``RequestData``; heavier payloads would amplify copy cost (see
+    ``doc/dev/request_data_copy_policy.md``).
+    """
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "New Request"
     method: str = "GET"

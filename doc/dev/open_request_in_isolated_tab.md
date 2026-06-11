@@ -70,9 +70,12 @@ version when the tab baseline differs from disk (even without `stale_persisted`)
 
 ## Implementation Details
 
+Copy semantics are centralized in `copy_request_for_isolated_tab` (see
+[request_data_copy_policy.md](request_data_copy_policy.md)).
+
 1. **Left-click**
    Clicking a request row in Collections emits `open_request_in_tab` with
-   `RequestData.model_copy(deep=True)`. Folder rows still expand/collapse only.
+   `copy_request_for_isolated_tab(data)`. Folder rows still expand/collapse only.
 2. **Context menu**
    The `CollectionsPresenter` provides a **New tab** option when right-clicking a request node.
    When chosen, it emits `open_request_in_isolated_tab` with the same deep-copy contract.
@@ -140,4 +143,5 @@ Stale-dialog button choices (Keep / Load latest / Dismiss) are not logged.
   detected; notification is limited to saves within the running session.
 - **No merge/diff** for concurrent drafts; users choose keep draft or load latest explicitly.
 - **Performance**: `persisted_fields_equal` compares full persisted fields (including large
-  bodies) on each sibling notification; acceptable for typical requests.
+  bodies) on each sibling notification; acceptable for typical requests. Keep `RequestData`
+  lean so tab copies do not include response buffers (see copy policy doc).

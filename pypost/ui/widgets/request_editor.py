@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.core.metrics import MetricsManager
+from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.models.models import RequestData
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
@@ -244,7 +245,7 @@ class RequestWidget(QWidget):
         self.request_data.expose_as_mcp = self.mcp_check.isChecked()
 
     def get_request_data_from_ui(self) -> RequestData:
-        request_data = self.request_data.model_copy(deep=True)
+        request_data = copy_request_for_isolated_tab(self.request_data)
         request_data.url = self.url_input.text()
         request_data.method = self.method_combo.currentText()
         request_data.params = self.params_table.get_data()

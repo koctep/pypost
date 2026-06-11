@@ -10,6 +10,7 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QAbstractItemDelegate, QMenu, QMessageBox, QTreeView
 
 from pypost.core.metrics import MetricsManager
+from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import RequestData
 
@@ -83,7 +84,7 @@ class CollectionTreeActions:
                 data.name,
             )
             self._metrics.track_gui_new_tab_action("collections_context")
-            self._emit_open_isolated_tab(data.model_copy(deep=True))
+            self._emit_open_isolated_tab(copy_request_for_isolated_tab(data))
             return
 
         if selected_action == rename_action:

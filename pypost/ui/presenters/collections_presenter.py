@@ -5,6 +5,7 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QTreeView
 
 from pypost.core.metrics import MetricsManager
+from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.models.models import RequestData
@@ -127,7 +128,7 @@ class CollectionsPresenter(QObject):
                 data.id,
                 data.name,
             )
-            self.open_request_in_tab.emit(data.model_copy(deep=True))
+            self.open_request_in_tab.emit(copy_request_for_isolated_tab(data))
         else:
             if self._view.isExpanded(index):
                 self._view.collapse(index)

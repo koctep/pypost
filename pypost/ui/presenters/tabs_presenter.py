@@ -15,7 +15,12 @@ from PySide6.QtWidgets import (
 
 from pypost.core.alert_manager import AlertManager
 from pypost.core.curl_generator import CurlGenerator
-from pypost.core.request_sync import is_tab_dirty, persisted_fields_equal, snapshot_persisted_fields
+from pypost.core.request_sync import (
+    copy_request_for_isolated_tab,
+    is_tab_dirty,
+    persisted_fields_equal,
+    snapshot_persisted_fields,
+)
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
@@ -143,7 +148,7 @@ class TabsPresenter(QObject):
 
     def add_new_tab(self, request_data: RequestData | None = None, save_state: bool = True) -> None:
         if request_data is not None:
-            request_data = request_data.model_copy(deep=True)
+            request_data = copy_request_for_isolated_tab(request_data)
         tab = RequestTab(request_data, metrics=self._metrics)
 
         if hasattr(tab.request_editor, "body_edit"):
@@ -192,7 +197,10 @@ class TabsPresenter(QObject):
             result = self._request_manager.find_request(request_id)
             if result:
                 found_request, _ = result
-                self.add_new_tab(found_request.model_copy(deep=True), save_state=False)
+                self.add_new_tab(
+                    copy_request_for_isolated_tab(found_request),
+                    save_state=False,
+                )
                 tabs_restored = True
                 restored_count += 1
             else:
