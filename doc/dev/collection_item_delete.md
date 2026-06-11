@@ -58,6 +58,22 @@ Type-based delete dispatch.
 - `item_type == "collection"` -> `delete_collection(...)`
 - Unsupported type returns `False`
 
+### Index-assisted delete (PYPOST-340)
+
+`RequestManager` keeps `_request_index: Dict[str, Tuple[RequestData, Collection]]` for
+O(1) lookup (PYPOST-333). Delete paths update the index incrementally:
+
+| Step | `delete_request` | `delete_collection` |
+| --- | --- | --- |
+| Lookup | O(1) index get | O(c) scan collections |
+| Mutate list | O(m) remove from parent collection | O(1) remove collection |
+| Index update | O(1) `_drop_request_from_index` | O(k) drop k request keys |
+| Persist | `save_collection` | `delete_collection` file |
+
+m = requests in target collection; k = requests in deleted collection; c = collection
+count. Full `_rebuild_index()` is **not** called on delete — only on reload, save, and
+rename paths.
+
 ## Configuration
 
 No task-specific settings were added.
@@ -93,6 +109,15 @@ Observability relies on existing global metrics server configuration:
   `gui_collection_delete_actions_total{item_type="...",status="..."}` after actions.
 
 ## Testing
+
+Index-assisted delete consistency (`tests/test_request_manager.py`,
+`TestRequestManagerDeleteIndex`):
+
+| Test | Asserts |
+| --- | --- |
+| `test_delete_request_uses_incremental_index_update` | No full index rebuild on request delete |
+| `test_delete_collection_uses_incremental_index_update` | No full index rebuild on collection delete |
+| `test_delete_request_large_collection_keeps_index_consistent` | 500-request bulk delete index size |
 
 Delete metric emission by status and item type:
 

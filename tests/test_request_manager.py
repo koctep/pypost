@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from unittest.mock import patch
 
 try:
     import platformdirs  # noqa: F401
@@ -121,6 +122,45 @@ class TestRequestManagerDeleteIndex(unittest.TestCase):
         result = manager.find_request("r2")
         self.assertIsNotNone(result)
         self.assertEqual(r2, result[0])
+
+    def test_delete_request_uses_incremental_index_update(self):
+        r1 = RequestData(id="r1", name="Req 1")
+        col = Collection(id="c1", name="Team API", requests=[r1])
+        storage = FakeStorageManager([col])
+        manager = RequestManager(storage)
+
+        with patch.object(manager, "_rebuild_index") as rebuild_mock:
+            manager.delete_request("r1")
+
+        rebuild_mock.assert_not_called()
+        self.assertIsNone(manager.find_request("r1"))
+
+    def test_delete_collection_uses_incremental_index_update(self):
+        requests = [RequestData(id=f"r{i}", name=f"Req {i}") for i in range(3)]
+        col = Collection(id="c1", name="Team API", requests=requests)
+        storage = FakeStorageManager([col])
+        manager = RequestManager(storage)
+
+        with patch.object(manager, "_rebuild_index") as rebuild_mock:
+            manager.delete_collection("c1")
+
+        rebuild_mock.assert_not_called()
+        for req in requests:
+            self.assertIsNone(manager.find_request(req.id))
+
+    def test_delete_request_large_collection_keeps_index_consistent(self):
+        requests = [RequestData(id=f"r{i}", name=f"Req {i}") for i in range(500)]
+        col = Collection(id="c1", name="Large API", requests=requests)
+        storage = FakeStorageManager([col])
+        manager = RequestManager(storage)
+
+        for i in range(50):
+            self.assertTrue(manager.delete_request(f"r{i}"))
+
+        self.assertEqual(450, len(col.requests))
+        self.assertEqual(450, len(manager._request_index))
+        self.assertIsNone(manager.find_request("r0"))
+        self.assertIsNotNone(manager.find_request("r50"))
 
 
 if __name__ == "__main__":

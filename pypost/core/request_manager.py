@@ -30,6 +30,15 @@ class RequestManager:
             for req in col.requests:
                 self._request_index[req.id] = (req, col)
 
+    def _drop_request_from_index(self, request_id: str) -> None:
+        """Removes one request from the lookup index without a full rebuild."""
+        self._request_index.pop(request_id, None)
+
+    def _drop_collection_requests_from_index(self, collection: Collection) -> None:
+        """Removes all requests in a collection from the lookup index."""
+        for req in collection.requests:
+            self._drop_request_from_index(req.id)
+
     def get_collections(self) -> List[Collection]:
         return self.collections
 
@@ -102,9 +111,12 @@ class RequestManager:
             return False
 
         _, col = indexed
-        col.requests = [req for req in col.requests if req.id != request_id]
+        for i, req in enumerate(col.requests):
+            if req.id == request_id:
+                del col.requests[i]
+                break
         self.storage.save_collection(col)
-        self._rebuild_index()
+        self._drop_request_from_index(request_id)
         logger.info(
             "delete_request_succeeded request_id=%s collection_id=%s",
             request_id,
@@ -118,8 +130,8 @@ class RequestManager:
         for idx, col in enumerate(self.collections):
             if col.id == collection_id:
                 self.storage.delete_collection(col.id, collection_name=col.name)
+                self._drop_collection_requests_from_index(col)
                 del self.collections[idx]
-                self._rebuild_index()
                 logger.info(
                     "delete_collection_succeeded collection_id=%s collection_name=%s",
                     collection_id,
