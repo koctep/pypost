@@ -4,9 +4,12 @@ import os
 from pathlib import Path
 
 from pypost.core.encryption_key import EncryptionKey, build_key_id
+from pypost.core.key_sources.file_cache import MtimeFileCache
 from pypost.core.key_sources.registry import KeyRegistry
 
 logger = logging.getLogger(__name__)
+
+_registry_cache: MtimeFileCache[KeyRegistry] = MtimeFileCache()
 
 
 class EnvKeySource:
@@ -19,14 +22,7 @@ class EnvKeySource:
     def name(self) -> str:
         return "environment"
 
-    def _load_registry(self) -> KeyRegistry | None:
-        path_value = os.getenv(self.KEYS_FILE, "").strip()
-        if not path_value:
-            return None
-        path = Path(path_value)
-        if not path.is_file():
-            logger.debug("env_keys_file_missing path=%s", path)
-            return None
+    def _read_registry_file(self, path: Path) -> KeyRegistry | None:
         try:
             with open(path, encoding="utf-8") as handle:
                 data = json.load(handle)
@@ -39,6 +35,16 @@ class EnvKeySource:
             logger.debug("env_keys_file_invalid path=%s", path)
             return None
         return KeyRegistry(active_key_id=active_key_id, keys=keys)
+
+    def _load_registry(self) -> KeyRegistry | None:
+        path_value = os.getenv(self.KEYS_FILE, "").strip()
+        if not path_value:
+            return None
+        path = Path(path_value)
+        if not path.is_file():
+            logger.debug("env_keys_file_missing path=%s", path)
+            return None
+        return _registry_cache.get(path, self._read_registry_file)
 
     def _key_from_material(self, material: str) -> EncryptionKey:
         return EncryptionKey(key=material, key_id=build_key_id(material))

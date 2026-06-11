@@ -7,6 +7,7 @@ from typing import Any
 import requests
 
 from pypost.core.encryption_key import EncryptionKey
+from pypost.core.key_sources.file_cache import MtimeFileCache
 from pypost.core.key_sources.registry import KeyRegistry
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,8 @@ DEFAULT_VAULT_TOKEN_ENV = "VAULT_TOKEN"
 DEFAULT_VAULT_TIMEOUT_SECONDS = 10.0
 
 SECRETS_FILE_ENV = "PYPOST_ENV_ENCRYPTION_SECRETS_FILE"
+
+_spec_cache: MtimeFileCache[dict[str, Any]] = MtimeFileCache()
 
 
 class SecretBackend:
@@ -178,6 +181,14 @@ class SecretStoreKeySource:
     def name(self) -> str:
         return "secret_store"
 
+    def _read_spec_file(self, path: Path) -> dict[str, Any] | None:
+        try:
+            with open(path, encoding="utf-8") as handle:
+                return json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.debug("secret_store_spec_load_failed path=%s reason=%s", path, exc)
+            return None
+
     def _load_spec(self) -> dict[str, Any] | None:
         path_value = os.getenv(SECRETS_FILE_ENV, "").strip()
         if not path_value:
@@ -186,12 +197,7 @@ class SecretStoreKeySource:
         if not path.is_file():
             logger.debug("secret_store_spec_missing path=%s", path)
             return None
-        try:
-            with open(path, encoding="utf-8") as handle:
-                return json.load(handle)
-        except (OSError, json.JSONDecodeError) as exc:
-            logger.debug("secret_store_spec_load_failed path=%s reason=%s", path, exc)
-            return None
+        return _spec_cache.get(path, self._read_spec_file)
 
     def _resolve_registry(self) -> KeyRegistry | None:
         spec = self._load_spec()

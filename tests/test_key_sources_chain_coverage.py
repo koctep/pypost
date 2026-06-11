@@ -105,6 +105,30 @@ def test_env_key_source_empty_registry_returns_none(monkeypatch, tmp_path):
     assert EnvKeySource().try_resolve_active() is None
 
 
+def test_env_keys_file_cache_avoids_reread(monkeypatch, tmp_path):
+    fernet = pytest.importorskip("cryptography.fernet")
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    key_id = build_key_id(key)
+    registry_path = tmp_path / "keys.json"
+    registry_path.write_text(
+        json.dumps({"active_key_id": key_id, "keys": {key_id: key}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(EnvKeySource.KEYS_FILE, str(registry_path))
+    calls: list[int] = []
+    original = EnvKeySource._read_registry_file
+
+    def counting(self, path):
+        calls.append(1)
+        return original(self, path)
+
+    monkeypatch.setattr(EnvKeySource, "_read_registry_file", counting)
+    source = EnvKeySource()
+    assert source.try_resolve_active() is not None
+    assert source.try_resolve_active() is not None
+    assert len(calls) == 1
+
+
 def test_chained_provider_by_id_uses_chain_fallback(monkeypatch):
     fernet = pytest.importorskip("cryptography.fernet")
     key = fernet.Fernet.generate_key().decode("utf-8")
