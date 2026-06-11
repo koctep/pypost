@@ -240,8 +240,16 @@ succeeds only when stored `kid` matches that key.
 }
 ```
 
-v1 implements only the `file` backend (`FileSecretBackend`). The spec's inline `keys` map is used
-when backends succeed; backend files may also contain registry-shaped JSON.
+Supported `backends` entries (tried in order; inline `keys` used when all fail):
+
+| `type` | Class | Config |
+| --- | --- | --- |
+| `file` | `FileSecretBackend` | `path` — local JSON registry file |
+| `env-indirection` | `EnvIndirectionSecretBackend` | `active_key_id`, `keys` map (`kid` → env var name) |
+| `vault` | `VaultSecretBackend` | `url` (KV read endpoint), optional `token_env` (default `VAULT_TOKEN`), `timeout` |
+
+The spec's inline `keys` map is used when backends fail; backend payloads return registry-shaped
+JSON (`active_key_id`, `keys`). Vault KV v2 responses unwrap `data.data`.
 
 **Keyring conventions**
 
