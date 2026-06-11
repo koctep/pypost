@@ -247,9 +247,6 @@ class EnvironmentDialog(QDialog):
 
         key = k_item.text()
 
-        env.variables.pop(key, None)
-        env.hidden_keys.discard(key)
-
         logger.info(
             "env_variable_deleted env_name=%s key=%s",
             env.name,
@@ -259,7 +256,11 @@ class EnvironmentDialog(QDialog):
             ),
         )
 
-        self.on_env_selected(env_row)
+        self.vars_table.blockSignals(True)
+        self.vars_table.removeRow(row)
+        self._ensure_trailing_add_row_present()
+        self._sync_env_variables_from_table(env)
+        self.vars_table.blockSignals(False)
 
     def _on_env_list_context_menu(self, pos) -> None:
         item = self.env_list.itemAt(pos)
@@ -502,30 +503,31 @@ class EnvironmentDialog(QDialog):
                 )
                 return
 
-    def on_var_changed(self, item):
-        env_row = self.env_list.currentRow()
-        if env_row < 0:
+    def _append_trailing_add_row(self) -> None:
+        self.vars_table.setRowCount(self.vars_table.rowCount() + 1)
+        self.vars_table.setCellWidget(
+            self.vars_table.rowCount() - 1,
+            COL_HIDDEN,
+            self._make_hidden_checkbox(False),
+        )
+
+    def _ensure_trailing_add_row_present(self) -> None:
+        row_count = self.vars_table.rowCount()
+        if row_count == 0:
+            self._append_trailing_add_row()
             return
+        last_k = self.vars_table.item(row_count - 1, COL_VAR)
+        if last_k and last_k.text():
+            self._append_trailing_add_row()
 
-        env = self.environments[env_row]
-
-        # Add new row if editing last
-        if item.row() == self.vars_table.rowCount() - 1:
-            if item.text():
-                self.vars_table.blockSignals(True)
-                self.vars_table.setRowCount(
-                    self.vars_table.rowCount() + 1,
-                )
-                self.vars_table.setCellWidget(
-                    self.vars_table.rowCount() - 1,
-                    COL_HIDDEN,
-                    self._make_hidden_checkbox(False),
-                )
-                self.vars_table.blockSignals(False)
-
-        # Rebuild env variables and hidden_keys
-        new_vars = {}
-        new_hidden = set()
+    def _sync_env_variables_from_table(
+        self,
+        env: Environment,
+        edited_item: QTableWidgetItem | None = None,
+    ) -> None:
+        """Rebuild env.variables and env.hidden_keys from the variables table."""
+        new_vars: dict[str, str] = {}
+        new_hidden: set[str] = set()
         for i in range(self.vars_table.rowCount()):
             k_item = self.vars_table.item(i, COL_VAR)
             v_item = self.vars_table.item(i, COL_VAL)
@@ -535,12 +537,14 @@ class EnvironmentDialog(QDialog):
                 key = k_item.text().strip()
                 is_valid, _error = validate_environment_variable_name(key)
                 if not is_valid:
-                    if item.column() == COL_VAR and item.row() == i:
+                    if (
+                        edited_item is not None
+                        and edited_item.column() == COL_VAR
+                        and edited_item.row() == i
+                    ):
                         old_keys = list(env.variables.keys())
                         revert = old_keys[i] if i < len(old_keys) else ""
-                        self.vars_table.blockSignals(True)
                         k_item.setText(revert)
-                        self.vars_table.blockSignals(False)
                     continue
                 is_hidden = cb.isChecked() if cb else False
                 if is_hidden:
@@ -549,25 +553,41 @@ class EnvironmentDialog(QDialog):
                         v_item,
                         env.variables.get(key, ""),
                     )
-                    if item.column() == COL_VAL and item.row() == i:
-                        # User just edited the value cell
+                    if (
+                        edited_item is not None
+                        and edited_item.column() == COL_VAL
+                        and edited_item.row() == i
+                    ):
                         typed = v_item.text() if v_item else ""
                         if typed != HIDDEN_MASK:
                             val = typed
-                        # Re-mask the display
-                        self.vars_table.blockSignals(True)
                         self.vars_table.setItem(
                             i,
                             COL_VAL,
                             self._make_value_item(val, True),
                         )
-                        self.vars_table.blockSignals(False)
                     new_vars[key] = val
                 else:
                     new_vars[key] = self._extract_real_value(v_item, "")
 
         env.variables = new_vars
         env.hidden_keys = new_hidden
+
+    def on_var_changed(self, item):
+        env_row = self.env_list.currentRow()
+        if env_row < 0:
+            return
+
+        env = self.environments[env_row]
+
+        if item.row() == self.vars_table.rowCount() - 1 and item.text():
+            self.vars_table.blockSignals(True)
+            self._append_trailing_add_row()
+            self.vars_table.blockSignals(False)
+
+        self.vars_table.blockSignals(True)
+        self._sync_env_variables_from_table(env, edited_item=item)
+        self.vars_table.blockSignals(False)
 
     def on_mcp_toggled(self, checked):
         row = self.env_list.currentRow()
