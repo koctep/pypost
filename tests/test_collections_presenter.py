@@ -31,6 +31,11 @@ class FakeRequestManager:
 
     def delete_collection_item(self, item_id, item_type):
         self.deleted.append((item_id, item_type))
+        if item_type == "request":
+            for col in self.collections:
+                col.requests = [req for req in col.requests if req.id != item_id]
+        elif item_type == "collection":
+            self.collections = [col for col in self.collections if col.id != item_id]
         return True
 
     def rename_collection_item(self, item_id, item_type, new_name):
@@ -172,6 +177,16 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter.collections_changed.connect(lambda: received.append(True))
         presenter._handle_delete("c1", "collection", "My API")
         self.assertEqual(len(received), 1)
+
+    def test_delete_request_removes_tree_node_incrementally(self):
+        req = _make_request("r1", "Get users")
+        col = _make_collection("c1", "My API", [req])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        self.assertEqual(presenter._model.item(0).rowCount(), 1)
+        presenter._handle_delete("r1", "request", "Get users")
+        self.assertEqual(presenter._model.rowCount(), 1)
+        self.assertEqual(presenter._model.item(0).rowCount(), 0)
 
     def test_requests_deleted_signal_emitted_for_request_delete(self):
         req = _make_request("r1", "Get users")

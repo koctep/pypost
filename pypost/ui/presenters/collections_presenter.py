@@ -296,6 +296,20 @@ class CollectionsPresenter(QObject):
         self.restore_tree_state()
         self.collections_changed.emit()
 
+    def remove_item_from_tree(self, item_id: str, item_type: str) -> bool:
+        """Removes a collection or request node without rebuilding the full tree model."""
+        item = self._find_collection_item(item_id, item_type)
+        if item is None:
+            return False
+        parent = item.parent() or self._model.invisibleRootItem()
+        parent.removeRow(item.row())
+        logger.info(
+            "collection_tree_item_removed item_type=%s item_id=%s",
+            item_type,
+            item_id,
+        )
+        return True
+
     def _find_collection_item(self, item_id: str, item_type: str) -> QStandardItem | None:
         for row in range(self._model.rowCount()):
             col_item = self._model.item(row)
@@ -352,8 +366,9 @@ class CollectionsPresenter(QObject):
         self._metrics.track_gui_collection_delete_action(item_type, "succeeded")
         if affected_request_ids:
             self.requests_deleted.emit(affected_request_ids)
-        self.load_collections()
-        self.restore_tree_state()
+        if not self.remove_item_from_tree(item_id, item_type):
+            self.load_collections()
+            self.restore_tree_state()
         self.collections_changed.emit()
 
     def _on_tree_expanded(self, index) -> None:
