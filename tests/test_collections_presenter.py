@@ -1,7 +1,7 @@
 import unittest
-from unittest.mock import MagicMock
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
+from unittest.mock import MagicMock, patch
+from PySide6.QtWidgets import QApplication, QAbstractItemDelegate, QMessageBox
+from PySide6.QtCore import Qt, QPoint
 
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.models.models import RequestData, Collection
@@ -271,6 +271,72 @@ class TestCollectionsPresenter(unittest.TestCase):
         idx2 = model.item(1).index()
         self.assertFalse(presenter.widget.isExpanded(idx1))
         self.assertTrue(presenter.widget.isExpanded(idx2))
+
+    @patch.object(CollectionsPresenter, "_handle_delete")
+    @patch("pypost.ui.presenters.collections_presenter.QMessageBox.question")
+    def test_delete_confirmation_cancelled_skips_delete(self, mock_question, mock_handle_delete):
+        col = _make_collection("c1", "My API")
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        mock_question.return_value = QMessageBox.No
+        item = presenter._model.item(0)
+        with patch.object(presenter._view, "indexAt", return_value=item.index()):
+            with patch("pypost.ui.presenters.collections_presenter.QMenu") as mock_menu_class:
+                mock_menu = MagicMock()
+                rename_action = MagicMock()
+                delete_action = MagicMock()
+                mock_menu.addAction.side_effect = [rename_action, delete_action]
+                mock_menu.exec.return_value = delete_action
+                mock_menu_class.return_value = mock_menu
+                presenter._show_context_menu(QPoint(0, 0))
+        mock_handle_delete.assert_not_called()
+
+    @patch("pypost.ui.presenters.collections_presenter.QMessageBox.question")
+    def test_delete_confirmation_accepted_updates_tree(self, mock_question):
+        req = _make_request("r1", "Get users")
+        col = _make_collection("c1", "My API", [req])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        mock_question.return_value = QMessageBox.Yes
+        req_item = presenter._model.item(0).child(0)
+        with patch.object(presenter._view, "indexAt", return_value=req_item.index()):
+            with patch("pypost.ui.presenters.collections_presenter.QMenu") as mock_menu_class:
+                mock_menu = MagicMock()
+                new_tab_action = MagicMock()
+                rename_action = MagicMock()
+                delete_action = MagicMock()
+                mock_menu.addAction.side_effect = [
+                    new_tab_action,
+                    rename_action,
+                    delete_action,
+                ]
+                mock_menu.exec.return_value = delete_action
+                mock_menu_class.return_value = mock_menu
+                presenter._show_context_menu(QPoint(0, 0))
+        self.assertEqual(presenter._model.item(0).rowCount(), 0)
+
+    def test_rename_cancel_restores_tree_via_reload(self):
+        req = _make_request("r1", "Old Name")
+        col = _make_collection("c1", "My API", [req])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
+        presenter._on_editor_closed(None, QAbstractItemDelegate.EndEditHint.RevertModelCache)
+        self.assertIsNone(presenter._pending_rename)
+        self.assertEqual(presenter._model.item(0).child(0).text(), "GET Old Name")
+
+    @patch("pypost.ui.presenters.collections_presenter.QMessageBox.warning")
+    def test_rename_empty_name_shows_warning(self, mock_warning):
+        req = _make_request("r1", "Old Name")
+        col = _make_collection("c1", "My API", [req])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        item = presenter._find_collection_item("r1", "request")
+        item.setText("   ")
+        presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
+        presenter._on_editor_closed(None, QAbstractItemDelegate.EndEditHint.SubmitModelCache)
+        mock_warning.assert_called_once()
+        self.assertEqual("Old Name", req.name)
 
 
 if __name__ == "__main__":
