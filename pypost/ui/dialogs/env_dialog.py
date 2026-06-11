@@ -20,7 +20,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pypost.core.environment_ops import clone_environment, validate_environment_rename
+from pypost.core.environment_ops import (
+    clone_environment,
+    validate_environment_rename,
+    validate_environment_variable_name,
+)
 from pypost.ui.delegates import EnvironmentNameDelegate
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.models.models import Environment
@@ -516,7 +520,16 @@ class EnvironmentDialog(QDialog):
             cb = self._get_hidden_checkbox(i)
 
             if k_item and k_item.text():
-                key = k_item.text()
+                key = k_item.text().strip()
+                is_valid, _error = validate_environment_variable_name(key)
+                if not is_valid:
+                    if item.column() == COL_VAR and item.row() == i:
+                        old_keys = list(env.variables.keys())
+                        revert = old_keys[i] if i < len(old_keys) else ""
+                        self.vars_table.blockSignals(True)
+                        k_item.setText(revert)
+                        self.vars_table.blockSignals(False)
+                    continue
                 is_hidden = cb.isChecked() if cb else False
                 if is_hidden:
                     new_hidden.add(key)

@@ -417,3 +417,17 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
+    def test_invalid_variable_name_rejected_in_table(self, qapp):
+        env = Environment(name="Dev", variables={"valid_key": "1"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            row = len(env.variables)
+            dlg.vars_table.setItem(row, 0, QTableWidgetItem("123bad"))
+            item = dlg.vars_table.item(row, 0)
+            dlg.on_var_changed(item)
+            assert "123bad" not in env.variables
+            assert dlg.vars_table.item(row, 0).text() == ""
+        finally:
+            dlg.close()
+

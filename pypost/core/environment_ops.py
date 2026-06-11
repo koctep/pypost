@@ -1,6 +1,12 @@
 """Pure helpers for environment model operations."""
 
+from pypost.core.variable_name_validation import validate_variable_name
 from pypost.models.models import Environment
+
+
+def validate_environment_variable_name(name: str) -> tuple[bool, str]:
+    """Validate a proposed environment variable name (Jinja2-compatible)."""
+    return validate_variable_name(name)
 
 
 def validate_environment_rename(
