@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QKeyEvent, QPaintEvent
+from PySide6.QtGui import QKeyEvent, QMouseEvent, QPaintEvent
 from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
 
@@ -16,6 +16,10 @@ class LineNumberArea(QWidget):
 
     def paintEvent(self, event: QPaintEvent):
         self._editor.line_number_area_paint_event(event)
+
+    def mousePressEvent(self, event: QMouseEvent):
+        self._editor.line_number_area_mouse_press(event)
+        event.accept()
 
     def keyPressEvent(self, event: QKeyEvent):
         event.accept()

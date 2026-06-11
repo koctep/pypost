@@ -1,11 +1,22 @@
 import json
 
 from PySide6.QtCore import QMimeData, Qt, QRect
-from PySide6.QtGui import QFontMetrics, QKeyEvent, QPaintEvent, QPainter, QTextCursor
+from PySide6.QtGui import (
+    QFontMetrics,
+    QKeyEvent,
+    QMouseEvent,
+    QPaintEvent,
+    QPainter,
+    QTextCursor,
+)
 from PySide6.QtWidgets import QPlainTextEdit
 
+from pypost.ui.widgets.fold import BodyFormat, FoldController
 from pypost.ui.widgets.line_number_area import LineNumberArea
 from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
+
+_CHEVRON_WIDTH = 14
+_CHEVRON_PADDING = 2
 
 
 class CodeEditor(VariableAwarePlainTextEdit):
@@ -14,6 +25,9 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self.indent_size = indent_size
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
+        self._body_format = BodyFormat.JSON
+        self._fold_controller = FoldController(self, self._body_format)
+
         self._line_number_area = LineNumberArea(self)
         self.blockCountChanged.connect(self._update_line_number_area_width)
         self.updateRequest.connect(self._update_line_number_area)
@@ -21,9 +35,20 @@ class CodeEditor(VariableAwarePlainTextEdit):
 
         self.update_indent_size(indent_size)
 
+    def fold_controller(self) -> FoldController:
+        return self._fold_controller
+
+    def set_body_format(self, body_format: BodyFormat) -> None:
+        self._body_format = body_format
+        self._fold_controller.set_body_format(body_format)
+        self._update_line_number_area_width(0)
+
+    def setPlainText(self, text: str) -> None:
+        self._fold_controller.expand_all()
+        super().setPlainText(text)
+
     def update_indent_size(self, new_size: int):
         self.indent_size = new_size
-        # Set tab stop to indent_size spaces
         font = self.document().defaultFont()
         font_metrics = QFontMetrics(font)
         self.setTabStopDistance(self.indent_size * font_metrics.horizontalAdvance(" "))
@@ -31,8 +56,11 @@ class CodeEditor(VariableAwarePlainTextEdit):
     def line_number_area_width(self) -> int:
         digits = max(1, len(str(self.blockCount())))
         font_metrics = QFontMetrics(self.document().defaultFont())
-        space = 3 + font_metrics.horizontalAdvance("9") * digits
-        return space
+        number_width = font_metrics.horizontalAdvance("9") * digits
+        return _CHEVRON_WIDTH + _CHEVRON_PADDING + 3 + number_width
+
+    def chevron_width(self) -> int:
+        return _CHEVRON_WIDTH
 
     def _update_line_number_area_width(self, _block_count: int):
         width = self.line_number_area_width()
@@ -74,17 +102,62 @@ class CodeEditor(VariableAwarePlainTextEdit):
         gutter_color.setAlpha(128)
         painter.setPen(gutter_color)
 
+        number_left = _CHEVRON_WIDTH + _CHEVRON_PADDING
+
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
+                region = self._fold_controller.fold_header_at_block(block_number)
+                if region is not None:
+                    chevron = (
+                        "\u25b6"
+                        if self._fold_controller.is_collapsed(region.region_id)
+                        else "\u25bc"
+                    )
+                    painter.drawText(
+                        0,
+                        top,
+                        _CHEVRON_WIDTH,
+                        self.fontMetrics().height(),
+                        Qt.AlignmentFlag.AlignCenter,
+                        chevron,
+                    )
+
                 number = str(block_number + 1)
                 painter.drawText(
-                    0,
+                    number_left,
                     top,
-                    self._line_number_area.width() - 3,
+                    self._line_number_area.width() - number_left - 3,
                     self.fontMetrics().height(),
                     Qt.AlignmentFlag.AlignRight,
                     number,
                 )
+
+            block = block.next()
+            top = bottom
+            bottom = top + round(self.blockBoundingRect(block).height())
+            block_number += 1
+
+    def line_number_area_mouse_press(self, event: QMouseEvent) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        event.accept()
+
+        y = event.position().y()
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = round(
+            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+        )
+        bottom = top + round(self.blockBoundingRect(block).height())
+
+        while block.isValid():
+            if block.isVisible() and top <= y <= bottom:
+                if event.position().x() <= _CHEVRON_WIDTH:
+                    region = self._fold_controller.fold_header_at_block(block_number)
+                    if region is not None:
+                        self._fold_controller.toggle(region.region_id)
+                        self._line_number_area.update()
+                return
 
             block = block.next()
             top = bottom
@@ -102,12 +175,9 @@ class CodeEditor(VariableAwarePlainTextEdit):
             formatted_json = json.dumps(parsed, indent=self.indent_size)
             self.setPlainText(formatted_json)
         except (json.JSONDecodeError, ValueError):
-            pass  # Keep as is if not valid JSON
+            pass
 
     def keyPressEvent(self, event: QKeyEvent):
-        """
-        Handle key press events for auto-indentation.
-        """
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self._handle_enter_key(event)
         elif event.text() in ("}", "]"):
@@ -120,7 +190,6 @@ class CodeEditor(VariableAwarePlainTextEdit):
         cursor.select(QTextCursor.SelectionType.LineUnderCursor)
         line_text = cursor.selectedText()
 
-        # Calculate current indentation
         indent = ""
         for char in line_text:
             if char.isspace():
@@ -128,32 +197,20 @@ class CodeEditor(VariableAwarePlainTextEdit):
             else:
                 break
 
-        # Check if line ends with opening bracket
         trimmed_line = line_text.rstrip()
         if trimmed_line and trimmed_line[-1] in ("{", "["):
-            indent += " " * self.indent_size  # Add indent_size spaces
+            indent += " " * self.indent_size
 
-        # Insert new line with indentation
         self.insertPlainText("\n" + indent)
 
     def _handle_closing_bracket(self, event: QKeyEvent):
         cursor = self.textCursor()
         current_line_text = cursor.block().text()
 
-        # Check if we are at the beginning of the line (ignoring whitespace)
-        # to dedent only if it's the first non-whitespace char
         if current_line_text.strip() == "":
-            # Calculate indentation of the previous line to match context if possible,
-            # or simply unindent by 4 spaces if currently indented
-
-            # Current approach: Dedent if the line consists only of indentation so far
-            # and the user types '}' or ']'
-
-            # Get current indentation level
             indent_level = len(current_line_text) - len(current_line_text.lstrip())
 
             if indent_level >= self.indent_size:
-                # Remove indent_size spaces from the start
                 cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
                 cursor.movePosition(
                     QTextCursor.MoveOperation.Right,
@@ -166,18 +223,13 @@ class CodeEditor(VariableAwarePlainTextEdit):
         super().keyPressEvent(event)
 
     def insertFromMimeData(self, source: QMimeData):
-        """
-        Handle paste events for JSON formatting.
-        """
         if source.hasText():
             text = source.text()
             try:
-                # Try to parse and format JSON
                 parsed = json.loads(text)
                 formatted_json = json.dumps(parsed, indent=self.indent_size)
                 self.insertPlainText(formatted_json)
             except (json.JSONDecodeError, ValueError):
-                # If not valid JSON, paste as is
                 super().insertFromMimeData(source)
         else:
             super().insertFromMimeData(source)

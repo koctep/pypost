@@ -52,5 +52,11 @@ Gutter width recalculates on `blockCountChanged`. If numbers clip after bulk pas
 
 ### Clicking the gutter changes the cursor
 
-Expected: the gutter is read-only. Clicks should not modify text; focus remains on the editor
+Clicks on the line-number area do not insert text. Clicks on the left chevron column toggle fold
+regions (PYPOST-511); clicks elsewhere in the gutter are ignored. Focus remains on the editor
 viewport.
+
+## Related
+
+- [Body Editor Folding (PYPOST-511)](body_editor_folding.md) — collapsible JSON sections in the
+  same gutter.
