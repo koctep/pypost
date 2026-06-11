@@ -237,6 +237,23 @@ Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, mini
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -v
 ```
 
+## Test log inventory (PYPOST-567)
+
+A green `make test` run can still emit many ERROR/WARNING lines because `pytest.ini`
+enables live CLI logging at WARNING level. To audit that noise:
+
+```bash
+make test > tests.txt 2>&1
+.venv/bin/python scripts/parse_test_log_inventory.py tests.txt \
+  --markdown ai-tasks/PYPOST-567/inventory.md \
+  --csv ai-tasks/PYPOST-567/inventory.csv
+```
+
+The script groups lines by logger, links them to the adjacent pytest node id, and tags
+groups as **expected** (error-path tests), **suspicious**, or **unknown**. Baseline
+capture (2026-06-11): 937 passed, 72 ERROR, 138 WARNING lines. See
+`ai-tasks/PYPOST-567/inventory.md` for the full breakdown.
+
 ## References
 
 - [gui_testing.md](gui_testing.md) — Qt offscreen setup, `qapp` fixture, GUI test patterns

@@ -1,0 +1,65 @@
+# Roadmap: PYPOST-567
+
+Parent epic: [PYPOST-566](https://pypost.atlassian.net/browse/PYPOST-566) — Audit test suite
+for false positives and noisy passing tests.
+
+Recommended branch: `docs/PYPOST-567-test-log-inventory`
+
+## Programming Language
+
+Python 3.10+ (same as the PyPost application codebase; see `.cursor/lsr/do-python.md`).
+
+## Step Status
+
+- [x] **STEP 1: Requirements Gathering and Documentation**
+- [x] **STEP 2: High-Level Architecture Design**
+- [x] **STEP 3: Development**
+  - [x] Parser script + inventory.md/csv from tests.txt baseline
+- [x] **STEP 4: Code Cleanup**
+- [x] **STEP 5: Observability**
+- [x] **STEP 6: Review and Technical Debt**
+- [x] **STEP 7: Dev Docs**
+
+## Status Legend
+
+- `[ ]` — step not started
+- `[/]` — step in progress
+- `[x]` — step completed
+
+## Artifacts
+
+### STEP 1: Requirements
+
+- `ai-tasks/PYPOST-567/10-requirements.md`
+
+### STEP 2: Architecture
+
+- `ai-tasks/PYPOST-567/20-architecture.md`
+
+### STEP 3: Development
+
+- `scripts/parse_test_log_inventory.py`
+- `ai-tasks/PYPOST-567/inventory.md`
+- `ai-tasks/PYPOST-567/inventory.csv`
+
+### STEP 4: Code Cleanup
+
+- `ai-tasks/PYPOST-567/40-code-cleanup.md`
+
+### STEP 5: Observability
+
+- `ai-tasks/PYPOST-567/50-observability.md`
+
+### STEP 6: Review
+
+- `ai-tasks/PYPOST-567/60-tech-debt.md`
+
+### STEP 7: Dev Docs
+
+- `doc/dev/testing.md` — Test log inventory section
+- `ai-tasks/PYPOST-567/70-dev-docs.md`
+
+## Related Work
+
+- Parent: [PYPOST-566](https://pypost.atlassian.net/browse/PYPOST-566)
+- Evidence capture: `tests.txt` in repository root (937 passed baseline)
