@@ -22,6 +22,7 @@ set up your development environment, and contribute to the project.
 1. [Body Editor Line Numbers (PYPOST-510)](body_editor_line_numbers.md)
 1. [Body Editor Folding (PYPOST-511)](body_editor_folding.md)
 1. [Body Editor Validation (PYPOST-512)](body_editor_validation.md)
+1. [Body Format Selector (PYPOST-513)](body_format_selector.md)
 
 ## Quick Start
 

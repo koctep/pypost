@@ -4,8 +4,8 @@
 
 The request Body tab `CodeEditor` validates content against the active body format and shows
 inline errors while the user edits. JSON is fully supported (default format). YAML and XML
-validators are registered but return no errors until the format selector (PYPOST-513) enables
-those formats and concrete parsers ship.
+validators are registered; the Body tab format selector sets `BodyFormat`. Concrete YAML/XML
+parsers ship in PYPOST-519.
 
 Errors do not modify body text — save and send use the full `toPlainText()` content.
 
@@ -21,7 +21,8 @@ Errors do not modify body text — save and send use the full `toPlainText()` co
   `setExtraSelections()` for line/column markers and an error banner label.
 - **`CodeEditor`** — Owns `ValidationController`; `set_body_format()` switches validator.
 
-See also [Body Editor Folding](body_editor_folding.md) for the shared `BodyFormat` hook.
+See also [Body Editor Folding](body_editor_folding.md) and
+[Body Format Selector](body_format_selector.md) for the shared `BodyFormat` hook.
 
 ```mermaid
 flowchart LR
@@ -36,8 +37,8 @@ flowchart LR
 
 ### `CodeEditor.set_body_format(body_format: BodyFormat) -> None`
 
-Switches the active validator and fold scanner. Default is `BodyFormat.JSON`. PYPOST-513 will
-call this from the format selector.
+Switches the active validator and fold scanner. Default is `BodyFormat.JSON`. The Body tab
+format selector calls this when the user changes JSON/YAML/XML.
 
 ### `CodeEditor.validation_controller() -> ValidationController`
 
@@ -66,7 +67,8 @@ error line must be visible or expanded to see the highlight.
 
 ### YAML/XML bodies show no validation errors
 
-Expected until PYPOST-513 sets `body_format` and YAML/XML validators are implemented.
+Expected until YAML/XML validators are implemented (PYPOST-519). Select the matching format in
+the Body tab selector so validation activates when parsers ship.
 
 ### Error banner overlaps text
 

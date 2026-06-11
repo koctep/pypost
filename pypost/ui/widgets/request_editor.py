@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QMenu,
     QPlainTextEdit,
     QPushButton,
@@ -20,11 +21,28 @@ from PySide6.QtWidgets import (
 from pypost.core.metrics import MetricsManager
 from pypost.models.models import RequestData
 from pypost.ui.widgets.code_editor import CodeEditor
+from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.mixins import VariableHoverHelper
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwareTableWidget
 
 logger = logging.getLogger(__name__)
+
+_BODY_FORMAT_OPTIONS = (BodyFormat.JSON, BodyFormat.YAML, BodyFormat.XML)
+
+
+def body_type_to_body_format(body_type: str) -> BodyFormat:
+    try:
+        fmt = BodyFormat(body_type.lower())
+    except ValueError:
+        return BodyFormat.JSON
+    if fmt in _BODY_FORMAT_OPTIONS:
+        return fmt
+    return BodyFormat.JSON
+
+
+def body_format_to_body_type(body_format: BodyFormat) -> str:
+    return body_format.value
 
 
 class RequestWidget(QWidget):
@@ -95,7 +113,23 @@ class RequestWidget(QWidget):
 
         self.body_edit = CodeEditor()
         self.json_highlighter = JsonHighlighter(self.body_edit.document())
-        self.detail_tabs.addTab(self.body_edit, "Body")
+
+        self.body_format_combo = QComboBox()
+        for fmt in _BODY_FORMAT_OPTIONS:
+            self.body_format_combo.addItem(fmt.name, fmt)
+        self.body_format_combo.currentIndexChanged.connect(self._on_body_format_changed)
+
+        body_tab = QWidget()
+        body_tab_layout = QVBoxLayout(body_tab)
+        body_tab_layout.setContentsMargins(0, 0, 0, 0)
+        format_row = QHBoxLayout()
+        format_row.addWidget(QLabel("Format:"))
+        format_row.addWidget(self.body_format_combo)
+        format_row.addStretch()
+        body_tab_layout.addLayout(format_row)
+        body_tab_layout.addWidget(self.body_edit)
+        self.body_tab = body_tab
+        self.detail_tabs.addTab(self.body_tab, "Body")
         self._on_method_changed(self.method_combo.currentText())
 
         self.script_edit = QPlainTextEdit()
@@ -134,9 +168,20 @@ class RequestWidget(QWidget):
         else:
             self.body_edit.setPlaceholderText("")
         if not self._loading and method in ("POST", "PUT"):
-            self.detail_tabs.setCurrentWidget(self.body_edit)
+            self.detail_tabs.setCurrentWidget(self.body_tab)
             if self._metrics:
                 self._metrics.track_gui_method_body_autoswitch(method)
+
+    def _set_body_format_combo(self, body_format: BodyFormat) -> None:
+        index = self.body_format_combo.findData(body_format)
+        if index >= 0:
+            self.body_format_combo.setCurrentIndex(index)
+
+    def _on_body_format_changed(self, _index: int) -> None:
+        body_format = self.body_format_combo.currentData()
+        if body_format is None:
+            return
+        self.body_edit.set_body_format(body_format)
 
     def load_data(self):
         self._loading = True
@@ -147,10 +192,19 @@ class RequestWidget(QWidget):
             self.params_table.set_data(self.request_data.params)
             self.headers_table.set_data(self.request_data.headers)
             self.body_edit.setPlainText(self.request_data.body)
+            body_format = body_type_to_body_format(self.request_data.body_type)
+            self._set_body_format_combo(body_format)
+            self.body_edit.set_body_format(body_format)
             self.script_edit.setPlainText(self.request_data.post_script)
             self.mcp_check.setChecked(self.request_data.expose_as_mcp)
         finally:
             self._loading = False
+
+    def _body_type_from_ui(self) -> str:
+        body_format = self.body_format_combo.currentData()
+        if body_format is None:
+            return BodyFormat.JSON.value
+        return body_format_to_body_type(body_format)
 
     def update_request_data(self):
         self.request_data.url = self.url_input.text()
@@ -158,6 +212,7 @@ class RequestWidget(QWidget):
         self.request_data.params = self.params_table.get_data()
         self.request_data.headers = self.headers_table.get_data()
         self.request_data.body = self.body_edit.toPlainText()
+        self.request_data.body_type = self._body_type_from_ui()
         self.request_data.post_script = self.script_edit.toPlainText()
         self.request_data.expose_as_mcp = self.mcp_check.isChecked()
 
@@ -168,6 +223,7 @@ class RequestWidget(QWidget):
         request_data.params = self.params_table.get_data()
         request_data.headers = self.headers_table.get_data()
         request_data.body = self.body_edit.toPlainText()
+        request_data.body_type = self._body_type_from_ui()
         request_data.post_script = self.script_edit.toPlainText()
         request_data.expose_as_mcp = self.mcp_check.isChecked()
         return request_data

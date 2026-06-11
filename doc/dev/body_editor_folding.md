@@ -6,8 +6,8 @@ The request Body tab `CodeEditor` supports collapsing and expanding nested secti
 body content. Hidden lines remain in the document (`toPlainText()` is unchanged) so save and send
 use the full payload. Collapse state is session-only and resets when body text is replaced.
 
-YAML and XML scanners are registered but return no regions until the format selector (PYPOST-513)
-sets `BodyFormat` and concrete scanners ship.
+YAML and XML scanners are registered; the format selector on the Body tab sets `BodyFormat`.
+Concrete YAML/XML region detection ships in PYPOST-518.
 
 ## Architecture
 
@@ -40,8 +40,8 @@ flowchart LR
 
 ### `CodeEditor.set_body_format(body_format: BodyFormat) -> None`
 
-Switches the active structure scanner. Default is `BodyFormat.JSON`. PYPOST-513 will call this
-from the format selector.
+Switches the active structure scanner. Default is `BodyFormat.JSON`. The Body tab format selector
+calls this when the user changes JSON/YAML/XML.
 
 ### `CodeEditor.fold_controller() -> FoldController`
 
@@ -87,5 +87,5 @@ Re-collapse after the document is valid again.
 
 ### YAML/XML bodies do not fold
 
-Expected until PYPOST-513 sets `body_format` and YAML/XML scanners are implemented
-(PYPOST-518).
+Expected until YAML/XML structure scanners are implemented (PYPOST-518). Select the matching
+format in the Body tab selector so folding activates when scanners ship.

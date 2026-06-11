@@ -31,11 +31,11 @@ class TestAutoSwitchToBodyTab(unittest.TestCase):
 
     def test_post_switches_to_body(self):
         self.widget.method_combo.setCurrentText("POST")
-        self.assertIs(self.widget.detail_tabs.currentWidget(), self.widget.body_edit)
+        self.assertIs(self.widget.detail_tabs.currentWidget(), self.widget.body_tab)
 
     def test_put_switches_to_body(self):
         self.widget.method_combo.setCurrentText("PUT")
-        self.assertIs(self.widget.detail_tabs.currentWidget(), self.widget.body_edit)
+        self.assertIs(self.widget.detail_tabs.currentWidget(), self.widget.body_tab)
 
     # --- no-switch cases ---
 
