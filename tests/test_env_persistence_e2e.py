@@ -35,6 +35,9 @@ class _FakeMCPManager:
     def stop_server(self):
         return None
 
+    def set_variable_supplier(self, supplier):  # noqa: ARG002
+        return None
+
 
 def _empty_collections():
     return []

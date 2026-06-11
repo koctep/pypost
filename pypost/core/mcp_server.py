@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import threading
+from collections.abc import Callable
 from typing import List, Optional
 
 import uvicorn
@@ -31,6 +32,13 @@ class MCPServerManager(QObject):
             )
         self._current_port = 1080
         self._current_host = "127.0.0.1"
+        self._variable_supplier: Callable[[], dict[str, str]] | None = None
+
+    def set_variable_supplier(
+        self, supplier: Callable[[], dict[str, str]] | None
+    ) -> None:
+        self._variable_supplier = supplier
+        self._impl.set_variable_supplier(supplier)
 
     def start_server(self, port: int, tools: List[RequestData], host: str = "127.0.0.1"):
         if self.is_running():

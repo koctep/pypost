@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from typing import Any, Dict, List, Set
 
 from starlette.applications import Starlette
@@ -20,17 +21,26 @@ from pypost.models.models import RequestData
 logger = logging.getLogger(__name__)
 
 
+def _merge_execution_variables(
+    env_vars: dict[str, str], mcp_args: dict[str, Any]
+) -> dict[str, Any]:
+    """Merge active env snapshot with mcp.request namespace."""
+    return {**env_vars, "mcp": {"request": mcp_args}}
+
+
 class MCPServerImpl:
     def __init__(
         self,
         name: str = "pypost-server",
         metrics: MetricsManager | None = None,
         template_service: TemplateService | None = None,
+        variable_supplier: Callable[[], dict[str, str]] | None = None,
     ):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
         self._metrics = metrics
         self._template_service = template_service
+        self._variable_supplier = variable_supplier or (lambda: {})
         if template_service is not None:
             logger.debug(
                 "MCPServerImpl: using injected TemplateService id=%d", id(template_service)
@@ -94,11 +104,23 @@ class MCPServerImpl:
                 self._metrics.track_mcp_response_sent(request_data.method, "error")
             return [TextContent(type="text", text=f"Error executing request: {str(e)}")]
 
-    def _execute_request_sync(self, request_data: RequestData, args: dict):
-        # Prepare context
-        context = {"mcp": {"request": args}}
+    def set_variable_supplier(
+        self, supplier: Callable[[], dict[str, str]] | None
+    ) -> None:
+        self._variable_supplier = supplier or (lambda: {})
 
-        return self.request_service.execute(request_data, context)
+    def _build_execution_variables(self, mcp_args: dict[str, Any]) -> dict[str, Any]:
+        env_vars = self._variable_supplier()
+        logger.debug(
+            "mcp_execution_variables_merged env_var_count=%d mcp_arg_count=%d",
+            len(env_vars),
+            len(mcp_args),
+        )
+        return _merge_execution_variables(env_vars, mcp_args)
+
+    def _execute_request_sync(self, request_data: RequestData, args: dict):
+        variables = self._build_execution_variables(args)
+        return self.request_service.execute(request_data, variables)
 
     def register_tools(self, requests: List[RequestData]):
         self.tools_map.clear()

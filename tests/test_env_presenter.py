@@ -58,6 +58,9 @@ class FakeMCPManager:
     def is_running(self):
         return self._running
 
+    def set_variable_supplier(self, supplier):
+        self.variable_supplier = supplier
+
 
 def _make_mcp_manager():
     mgr = FakeMCPManager()

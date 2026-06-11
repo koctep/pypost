@@ -12,7 +12,7 @@ from starlette.applications import Starlette
 from starlette.routing import Mount, Route
 from starlette.testclient import TestClient
 
-from pypost.core.mcp_server_impl import MCPServerImpl
+from pypost.core.mcp_server_impl import MCPServerImpl, _merge_execution_variables
 from pypost.core.request_service import ExecutionResult
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
@@ -109,6 +109,105 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertEqual(out[0].text, "response-body")
         metrics.track_mcp_request_received.assert_called_once_with("GET")
         metrics.track_mcp_response_sent.assert_called_once_with("GET", "success")
+
+    def test_merge_execution_variables_combines_env_and_mcp_args(self):
+        merged = _merge_execution_variables(
+            {"base_url": "http://api"}, {"id": "1"}
+        )
+        self.assertEqual(
+            merged,
+            {"base_url": "http://api", "mcp": {"request": {"id": "1"}}},
+        )
+
+    def test_merge_execution_variables_mcp_namespace_wins_over_env_mcp_key(self):
+        merged = _merge_execution_variables(
+            {"mcp": "env-value", "base_url": "http://api"},
+            {"id": "1"},
+        )
+        self.assertEqual(merged["base_url"], "http://api")
+        self.assertEqual(merged["mcp"], {"request": {"id": "1"}})
+
+    def test_call_tool_passes_merged_env_and_mcp_context(self):
+        impl = MCPServerImpl(
+            variable_supplier=lambda: {"base_url": "http://api"}
+        )
+        req = RequestData(
+            name="Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="{{ base_url }}/{{ mcp.request.id }}",
+        )
+        impl.register_tools([req])
+        impl.request_service = MagicMock()
+        impl.request_service.execute.return_value = _exec_result("ok")
+        asyncio.run(impl.call_tool("tool", {"id": "1"}))
+        _req, passed_ctx = impl.request_service.execute.call_args[0]
+        self.assertEqual(
+            passed_ctx,
+            {
+                "base_url": "http://api",
+                "mcp": {"request": {"id": "1"}},
+            },
+        )
+
+    def test_call_tool_invokes_variable_supplier_per_call(self):
+        remaining = [{"base_url": "http://staging"}, {"base_url": "http://prod"}]
+        impl = MCPServerImpl(variable_supplier=lambda: remaining.pop(0))
+        req = RequestData(name="Tool", expose_as_mcp=True, method="GET", url="http://u")
+        impl.register_tools([req])
+        impl.request_service = MagicMock()
+        impl.request_service.execute.return_value = _exec_result("ok")
+        asyncio.run(impl.call_tool("tool", {}))
+        asyncio.run(impl.call_tool("tool", {}))
+        first_ctx = impl.request_service.execute.call_args_list[0][0][1]
+        second_ctx = impl.request_service.execute.call_args_list[1][0][1]
+        self.assertEqual(first_ctx["base_url"], "http://staging")
+        self.assertEqual(second_ctx["base_url"], "http://prod")
+
+    def test_execute_request_sync_parity_with_request_service(self):
+        from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
+        from pypost.core.request_service import RequestService
+
+        env_vars = {"base_url": "http://api"}
+        mcp_args = {"id": "42"}
+        req = RequestData(
+            name="Parity",
+            expose_as_mcp=True,
+            method="GET",
+            url="{{ base_url }}/items/{{ mcp.request.id }}",
+        )
+        resolved_url = "http://api/items/42"
+        http_result = HTTPRequestResult(
+            response=ResponseData(
+                status_code=200,
+                headers={},
+                body="ok",
+                elapsed_time=0.01,
+                size=2,
+            ),
+            resolved=ResolvedRequestFields(url=resolved_url, headers={}, body=""),
+        )
+
+        direct_svc = RequestService()
+        direct_svc.http_client = MagicMock()
+        direct_svc.http_client.send_request.return_value = http_result
+        merged = _merge_execution_variables(env_vars, mcp_args)
+        direct = direct_svc.execute(req, merged)
+
+        impl = MCPServerImpl(variable_supplier=lambda: dict(env_vars))
+        impl.request_service = RequestService()
+        impl.request_service.http_client = MagicMock()
+        impl.request_service.http_client.send_request.return_value = http_result
+        via_mcp = impl._execute_request_sync(req, mcp_args)
+
+        direct_url = direct_svc.http_client.send_request.call_args.kwargs.get(
+            "variables"
+        )
+        mcp_url_vars = impl.request_service.http_client.send_request.call_args.kwargs.get(
+            "variables"
+        )
+        self.assertEqual(direct_url, mcp_url_vars)
+        self.assertEqual(via_mcp.response.body, direct.response.body)
 
     def test_call_tool_appends_script_logs_and_error_to_body(self):
         impl = MCPServerImpl()

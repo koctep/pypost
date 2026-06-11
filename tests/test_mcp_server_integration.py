@@ -158,6 +158,29 @@ class TestMCPServerIntegration(unittest.TestCase):
             _req, ctx = server.impl.request_service.execute.call_args[0]
             self.assertEqual(ctx, {"mcp": {"request": {"name": "world"}}})
 
+    def test_call_tool_passes_env_and_mcp_variables_to_request_service(self):
+        tool = RequestData(
+            name="Fetch",
+            expose_as_mcp=True,
+            method="GET",
+            url="{{ base_url }}/{{ mcp.request.id }}",
+        )
+        server = _LiveMCPServer([tool], execute_result=_exec_result("ok"))
+        server.impl.set_variable_supplier(lambda: {"base_url": "http://api"})
+        server.start()
+        try:
+            anyio.run(_mcp_call_tool, server.sse_url, "fetch", {"id": "1"})
+            _req, ctx = server.impl.request_service.execute.call_args[0]
+            self.assertEqual(
+                ctx,
+                {
+                    "base_url": "http://api",
+                    "mcp": {"request": {"id": "1"}},
+                },
+            )
+        finally:
+            server.stop()
+
 
 class TestMCPServerManagerIntegration(unittest.TestCase):
     """Exercise production MCPServerManager thread + uvicorn lifecycle."""

@@ -56,6 +56,7 @@ class EnvPresenter(QObject):
         self._metrics = metrics
         self._environments: list[Environment] = []
         self._current_env_index: int = 0
+        self._current_variables: dict[str, str] = {}
         self._pending_env_manager_refresh = False
         self._storage_gateway = EnvironmentStorageGateway(storage, parent=self)
         self._storage_gateway.load_completed.connect(self._on_storage_load_completed)
@@ -63,6 +64,9 @@ class EnvPresenter(QObject):
         self._storage_gateway.save_failed.connect(self._on_storage_save_failed)
 
         self._mcp_manager.status_changed.connect(self._on_mcp_status_changed)
+        self._mcp_manager.set_variable_supplier(
+            lambda: dict(self._current_variables)
+        )
 
         # Build top-bar widget
         self._widget = QWidget()
@@ -284,6 +288,7 @@ class EnvPresenter(QObject):
 
         self._config_manager.save_config(self._settings)
         self._current_env_index = index
+        self._current_variables = dict(variables)
 
         keys = list(variables.keys()) if isinstance(selected, Environment) else None
         hidden_keys = selected.hidden_keys if isinstance(selected, Environment) else set()

@@ -31,8 +31,23 @@ This class contains the actual business logic of the MCP server.
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
 *   **Schema Generation**: Automatically generates JSON Schema for tools by parsing the request URL, headers, and body using `TemplateService` (Jinja2 AST) to find variables matching the pattern `{{ mcp.request.VAR_NAME }}`.
 *   **Execution**: Delegates request execution to `RequestService`.
+*   **Environment variables (PYPOST-550)**: At `call_tool` time, snapshots active
+    environment variables via an injected `variable_supplier`, merges them with MCP tool
+    arguments, and passes the combined dict to `RequestService.execute()` (GUI parity).
 
-### 3. `MetricsManager` (`pypost/core/metrics.py`)
+### 3. `EnvPresenter` (`pypost/ui/presenters/env_presenter.py`)
+
+The environment selector owns MCP lifecycle and the active-variable cache used by MCP tools.
+
+*   **Responsibility**: Load environments, emit variable changes to the UI, start/stop MCP
+    when `enable_mcp` is set on the selected environment.
+*   **Variable cache**: `_current_variables` is updated on the main thread in
+    `_on_env_changed` whenever the user selects or edits an environment.
+*   **Supplier registration**: On init, calls
+    `MCPServerManager.set_variable_supplier(lambda: dict(self._current_variables))`.
+    The lambda returns a **copy** so MCP threadpool workers never observe partial writes.
+
+### 4. `MetricsManager` (`pypost/core/metrics.py`)
 
 PyPost also exposes a separate MCP server dedicated to observability.
 
@@ -58,11 +73,73 @@ PyPost also exposes a separate MCP server dedicated to observability.
 1.  External Client sends a `call_tool` request via SSE/HTTP.
 2.  `MCPServerImpl.call_tool` is invoked (async).
 3.  **Context Switching**: Since `RequestService` is synchronous, execution is offloaded to a thread pool using `starlette.concurrency.run_in_threadpool`.
-4.  `RequestService.execute()` is called.
-    -   It renders templates.
+4.  `_execute_request_sync` builds the variables dict:
+    -   Calls `variable_supplier()` for a snapshot of the active environment's flat keys
+        (e.g. `base_url`, `api_key`).
+    -   Merges with MCP tool arguments via `_merge_execution_variables` (see below).
+5.  `RequestService.execute()` is called with the merged dict.
+    -   It renders templates (environment placeholders **and** `{{ mcp.request.* }}`).
     -   Executes the HTTP request via `HTTPClient`.
-    -   Runs any post-request scripts via `ScriptExecutor`.
-5.  Response body (plus any script logs/errors) is returned as `TextContent` to the MCP Client.
+    -   Runs any post-request scripts via `ScriptExecutor` (same variable dict as GUI).
+6.  Response body (plus any script logs/errors) is returned as `TextContent` to the MCP Client.
+
+### Environment variable injection (PYPOST-550)
+
+MCP tool calls must resolve the same `{{ variable }}` placeholders as GUI sends. The fix
+lives entirely in the MCP adapter — `RequestService`, `TemplateService`, and `HTTPClient` are
+unchanged.
+
+#### Variable dict shape
+
+`TemplateService` renders against a single Jinja2 context:
+
+| Placeholder | Dict path | Source |
+| --- | --- | --- |
+| `{{ base_url }}` | top-level key | Active environment |
+| `{{ mcp.request.user_id }}` | `mcp.request.user_id` | Agent `call_tool` arguments |
+
+Merge contract (module-level helper in `mcp_server_impl.py`):
+
+```python
+def _merge_execution_variables(env_vars, mcp_args):
+    return {**env_vars, "mcp": {"request": mcp_args}}
+```
+
+The `mcp` namespace **always wins**: an environment variable named `mcp` cannot override
+`mcp.request.*` tool arguments.
+
+#### Wiring
+
+```
+EnvPresenter._current_variables  (main thread, updated in _on_env_changed)
+        │
+        ▼  set_variable_supplier(λ: dict(_current_variables))
+MCPServerManager ──► MCPServerImpl._variable_supplier
+        │
+        ▼  per call_tool (threadpool worker)
+_build_execution_variables(mcp_args) ──► RequestService.execute(request, merged)
+```
+
+Freshness: the supplier is invoked on **every** `call_tool`, so edits to environment
+variables take effect on the next agent call without restarting MCP (existing restart-on-env
+change behavior is unchanged).
+
+#### GUI parity
+
+| Path | Variables passed to `RequestService.execute()` |
+| --- | --- |
+| GUI (`RequestWorker`) | Flat env dict from `TabsPresenter._current_variables` |
+| MCP (`MCPServerImpl`) | Merged env dict + `mcp.request` namespace |
+
+Hidden variables: masking applies to UI/history only. MCP execution uses real stored values,
+consistent with GUI sends. MCP inbound tools do not record history, so `hidden_keys` is not
+wired on this path.
+
+#### Observability
+
+DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
+`env_var_count` and `mcp_arg_count` (no names or values). See
+`ai-tasks/PYPOST-550/50-observability.md`.
 
 ## Threading Model
 
@@ -70,11 +147,48 @@ PyPost also exposes a separate MCP server dedicated to observability.
 *   **Worker Thread (`RequestWorker`)**: Used for GUI-initiated requests.
 *   **MCP Thread (`MCPServerManager`)**: Runs the `uvicorn` loop.
     *   **Thread Pool**: Used inside MCP Thread for blocking I/O (Request execution).
+    *   **Variable supplier**: Must not call Qt APIs. `EnvPresenter` reads only
+        `_current_variables` (main-thread cache); supplier returns `dict(...)` snapshot.
 *   **Metrics Thread (`MetricsManager`)**: Runs its own isolated `uvicorn` loop for metrics and observability.
+
+## API / Usage
+
+### `MCPServerManager.set_variable_supplier(supplier)`
+
+Register a callable that returns the current active environment variables as `dict[str, str]`.
+Called by `EnvPresenter` at init. Forwarded to `MCPServerImpl`. Pass `None` to reset to an
+empty dict.
+
+### `MCPServerImpl._build_execution_variables(mcp_args)`
+
+Internal. Invokes `_variable_supplier()`, logs merge counts at DEBUG, returns merged dict for
+`RequestService.execute()`.
+
+### `_merge_execution_variables(env_vars, mcp_args)`
+
+Pure merge helper; unit-tested independently. Spread env vars first, then set `"mcp"` from tool
+arguments.
+
+## Configuration
+
+No new settings. MCP tools use variables from the **currently selected environment** when
+`enable_mcp=True`. Port and host remain in `AppSettings` (`mcp_port`, `mcp_host`).
+
+## Troubleshooting
+
+| Symptom | Likely cause | Resolution |
+| --- | --- | --- |
+| MCP tool URL still has `{{ base_url }}` unresolved | No environment selected, or supplier not registered | Select an environment with the variable defined; verify `EnvPresenter` wired the supplier |
+| Stale env values after editing variables | Supplier not invoked or cache not updated | `_on_env_changed` must refresh `_current_variables`; supplier runs per `call_tool` |
+| `{{ mcp.request.x }}` works but env vars do not | Custom MCP setup without supplier | Call `set_variable_supplier` before `start_server`, or use default `EnvPresenter` wiring |
+| Env var named `mcp` ignored for nested keys | By design — merge preserves `mcp.request.*` | Rename the environment variable |
+| DEBUG shows `env_var_count=0` | "No Environment" selected or empty env | Expected when no env is active; only MCP args resolve |
 
 ## Limitations & Tech Debt
 
 *   **Synchronous Execution**: The core uses `requests` (sync). Ideally, we should move to `httpx` for async support to avoid `run_in_threadpool`.
 *   **Parsing**: Schema generation uses `TemplateService` for AST parsing, but complex Jinja2 constructs might still need attention.
+*   **Schema vs execution**: `list_tools` JSON Schema still exposes only `mcp.request.*` placeholders; environment variables are resolved at execution time and are not listed as tool inputs.
+*   **Dual variable sources in EnvPresenter**: `current_variables` property reads the combo box while MCP uses `_current_variables` cache (see `ai-tasks/PYPOST-550/60-tech-debt.md`).
 
 See `ai-tasks/PYPOST-20/40-tech-debt.md` for more details.
