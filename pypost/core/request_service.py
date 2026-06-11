@@ -164,6 +164,8 @@ class RequestService:
                     headers_callback=headers_callback,
                 )
             except ExecutionError as exc:
+                if exc.category == ErrorCategory.BODY:
+                    raise
                 last_error = exc
                 if attempt == max_retries:
                     last_error.detail = f"retries_attempted: {attempt}"

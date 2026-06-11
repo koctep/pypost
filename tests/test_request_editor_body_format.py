@@ -78,6 +78,37 @@ class TestRequestWidgetBodyFormat(unittest.TestCase):
         self.widget.load_data()
         self.widget.body_edit.set_body_format.assert_called_with(BodyFormat.XML)
 
+    def test_yaml_as_json_checkbox_enabled_only_for_yaml(self):
+        self.assertFalse(self.widget.yaml_as_json_check.isEnabled())
+        index = self.widget.body_format_combo.findData(BodyFormat.YAML)
+        self.widget.body_format_combo.setCurrentIndex(index)
+        self.assertTrue(self.widget.yaml_as_json_check.isEnabled())
+        index = self.widget.body_format_combo.findData(BodyFormat.JSON)
+        self.widget.body_format_combo.setCurrentIndex(index)
+        self.assertFalse(self.widget.yaml_as_json_check.isEnabled())
+
+    def test_load_data_restores_yaml_as_json_checked(self):
+        self.widget.request_data = RequestData(body_type="yaml", yaml_as_json=True)
+        self.widget.load_data()
+        self.assertTrue(self.widget.yaml_as_json_check.isChecked())
+        self.assertTrue(self.widget.yaml_as_json_check.isEnabled())
+
+    def test_get_request_data_persists_yaml_as_json(self):
+        index = self.widget.body_format_combo.findData(BodyFormat.YAML)
+        self.widget.body_format_combo.setCurrentIndex(index)
+        self.widget.yaml_as_json_check.setChecked(True)
+        data = self.widget.get_request_data_from_ui()
+        self.assertTrue(data.yaml_as_json)
+
+    def test_yaml_as_json_persisted_when_format_not_yaml(self):
+        self.widget.request_data = RequestData(body_type="yaml", yaml_as_json=True)
+        self.widget.load_data()
+        index = self.widget.body_format_combo.findData(BodyFormat.JSON)
+        self.widget.body_format_combo.setCurrentIndex(index)
+        self.assertFalse(self.widget.yaml_as_json_check.isEnabled())
+        data = self.widget.get_request_data_from_ui()
+        self.assertTrue(data.yaml_as_json)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,5 @@
 """Unit tests for retry logic in RequestService._execute_http_with_retry."""
+
 import unittest
 from unittest.mock import MagicMock
 
@@ -12,8 +13,11 @@ from pypost.models.errors import ErrorCategory, ExecutionError
 
 def _make_response(status=200, body="OK"):
     return ResponseData(
-        status_code=status, headers={}, body=body,
-        elapsed_time=0.1, size=len(body),
+        status_code=status,
+        headers={},
+        body=body,
+        elapsed_time=0.1,
+        size=len(body),
     )
 
 
@@ -164,9 +168,7 @@ class TestRetryCallback(unittest.TestCase):
 
     def test_no_callback_does_not_raise(self):
         svc = _make_service()
-        svc.http_client.send_request.side_effect = [
-            _make_response(503), _make_response(200)
-        ]
+        svc.http_client.send_request.side_effect = [_make_response(503), _make_response(200)]
         req = _make_request(max_retries=1)
         # Should not raise even with no callback
         result = svc.execute(req, retry_callback=None)
@@ -197,7 +199,9 @@ class TestRetryMetrics(unittest.TestCase):
         metrics = MagicMock()
         svc = _make_service(metrics=metrics)
         svc.http_client.send_request.side_effect = [
-            _make_response(503), _make_response(503), _make_response(200)
+            _make_response(503),
+            _make_response(503),
+            _make_response(200),
         ]
         req = _make_request(max_retries=2)
         svc.execute(req)
@@ -215,9 +219,7 @@ class TestRetryMetrics(unittest.TestCase):
     def test_no_metrics_no_error_on_retry(self):
         svc = RequestService()
         svc.http_client = MagicMock()
-        svc.http_client.send_request.side_effect = [
-            _make_response(503), _make_response(200)
-        ]
+        svc.http_client.send_request.side_effect = [_make_response(503), _make_response(200)]
         req = _make_request(max_retries=1)
         result = svc.execute(req)
         self.assertEqual(result.response.status_code, 200)
@@ -314,6 +316,37 @@ class TestRetryableStatusExhaustion(unittest.TestCase):
         self.assertEqual(payload.retries_attempted, 0)
         self.assertEqual(payload.final_error_category, "network")
         self.assertEqual(payload.final_error_message, "HTTP 503")
+
+
+class TestBodyErrorNonRetryable(unittest.TestCase):
+    """BODY errors must not enter the retry loop."""
+
+    def test_body_error_not_retried(self):
+        svc = _make_service()
+        exc = ExecutionError(
+            category=ErrorCategory.BODY,
+            message="Could not convert YAML body to JSON.",
+            detail="invalid yaml",
+        )
+        svc.http_client.send_request.side_effect = exc
+        req = _make_request(max_retries=3)
+        result = svc.execute(req)
+        self.assertIsNotNone(result.execution_error)
+        self.assertEqual(result.execution_error.category, ErrorCategory.BODY)
+        self.assertEqual(svc.http_client.send_request.call_count, 1)
+
+    def test_body_error_no_retry_metrics(self):
+        metrics = MagicMock()
+        svc = _make_service(metrics=metrics)
+        exc = ExecutionError(
+            category=ErrorCategory.BODY,
+            message="Could not convert YAML body to JSON.",
+            detail="invalid yaml",
+        )
+        svc.http_client.send_request.side_effect = exc
+        req = _make_request(max_retries=3)
+        svc.execute(req)
+        metrics.track_retry_attempt.assert_not_called()
 
 
 class TestRetryPolicyModel(unittest.TestCase):

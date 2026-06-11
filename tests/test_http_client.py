@@ -24,9 +24,7 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         self.client.session = self.mock_session
 
     def test_get_200_returns_response_data_with_correct_fields(self):
-        self.mock_session.request.return_value = _make_response(
-            status=200, chunks=[b'{"ok":true}']
-        )
+        self.mock_session.request.return_value = _make_response(status=200, chunks=[b'{"ok":true}'])
         req = RequestData(method="GET", url="http://x")
         result = self.client.send_request(req)
         self.assertEqual(200, result.status_code)
@@ -40,6 +38,91 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         call_kwargs = self.mock_session.request.call_args[1]
         self.assertEqual({"k": "v"}, call_kwargs.get("json"))
         self.assertNotIn("data", call_kwargs)
+
+    def test_yaml_as_json_converts_body_to_json_kwarg(self):
+        self.mock_session.request.return_value = _make_response(status=200)
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body="name: Alice\nage: 30",
+            body_type="yaml",
+            yaml_as_json=True,
+        )
+        self.client.send_request(req)
+        call_kwargs = self.mock_session.request.call_args[1]
+        self.assertEqual({"name": "Alice", "age": 30}, call_kwargs.get("json"))
+        self.assertNotIn("data", call_kwargs)
+
+    def test_yaml_without_flag_sends_raw_data(self):
+        self.mock_session.request.return_value = _make_response(status=200)
+        body = "name: Alice\nage: 30"
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body=body,
+            body_type="yaml",
+            yaml_as_json=False,
+        )
+        self.client.send_request(req)
+        call_kwargs = self.mock_session.request.call_args[1]
+        self.assertEqual(body, call_kwargs.get("data"))
+        self.assertNotIn("json", call_kwargs)
+
+    def test_invalid_yaml_with_flag_raises_body_error(self):
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body="{ invalid",
+            body_type="yaml",
+            yaml_as_json=True,
+        )
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client.send_request(req)
+        self.assertEqual(ctx.exception.category, ErrorCategory.BODY)
+        self.mock_session.request.assert_not_called()
+
+    def test_yaml_as_json_whitespace_body_skips_body_kwargs(self):
+        self.mock_session.request.return_value = _make_response(status=200)
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body="   \n\t  ",
+            body_type="yaml",
+            yaml_as_json=True,
+        )
+        self.client.send_request(req)
+        call_kwargs = self.mock_session.request.call_args[1]
+        self.assertNotIn("json", call_kwargs)
+        self.assertNotIn("data", call_kwargs)
+
+    def test_yaml_as_json_ignored_for_json_body_type(self):
+        self.mock_session.request.return_value = _make_response(status=200)
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body='{"k":"v"}',
+            body_type="json",
+            yaml_as_json=True,
+        )
+        self.client.send_request(req)
+        call_kwargs = self.mock_session.request.call_args[1]
+        self.assertEqual({"k": "v"}, call_kwargs.get("json"))
+        self.assertNotIn("data", call_kwargs)
+
+    def test_yaml_as_json_ignored_for_xml_body_type(self):
+        self.mock_session.request.return_value = _make_response(status=200)
+        body = "<root><item/></root>"
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body=body,
+            body_type="xml",
+            yaml_as_json=True,
+        )
+        self.client.send_request(req)
+        call_kwargs = self.mock_session.request.call_args[1]
+        self.assertEqual(body, call_kwargs.get("data"))
+        self.assertNotIn("json", call_kwargs)
 
     def test_template_variables_substituted_in_url(self):
         self.mock_session.request.return_value = _make_response(status=200)
@@ -174,6 +257,7 @@ class TestHTTPClientInjection(unittest.TestCase):
     def test_no_injection_creates_default_template_service(self):
         """HTTPClient() with no template_service creates a default TemplateService instance."""
         from pypost.core.template_service import TemplateService
+
         client = HTTPClient()
         self.assertIsInstance(client._template_service, TemplateService)
 

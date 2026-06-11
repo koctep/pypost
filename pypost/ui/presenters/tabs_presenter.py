@@ -40,6 +40,9 @@ _ERROR_MESSAGES = {
     ErrorCategory.TEMPLATE: (
         "Template rendering failed: {detail}. Check variable names and syntax."
     ),
+    ErrorCategory.BODY: (
+        "Could not convert YAML body to JSON: {detail}. Check YAML syntax and structure."
+    ),
     ErrorCategory.SCRIPT: ("Post-script execution failed: {detail}. Review the script for errors."),
     ErrorCategory.HISTORY: ("History could not be recorded: {detail}."),
     ErrorCategory.UNKNOWN: ("An unexpected error occurred: {detail}."),

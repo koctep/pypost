@@ -7,6 +7,10 @@ import requests
 
 from pypost.core.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
+from pypost.core.yaml_json_converter import (
+    YamlBodyConversionError,
+    convert_yaml_body_to_object,
+)
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
@@ -52,6 +56,7 @@ class HTTPClient:
             params[rendered_k] = rendered_v
 
         body = self._template_service.render_string(request_data.body, variables)
+        stripped_body = body.strip()
 
         # Prepare kwargs
         kwargs = {
@@ -63,12 +68,27 @@ class HTTPClient:
             "timeout": 30.0,
         }
 
-        if request_data.body_type == "json" and body:
+        if request_data.body_type == "yaml" and request_data.yaml_as_json and stripped_body:
+            try:
+                kwargs["json"] = convert_yaml_body_to_object(body)
+            except YamlBodyConversionError as exc:
+                logger.error(
+                    "yaml_to_json_conversion_failed method=%s url=%r detail=%s",
+                    request_data.method,
+                    url,
+                    exc,
+                )
+                raise ExecutionError(
+                    category=ErrorCategory.BODY,
+                    message="Could not convert YAML body to JSON.",
+                    detail=str(exc),
+                ) from exc
+        elif request_data.body_type == "json" and stripped_body:
             try:
                 kwargs["json"] = json.loads(body)
             except json.JSONDecodeError:
                 kwargs["data"] = body
-        elif request_data.body_type != "json":
+        elif request_data.body_type != "json" and stripped_body:
             kwargs["data"] = body
 
         return kwargs

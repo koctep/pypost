@@ -15,6 +15,7 @@ class RequestData(BaseModel):
     params: Dict[str, str] = Field(default_factory=dict)
     body: str = ""
     body_type: str = "json"  # json, text, etc.
+    yaml_as_json: bool = False
     post_script: str = ""  # Python script to execute after response
     expose_as_mcp: bool = False  # Expose this request as an MCP tool
     retry_policy: Optional[RetryPolicy] = None

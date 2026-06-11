@@ -7,6 +7,7 @@ class ErrorCategory(str, enum.Enum):
     NETWORK = "network"
     TIMEOUT = "timeout"
     TEMPLATE = "template"
+    BODY = "body"
     SCRIPT = "script"
     HISTORY = "history"
     UNKNOWN = "unknown"

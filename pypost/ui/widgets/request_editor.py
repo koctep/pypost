@@ -125,6 +125,11 @@ class RequestWidget(QWidget):
         format_row = QHBoxLayout()
         format_row.addWidget(QLabel("Format:"))
         format_row.addWidget(self.body_format_combo)
+        self.yaml_as_json_check = QCheckBox("YAML as JSON")
+        self.yaml_as_json_check.setToolTip(
+            "When enabled, YAML body is converted to JSON at send time."
+        )
+        format_row.addWidget(self.yaml_as_json_check)
         format_row.addStretch()
         body_tab_layout.addLayout(format_row)
         body_tab_layout.addWidget(self.body_edit)
@@ -182,6 +187,11 @@ class RequestWidget(QWidget):
         if body_format is None:
             return
         self.body_edit.set_body_format(body_format)
+        self.yaml_as_json_check.setEnabled(body_format == BodyFormat.YAML)
+
+    def _update_yaml_as_json_enabled(self) -> None:
+        body_format = self.body_format_combo.currentData()
+        self.yaml_as_json_check.setEnabled(body_format == BodyFormat.YAML)
 
     def load_data(self):
         self._loading = True
@@ -195,6 +205,8 @@ class RequestWidget(QWidget):
             body_format = body_type_to_body_format(self.request_data.body_type)
             self._set_body_format_combo(body_format)
             self.body_edit.set_body_format(body_format)
+            self.yaml_as_json_check.setChecked(self.request_data.yaml_as_json)
+            self._update_yaml_as_json_enabled()
             self.script_edit.setPlainText(self.request_data.post_script)
             self.mcp_check.setChecked(self.request_data.expose_as_mcp)
         finally:
@@ -213,6 +225,7 @@ class RequestWidget(QWidget):
         self.request_data.headers = self.headers_table.get_data()
         self.request_data.body = self.body_edit.toPlainText()
         self.request_data.body_type = self._body_type_from_ui()
+        self.request_data.yaml_as_json = self.yaml_as_json_check.isChecked()
         self.request_data.post_script = self.script_edit.toPlainText()
         self.request_data.expose_as_mcp = self.mcp_check.isChecked()
 
@@ -224,6 +237,7 @@ class RequestWidget(QWidget):
         request_data.headers = self.headers_table.get_data()
         request_data.body = self.body_edit.toPlainText()
         request_data.body_type = self._body_type_from_ui()
+        request_data.yaml_as_json = self.yaml_as_json_check.isChecked()
         request_data.post_script = self.script_edit.toPlainText()
         request_data.expose_as_mcp = self.mcp_check.isChecked()
         return request_data

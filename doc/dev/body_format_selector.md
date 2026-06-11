@@ -31,8 +31,10 @@ flowchart LR
 - **`RequestData.body_type`** — Persisted field (`json`, `yaml`, `xml`); used by `http_client` for
   send serialization.
 
-See also [Body Editor Folding](body_editor_folding.md) and
-[Body Editor Validation](body_editor_validation.md) for format-driven editor behavior.
+See also [Body Editor Folding](body_editor_folding.md),
+[Body Editor Validation](body_editor_validation.md) for format-driven editor behavior, and
+[YAML as JSON Send Conversion](yaml_as_json.md) for optional send-time YAML→JSON conversion when
+format is YAML.
 
 ## API / Usage
 
