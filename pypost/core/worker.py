@@ -128,9 +128,6 @@ class RequestWorker(QThread):
                 stopped,
             )
             self.finished.emit(result.response)
-        except ExecutionError as exc:
-            logger.error("RequestWorker failed category=%s detail=%s", exc.category, exc.detail)
-            self.error.emit(exc)
         except Exception as exc:
             logger.error("RequestWorker unexpected error: %s", exc, exc_info=True)
             self.error.emit(

@@ -13,18 +13,31 @@ class TestRequestWorkerError(unittest.TestCase):
         req = RequestData(method="GET", url="http://x")
         return RequestWorker(req, variables={}, metrics=MagicMock())
 
-    def test_worker_emits_execution_error_on_execution_error(self):
+    def test_worker_emits_finished_on_execution_result_error(self):
+        from pypost.core.request_service import ExecutionResult
+        from pypost.models.response import ResponseData
+
         worker = self._make_worker()
-        received = []
-        worker.error.connect(lambda e: received.append(e))
+        finished = []
+        errors = []
+        worker.finished.connect(lambda r: finished.append(r))
+        worker.error.connect(lambda e: errors.append(e))
 
         exc = ExecutionError(category=ErrorCategory.NETWORK, message="no conn")
-        with patch.object(worker.service, "execute", side_effect=exc):
+        resp = ResponseData(
+            status_code=0, headers={}, body="", elapsed_time=0.0, size=0,
+        )
+        result = ExecutionResult(
+            response=resp,
+            updated_variables={},
+            script_logs=[],
+            execution_error=exc,
+        )
+        with patch.object(worker.service, "execute", return_value=result):
             worker.run()
 
-        self.assertEqual(len(received), 1)
-        self.assertIsInstance(received[0], ExecutionError)
-        self.assertEqual(received[0].category, ErrorCategory.NETWORK)
+        self.assertEqual(len(finished), 1)
+        self.assertEqual(len(errors), 0)
 
     def test_worker_wraps_unexpected_exception_as_execution_error_unknown(self):
         worker = self._make_worker()

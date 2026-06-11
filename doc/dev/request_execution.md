@@ -41,6 +41,19 @@ Post-script failures populate `execution_error` with `ErrorCategory.SCRIPT` and 
 string in `detail` (PYPOST-409). Callers such as `RequestWorker` and `MCPServerImpl` read
 script errors from `execution_error` rather than a separate string field.
 
+### Worker signals (PYPOST-412)
+
+`RequestWorker.run()` does not catch `ExecutionError` from `execute()` — that path is
+unreachable because `RequestService.execute()` always returns `ExecutionResult` for handled
+failures.
+
+| Signal | When emitted |
+|--------|----------------|
+| `finished` | Successful response or handled failure (`ExecutionResult` with synthetic error response) |
+| `error` | Unexpected `Exception` in the worker thread, wrapped as `ErrorCategory.UNKNOWN` |
+| `script_output` | Post-script logs; script failure detail from `execution_error` when category is `SCRIPT` |
+| `retry_attempt` | Retry progress from `RequestService._execute_http_with_retry` |
+
 ### MCP transport exceptions (PYPOST-411)
 
 `MCPClientService.run()` maps httpx exceptions from the MCP SSE client to `ExecutionError`:
