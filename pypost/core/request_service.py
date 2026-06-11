@@ -148,7 +148,7 @@ class RequestService:
         for attempt in range(max_retries + 1):  # attempt 0 = first try
             if stop_flag and stop_flag():
                 raise ExecutionError(
-                    category=ErrorCategory.NETWORK,
+                    category=ErrorCategory.CANCELLED,
                     message="Request cancelled",
                     detail="Cancelled during retry delay",
                 )
@@ -240,7 +240,7 @@ class RequestService:
                         attempt,
                     )
                     raise ExecutionError(
-                        category=ErrorCategory.NETWORK,
+                        category=ErrorCategory.CANCELLED,
                         message="Request cancelled",
                         detail="Cancelled during retry delay",
                     )
@@ -419,7 +419,7 @@ class RequestService:
                 exc.category,
                 exc.detail,
             )
-            if self._metrics:
+            if self._metrics and exc.category != ErrorCategory.CANCELLED:
                 self._metrics.track_request_error(exc.category)
             return ExecutionResult(
                 response=_error_response(exc),

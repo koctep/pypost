@@ -595,13 +595,26 @@ class TestOnRequestError(unittest.TestCase):
             args = mock_show.call_args[0]
             self.assertIn("timed out", args[1])
 
+    def test_execution_error_detail_substring_not_treated_as_cancelled(self):
+        """NETWORK errors with 'cancelled' in detail still show a dialog."""
+        from pypost.models.errors import ErrorCategory, ExecutionError
+        p, tab = self._make_presenter_with_tab()
+        exc = ExecutionError(
+            category=ErrorCategory.NETWORK,
+            message="connection failed",
+            detail="operation cancelled by upstream proxy",
+        )
+        with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
+            p._on_request_error(tab, exc)
+            mock_show.assert_called_once()
+
     def test_execution_error_cancelled_no_dialog(self):
         from pypost.models.errors import ErrorCategory, ExecutionError
         p, tab = self._make_presenter_with_tab()
         exc = ExecutionError(
-            category=ErrorCategory.UNKNOWN,
-            message="something",
-            detail="request aborted by user",
+            category=ErrorCategory.CANCELLED,
+            message="Request cancelled",
+            detail="Cancelled during retry delay",
         )
         with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
             p._on_request_error(tab, exc)

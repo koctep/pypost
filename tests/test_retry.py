@@ -194,8 +194,9 @@ class TestStopFlagDuringRetry(unittest.TestCase):
         stop = MagicMock(return_value=True)
         # First call: stop_flag checked before 2nd attempt
         result = svc.execute(req, stop_flag=stop)
-        # Should return a cancelled/network error, not retry 3 times
+        # Should return a cancelled error, not retry 3 times
         self.assertIsNotNone(result.execution_error)
+        self.assertEqual(result.execution_error.category, ErrorCategory.CANCELLED)
         # stop_flag was checked
         stop.assert_called()
 

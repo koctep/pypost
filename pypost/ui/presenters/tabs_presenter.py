@@ -509,9 +509,7 @@ class TabsPresenter(QObject):
 
         # Structured ExecutionError path
         if isinstance(error, ExecutionError):
-            if error.detail and (
-                "cancelled" in error.detail.lower() or "aborted" in error.detail.lower()
-            ):
+            if error.category == ErrorCategory.CANCELLED:
                 logger.info("request_cancelled category=%s", error.category)
                 return
 

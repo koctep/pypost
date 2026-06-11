@@ -13,6 +13,37 @@ class TestRequestWorkerError(unittest.TestCase):
         req = RequestData(method="GET", url="http://x")
         return RequestWorker(req, variables={}, metrics=MagicMock())
 
+    def test_worker_emits_error_on_cancelled_execution_result(self):
+        from pypost.core.request_service import ExecutionResult
+        from pypost.models.response import ResponseData
+
+        worker = self._make_worker()
+        finished = []
+        errors = []
+        worker.finished.connect(lambda r: finished.append(r))
+        worker.error.connect(lambda e: errors.append(e))
+
+        exc = ExecutionError(
+            category=ErrorCategory.CANCELLED,
+            message="Request cancelled",
+            detail="Cancelled during retry delay",
+        )
+        resp = ResponseData(
+            status_code=0, headers={}, body="", elapsed_time=0.0, size=0,
+        )
+        result = ExecutionResult(
+            response=resp,
+            updated_variables={},
+            script_logs=[],
+            execution_error=exc,
+        )
+        with patch.object(worker.service, "execute", return_value=result):
+            worker.run()
+
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0].category, ErrorCategory.CANCELLED)
+        self.assertEqual(len(finished), 0)
+
     def test_worker_emits_finished_on_execution_result_error(self):
         from pypost.core.request_service import ExecutionResult
         from pypost.models.response import ResponseData

@@ -10,6 +10,7 @@ class ErrorCategory(str, enum.Enum):
     BODY = "body"
     SCRIPT = "script"
     HISTORY = "history"
+    CANCELLED = "cancelled"
     UNKNOWN = "unknown"
 
 

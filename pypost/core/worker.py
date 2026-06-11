@@ -120,6 +120,18 @@ class RequestWorker(QThread):
             if result.updated_variables:
                 self.env_update.emit(result.updated_variables)
 
+            if (
+                result.execution_error
+                and result.execution_error.category == ErrorCategory.CANCELLED
+            ):
+                logger.debug(
+                    "worker_run_cancelled method=%s url=%s",
+                    self.request_data.method,
+                    self.request_data.url,
+                )
+                self.error.emit(result.execution_error)
+                return
+
             stopped = self._stop_event.is_set()
             logger.debug(
                 "worker_run_completed method=%s url=%s stopped=%s",
