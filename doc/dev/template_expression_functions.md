@@ -381,7 +381,7 @@ hardening — not release blockers.
 
 | Item | Jira | Notes |
 | --- | --- | --- |
-| Expression/template caching | [PYPOST-455](https://pypost.atlassian.net/browse/PYPOST-455) | No cache today; revisit after usage metrics |
+| Expression/template caching | — | Evaluated in PYPOST-455; deferred (see Caching evaluation) |
 | Registry vs `env.globals` parity test | — | Done in PYPOST-457 (`test_function_registry`, `test_template_service`) |
 | Shared tokenization dedup | — | Done in PYPOST-460 (`template_expression_tokenizer`) |
 | Empty-arg / multi-placeholder / closing-paren edge cases | [PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461) | Boundary with PYPOST-454 M1–M4 matrix |
@@ -393,7 +393,42 @@ hardening — not release blockers.
 Completed follow-ups referenced in this doc: PYPOST-451 (registry), PYPOST-452 (resolver),
 PYPOST-453 (nested policy), PYPOST-454 (edge-case tests), PYPOST-456 (doc polish),
 PYPOST-457 (registry/globals parity test), PYPOST-459 (orchestration stage helpers in
-`TemplateService`), PYPOST-460 (shared tokenization).
+`TemplateService`), PYPOST-460 (shared tokenization), PYPOST-455 (caching evaluation).
+
+## Caching evaluation (PYPOST-455)
+
+**Decision: defer implementation.** No render cache is active today.
+
+### Current cost (local benchmark, 2026-06-11)
+
+| Scenario | Approx. cost |
+| --- | ---: |
+| Plain two-placeholder template | ~130 µs/render |
+| Single function expression | ~152 µs/render |
+| Nested `base64(md5(...))` chain | ~182 µs/render |
+| Simulated HTTP request (URL + headers + params + body) | ~0.7 ms/request |
+
+Network I/O dominates request latency. PYPOST-460 already removed duplicate tokenization;
+remaining repeatable work is `Environment.from_string` compile plus validation per call.
+
+### Monitoring
+
+Use existing Prometheus counters (no new metrics from PYPOST-455):
+
+- `template_expression_render_attempts{render_path, outcome}`
+- `template_expression_validation_failures{render_path, code, function_name}`
+
+### Revisit criteria
+
+Consider a compiled-template LRU (`functools.lru_cache` on compile, bounded `maxsize`) when:
+
+- Users report hover lag with function templates, or
+- Prometheus shows sustained very high render attempt rates, or
+- Production templates routinely carry many placeholders (20+).
+
+Guard tests for future cache work: `tests/test_template_service_caching_eval.py`.
+
+Full analysis: `ai-tasks/PYPOST-455/20-architecture.md`.
 
 ## Troubleshooting
 
