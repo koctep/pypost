@@ -3,9 +3,10 @@
 
 ## Shortcuts Taken
 
-- **Tree delete in MainWindow** ([PYPOST-324](https://pypost.atlassian.net/browse/PYPOST-324)):
-  Implemented directly on `MainWindow`; architecture had planned a separate UI controller layer not
-  yet extracted.
+- **Tree delete in MainWindow** — resolved in
+  [PYPOST-324](https://pypost.atlassian.net/browse/PYPOST-324) /
+  [PYPOST-326](https://pypost.atlassian.net/browse/PYPOST-326): delete flow lives in
+  `CollectionTreeActions`; `MainWindow` only wires `requests_deleted` to tabs.
 - Deletion telemetry was added without dedicated metric-focused automated tests.
   — [PYPOST-325](https://pypost.atlassian.net/browse/PYPOST-325)
 
