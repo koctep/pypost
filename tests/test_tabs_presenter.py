@@ -131,6 +131,32 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(p.widget.count(), 1)
         self.assertEqual(p.widget.tabText(0), "New Request")
 
+    def test_close_tabs_for_request_ids_noop_for_empty_list(self):
+        req = _make_request("r1", "Open")
+        p = self._make_presenter()
+        p.add_new_tab(req, save_state=False)
+        p.close_tabs_for_request_ids([])
+        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(p.widget.widget(0).request_data.id, "r1")
+
+    def test_close_tabs_for_request_ids_closes_duplicate_request_tabs(self):
+        req = _make_request("r1", "Duplicate")
+        p = self._make_presenter()
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        p.add_new_tab(_make_request("r2", "Other"), save_state=False)
+        p.close_tabs_for_request_ids(["r1"])
+        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(p.widget.widget(0).request_data.id, "r2")
+
+    def test_close_tabs_for_request_ids_updates_persisted_state(self):
+        req = _make_request("r1", "Tracked")
+        p = self._make_presenter()
+        p.add_new_tab(req, save_state=True)
+        self.assertEqual(p._state_manager.get_open_tabs(), ["r1"])
+        p.close_tabs_for_request_ids(["r1"])
+        self.assertEqual(p._state_manager.get_open_tabs(), [])
+
     def test_restore_tabs_opens_saved_tabs(self):
         req = _make_request("r1", "Saved Request")
         p = self._make_presenter(requests=[req], open_tabs=["r1"])
