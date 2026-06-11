@@ -235,7 +235,6 @@ class EnvPresenter(QObject):
         is_valid, error_msg = validate_variable_name(name)
         if is_valid:
             self._metrics.track_variable_validation("valid")
-            logger.debug("variable_name_validation_attempt name=%s valid=True error=", name)
             return True, ""
 
         reason = validation_failure_reason(name)

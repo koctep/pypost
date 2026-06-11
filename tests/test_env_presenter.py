@@ -1,3 +1,4 @@
+import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -227,6 +228,21 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter([])
         p._on_mcp_status_changed(False)
         self.assertEqual(p.mcp_status_label.text(), "MCP: OFF")
+
+    def test_valid_variable_name_does_not_emit_debug_log(self):
+        p = self._make_presenter()
+        with self.assertNoLogs("pypost.ui.presenters.env_presenter", level=logging.DEBUG):
+            is_valid, _ = p._is_valid_variable_name("valid_name")
+        self.assertTrue(is_valid)
+
+    def test_invalid_variable_name_emits_debug_log(self):
+        p = self._make_presenter()
+        with self.assertLogs("pypost.ui.presenters.env_presenter", level=logging.DEBUG) as caplog:
+            is_valid, _ = p._is_valid_variable_name("1invalid")
+        self.assertFalse(is_valid)
+        self.assertEqual(len(caplog.records), 1)
+        self.assertIn("variable_name_validation_attempt", caplog.records[0].message)
+        self.assertIn("valid=False", caplog.records[0].message)
 
     def test_handle_variable_set_request_valid_name(self):
         """Test that valid variable names are accepted"""

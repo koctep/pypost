@@ -113,7 +113,9 @@ typically surfaces the empty-name path, not `invalid_chars`.
 
 ### Observability
 
-- **Logging**: DEBUG logs for validation attempts, INFO logs for successful variable setting
+- **Logging**: DEBUG logs for failed validation attempts only (reduces noise on the happy
+  path); INFO logs for successful variable setting. Prometheus metrics still count every
+  valid and invalid attempt.
 - **Metrics**:
   - `gui_variable_validation_total{result="valid|invalid"}` — tracks validation attempts
   - `gui_variable_validation_failures_total{reason="empty|starts_with_digit|invalid_chars"}`
