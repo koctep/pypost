@@ -102,27 +102,34 @@ class ResponseView(QWidget):
             flags |= QTextDocument.FindFlag.FindCaseSensitively
         return flags
 
-    def _find_next(self, source: str = "next") -> None:
+    def _search_text_or_clear(self) -> str | None:
         text = self.search_input.text()
         if not text:
             self.search_status_label.setText("")
-            return
-        self.body_view.find(text, self._search_flags(backward=False))
+            return None
+        return text
+
+    def _track_search_result(self, source: str) -> None:
         total = self._update_match_count()
         if self._metrics:
-            self._metrics.track_gui_response_search_action(source=source, has_matches=(total > 0))
+            self._metrics.track_gui_response_search_action(
+                source=source, has_matches=(total > 0)
+            )
         logger.debug("response_search_find source=%s matches=%d", source, total)
 
+    def _find_next(self, source: str = "next") -> None:
+        text = self._search_text_or_clear()
+        if text is None:
+            return
+        self.body_view.find(text, self._search_flags(backward=False))
+        self._track_search_result(source)
+
     def _find_previous(self, source: str = "previous") -> None:
-        text = self.search_input.text()
-        if not text:
-            self.search_status_label.setText("")
+        text = self._search_text_or_clear()
+        if text is None:
             return
         self.body_view.find(text, self._search_flags(backward=True))
-        total = self._update_match_count()
-        if self._metrics:
-            self._metrics.track_gui_response_search_action(source=source, has_matches=(total > 0))
-        logger.debug("response_search_find source=%s matches=%d", source, total)
+        self._track_search_result(source)
 
     def _is_large_document(self) -> bool:
         return len(self.body_view.toPlainText()) > LARGE_DOC_CHAR_THRESHOLD

@@ -28,12 +28,18 @@ Features:
 
 Finds the next occurrence of the search text from the current cursor position.
 
-- **source**: "next" (button), "enter" (Return key), or "typed" (text change)
-- Updates match counter and emits metrics.
+- **source**: "next" (button) or "enter" (Return key)
+- Delegates match counter, metrics, and debug logging to `_track_search_result`.
 
 ### `ResponseView._find_previous(source: str = "previous")`
 
-Finds the previous occurrence using `FindBackward` flag.
+Finds the previous occurrence using `FindBackward` flag. Uses the same
+`_search_text_or_clear` guard and `_track_search_result` helper as `_find_next`.
+
+### `ResponseView._track_search_result(source: str)`
+
+Updates the match counter, records `gui_response_search_actions_total`, and logs
+`response_search_find` at DEBUG. Shared by Next, Previous, and Enter navigation.
 
 ### `ResponseView._count_matches() -> tuple[int, bool]`
 
