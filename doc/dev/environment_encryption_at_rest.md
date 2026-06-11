@@ -258,6 +258,20 @@ JSON (`active_key_id`, `keys`). Vault KV v2 responses unwrap `data.data`.
 - Username `{key_id}`: historical Fernet key string
 - Missing `keyring` package or OS backend → source unavailable (chain continues)
 
+**Keyring packaging (desktop installs)**
+
+`keyring` is listed in `requirements.txt` for teams that use the OS credential store, but
+PyPost runs without it when encryption keys come from `environment` or `secret_store` only.
+Install explicitly when Settings primary/fallback includes `keyring`:
+
+```bash
+pip install keyring
+```
+
+Ensure the target OS credential backend is available (macOS Keychain, Windows Credential
+Locker, Secret Service on Linux). If `keyring` is missing or the backend is unavailable,
+the provider chain skips keyring and continues with configured fallbacks.
+
 ### Key rotation workflow
 
 Rotation does not change the envelope format. Each encrypted value stores a `kid` (sha256 prefix
