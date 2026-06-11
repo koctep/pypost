@@ -124,8 +124,7 @@ class CollectionsPresenter(QObject):
         expanded = self._state_manager.get_expanded_collections()
         for row in range(root.rowCount()):
             item = root.child(row)
-            data = item.data(Qt.UserRole)
-            if isinstance(data, str) and data in expanded:
+            if self._is_collection_item(item.index()) and item.data(Qt.UserRole) in expanded:
                 self._view.setExpanded(item.index(), True)
 
     def _on_collection_clicked(self, index) -> None:
@@ -170,20 +169,27 @@ class CollectionsPresenter(QObject):
                     return req_item
         return None
 
-    def _on_tree_expanded(self, index) -> None:
+    def _is_collection_item(self, index) -> bool:
+        """Return True when the tree index refers to a collection (not a request)."""
         item = self._model.itemFromIndex(index)
-        data = item.data(Qt.UserRole)
-        if isinstance(data, str):
-            current = self._state_manager.get_expanded_collections()
-            if data not in current:
-                current.append(data)
-                self._state_manager.set_expanded_collections(current)
+        if item is None:
+            return False
+        return isinstance(item.data(Qt.UserRole), str)
+
+    def _on_tree_expanded(self, index) -> None:
+        if not self._is_collection_item(index):
+            return
+        collection_id = self._model.itemFromIndex(index).data(Qt.UserRole)
+        current = self._state_manager.get_expanded_collections()
+        if collection_id not in current:
+            current.append(collection_id)
+            self._state_manager.set_expanded_collections(current)
 
     def _on_tree_collapsed(self, index) -> None:
-        item = self._model.itemFromIndex(index)
-        data = item.data(Qt.UserRole)
-        if isinstance(data, str):
-            current = self._state_manager.get_expanded_collections()
-            if data in current:
-                current.remove(data)
-                self._state_manager.set_expanded_collections(current)
+        if not self._is_collection_item(index):
+            return
+        collection_id = self._model.itemFromIndex(index).data(Qt.UserRole)
+        current = self._state_manager.get_expanded_collections()
+        if collection_id in current:
+            current.remove(collection_id)
+            self._state_manager.set_expanded_collections(current)

@@ -205,6 +205,21 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter.load_collections()
         self.assertIsNone(presenter._find_collection_item("missing", "collection"))
 
+    def test_is_collection_item_true_for_collection_index(self):
+        col = _make_collection("c1", "My API")
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        index = presenter.widget.model().item(0).index()
+        self.assertTrue(presenter._is_collection_item(index))
+
+    def test_is_collection_item_false_for_request_index(self):
+        req = _make_request("r1", "Get Users")
+        col = _make_collection("c1", "My API", [req])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        index = presenter.widget.model().item(0).child(0).index()
+        self.assertFalse(presenter._is_collection_item(index))
+
     def test_on_tree_expanded_updates_state(self):
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])

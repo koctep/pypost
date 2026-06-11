@@ -26,7 +26,7 @@ flowchart TB
 
 | Component | Role |
 |-----------|------|
-| `CollectionsPresenter` | Builds tree model, handles left-click open, expand state |
+| `CollectionsPresenter` | Builds tree model, left-click open, expand/collapse state |
 | `CollectionItemRenameDelegate` | Inline rename editor lifecycle |
 | `CollectionTreeActions` | Context menu, rename callbacks, delete with confirmation |
 | `collection_item_dialogs` | Shared QMessageBox helpers for rename/delete flows |
@@ -36,6 +36,16 @@ Wiring in `CollectionsPresenter.__init__`:
 
 - `setItemDelegate(CollectionItemRenameDelegate)` — commit/cancel callbacks to tree actions
 - `customContextMenuRequested` → `CollectionTreeActions.show_context_menu`
+
+## Expand/collapse state (`CollectionsPresenter`)
+
+Collection rows store a collection id (`str`) in `Qt.UserRole`; request rows store `RequestData`.
+`_is_collection_item(index)` centralizes that discrimination for:
+
+- `_on_tree_expanded` / `_on_tree_collapsed` — persist expanded collection ids in `StateManager`
+- `restore_tree_state` — re-expand saved collection nodes after model rebuild
+
+Request indices are ignored by expand/collapse persistence (unchanged behavior).
 
 ## API / Usage
 
