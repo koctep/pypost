@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QEventLoop, QTimer
-from PySide6.QtWidgets import QApplication, QWidget, QInputDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QWidget, QInputDialog
 
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
@@ -310,15 +310,17 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter([])
         shown = []
 
-        def capture_warning(*args, **kwargs):
-            shown.append(args)
-            return QMessageBox.StandardButton.Ok
+        def capture_warning(parent, message):
+            shown.append((parent, message))
 
-        with patch.object(QMessageBox, "warning", side_effect=capture_warning):
+        with patch(
+            "pypost.ui.presenters.env_presenter.show_mcp_server_start_failed",
+            side_effect=capture_warning,
+        ):
             p._on_mcp_start_failed("Port is busy")
         self.assertEqual(p.mcp_status_label.text(), "MCP: OFF")
         self.assertEqual(len(shown), 1)
-        self.assertIn("Port is busy", shown[0][2])
+        self.assertIn("Port is busy", shown[0][1])
 
     def test_valid_variable_name_does_not_emit_debug_log(self):
         p = self._make_presenter()
@@ -370,25 +372,23 @@ class TestEnvPresenter(unittest.TestCase):
         original_getText = QInputDialog.getText
         QInputDialog.getText = lambda *args, **kwargs: ("   ", True)  # spaces only
 
-        # Mock QMessageBox to capture the warning
-        original_warning = QMessageBox.warning
         warning_called = []
 
-        def mock_warning(*args, **kwargs):
-            warning_called.append(args)
+        def mock_warning(parent, error_msg):
+            warning_called.append(error_msg)
 
-        QMessageBox.warning = mock_warning
+        with patch(
+            "pypost.ui.presenters.env_presenter.show_invalid_variable_name_error",
+            side_effect=mock_warning,
+        ):
+            try:
+                p.handle_variable_set_request(None, "test_value")
+            finally:
+                QInputDialog.getText = original_getText
 
-        try:
-            p.handle_variable_set_request(None, "test_value")
-            # Should not have added the variable
-            self.assertNotIn("", env.variables)
-            # Should have shown warning
-            self.assertTrue(len(warning_called) > 0)
-            self.assertIn("Variable name cannot be empty.", warning_called[0][2])
-        finally:
-            QInputDialog.getText = original_getText
-            QMessageBox.warning = original_warning
+        self.assertNotIn("", env.variables)
+        self.assertTrue(len(warning_called) > 0)
+        self.assertIn("Variable name cannot be empty.", warning_called[0])
 
     def test_handle_variable_set_request_starts_with_digit(self):
         """Test that variable names starting with digit are rejected"""
@@ -404,25 +404,23 @@ class TestEnvPresenter(unittest.TestCase):
         original_getText = QInputDialog.getText
         QInputDialog.getText = lambda *args, **kwargs: ("1invalid", True)
 
-        # Mock QMessageBox to capture the warning
-        original_warning = QMessageBox.warning
         warning_called = []
 
-        def mock_warning(*args, **kwargs):
-            warning_called.append(args)
+        def mock_warning(parent, error_msg):
+            warning_called.append(error_msg)
 
-        QMessageBox.warning = mock_warning
+        with patch(
+            "pypost.ui.presenters.env_presenter.show_invalid_variable_name_error",
+            side_effect=mock_warning,
+        ):
+            try:
+                p.handle_variable_set_request(None, "test_value")
+            finally:
+                QInputDialog.getText = original_getText
 
-        try:
-            p.handle_variable_set_request(None, "test_value")
-            # Should not have added the variable
-            self.assertNotIn("1invalid", env.variables)
-            # Should have shown warning
-            self.assertTrue(len(warning_called) > 0)
-            self.assertIn("Variable name cannot start with a digit.", warning_called[0][2])
-        finally:
-            QInputDialog.getText = original_getText
-            QMessageBox.warning = original_warning
+        self.assertNotIn("1invalid", env.variables)
+        self.assertTrue(len(warning_called) > 0)
+        self.assertIn("Variable name cannot start with a digit.", warning_called[0])
 
     def test_handle_variable_set_request_invalid_chars(self):
         """Test that variable names with invalid characters are rejected"""
@@ -438,28 +436,26 @@ class TestEnvPresenter(unittest.TestCase):
         original_getText = QInputDialog.getText
         QInputDialog.getText = lambda *args, **kwargs: ("valid-name", True)  # hyphen is invalid
 
-        # Mock QMessageBox to capture the warning
-        original_warning = QMessageBox.warning
         warning_called = []
 
-        def mock_warning(*args, **kwargs):
-            warning_called.append(args)
+        def mock_warning(parent, error_msg):
+            warning_called.append(error_msg)
 
-        QMessageBox.warning = mock_warning
+        with patch(
+            "pypost.ui.presenters.env_presenter.show_invalid_variable_name_error",
+            side_effect=mock_warning,
+        ):
+            try:
+                p.handle_variable_set_request(None, "test_value")
+            finally:
+                QInputDialog.getText = original_getText
 
-        try:
-            p.handle_variable_set_request(None, "test_value")
-            # Should not have added the variable
-            self.assertNotIn("valid-name", env.variables)
-            # Should have shown warning
-            self.assertTrue(len(warning_called) > 0)
-            self.assertIn(
-                "Variable name can only contain letters, numbers, and underscores.",
-                warning_called[0][2],
-            )
-        finally:
-            QInputDialog.getText = original_getText
-            QMessageBox.warning = original_warning
+        self.assertNotIn("valid-name", env.variables)
+        self.assertTrue(len(warning_called) > 0)
+        self.assertIn(
+            "Variable name can only contain letters, numbers, and underscores.",
+            warning_called[0],
+        )
 
     def test_handle_variable_set_request_cancelled_dialog(self):
         """Test that cancelled dialog does nothing"""
@@ -526,17 +522,19 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter([])
         shown = []
 
-        def capture_warning(*args, **kwargs):
-            shown.append(args)
-            return QMessageBox.StandardButton.Ok
+        def capture_warning(parent, message):
+            shown.append((parent, message))
 
-        with patch.object(QMessageBox, "warning", side_effect=capture_warning):
+        with patch(
+            "pypost.ui.presenters.env_presenter.show_env_save_failed",
+            side_effect=capture_warning,
+        ):
             p._on_storage_save_failed(
                 EnvironmentEncryptionError("Encryption key is unavailable.")
             )
 
         self.assertEqual(len(shown), 1)
-        self.assertIn("Encryption key is unavailable.", shown[0][2])
+        self.assertIn("Encryption key is unavailable.", shown[0][1])
 
     def test_sync_save_used_when_encryption_disabled(self):
         env = _make_env("e1", "Dev", {"K": "V"})

@@ -7,7 +7,7 @@ pytestmark = pytest.mark.timeout(120)
 import unittest
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication
 
 from pypost.models.models import Collection
 from pypost.models.settings import AppSettings
@@ -91,7 +91,10 @@ class TestSaveFlowIntegration(unittest.TestCase):
         tab = self._active_tab(presenter)
         tab.request_editor.url_input.setText("https://blocked.example.com")
 
-        with patch.object(QMessageBox, "question", return_value=QMessageBox.No):
+        with patch(
+            "pypost.ui.request_save_orchestrator.confirm_overwrite_request",
+            return_value=False,
+        ):
             tab.request_editor.handle_save_request_shortcut()
 
         self.assertEqual(len(rm.saved), 0)

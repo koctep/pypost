@@ -116,3 +116,84 @@ def confirm_clear_history(parent: QWidget) -> bool:
         QMessageBox.No,
     )
     return reply == QMessageBox.Yes
+
+
+def show_env_save_failed(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, "Save Failed", message)
+
+
+def show_no_environment_selected(parent: QWidget) -> None:
+    QMessageBox.warning(
+        parent,
+        "No Environment",
+        "Please select an environment to set variables.",
+    )
+
+
+def show_invalid_variable_name_error(parent: QWidget, error_msg: str) -> None:
+    QMessageBox.warning(parent, "Invalid Variable Name", error_msg)
+
+
+def show_mcp_server_start_failed(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, "MCP Server Failed to Start", message)
+
+
+def show_metrics_server_start_failed(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, "Metrics Server Failed to Start", message)
+
+
+def show_save_request_name_required(parent: QWidget) -> None:
+    QMessageBox.warning(parent, "Error", "Please enter a request name")
+
+
+def show_save_collection_name_required(parent: QWidget) -> None:
+    QMessageBox.warning(parent, "Error", "Please enter a new collection name")
+
+
+def confirm_overwrite_request(parent: QWidget, message: str) -> bool:
+    reply = QMessageBox.question(
+        parent,
+        "Overwrite Request?",
+        message,
+        QMessageBox.Yes | QMessageBox.No,
+        QMessageBox.No,
+    )
+    return reply == QMessageBox.Yes
+
+
+def confirm_overwrite_newer_saved_version(parent: QWidget) -> bool:
+    reply = QMessageBox.question(
+        parent,
+        "Overwrite Newer Saved Version?",
+        (
+            "A newer version of this request was saved in another tab. "
+            "Saving now will replace it on disk. Continue?"
+        ),
+        QMessageBox.Yes | QMessageBox.No,
+        QMessageBox.No,
+    )
+    return reply == QMessageBox.Yes
+
+
+def show_migration_result(parent: QWidget, title: str, body: str, *, success: bool) -> None:
+    if success:
+        QMessageBox.information(parent, title, body)
+    else:
+        QMessageBox.warning(parent, title, body)
+
+
+def confirm_re_encrypt_environments(parent: QWidget) -> bool:
+    reply = QMessageBox.question(
+        parent,
+        "Re-encrypt all environments",
+        "This rewrites all encrypted hidden values under the current active key. "
+        "A timestamped backup of environments.json is created before writing.\n\n"
+        "Continue?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No,
+    )
+    return reply == QMessageBox.StandardButton.Yes
+
+
+def show_invalid_retryable_status_codes(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, "Invalid retryable status codes", message)

@@ -6,11 +6,14 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QVBoxLayout,
 )
 
 from pypost.models.models import Collection
+from pypost.ui.collection_item_dialogs import (
+    show_save_collection_name_required,
+    show_save_request_name_required,
+)
 
 
 class SaveRequestDialog(QDialog):
@@ -69,7 +72,7 @@ class SaveRequestDialog(QDialog):
     def validate_and_accept(self):
         name = self.name_input.text().strip()
         if not name:
-            QMessageBox.warning(self, "Error", "Please enter a request name")
+            show_save_request_name_required(self)
             return
 
         self.request_name = name
@@ -77,7 +80,7 @@ class SaveRequestDialog(QDialog):
         if self.collection_combo.currentIndex() == 0:
             new_col_name = self.new_col_input.text().strip()
             if not new_col_name:
-                QMessageBox.warning(self, "Error", "Please enter a new collection name")
+                show_save_collection_name_required(self)
                 return
             self.new_collection_name = new_col_name
             self.selected_collection_id = None  # Signal to create new

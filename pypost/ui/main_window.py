@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QMainWindow,
-    QMessageBox,
     QPushButton,
     QSplitter,
     QVBoxLayout,
@@ -25,6 +24,7 @@ from pypost.core.state_manager import StateManager
 from pypost.core.storage import StorageManager
 from pypost.core.style_manager import StyleManager
 from pypost.core.template_service import TemplateService
+from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
 
     def _on_metrics_start_failed(self, message: str) -> None:
         logger.error("metrics_server_start_failed_ui message=%s", message)
-        QMessageBox.warning(self, "Metrics Server Failed to Start", message)
+        show_metrics_server_start_failed(self, message)
 
     def handle_exit(self) -> None:
         logger.info("main_window_exit_requested")

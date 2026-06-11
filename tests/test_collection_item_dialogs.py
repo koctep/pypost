@@ -13,17 +13,28 @@ from pypost.ui.collection_item_dialogs import (
     confirm_clear_history,
     confirm_delete,
     confirm_delete_environment,
+    confirm_overwrite_newer_saved_version,
+    confirm_overwrite_request,
+    confirm_re_encrypt_environments,
     prompt_clean_sibling_tab_reload,
     prompt_dirty_sibling_tab_reload,
     show_copy_environment_duplicate_name_error,
     show_copy_environment_empty_name_error,
     show_delete_failure,
     show_delete_not_found,
+    show_env_save_failed,
+    show_invalid_retryable_status_codes,
+    show_invalid_variable_name_error,
+    show_mcp_server_start_failed,
+    show_metrics_server_start_failed,
+    show_migration_result,
     show_rename_empty_name_error,
     show_rename_failure,
     show_rename_not_found,
     show_request_error,
     show_request_failed_error,
+    show_save_collection_name_required,
+    show_save_request_name_required,
 )
 
 
@@ -150,6 +161,55 @@ class TestCollectionItemDialogs(unittest.TestCase):
     def test_confirm_clear_history_returns_false_on_no(self, mock_question):
         mock_question.return_value = QMessageBox.No
         self.assertFalse(confirm_clear_history(self.parent))
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox.warning")
+    def test_show_env_save_failed(self, mock_warning):
+        show_env_save_failed(self.parent, "disk full")
+        mock_warning.assert_called_once_with(self.parent, "Save Failed", "disk full")
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox.warning")
+    def test_show_invalid_variable_name_error(self, mock_warning):
+        show_invalid_variable_name_error(self.parent, "Name cannot be empty.")
+        mock_warning.assert_called_once_with(
+            self.parent,
+            "Invalid Variable Name",
+            "Name cannot be empty.",
+        )
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox.question")
+    def test_confirm_overwrite_request_returns_true_on_yes(self, mock_question):
+        mock_question.return_value = QMessageBox.Yes
+        self.assertTrue(confirm_overwrite_request(self.parent, "Overwrite?"))
+        self.assertIn("Overwrite?", mock_question.call_args.args[2])
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox.question")
+    def test_confirm_overwrite_newer_saved_version_returns_false_on_no(self, mock_question):
+        mock_question.return_value = QMessageBox.No
+        self.assertFalse(confirm_overwrite_newer_saved_version(self.parent))
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox.information")
+    def test_show_migration_result_success(self, mock_info):
+        show_migration_result(self.parent, "Title", "body", success=True)
+        mock_info.assert_called_once_with(self.parent, "Title", "body")
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox.warning")
+    def test_show_migration_result_failure(self, mock_warning):
+        show_migration_result(self.parent, "Title", "body", success=False)
+        mock_warning.assert_called_once_with(self.parent, "Title", "body")
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox.question")
+    def test_confirm_re_encrypt_environments_returns_true_on_yes(self, mock_question):
+        mock_question.return_value = QMessageBox.StandardButton.Yes
+        self.assertTrue(confirm_re_encrypt_environments(self.parent))
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox.warning")
+    def test_show_save_request_name_required(self, mock_warning):
+        show_save_request_name_required(self.parent)
+        mock_warning.assert_called_once_with(
+            self.parent,
+            "Error",
+            "Please enter a request name",
+        )
 
 
 if __name__ == "__main__":

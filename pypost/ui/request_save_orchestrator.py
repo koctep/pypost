@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum, auto
 
-from PySide6.QtWidgets import QMessageBox, QWidget
+from PySide6.QtWidgets import QWidget
 
 from pypost.core.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
@@ -15,6 +15,10 @@ from pypost.core.request_sync import persisted_fields_equal, snapshot_persisted_
 from pypost.core.state_manager import StateManager
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
+from pypost.ui.collection_item_dialogs import (
+    confirm_overwrite_newer_saved_version,
+    confirm_overwrite_request,
+)
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 
 logger = logging.getLogger(__name__)
@@ -132,14 +136,7 @@ class RequestSaveOrchestrator:
                     "A newer version of this request exists on disk. "
                     f"This will overwrite '{existing_request.name}'. Continue?"
                 )
-            reply = QMessageBox.question(
-                parent,
-                "Overwrite Request?",
-                message,
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            if reply == QMessageBox.No:
+            if not confirm_overwrite_request(parent, message):
                 logger.info("save_request_overwrite_cancelled request_id=%s", request_data.id)
                 return SaveResult(SaveAction.CANCELLED)
 
@@ -217,14 +214,4 @@ class RequestSaveOrchestrator:
             return True
         if not stale_context.stale_persisted:
             return True
-        reply = QMessageBox.question(
-            parent,
-            "Overwrite Newer Saved Version?",
-            (
-                "A newer version of this request was saved in another tab. "
-                "Saving now will replace it on disk. Continue?"
-            ),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
-        return reply == QMessageBox.Yes
+        return confirm_overwrite_newer_saved_version(parent)

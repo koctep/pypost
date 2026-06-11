@@ -8,7 +8,7 @@ pytestmark = pytest.mark.timeout(120)
 from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication
 
 from pypost.core.encryption_migration import MigrationReport, ReencryptStats
 from pypost.core.storage import StorageManager
@@ -67,8 +67,8 @@ class TestSettingsDialogEncryptionMigration:
         finally:
             dlg.close()
 
-    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.information")
-    def test_verify_delegates_to_migration_service(self, mock_info, qapp):
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    def test_verify_delegates_to_migration_service(self, mock_show, qapp):
         storage = MagicMock(spec=StorageManager)
         dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
         service = dlg._migration_service
@@ -81,12 +81,15 @@ class TestSettingsDialogEncryptionMigration:
         service.verify_decrypt_access.assert_called_once()
         settings_arg = service.verify_decrypt_access.call_args[0][0]
         assert settings_arg.env_encryption_enabled is True
-        mock_info.assert_called_once()
+        mock_show.assert_called_once()
+        assert mock_show.call_args.kwargs["success"] is True
 
-    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.question")
-    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.information")
-    def test_reencrypt_skipped_when_not_confirmed(self, mock_info, mock_question, qapp):
-        mock_question.return_value = QMessageBox.StandardButton.No
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    @patch(
+        "pypost.ui.dialogs.settings_dialog.confirm_re_encrypt_environments",
+        return_value=False,
+    )
+    def test_reencrypt_skipped_when_not_confirmed(self, mock_confirm, mock_show, qapp):
         storage = MagicMock(spec=StorageManager)
         dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
         service = dlg._migration_service
@@ -97,12 +100,14 @@ class TestSettingsDialogEncryptionMigration:
             dlg.close()
 
         service.bulk_re_encrypt.assert_not_called()
-        mock_info.assert_not_called()
+        mock_show.assert_not_called()
 
-    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.question")
-    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.information")
-    def test_reencrypt_runs_when_confirmed(self, mock_info, mock_question, qapp):
-        mock_question.return_value = QMessageBox.StandardButton.Yes
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    @patch(
+        "pypost.ui.dialogs.settings_dialog.confirm_re_encrypt_environments",
+        return_value=True,
+    )
+    def test_reencrypt_runs_when_confirmed(self, mock_confirm, mock_show, qapp):
         storage = MagicMock(spec=StorageManager)
         dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
         service = dlg._migration_service
@@ -115,12 +120,14 @@ class TestSettingsDialogEncryptionMigration:
         service.bulk_re_encrypt.assert_called_once()
         call_kwargs = service.bulk_re_encrypt.call_args.kwargs
         assert call_kwargs["backup"] is True
-        mock_info.assert_called_once()
+        mock_show.assert_called_once()
 
-    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.question")
-    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.information")
-    def test_reencrypt_shows_reencrypt_stats(self, mock_info, mock_question, qapp):
-        mock_question.return_value = QMessageBox.StandardButton.Yes
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    @patch(
+        "pypost.ui.dialogs.settings_dialog.confirm_re_encrypt_environments",
+        return_value=True,
+    )
+    def test_reencrypt_shows_reencrypt_stats(self, mock_confirm, mock_show, qapp):
         storage = MagicMock(spec=StorageManager)
         dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
         service = dlg._migration_service
@@ -134,13 +141,13 @@ class TestSettingsDialogEncryptionMigration:
         finally:
             dlg.close()
 
-        mock_info.assert_called_once()
-        body = mock_info.call_args[0][2]
+        mock_show.assert_called_once()
+        body = mock_show.call_args[0][2]
         assert "Re-encrypted: 2" in body
         assert "Reused: 1" in body
 
-    @patch("pypost.ui.dialogs.settings_dialog.QMessageBox.warning")
-    def test_verify_shows_warning_on_failure(self, mock_warning, qapp):
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    def test_verify_shows_warning_on_failure(self, mock_show, qapp):
         storage = MagicMock(spec=StorageManager)
         dlg = SettingsDialog(AppSettings(), storage=storage)
         dlg._migration_service.verify_decrypt_access = MagicMock(
@@ -151,4 +158,5 @@ class TestSettingsDialogEncryptionMigration:
         finally:
             dlg.close()
 
-        mock_warning.assert_called_once()
+        mock_show.assert_called_once()
+        assert mock_show.call_args.kwargs["success"] is False

@@ -5,7 +5,7 @@ pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication
 
 from pypost.models.models import Collection, RequestData
 
@@ -181,7 +181,10 @@ class TestRequestSaveOrchestrator(unittest.TestCase):
         orchestrator = RequestSaveOrchestrator(rm, FakeStateManager(), settings)
 
         parent = MagicMock()
-        with patch.object(QMessageBox, "question", return_value=QMessageBox.No):
+        with patch(
+            "pypost.ui.request_save_orchestrator.confirm_overwrite_request",
+            return_value=False,
+        ):
             result = orchestrator.save_request(req, parent)
 
         self.assertEqual(result.action, SaveAction.CANCELLED)
@@ -224,7 +227,10 @@ class TestRequestSaveOrchestrator(unittest.TestCase):
             stale_persisted=True,
         )
         parent = MagicMock()
-        with patch.object(QMessageBox, "question", return_value=QMessageBox.No):
+        with patch(
+            "pypost.ui.request_save_orchestrator.confirm_overwrite_newer_saved_version",
+            return_value=False,
+        ):
             result = orchestrator.save_request(req, parent, stale_context=stale)
 
         self.assertEqual(result.action, SaveAction.CANCELLED)

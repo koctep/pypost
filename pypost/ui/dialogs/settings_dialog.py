@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -30,6 +29,11 @@ from pypost.models.retry import (
     parse_retryable_status_codes,
 )
 from pypost.models.settings import AppSettings
+from pypost.ui.collection_item_dialogs import (
+    confirm_re_encrypt_environments,
+    show_invalid_retryable_status_codes,
+    show_migration_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -320,10 +324,7 @@ class SettingsDialog(QDialog):
 
     def _show_migration_result(self, title: str, report: MigrationReport) -> None:
         body = _format_migration_report(report)
-        if report.success:
-            QMessageBox.information(self, title, body)
-        else:
-            QMessageBox.warning(self, title, body)
+        show_migration_result(self, title, body, success=report.success)
 
     def _on_verify_encryption(self) -> None:
         if self._migration_service is None:
@@ -341,16 +342,7 @@ class SettingsDialog(QDialog):
     def _on_re_encrypt_environments(self) -> None:
         if self._migration_service is None:
             return
-        confirm = QMessageBox.question(
-            self,
-            "Re-encrypt all environments",
-            "This rewrites all encrypted hidden values under the current active key. "
-            "A timestamped backup of environments.json is created before writing.\n\n"
-            "Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if confirm != QMessageBox.StandardButton.Yes:
+        if not confirm_re_encrypt_environments(self):
             logger.info("settings_encryption_reencrypt_cancelled")
             return
         settings = self._encryption_settings_from_form()
@@ -382,11 +374,7 @@ class SettingsDialog(QDialog):
                 "retryable_codes_settings_validation_failed reason=%s",
                 parsed_codes.reason,
             )
-            QMessageBox.warning(
-                self,
-                "Invalid retryable status codes",
-                parsed_codes.message,
-            )
+            show_invalid_retryable_status_codes(self, parsed_codes.message)
             return
         retry_policy = RetryPolicy(
             max_retries=self.max_retries_spin.value(),

@@ -7,7 +7,7 @@ pytestmark = pytest.mark.timeout(120)
 
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication, QMessageBox, QInputDialog
+from PySide6.QtWidgets import QApplication, QInputDialog
 
 from pypost.models.models import Environment
 from pypost.ui.presenters.env_presenter import EnvPresenter
@@ -66,13 +66,15 @@ class TestNewVariableFlowIntegration:
 
         with (
             patch.object(QInputDialog, "getText", return_value=("1bad", True)),
-            patch.object(QMessageBox, "warning") as mock_warning,
+            patch(
+                "pypost.ui.presenters.env_presenter.show_invalid_variable_name_error",
+            ) as mock_warning,
         ):
             view.variable_set_requested.emit(None, "value")
 
         assert "1bad" not in env.variables
         mock_warning.assert_called_once()
-        assert "digit" in mock_warning.call_args[0][2]
+        assert "digit" in mock_warning.call_args[0][1]
 
     def test_new_variable_menu_path_uses_none_key(self, qapp):
         """Context menu 'New Variable...' emits key=None (PYPOST-480 contract)."""

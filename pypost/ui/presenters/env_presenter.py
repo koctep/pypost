@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QMessageBox,
     QPushButton,
     QWidget,
 )
@@ -25,6 +24,12 @@ from pypost.core.variable_name_validation import (
 )
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
+from pypost.ui.collection_item_dialogs import (
+    show_env_save_failed,
+    show_invalid_variable_name_error,
+    show_mcp_server_start_failed,
+    show_no_environment_selected,
+)
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.dialogs.mcp_activity_dialog import McpActivityDialog
 from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
@@ -214,7 +219,7 @@ class EnvPresenter(QObject):
     def _on_storage_save_failed(self, error: object) -> None:
         message = str(error) if error else "Failed to save environments."
         logger.error("storage_save_failed error=%s", message)
-        QMessageBox.warning(self._widget, "Save Failed", message)
+        show_env_save_failed(self._widget, message)
 
     def on_env_update(self, vars: dict) -> None:
         """Merges post-request variable updates into current env."""
@@ -235,11 +240,7 @@ class EnvPresenter(QObject):
         selected = self._env_selector.currentData()
         if not isinstance(selected, Environment):
             logger.warning("variable_set_request_no_env_selected")
-            QMessageBox.warning(
-                self._widget,
-                "No Environment",
-                "Please select an environment to set variables.",
-            )
+            show_no_environment_selected(self._widget)
             return
 
         target_key = key
@@ -249,7 +250,7 @@ class EnvPresenter(QObject):
                 target_key = text.strip()
                 is_valid, error_msg = self._is_valid_variable_name(target_key)
                 if not is_valid:
-                    QMessageBox.warning(self._widget, "Invalid Variable Name", error_msg)
+                    show_invalid_variable_name_error(self._widget, error_msg)
                     return
             else:
                 return
@@ -359,7 +360,7 @@ class EnvPresenter(QObject):
         logger.error("mcp_server_start_failed_ui message=%s", message)
         self._mcp_status_label.setText("MCP: OFF")
         self._mcp_status_label.setStyleSheet("color: gray;")
-        QMessageBox.warning(self._widget, "MCP Server Failed to Start", message)
+        show_mcp_server_start_failed(self._widget, message)
 
     def _open_mcp_tools_overview(self) -> None:
         entries = collect_mcp_tool_overview(self._get_collections())

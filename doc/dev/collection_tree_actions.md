@@ -96,6 +96,21 @@ and delete, plus tab, environment, and history flows (PYPOST-539):
 | `show_copy_environment_empty_name_error(parent)` | Environment copy with empty name |
 | `show_copy_environment_duplicate_name_error(parent, name)` | Environment copy duplicate name |
 | `confirm_clear_history(parent)` | History panel clear-all (Yes/No) |
+| `show_env_save_failed(parent, message)` | Environment storage save failure |
+| `show_no_environment_selected(parent)` | Variable set with no environment selected |
+| `show_invalid_variable_name_error(parent, error_msg)` | Variable name validation error |
+| `show_mcp_server_start_failed(parent, message)` | MCP server startup failure |
+| `show_metrics_server_start_failed(parent, message)` | Metrics server startup failure |
+| `show_save_request_name_required(parent)` | Save dialog empty request name |
+| `show_save_collection_name_required(parent)` | Save dialog empty new collection name |
+| `confirm_overwrite_request(parent, message)` | Overwrite existing saved request (Yes/No) |
+| `confirm_overwrite_newer_saved_version(parent)` | Overwrite newer disk version (Yes/No) |
+| `show_migration_result(parent, title, body, success=…)` | Settings encryption migration outcome |
+| `confirm_re_encrypt_environments(parent)` | Settings re-encrypt confirmation (Yes/No) |
+| `show_invalid_retryable_status_codes(parent, message)` | Settings retry policy validation |
+
+PYPOST-539 added tab, environment dialog, and history helpers; PYPOST-547 added env presenter,
+main window, save dialog, save orchestrator, and settings dialog helpers.
 
 ### Callbacks (constructor)
 
