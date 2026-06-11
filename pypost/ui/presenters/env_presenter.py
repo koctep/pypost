@@ -213,13 +213,6 @@ class EnvPresenter(QObject):
             text, ok = QInputDialog.getText(self._widget, "New Variable", "Enter variable name:")
             if ok and text:
                 target_key = text.strip()
-                if not target_key:
-                    QMessageBox.warning(
-                        self._widget, "Invalid Name", "Variable name cannot be empty."
-                    )
-                    return
-
-                # Validate variable name for Jinja2 compatibility
                 is_valid, error_msg = self._is_valid_variable_name(target_key)
                 if not is_valid:
                     QMessageBox.warning(self._widget, "Invalid Variable Name", error_msg)

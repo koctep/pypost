@@ -82,8 +82,8 @@ whitespace.
 | Layer | Whitespace handling | Empty check |
 | --- | --- | --- |
 | Core (`variable_name_validation.py`) | No strip; `" "` / `"\t"` → `invalid_chars` | Only `""` → `empty` |
-| ResponseView (`EnvPresenter`) | `text.strip()` before validation | Stripped empty → UI empty warning |
-| Manage Environments (`environment_ops`) | Caller strips before validation | Stripped empty → separate message |
+| ResponseView (`EnvPresenter`) | `text.strip()` before validation | Stripped empty → core `empty` message via `_is_valid_variable_name` |
+| Manage Environments (`environment_ops`) | Caller strips before validation | Uses `validate_environment_variable_name` return value |
 
 Boundary tests pass whitespace-only strings directly into the core module to document
 validator semantics. End-user dialogs strip input first, so a whitespace-only dialog entry
@@ -106,11 +106,10 @@ typically surfaces the empty-name path, not `invalid_chars`.
 
 1. User right-clicks in ResponseView → Context Menu → "Set Variable" → "New Variable..."
 2. QInputDialog prompts for variable name
-3. On OK, the name is stripped and validated:
-   - Empty check (existing)
-   - Character validation (new)
-4. If valid: Variable is created in current environment
-5. If invalid: QMessageBox shows error, operation aborted
+3. On OK, the name is stripped and validated via `_is_valid_variable_name` (all rules,
+   including empty after strip).
+4. If valid: Variable is created in current environment.
+5. If invalid: QMessageBox shows the validator's `error_msg` (single source of truth).
 
 ### Observability
 
