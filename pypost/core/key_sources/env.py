@@ -6,6 +6,7 @@ from pathlib import Path
 from pypost.core.encryption_key import EncryptionKey, build_key_id
 from pypost.core.key_sources.file_cache import MtimeFileCache
 from pypost.core.key_sources.registry import KeyRegistry
+from pypost.core.key_sources.registry_validation import filter_valid_registry_keys
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,11 @@ class EnvKeySource:
         if not active_key_id or not isinstance(keys, dict) or not keys:
             logger.debug("env_keys_file_invalid path=%s", path)
             return None
-        return KeyRegistry(active_key_id=active_key_id, keys=keys)
+        valid_keys = filter_valid_registry_keys(keys, context="env_keys_file")
+        if active_key_id not in valid_keys:
+            logger.debug("env_keys_file_active_key_invalid path=%s", path)
+            return None
+        return KeyRegistry(active_key_id=str(active_key_id), keys=valid_keys)
 
     def _load_registry(self) -> KeyRegistry | None:
         path_value = os.getenv(self.KEYS_FILE, "").strip()

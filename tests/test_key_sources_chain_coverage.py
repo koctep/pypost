@@ -97,6 +97,18 @@ def test_env_key_source_malformed_keys_file_returns_none(monkeypatch, tmp_path):
     assert EnvKeySource().try_resolve_active() is None
 
 
+def test_env_key_source_rejects_invalid_fernet_material(monkeypatch, tmp_path):
+    pytest.importorskip("cryptography.fernet")
+    bad_path = tmp_path / "keys.json"
+    bad_path.write_text(
+        json.dumps({"active_key_id": "kid1", "keys": {"kid1": "not-a-fernet-key"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(EnvKeySource.KEYS_FILE, str(bad_path))
+    monkeypatch.delenv(EnvKeySource.ENV_KEY, raising=False)
+    assert EnvKeySource().try_resolve_active() is None
+
+
 def test_env_key_source_empty_registry_returns_none(monkeypatch, tmp_path):
     empty_path = tmp_path / "keys.json"
     empty_path.write_text(json.dumps({"active_key_id": "", "keys": {}}), encoding="utf-8")

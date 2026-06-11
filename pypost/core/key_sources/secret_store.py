@@ -9,6 +9,7 @@ import requests
 from pypost.core.encryption_key import EncryptionKey
 from pypost.core.key_sources.file_cache import MtimeFileCache
 from pypost.core.key_sources.registry import KeyRegistry
+from pypost.core.key_sources.registry_validation import filter_valid_registry_keys
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,10 @@ def _registry_from_dict(data: dict[str, Any]) -> KeyRegistry | None:
     keys = data.get("keys", {})
     if not active_key_id or not isinstance(keys, dict) or not keys:
         return None
-    return KeyRegistry(active_key_id=str(active_key_id), keys=keys)
+    valid_keys = filter_valid_registry_keys(keys, context="secret_store_registry")
+    if str(active_key_id) not in valid_keys:
+        return None
+    return KeyRegistry(active_key_id=str(active_key_id), keys=valid_keys)
 
 
 def _registry_from_vault_payload(payload: dict[str, Any]) -> KeyRegistry | None:
