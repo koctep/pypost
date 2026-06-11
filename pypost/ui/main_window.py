@@ -223,7 +223,7 @@ class MainWindow(QMainWindow):
         self.env.apply_settings(settings)
 
     def open_settings(self) -> None:
-        dialog = SettingsDialog(self.settings, self)
+        dialog = SettingsDialog(self.settings, self, storage=self.storage)
         if not dialog.exec():
             return
         new_settings = dialog.get_settings()

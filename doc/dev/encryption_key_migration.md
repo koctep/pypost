@@ -17,6 +17,7 @@ staged rollout, scenario procedures, CLI usage, and failure playbooks.
 flowchart TD
   subgraph operator [Operator surfaces]
     CLI[scripts/encryption_migrate.py]
+    UI[SettingsDialog migration actions]
     DOC[doc/dev/encryption_key_migration.md]
   end
 
@@ -36,6 +37,7 @@ flowchart TD
   end
 
   CLI --> EMS
+  UI --> EMS
   EMS --> INV
   EMS --> REP
   EMS -->|"load_environments_with_errors()"| SM
@@ -50,6 +52,7 @@ flowchart TD
 | --- | --- | --- |
 | Migration service | `pypost/core/encryption_migration.py` | Verify, inventory, bulk re-encrypt, encrypt-plaintext |
 | Operator CLI | `scripts/encryption_migrate.py` | Headless subcommands; loads `AppSettings` via `ConfigManager` |
+| Settings UI | `pypost/ui/dialogs/settings_dialog.py` | Verify encryption; re-encrypt all (with confirmation) |
 | Inventory | `EnvironmentInventory` | Per-env and aggregate `kid`/plaintext stats |
 | Report | `MigrationReport` | Structured outcome: counts, errors, dry-run, backup path |
 | Storage | `pypost/core/storage.py` | Atomic I/O; migration uses `load_environments_with_errors()` |
@@ -99,7 +102,7 @@ Before promoting to the next stage:
 | **M4** | Enable encryption on plaintext hidden values | Enable in Settings; `encrypt-plaintext` |
 | **M5** | Change fallback order only | Update Settings; `verify`; no bulk rewrite |
 | **M6** | Rotate active key | Update registry per [rotation workflow](environment_encryption_at_rest.md#key-rotation-workflow); `verify` |
-| **M7** | Bulk re-encrypt under active key | `re-encrypt` (backup is default) |
+| **M7** | Bulk re-encrypt under active key | `re-encrypt` (backup is default) or Settings → **Re-encrypt all environments** |
 | **M8** | Retire historical key material | Only after M7 confirms no envelopes reference retired `kid` |
 
 ### M3 — Change primary key source (cutover)
@@ -135,7 +138,20 @@ until re-encrypted.
 6. Confirm `kid_histogram` shows a single active `kid`.
 7. Remove retired keys from registry (M8).
 
-## Operator CLI
+## Operator surfaces
+
+### Settings (desktop)
+
+Open **Settings** from the main window. Under **Encryption migration**:
+
+- **Verify encryption** — read-only decrypt check using encryption fields currently shown in the
+  form (saved or not). Results appear in an information or warning dialog.
+- **Re-encrypt all environments** — asks for confirmation, creates a timestamped backup, then
+  bulk re-encrypts under the active key. Same safety properties as the CLI `re-encrypt` command.
+
+`encrypt-plaintext` and dry-run are CLI-only.
+
+### Operator CLI
 
 Run from the repository root (or any environment where PyPost dependencies and data dir are
 available). The CLI loads `AppSettings` via `ConfigManager` and respects `PYPOST_ENV_ENCRYPTION_*`

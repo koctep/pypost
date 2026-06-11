@@ -10,10 +10,12 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPushButton,
     QSpinBox,
     QVBoxLayout,
 )
 
+from pypost.core.encryption_migration import EncryptionMigrationService, MigrationReport
 from pypost.core.key_source_constants import (
     KEY_SOURCE_ENVIRONMENT,
     KEY_SOURCE_KEYRING,
@@ -21,6 +23,7 @@ from pypost.core.key_source_constants import (
     find_fallback_parse_issues,
     parse_key_source_fallback,
 )
+from pypost.core.storage import StorageManager
 from pypost.models.retry import (
     RetryableCodesValidationFailure,
     RetryPolicy,
@@ -43,6 +46,31 @@ def _make_section_header(title: str) -> QLabel:
     return label
 
 
+def _format_migration_report(report: MigrationReport) -> str:
+    inv = report.inventory
+    lines = [
+        f"Environments: {inv.environment_count}",
+        f"Hidden values: {inv.hidden_value_count}",
+        f"Encrypted envelopes: {inv.encrypted_envelope_count}",
+        f"Plaintext hidden: {inv.plaintext_hidden_count}",
+    ]
+    if inv.kid_histogram:
+        lines.append("Key IDs:")
+        for kid, count in sorted(inv.kid_histogram.items()):
+            lines.append(f"  {kid}: {count}")
+    if inv.missing_kids:
+        lines.append("Missing key IDs:")
+        for kid in sorted(inv.missing_kids):
+            lines.append(f"  {kid}")
+    if report.backup_path is not None:
+        lines.append(f"Backup: {report.backup_path}")
+    if report.errors:
+        lines.append("")
+        lines.append("Errors:")
+        lines.extend(f"  {error}" for error in report.errors)
+    return "\n".join(lines)
+
+
 KEY_SOURCE_HELP = {
     KEY_SOURCE_ENVIRONMENT: (
         "Store the Fernet key in PYPOST_ENV_ENCRYPTION_KEY (shell or service env). "
@@ -60,12 +88,22 @@ KEY_SOURCE_HELP = {
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, current_settings: AppSettings, parent=None):
+    def __init__(
+        self,
+        current_settings: AppSettings,
+        parent=None,
+        *,
+        storage: StorageManager | None = None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.resize(400, 400)
         self.current_settings = current_settings
         self.new_settings = None
+        self._storage = storage
+        self._migration_service = (
+            EncryptionMigrationService(storage) if storage is not None else None
+        )
 
         self.layout = QVBoxLayout(self)
 
@@ -163,6 +201,17 @@ class SettingsDialog(QDialog):
         )
         self._update_encryption_key_source_help()
 
+        self.encryption_migration_section_label = _make_section_header(
+            "Encryption migration",
+        )
+        self.verify_encryption_btn = QPushButton("Verify encryption")
+        self.verify_encryption_btn.clicked.connect(self._on_verify_encryption)
+        self.reencrypt_environments_btn = QPushButton("Re-encrypt all environments")
+        self.reencrypt_environments_btn.clicked.connect(self._on_re_encrypt_environments)
+        migration_enabled = self._migration_service is not None
+        self.verify_encryption_btn.setEnabled(migration_enabled)
+        self.reencrypt_environments_btn.setEnabled(migration_enabled)
+
         # Retry policy defaults
         default_policy = RetryPolicy()
         current_policy = current_settings.default_retry_policy or default_policy
@@ -221,6 +270,9 @@ class SettingsDialog(QDialog):
         )
         self.form_layout.addRow("", self.env_encryption_fallback_warning_label)
         self.form_layout.addRow("", self.env_encryption_help_label)
+        self.form_layout.addRow(self.encryption_migration_section_label)
+        self.form_layout.addRow("", self.verify_encryption_btn)
+        self.form_layout.addRow("", self.reencrypt_environments_btn)
         self.form_layout.addRow("Max Retries (0 = disabled):", self.max_retries_spin)
         self.form_layout.addRow("Retry Delay (seconds):", self.retry_delay_spin)
         self.form_layout.addRow("Retry Backoff Multiplier:", self.retry_backoff_spin)
@@ -242,6 +294,70 @@ class SettingsDialog(QDialog):
         source = self.env_encryption_key_source_combo.currentData()
         help_text = KEY_SOURCE_HELP.get(source, KEY_SOURCE_HELP[KEY_SOURCE_ENVIRONMENT])
         self.env_encryption_help_label.setText(help_text)
+
+    def _encryption_settings_from_form(self) -> AppSettings:
+        encryption_mode = self.env_encryption_mode_combo.currentData()
+        if encryption_mode == ENCRYPTION_MODE_ENABLED:
+            env_encryption_enabled = True
+        elif encryption_mode == ENCRYPTION_MODE_DISABLED:
+            env_encryption_enabled = False
+        else:
+            env_encryption_enabled = None
+        return self.current_settings.model_copy(
+            update={
+                "env_encryption_enabled": env_encryption_enabled,
+                "env_encryption_key_source": self.env_encryption_key_source_combo.currentData(),
+                "env_encryption_key_source_fallback": parse_key_source_fallback(
+                    self.env_encryption_key_source_fallback_edit.text(),
+                ),
+            },
+        )
+
+    def _show_migration_result(self, title: str, report: MigrationReport) -> None:
+        body = _format_migration_report(report)
+        if report.success:
+            QMessageBox.information(self, title, body)
+        else:
+            QMessageBox.warning(self, title, body)
+
+    def _on_verify_encryption(self) -> None:
+        if self._migration_service is None:
+            return
+        settings = self._encryption_settings_from_form()
+        logger.info("settings_encryption_verify_started")
+        report = self._migration_service.verify_decrypt_access(settings)
+        logger.info(
+            "settings_encryption_verify_completed success=%s error_count=%d",
+            report.success,
+            len(report.errors),
+        )
+        self._show_migration_result("Verify encryption", report)
+
+    def _on_re_encrypt_environments(self) -> None:
+        if self._migration_service is None:
+            return
+        confirm = QMessageBox.question(
+            self,
+            "Re-encrypt all environments",
+            "This rewrites all encrypted hidden values under the current active key. "
+            "A timestamped backup of environments.json is created before writing.\n\n"
+            "Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            logger.info("settings_encryption_reencrypt_cancelled")
+            return
+        settings = self._encryption_settings_from_form()
+        logger.info("settings_encryption_reencrypt_started")
+        report = self._migration_service.bulk_re_encrypt(settings, backup=True)
+        logger.info(
+            "settings_encryption_reencrypt_completed success=%s backup=%s error_count=%d",
+            report.success,
+            report.backup_path,
+            len(report.errors),
+        )
+        self._show_migration_result("Re-encrypt all environments", report)
 
     def _update_fallback_warning(self) -> None:
         issues = find_fallback_parse_issues(
