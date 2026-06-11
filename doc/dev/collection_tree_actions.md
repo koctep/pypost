@@ -125,6 +125,20 @@ Patch `QMenu` under `pypost.ui.presenters.collection_tree_actions`. Patch dialog
 import site. Unit tests for helpers live in `tests/test_collection_item_dialogs.py`.
 Related presenter tests remain in `tests/test_collections_presenter.py`.
 
+### Tree expand/collapse state tests (PYPOST-388)
+
+| Test | Behavior |
+|------|----------|
+| `test_on_tree_expanded_updates_state` | Expand adds collection id to `StateManager` |
+| `test_on_tree_collapsed_updates_state` | Collapse removes collection id |
+| `test_restore_tree_state_expands_known_ids` | `restore_tree_state` expands saved ids |
+| `test_tree_expansion_saved_and_restored_after_reload` | Round-trip after `load_collections` |
+| `test_restore_tree_state_skips_stale_saved_collection_ids` | Stale ids ignored (PYPOST-389) |
+| `test_restore_tree_state_expands_only_collections_in_saved_list` | Subset expansion (PYPOST-391) |
+
+`tests/test_settings_persistence.py` (`TestStateManagerPersistence`) covers disk persistence
+of `expanded_collections` via real `StateManager` + `ConfigManager`.
+
 ## Troubleshooting
 
 ### Context menu tests fail after moving imports

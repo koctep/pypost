@@ -132,6 +132,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         rm.reload_collections.assert_called_once()
 
     def test_restore_tree_state_expands_known_ids(self):
+        """PYPOST-388: restore_tree_state expands ids from StateManager."""
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
         presenter._state_manager._expanded = ["c1"]
@@ -221,6 +222,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertFalse(presenter._is_collection_item(index))
 
     def test_on_tree_expanded_updates_state(self):
+        """PYPOST-388: expand signal adds collection id to StateManager."""
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
         presenter.load_collections()
@@ -230,6 +232,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertIn("c1", presenter._state_manager.get_expanded_collections())
 
     def test_on_tree_collapsed_updates_state(self):
+        """PYPOST-388: collapse signal removes collection id from StateManager."""
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
         presenter._state_manager._expanded = ["c1"]
@@ -294,7 +297,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertEqual(received[0], ("r1", "New Name"))
 
     def test_tree_expansion_saved_and_restored_after_reload(self):
-        """PYPOST-92: expand → persisted → load_collections → restore → UI expanded."""
+        """PYPOST-388/PYPOST-92: expand → persist → reload → restore → UI expanded."""
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
         presenter.load_collections()

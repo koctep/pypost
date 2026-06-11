@@ -19,7 +19,8 @@ Addressed in PYPOST-14 by implementing `StateManager`.
 
 ## Missing Tests
 
-- Unit tests for tree state save/restore logic are missing. Testing was done manually. — [PYPOST-388](https://pypost.atlassian.net/browse/PYPOST-388)
+- **[FIXED] Unit tests for tree state save/restore** ([PYPOST-388](https://pypost.atlassian.net/browse/PYPOST-388)):
+  `tests/test_collections_presenter.py` and `tests/test_settings_persistence.py`.
 - No tests for edge cases (e.g., ID exists in settings but collection is gone). — [PYPOST-389](https://pypost.atlassian.net/browse/PYPOST-389)
 
 ## Performance Concerns
