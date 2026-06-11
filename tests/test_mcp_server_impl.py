@@ -123,5 +123,22 @@ class TestMCPServerImpl(unittest.TestCase):
         metrics.track_mcp_response_sent.assert_called_once_with("POST", "error")
 
 
+class TestMCPServerImplInjection(unittest.TestCase):
+    def test_injected_template_service_is_used_for_schema_generation(self):
+        """A TemplateService passed at construction is used during list_tools."""
+        mock_ts = MagicMock()
+        mock_ts.parse.return_value = MagicMock()
+        impl = MCPServerImpl(template_service=mock_ts)
+        req = RequestData(
+            name="Echo",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://{{ mcp.request.host }}/p",
+        )
+        impl.register_tools([req])
+        asyncio.run(impl.list_tools())
+        mock_ts.parse.assert_called()
+
+
 if __name__ == "__main__":
     unittest.main()
