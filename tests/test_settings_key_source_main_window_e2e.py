@@ -85,8 +85,8 @@ def _open_settings_with_key_source(
 ) -> AppSettings:
     original_init = SettingsDialog.__init__
 
-    def init_and_configure(self, current, parent=None):
-        original_init(self, current, parent)
+    def init_and_configure(self, current, parent=None, *, storage=None):
+        original_init(self, current, parent, storage=storage)
         enabled_index = self.env_encryption_mode_combo.findData(ENCRYPTION_MODE_ENABLED)
         self.env_encryption_mode_combo.setCurrentIndex(enabled_index)
         source_index = self.env_encryption_key_source_combo.findData(key_source)

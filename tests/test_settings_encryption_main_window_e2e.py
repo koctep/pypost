@@ -80,8 +80,8 @@ def _make_main_window(qapp, storage, config_manager):  # noqa: ARG001
 def _open_settings_with_mode(window, mode_data: str) -> AppSettings:
     original_init = SettingsDialog.__init__
 
-    def init_and_configure(self, current, parent=None):
-        original_init(self, current, parent)
+    def init_and_configure(self, current, parent=None, *, storage=None):
+        original_init(self, current, parent, storage=storage)
         index = self.env_encryption_mode_combo.findData(mode_data)
         assert index >= 0, f"unknown encryption mode {mode_data!r}"
         self.env_encryption_mode_combo.setCurrentIndex(index)
