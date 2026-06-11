@@ -1,3 +1,4 @@
+import logging
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -80,6 +81,39 @@ def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa
                 loaded_env = presenter_after_restart.env_selector.itemData(1)
                 assert isinstance(loaded_env, Environment)
                 assert loaded_env.hidden_keys == {"API_KEY"}
+
+
+def test_default_masked_toggle_log_after_persistence_round_trip(qapp, caplog):  # noqa: ARG001
+    """PYPOST-489: default dialog masks key names after storage round-trip."""
+    env_name = "Dev"
+    variable_key = "API_KEY"
+    variable_value = "secret"
+    with tempfile.TemporaryDirectory() as td:
+        with patch("pypost.core.storage.user_data_dir", return_value=td):
+            storage = StorageManager()
+            initial_env = Environment(
+                name=env_name,
+                variables={variable_key: variable_value},
+            )
+            storage.save_environments([initial_env])
+
+            reloaded = storage.load_environments()
+            dialog = EnvironmentDialog(reloaded)
+            try:
+                dialog.on_env_selected(0)
+                hidden_cb = dialog._get_hidden_checkbox(0)
+                assert hidden_cb is not None
+                with caplog.at_level(logging.INFO):
+                    hidden_cb.setChecked(True)
+                assert any(
+                    f"env_hidden_flag_changed env_name={env_name} key={HIDDEN_MASK} hidden=True"
+                    in r.message
+                    for r in caplog.records
+                )
+                assert not any(variable_key in r.message for r in caplog.records)
+                assert not any(variable_value in r.message for r in caplog.records)
+            finally:
+                dialog.close()
 
 
 def test_hidden_toggle_persists_and_reveal_keeps_original_value(qapp):  # noqa: ARG001
