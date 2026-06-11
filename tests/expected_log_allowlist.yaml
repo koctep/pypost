@@ -1,0 +1,73 @@
+# ERROR allowlist derived from PYPOST-567 inventory (expected groups).
+# CI verifier fails on unlisted ERROR lines or count > baseline + margin.
+baseline_error_count: 72
+error_margin: 5
+
+rules:
+  # pypost.core.request_service
+  - logger: pypost.core.request_service
+    message_prefix: request_execution_failed
+  - logger: pypost.core.request_service
+    message_prefix: history_record_failed
+
+  # pypost.core.worker
+  - logger: pypost.core.worker
+    message_prefix: RequestWorker unexpected error
+
+  # pypost.ui.presenters.tabs_presenter
+  - logger: pypost.ui.presenters.tabs_presenter
+    message_prefix: request_error
+
+  # pypost.ui.presenters.collection_tree_actions
+  - logger: pypost.ui.presenters.collection_tree_actions
+    message_prefix: collection_item_delete_failed
+
+  # pypost.core.storage
+  - logger: pypost.core.storage
+    message_prefix: load_environments_failed
+  - logger: pypost.core.storage
+    message_prefix: save_environments_replace_failed
+
+  # pypost.core.encryption_migration
+  - logger: pypost.core.encryption_migration
+    message_prefix: encryption_migration_missing_kids
+  - logger: pypost.core.encryption_migration
+    message_prefix: encryption_migration_data_quality_errors
+  - logger: pypost.core.encryption_migration
+    message_prefix: encryption_migration_decrypt_failed
+
+  # pypost.core.mcp_client_service
+  - logger: pypost.core.mcp_client_service
+    message_prefix: mcp_operation_failed
+  - logger: pypost.core.mcp_client_service
+    message_prefix: mcp_operation_timeout
+
+  # pypost.core.http_client (structured and legacy message shapes)
+  - logger: pypost.core.http_client
+    message_prefix: Connection failed
+  - logger: pypost.core.http_client
+    message_prefix: Request failed
+  - logger: pypost.core.http_client
+    message_prefix: Request timed out
+  - logger: pypost.core.http_client
+    message_prefix: yaml_to_json_conversion_failed
+
+  # Encryption / environment storage (error-path tests)
+  - logger: pypost.core.key_provider
+    message_prefix: encryption_key_rotation_lookup_failed
+  - logger: pypost.core.key_provider
+    message_prefix: encryption_key_unavailable
+  - logger: pypost.core.environment_secrets_codec
+    message_prefix: env_value_decrypt_failed
+  - logger: pypost.core.environment_storage_worker
+    message_prefix: environment_storage_worker_load_failed
+  - logger: pypost.core.environment_storage_worker
+    message_prefix: environment_storage_worker_save_failed
+  - logger: pypost.core.environment_variables_adapter
+    message_prefix: environment_value_encrypt_failed
+  - logger: pypost.ui.presenters.env_presenter
+    message_prefix: storage_save_failed
+
+  # asyncio pending-task noise from MCP test teardown
+  - logger: asyncio
+    message_prefix: Task was destroyed but it is pending

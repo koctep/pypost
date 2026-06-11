@@ -343,10 +343,25 @@ propagation — no Makefile wrapper maps codes to success):
 | `2` | User interrupt | Failure |
 | `3` | Internal error | Failure |
 | `4` | pytest usage error | Failure |
-| `5` | No tests collected | **Failure** — misconfiguration, not an acceptable empty state |
+| `5` | No tests collected | **Failure** (default) or **Warning** (if configured) |
 
-Exit code `5` indicates zero tests were collected (empty `tests/`, broken discovery path, or
-marker filter excluding everything). With a mature suite this always blocks merges.
+### Empty Tests Policy (`empty_tests_policy`)
+
+To prevent false-positive CI/CD pipeline failures in empty-test repositories, templates, or newly initialized projects, PyPost supports configuring the policy for handling pytest exit code `5` (no tests collected) via the `empty_tests_policy` setting in `pytest.ini` or `pyproject.toml`.
+
+#### Supported Policies
+
+- `fail` (default): Exit code `5` is treated as a hard failure, causing the build/test run to fail. This is the recommended setting for mature repositories to prevent accidental deletion of tests or misconfiguration.
+- `warn` / `warning` / `ignore_and_warn`: Exit code `5` is intercepted and rewritten to `0` (success), but a highly visible warning message is printed to stderr/stdout to notify developers that no tests were executed. This is the recommended setting for empty-test or template repositories.
+
+#### Configuration Example
+
+In `pytest.ini`:
+
+```ini
+[pytest]
+empty_tests_policy = warn
+```
 
 Regression coverage: `tests/test_pytest_exit_policy.py`.
 
@@ -477,11 +492,10 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 Optional hardening: add `caplog.at_level(logging.ERROR)` assertions for medium-risk tests
 listed in the audit report.
 
-## CI guardrails (PYPOST-571)
+## CI guardrails (PYPOST-571 / PYPOST-572)
 
-Proposal for enforceable CI gates so green runs cannot hide unexpected ERROR storms or
-timeout-boundary passes. Full design:
-`ai-tasks/PYPOST-571/ci-guardrails-proposal.md`.
+Enforceable CI gates so green runs cannot hide unexpected ERROR storms or timeout-boundary
+passes. Full design: `ai-tasks/PYPOST-571/ci-guardrails-proposal.md`.
 
 | Pillar | Summary |
 | --- | --- |
@@ -490,9 +504,38 @@ timeout-boundary passes. Full design:
 | **Duration budget** | Warn when test duration >80% of `pytest.mark.timeout`; fail at >95% (PYPOST-569) |
 | **Post-run script** | `scripts/verify_test_log_guardrails.py` parses captured pytest log after run; wired in CI after pytest |
 
-Phase 1 implementation: [PYPOST-572](https://pypost.atlassian.net/browse/PYPOST-572) (allowlist
-+ verifier). Phase 2: [PYPOST-573](https://pypost.atlassian.net/browse/PYPOST-573) (duration
-audit). Caplog contract: [PYPOST-574](https://pypost.atlassian.net/browse/PYPOST-574).
+### Phase 1 — log allowlist + verifier (PYPOST-572)
+
+After pytest in `.github/workflows/test.yml`, CI captures stdout/stderr to `pytest.log` and runs:
+
+```bash
+python scripts/verify_test_log_guardrails.py pytest.log
+```
+
+The verifier reuses `parse_log` from `scripts/parse_test_log_inventory.py`. It:
+
+1. Parses live-log lines (`HH:MM:SS LEVEL logger: message`) from the capture.
+2. Matches each **ERROR** against `tests/expected_log_allowlist.yaml` rules:
+   - **Logger + prefix:** both must match (e.g. `pypost.core.request_service` +
+     `request_execution_failed`).
+   - **Prefix only:** `message_prefix` matches any logger (for shared event names).
+3. **Fails** when any ERROR line is unlisted.
+4. **Fails** when total ERROR count exceeds `baseline_error_count + error_margin`
+   (baseline **72**, margin **5** from PYPOST-567).
+
+Local reproduction:
+
+```bash
+make test 2>&1 | tee tests.txt
+.venv/bin/python scripts/verify_test_log_guardrails.py tests.txt
+```
+
+When adding an intentional error-path test that emits a new ERROR pattern, add a rule to
+`tests/expected_log_allowlist.yaml` in the same PR. Prefer structured event prefixes
+(`request_execution_failed`, `mcp_operation_failed`, etc.) over raw message substrings.
+
+Phase 2: [PYPOST-573](https://pypost.atlassian.net/browse/PYPOST-573) (duration audit).
+Caplog contract: [PYPOST-574](https://pypost.atlassian.net/browse/PYPOST-574).
 
 ## References
 
