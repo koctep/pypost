@@ -1,7 +1,10 @@
 """Tests for MCPClientService (MCP method for testing MCP endpoints)."""
+import asyncio
 import json
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
+import httpx
 
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -45,24 +48,38 @@ class MCPClientServiceTests(unittest.TestCase):
         self.assertIn("content", body)
         self.assertEqual(body["content"][0]["text"], "ok")
 
-    def test_connection_error_raises_execution_error_network(self):
-        """Connection error raises ExecutionError with NETWORK category."""
+    def test_connect_error_raises_execution_error_network(self):
+        """httpx.ConnectError raises ExecutionError with NETWORK category."""
         service = MCPClientService()
 
         with patch.object(
             service,
             "_run_async",
             new_callable=AsyncMock,
-            side_effect=ConnectionError("Connection refused"),
+            side_effect=httpx.ConnectError("Connection refused"),
         ):
             with self.assertRaises(ExecutionError) as ctx:
                 service.run("http://localhost:1080/sse", "list_tools", None)
 
         self.assertEqual(ctx.exception.category, ErrorCategory.NETWORK)
 
+    def test_read_timeout_raises_execution_error_timeout(self):
+        """httpx.ReadTimeout raises ExecutionError with TIMEOUT category."""
+        service = MCPClientService()
+
+        with patch.object(
+            service,
+            "_run_async",
+            new_callable=AsyncMock,
+            side_effect=httpx.ReadTimeout("read timed out"),
+        ):
+            with self.assertRaises(ExecutionError) as ctx:
+                service.run("http://localhost:1080/sse", "list_tools", None)
+
+        self.assertEqual(ctx.exception.category, ErrorCategory.TIMEOUT)
+
     def test_timeout_raises_execution_error_timeout(self):
         """asyncio.TimeoutError raises ExecutionError with TIMEOUT category."""
-        import asyncio
         service = MCPClientService()
 
         with patch.object(

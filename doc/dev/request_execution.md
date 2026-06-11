@@ -41,6 +41,21 @@ Post-script failures populate `execution_error` with `ErrorCategory.SCRIPT` and 
 string in `detail` (PYPOST-409). Callers such as `RequestWorker` and `MCPServerImpl` read
 script errors from `execution_error` rather than a separate string field.
 
+### MCP transport exceptions (PYPOST-411)
+
+`MCPClientService.run()` maps httpx exceptions from the MCP SSE client to `ExecutionError`:
+
+| Exception | `ErrorCategory` |
+|-----------|-----------------|
+| `asyncio.TimeoutError` (outer `wait_for`) | `TIMEOUT` |
+| `httpx.TimeoutException` | `TIMEOUT` |
+| `httpx.NetworkError` (includes `ConnectError`) | `NETWORK` |
+| `httpx.RequestError` (other transport) | `UNKNOWN` |
+| Other `Exception` | `UNKNOWN` |
+
+`httpx.TimeoutException` is caught before `httpx.NetworkError` because both inherit from
+`httpx.TransportError` but are siblings, not parent/child.
+
 ## Key files
 
 | File | Role |
@@ -48,9 +63,11 @@ script errors from `execution_error` rather than a separate string field.
 | `pypost/core/worker.py` | Background thread; calls `RequestService.execute()` |
 | `pypost/core/request_service.py` | Orchestrates MCP/HTTP, scripts, history |
 | `pypost/core/http_client.py` | HTTP transport; single URL render per send |
+| `pypost/core/mcp_client_service.py` | MCP transport; typed httpx error mapping |
 | `pypost/core/template_service.py` | Jinja2 rendering and validation |
 
 ## Tests
 
 - `tests/test_request_service.py` — `test_execute_http_does_not_pre_render_url`
 - `tests/test_http_client.py` — `test_url_template_rendered_once_per_request`
+- `tests/test_mcp_client_service.py` — httpx exception category mapping

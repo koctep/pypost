@@ -6,6 +6,7 @@ import logging
 import time
 from typing import Any
 
+import httpx
 from mcp.client.session import ClientSession
 from mcp.client.sse import sse_client
 
@@ -60,28 +61,61 @@ class MCPClientService:
                 message=f"MCP request timed out after {MCP_TOTAL_TIMEOUT}s.",
                 detail=str(exc),
             ) from exc
-        except Exception as exc:
-            err_msg = str(exc)
-            if isinstance(exc, BaseExceptionGroup):
-                err_msg = "; ".join(str(x) for x in exc.exceptions)
-            err_type = type(exc).__name__
-            if "ConnectError" in err_type or "connection" in err_msg.lower():
-                category = ErrorCategory.NETWORK
-                message = "Could not connect to MCP server. Is it running?"
-            elif "Timeout" in err_type or "timeout" in err_msg.lower():
-                category = ErrorCategory.TIMEOUT
-                message = "MCP server did not respond in time."
-            else:
-                category = ErrorCategory.UNKNOWN
-                message = "MCP operation failed."
+        except httpx.TimeoutException as exc:
             logger.error(
                 "mcp_operation_failed url=%s operation=%s category=%s detail=%s",
                 url,
                 operation,
-                category,
+                ErrorCategory.TIMEOUT,
+                exc,
+            )
+            raise ExecutionError(
+                category=ErrorCategory.TIMEOUT,
+                message="MCP server did not respond in time.",
+                detail=str(exc),
+            ) from exc
+        except httpx.NetworkError as exc:
+            logger.error(
+                "mcp_operation_failed url=%s operation=%s category=%s detail=%s",
+                url,
+                operation,
+                ErrorCategory.NETWORK,
+                exc,
+            )
+            raise ExecutionError(
+                category=ErrorCategory.NETWORK,
+                message="Could not connect to MCP server. Is it running?",
+                detail=str(exc),
+            ) from exc
+        except httpx.RequestError as exc:
+            logger.error(
+                "mcp_operation_failed url=%s operation=%s category=%s detail=%s",
+                url,
+                operation,
+                ErrorCategory.UNKNOWN,
+                exc,
+            )
+            raise ExecutionError(
+                category=ErrorCategory.UNKNOWN,
+                message="MCP operation failed.",
+                detail=str(exc),
+            ) from exc
+        except Exception as exc:
+            err_msg = str(exc)
+            if isinstance(exc, BaseExceptionGroup):
+                err_msg = "; ".join(str(x) for x in exc.exceptions)
+            logger.error(
+                "mcp_operation_failed url=%s operation=%s category=%s detail=%s",
+                url,
+                operation,
+                ErrorCategory.UNKNOWN,
                 err_msg,
             )
-            raise ExecutionError(category=category, message=message, detail=err_msg) from exc
+            raise ExecutionError(
+                category=ErrorCategory.UNKNOWN,
+                message="MCP operation failed.",
+                detail=err_msg,
+            ) from exc
 
         elapsed = time.time() - start_time
         logger.debug(
