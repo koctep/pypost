@@ -16,6 +16,8 @@ pypost/
 │   ├── script_executor.py  # Python script execution environment
 │   ├── template_service.py # Variable interpolation (Jinja2) Service
 │   ├── storage.py          # Persistence (JSON)
+│   ├── environment_storage_worker.py  # Background env load/save (encrypted)
+│   ├── environment_storage_gateway.py # Single-flight async env storage queue
 │   ├── config_manager.py   # Configuration management
 │   └── worker.py           # Background task execution
 ├── models/                 # Data structures
@@ -52,7 +54,9 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 - **TemplateService**: A service that manages the Jinja2 Environment and processes strings like `{{base_url}}/api`.
 - **MetricsManager**: A singleton service managing the observability server. It runs an isolated `uvicorn` server providing both Prometheus metrics (`/metrics`) and an MCP interface (`/sse`) for accessing metrics as resources.
 - **Storage**: Manages saving and loading collections and environments to/from the filesystem (JSON
-  format).
+  format). When environment encryption is enabled, `EnvironmentStorageGateway` delegates encrypted
+  load/save to `EnvironmentStorageWorker` on a background thread (see
+  [environment_storage_async.md](environment_storage_async.md)).
 
 ### User Interface (`pypost/ui/`)
 

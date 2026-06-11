@@ -7,6 +7,9 @@ PYPOST-481 adds user-facing controls in **Settings** so developers can enable or
 encryption and choose a key source strategy without editing process environment variables.
 PYPOST-483 extends key resolution to a provider chain with OS keyring and secret-store sources,
 configurable fallback order, and a rotation-friendly key registry model.
+PYPOST-486 runs encrypted load/save off the UI thread via
+[Async Environment Storage](environment_storage_async.md) so large datasets do not freeze the
+desktop window.
 
 This feature protects hidden-key values in persisted environment storage (`environments.json`).
 Runtime request execution is unchanged: components still consume plain
@@ -43,6 +46,12 @@ flowchart TD
 | Controller wiring | `pypost/ui/main_window.py` | Apply settings on init and after save |
 | Crypto codec | `pypost/core/environment_secrets_codec.py` | Envelope encrypt/decrypt |
 | Observability | `pypost/core/metrics.py` | Encryption counters and error labels |
+| Async orchestration | `pypost/core/environment_storage_gateway.py` | Off-UI-thread load/save when encryption enabled (PYPOST-486) |
+
+When encryption is enabled, the UI uses `EnvironmentStorageGateway` and
+`EnvironmentStorageWorker` instead of calling `StorageManager` on the main thread. See
+[Async Environment Storage](environment_storage_async.md) for queueing, startup ordering, and
+troubleshooting.
 
 ### Key source chain
 
@@ -66,10 +75,13 @@ are still registered.
 ### Data flow
 
 1. User edits environment values in UI.
-2. `StorageManager.save_environments()` serializes environment payload.
-3. Hidden-key values are encrypted with `EnvironmentSecretsCodec` when encryption is enabled.
-4. Data is written atomically to `environments.json`.
-5. On load, encrypted payloads are decrypted before creating `Environment` instances.
+2. `EnvPresenter` saves via the async gateway (encryption on) or calls
+   `StorageManager.save_environments()` directly (encryption off).
+3. `StorageManager.save_environments()` serializes environment payload.
+4. Hidden-key values are encrypted with `EnvironmentSecretsCodec` when encryption is enabled.
+5. Data is written atomically to `environments.json`.
+6. On load, encrypted payloads are decrypted before creating `Environment` instances (load may
+   run on a worker thread when encryption is enabled).
 
 Changing encryption settings does **not** immediately re-save all environments. The new policy
 applies on the next save or load cycle.
@@ -121,7 +133,8 @@ resolved key provider and logs the effective policy (`storage_encryption_config_
 Call sites:
 
 - `MainWindow.__init__` — apply settings on startup.
-- `MainWindow.open_settings()` — re-apply after the user saves Settings.
+- `MainWindow.open_settings()` — waits for `EnvPresenter.wait_storage_idle()`, then re-applies
+  after the user saves Settings.
 
 ### Settings UI
 
@@ -419,6 +432,11 @@ Primary coverage files:
 - `tests/test_key_sources_secret_store.py`
 - `tests/test_storage_environments.py`
 - `tests/test_env_persistence_e2e.py`
+- `tests/test_environment_storage_worker.py`
+- `tests/test_environment_storage_gateway.py`
+- `tests/test_env_storage_responsiveness.py`
+
+Async orchestration details: [environment_storage_async.md](environment_storage_async.md).
 
 Project-wide regression:
 

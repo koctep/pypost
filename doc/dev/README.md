@@ -17,6 +17,7 @@ set up your development environment, and contribute to the project.
 1. [Hidden Variables](hidden_variables.md)
 1. [Environment Variable Delete](environment_variable_delete.md)
 1. [Environment Encryption at Rest](environment_encryption_at_rest.md)
+1. [Async Environment Storage (PYPOST-486)](environment_storage_async.md)
 1. [Template Expression Functions (PYPOST-450)](template_expression_functions.md)
 
 ## Quick Start

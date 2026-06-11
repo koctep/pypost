@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
+from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.history_manager import HistoryManager
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
@@ -92,12 +93,21 @@ class MainWindow(QMainWindow):
         self._create_menu_bar()
         self._setup_shortcuts()
         self.collections.load_collections()
-        self.env.load_environments()
-        self.tabs.restore_tabs()
-        self.collections.restore_tree_state()
+        if resolve_encryption_enabled(self.settings):
+            self.env.environments_loaded.connect(self._on_startup_environments_loaded)
+            self.env.load_environments()
+        else:
+            self.env.load_environments()
+            self.tabs.restore_tabs()
+            self.collections.restore_tree_state()
         self._startup_settings_reapplied = False
         self.apply_settings(self.settings)
         logger.info("main_window_initialized")
+
+    def _on_startup_environments_loaded(self) -> None:
+        self.env.environments_loaded.disconnect(self._on_startup_environments_loaded)
+        self.tabs.restore_tabs()
+        self.collections.restore_tree_state()
 
     def _load_icons(self) -> dict:
         d = Path(__file__).parent / "resources" / "icons"
@@ -224,6 +234,7 @@ class MainWindow(QMainWindow):
         )
         self.settings = new_settings
         self.config_manager.save_config(self.settings)
+        self.env.wait_storage_idle()
         self.storage.apply_encryption_settings(self.settings)
         self.apply_settings(self.settings)
         if metrics_changed:

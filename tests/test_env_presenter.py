@@ -1,7 +1,10 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
+from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication, QWidget, QInputDialog, QMessageBox
 
+from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.models.models import Environment, Collection, RequestData
 from pypost.models.settings import AppSettings
@@ -386,6 +389,60 @@ class TestEnvPresenter(unittest.TestCase):
         p.apply_settings(new_settings)
         self.assertIs(p._settings, new_settings)
         self.assertTrue(p._settings.log_hidden_key_names)
+
+    def test_async_load_refreshes_combo_when_encryption_enabled(self):
+        envs = [_make_env("e1", "Production")]
+        p = self._make_presenter(envs)
+        p._settings = AppSettings(env_encryption_enabled=True)
+        loaded = []
+        p.environments_loaded.connect(lambda: loaded.append(True))
+        p.load_environments()
+
+        loop = QEventLoop()
+        timer = QTimer()
+        timer.setInterval(10)
+
+        def check_done():
+            if loaded:
+                loop.quit()
+
+        timer.timeout.connect(check_done)
+        timer.start()
+        loop.exec()
+        timer.stop()
+
+        self.assertEqual(len(loaded), 1)
+        self.assertEqual(p.env_selector.count(), 2)
+        self.assertEqual(p.env_selector.itemText(1), "Production")
+
+    def test_save_failure_shows_warning_dialog(self):
+        p = self._make_presenter([])
+        shown = []
+
+        def capture_warning(*args, **kwargs):
+            shown.append(args)
+            return QMessageBox.StandardButton.Ok
+
+        with patch.object(QMessageBox, "warning", side_effect=capture_warning):
+            p._on_storage_save_failed(
+                EnvironmentEncryptionError("Encryption key is unavailable.")
+            )
+
+        self.assertEqual(len(shown), 1)
+        self.assertIn("Encryption key is unavailable.", shown[0][2])
+
+    def test_sync_save_used_when_encryption_disabled(self):
+        env = _make_env("e1", "Dev", {"K": "V"})
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.setCurrentIndex(1)
+        p.env_selector.blockSignals(False)
+        with patch.object(p._storage_gateway, "save_async") as save_async:
+            p._save_environments()
+            save_async.assert_not_called()
+        self.assertEqual(len(p._storage.saved), 1)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.core.config_manager import ConfigManager
+from pypost.core.encryption_config import resolve_encryption_enabled
+from pypost.core.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.storage import StorageManager
@@ -29,6 +31,7 @@ class EnvPresenter(QObject):
     env_variables_changed = Signal(object)  # payload: dict[str, str]
     env_keys_changed = Signal(object)  # payload: list[str] | None
     env_hidden_keys_changed = Signal(object)  # payload: set[str]
+    environments_loaded = Signal()
 
     def __init__(
         self,
@@ -49,6 +52,11 @@ class EnvPresenter(QObject):
         self._metrics = metrics
         self._environments: list[Environment] = []
         self._current_env_index: int = 0
+        self._pending_env_manager_refresh = False
+        self._storage_gateway = EnvironmentStorageGateway(storage, parent=self)
+        self._storage_gateway.load_completed.connect(self._on_storage_load_completed)
+        self._storage_gateway.load_failed.connect(self._on_storage_load_failed)
+        self._storage_gateway.save_failed.connect(self._on_storage_save_failed)
 
         self._mcp_manager.status_changed.connect(self._on_mcp_status_changed)
 
@@ -106,9 +114,34 @@ class EnvPresenter(QObject):
     def apply_settings(self, settings: AppSettings) -> None:
         self._settings = settings
 
+    def wait_storage_idle(self, timeout_ms: int = 30000) -> bool:
+        return self._storage_gateway.wait_idle(timeout_ms)
+
     def load_environments(self) -> None:
         """Loads from storage, populates combo, emits current vars."""
-        self._environments = self._storage.load_environments()
+        if self._encryption_enabled():
+            logger.info("environment_storage_async_load_dispatched")
+            self._storage_gateway.load_async()
+            return
+        environments = self._storage.load_environments()
+        self._apply_loaded_environments(environments)
+        self.environments_loaded.emit()
+
+    def _encryption_enabled(self) -> bool:
+        return resolve_encryption_enabled(self._settings)
+
+    def _save_environments(self) -> None:
+        if self._encryption_enabled():
+            logger.info(
+                "environment_storage_async_save_dispatched count=%d",
+                len(self._environments),
+            )
+            self._storage_gateway.save_async(self._environments)
+        else:
+            self._storage.save_environments(self._environments)
+
+    def _apply_loaded_environments(self, environments: list[Environment]) -> None:
+        self._environments = environments
         logger.info("load_environments_completed count=%d", len(self._environments))
 
         self._env_selector.blockSignals(True)
@@ -128,6 +161,23 @@ class EnvPresenter(QObject):
         if selected_index > 0:
             self._on_env_changed(selected_index)
 
+    def _on_storage_load_completed(self, environments: list[Environment]) -> None:
+        self._apply_loaded_environments(environments)
+        if self._pending_env_manager_refresh:
+            self._pending_env_manager_refresh = False
+            self._on_env_changed(self._env_selector.currentIndex())
+        self.environments_loaded.emit()
+
+    def _on_storage_load_failed(self, error: object) -> None:
+        logger.error("storage_load_failed error=%s", error)
+        self._apply_loaded_environments([])
+        self.environments_loaded.emit()
+
+    def _on_storage_save_failed(self, error: object) -> None:
+        message = str(error) if error else "Failed to save environments."
+        logger.error("storage_save_failed error=%s", message)
+        QMessageBox.warning(self._widget, "Save Failed", message)
+
     def on_env_update(self, vars: dict) -> None:
         """Merges post-request variable updates into current env."""
         selected = self._env_selector.currentData()
@@ -139,7 +189,7 @@ class EnvPresenter(QObject):
                 len(vars),
             )
             selected.variables.update(vars)
-            self._storage.save_environments(self._environments)
+            self._save_environments()
             self._on_env_changed(self._env_selector.currentIndex())
 
     def handle_variable_set_request(self, key, value: str) -> None:
@@ -180,7 +230,7 @@ class EnvPresenter(QObject):
             target_key,
         )
         selected.variables[target_key] = value
-        self._storage.save_environments(self._environments)
+        self._save_environments()
         self._on_env_changed(self._env_selector.currentIndex())
 
     def _is_valid_variable_name(self, name: str) -> tuple[bool, str]:
@@ -297,9 +347,12 @@ class EnvPresenter(QObject):
         )
         dialog.exec()
         logger.info("env_manager_dialog_closed")
-        self._storage.save_environments(self._environments)
+        self._save_environments()
+        if self._encryption_enabled():
+            self._pending_env_manager_refresh = True
         self.load_environments()
-        self._on_env_changed(self._env_selector.currentIndex())
+        if not self._encryption_enabled():
+            self._on_env_changed(self._env_selector.currentIndex())
 
     def _get_mcp_tools(self) -> list:
         """Returns expose_as_mcp requests from current collections."""
