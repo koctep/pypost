@@ -30,8 +30,31 @@ Key metrics for MCP testing:
 | `requests_sent_total` | `method` | HTTP requests sent |
 | `responses_received_total` | `method`, `status_code` | HTTP responses received |
 
+## Delete metric unit tests
+
+Collection-tree delete telemetry (`gui_collection_delete_actions_total`) has dedicated
+automated tests that assert `MetricsManager.track_gui_collection_delete_action` calls
+without live Prometheus scraping.
+
+| Layer | File | Status values |
+| --- | --- | --- |
+| Confirmation boundary | `tests/test_collection_tree_delete_confirmation.py` | `selected`, `cancelled`, `succeeded` |
+| `handle_delete` failures | `tests/test_collection_tree_delete_metrics.py` | `error`, `not_found` |
+
+Both modules cover `collection` and `request` item types. See
+[collection_item_delete.md](collection_item_delete.md) for scenario details.
+
+Focused run:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest \
+  tests.test_collection_tree_delete_confirmation \
+  tests.test_collection_tree_delete_metrics -v
+```
+
 ## References
 
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — AI assistant rules
 - [MCP Integration](mcp_integration.md) — MCP setup
+- [Collection item delete](collection_item_delete.md) — delete flow and metric matrix
 - [pypost/core/metrics.py](../../pypost/core/metrics.py) — metric definitions

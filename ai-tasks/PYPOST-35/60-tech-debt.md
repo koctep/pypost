@@ -7,8 +7,10 @@
   [PYPOST-324](https://pypost.atlassian.net/browse/PYPOST-324) /
   [PYPOST-326](https://pypost.atlassian.net/browse/PYPOST-326): delete flow lives in
   `CollectionTreeActions`; `MainWindow` only wires `requests_deleted` to tabs.
-- Deletion telemetry was added without dedicated metric-focused automated tests.
-  — [PYPOST-325](https://pypost.atlassian.net/browse/PYPOST-325)
+- **Deletion telemetry without metric tests** — resolved in
+  [PYPOST-325](https://pypost.atlassian.net/browse/PYPOST-325): confirmation metrics
+  (`test_collection_tree_delete_confirmation.py`) and `handle_delete` failure metrics
+  (`test_collection_tree_delete_metrics.py`) cover all status labels.
 
 ## Code Quality Issues
 
@@ -28,8 +30,10 @@
   — [PYPOST-329](https://pypost.atlassian.net/browse/PYPOST-329)
 - No tests for confirmation-dialog branching in delete flow (Yes/No outcomes).
   — [PYPOST-330](https://pypost.atlassian.net/browse/PYPOST-330)
-- No tests for emitted metric labels/status values for delete actions.
-  — [PYPOST-331](https://pypost.atlassian.net/browse/PYPOST-331)
+- **No tests for delete metric labels** — resolved in
+  [PYPOST-325](https://pypost.atlassian.net/browse/PYPOST-325) /
+  [PYPOST-331](https://pypost.atlassian.net/browse/PYPOST-331): full status matrix
+  covered by confirmation and `handle_delete` metric test modules.
 - No tests for open-tab behavior after deleting a request or its parent collection.
   — [PYPOST-332](https://pypost.atlassian.net/browse/PYPOST-332)
 
