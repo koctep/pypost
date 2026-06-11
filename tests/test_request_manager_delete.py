@@ -32,6 +32,14 @@ class RequestManagerDeleteTests(unittest.TestCase):
         self.assertEqual(["Team API"], [c.name for c in storage.saved_collections])
         self.assertIsNone(manager.find_request("r1"))
 
+    def test_delete_collection_returns_false_when_not_found(self):
+        storage = FakeStorageManager([])
+        manager = RequestManager(storage)
+
+        deleted = manager.delete_collection("missing")
+
+        self.assertFalse(deleted)
+
     def test_delete_collection_removes_collection_and_deletes_file(self):
         req = RequestData(id="r1", name="Get users")
         collection = Collection(id="c1", name="Team API", requests=[req])
@@ -55,6 +63,14 @@ class RequestManagerDeleteTests(unittest.TestCase):
         self.assertFalse(manager.delete_collection_item("missing", "request"))
         self.assertFalse(manager.delete_collection_item("c1", "unsupported"))
 
+    def test_delete_collection_item_routes_collection_type(self):
+        collection = Collection(id="c1", name="Team API", requests=[])
+        storage = FakeStorageManager([collection])
+        manager = RequestManager(storage)
+
+        self.assertTrue(manager.delete_collection_item("c1", "collection"))
+        self.assertEqual([], manager.get_collections())
+
     def test_rename_request_updates_name_and_persists_collection(self):
         req = RequestData(id="r1", name="Get users")
         collection = Collection(id="c1", name="Team API", requests=[req])
@@ -66,6 +82,14 @@ class RequestManagerDeleteTests(unittest.TestCase):
         self.assertTrue(renamed)
         self.assertEqual("Get active users", collection.requests[0].name)
         self.assertEqual(["Team API"], [c.name for c in storage.saved_collections])
+
+    def test_rename_request_returns_false_when_not_found(self):
+        storage = FakeStorageManager([])
+        manager = RequestManager(storage)
+
+        renamed = manager.rename_request("missing", "Name")
+
+        self.assertFalse(renamed)
 
     def test_rename_collection_updates_name_and_rewrites_collection_file(self):
         collection = Collection(id="c1", name="Team API", requests=[])
@@ -90,6 +114,24 @@ class RequestManagerDeleteTests(unittest.TestCase):
         self.assertFalse(renamed)
         self.assertEqual("Other API", manager.get_collections()[1].name)
 
+    def test_rename_collection_rejects_empty_name(self):
+        collection = Collection(id="c1", name="Team API", requests=[])
+        storage = FakeStorageManager([collection])
+        manager = RequestManager(storage)
+
+        renamed = manager.rename_collection("c1", "   ")
+
+        self.assertFalse(renamed)
+        self.assertEqual("Team API", collection.name)
+
+    def test_rename_collection_returns_false_when_not_found(self):
+        storage = FakeStorageManager([])
+        manager = RequestManager(storage)
+
+        renamed = manager.rename_collection("missing", "Name")
+
+        self.assertFalse(renamed)
+
     def test_rename_collection_item_rejects_empty_name(self):
         req = RequestData(id="r1", name="Get users")
         collection = Collection(id="c1", name="Team API", requests=[req])
@@ -100,6 +142,24 @@ class RequestManagerDeleteTests(unittest.TestCase):
 
         self.assertFalse(renamed)
         self.assertEqual("Get users", collection.requests[0].name)
+
+    def test_rename_collection_item_routes_collection_type(self):
+        collection = Collection(id="c1", name="Team API", requests=[])
+        storage = FakeStorageManager([collection])
+        manager = RequestManager(storage)
+
+        renamed = manager.rename_collection_item("c1", "collection", "Team API v2")
+
+        self.assertTrue(renamed)
+        self.assertEqual("Team API v2", manager.get_collections()[0].name)
+
+    def test_rename_collection_item_unsupported_type_returns_false(self):
+        storage = FakeStorageManager([])
+        manager = RequestManager(storage)
+
+        renamed = manager.rename_collection_item("x", "unsupported", "Name")
+
+        self.assertFalse(renamed)
 
 
 if __name__ == "__main__":

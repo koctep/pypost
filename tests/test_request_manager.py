@@ -39,6 +39,10 @@ class TestRequestManagerCreate(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.manager.create_collection("My API")
 
+    def test_create_collection_rejects_empty_name(self):
+        with self.assertRaises(ValueError):
+            self.manager.create_collection("   ")
+
 
 class TestRequestManagerSaveRequest(unittest.TestCase):
     def setUp(self):

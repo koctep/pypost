@@ -267,6 +267,38 @@ Shared fixtures for presenter and `CollectionTreeActions` tests live in
 `patch_view_context_menu`, `build_isolated_tree_actions`, etc.). See
 [collection_tree_actions.md](collection_tree_actions.md) for the isolated harness.
 
+## Core manager unit tests (PYPOST-252)
+
+Automated unit coverage for `RequestManager` and `StateManager` (debt follow-up from
+[PYPOST-29](https://pypost.atlassian.net/browse/PYPOST-29)). Pytest infrastructure
+(`pytest.ini`, `Makefile`, `tests/conftest.py` timeout gate) was already in place; this section
+indexes the manager test modules.
+
+| Module | Test file | Scope |
+| --- | --- | --- |
+| `RequestManager` | `tests/test_request_manager.py` | Create, save, find, reload, get, index consistency |
+| `RequestManager` | `tests/test_request_manager_delete.py` | Delete, rename, routing, validation edge cases |
+| `StateManager` | `tests/test_settings_persistence.py` | Persistence, no-op saves, coalescing, debounce, flush |
+
+Patterns:
+
+- **RequestManager** — `FakeStorageManager` from `tests/helpers/__init__.py` (in-memory
+  collections; no filesystem I/O).
+- **StateManager** — isolated config directory via
+  `patch("pypost.core.config_manager.user_config_dir")`; debounce tests use `QTest.qWait(350)`
+  with the module `qapp` fixture.
+
+Focused run:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_request_manager.py \
+  tests/test_request_manager_delete.py \
+  tests/test_settings_persistence.py::TestStateManagerPersistence \
+  tests/test_settings_persistence.py::test_state_manager_debounced_save_persists_after_timer \
+  -v --cov=pypost.core.request_manager --cov=pypost.core.state_manager --cov-report=term-missing
+```
+
 ## Delete metric unit tests
 
 Collection-tree delete telemetry (`gui_collection_delete_actions_total`) has dedicated
