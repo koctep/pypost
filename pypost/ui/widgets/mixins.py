@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QToolTip, QWidget
 
 from pypost.core.constants import HIDDEN_MASK
 from pypost.core.metrics import MetricsManager
+from pypost.core.template_expression_tokenizer import TEMPLATE_PLACEHOLDER_PATTERN
 from pypost.core.template_service import TemplateService
 
 
@@ -13,7 +14,8 @@ class VariableHoverHelper:
 
     # Regex to find {{variable}} pattern
     VARIABLE_PATTERN = re.compile(r"\{\{([a-zA-Z0-9_]+)\}\}")
-    EXPRESSION_PATTERN = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
+    # Full-token scan shared with core template_expression_tokenizer (PYPOST-536).
+    EXPRESSION_PATTERN = TEMPLATE_PLACEHOLDER_PATTERN
     _template_service = TemplateService()
 
     @classmethod

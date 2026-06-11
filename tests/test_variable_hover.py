@@ -19,6 +19,10 @@ from PySide6.QtGui import QMouseEvent, QTextCursor
 from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit, QTableWidgetItem
 
 from pypost.core.constants import HIDDEN_MASK
+from pypost.core.template_expression_tokenizer import (
+    TEMPLATE_PLACEHOLDER_PATTERN,
+    tokenize_template_expressions,
+)
 from pypost.ui.widgets.mixins import VariableHoverHelper, VariableHoverMixin
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareTableWidget
 
@@ -103,6 +107,33 @@ class TestVariableHoverHelper(unittest.TestCase):
         self.assertEqual(
             VariableHoverHelper.find_expression_at_index(text, idx),
             "{{urlencode(db)}}",
+        )
+
+    def test_expression_pattern_matches_core_tokenizer(self):
+        text = "{{ a }} {{ md5(urlencode(db)) }}"
+        hover_tokens = [
+            match.group(0)
+            for match in VariableHoverHelper.EXPRESSION_PATTERN.finditer(text)
+        ]
+        inner_tokens = tokenize_template_expressions(text)
+        self.assertEqual(
+            hover_tokens,
+            [
+                match.group(0)
+                for match in TEMPLATE_PLACEHOLDER_PATTERN.finditer(text)
+            ],
+        )
+        self.assertEqual(
+            [match.group(1) for match in TEMPLATE_PLACEHOLDER_PATTERN.finditer(text)],
+            inner_tokens,
+        )
+
+    def test_find_expression_at_index_for_nested_function(self):
+        text = "x{{ md5(urlencode(db)) }}y"
+        idx = text.index("md5")
+        self.assertEqual(
+            VariableHoverHelper.find_expression_at_index(text, idx),
+            "{{ md5(urlencode(db)) }}",
         )
 
     def test_get_variable_value_defined(self):

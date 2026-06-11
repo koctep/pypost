@@ -54,6 +54,8 @@ Main components:
     `FunctionExpressionResolver`.
   - Maps validation codes to user-facing messages only on the render fallback path.
 - `pypost/ui/widgets/mixins.py` (`VariableHoverHelper`)
+  - `EXPRESSION_PATTERN` aliases `TEMPLATE_PLACEHOLDER_PATTERN` from the core tokenizer
+    (PYPOST-536) so hover token boundaries match validation.
   - Reuses `TemplateService.render_string(..., render_path="hover")` for function hover parity.
   - Keeps hidden-variable masking for plain variables via `HIDDEN_MASK`.
 - `pypost/core/metrics.py` (`MetricsManager`)
@@ -101,6 +103,8 @@ Primary API entry points:
 - `FunctionExpressionResolver.validate_expressions(expressions) -> ValidationResult`
   - Validates pre-tokenized inner expression strings (used by render path after a single
     scan).
+- `TEMPLATE_PLACEHOLDER_PATTERN` (`template_expression_tokenizer`)
+  - Compiled regex `\{\{\s*(.*?)\s*\}\}` shared by render, validation, and hover scans.
 - `tokenize_template_expressions(content) -> list[str]` (`template_expression_tokenizer`)
   - Canonical extraction of inner text for each `{{ ... }}` placeholder.
 
@@ -386,6 +390,7 @@ hardening — not release blockers.
 | Shared tokenization dedup | — | Done in PYPOST-460 (`template_expression_tokenizer`) |
 | Empty-arg / multi-placeholder / closing-paren edge cases | [PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461) | Boundary with PYPOST-454 M1–M4 matrix |
 | Hover regex vs resolver identifier rules | — | Hover `VARIABLE_PATTERN` vs resolver `_IDENTIFIER_RE` mismatch for digit-leading names |
+| Hover expression pattern vs tokenizer | — | Done in PYPOST-536 (`EXPRESSION_PATTERN` aliases `TEMPLATE_PLACEHOLDER_PATTERN`) |
 | HTTPClient body / header-name integration | — | Optional; shared `render_string` path already proven |
 | Table tooltip malformed/spacing variants | — | Hover pipeline proven at `TemplateService`; table tests cover valid function cells only |
 | Class-level hover `TemplateService` | — | `VariableHoverHelper` uses class-level instance via `set_metrics()` |
