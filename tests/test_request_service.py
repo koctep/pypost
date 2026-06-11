@@ -132,6 +132,18 @@ class TestRequestServiceInjection(unittest.TestCase):
         svc = RequestService()
         self.assertIsNone(svc._template_service)
 
+    def test_injected_http_client_is_used(self):
+        """An HTTPClient passed at construction is stored, not recreated."""
+        mock_http = MagicMock()
+        svc = RequestService(http_client=mock_http)
+        self.assertIs(mock_http, svc.http_client)
+
+    def test_injected_mcp_client_is_used(self):
+        """An MCPClientService passed at construction is stored, not recreated."""
+        mock_mcp = MagicMock()
+        svc = RequestService(mcp_client=mock_mcp)
+        self.assertIs(mock_mcp, svc.mcp_client)
+
 
 class TestRequestServiceHistory(unittest.TestCase):
     def setUp(self):

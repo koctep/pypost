@@ -39,6 +39,9 @@ widget methods and assert on labels, models, and mocked dialogs.
 See [gui_testing.md](gui_testing.md) for patterns, representative modules, focused commands,
 and troubleshooting.
 
+Unit testability seams for `RequestService`, `HTTPClient`, and `MainWindow` are documented in
+[testability.md](testability.md) (PYPOST-382).
+
 ResponseView search bar coverage (PYPOST-365):
 
 ```bash

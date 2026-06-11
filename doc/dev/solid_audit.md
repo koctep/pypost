@@ -14,8 +14,9 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
   presenters (CollectionsPresenter, TabsPresenter, EnvironmentPresenter).
 - **Singletons/globals**: MetricsManager and template_service hinder testability and DIP.
   Replace with constructor injection.
-- **Direct instantiation**: RequestService, RequestWorker, MCPServerImpl create dependencies
-  directly. Introduce protocols and injection.
+- **Direct instantiation**: RequestService still creates default HTTP/MCP clients when not
+  injected; RequestWorker creates RequestService internally. Constructor seams and test patterns
+  documented in [testability.md](testability.md) (PYPOST-382). Full protocol refactor: PYPOST-46.
 
 ## Prioritized Recommendations
 

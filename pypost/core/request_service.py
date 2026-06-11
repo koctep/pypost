@@ -49,6 +49,8 @@ class RequestService:
         history_manager: HistoryManager | None = None,
         alert_manager: AlertManager | None = None,
         default_retry_policy: RetryPolicy | None = None,
+        http_client: HTTPClient | None = None,
+        mcp_client: MCPClientService | None = None,
     ) -> None:
         self._metrics = metrics
         self._history_manager = history_manager
@@ -67,10 +69,20 @@ class RequestService:
             default_retry_policy is not None,
             default_retry_policy.max_retries if default_retry_policy is not None else "N/A",
         )
-        self.http_client = HTTPClient(
-            metrics=self._metrics, template_service=self._template_service
-        )
-        self.mcp_client = MCPClientService()
+        if http_client is not None:
+            self.http_client = http_client
+            logger.debug("RequestService: using injected HTTPClient id=%d", id(http_client))
+        else:
+            self.http_client = HTTPClient(
+                metrics=self._metrics, template_service=self._template_service
+            )
+        if mcp_client is not None:
+            self.mcp_client = mcp_client
+            logger.debug(
+                "RequestService: using injected MCPClientService id=%d", id(mcp_client)
+            )
+        else:
+            self.mcp_client = MCPClientService()
 
     def _execute_mcp(
         self,

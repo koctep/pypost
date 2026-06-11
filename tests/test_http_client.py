@@ -305,6 +305,12 @@ class TestHTTPClientInjection(unittest.TestCase):
         client = HTTPClient()
         self.assertIsInstance(client._template_service, TemplateService)
 
+    def test_injected_session_is_used(self):
+        """A requests.Session passed at construction is stored on the client."""
+        mock_session = MagicMock()
+        client = HTTPClient(session=mock_session)
+        self.assertIs(mock_session, client.session)
+
 
 if __name__ == "__main__":
     unittest.main()

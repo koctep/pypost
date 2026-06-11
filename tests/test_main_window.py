@@ -62,6 +62,42 @@ class TestMainWindow(unittest.TestCase):
         mock_collections.refresh_tree.assert_called_once()
         mock_collections.load_collections.assert_not_called()
 
+    def test_constructor_stores_injected_dependencies(self):
+        """PYPOST-382: metrics, template_service, config_manager, alert_manager are retained."""
+        metrics = MagicMock()
+        template_service = MagicMock()
+        config_manager = MagicMock()
+        alert_manager = MagicMock()
+        with (
+            patch("pypost.ui.main_window.StorageManager"),
+            patch("pypost.ui.main_window.ConfigManager"),
+            patch("pypost.ui.main_window.RequestManager"),
+            patch("pypost.ui.main_window.StateManager") as mock_sm,
+            patch("pypost.ui.main_window.MCPServerManager"),
+            patch("pypost.ui.main_window.HistoryManager"),
+            patch("pypost.ui.main_window.CollectionsPresenter"),
+            patch("pypost.ui.main_window.TabsPresenter"),
+            patch("pypost.ui.main_window.EnvPresenter"),
+            patch("pypost.ui.main_window.HistoryPanel"),
+            patch("pypost.ui.main_window.MainWindow._build_layout"),
+            patch("pypost.ui.main_window.MainWindow._wire_signals"),
+            patch("pypost.ui.main_window.MainWindow._create_menu_bar"),
+            patch("pypost.ui.main_window.MainWindow._setup_shortcuts"),
+            patch("pypost.ui.main_window.MainWindow.apply_settings"),
+            patch("pypost.ui.main_window.resolve_encryption_enabled", return_value=False),
+        ):
+            mock_sm.return_value.settings = AppSettings()
+            window = MainWindow(
+                metrics=metrics,
+                template_service=template_service,
+                config_manager=config_manager,
+                alert_manager=alert_manager,
+            )
+        self.assertIs(metrics, window.metrics)
+        self.assertIs(template_service, window.template_service)
+        self.assertIs(config_manager, window.config_manager)
+        self.assertIs(alert_manager, window._alert_manager)
+
     def test_main_window_curl_copied_status_bar(self):
         metrics = MagicMock()
         template_service = MagicMock()

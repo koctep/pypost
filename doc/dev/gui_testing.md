@@ -102,5 +102,6 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing
+- [testability.md](testability.md) — RequestService / HTTPClient / MainWindow unit test seams (PYPOST-382)
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — agent rules
 - [PYPOST-365](https://pypost.atlassian.net/browse/PYPOST-365) — GUI patterns and search tests

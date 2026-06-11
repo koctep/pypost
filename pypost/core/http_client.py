@@ -42,13 +42,18 @@ class HTTPRequestResult:
 
 class HTTPClient:
     def __init__(
-        self, metrics: MetricsManager | None = None, template_service: TemplateService | None = None
+        self,
+        metrics: MetricsManager | None = None,
+        template_service: TemplateService | None = None,
+        session: requests.Session | None = None,
     ):
-        self.session = requests.Session()
+        self.session = session if session is not None else requests.Session()
         self._metrics = metrics
         self._template_service = (
             template_service if template_service is not None else TemplateService()
         )
+        if session is not None:
+            logger.debug("HTTPClient: using injected requests.Session id=%d", id(session))
         if template_service is not None:
             logger.debug("HTTPClient: using injected TemplateService id=%d", id(template_service))
         else:

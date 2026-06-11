@@ -21,8 +21,9 @@ See audit R5.
 
 ## 4. Request Execution Protocol
 
-RequestService, RequestWorker, MCPServerImpl create HTTPClient/RequestService directly. Introduce
-protocols for testability. See audit R4, R9.
+RequestService accepts optional `http_client` and `mcp_client` constructor injection (PYPOST-382).
+RequestWorker and MCPServerImpl still create RequestService internally. Introduce protocols for
+full testability. See [testability.md](../testability.md) and audit R4, R9.
 
 ## Follow-up Tasks
 
