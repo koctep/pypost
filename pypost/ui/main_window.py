@@ -92,7 +92,7 @@ class MainWindow(QMainWindow):
         self._wire_signals()
         self._create_menu_bar()
         self._setup_shortcuts()
-        self.collections.load_collections()
+        self.collections.refresh_tree()
         if resolve_encryption_enabled(self.settings):
             self.env.environments_loaded.connect(self._on_startup_environments_loaded)
             self.env.load_environments()
@@ -155,7 +155,7 @@ class MainWindow(QMainWindow):
         )
         self.tabs.variable_set_requested.connect(self.env.handle_variable_set_request)
         self.tabs.env_update_requested.connect(self.env.on_env_update)
-        self.tabs.request_saved.connect(self.collections.load_collections)
+        self.tabs.request_saved.connect(self.collections.refresh_tree)
         self.tabs.request_saved.connect(self.collections.restore_tree_state)
         self.tabs.request_executed.connect(self.history_panel.refresh)
         self.history_panel.load_into_editor.connect(self.tabs.load_request_from_history)

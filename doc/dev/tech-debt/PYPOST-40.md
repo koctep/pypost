@@ -15,8 +15,8 @@ from main.py. See audit R2, R3.
 
 ## 3. Collection Loading
 
-MainWindow loads collections from Storage directly in `load_collections()` but uses
-RequestManager for CRUD. Unify: use RequestManager.reload_collections() and get_collections().
+**Resolved in PYPOST-47.** UI reads collections via `RequestManager.get_collections()`; disk
+reloads use `RequestManager.reload_collections()` only. See [collection_loading.md](../collection_loading.md).
 See audit R5.
 
 ## 4. Request Execution Protocol
@@ -28,7 +28,7 @@ protocols for testability. See audit R4, R9.
 
 - **Prerequisite:** PYPOST-52 — Add test coverage for refactoring safety (blocks P1)
 - **P1:** PYPOST-43 (MainWindow), PYPOST-44 (MetricsManager), PYPOST-45 (template_service)
-- **P2:** PYPOST-46 (HTTPClient protocol), PYPOST-47 (collection loading), PYPOST-48
+- **P2:** PYPOST-46 (HTTPClient protocol), ~~PYPOST-47 (collection loading)~~, PYPOST-48
   (item_type strategy), PYPOST-49 (MetricsManager split)
 - **P3:** PYPOST-50 (StorageInterface), PYPOST-51 (ExecuteRequestProtocol)
 - Consider automated audit tooling (radon, pylint) in CI.

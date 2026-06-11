@@ -22,7 +22,7 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 | Priority | Recommendation |
 |----------|----------------|
 | P1 | Decompose MainWindow; replace MetricsManager/template_service with injection |
-| P2 | HTTPClient protocol; unified collection loading; item_type strategy; split MetricsManager |
+| P2 | HTTPClient protocol; ~~unified collection loading~~ (PYPOST-47); item_type strategy; split MetricsManager |
 | P3 | StorageInterface; ExecuteRequestProtocol |
 
 ## Related

@@ -51,15 +51,14 @@ class CollectionsPresenter(QObject):
     def widget(self) -> QTreeView:
         return self._view
 
-    def load_collections(self) -> None:
-        """(Re)populates tree model from request_manager."""
-        self._request_manager.reload_collections()
+    def refresh_tree(self) -> None:
+        """Rebuilds tree model from RequestManager in-memory collections."""
         self._model.clear()
 
         collections = self._request_manager.get_collections()
         total_requests = sum(len(col.requests) for col in collections)
         logger.info(
-            "load_collections_completed collection_count=%d request_count=%d",
+            "refresh_tree_completed collection_count=%d request_count=%d",
             len(collections),
             total_requests,
         )
@@ -80,6 +79,11 @@ class CollectionsPresenter(QObject):
                 col_item.appendRow(req_item)
 
             self._model.appendRow(col_item)
+
+    def load_collections(self) -> None:
+        """Reloads collections from storage and rebuilds the tree model."""
+        self._request_manager.reload_collections()
+        self.refresh_tree()
 
     def restore_tree_state(self) -> None:
         """Re-expands nodes from StateManager state."""
@@ -219,7 +223,7 @@ class CollectionsPresenter(QObject):
             )
             self._metrics.track_gui_collection_rename_action(item_type, "cancelled")
             self._pending_rename = None
-            self.load_collections()
+            self.refresh_tree()
             self.restore_tree_state()
             return
 
@@ -233,7 +237,7 @@ class CollectionsPresenter(QObject):
                 item_id,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "not_found")
-            self.load_collections()
+            self.refresh_tree()
             self.restore_tree_state()
             return
 
@@ -246,7 +250,7 @@ class CollectionsPresenter(QObject):
             )
             self._metrics.track_gui_collection_rename_action(item_type, "rejected_empty")
             QMessageBox.warning(self._view, "Rename Error", "Name cannot be empty.")
-            self.load_collections()
+            self.refresh_tree()
             self.restore_tree_state()
             return
 
@@ -264,7 +268,7 @@ class CollectionsPresenter(QObject):
             QMessageBox.critical(
                 self._view, "Rename Error", f"Failed to rename '{item.text()}': {exc}"
             )
-            self.load_collections()
+            self.refresh_tree()
             self.restore_tree_state()
             return
 
@@ -277,7 +281,7 @@ class CollectionsPresenter(QObject):
             )
             self._metrics.track_gui_collection_rename_action(item_type, "not_found")
             QMessageBox.warning(self._view, "Rename Error", f"Could not rename '{item.text()}'.")
-            self.load_collections()
+            self.refresh_tree()
             self.restore_tree_state()
             return
 
@@ -292,7 +296,7 @@ class CollectionsPresenter(QObject):
         if item_type == "request":
             self.request_renamed.emit(item_id, new_name)
 
-        self.load_collections()
+        self.refresh_tree()
         self.restore_tree_state()
         self.collections_changed.emit()
 
@@ -367,7 +371,7 @@ class CollectionsPresenter(QObject):
         if affected_request_ids:
             self.requests_deleted.emit(affected_request_ids)
         if not self.remove_item_from_tree(item_id, item_type):
-            self.load_collections()
+            self.refresh_tree()
             self.restore_tree_state()
         self.collections_changed.emit()
 

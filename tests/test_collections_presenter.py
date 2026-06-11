@@ -95,6 +95,28 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter.load_collections()
         self.assertEqual(presenter.widget.model().rowCount(), 0)
 
+    def test_refresh_tree_populates_model_without_reload(self):
+        col = _make_collection("c1", "My API")
+        presenter = self._make_presenter([col])
+        rm = presenter._request_manager
+        rm.reload_collections = MagicMock(wraps=rm.reload_collections)
+
+        presenter.refresh_tree()
+
+        rm.reload_collections.assert_not_called()
+        self.assertEqual(presenter.widget.model().rowCount(), 1)
+        self.assertEqual(presenter.widget.model().item(0).text(), "My API")
+
+    def test_load_collections_reloads_from_storage(self):
+        col = _make_collection("c1", "My API")
+        presenter = self._make_presenter([col])
+        rm = presenter._request_manager
+        rm.reload_collections = MagicMock(wraps=rm.reload_collections)
+
+        presenter.load_collections()
+
+        rm.reload_collections.assert_called_once()
+
     def test_restore_tree_state_expands_known_ids(self):
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
