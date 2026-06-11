@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QPlainTextEdit
 
 from pypost.ui.widgets.fold import BodyFormat, FoldController
 from pypost.ui.widgets.line_number_area import LineNumberArea
+from pypost.ui.widgets.validate import ValidationController
 from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
 
 _CHEVRON_WIDTH = 14
@@ -27,6 +28,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
 
         self._body_format = BodyFormat.JSON
         self._fold_controller = FoldController(self, self._body_format)
+        self._validation_controller = ValidationController(self, self._body_format)
 
         self._line_number_area = LineNumberArea(self)
         self.blockCountChanged.connect(self._update_line_number_area_width)
@@ -38,14 +40,19 @@ class CodeEditor(VariableAwarePlainTextEdit):
     def fold_controller(self) -> FoldController:
         return self._fold_controller
 
+    def validation_controller(self) -> ValidationController:
+        return self._validation_controller
+
     def set_body_format(self, body_format: BodyFormat) -> None:
         self._body_format = body_format
         self._fold_controller.set_body_format(body_format)
+        self._validation_controller.set_body_format(body_format)
         self._update_line_number_area_width(0)
 
     def setPlainText(self, text: str) -> None:
         self._fold_controller.expand_all()
         super().setPlainText(text)
+        self._validation_controller.clear()
 
     def update_indent_size(self, new_size: int):
         self.indent_size = new_size
@@ -86,6 +93,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self._line_number_area.setGeometry(
             QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
         )
+        self._validation_controller.layout_error_banner()
 
     def line_number_area_paint_event(self, event: QPaintEvent):
         painter = QPainter(self._line_number_area)

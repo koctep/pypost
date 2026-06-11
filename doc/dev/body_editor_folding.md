@@ -71,7 +71,9 @@ interval is `_DEBOUNCE_MS = 200` in `fold_controller.py` (not user-configurable)
 ### No chevrons appear
 
 Content may be invalid JSON or empty. The scanner returns no regions when `json.loads()` fails.
-Fix syntax or confirm the widget is `CodeEditor` with default `BodyFormat.JSON`.
+Invalid JSON yields no fold regions and no chevrons; validation errors are shown separately
+via [Body Editor Validation](body_editor_validation.md). Fix syntax or confirm the widget is
+`CodeEditor` with default `BodyFormat.JSON`.
 
 ### Collapsed content missing from saved request
 

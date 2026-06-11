@@ -21,6 +21,7 @@ set up your development environment, and contribute to the project.
 1. [Template Expression Functions (PYPOST-450)](template_expression_functions.md)
 1. [Body Editor Line Numbers (PYPOST-510)](body_editor_line_numbers.md)
 1. [Body Editor Folding (PYPOST-511)](body_editor_folding.md)
+1. [Body Editor Validation (PYPOST-512)](body_editor_validation.md)
 
 ## Quick Start
 
