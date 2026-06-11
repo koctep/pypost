@@ -38,8 +38,12 @@ class StorageManager:
         app_name: str = "pypost",
         app_author=None,
         metrics: "MetricsManager | None" = None,
+        data_dir: str | Path | None = None,
     ):
-        self.data_dir = Path(user_data_dir(app_name, app_author))
+        if data_dir is not None:
+            self.data_dir = Path(data_dir)
+        else:
+            self.data_dir = Path(user_data_dir(app_name, app_author))
         self.collections_path = self.data_dir / "collections"
         self.environments_file = self.data_dir / "environments.json"
         self._metrics = metrics

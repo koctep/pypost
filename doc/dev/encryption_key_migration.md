@@ -158,11 +158,16 @@ available). The CLI loads `AppSettings` via `ConfigManager` and respects `PYPOST
 env overrides the same way the desktop app does.
 
 ```bash
-python scripts/encryption_migrate.py verify
-python scripts/encryption_migrate.py report
-python scripts/encryption_migrate.py re-encrypt [--dry-run] [--no-backup]
-python scripts/encryption_migrate.py encrypt-plaintext [--dry-run] [--no-backup]
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] verify
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] report
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] re-encrypt [--dry-run] [--no-backup]
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] encrypt-plaintext [--dry-run] [--no-backup]
 ```
+
+| Flag | Purpose |
+| --- | --- |
+| `--json` | Emit one JSON document on stdout (inventory, errors, success). For CI and scripting. |
+| `--data-dir PATH` | Use `PATH` as the PyPost data directory (`environments.json`). Settings still load from `ConfigManager`. Useful when verifying a restored copy before swap-in. |
 
 | Command | Writes | Purpose |
 | --- | --- | --- |
@@ -188,8 +193,10 @@ to stderr; with `--json`, errors are included in the JSON payload on stdout.
     "hidden_value_count": 0,
     "encrypted_envelope_count": 0,
     "plaintext_hidden_count": 0,
+    "invalid_hidden_count": 0,
     "kid_histogram": {},
-    "missing_kids": []
+    "missing_kids": [],
+    "data_quality_errors": []
   }
 }
 ```
