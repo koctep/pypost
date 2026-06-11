@@ -44,8 +44,9 @@ This class contains the actual business logic of the MCP server.
     description (falls back to `name`). `RequestData.mcp_params` holds per-parameter
     `McpToolParam` records (`type`, `description`, `required`).
 *   **Schema Generation**: Discovers `{{ mcp.request.VAR_NAME }}` placeholders in URL,
-    headers, params, and body (regex + optional `TemplateService` parse). Merges discovered
-    names with explicit `mcp_params` and builds JSON Schema via `_build_tool_input_schema`.
+    headers, params, and body via regex in `McpSecretsPolicy.extract_mcp_request_variables`.
+    Merges discovered names with explicit `mcp_params` and builds JSON Schema via
+    `build_tool_input_schema`.
     Undeclared placeholders default to `type: string`, `required: true` (backward compatible).
 *   **Execution**: Delegates request execution to `RequestService`.
 *   **Environment variables (PYPOST-550)**: At `call_tool` time, snapshots active
