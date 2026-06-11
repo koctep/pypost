@@ -1,11 +1,12 @@
-
 import pytest
 
 pytestmark = pytest.mark.timeout(30)
 
+import base64
 from unittest.mock import MagicMock
 
 
+from pypost.core.encryption_key import build_key_id
 from pypost.core.environment_secrets_codec import (
     EncryptedValueEnvelope,
     EncryptedValueEnvelopeV2,
@@ -178,18 +179,85 @@ def test_from_payload_rejects_invalid_v2_shapes(
         EncryptedValueEnvelope.from_payload(payload)
 
 
-def test_decrypt_rejects_v2_payload(codec: EnvironmentSecretsCodec):
-    with pytest.raises(
-        EnvironmentEncryptionError,
-        match="uses unsupported envelope version 2",
-    ):
+def test_decrypt_v2_fernet_payload():
+    fernet = pytest.importorskip("cryptography.fernet")
+    raw_key = fernet.Fernet.generate_key().decode("utf-8")
+    key_id = build_key_id(raw_key)
+    token = fernet.Fernet(raw_key.encode("utf-8")).encrypt(b"secret-value").decode("utf-8")
+    key_provider = _build_key_provider_with_active_key(raw_key)
+    key_provider.get_key_by_id.return_value = EncryptionKey(key=raw_key, key_id=key_id)
+    codec = EnvironmentSecretsCodec(key_provider)
+
+    assert (
         codec.decrypt(
             {
                 "enc": True,
                 "v": 2,
                 "alg": "fernet",
-                "kid": "kid-1",
-                "ct": "token-value",
+                "kid": key_id,
+                "ct": token,
+            }
+        )
+        == "secret-value"
+    )
+
+
+def test_decrypt_v2_aes_gcm_payload():
+    aesgcm = pytest.importorskip("cryptography.hazmat.primitives.ciphers.aead").AESGCM
+    fernet = pytest.importorskip("cryptography.fernet")
+    raw_key = fernet.Fernet.generate_key().decode("utf-8")
+    key_id = build_key_id(raw_key)
+    aes_key = base64.urlsafe_b64decode(raw_key.encode("utf-8"))
+    nonce = b"\x00" * 12
+    encrypted = aesgcm(aes_key).encrypt(nonce, b"secret-value", None)
+    ciphertext = encrypted[:-16]
+    tag = encrypted[-16:]
+    key_provider = _build_key_provider_with_active_key(raw_key)
+    key_provider.get_key_by_id.return_value = EncryptionKey(key=raw_key, key_id=key_id)
+    codec = EnvironmentSecretsCodec(key_provider)
+
+    assert (
+        codec.decrypt(
+            {
+                "enc": True,
+                "v": 2,
+                "alg": "aes-gcm",
+                "kid": key_id,
+                "ct": base64.b64encode(ciphertext).decode("utf-8"),
+                "iv": base64.b64encode(nonce).decode("utf-8"),
+                "tag": base64.b64encode(tag).decode("utf-8"),
+            }
+        )
+        == "secret-value"
+    )
+
+
+def test_decrypt_v2_aes_gcm_invalid_tag_raises():
+    aesgcm = pytest.importorskip("cryptography.hazmat.primitives.ciphers.aead").AESGCM
+    fernet = pytest.importorskip("cryptography.fernet")
+    raw_key = fernet.Fernet.generate_key().decode("utf-8")
+    key_id = build_key_id(raw_key)
+    aes_key = base64.urlsafe_b64decode(raw_key.encode("utf-8"))
+    nonce = b"\x00" * 12
+    encrypted = aesgcm(aes_key).encrypt(nonce, b"secret-value", None)
+    ciphertext = encrypted[:-16]
+    key_provider = _build_key_provider_with_active_key(raw_key)
+    key_provider.get_key_by_id.return_value = EncryptionKey(key=raw_key, key_id=key_id)
+    codec = EnvironmentSecretsCodec(key_provider)
+
+    with pytest.raises(
+        EnvironmentEncryptionError,
+        match="Encrypted environment value could not be decrypted with current key",
+    ):
+        codec.decrypt(
+            {
+                "enc": True,
+                "v": 2,
+                "alg": "aes-gcm",
+                "kid": key_id,
+                "ct": base64.b64encode(ciphertext).decode("utf-8"),
+                "iv": base64.b64encode(nonce).decode("utf-8"),
+                "tag": base64.b64encode(b"invalid-tag-bytes").decode("utf-8"),
             }
         )
 

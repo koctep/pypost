@@ -202,7 +202,9 @@ JSON uses `to_json()`.
   `EnvironmentEncryptionError` for missing markers, unsupported version/algorithm, or missing
   required fields. Coerces string fields.
 - `EnvironmentSecretsCodec.decrypt(payload)` — delegates validation to `from_payload`, decrypts
-  v1 Fernet payloads; v2 envelopes raise until algorithm handlers are implemented.
+  v1 and v2 envelopes via algorithm-specific handlers (`fernet` token decrypt; `aes-gcm` with
+  base64 `iv`, `ct`, and `tag`). Key material for both algorithms is resolved by `kid` from the
+  configured key provider (AES-GCM uses the raw 32-byte key decoded from the Fernet key string).
 
 ### `StorageManager.apply_encryption_settings(settings: AppSettings | None) -> None`
 
@@ -449,7 +451,7 @@ Encrypted values are stored as envelope objects in the `variables` map. All vers
 
 `encrypt()` emits v1 only. Fields: `enc`, `v=1`, `alg=fernet`, `kid`, `ct`.
 
-### Version 2 (designed, decrypt not yet implemented)
+### Version 2 (decrypt supported; encrypt still v1-only)
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -457,7 +459,8 @@ Encrypted values are stored as envelope objects in the `variables` map. All vers
 | `iv`, `tag` | aes-gcm only | Base64 nonce and authentication tag |
 | `meta` | no | String-to-string metadata map |
 
-Algorithm rules: `fernet` must not include `iv`/`tag`; `aes-gcm` requires both.
+Algorithm rules: `fernet` must not include `iv`/`tag`; `aes-gcm` requires both. `encrypt()` still
+emits v1 only; v2 is for migration and external tooling until v2 encrypt is added.
 
 Validation and version dispatch are centralized in `EncryptedValueEnvelope.from_payload()`.
 Callers should not re-implement field checks before `EnvironmentSecretsCodec.decrypt()`.

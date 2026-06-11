@@ -1,3 +1,4 @@
+import base64
 import logging
 from dataclasses import dataclass
 from typing import Any, ClassVar, TypeAlias
@@ -5,10 +6,14 @@ from typing import Any, ClassVar, TypeAlias
 from pypost.core.key_provider import EncryptionKey, EnvironmentEncryptionError, KeyProvider
 
 try:
+    from cryptography.exceptions import InvalidTag
     from cryptography.fernet import Fernet, InvalidToken
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 except ImportError:  # pragma: no cover - exercised when dependency is absent.
     Fernet = None  # type: ignore[assignment]
     InvalidToken = Exception  # type: ignore[assignment]
+    InvalidTag = Exception  # type: ignore[assignment]
+    AESGCM = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -163,15 +168,15 @@ class EnvironmentSecretsCodec:
     def __init__(self, key_provider: KeyProvider) -> None:
         self._key_provider = key_provider
 
-    def _ensure_fernet_available(self) -> None:
-        if Fernet is None:
+    def _ensure_crypto_available(self) -> None:
+        if Fernet is None or AESGCM is None:
             raise EnvironmentEncryptionError(
                 "cryptography dependency is missing. Install 'cryptography' to use "
                 "encrypted environment storage."
             )
 
     def encrypt(self, value: str) -> EncryptedValueEnvelope:
-        self._ensure_fernet_available()
+        self._ensure_crypto_available()
         key = self._key_provider.get_current_key()
         token = Fernet(key.key.encode("utf-8")).encrypt(value.encode("utf-8"))
         logger.debug(
@@ -189,20 +194,58 @@ class EnvironmentSecretsCodec:
         )
 
     def decrypt(self, payload: dict[str, Any]) -> str:
-        self._ensure_fernet_available()
+        self._ensure_crypto_available()
         envelope = EncryptedValueEnvelope.from_payload(payload)
         if isinstance(envelope, EncryptedValueEnvelopeV2):
-            logger.error(
-                "env_value_decrypt_failed reason=unsupported_version version=%d algorithm=%s",
-                envelope.v,
-                envelope.alg,
-            )
-            raise EnvironmentEncryptionError(
-                "Encrypted environment value uses unsupported envelope version 2."
-            )
+            return self._decrypt_v2(envelope)
         key = self._key_provider.get_key_by_id(envelope.kid)
         logger.debug("env_value_decrypt_attempt key_id=%s", envelope.kid)
         return self._decrypt_token(envelope.ct, key)
+
+    def _decrypt_v2(self, envelope: EncryptedValueEnvelopeV2) -> str:
+        key = self._key_provider.get_key_by_id(envelope.kid)
+        logger.debug(
+            "env_value_decrypt_attempt key_id=%s version=%d algorithm=%s",
+            envelope.kid,
+            envelope.v,
+            envelope.alg,
+        )
+        if envelope.alg == EncryptedValueEnvelopeV2.FERNET_ALGORITHM:
+            return self._decrypt_token(envelope.ct, key)
+        if envelope.alg == EncryptedValueEnvelopeV2.AES_GCM_ALGORITHM:
+            return self._decrypt_aes_gcm(envelope, key)
+        raise EnvironmentEncryptionError(
+            f"Unsupported encrypted payload algorithm: {envelope.alg}"
+        )
+
+    @staticmethod
+    def _fernet_key_to_aes_bytes(key_material: str) -> bytes:
+        return base64.urlsafe_b64decode(key_material.encode("utf-8"))
+
+    def _decrypt_aes_gcm(self, envelope: EncryptedValueEnvelopeV2, key: EncryptionKey) -> str:
+        assert envelope.iv is not None
+        assert envelope.tag is not None
+        try:
+            aes_key = self._fernet_key_to_aes_bytes(key.key)
+            nonce = base64.b64decode(envelope.iv.encode("utf-8"))
+            ciphertext = base64.b64decode(envelope.ct.encode("utf-8"))
+            tag = base64.b64decode(envelope.tag.encode("utf-8"))
+            raw = AESGCM(aes_key).decrypt(nonce, ciphertext + tag, None)
+            logger.debug(
+                "env_value_decrypted key_id=%s algorithm=%s",
+                key.key_id,
+                EncryptedValueEnvelopeV2.AES_GCM_ALGORITHM,
+            )
+            return raw.decode("utf-8")
+        except (InvalidTag, ValueError, UnicodeDecodeError) as exc:
+            logger.error(
+                "env_value_decrypt_failed reason=invalid_token key_id=%s algorithm=%s",
+                key.key_id,
+                EncryptedValueEnvelopeV2.AES_GCM_ALGORITHM,
+            )
+            raise EnvironmentEncryptionError(
+                "Encrypted environment value could not be decrypted with current key."
+            ) from exc
 
     def _decrypt_token(self, token: str, key: EncryptionKey) -> str:
         try:
