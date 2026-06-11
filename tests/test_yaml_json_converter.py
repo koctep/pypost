@@ -2,6 +2,7 @@ import unittest
 
 from pypost.core.yaml_json_converter import (
     YamlBodyConversionError,
+    convert_json_object_to_yaml,
     convert_yaml_body_to_object,
 )
 
@@ -45,6 +46,21 @@ class TestConvertYamlBodyToObject(unittest.TestCase):
         with self.assertRaises(YamlBodyConversionError) as ctx:
             convert_yaml_body_to_object("dt: 2020-01-01T12:00:00")
         self.assertIn("not JSON-serializable", str(ctx.exception))
+
+
+class TestConvertJsonObjectToYaml(unittest.TestCase):
+    def test_mapping(self):
+        result = convert_json_object_to_yaml({"key": "value", "num": 42})
+        self.assertEqual(convert_yaml_body_to_object(result), {"key": "value", "num": 42})
+
+    def test_list(self):
+        result = convert_json_object_to_yaml(["a", "b", "c"])
+        self.assertEqual(convert_yaml_body_to_object(result), ["a", "b", "c"])
+
+    def test_nested_structure(self):
+        obj = {"user": {"name": "Alice", "roles": ["admin", "user"]}}
+        result = convert_json_object_to_yaml(obj)
+        self.assertEqual(convert_yaml_body_to_object(result), obj)
 
 
 if __name__ == "__main__":

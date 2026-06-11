@@ -38,3 +38,8 @@ def convert_yaml_body_to_object(text: str) -> Any:
         raise YamlBodyConversionError(f"Parsed YAML is not JSON-serializable: {exc}") from exc
 
     return parsed
+
+
+def convert_json_object_to_yaml(obj: Any) -> str:
+    """Serialize a JSON-compatible Python object to YAML text."""
+    return yaml.dump(obj, default_flow_style=False, sort_keys=False)

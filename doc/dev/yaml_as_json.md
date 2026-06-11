@@ -1,10 +1,14 @@
-# YAML as JSON Send Conversion
+# YAML as JSON Conversion
 
 ## Overview
 
 The Body tab includes an optional **YAML as JSON** checkbox. When enabled and the body format is
-YAML, the application converts the editor content to JSON at send time so users can author payloads
-in YAML while targeting JSON-only HTTP APIs.
+YAML, the application:
+
+1. **Paste** — converts pasted JSON to YAML in the editor (`CodeEditor.insertFromMimeData`).
+2. **Send** — converts editor YAML to JSON on the HTTP wire (`HTTPClient`).
+
+Users can author payloads in YAML while pasting from JSON sources and targeting JSON-only APIs.
 
 Behaviour:
 
@@ -13,7 +17,9 @@ Behaviour:
 - Default is unchecked for new requests and requests without a saved preference.
 - Editor text stays YAML after send; only the outgoing HTTP request uses the converted JSON.
 - Invalid or non-serializable YAML surfaces a user-visible error; the request is not sent.
-- When format is not YAML, the flag has no effect on send (even if still checked in the model).
+- When format is not YAML, the flag has no effect on send or paste (even if still checked in the
+  model).
+- Pasted non-JSON text is unchanged; invalid JSON paste falls back to default insert.
 
 See also [Body Format Selector](body_format_selector.md) for format persistence and
 [Copy cURL](copy_curl.md) for cURL generation (cURL uses editor text, not converted JSON).
@@ -54,11 +60,14 @@ flowchart LR
 
 - **`RequestWidget` (`pypost/ui/widgets/request_editor.py`)** — `yaml_as_json_check` on the Body
   tab format row; load/save via `load_data`, `update_request_data`, `get_request_data_from_ui`;
-  `setEnabled` when format is YAML.
+  `setEnabled` when format is YAML; `_sync_yaml_as_json_to_editor` pushes flag to `CodeEditor`.
+- **`CodeEditor` (`pypost/ui/widgets/code_editor.py`)** — `set_yaml_as_json`; paste hook converts
+  JSON→YAML when format is YAML and flag is on, otherwise pretty-prints JSON (existing behavior).
 - **`RequestData` (`pypost/models/models.py`)** — `yaml_as_json: bool = False`; serializes with
   existing collection storage (no migration).
-- **`yaml_json_converter` (`pypost/core/yaml_json_converter.py`)** — Pure parse/validate function;
-  raises `YamlBodyConversionError` on failure.
+- **`yaml_json_converter` (`pypost/core/yaml_json_converter.py`)** — `convert_yaml_body_to_object`
+  for send; `convert_json_object_to_yaml` for paste; raises `YamlBodyConversionError` on send-path
+  failure.
 - **`HTTPClient` (`pypost/core/http_client.py`)** — Branch in `_prepare_request_kwargs` when
   `body_type == "yaml"` and `yaml_as_json` is true; raises `ExecutionError(BODY)` on conversion
   failure.
@@ -156,7 +165,9 @@ Mirror `mcp_check` pattern in `RequestWidget`:
 
 - `load_data`: `yaml_as_json_check.setChecked(request_data.yaml_as_json)` and
   `_update_yaml_as_json_enabled()`.
-- `_on_body_format_changed`: `yaml_as_json_check.setEnabled(body_format == BodyFormat.YAML)`.
+- `_on_body_format_changed`: `yaml_as_json_check.setEnabled(body_format == BodyFormat.YAML)` and
+  `_sync_yaml_as_json_to_editor()`.
+- `_on_yaml_as_json_toggled` / `load_data`: sync checkbox to `body_edit.set_yaml_as_json`.
 - `update_request_data` / `get_request_data_from_ui`: read checkbox into `yaml_as_json`.
 
 When the checkbox is disabled (non-YAML format), checked state is still persisted in
@@ -216,15 +227,17 @@ BODY errors before the retry loop. See `tests/test_retry.py`.
 
 | File | Coverage |
 | --- | --- |
-| `tests/test_yaml_json_converter.py` | Valid/invalid YAML, multi-document rejection, JSON-serialization failure |
+| `tests/test_yaml_json_converter.py` | YAML parse + `convert_json_object_to_yaml` round-trip |
 | `tests/test_http_client.py` | Send with flag on/off, ignored for JSON/XML, BODY error path |
-| `tests/test_request_editor_body_format.py` | Checkbox persistence and enabled-state by format |
+| `tests/test_code_editor.py` | JSON→YAML paste when flag on; JSON format unchanged |
+| `tests/test_request_editor_body_format.py` | Checkbox persistence, enabled-state, editor sync |
 | `tests/test_retry.py` | BODY errors do not retry |
 
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_yaml_json_converter.py \
   tests/test_http_client.py \
+  tests/test_code_editor.py -k mime \
   tests/test_request_editor_body_format.py \
   tests/test_retry.py -k body
 ```
@@ -233,5 +246,4 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 
 - **PYPOST-513** — Body format selector (`body_type`).
 - **PYPOST-514** — YAML-as-JSON send conversion (this feature).
-- **PYPOST-515** — Paste-time JSON→YAML display when checkbox is on (follow-up; shares
-  `yaml_as_json` flag).
+- **PYPOST-515** — Paste-time JSON→YAML in editor when checkbox is on (shares `yaml_as_json` flag).

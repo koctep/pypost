@@ -11,6 +11,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QPlainTextEdit
 
+from pypost.core.yaml_json_converter import convert_json_object_to_yaml
 from pypost.ui.widgets.fold import BodyFormat, FoldController
 from pypost.ui.widgets.line_number_area import LineNumberArea
 from pypost.ui.widgets.validate import ValidationController
@@ -27,6 +28,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
         self._body_format = BodyFormat.JSON
+        self._yaml_as_json = False
         self._fold_controller = FoldController(self, self._body_format)
         self._validation_controller = ValidationController(self, self._body_format)
 
@@ -48,6 +50,9 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self._fold_controller.set_body_format(body_format)
         self._validation_controller.set_body_format(body_format)
         self._update_line_number_area_width(0)
+
+    def set_yaml_as_json(self, enabled: bool) -> None:
+        self._yaml_as_json = enabled
 
     def setPlainText(self, text: str) -> None:
         self._fold_controller.expand_all()
@@ -235,8 +240,12 @@ class CodeEditor(VariableAwarePlainTextEdit):
             text = source.text()
             try:
                 parsed = json.loads(text)
-                formatted_json = json.dumps(parsed, indent=self.indent_size)
-                self.insertPlainText(formatted_json)
+                if self._body_format == BodyFormat.YAML and self._yaml_as_json:
+                    yaml_text = convert_json_object_to_yaml(parsed)
+                    self.insertPlainText(yaml_text.rstrip("\n"))
+                else:
+                    formatted_json = json.dumps(parsed, indent=self.indent_size)
+                    self.insertPlainText(formatted_json)
             except (json.JSONDecodeError, ValueError):
                 super().insertFromMimeData(source)
         else:

@@ -15,7 +15,9 @@ from PySide6.QtGui import QKeyEvent, QPaintEvent, QPainter, QTextCursor
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QPlainTextEdit
 
+from pypost.core.yaml_json_converter import convert_yaml_body_to_object
 from pypost.ui.widgets.code_editor import CodeEditor
+from pypost.ui.widgets.fold import BodyFormat
 
 
 def _collect_gutter_numbers(editor: CodeEditor) -> list[str]:
@@ -117,6 +119,39 @@ class TestCodeEditorPaste(unittest.TestCase):
         mime.setText("hello {{var}}")
         ed.insertFromMimeData(mime)
         self.assertEqual(ed.toPlainText(), "keephello {{var}}")
+
+    def test_insert_from_mime_data_json_to_yaml_when_yaml_as_json(self):
+        ed = CodeEditor()
+        ed.set_body_format(BodyFormat.YAML)
+        ed.set_yaml_as_json(True)
+        ed.setPlainText("")
+        mime = QMimeData()
+        mime.setText('{"x": 1, "items": ["a", "b"]}')
+        ed.insertFromMimeData(mime)
+        self.assertEqual(
+            convert_yaml_body_to_object(ed.toPlainText()),
+            {"x": 1, "items": ["a", "b"]},
+        )
+
+    def test_insert_from_mime_data_json_stays_json_without_yaml_as_json(self):
+        ed = CodeEditor(indent_size=2)
+        ed.set_body_format(BodyFormat.YAML)
+        ed.set_yaml_as_json(False)
+        ed.setPlainText("")
+        mime = QMimeData()
+        mime.setText('{"x": 1}')
+        ed.insertFromMimeData(mime)
+        self.assertEqual(json.loads(ed.toPlainText()), {"x": 1})
+
+    def test_insert_from_mime_data_json_stays_json_for_json_format(self):
+        ed = CodeEditor(indent_size=2)
+        ed.set_body_format(BodyFormat.JSON)
+        ed.set_yaml_as_json(True)
+        ed.setPlainText("")
+        mime = QMimeData()
+        mime.setText('{"x": 1}')
+        ed.insertFromMimeData(mime)
+        self.assertEqual(json.loads(ed.toPlainText()), {"x": 1})
 
 
 class TestCodeEditorKeyHandling(unittest.TestCase):

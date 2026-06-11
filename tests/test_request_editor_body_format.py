@@ -109,6 +109,15 @@ class TestRequestWidgetBodyFormat(unittest.TestCase):
         data = self.widget.get_request_data_from_ui()
         self.assertTrue(data.yaml_as_json)
 
+    def test_yaml_as_json_synced_to_body_editor(self):
+        self.widget.body_edit.set_yaml_as_json = MagicMock()
+        index = self.widget.body_format_combo.findData(BodyFormat.YAML)
+        self.widget.body_format_combo.setCurrentIndex(index)
+        self.widget.yaml_as_json_check.setChecked(True)
+        self.widget.body_edit.set_yaml_as_json.assert_called_with(True)
+        self.widget.yaml_as_json_check.setChecked(False)
+        self.widget.body_edit.set_yaml_as_json.assert_called_with(False)
+
 
 if __name__ == "__main__":
     unittest.main()

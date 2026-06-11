@@ -127,8 +127,10 @@ class RequestWidget(QWidget):
         format_row.addWidget(self.body_format_combo)
         self.yaml_as_json_check = QCheckBox("YAML as JSON")
         self.yaml_as_json_check.setToolTip(
-            "When enabled, YAML body is converted to JSON at send time."
+            "When enabled, YAML body is converted to JSON at send time; "
+            "pasted JSON is converted to YAML in the editor."
         )
+        self.yaml_as_json_check.toggled.connect(self._on_yaml_as_json_toggled)
         format_row.addWidget(self.yaml_as_json_check)
         format_row.addStretch()
         body_tab_layout.addLayout(format_row)
@@ -188,6 +190,17 @@ class RequestWidget(QWidget):
             return
         self.body_edit.set_body_format(body_format)
         self.yaml_as_json_check.setEnabled(body_format == BodyFormat.YAML)
+        self._sync_yaml_as_json_to_editor()
+
+    def _on_yaml_as_json_toggled(self, _checked: bool) -> None:
+        self._sync_yaml_as_json_to_editor()
+
+    def _sync_yaml_as_json_to_editor(self) -> None:
+        body_format = self.body_format_combo.currentData()
+        enabled = (
+            body_format == BodyFormat.YAML and self.yaml_as_json_check.isChecked()
+        )
+        self.body_edit.set_yaml_as_json(enabled)
 
     def _update_yaml_as_json_enabled(self) -> None:
         body_format = self.body_format_combo.currentData()
@@ -207,6 +220,7 @@ class RequestWidget(QWidget):
             self.body_edit.set_body_format(body_format)
             self.yaml_as_json_check.setChecked(self.request_data.yaml_as_json)
             self._update_yaml_as_json_enabled()
+            self._sync_yaml_as_json_to_editor()
             self.script_edit.setPlainText(self.request_data.post_script)
             self.mcp_check.setChecked(self.request_data.expose_as_mcp)
         finally:
