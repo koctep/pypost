@@ -49,6 +49,23 @@ ResponseView search bar coverage (PYPOST-365):
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_response_view_search.py -v
 ```
 
+## Response search flow integration (PYPOST-357)
+
+RequestTab-level wiring tests load a response via `display_response`, then drive search through
+widget signals and controls (type, Next button, Enter). Unit-level ResponseView behavior remains in
+`tests/test_response_view_search.py`.
+
+| Module | Scope |
+| --- | --- |
+| `tests/test_response_search_flow_integration.py` | Tab → ResponseView search after response display |
+
+Focused run:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_response_search_flow_integration.py -v
+```
+
 ## MCP server unit tests
 
 Automated pytest coverage for `MCPServerImpl` and Starlette routing lives in

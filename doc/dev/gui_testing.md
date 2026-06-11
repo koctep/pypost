@@ -32,6 +32,7 @@ Representative modules:
 | `tests/test_settings_encryption_migration_ui.py` | Migration buttons and QMessageBox delegation |
 | `tests/test_new_variable_flow_integration.py` | ResponseView → EnvPresenter signals |
 | `tests/test_response_view_search.py` | Response body search bar (PYPOST-365) |
+| `tests/test_response_search_flow_integration.py` | RequestTab search flow (PYPOST-357) |
 
 ## Writing a GUI Test
 

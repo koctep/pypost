@@ -101,6 +101,20 @@ Search is cleared automatically when:
 - Verify focus is within `ResponseView` or its children. The shortcut is registered on the widget.
 - If another widget has captured Ctrl+F, it may take precedence.
 
+## Testing
+
+| Module | Scope |
+| --- | --- |
+| `tests/test_response_view_search.py` | ResponseView unit tests: counter, navigation, debounce, metrics |
+| `tests/test_response_search_flow_integration.py` | RequestTab wiring: `display_response` → type → Next/Enter → counter |
+
+Focused run:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_response_search_flow_integration.py -v
+```
+
 ### Search metrics are missing
 
 - Confirm metrics server is running (Settings → Metrics).
