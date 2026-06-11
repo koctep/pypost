@@ -101,6 +101,7 @@ class TestStateManagerPersistence(unittest.TestCase):
         cm, _td = self._cm_and_td()
         sm = StateManager(cm)
         sm.set_expanded_collections(["c1", "c2"])
+        sm.flush_pending_save()
 
         cm2 = ConfigManager()
         sm2 = StateManager(cm2)
@@ -110,6 +111,7 @@ class TestStateManagerPersistence(unittest.TestCase):
         cm, _td = self._cm_and_td()
         sm = StateManager(cm)
         sm.set_open_tabs(["r1", "r2"])
+        sm.flush_pending_save()
 
         sm2 = StateManager(ConfigManager())
         self.assertEqual(sm2.get_open_tabs(), ["r1", "r2"])
@@ -118,6 +120,7 @@ class TestStateManagerPersistence(unittest.TestCase):
         cm, _td = self._cm_and_td()
         sm = StateManager(cm)
         sm.set_last_environment_id("env-99")
+        sm.flush_pending_save()
 
         sm2 = StateManager(ConfigManager())
         self.assertEqual(sm2.get_last_environment_id(), "env-99")
@@ -129,9 +132,30 @@ class TestStateManagerPersistence(unittest.TestCase):
             sm.set_expanded_collections([])
             wrapped.assert_not_called()
             sm.set_expanded_collections(["a"])
+            wrapped.assert_not_called()
+            sm.flush_pending_save()
             self.assertEqual(wrapped.call_count, 1)
             sm.set_expanded_collections(["a"])
             self.assertEqual(wrapped.call_count, 1)
+            sm.flush_pending_save()
+            self.assertEqual(wrapped.call_count, 1)
+
+    def test_rapid_ui_state_changes_coalesce_to_single_save(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+        with patch.object(cm, "save_config", wraps=cm.save_config) as wrapped:
+            sm.set_expanded_collections(["a"])
+            sm.set_expanded_collections(["a", "b"])
+            sm.set_expanded_collections(["b"])
+            sm.set_open_tabs(["r1"])
+            sm.set_open_tabs(["r1", "r2"])
+            wrapped.assert_not_called()
+            sm.flush_pending_save()
+            self.assertEqual(wrapped.call_count, 1)
+
+        sm2 = StateManager(ConfigManager())
+        self.assertEqual(sm2.get_expanded_collections(), ["b"])
+        self.assertEqual(sm2.get_open_tabs(), ["r1", "r2"])
 
 
 if __name__ == "__main__":

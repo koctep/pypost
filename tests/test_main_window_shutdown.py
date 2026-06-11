@@ -64,3 +64,12 @@ def test_handle_exit_skips_storage_wait_when_encryption_disabled(qapp):
         mock_qapp.instance.return_value = MagicMock()
         window.handle_exit()
     window.env.wait_storage_idle.assert_not_called()
+
+
+def test_handle_exit_flushes_pending_state_manager_save(qapp):
+    window = _make_window(qapp)
+    window.settings = AppSettings(env_encryption_enabled=False)
+    with patch("pypost.ui.main_window.QApplication") as mock_qapp:
+        mock_qapp.instance.return_value = MagicMock()
+        window.handle_exit()
+    window.state_manager.flush_pending_save.assert_called_once()

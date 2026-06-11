@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
         self._alert_manager = alert_manager
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
         self.request_manager = RequestManager(self.storage)
-        self.state_manager = StateManager(self.config_manager)
+        self.state_manager = StateManager(self.config_manager, parent=self)
         self.storage.apply_encryption_settings(self.state_manager.settings)
         self.style_manager = StyleManager()
         self.mcp_manager = MCPServerManager(
@@ -255,6 +255,7 @@ class MainWindow(QMainWindow):
 
     def handle_exit(self) -> None:
         logger.info("main_window_exit_requested")
+        self.state_manager.flush_pending_save()
         if resolve_encryption_enabled(self.settings):
             idle = self.env.wait_storage_idle()
             logger.info("main_window_exit_storage_idle completed=%s", idle)

@@ -43,6 +43,7 @@ Collection rows store a collection id (`str`) in `Qt.UserRole`; request rows sto
 `_is_collection_item(index)` centralizes that discrimination for:
 
 - `_on_tree_expanded` / `_on_tree_collapsed` — persist expanded collection ids in `StateManager`
+  (debounced disk write; flushed on app exit)
 - `restore_tree_state` — re-expand saved collection nodes after model rebuild
 
 `CollectionsPresenter` keeps `_collection_items_by_id` (`dict[str, QStandardItem]`) in sync on
@@ -209,7 +210,8 @@ Presenter wiring and integration paths remain in `tests/test_collections_present
 | `test_collection_index_updated_on_incremental_insert_and_remove` | Index sync on insert/remove (PYPOST-390/94) |
 
 `tests/test_settings_persistence.py` (`TestStateManagerPersistence`) covers disk persistence
-of `expanded_collections` via real `StateManager` + `ConfigManager`.
+of `expanded_collections` via real `StateManager` + `ConfigManager`, including debounced
+coalescing and `flush_pending_save()` durability.
 
 ## Troubleshooting
 

@@ -46,7 +46,10 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 ### Business Logic (`pypost/core/`)
 
 - **RequestManager**: Manages the CRUD operations for Requests and Collections. Encapsulates searching and saving logic, decoupling it from the UI. Maintains an internal index for O(1) request lookup. UI code reads collections via `get_collections()` only; see [collection_loading.md](collection_loading.md).
-- **StateManager**: Manages the persistence of UI state (e.g., open tabs, expanded tree nodes), abstracting the configuration structure.
+- **StateManager**: Manages the persistence of UI state (e.g., open tabs, expanded tree nodes),
+  abstracting the configuration structure. UI mutations debounce disk writes (300 ms); pending
+  state is flushed on application exit via `flush_pending_save()`. Explicit Settings dialog
+  saves bypass `StateManager` and write immediately through `ConfigManager`.
 - **RequestService**: The central entry point for executing requests. It coordinates the `HTTPClient`
   for network calls and `ScriptExecutor` for post-request scripts.
 - **HTTPClient**: Handles the actual network communication using `requests`. Responsible for rendering templates and preparing request parameters.
