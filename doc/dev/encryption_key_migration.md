@@ -237,6 +237,8 @@ Decrypt validation is not available on `build_inventory()` — that path is veri
 
 Loads all environments, decrypts, saves unchanged in-memory values so the adapter re-encrypts with
 the active key. Requires encryption enabled. Aborts if any `kid` is missing or decrypt fails.
+Succeeds immediately without backup or file I/O when every hidden value is already encrypted with
+the active `kid` and there is no plaintext hidden data.
 
 #### `encrypt_plaintext_hidden(settings, *, dry_run=False, backup=True) -> MigrationReport`
 

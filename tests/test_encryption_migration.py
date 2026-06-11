@@ -404,6 +404,81 @@ def test_deserialize_all_uses_public_storage_api(tmp_path, monkeypatch):
     assert errors == ()
 
 
+def test_bulk_re_encrypt_skips_when_already_on_active_kid(tmp_path, monkeypatch, caplog):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+    storage.apply_encryption_settings(settings)
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    before_mtime = storage.environments_file.stat().st_mtime
+    service = EncryptionMigrationService(storage)
+
+    with caplog.at_level("INFO"):
+        report = service.bulk_re_encrypt(settings, dry_run=False, backup=True)
+
+    assert report.success is True
+    assert report.backup_path is None
+    assert storage.environments_file.stat().st_mtime == before_mtime
+    assert any(
+        "encryption_migration_operation_skipped operation=re_encrypt "
+        "reason=already_on_active_kid" in record.message
+        for record in caplog.records
+    )
+
+
+def test_bulk_re_encrypt_does_not_skip_with_plaintext_hidden(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+
+    encrypted_env = Environment(
+        id="e1",
+        name="Encrypted",
+        variables={"SECRET": "hidden"},
+        hidden_keys={"SECRET"},
+    )
+    storage.apply_encryption_settings(settings)
+    storage.save_environments([encrypted_env])
+
+    plain_payload = {
+        "id": "e2",
+        "name": "Plain",
+        "variables": {"TOKEN": "plain"},
+        "hidden_keys": ["TOKEN"],
+        "enable_mcp": False,
+    }
+    with open(storage.environments_file, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    data.append(plain_payload)
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2)
+
+    before_mtime = storage.environments_file.stat().st_mtime
+    report = EncryptionMigrationService(storage).bulk_re_encrypt(
+        settings,
+        dry_run=False,
+        backup=False,
+    )
+
+    assert report.success is True
+    assert storage.environments_file.stat().st_mtime > before_mtime
+    after = EncryptionMigrationService(storage).build_inventory(settings)
+    assert after.plaintext_hidden_count == 0
+
+
 def test_backup_environments_file_creates_timestamped_copy(tmp_path):
     source = tmp_path / "environments.json"
     source.write_text("[]", encoding="utf-8")

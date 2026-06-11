@@ -189,6 +189,23 @@ class EncryptionMigrationService:
                 success=True,
             )
 
+        if not require_plaintext:
+            active_kid = build_key_provider(settings).get_current_key().key_id
+            if self._inventory_matches_active_kid(inventory, active_kid):
+                logger.info(
+                    "encryption_migration_operation_skipped operation=%s "
+                    "reason=already_on_active_kid active_kid=%s",
+                    operation,
+                    active_kid,
+                )
+                return MigrationReport(
+                    inventory=inventory,
+                    dry_run=dry_run,
+                    backup_path=None,
+                    errors=(),
+                    success=True,
+                )
+
         if inventory.missing_kids:
             logger.error(
                 "encryption_migration_missing_kids count=%d",
@@ -342,6 +359,18 @@ class EncryptionMigrationService:
         environments, failures = self._storage.load_environments_with_errors()
         errors = tuple(failure.format_operator_message() for failure in failures)
         return environments, errors
+
+    @staticmethod
+    def _inventory_matches_active_kid(
+        inventory: EnvironmentInventory,
+        active_kid: str,
+    ) -> bool:
+        if inventory.plaintext_hidden_count > 0:
+            return False
+        if inventory.encrypted_envelope_count == 0:
+            return inventory.hidden_value_count == 0
+        hist = inventory.kid_histogram
+        return len(hist) == 1 and hist.get(active_kid) == inventory.encrypted_envelope_count
 
     @staticmethod
     def _projected_inventory_after_encrypt(
