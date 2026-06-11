@@ -110,5 +110,60 @@ class TestMCPServerManagerStartup(unittest.TestCase):
         self.assertEqual(manager._impl._variable_supplier(), {"token": "abc"})
 
 
+class TestMCPServerManagerUpdateTools(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_update_tools_restarts_when_exposed_set_changes(self):
+        port = _free_port()
+        tool_a = RequestData(
+            name="A", id="a", expose_as_mcp=True, method="GET", url="http://a"
+        )
+        tool_b = RequestData(
+            name="B", id="b", expose_as_mcp=True, method="GET", url="http://b"
+        )
+        manager = MCPServerManager()
+        manager._impl.request_service = MagicMock()
+        manager.start_server(port, [tool_a], host="127.0.0.1")
+        try:
+            deadline = time.time() + 10.0
+            while time.time() < deadline and not manager.is_running():
+                QCoreApplication.processEvents()
+                time.sleep(0.05)
+            self.assertTrue(manager.update_tools([tool_a, tool_b]))
+            deadline = time.time() + 10.0
+            while time.time() < deadline and not manager.is_running():
+                QCoreApplication.processEvents()
+                time.sleep(0.05)
+            self.assertTrue(manager.is_running())
+        finally:
+            manager.stop_server()
+
+    def test_update_tools_noop_when_signature_unchanged(self):
+        port = _free_port()
+        tool = RequestData(
+            name="Ping", expose_as_mcp=True, method="GET", url="http://x"
+        )
+        manager = MCPServerManager()
+        manager._impl.request_service = MagicMock()
+        manager.start_server(port, [tool], host="127.0.0.1")
+        try:
+            deadline = time.time() + 10.0
+            while time.time() < deadline and not manager.is_running():
+                QCoreApplication.processEvents()
+                time.sleep(0.05)
+            self.assertFalse(manager.update_tools([tool]))
+        finally:
+            manager.stop_server()
+
+    def test_update_tools_noop_when_server_stopped(self):
+        tool = RequestData(
+            name="Ping", expose_as_mcp=True, method="GET", url="http://x"
+        )
+        manager = MCPServerManager()
+        self.assertFalse(manager.update_tools([tool]))
+
+
 if __name__ == "__main__":
     unittest.main()

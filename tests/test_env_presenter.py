@@ -62,6 +62,14 @@ class FakeMCPManager:
     def is_running(self):
         return self._running
 
+    def update_tools(self, tools):
+        if not self._running:
+            return False
+        self.started.append(
+            (self.started[-1][0], self.started[-1][1], tools)
+        )
+        return True
+
     def set_variable_supplier(self, supplier):
         self.variable_supplier = supplier
 
@@ -295,6 +303,34 @@ class TestEnvPresenter(unittest.TestCase):
         col = Collection(id="c1", name="API", requests=[req])
         p = self._make_presenter(collections=[col])
         p._refresh_mcp_tools_button()
+        self.assertEqual(p.mcp_tools_btn.text(), "MCP Tools (1)")
+
+    def test_refresh_mcp_tools_restarts_when_running(self):
+        env = _make_env("e1", "MCP-Env", enable_mcp=True)
+        req = RequestData(id="r1", name="Tool", expose_as_mcp=True)
+        col = Collection(id="c1", name="API", requests=[req])
+        p = self._make_presenter([env], collections=[col])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.setCurrentIndex(1)
+        p.env_selector.blockSignals(False)
+        p._on_env_changed(1)
+        self.assertEqual(len(p._mcp_manager.started), 1)
+
+        req2 = RequestData(id="r2", name="NewTool", expose_as_mcp=True)
+        col.requests.append(req2)
+
+        p.refresh_mcp_tools()
+        self.assertEqual(len(p._mcp_manager.started), 2)
+        self.assertEqual(p.mcp_tools_btn.text(), "MCP Tools (2)")
+
+    def test_refresh_mcp_tools_noop_when_mcp_disabled(self):
+        req = RequestData(id="r1", name="Tool", expose_as_mcp=True)
+        col = Collection(id="c1", name="API", requests=[req])
+        p = self._make_presenter(collections=[col])
+        p.refresh_mcp_tools()
+        self.assertEqual(len(p._mcp_manager.started), 0)
         self.assertEqual(p.mcp_tools_btn.text(), "MCP Tools (1)")
 
     def test_mcp_activity_button_shows_count(self):

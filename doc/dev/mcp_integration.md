@@ -121,6 +121,22 @@ former monolithic `MetricsManager` into focused modules:
 sorted `McpToolOverviewEntry` rows. `EnvPresenter` opens `McpToolsOverviewDialog` from the
 top bar. Overview is read-only and does not require MCP to be running.
 
+### Tool list refresh (PYPOST-136)
+
+When the user saves a request or edits collections while MCP is running, PyPost must expose an
+up-to-date tool catalog to connected agents.
+
+1.  `MainWindow` connects `request_saved`, `collections_changed`, and `requests_deleted` to
+    `EnvPresenter.refresh_mcp_tools()`.
+2.  `refresh_mcp_tools()` recomputes exposed tools via `_get_mcp_tools()` and updates the
+    **MCP Tools (N)** button count.
+3.  If the current environment has `enable_mcp` and the server is running,
+    `MCPServerManager.update_tools()` compares `mcp_tools_signature(tools)` (sorted exposed
+    `(id, name)` pairs). When the signature changed, it logs `mcp_tools_changed` and restarts
+    uvicorn so `list_tools` reflects the new catalog.
+4.  Unchanged signatures skip restart (e.g. saving a non-MCP field on an already-exposed
+    request).
+
 ### MCP activity inspection (PYPOST-141)
 
 `McpActivityLog` in `pypost/core/mcp_activity_log.py` stores a thread-safe ring buffer (default

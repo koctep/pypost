@@ -325,6 +325,16 @@ class EnvPresenter(QObject):
         self.env_hidden_keys_changed.emit(hidden_keys)
         self._refresh_mcp_tools_button()
 
+    def refresh_mcp_tools(self) -> None:
+        """Refresh MCP tool list when collections change while server is running."""
+        tools = self._get_mcp_tools()
+        self._refresh_mcp_tools_button()
+        selected = self._env_selector.currentData()
+        if not isinstance(selected, Environment) or not selected.enable_mcp:
+            return
+        if self._mcp_manager.update_tools(tools):
+            self._show_mcp_starting()
+
     def _refresh_mcp_tools_button(self) -> None:
         count = len(self._get_mcp_tools())
         self._mcp_tools_btn.setText(f"MCP Tools ({count})")

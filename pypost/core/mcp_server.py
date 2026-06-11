@@ -19,6 +19,12 @@ from pypost.models.models import RequestData
 logger = logging.getLogger(__name__)
 
 
+def mcp_tools_signature(tools: List[RequestData]) -> tuple[tuple[str, str], ...]:
+    """Stable fingerprint of exposed MCP tools for change detection."""
+    exposed = ((req.id, req.name) for req in tools if req.expose_as_mcp)
+    return tuple(sorted(exposed))
+
+
 def format_mcp_bind_error(exc: OSError, host: str, port: int) -> str:
     """Return an operator-facing message for MCP bind failures."""
     return format_bind_error(exc, host, port, "MCP server")
@@ -53,6 +59,7 @@ class MCPServerManager(QObject):
         self._variable_supplier: Callable[[], dict[str, str]] | None = None
         self._hidden_keys_supplier: Callable[[], set[str]] | None = None
         self._startup_notified = False
+        self._tools_signature: tuple[tuple[str, str], ...] = ()
 
     @property
     def activity_log(self) -> McpActivityLog:
@@ -79,6 +86,7 @@ class MCPServerManager(QObject):
 
         self._current_port = port
         self._current_host = host
+        self._tools_signature = mcp_tools_signature(tools)
         self._impl.register_tools(tools)
         self._stop_event.clear()
         self._startup_notified = False
@@ -107,11 +115,18 @@ class MCPServerManager(QObject):
     def is_running(self) -> bool:
         return self._server_thread is not None and self._server_thread.is_alive()
 
-    def update_tools(self, tools: List[RequestData]):
-        if self.is_running():
-            # Restart to refresh tools
-            self.stop_server()
-            self.start_server(self._current_port, tools, self._current_host)
+    def update_tools(self, tools: List[RequestData]) -> bool:
+        """Restart the server when the exposed tool set changes. Returns True if restarted."""
+        signature = mcp_tools_signature(tools)
+        if signature == self._tools_signature:
+            return False
+        self._tools_signature = signature
+        if not self.is_running():
+            return False
+        logger.info("mcp_tools_changed tool_count=%d restarting=true", len(signature))
+        self.stop_server()
+        self.start_server(self._current_port, tools, self._current_host)
+        return True
 
     def _notify_started(self) -> None:
         if self._startup_notified or self._stop_event.is_set():
