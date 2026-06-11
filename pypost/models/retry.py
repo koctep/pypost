@@ -57,7 +57,7 @@ def parse_retryable_status_codes(
 
 
 class RetryPolicy(BaseModel):
-    max_retries: int = 0
+    max_retries: int = Field(default=0, ge=0)
     retry_delay_seconds: float = 1.0
     retry_backoff_multiplier: float = 2.0
     retryable_status_codes: List[int] = Field(default_factory=lambda: [429, 500, 502, 503, 504])

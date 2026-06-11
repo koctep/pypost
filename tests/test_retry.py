@@ -11,6 +11,8 @@ from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
 from pypost.core.request_service import RequestService
 from pypost.core.alert_manager import AlertManager
 from pypost.models.models import RequestData
+from pydantic import ValidationError
+
 from pypost.models.retry import RetryPolicy
 from pypost.models.response import ResponseData
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -386,6 +388,26 @@ class TestRetryPolicyModel(unittest.TestCase):
     def test_request_data_retry_policy_defaults_none(self):
         req = RequestData(method="GET", url="http://x")
         self.assertIsNone(req.retry_policy)
+
+    def test_max_retries_rejects_negative(self):
+        with self.assertRaises(ValidationError):
+            RetryPolicy(max_retries=-1)
+
+    def test_max_retries_accepts_zero(self):
+        p = RetryPolicy(max_retries=0)
+        self.assertEqual(p.max_retries, 0)
+
+    def test_max_retries_accepts_positive(self):
+        p = RetryPolicy(max_retries=5)
+        self.assertEqual(p.max_retries, 5)
+
+    def test_request_data_rejects_negative_max_retries(self):
+        with self.assertRaises(ValidationError):
+            RequestData(
+                method="GET",
+                url="http://x",
+                retry_policy=RetryPolicy(max_retries=-1),
+            )
 
 
 if __name__ == "__main__":
