@@ -56,6 +56,14 @@ Clicks on the line-number area do not insert text. Clicks on the left chevron co
 regions (PYPOST-511); clicks elsewhere in the gutter are ignored. Focus remains on the editor
 viewport.
 
+## Testing
+
+- **Unit tests** — `tests/test_code_editor.py` (`TestCodeEditorLineNumbers`): gutter width,
+  painting, scroll sync, read-only clicks on `CodeEditor` directly.
+- **Integration tests** — `tests/test_request_editor_body_gutter.py` (PYPOST-516): loads
+  `RequestWidget`, switches to the Body tab, and asserts gutter width and read-only behaviour
+  in the full widget hierarchy.
+
 ## Related
 
 - [Body Editor Folding (PYPOST-511)](body_editor_folding.md) — collapsible JSON sections in the
