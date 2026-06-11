@@ -32,12 +32,19 @@ class EnvironmentInventory:
 
 
 @dataclass(frozen=True)
+class ReencryptStats:
+    encrypted_count: int
+    reused_count: int
+
+
+@dataclass(frozen=True)
 class MigrationReport:
     inventory: EnvironmentInventory
     dry_run: bool
     backup_path: Path | None
     errors: tuple[str, ...]
     success: bool
+    reencrypt_stats: ReencryptStats | None = None
 
 
 def _log_inventory(event: str, inventory: EnvironmentInventory) -> None:
@@ -232,6 +239,10 @@ class EncryptionMigrationService:
                     backup_path=None,
                     errors=(),
                     success=True,
+                    reencrypt_stats=ReencryptStats(
+                        encrypted_count=0,
+                        reused_count=inventory.hidden_value_count,
+                    ),
                 )
 
         quality_errors = inventory.data_quality_errors
@@ -307,15 +318,16 @@ class EncryptionMigrationService:
                 success=True,
             )
 
-        self._storage.apply_encryption_settings(settings)
-        self._storage.save_environments(environments)
+        save_stats = self._storage.save_environments(environments)
         final_inventory = self.build_inventory(settings)
         logger.info(
             "encryption_migration_save_completed operation=%s backup_path=%s "
-            "environment_count=%d",
+            "environment_count=%d encrypted_count=%d reused_count=%d",
             operation,
             backup_path,
             final_inventory.environment_count,
+            save_stats.encrypted_count,
+            save_stats.reused_count,
         )
         logger.info(
             "encryption_migration_operation_completed operation=%s success=true dry_run=false",
@@ -327,6 +339,10 @@ class EncryptionMigrationService:
             backup_path=backup_path,
             errors=(),
             success=True,
+            reencrypt_stats=ReencryptStats(
+                encrypted_count=save_stats.encrypted_count,
+                reused_count=save_stats.reused_count,
+            ),
         )
 
     def _read_raw_environments(self) -> list[dict[str, Any]]:

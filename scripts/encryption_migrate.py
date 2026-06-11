@@ -20,6 +20,7 @@ from pypost.core.encryption_migration import (  # noqa: E402
     EncryptionMigrationService,
     EnvironmentInventory,
     MigrationReport,
+    ReencryptStats,
 )
 from pypost.core.storage import StorageManager  # noqa: E402
 
@@ -47,8 +48,17 @@ def _inventory_to_dict(inventory: EnvironmentInventory) -> dict[str, Any]:
     }
 
 
-def _report_to_dict(report: MigrationReport, *, command: str) -> dict[str, Any]:
+def _reencrypt_stats_to_dict(stats: ReencryptStats | None) -> dict[str, int] | None:
+    if stats is None:
+        return None
     return {
+        "encrypted_count": stats.encrypted_count,
+        "reused_count": stats.reused_count,
+    }
+
+
+def _report_to_dict(report: MigrationReport, *, command: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "command": command,
         "success": report.success,
         "dry_run": report.dry_run,
@@ -56,6 +66,10 @@ def _report_to_dict(report: MigrationReport, *, command: str) -> dict[str, Any]:
         "errors": list(report.errors),
         "inventory": _inventory_to_dict(report.inventory),
     }
+    stats = _reencrypt_stats_to_dict(report.reencrypt_stats)
+    if stats is not None:
+        payload["reencrypt_stats"] = stats
+    return payload
 
 
 def _format_inventory(report: MigrationReport) -> str:
@@ -79,6 +93,11 @@ def _format_inventory(report: MigrationReport) -> str:
         lines.append("dry_run: true")
     if report.backup_path is not None:
         lines.append(f"backup: {report.backup_path}")
+    if report.reencrypt_stats is not None:
+        stats = report.reencrypt_stats
+        lines.append("reencrypt_stats:")
+        lines.append(f"  encrypted: {stats.encrypted_count}")
+        lines.append(f"  reused: {stats.reused_count}")
     return "\n".join(lines)
 
 

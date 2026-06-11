@@ -25,7 +25,7 @@ def test_serialize_encrypts_only_hidden_keys_when_enabled(monkeypatch):
         hidden_keys={"SECRET"},
     )
 
-    payload = adapter.serialize_environment(env)
+    payload, _stats = adapter.serialize_environment(env)
 
     secret_payload = payload["variables"]["SECRET"]
     assert isinstance(secret_payload, dict)
@@ -47,7 +47,7 @@ def test_round_trip_decrypts_encrypted_hidden_values(monkeypatch):
         hidden_keys={"SECRET"},
     )
 
-    payload = adapter.serialize_environment(env)
+    payload, _stats = adapter.serialize_environment(env)
     restored = adapter.deserialize_environment(payload)
 
     assert restored.variables["SECRET"] == "s3cr3t"
@@ -65,7 +65,7 @@ def test_app_settings_disabled_overrides_env_enabled(monkeypatch):
         hidden_keys={"SECRET"},
     )
 
-    payload = adapter.serialize_environment(env)
+    payload, _stats = adapter.serialize_environment(env)
     assert payload["variables"]["SECRET"] == "plain"
 
 
@@ -84,7 +84,7 @@ def test_metrics_track_encryption_and_decryption(monkeypatch):
         hidden_keys={"SECRET"},
     )
 
-    payload = adapter.serialize_environment(env)
+    payload, _stats = adapter.serialize_environment(env)
     adapter.deserialize_environment(payload)
 
     scraped = _scrape_metrics(metrics)
@@ -107,13 +107,15 @@ def test_second_save_reuses_unchanged_hidden_envelopes(monkeypatch):
         hidden_keys={"A", "B"},
     )
 
-    first = adapter.serialize_environment(env)
+    first, _first_stats = adapter.serialize_environment(env)
     adapter.remember_environment_state(env.id, first["variables"], dict(env.variables))
 
-    second = adapter.serialize_environment(env)
+    second, second_stats = adapter.serialize_environment(env)
 
     assert second["variables"]["A"] == first["variables"]["A"]
     assert second["variables"]["B"] == first["variables"]["B"]
+    assert second_stats.reused_count == 2
+    assert second_stats.encrypted_count == 0
     scraped = _scrape_metrics(metrics)
     assert "environment_value_encryptions_total 2.0" in scraped
 
@@ -133,16 +135,56 @@ def test_changed_hidden_key_reencrypts_only_that_value(monkeypatch):
         hidden_keys={"A", "B"},
     )
 
-    first = adapter.serialize_environment(env)
+    first, _first_stats = adapter.serialize_environment(env)
     adapter.remember_environment_state(env.id, first["variables"], dict(env.variables))
 
     env.variables["B"] = "changed"
-    second = adapter.serialize_environment(env)
+    second, second_stats = adapter.serialize_environment(env)
 
     assert second["variables"]["A"] == first["variables"]["A"]
+    assert second_stats.reused_count == 1
+    assert second_stats.encrypted_count == 1
     assert second["variables"]["B"] != first["variables"]["B"]
     scraped = _scrape_metrics(metrics)
     assert "environment_value_encryptions_total 3.0" in scraped
+
+
+def test_reuse_requires_matching_active_kid(monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_ENABLED", "true")
+    key_a = fernet.Fernet.generate_key().decode("utf-8")
+    key_b = fernet.Fernet.generate_key().decode("utf-8")
+    from pypost.core.key_provider import build_key_id
+
+    kid_a = build_key_id(key_a)
+    kid_b = build_key_id(key_b)
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key_b)
+
+    adapter = EnvironmentVariablesAdapter()
+    env = Environment(
+        id="e1",
+        name="Dev",
+        variables={"SECRET": "value"},
+        hidden_keys={"SECRET"},
+    )
+    stale_envelope = {
+        "enc": True,
+        "v": 2,
+        "alg": "fernet",
+        "kid": kid_a,
+        "ct": "stale",
+    }
+    adapter.remember_environment_state(
+        env.id,
+        {"SECRET": stale_envelope},
+        {"SECRET": "value"},
+    )
+
+    payload, stats = adapter.serialize_environment(env)
+
+    assert payload["variables"]["SECRET"] != stale_envelope
+    assert stats.encrypted_count == 1
+    assert stats.reused_count == 0
 
 
 def test_apply_encryption_settings_clears_persisted_state(monkeypatch):

@@ -179,6 +179,32 @@ python scripts/encryption_migrate.py [--json] [--data-dir PATH] encrypt-plaintex
 **Exit codes:** `0` on success; `1` on verification or migration failure. In human mode, errors print
 to stderr; with `--json`, errors are included in the JSON payload on stdout.
 
+**JSON example** (`re-encrypt --json` after kid rotation):
+
+```json
+{
+  "command": "re-encrypt",
+  "success": true,
+  "dry_run": false,
+  "backup_path": "/path/to/environments.json.backup.20260611T120000Z",
+  "errors": [],
+  "reencrypt_stats": {
+    "encrypted_count": 3,
+    "reused_count": 0
+  },
+  "inventory": {
+    "environment_count": 2,
+    "hidden_value_count": 3,
+    "encrypted_envelope_count": 3,
+    "plaintext_hidden_count": 0,
+    "invalid_hidden_count": 0,
+    "kid_histogram": { "abc123def4567890": 3 },
+    "missing_kids": [],
+    "data_quality_errors": []
+  }
+}
+```
+
 **JSON example** (`report --json`):
 
 ```json
@@ -211,7 +237,17 @@ plaintext_hidden: 2
 kid_histogram:
   abc123def4567890: 8
   fedcba0987654321: 2
+reencrypt_stats:
+  encrypted: 8
+  reused: 2
 ```
+
+`reencrypt_stats` appears on `re-encrypt` and `encrypt-plaintext` when the command completes a
+rewrite or skips because every hidden value already uses the active `kid`. Omitted on `verify` and
+`report`. Dry-run does not include `reencrypt_stats` (no save occurs).
+
+Envelope reuse during bulk save requires the stored `kid` to match the active key (PYPOST-535), so
+kid rotation re-encrypts historical envelopes even when plaintext is unchanged.
 
 With `--dry-run` on write commands, `kid_histogram` reflects the projected state after re-encryption
 under the active key.
@@ -267,7 +303,10 @@ failure. Decrypt validation is not available on `build_inventory()` — that pat
 Loads all environments, decrypts, saves unchanged in-memory values so the adapter re-encrypts with
 the active key. Requires encryption enabled. Aborts if any `kid` is missing or decrypt fails.
 Succeeds immediately without backup or file I/O when every hidden value is already encrypted with
-the active `kid` and there is no plaintext hidden data.
+the active `kid` and there is no plaintext hidden data. Returns `reencrypt_stats` on the report:
+all hidden values counted as `reused_count` on the skip path, or actual encrypt/reuse counts after
+save. Reuse keeps an envelope only when plaintext is unchanged **and** the stored `kid` matches the
+active key.
 
 #### `encrypt_plaintext_hidden(settings, *, dry_run=False, backup=True) -> MigrationReport`
 
@@ -283,7 +322,9 @@ Copies `environments.json` to `{stem}.backup.{UTC-timestamp}{suffix}` alongside 
 - `EnvironmentInventory` — `environment_count`, `hidden_value_count`, `encrypted_envelope_count`,
   `plaintext_hidden_count`, `invalid_hidden_count`, `kid_histogram`, `missing_kids`,
   `data_quality_errors` (per-field messages for invalid hidden shapes)
-- `MigrationReport` — `inventory`, `dry_run`, `backup_path`, `errors`, `success`
+- `MigrationReport` — `inventory`, `dry_run`, `backup_path`, `errors`, `success`,
+  `reencrypt_stats` (optional; `encrypted_count` / `reused_count` from bulk save)
+- `ReencryptStats` — aggregate selective re-encrypt counts for operator output
 
 ## Configuration
 

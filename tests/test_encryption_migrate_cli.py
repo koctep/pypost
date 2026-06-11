@@ -237,6 +237,131 @@ def test_cli_verify_json_includes_errors(tmp_path, monkeypatch, capsys):
     assert payload["errors"]
 
 
+def test_cli_encrypt_plaintext_dry_run(tmp_path, monkeypatch, capsys):
+    fernet = pytest.importorskip("cryptography.fernet")
+    _patch_dirs(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    from pypost.core.key_provider import build_key_id
+
+    active_id = build_key_id(key)
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=True))
+
+    storage = StorageManager()
+    plain_payload = [
+        {
+            "id": "e1",
+            "name": "Plain",
+            "variables": {"SECRET": "plain"},
+            "hidden_keys": ["SECRET"],
+            "enable_mcp": False,
+        }
+    ]
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(plain_payload, handle, indent=2)
+
+    main = _import_cli_main()
+    code = main(["encrypt-plaintext", "--dry-run", "--no-backup"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "dry_run: true" in captured.out
+    assert "plaintext_hidden: 0" in captured.out
+    assert "encrypted_envelopes: 1" in captured.out
+    assert f"  {active_id}: 1" in captured.out
+
+    with open(storage.environments_file, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload[0]["variables"]["SECRET"] == "plain"
+
+
+def test_cli_re_encrypt_reports_reencrypt_stats(tmp_path, monkeypatch, capsys):
+    fernet = pytest.importorskip("cryptography.fernet")
+    _patch_dirs(tmp_path, monkeypatch)
+    active_key = fernet.Fernet.generate_key().decode("utf-8")
+    historical_key = fernet.Fernet.generate_key().decode("utf-8")
+    from pypost.core.key_provider import build_key_id
+    from pypost.core.key_sources.env import EnvKeySource
+
+    active_id = build_key_id(active_key)
+    historical_id = build_key_id(historical_key)
+    registry_path = tmp_path / "keys.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "active_key_id": active_id,
+                "keys": {active_id: active_key, historical_id: historical_key},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(EnvKeySource.KEYS_FILE, str(registry_path))
+    monkeypatch.delenv(EnvKeySource.ENV_KEY, raising=False)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=True))
+
+    storage = StorageManager()
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    registry_path.write_text(
+        json.dumps(
+            {
+                "active_key_id": historical_id,
+                "keys": {active_id: active_key, historical_id: historical_key},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    main = _import_cli_main()
+    code = main(["re-encrypt", "--no-backup"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "reencrypt_stats:" in captured.out
+    assert "  encrypted: 1" in captured.out
+    assert "  reused: 0" in captured.out
+
+
+def test_cli_re_encrypt_json_includes_reencrypt_stats(tmp_path, monkeypatch, capsys):
+    fernet = pytest.importorskip("cryptography.fernet")
+    _patch_dirs(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=True))
+
+    storage = StorageManager()
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    main = _import_cli_main()
+    code = main(["re-encrypt", "--json", "--no-backup"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    payload = json.loads(captured.out)
+    assert payload["reencrypt_stats"] == {
+        "encrypted_count": 0,
+        "reused_count": 1,
+    }
+
+
 def test_cli_encrypt_plaintext(tmp_path, monkeypatch, capsys):
     fernet = pytest.importorskip("cryptography.fernet")
     _patch_dirs(tmp_path, monkeypatch)

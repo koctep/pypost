@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pypost.core.encryption_config import (
@@ -16,6 +17,18 @@ if TYPE_CHECKING:
     from pypost.core.metrics import MetricsManager
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class EnvironmentSerializeStats:
+    encrypted_count: int = 0
+    reused_count: int = 0
+
+    def __add__(self, other: "EnvironmentSerializeStats") -> "EnvironmentSerializeStats":
+        return EnvironmentSerializeStats(
+            encrypted_count=self.encrypted_count + other.encrypted_count,
+            reused_count=self.reused_count + other.reused_count,
+        )
 
 
 class EnvironmentVariablesAdapter:
@@ -62,13 +75,14 @@ class EnvironmentVariablesAdapter:
         self._persisted_variables.clear()
         self._persisted_plaintext.clear()
 
-    def serialize_environment(self, env: Environment) -> dict[str, Any]:
+    def serialize_environment(self, env: Environment) -> tuple[dict[str, Any], EnvironmentSerializeStats]:
         payload = env.model_dump(mode="json")
         variables: dict[str, Any] = dict(payload.get("variables", {}))
         hidden_keys = set(env.hidden_keys)
         should_encrypt = self._is_encryption_enabled()
         encrypted_count = 0
         reused_count = 0
+        active_kid = self._active_key_id() if should_encrypt else None
         previous_variables = self._persisted_variables.get(env.id, {})
         previous_plaintext = self._persisted_plaintext.get(env.id, {})
 
@@ -81,6 +95,7 @@ class EnvironmentVariablesAdapter:
                     current_plaintext,
                     previous_plaintext.get(key),
                     previous_payload,
+                    active_kid=active_kid,
                 ):
                     serialized_variables[key] = previous_payload
                     reused_count += 1
@@ -117,7 +132,10 @@ class EnvironmentVariablesAdapter:
             reused_count,
             len(serialized_variables),
         )
-        return payload
+        return payload, EnvironmentSerializeStats(
+            encrypted_count=encrypted_count,
+            reused_count=reused_count,
+        )
 
     def deserialize_environment(self, raw_env: dict[str, Any]) -> Environment:
         variables_raw: dict[str, Any] = dict(raw_env.get("variables", {}))
@@ -142,17 +160,29 @@ class EnvironmentVariablesAdapter:
     def _is_encryption_enabled(self) -> bool:
         return resolve_encryption_enabled(self._encryption_settings)
 
+    def _active_key_id(self) -> str | None:
+        try:
+            return self._secrets_codec._key_provider.get_current_key().key_id
+        except EnvironmentEncryptionError:
+            return None
+
     @staticmethod
     def _can_reuse_encrypted_envelope(
         current_plaintext: str,
         previous_plaintext: str | None,
         previous_payload: Any,
+        *,
+        active_kid: str | None = None,
     ) -> bool:
         if previous_plaintext != current_plaintext:
             return False
         if not isinstance(previous_payload, dict):
             return False
-        return previous_payload.get("enc") is True
+        if previous_payload.get("enc") is not True:
+            return False
+        if active_kid is not None:
+            return str(previous_payload.get("kid", "")) == active_kid
+        return True
 
     def _decode_variable_value(self, key: str, value: Any) -> tuple[str, bool]:
         if isinstance(value, str):

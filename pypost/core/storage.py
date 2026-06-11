@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING, List
 from platformdirs import user_data_dir
 from pydantic import ValidationError
 
-from pypost.core.environment_variables_adapter import EnvironmentVariablesAdapter
+from pypost.core.environment_variables_adapter import (
+    EnvironmentSerializeStats,
+    EnvironmentVariablesAdapter,
+)
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import AppSettings
@@ -152,10 +155,12 @@ class StorageManager:
                 )
         return collections
 
-    def save_environments(self, environments: List[Environment]):
+    def save_environments(self, environments: List[Environment]) -> EnvironmentSerializeStats:
         data: list[dict] = []
+        stats = EnvironmentSerializeStats()
         for env in environments:
-            serialized = self._env_adapter.serialize_environment(env)
+            serialized, env_stats = self._env_adapter.serialize_environment(env)
+            stats += env_stats
             data.append(serialized)
             self._env_adapter.remember_environment_state(
                 env.id,
@@ -178,10 +183,13 @@ class StorageManager:
                 tmp_file.unlink(missing_ok=True)
             raise
         logger.info(
-            "save_environments_completed count=%d file=%s",
+            "save_environments_completed count=%d encrypted_count=%d reused_count=%d file=%s",
             len(environments),
+            stats.encrypted_count,
+            stats.reused_count,
             self.environments_file,
         )
+        return stats
 
     def load_environments(self) -> List[Environment]:
         if not self.environments_file.exists():
