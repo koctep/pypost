@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
+from pypost.core.env_variable_snapshot import EnvVariableSnapshot
 from pypost.core.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
 from pypost.core.mcp_server import MCPServerManager
@@ -64,8 +65,7 @@ class EnvPresenter(QObject):
         self._metrics = metrics
         self._environments: list[Environment] = []
         self._current_env_index: int = 0
-        self._current_variables: dict[str, str] = {}
-        self._current_hidden_keys: set[str] = set()
+        self._env_snapshot = EnvVariableSnapshot()
         self._pending_env_manager_refresh = False
         self._storage_gateway = EnvironmentStorageGateway(storage, parent=self)
         self._storage_gateway.load_completed.connect(self._on_storage_load_completed)
@@ -75,12 +75,8 @@ class EnvPresenter(QObject):
         self._mcp_manager.status_changed.connect(self._on_mcp_status_changed)
         self._mcp_manager.start_failed.connect(self._on_mcp_start_failed)
         self._mcp_manager.activity_recorded.connect(self._on_mcp_activity_recorded)
-        self._mcp_manager.set_variable_supplier(
-            lambda: dict(self._current_variables)
-        )
-        self._mcp_manager.set_hidden_keys_supplier(
-            lambda: set(self._current_hidden_keys)
-        )
+        self._mcp_manager.set_variable_supplier(self._env_snapshot.snapshot_variables)
+        self._mcp_manager.set_hidden_keys_supplier(self._env_snapshot.snapshot_hidden_keys)
 
         # Build top-bar widget
         self._widget = QWidget()
@@ -320,9 +316,8 @@ class EnvPresenter(QObject):
 
         self._config_manager.save_config(self._settings)
         self._current_env_index = index
-        self._current_variables = dict(variables)
         hidden_keys = selected.hidden_keys if isinstance(selected, Environment) else set()
-        self._current_hidden_keys = set(hidden_keys)
+        self._env_snapshot.update(variables, hidden_keys)
 
         keys = list(variables.keys()) if isinstance(selected, Environment) else None
         self.env_variables_changed.emit(variables)
