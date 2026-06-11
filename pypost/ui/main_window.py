@@ -147,6 +147,7 @@ class MainWindow(QMainWindow):
         self.collections.open_request_in_isolated_tab.connect(self.tabs.add_new_tab)
         self.collections.collections_changed.connect(self.env.load_environments)
         self.collections.request_renamed.connect(self.tabs.rename_request_tabs)
+        self.collections.requests_deleted.connect(self.tabs.close_tabs_for_request_ids)
         self.env.env_variables_changed.connect(self.tabs.on_env_variables_changed)
         self.env.env_keys_changed.connect(self.tabs.on_env_keys_changed)
         self.env.env_hidden_keys_changed.connect(

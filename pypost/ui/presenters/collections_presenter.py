@@ -19,6 +19,7 @@ class CollectionsPresenter(QObject):
     open_request_in_isolated_tab = Signal(object)  # payload: RequestData (deep copy)
     collections_changed = Signal()  # after create / delete / rename
     request_renamed = Signal(str, str)  # (request_id, new_name)
+    requests_deleted = Signal(list)  # request IDs whose tabs should close
 
     def __init__(
         self,
@@ -307,7 +308,17 @@ class CollectionsPresenter(QObject):
                     return req_item
         return None
 
+    def _affected_request_ids(self, item_id: str, item_type: str) -> list[str]:
+        if item_type == "request":
+            return [item_id]
+        if item_type == "collection":
+            for col in self._request_manager.get_collections():
+                if col.id == item_id:
+                    return [req.id for req in col.requests]
+        return []
+
     def _handle_delete(self, item_id: str, item_type: str, item_label: str) -> None:
+        affected_request_ids = self._affected_request_ids(item_id, item_type)
         try:
             deleted = self._request_manager.delete_collection_item(item_id, item_type)
         except Exception as exc:
@@ -339,6 +350,8 @@ class CollectionsPresenter(QObject):
             item_id,
         )
         self._metrics.track_gui_collection_delete_action(item_type, "succeeded")
+        if affected_request_ids:
+            self.requests_deleted.emit(affected_request_ids)
         self.load_collections()
         self.restore_tree_state()
         self.collections_changed.emit()

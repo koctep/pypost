@@ -96,6 +96,24 @@ class TestTabsPresenter(unittest.TestCase):
         p.close_tab(0)
         self.assertEqual(p.widget.count(), 1)
 
+    def test_close_tabs_for_request_ids_closes_matching_tabs(self):
+        req1 = _make_request("r1", "Tab1")
+        req2 = _make_request("r2", "Tab2")
+        p = self._make_presenter()
+        p.add_new_tab(req1, save_state=False)
+        p.add_new_tab(req2, save_state=False)
+        p.close_tabs_for_request_ids(["r1"])
+        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(p.widget.widget(0).request_data.id, "r2")
+
+    def test_close_tabs_for_request_ids_keeps_blank_tab_when_all_closed(self):
+        req = _make_request("r1", "Only")
+        p = self._make_presenter()
+        p.add_new_tab(req, save_state=False)
+        p.close_tabs_for_request_ids(["r1"])
+        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(p.widget.tabText(0), "New Request")
+
     def test_restore_tabs_opens_saved_tabs(self):
         req = _make_request("r1", "Saved Request")
         p = self._make_presenter(requests=[req], open_tabs=["r1"])

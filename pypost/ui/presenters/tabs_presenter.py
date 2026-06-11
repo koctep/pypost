@@ -244,6 +244,32 @@ class TabsPresenter(QObject):
                 tab.request_data.name = new_name
                 self._tabs.setTabText(i, new_name)
 
+    def close_tabs_for_request_ids(self, request_ids: list) -> None:
+        """Closes tabs that reference deleted collection requests."""
+        if not request_ids:
+            return
+        ids_to_close = set(request_ids)
+        indices_to_close = []
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            if (
+                isinstance(tab, RequestTab)
+                and tab.request_data
+                and tab.request_data.id in ids_to_close
+            ):
+                indices_to_close.append(i)
+        for index in reversed(indices_to_close):
+            self._tabs.removeTab(index)
+        if self._tabs.count() == 0:
+            self.add_new_tab(save_state=False)
+        self._position_add_tab_button()
+        self.save_tabs_state()
+        logger.info(
+            "close_tabs_for_deleted_requests closed_count=%d request_ids=%s",
+            len(indices_to_close),
+            sorted(ids_to_close),
+        )
+
     def apply_settings(self, settings: AppSettings) -> None:
         """Updates font/indent in all tabs."""
         self._settings = settings

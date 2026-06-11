@@ -15,6 +15,7 @@ The goal is to allow direct cleanup from the tree without extra navigation.
   - Enables custom context menu on `collections_view`.
   - Resolves clicked item type (`collection` or `request`).
   - Prompts user confirmation and handles success/error UI flow.
+  - Wires `CollectionsPresenter.requests_deleted` to `TabsPresenter.close_tabs_for_request_ids`.
 - **`RequestManager` (`pypost/core/request_manager.py`)**:
   - Owns deletion business logic:
     - `delete_request(request_id)`

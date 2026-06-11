@@ -173,6 +173,27 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter._handle_delete("c1", "collection", "My API")
         self.assertEqual(len(received), 1)
 
+    def test_requests_deleted_signal_emitted_for_request_delete(self):
+        req = _make_request("r1", "Get users")
+        col = _make_collection("c1", "My API", [req])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        received = []
+        presenter.requests_deleted.connect(lambda ids: received.append(ids))
+        presenter._handle_delete("r1", "request", "Get users")
+        self.assertEqual(received, [["r1"]])
+
+    def test_requests_deleted_signal_emitted_for_collection_delete(self):
+        req1 = _make_request("r1", "A")
+        req2 = _make_request("r2", "B")
+        col = _make_collection("c1", "My API", [req1, req2])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        received = []
+        presenter.requests_deleted.connect(lambda ids: received.append(list(ids)))
+        presenter._handle_delete("c1", "collection", "My API")
+        self.assertEqual(sorted(received[0]), ["r1", "r2"])
+
     def test_request_renamed_signal_emitted(self):
         req = _make_request("r1", "Old Name")
         col = _make_collection("c1", "My API", [req])
