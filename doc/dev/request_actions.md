@@ -13,12 +13,16 @@ This design reduces UI clutter and allows adding more actions in the same menu l
 - **`RequestWidget` (`pypost/ui/widgets/request_editor.py`)**:
   - Builds action controls for each request tab.
   - Owns `Send` button, `Actions` tool button, and `Save` menu action.
+- **`RequestTabHeader` (`pypost/ui/widgets/tab_header.py`)**:
+  - Owns request tab-bar chrome: closable tab setup, trailing plus placeholder tab, and label
+    text updates via `set_tab_label`.
+  - Emits `new_tab_requested` when the user clicks the `+` tab; wired to
+    `TabsPresenter.handle_new_tab("plus_button")`.
 - **`TabsPresenter` (`pypost/ui/presenters/tabs_presenter.py`)**:
   - Receives `save_requested` and `save_as_requested` from each `RequestWidget`.
   - Delegates persistence to `RequestSaveOrchestrator` and updates tab state/signals.
-  - Hosts a trailing **plus placeholder tab** with a layout-managed `+` button via
-    `QTabBar.setTabButton()` (constant `PLUS_TAB_MARKER`).
-  - Routes `+` tab clicks and `Ctrl+N` to `handle_new_tab(source=...)`.
+  - Composes `RequestTabHeader` for tab-bar controls; routes `Ctrl+N` to
+    `handle_new_tab(source=...)`.
 - **`RequestSaveOrchestrator` (`pypost/ui/request_save_orchestrator.py`)**:
   - Owns save/save-as dialogs, overwrite/stale confirmations, and `RequestManager` calls.
   - Returns `SaveResult` for the presenter to apply tab updates.
@@ -108,15 +112,20 @@ Centralized new-tab entry point used by both keyboard and plus-tab flows.
   1. Increments metric `gui_new_tab_actions_total{source=<source>}`.
   1. Calls `add_new_tab()` once (inserts before the plus placeholder tab).
 
-### Plus placeholder tab (`TabsPresenter._install_plus_tab()`)
+### Plus placeholder tab (`RequestTabHeader.ensure_plus_tab()`)
 
 Layout-managed `+` control using Qt tab-bar APIs:
 
 - Trailing tab marked with `PLUS_TAB_MARKER` in `QTabBar.tabData`.
 - `+` widget attached via `QTabBar.setTabButton(..., LeftSide, ...)`.
-- `tabBarClicked` on the plus index calls `handle_new_tab("plus_button")`.
+- `tabBarClicked` on the plus index emits `new_tab_requested` → `handle_new_tab("plus_button")`.
 - Close requests on the plus tab are ignored; tab cycling skips the placeholder.
 - Use `_request_tab_count()` (or filter `RequestTab` widgets) instead of raw `QTabWidget.count()`.
+
+### `RequestTabHeader.set_tab_label(index, label)`
+
+Updates tab title text after collection renames or save flows. `TabsPresenter` still matches tabs
+by request id before calling this helper.
 
 ### `MainWindow.handle_new_tab(source: str = "unknown")`
 
@@ -138,7 +147,7 @@ Observability endpoint configuration remains global and unchanged:
 - `settings.metrics_host`
 - `settings.metrics_port`
 
-Tab action UI uses internal constants in `TabsPresenter`:
+Tab action UI uses internal constants in `RequestTabHeader`:
 - Plus button size: `ADD_TAB_BUTTON_SIZE` (24px)
 - Plus tab marker: `PLUS_TAB_MARKER` (`pypost_plus_tab`)
 
@@ -153,7 +162,7 @@ Save-as identity regression coverage lives in `tests/test_tabs_presenter.py`:
 - `test_save_as_emits_request_save_as_completed_not_request_saved` — save-as emits
   `request_save_as_completed` (not `request_saved`) with the new ID.
 
-Run: `python -m pytest tests/test_request_save_orchestrator.py tests/test_tabs_presenter.py -k "save or plus_tab" -v`
+Run: `python -m pytest tests/test_tab_header.py tests/test_request_save_orchestrator.py tests/test_tabs_presenter.py -k "save or plus_tab" -v`
 
 ## Troubleshooting
 
@@ -191,8 +200,8 @@ Run: `python -m pytest tests/test_request_save_orchestrator.py tests/test_tabs_p
 
 ### `+` button is not visible or overlaps tabs
 
-- Confirm `self._tab_bar.setExpanding(False)` is active in `TabsPresenter`.
-- Verify the plus placeholder tab exists (`_plus_tab_index() >= 0`) and is the last tab.
+- Confirm `RequestTabHeader.tab_bar.setExpanding(False)` is active after attach.
+- Verify the plus placeholder tab exists (`plus_tab_index() >= 0`) and is the last tab.
 - Check `QTabBar.setTabButton` still attaches the `+` widget on the plus tab index.
 
 ### `Ctrl+N` works but `+` click does nothing

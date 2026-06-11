@@ -3,9 +3,7 @@ import logging
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
-    QPushButton,
     QSplitter,
-    QTabBar,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -42,11 +40,11 @@ from pypost.ui.request_save_orchestrator import (
 )
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
+from pypost.ui.widgets.tab_header import PLUS_TAB_MARKER, RequestTabHeader
 
 logger = logging.getLogger(__name__)
 
-PLUS_TAB_MARKER = "pypost_plus_tab"
-ADD_TAB_BUTTON_SIZE = 24
+__all__ = ["PLUS_TAB_MARKER", "RequestTab", "TabsPresenter"]
 
 _ERROR_MESSAGES = {
     ErrorCategory.NETWORK: (
@@ -131,14 +129,13 @@ class TabsPresenter(QObject):
         self._current_variables: dict = {}
         self._current_hidden_keys: set = set()
 
-        self._tab_bar = QTabBar()
-        self._tab_bar.setExpanding(False)
-
         self._tabs = QTabWidget()
-        self._tabs.setTabBar(self._tab_bar)
-        self._tabs.setTabsClosable(True)
+        self._header = RequestTabHeader(self)
+        self._header.attach(self._tabs)
+        self._header.new_tab_requested.connect(
+            lambda: self.handle_new_tab("plus_button"),
+        )
         self._tabs.tabCloseRequested.connect(self.close_tab)
-        self._install_plus_tab()
         self.request_persisted.connect(self._on_request_persisted)
 
     @property
@@ -178,19 +175,19 @@ class TabsPresenter(QObject):
             tab.persisted_baseline = snapshot_persisted_fields(request_data)
 
         name = request_data.name if request_data else "New Request"
-        plus_idx = self._plus_tab_index()
+        plus_idx = self._header.insert_index_before_plus()
         if plus_idx >= 0:
             self._tabs.insertTab(plus_idx, tab, name)
         else:
             self._tabs.addTab(tab, name)
-            self._install_plus_tab()
+            self._header.ensure_plus_tab()
         self._tabs.setCurrentWidget(tab)
 
         if save_state:
             self.save_tabs_state()
 
     def close_tab(self, index: int) -> None:
-        if self._is_plus_tab_index(index):
+        if self._header.is_plus_tab_index(index):
             return
         self._tabs.removeTab(index)
         if self._request_tab_count() == 0:
@@ -324,7 +321,7 @@ class TabsPresenter(QObject):
             self.close_tab(current_index)
 
     def handle_next_tab(self) -> None:
-        indices = self._navigable_tab_indices()
+        indices = self._header.navigable_tab_indices()
         if not indices:
             return
         current = self._tabs.currentIndex()
@@ -335,7 +332,7 @@ class TabsPresenter(QObject):
         self._tabs.setCurrentIndex(indices[(pos + 1) % len(indices)])
 
     def handle_previous_tab(self) -> None:
-        indices = self._navigable_tab_indices()
+        indices = self._header.navigable_tab_indices()
         if not indices:
             return
         current = self._tabs.currentIndex()
@@ -346,7 +343,7 @@ class TabsPresenter(QObject):
         self._tabs.setCurrentIndex(indices[(pos - 1) % len(indices)])
 
     def handle_switch_to_tab(self, index: int) -> None:
-        if 0 <= index < self._tabs.count() and not self._is_plus_tab_index(index):
+        if 0 <= index < self._tabs.count() and not self._header.is_plus_tab_index(index):
             self._tabs.setCurrentIndex(index)
 
     def handle_send_request_global(self) -> None:
@@ -576,38 +573,6 @@ class TabsPresenter(QObject):
             if isinstance(self._tabs.widget(i), RequestTab)
         )
 
-    def _plus_tab_index(self) -> int:
-        for i in range(self._tab_bar.count()):
-            if self._tab_bar.tabData(i) == PLUS_TAB_MARKER:
-                return i
-        return -1
-
-    def _is_plus_tab_index(self, index: int) -> bool:
-        if not 0 <= index < self._tab_bar.count():
-            return False
-        return self._tab_bar.tabData(index) == PLUS_TAB_MARKER
-
-    def _navigable_tab_indices(self) -> list[int]:
-        return [i for i in range(self._tabs.count()) if not self._is_plus_tab_index(i)]
-
-    def _install_plus_tab(self) -> None:
-        if self._plus_tab_index() >= 0:
-            return
-        placeholder = QWidget()
-        placeholder.setObjectName("plus_tab_placeholder")
-        index = self._tabs.addTab(placeholder, "")
-        self._tab_bar.setTabData(index, PLUS_TAB_MARKER)
-        plus_btn = QPushButton("+")
-        plus_btn.setToolTip("New Tab (Ctrl+N)")
-        plus_btn.setFixedSize(ADD_TAB_BUTTON_SIZE, ADD_TAB_BUTTON_SIZE)
-        self._tab_bar.setTabButton(index, QTabBar.ButtonPosition.LeftSide, plus_btn)
-        self._tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
-        self._tab_bar.tabBarClicked.connect(self._on_tab_bar_clicked)
-
-    def _on_tab_bar_clicked(self, index: int) -> None:
-        if self._is_plus_tab_index(index):
-            self.handle_new_tab("plus_button")
-
     def _find_tab_for_sender(self) -> RequestTab | None:
         sender = self.sender()
         for i in range(self._tabs.count()):
@@ -626,7 +591,7 @@ class TabsPresenter(QObject):
                 and tab.request_data.id == request_id
             ):
                 tab.request_data.name = new_name
-                self._tabs.setTabText(i, new_name)
+                self._header.set_tab_label(i, new_name)
 
     def _on_request_persisted(
         self,
@@ -704,7 +669,7 @@ class TabsPresenter(QObject):
 
         if result.action == SaveAction.CREATED_NEW and result.request is not None:
             current_index = self._tabs.currentIndex()
-            self._tabs.setTabText(current_index, result.request.name)
+            self._header.set_tab_label(current_index, result.request.name)
             tab = self._tabs.widget(current_index)
             if isinstance(tab, RequestTab):
                 self._apply_save_result_to_tab(tab, result.request)
@@ -718,7 +683,7 @@ class TabsPresenter(QObject):
 
         new_request = result.request
         current_index = self._tabs.currentIndex()
-        self._tabs.setTabText(current_index, new_request.name)
+        self._header.set_tab_label(current_index, new_request.name)
         tab = self._tabs.widget(current_index)
         if isinstance(tab, RequestTab):
             tab.request_data = new_request
