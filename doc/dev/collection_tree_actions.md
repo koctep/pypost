@@ -82,6 +82,10 @@ No task-specific settings. Metrics use existing `MetricsManager` counters docume
 | `test_delete_cancelled_skips_persistence` | Delete No — tree unchanged |
 | `test_delete_confirmed_removes_request` | Delete Yes — row removed |
 
+`tests/test_collection_tree_delete_confirmation.py` asserts Yes/No confirmation
+branching and `track_gui_collection_delete_action` call sequences (`selected` →
+`cancelled` or `succeeded`) for collection and request nodes.
+
 Patch `QMenu` and `QMessageBox` under `pypost.ui.presenters.collection_tree_actions`.
 Related presenter tests remain in `tests/test_collections_presenter.py`.
 

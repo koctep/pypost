@@ -94,6 +94,12 @@ Observability relies on existing global metrics server configuration:
 
 ## Testing
 
+Confirmation-dialog Yes/No branching (PYPOST-330):
+
+| Layer | File | Scenarios |
+| --- | --- | --- |
+| Confirmation + metrics | `tests/test_collection_tree_delete_confirmation.py` | No → `cancelled`, Yes → `succeeded`; collection and request nodes; `handle_delete` skipped on No |
+
 Automated coverage for open-tab closure after delete (PYPOST-332):
 
 | Layer | File | Scenarios |
