@@ -26,7 +26,6 @@ class ExecutionResult:
     response: ResponseData
     updated_variables: Dict[str, Any]
     script_logs: List[str]
-    script_error: Optional[str]
     execution_error: Optional[ExecutionError] = field(default=None)
 
 
@@ -426,7 +425,6 @@ class RequestService:
                 response=_error_response(exc),
                 updated_variables={},
                 script_logs=[],
-                script_error=None,
                 execution_error=exc,
             )
 
@@ -454,7 +452,6 @@ class RequestService:
             response=response,
             updated_variables=updated_variables,
             script_logs=script_logs,
-            script_error=script_error,
             execution_error=exec_error_from_script,
         )
 

@@ -17,7 +17,7 @@ def _make_worker():
 
 def _ok_result():
     resp = ResponseData(status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2)
-    return ExecutionResult(response=resp, updated_variables={}, script_logs=[], script_error=None)
+    return ExecutionResult(response=resp, updated_variables={}, script_logs=[])
 
 
 class TestWorkerRaceCondition(unittest.TestCase):

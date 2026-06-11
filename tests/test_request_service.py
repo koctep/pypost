@@ -37,7 +37,7 @@ class TestRequestServiceExecuteHTTP(unittest.TestCase):
         req = RequestData(method="GET", url="http://x", post_script="")
         result = self.svc.execute(req)
         self.assertEqual(200, result.response.status_code)
-        self.assertIsNone(result.script_error)
+        self.assertIsNone(result.execution_error)
 
     def test_execute_passes_variables_to_http_client(self):
         self.svc.http_client.send_request.return_value = _make_http_result(200)
@@ -82,7 +82,7 @@ class TestRequestServicePostScript(unittest.TestCase):
         self.assertEqual({"x": 1}, result.updated_variables)
         self.assertEqual(["log"], result.script_logs)
 
-    def test_execute_post_script_error_sets_script_error_field(self):
+    def test_execute_post_script_error_sets_execution_error(self):
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
             # ScriptExecutor.execute is a @staticmethod, so mock_executor.execute (not
             # mock_executor.return_value.execute) is the correct target. If execute is ever
@@ -91,7 +91,8 @@ class TestRequestServicePostScript(unittest.TestCase):
             mock_executor.execute.return_value = ({}, [], "SyntaxError")
             req = RequestData(method="GET", url="http://x", post_script="bad")
             result = self.svc.execute(req)
-        self.assertEqual("SyntaxError", result.script_error)
+        self.assertEqual(ErrorCategory.SCRIPT, result.execution_error.category)
+        self.assertEqual("SyntaxError", result.execution_error.detail)
 
 
 class TestRequestServiceMCP(unittest.TestCase):
@@ -308,7 +309,7 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
             req = RequestData(method="GET", url="http://x", post_script="bad")
             result = self.svc.execute(req)
         self.assertEqual(result.execution_error.category, ErrorCategory.SCRIPT)
-        self.assertEqual(result.script_error, "NameError: x not defined")
+        self.assertEqual(result.execution_error.detail, "NameError: x not defined")
 
     def test_network_error_tracks_metrics(self):
         mock_metrics = MagicMock()

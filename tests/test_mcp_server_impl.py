@@ -7,11 +7,19 @@ from mcp.types import TextContent
 
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.request_service import ExecutionResult
+from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 
 
 def _exec_result(body="ok", logs=None, script_error=None):
+    execution_error = None
+    if script_error:
+        execution_error = ExecutionError(
+            category=ErrorCategory.SCRIPT,
+            message="Post-script execution failed.",
+            detail=script_error,
+        )
     return ExecutionResult(
         response=ResponseData(
             status_code=200,
@@ -22,7 +30,7 @@ def _exec_result(body="ok", logs=None, script_error=None):
         ),
         updated_variables={},
         script_logs=logs or [],
-        script_error=script_error,
+        execution_error=execution_error,
     )
 
 

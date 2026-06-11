@@ -108,8 +108,14 @@ class RequestWorker(QThread):
                 hidden_keys=self.hidden_keys,
             )
 
-            if result.script_logs or result.script_error:
-                self.script_output.emit(result.script_logs, result.script_error)
+            script_err = None
+            if (
+                result.execution_error
+                and result.execution_error.category == ErrorCategory.SCRIPT
+            ):
+                script_err = result.execution_error.detail
+            if result.script_logs or script_err:
+                self.script_output.emit(result.script_logs, script_err)
 
             if result.updated_variables:
                 self.env_update.emit(result.updated_variables)

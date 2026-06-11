@@ -37,6 +37,10 @@ History entries use `SensitiveDataMaskingPolicy` with resolved fields from trans
 Execution failures return `ExecutionResult` with `execution_error` set (PYPOST-400). Transport
 layers raise `ExecutionError`; `execute()` catches and converts them to results.
 
+Post-script failures populate `execution_error` with `ErrorCategory.SCRIPT` and the raw exception
+string in `detail` (PYPOST-409). Callers such as `RequestWorker` and `MCPServerImpl` read
+script errors from `execution_error` rather than a separate string field.
+
 ## Key files
 
 | File | Role |

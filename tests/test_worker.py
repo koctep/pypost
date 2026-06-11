@@ -48,7 +48,7 @@ class TestRequestWorkerError(unittest.TestCase):
 
         resp = ResponseData(status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2)
         result = ExecutionResult(
-            response=resp, updated_variables={}, script_logs=[], script_error=None
+            response=resp, updated_variables={}, script_logs=[],
         )
         with patch.object(worker.service, "execute", return_value=result):
             worker.run()
@@ -84,7 +84,7 @@ class TestRequestWorkerRetrySignal(unittest.TestCase):
                 status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2
             )
             return ExecutionResult(
-                response=resp, updated_variables={}, script_logs=[], script_error=None
+                response=resp, updated_variables={}, script_logs=[],
             )
 
         with patch.object(worker.service, "execute", side_effect=fake_execute):
@@ -124,7 +124,7 @@ class TestRequestWorkerHiddenKeys(unittest.TestCase):
             status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2
         )
         result = ExecutionResult(
-            response=resp, updated_variables={}, script_logs=[], script_error=None
+            response=resp, updated_variables={}, script_logs=[],
         )
         with patch.object(worker.service, "execute", return_value=result) as exec_mock:
             worker.run()

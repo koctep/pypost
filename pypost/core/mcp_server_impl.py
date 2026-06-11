@@ -14,6 +14,7 @@ from starlette.routing import Mount, Route
 from pypost.core.metrics import MetricsManager
 from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
+from pypost.models.errors import ErrorCategory
 from pypost.models.models import RequestData
 
 logger = logging.getLogger(__name__)
@@ -73,9 +74,14 @@ class MCPServerImpl:
                 logs_str = "\n".join(result.script_logs)
                 output_text += "\n\n--- Script Logs ---\n" + logs_str
 
-            if result.script_error:
-                err = result.script_error
-                output_text += "\n\n--- Script Error ---\n" + err
+            if (
+                result.execution_error
+                and result.execution_error.category == ErrorCategory.SCRIPT
+                and result.execution_error.detail
+            ):
+                output_text += (
+                    "\n\n--- Script Error ---\n" + result.execution_error.detail
+                )
 
             # Track MCP response success
             if self._metrics:
