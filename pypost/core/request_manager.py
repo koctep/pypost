@@ -84,20 +84,21 @@ class RequestManager:
     def delete_request(self, request_id: str) -> bool:
         """Deletes a request by ID from its collection."""
         logger.info("delete_request_started request_id=%s", request_id)
-        for col in self.collections:
-            for idx, req in enumerate(col.requests):
-                if req.id == request_id:
-                    del col.requests[idx]
-                    self.storage.save_collection(col)
-                    self._rebuild_index()
-                    logger.info(
-                        "delete_request_succeeded request_id=%s collection_id=%s",
-                        request_id,
-                        col.id,
-                    )
-                    return True
-        logger.warning("delete_request_not_found request_id=%s", request_id)
-        return False
+        indexed = self._request_index.get(request_id)
+        if not indexed:
+            logger.warning("delete_request_not_found request_id=%s", request_id)
+            return False
+
+        _, col = indexed
+        col.requests = [req for req in col.requests if req.id != request_id]
+        self.storage.save_collection(col)
+        self._rebuild_index()
+        logger.info(
+            "delete_request_succeeded request_id=%s collection_id=%s",
+            request_id,
+            col.id,
+        )
+        return True
 
     def delete_collection(self, collection_id: str) -> bool:
         """Deletes a collection by ID."""
