@@ -30,6 +30,13 @@ Key metrics for MCP testing:
 | `requests_sent_total` | `method` | HTTP requests sent |
 | `responses_received_total` | `method`, `status_code` | HTTP responses received |
 
+## Collections tree test helpers
+
+Shared fixtures for presenter and `CollectionTreeActions` tests live in
+`tests/helpers/collections_tree.py` (`make_collection`, `FakeRequestManager`,
+`patch_view_context_menu`, `build_isolated_tree_actions`, etc.). See
+[collection_tree_actions.md](collection_tree_actions.md) for the isolated harness.
+
 ## Delete metric unit tests
 
 Collection-tree delete telemetry (`gui_collection_delete_actions_total`) has dedicated
