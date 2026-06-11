@@ -107,16 +107,23 @@ Automated pytest coverage for `MCPServerImpl` and Starlette routing lives in
 `tests/test_mcp_server_impl.py` (PYPOST-367). Tests mock `RequestService` and avoid live
 transport handshakes; routing cases assert `/mcp` and legacy `Mount("/sse")` structure.
 
+Legacy SSE module tests in `tests/test_mcp_legacy_sse.py` (PYPOST-156, PYPOST-158) cover
+`build_legacy_sse_app()` structure, SSE GET closure (`Response()` after mocked transport
+teardown), and 405 guards for wrong methods on the inner stream (`GET /`) and messages
+(`POST /messages`) paths, including the mounted `/sse` prefix.
+
 | Class | Scope |
 | --- | --- |
 | `TestMCPServerImpl` | Tool registration, schemas, `call_tool`, metrics, script output |
 | `TestMCPServerImplRouting` | `create_app()` route structure and method guards |
 | `TestMCPServerImplInjection` | Constructor `TemplateService` injection |
+| `TestMcpLegacySseModule` | Module-level endpoint imports and route structure |
+| `TestMcpLegacySseHttpGuards` | SSE close contract and 405 method guards (PYPOST-158) |
 
 Focused run:
 
 ```bash
-.venv/bin/python -m pytest tests/test_mcp_server_impl.py -v
+.venv/bin/python -m pytest tests/test_mcp_server_impl.py tests/test_mcp_legacy_sse.py -v
 ```
 
 ## MCP server integration tests

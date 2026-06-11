@@ -2,13 +2,15 @@
 
 import inspect
 import unittest
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, patch
 
+import anyio
 import pytest
-
-pytestmark = pytest.mark.timeout(60)
-
 from mcp.server import Server
-from starlette.routing import Route
+from mcp.server.sse import SseServerTransport
+from starlette.applications import Starlette
+from starlette.routing import Mount, Route
 from starlette.testclient import TestClient
 
 from pypost.core.mcp_legacy_sse import (
@@ -16,7 +18,31 @@ from pypost.core.mcp_legacy_sse import (
     SSEEndpoint,
     build_legacy_sse_app,
 )
-from pypost.core.mcp_transport_routes import MCP_LEGACY_SSE_MESSAGES_PATH
+from pypost.core.mcp_transport_routes import (
+    MCP_LEGACY_SSE_MESSAGES_PATH,
+    MCP_LEGACY_SSE_MOUNT_PATH,
+)
+
+pytestmark = pytest.mark.timeout(60)
+
+
+@asynccontextmanager
+async def _quick_connect_sse(self, scope, receive, send):
+    """Minimal connect_sse stand-in so GET / completes without a live SSE stream."""
+    read_writer, read_stream = anyio.create_memory_object_stream(0)
+    write_stream, write_reader = anyio.create_memory_object_stream(0)
+    try:
+        yield (read_stream, write_stream)
+    finally:
+        await read_writer.aclose()
+        await write_reader.aclose()
+
+
+def _legacy_sse_test_client(*, mounted: bool = False) -> TestClient:
+    app = build_legacy_sse_app(Server("test"))
+    if mounted:
+        app = Starlette(routes=[Mount(MCP_LEGACY_SSE_MOUNT_PATH, app=app)])
+    return TestClient(app, raise_server_exceptions=False)
 
 
 class TestMcpLegacySseModule(unittest.TestCase):
@@ -45,16 +71,42 @@ class TestMcpLegacySseModule(unittest.TestCase):
         get_roots = [p for p in inner_paths if "GET" in p[1] and p[0] == "/"]
         self.assertEqual(len(get_roots), 1)
 
-    def test_build_legacy_sse_app_rejects_wrong_http_methods(self):
-        client = TestClient(
-            build_legacy_sse_app(Server("test")),
-            raise_server_exceptions=False,
-        )
+
+class TestMcpLegacySseHttpGuards(unittest.TestCase):
+    def test_sse_get_returns_empty_response_after_connection_closes(self):
+        """handle_sse_get must return Response() after transport teardown (MCP SDK contract)."""
+        client = TestClient(build_legacy_sse_app(Server("test")), raise_server_exceptions=True)
+        with patch.object(SseServerTransport, "connect_sse", _quick_connect_sse):
+            with patch.object(Server, "run", new_callable=AsyncMock) as mock_run:
+                response = client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.text, "")
+        self.assertTrue(mock_run.called)
+
+    def test_inner_app_rejects_non_get_on_sse_stream(self):
+        client = _legacy_sse_test_client()
+        for method in ("post", "put", "delete", "patch"):
+            with self.subTest(method=method):
+                self.assertEqual(getattr(client, method)("/").status_code, 405)
+
+    def test_inner_app_rejects_non_post_on_messages(self):
+        client = _legacy_sse_test_client()
+        for method in ("get", "put", "delete", "patch"):
+            with self.subTest(method=method):
+                self.assertEqual(
+                    getattr(client, method)(MCP_LEGACY_SSE_MESSAGES_PATH).status_code,
+                    405,
+                )
+
+    def test_mounted_sse_app_rejects_wrong_methods(self):
+        client = _legacy_sse_test_client(mounted=True)
+        self.assertEqual(client.post(MCP_LEGACY_SSE_MOUNT_PATH).status_code, 405)
         self.assertEqual(
-            client.get(MCP_LEGACY_SSE_MESSAGES_PATH).status_code,
+            client.get(
+                f"{MCP_LEGACY_SSE_MOUNT_PATH}{MCP_LEGACY_SSE_MESSAGES_PATH}"
+            ).status_code,
             405,
         )
-        self.assertEqual(client.post("/").status_code, 405)
 
 
 if __name__ == "__main__":
