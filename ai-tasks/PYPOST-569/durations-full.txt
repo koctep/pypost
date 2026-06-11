@@ -699,4 +699,806 @@ tests/test_makefile.py::TestExitBehavior::test_lint_fails_without_flake8_in_bare
 tests/test_makefile.py::TestTargetExecution::test_install_succeeds_with_empty_requirements PASSED [ 50%]
 tests/test_makefile.py::TestTargetExecution::test_test_fails_without_pytest_in_bare_venv PASSED [ 50%]
 tests/test_makefile.py::TestTargetExecution::test_test_succeeds_after_install PASSED [ 50%]
-tests/test_makefile.py::TestTargetExecution::test_lint_succeeds_after_install 
+tests/test_makefile.py::TestTargetExecution::test_lint_succeeds_after_install PASSED [ 50%]
+tests/test_mcp_client_service.py::MCPClientServiceTests::test_call_tool_returns_result PASSED [ 50%]
+tests/test_mcp_client_service.py::MCPClientServiceTests::test_connect_error_raises_execution_error_network 
+-------------------------------- live log call ---------------------------------
+20:41:54 ERROR    pypost.core.mcp_client_service: mcp_operation_failed url=http://localhost:1080/sse operation=list_tools category=ErrorCategory.NETWORK detail=Connection refused
+PASSED                                                                   [ 50%]
+tests/test_mcp_client_service.py::MCPClientServiceTests::test_list_tools_returns_json_with_tools PASSED [ 50%]
+tests/test_mcp_client_service.py::MCPClientServiceTests::test_read_timeout_raises_execution_error_timeout 
+-------------------------------- live log call ---------------------------------
+20:41:54 ERROR    pypost.core.mcp_client_service: mcp_operation_failed url=http://localhost:1080/sse operation=list_tools category=ErrorCategory.TIMEOUT detail=read timed out
+PASSED                                                                   [ 50%]
+tests/test_mcp_client_service.py::MCPClientServiceTests::test_timeout_raises_execution_error_timeout 
+-------------------------------- live log call ---------------------------------
+20:41:54 ERROR    pypost.core.mcp_client_service: mcp_operation_timeout url=http://localhost:1080/sse operation=list_tools timeout=25.0
+PASSED                                                                   [ 50%]
+tests/test_mcp_client_service.py::MCPClientServiceTests::test_unknown_error_raises_execution_error_unknown 
+-------------------------------- live log call ---------------------------------
+20:41:54 ERROR    pypost.core.mcp_client_service: mcp_operation_failed url=http://localhost:1080/sse operation=list_tools category=ErrorCategory.UNKNOWN detail=something broke
+PASSED                                                                   [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImpl::test_call_tool_appends_script_logs_and_error_to_body PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImpl::test_call_tool_invokes_request_service_with_mcp_context PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImpl::test_call_tool_on_execute_exception_returns_error_content_and_metrics PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImpl::test_call_tool_raises_when_unknown PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImpl::test_list_tools_builds_input_schema_from_mcp_request_placeholders PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImpl::test_list_tools_empty_when_no_tools PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImpl::test_register_tools_clears_previous_map PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImpl::test_register_tools_keeps_only_exposed_and_normalizes_names PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImplRouting::test_create_app_mounts_sse_sub_application PASSED [ 51%]
+tests/test_mcp_server_impl.py::TestMCPServerImplRouting::test_create_app_returns_starlette_application PASSED [ 52%]
+tests/test_mcp_server_impl.py::TestMCPServerImplRouting::test_inner_sse_app_exposes_messages_mount_and_get_root PASSED [ 52%]
+tests/test_mcp_server_impl.py::TestMCPServerImplRouting::test_routing_rejects_wrong_http_methods_without_live_sse PASSED [ 52%]
+tests/test_mcp_server_impl.py::TestMCPServerImplInjection::test_injected_template_service_is_used_for_schema_generation PASSED [ 52%]
+tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_over_live_sse_returns_response_body PASSED [ 52%]
+tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_passes_mcp_arguments_to_request_service PASSED [ 52%]
+tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_list_tools_over_live_sse PASSED [ 52%]
+tests/test_mcp_server_integration.py::TestMCPServerManagerIntegration::test_manager_starts_server_and_invokes_tool 
+-------------------------------- live log call ---------------------------------
+20:41:55 ERROR    asyncio: Task was destroyed but it is pending!
+task: <Task pending name='Task-102' coro=<_shutdown_watcher() done, defined at /Users/il/src/pypost/.venv/lib/python3.14/site-packages/sse_starlette/sse.py:110> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+PASSED                                                                   [ 52%]
+tests/test_metrics_manager.py::TestMetricsManagerHttpTracking::test_track_request_sent PASSED [ 52%]
+tests/test_metrics_manager.py::TestMetricsManagerHttpTracking::test_track_response_received PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerGuiTracking::test_track_gui_method_body_autoswitch PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerGuiTracking::test_track_gui_response_search_action_boolean_label PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerGuiTracking::test_track_gui_save_action_labeled PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerGuiTracking::test_track_gui_send_click PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerHistoryAndErrors::test_track_history_entry_appended PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerHistoryAndErrors::test_track_history_load_into_editor PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerHistoryAndErrors::test_track_history_record_error PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerHistoryAndErrors::test_track_request_error_uses_category_value PASSED [ 53%]
+tests/test_metrics_manager.py::TestMetricsManagerHistoryAndErrors::test_track_yaml_to_json_conversion_failed PASSED [ 54%]
+tests/test_metrics_manager.py::TestMetricsManagerRetryExhaustion::test_track_request_retry_exhaustion PASSED [ 54%]
+tests/test_metrics_manager.py::TestMetricsManagerRetryExhaustion::test_track_retry_attempt_uppercases_method PASSED [ 54%]
+tests/test_metrics_manager.py::TestMetricsManagerMcpResource::test_read_resource_metrics_success PASSED [ 54%]
+tests/test_new_variable_flow_integration.py::TestNewVariableFlowIntegration::test_response_view_new_variable_valid_name_persisted PASSED [ 54%]
+tests/test_new_variable_flow_integration.py::TestNewVariableFlowIntegration::test_response_view_new_variable_invalid_name_rejected PASSED [ 54%]
+tests/test_new_variable_flow_integration.py::TestNewVariableFlowIntegration::test_new_variable_menu_path_uses_none_key PASSED [ 54%]
+tests/test_request_editor_body_format.py::TestBodyFormatMapping::test_body_format_to_body_type PASSED [ 54%]
+tests/test_request_editor_body_format.py::TestBodyFormatMapping::test_body_type_to_format_json PASSED [ 54%]
+tests/test_request_editor_body_format.py::TestBodyFormatMapping::test_body_type_to_format_xml PASSED [ 54%]
+tests/test_request_editor_body_format.py::TestBodyFormatMapping::test_body_type_to_format_yaml PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestBodyFormatMapping::test_body_type_unknown_defaults_json PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_default_format_is_json PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_format_change_calls_set_body_format PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_get_request_data_persists_body_type PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_get_request_data_persists_yaml_as_json PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_load_data_restores_yaml_as_json_checked PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_load_data_restores_yaml_format PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_load_data_sets_editor_format PASSED [ 55%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_yaml_as_json_checkbox_enabled_only_for_yaml PASSED [ 56%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_yaml_as_json_persisted_when_format_not_yaml PASSED [ 56%]
+tests/test_request_editor_body_format.py::TestRequestWidgetBodyFormat::test_yaml_as_json_synced_to_body_editor PASSED [ 56%]
+tests/test_request_editor_body_gutter.py::TestRequestWidgetBodyGutter::test_body_editor_is_code_editor_with_gutter PASSED [ 56%]
+tests/test_request_editor_body_gutter.py::TestRequestWidgetBodyGutter::test_gutter_click_does_not_modify_body_in_widget_hierarchy PASSED [ 56%]
+tests/test_request_editor_body_gutter.py::TestRequestWidgetBodyGutter::test_gutter_width_grows_with_line_count_in_widget_hierarchy PASSED [ 56%]
+tests/test_request_editor_body_validation.py::TestRequestWidgetBodyValidation::test_invalid_json_shows_validation_banner_on_body_tab PASSED [ 56%]
+tests/test_request_editor_method_tab_switch.py::TestAutoSwitchToBodyTab::test_delete_does_not_switch_to_body PASSED [ 56%]
+tests/test_request_editor_method_tab_switch.py::TestAutoSwitchToBodyTab::test_get_does_not_switch_to_body PASSED [ 56%]
+tests/test_request_editor_method_tab_switch.py::TestAutoSwitchToBodyTab::test_load_data_post_does_not_switch_tab PASSED [ 56%]
+tests/test_request_editor_method_tab_switch.py::TestAutoSwitchToBodyTab::test_load_data_put_does_not_switch_tab PASSED [ 57%]
+tests/test_request_editor_method_tab_switch.py::TestAutoSwitchToBodyTab::test_loading_flag_reset_after_load_data PASSED [ 57%]
+tests/test_request_editor_method_tab_switch.py::TestAutoSwitchToBodyTab::test_patch_does_not_switch_to_body PASSED [ 57%]
+tests/test_request_editor_method_tab_switch.py::TestAutoSwitchToBodyTab::test_post_switches_to_body PASSED [ 57%]
+tests/test_request_editor_method_tab_switch.py::TestAutoSwitchToBodyTab::test_put_switches_to_body PASSED [ 57%]
+tests/test_request_manager.py::TestRequestManagerCreate::test_create_collection_persists_via_storage PASSED [ 57%]
+tests/test_request_manager.py::TestRequestManagerCreate::test_create_collection_rejects_duplicate_name PASSED [ 57%]
+tests/test_request_manager.py::TestRequestManagerCreate::test_create_collection_returns_collection_with_uuid_id PASSED [ 57%]
+tests/test_request_manager.py::TestRequestManagerSaveRequest::test_save_existing_request_updates_in_place PASSED [ 57%]
+tests/test_request_manager.py::TestRequestManagerSaveRequest::test_save_new_request_appended_to_collection PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerSaveRequest::test_save_request_unknown_collection_raises_value_error PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerFind::test_find_request_returns_none_when_not_found PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerFind::test_find_request_returns_tuple_when_found PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerReload::test_reload_collections_rebuilds_index_from_storage PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerGetCollections::test_get_collections_returns_current_list PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerDeleteIndex::test_delete_collection_uses_incremental_index_update PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerDeleteIndex::test_delete_request_index_consistent_after_deletion PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerDeleteIndex::test_delete_request_large_collection_keeps_index_consistent PASSED [ 58%]
+tests/test_request_manager.py::TestRequestManagerDeleteIndex::test_delete_request_uses_incremental_index_update PASSED [ 59%]
+tests/test_request_manager_delete.py::RequestManagerDeleteTests::test_delete_collection_item_routes_by_type 
+-------------------------------- live log call ---------------------------------
+20:41:55 WARNING  pypost.core.request_manager: delete_request_not_found request_id=missing
+20:41:55 WARNING  pypost.core.request_manager: delete_collection_item_unsupported_type item_id=c1 item_type=unsupported
+PASSED                                                                   [ 59%]
+tests/test_request_manager_delete.py::RequestManagerDeleteTests::test_delete_collection_removes_collection_and_deletes_file PASSED [ 59%]
+tests/test_request_manager_delete.py::RequestManagerDeleteTests::test_delete_request_removes_request_and_persists_collection PASSED [ 59%]
+tests/test_request_manager_delete.py::RequestManagerDeleteTests::test_rename_collection_item_rejects_empty_name 
+-------------------------------- live log call ---------------------------------
+20:41:55 WARNING  pypost.core.request_manager: rename_request_rejected_empty_name request_id=r1
+PASSED                                                                   [ 59%]
+tests/test_request_manager_delete.py::RequestManagerDeleteTests::test_rename_collection_rejects_duplicate_name 
+-------------------------------- live log call ---------------------------------
+20:41:55 WARNING  pypost.core.request_manager: rename_collection_rejected_duplicate_name collection_id=c2 new_name=Team API
+PASSED                                                                   [ 59%]
+tests/test_request_manager_delete.py::RequestManagerDeleteTests::test_rename_collection_updates_name_and_rewrites_collection_file PASSED [ 59%]
+tests/test_request_manager_delete.py::RequestManagerDeleteTests::test_rename_request_updates_name_and_persists_collection PASSED [ 59%]
+tests/test_request_save_orchestrator.py::TestRequestSaveOrchestrator::test_save_as_assigns_new_request_id PASSED [ 59%]
+tests/test_request_save_orchestrator.py::TestRequestSaveOrchestrator::test_save_new_persists_via_dialog PASSED [ 59%]
+tests/test_request_save_orchestrator.py::TestRequestSaveOrchestrator::test_save_overwrite_cancelled_by_user PASSED [ 60%]
+tests/test_request_save_orchestrator.py::TestRequestSaveOrchestrator::test_stale_context_blocks_overwrite_when_user_declines PASSED [ 60%]
+tests/test_request_service.py::TestRequestServiceExecuteHTTP::test_execute_headers_callback_forwarded_to_http_client PASSED [ 60%]
+tests/test_request_service.py::TestRequestServiceExecuteHTTP::test_execute_http_success_returns_execution_result PASSED [ 60%]
+tests/test_request_service.py::TestRequestServiceExecuteHTTP::test_execute_passes_variables_to_http_client PASSED [ 60%]
+tests/test_request_service.py::TestRequestServiceExecuteHTTP::test_execute_stream_callback_forwarded_to_http_client PASSED [ 60%]
+tests/test_request_service.py::TestRequestServicePostScript::test_execute_post_script_error_sets_execution_error PASSED [ 60%]
+tests/test_request_service.py::TestRequestServicePostScript::test_execute_post_script_populates_logs_and_variables PASSED [ 60%]
+tests/test_request_service.py::TestRequestServiceMCP::test_execute_mcp_does_not_call_http_client PASSED [ 60%]
+tests/test_request_service.py::TestRequestServiceMCP::test_execute_mcp_request_delegates_to_mcp_client PASSED [ 61%]
+tests/test_request_service.py::TestRequestServiceInjection::test_injected_http_client_is_used PASSED [ 61%]
+tests/test_request_service.py::TestRequestServiceInjection::test_injected_mcp_client_is_used PASSED [ 61%]
+tests/test_request_service.py::TestRequestServiceInjection::test_injected_template_service_forwarded_to_http_client PASSED [ 61%]
+tests/test_request_service.py::TestRequestServiceInjection::test_no_injection_sets_template_service_to_none PASSED [ 61%]
+tests/test_request_service.py::TestRequestServiceHistory::test_collection_name_propagated PASSED [ 61%]
+tests/test_request_service.py::TestRequestServiceHistory::test_history_entry_recorded_after_execute PASSED [ 61%]
+tests/test_request_service.py::TestRequestServiceHistory::test_history_failure_tracked_via_metrics 
+-------------------------------- live log call ---------------------------------
+20:41:55 ERROR    pypost.core.request_service: history_record_failed error=disk full
+PASSED                                                                   [ 61%]
+tests/test_request_service.py::TestRequestServiceHistory::test_history_masking_metric_recorded_when_hidden_keys_present PASSED [ 61%]
+tests/test_request_service.py::TestRequestServiceHistory::test_history_masks_hidden_variable_values PASSED [ 62%]
+tests/test_request_service.py::TestRequestServiceHistory::test_history_not_recorded_on_exception PASSED [ 62%]
+tests/test_request_service.py::TestRequestServiceHistory::test_history_records_resolved_url PASSED [ 62%]
+tests/test_request_service.py::TestRequestServiceHistory::test_history_reuses_resolved_fields_without_rerender PASSED [ 62%]
+tests/test_request_service.py::TestRequestServiceHistory::test_history_uses_resolved_url_without_injected_template_service PASSED [ 62%]
+tests/test_request_service.py::TestRequestServiceHistory::test_masking_metric_not_tracked_when_no_hidden_keys PASSED [ 62%]
+tests/test_request_service.py::TestRequestServiceHistory::test_no_history_manager_no_error PASSED [ 62%]
+tests/test_request_service.py::TestRequestServiceErrorHandling::test_execute_http_does_not_pre_render_url PASSED [ 62%]
+tests/test_request_service.py::TestRequestServiceErrorHandling::test_execution_error_from_http_client_returns_execution_result 
+-------------------------------- live log call ---------------------------------
+20:41:55 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://x' request_name='New Request' retries=0 error_category=ErrorCategory.NETWORK error=no conn detail=retries_attempted: 0
+20:41:55 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://x' category=ErrorCategory.NETWORK detail=retries_attempted: 0
+PASSED                                                                   [ 62%]
+tests/test_request_service.py::TestRequestServiceErrorHandling::test_network_error_populates_execution_error_category 
+-------------------------------- live log call ---------------------------------
+20:41:55 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://x' request_name='New Request' retries=0 error_category=ErrorCategory.NETWORK error=no conn detail=retries_attempted: 0
+20:41:55 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://x' category=ErrorCategory.NETWORK detail=retries_attempted: 0
+PASSED                                                                   [ 62%]
+tests/test_request_service.py::TestRequestServiceErrorHandling::test_network_error_response_has_status_code_zero 
+-------------------------------- live log call ---------------------------------
+20:41:55 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://x' request_name='New Request' retries=0 error_category=ErrorCategory.NETWORK error=no conn detail=retries_attempted: 0
+20:41:55 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://x' category=ErrorCategory.NETWORK detail=retries_attempted: 0
+PASSED                                                                   [ 63%]
+tests/test_request_service.py::TestRequestServiceErrorHandling::test_network_error_tracks_metrics 
+-------------------------------- live log call ---------------------------------
+20:41:55 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://x' request_name='New Request' retries=0 error_category=ErrorCategory.NETWORK error=no conn detail=retries_attempted: 0
+20:41:55 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://x' category=ErrorCategory.NETWORK detail=retries_attempted: 0
+PASSED                                                                   [ 63%]
+tests/test_request_service.py::TestRequestServiceErrorHandling::test_script_error_populates_execution_error_script_category PASSED [ 63%]
+tests/test_request_service.py::TestRequestServiceErrorHandling::test_script_error_tracks_metrics PASSED [ 63%]
+tests/test_request_service.py::TestRequestServiceRetryPolicyResolution::test_app_default_used_when_no_per_request_policy 
+-------------------------------- live log call ---------------------------------
+20:41:55 WARNING  pypost.core.request_service: retryable_status method=GET url='http://x' status=500 attempt=0 max_retries=2
+20:41:56 WARNING  pypost.core.request_service: retryable_status method=GET url='http://x' status=500 attempt=1 max_retries=2
+20:41:58 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://x' request_name='New Request' retries=2 error_category=ErrorCategory.NETWORK error=HTTP 500 detail=retries_attempted: 2
+20:41:58 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://x' category=ErrorCategory.NETWORK detail=retries_attempted: 2
+PASSED                                                                   [ 63%]
+tests/test_request_service.py::TestRequestServiceRetryPolicyResolution::test_hardcoded_fallback_when_both_policies_none PASSED [ 63%]
+tests/test_request_service.py::TestRequestServiceRetryPolicyResolution::test_per_request_policy_wins_over_app_default 
+-------------------------------- live log call ---------------------------------
+20:41:58 WARNING  pypost.core.request_service: retryable_status method=GET url='http://x' status=500 attempt=0 max_retries=1
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://x' request_name='New Request' retries=1 error_category=ErrorCategory.NETWORK error=HTTP 500 detail=retries_attempted: 1
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://x' category=ErrorCategory.NETWORK detail=retries_attempted: 1
+PASSED                                                                   [ 63%]
+tests/test_request_sync.py::TestCopyRequestForIsolatedTab::test_deep_copies_body PASSED [ 63%]
+tests/test_request_sync.py::TestCopyRequestForIsolatedTab::test_deep_copies_nested_headers PASSED [ 63%]
+tests/test_request_sync.py::TestCopyRequestForIsolatedTab::test_snapshot_persisted_fields_uses_same_copy_semantics PASSED [ 64%]
+tests/test_request_sync.py::TestRequestDataLeanModel::test_model_fields_exclude_response_and_history_payloads PASSED [ 64%]
+tests/test_response_view_search.py::TestResponseViewSearch::test_empty_query_clears_status PASSED [ 64%]
+tests/test_response_view_search.py::TestResponseViewSearch::test_typed_search_shows_match_counter PASSED [ 64%]
+tests/test_response_view_search.py::TestResponseViewSearch::test_no_matches_shows_message PASSED [ 64%]
+tests/test_response_view_search.py::TestResponseViewSearch::test_find_next_advances_counter PASSED [ 64%]
+tests/test_response_view_search.py::TestResponseViewSearch::test_find_previous_moves_backward PASSED [ 64%]
+tests/test_response_view_search.py::TestResponseViewSearch::test_match_case_checkbox PASSED [ 64%]
+tests/test_response_view_search.py::TestResponseViewSearch::test_metrics_tracked_on_typed_search PASSED [ 64%]
+tests/test_response_view_search.py::TestResponseViewSearch::test_display_response_clears_search PASSED [ 64%]
+tests/test_retry.py::TestNoRetryDefault::test_max_retries_zero_policy_returns_first_response PASSED [ 65%]
+tests/test_retry.py::TestNoRetryDefault::test_no_retry_policy_does_not_retry_on_503 PASSED [ 65%]
+tests/test_retry.py::TestNoRetryDefault::test_no_retry_policy_returns_first_response PASSED [ 65%]
+tests/test_retry.py::TestRetryOnRetryableStatusCode::test_200_not_retried PASSED [ 65%]
+tests/test_retry.py::TestRetryOnRetryableStatusCode::test_non_retryable_status_code_not_retried PASSED [ 65%]
+tests/test_retry.py::TestRetryOnRetryableStatusCode::test_retries_on_503_then_succeeds 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=0 max_retries=1
+PASSED                                                                   [ 65%]
+tests/test_retry.py::TestRetryOnRetryableStatusCode::test_retries_three_times_then_succeeds 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=0 max_retries=3
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=1 max_retries=3
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=2 max_retries=3
+PASSED                                                                   [ 65%]
+tests/test_retry.py::TestRetryOnException::test_detail_contains_retries_attempted_on_exhaustion 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=2 error=conn reset
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=1 max_retries=2 error=conn reset
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=2 error_category=ErrorCategory.NETWORK error=conn reset detail=retries_attempted: 2
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 2
+PASSED                                                                   [ 65%]
+tests/test_retry.py::TestRetryOnException::test_exhausted_exception_retries_returns_execution_result_with_error 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=2 error=conn reset
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=1 max_retries=2 error=conn reset
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=2 error_category=ErrorCategory.NETWORK error=conn reset detail=retries_attempted: 2
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 2
+PASSED                                                                   [ 65%]
+tests/test_retry.py::TestRetryOnException::test_retries_on_network_exception_then_succeeds 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=1 error=conn reset
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestRetryCallback::test_no_callback_does_not_raise 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=0 max_retries=1
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestRetryCallback::test_retry_callback_called_for_each_attempt 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=2 error=fail
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=1 max_retries=2 error=fail
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestRetryCallback::test_retry_callback_called_once_on_single_retry 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=0 max_retries=1
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestStopFlagDuringRetry::test_stop_flag_cancels_retry 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.CANCELLED detail=Cancelled during retry delay
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestRetryMetrics::test_no_metrics_no_error_on_retry 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=0 max_retries=1
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestRetryMetrics::test_track_retry_attempt_called_on_each_retry 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=0 max_retries=2
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=1 max_retries=2
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestRetryMetrics::test_track_retry_attempt_passes_method_and_category 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=1 error=fail
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestExhaustionAlert::test_alert_manager_emit_called_on_exhaustion 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=1 error=conn fail
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=1 error_category=ErrorCategory.NETWORK error=conn fail detail=retries_attempted: 1
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 1
+PASSED                                                                   [ 66%]
+tests/test_retry.py::TestExhaustionAlert::test_no_alert_manager_does_not_raise_on_exhaustion 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=1 error=fail
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=1 error_category=ErrorCategory.NETWORK error=fail detail=retries_attempted: 1
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 1
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestExhaustionAlert::test_no_exhaustion_alert_when_retries_succeed 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=1 error=fail
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestExhaustionAlert::test_track_request_retry_exhaustion_called_on_exhaustion 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_error method=GET url='http://example.com' category=ErrorCategory.NETWORK attempt=0 max_retries=1 error=fail
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=1 error_category=ErrorCategory.NETWORK error=fail detail=retries_attempted: 1
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 1
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestRetryableStatusExhaustion::test_alert_manager_emit_on_status_exhaustion 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=0 error_category=ErrorCategory.NETWORK error=HTTP 503 detail=retries_attempted: 0
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 0
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestRetryableStatusExhaustion::test_detail_contains_retries_attempted_on_status_exhaustion 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=0 max_retries=2
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=1 max_retries=2
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=2 error_category=ErrorCategory.NETWORK error=HTTP 503 detail=retries_attempted: 2
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 2
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestRetryableStatusExhaustion::test_exhausted_status_retries_returns_execution_error 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retryable_status method=GET url='http://example.com' status=503 attempt=0 max_retries=1
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=1 error_category=ErrorCategory.NETWORK error=HTTP 503 detail=retries_attempted: 1
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 1
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestRetryableStatusExhaustion::test_track_request_retry_exhaustion_on_status_exhaustion 
+-------------------------------- live log call ---------------------------------
+20:41:59 WARNING  pypost.core.request_service: retry_exhausted method=GET url='http://example.com' request_name='New Request' retries=0 error_category=ErrorCategory.NETWORK error=HTTP 502 detail=retries_attempted: 0
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.NETWORK detail=retries_attempted: 0
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestBodyErrorNonRetryable::test_body_error_no_retry_metrics 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.BODY detail=invalid yaml
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestBodyErrorNonRetryable::test_body_error_not_retried 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.request_service: request_execution_failed method=GET url='http://example.com' category=ErrorCategory.BODY detail=invalid yaml
+PASSED                                                                   [ 67%]
+tests/test_retry.py::TestRetryPolicyModel::test_defaults PASSED          [ 67%]
+tests/test_retry.py::TestRetryPolicyModel::test_max_retries_accepts_positive PASSED [ 68%]
+tests/test_retry.py::TestRetryPolicyModel::test_max_retries_accepts_zero PASSED [ 68%]
+tests/test_retry.py::TestRetryPolicyModel::test_max_retries_rejects_negative PASSED [ 68%]
+tests/test_retry.py::TestRetryPolicyModel::test_request_data_rejects_negative_max_retries PASSED [ 68%]
+tests/test_retry.py::TestRetryPolicyModel::test_request_data_retry_policy_defaults_none PASSED [ 68%]
+tests/test_retry.py::TestRetryPolicyModel::test_request_data_with_retry_policy PASSED [ 68%]
+tests/test_retry.py::TestRetryPolicyModel::test_serialise_and_deserialise PASSED [ 68%]
+tests/test_retryable_status_codes_parse.py::TestParseRetryableStatusCodes::test_empty_and_whitespace_returns_empty_list PASSED [ 68%]
+tests/test_retryable_status_codes_parse.py::TestParseRetryableStatusCodes::test_empty_segment_fails PASSED [ 68%]
+tests/test_retryable_status_codes_parse.py::TestParseRetryableStatusCodes::test_invalid_token PASSED [ 69%]
+tests/test_retryable_status_codes_parse.py::TestParseRetryableStatusCodes::test_non_empty_raw_all_invalid_tokens PASSED [ 69%]
+tests/test_retryable_status_codes_parse.py::TestParseRetryableStatusCodes::test_out_of_range PASSED [ 69%]
+tests/test_retryable_status_codes_parse.py::TestParseRetryableStatusCodes::test_unsupported_separator_yields_invalid_token PASSED [ 69%]
+tests/test_retryable_status_codes_parse.py::TestParseRetryableStatusCodes::test_valid_single_and_multiple PASSED [ 69%]
+tests/test_retryable_status_codes_parse.py::TestParseRetryableStatusCodes::test_whitespace_around_commas PASSED [ 69%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_empty_hidden_keys_renders_but_does_not_mask PASSED [ 69%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_hidden_key_not_in_variables_is_silently_skipped PASSED [ 69%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_masks_hidden_variable_in_body PASSED [ 69%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_masks_hidden_variable_in_header_value PASSED [ 70%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_masks_hidden_variable_in_url_query_param PASSED [ 70%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_multiple_hidden_keys_all_masked PASSED [ 70%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_non_hidden_variables_remain_unmasked PASSED [ 70%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_none_hidden_keys_renders_but_does_not_mask PASSED [ 70%]
+tests/test_sensitive_data_masking_policy.py::TestSensitiveDataMaskingPolicyBuildHistorySafeFields::test_reuses_resolved_fields_when_no_hidden_keys PASSED [ 70%]
+tests/test_settings_dialog.py::TestSettingsDialogRequestTimeout::test_request_timeout_spin_is_on_form_layout PASSED [ 70%]
+tests/test_settings_dialog.py::TestSettingsDialogRequestTimeout::test_request_timeout_loads_from_settings PASSED [ 70%]
+tests/test_settings_dialog.py::TestSettingsDialogRequestTimeout::test_accept_includes_request_timeout_in_result PASSED [ 70%]
+tests/test_settings_dialog.py::TestSettingsDialogLogHiddenKeyNames::test_log_hidden_key_names_checkbox_on_form PASSED [ 70%]
+tests/test_settings_dialog.py::TestSettingsDialogLogHiddenKeyNames::test_log_hidden_key_names_loads_from_settings PASSED [ 71%]
+tests/test_settings_dialog.py::TestSettingsDialogLogHiddenKeyNames::test_accept_includes_log_hidden_key_names_in_result PASSED [ 71%]
+tests/test_settings_dialog.py::TestSettingsDialogSecurityLoggingSection::test_security_logging_section_header_visible PASSED [ 71%]
+tests/test_settings_dialog.py::TestSettingsDialogSecurityLoggingSection::test_security_logging_fields_grouped_after_retry_policy PASSED [ 71%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_encryption_controls_on_form PASSED [ 71%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_key_source_combo_includes_all_sources PASSED [ 71%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_fallback_loads_from_settings PASSED [ 71%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_help_text_updates_for_key_source PASSED [ 71%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_encryption_mode_loads_from_settings PASSED [ 71%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_accept_persists_encryption_fields PASSED [ 72%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_accept_persists_fallback_chain PASSED [ 72%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_fallback_warning_shows_ignored_tokens PASSED [ 72%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_accept_default_mode_stores_none PASSED [ 72%]
+tests/test_settings_encryption.py::TestSettingsDialogEnvironmentEncryption::test_accept_disabled_mode PASSED [ 72%]
+tests/test_settings_encryption.py::TestConfigManagerEncryptionPersistence::test_save_load_encryption_fields PASSED [ 72%]
+tests/test_settings_encryption_main_window_e2e.py::test_open_settings_applies_encryption_policy_to_storage[enabled-None-True] PASSED [ 72%]
+tests/test_settings_encryption_main_window_e2e.py::test_open_settings_applies_encryption_policy_to_storage[disabled-true-False] PASSED [ 72%]
+tests/test_settings_encryption_main_window_e2e.py::test_open_settings_applies_encryption_policy_to_storage[default-true-True] PASSED [ 72%]
+tests/test_settings_encryption_migration_ui.py::TestSettingsDialogEncryptionMigration::test_migration_buttons_on_form_with_storage PASSED [ 72%]
+tests/test_settings_encryption_migration_ui.py::TestSettingsDialogEncryptionMigration::test_migration_buttons_disabled_without_storage PASSED [ 73%]
+tests/test_settings_encryption_migration_ui.py::TestSettingsDialogEncryptionMigration::test_verify_delegates_to_migration_service PASSED [ 73%]
+tests/test_settings_encryption_migration_ui.py::TestSettingsDialogEncryptionMigration::test_reencrypt_skipped_when_not_confirmed PASSED [ 73%]
+tests/test_settings_encryption_migration_ui.py::TestSettingsDialogEncryptionMigration::test_reencrypt_runs_when_confirmed PASSED [ 73%]
+tests/test_settings_encryption_migration_ui.py::TestSettingsDialogEncryptionMigration::test_verify_shows_warning_on_failure PASSED [ 73%]
+tests/test_settings_hidden_toggle_logging_e2e.py::test_default_masked_toggle_log_after_settings_apply PASSED [ 73%]
+tests/test_settings_hidden_toggle_logging_e2e.py::test_readable_toggle_log_when_settings_opt_in PASSED [ 73%]
+tests/test_settings_key_source_main_window_e2e.py::test_open_settings_secret_store_with_env_fallback_encrypt_decrypt_round_trip PASSED [ 73%]
+tests/test_settings_persistence.py::TestConfigManagerPersistence::test_each_save_increments_revision PASSED [ 73%]
+tests/test_settings_persistence.py::TestConfigManagerPersistence::test_load_corrupt_file_returns_defaults PASSED [ 74%]
+tests/test_settings_persistence.py::TestConfigManagerPersistence::test_load_legacy_settings_without_encryption_fields_default_none PASSED [ 74%]
+tests/test_settings_persistence.py::TestConfigManagerPersistence::test_load_legacy_settings_without_log_hidden_key_names_defaults_false PASSED [ 74%]
+tests/test_settings_persistence.py::TestConfigManagerPersistence::test_load_missing_file_returns_defaults PASSED [ 74%]
+tests/test_settings_persistence.py::TestConfigManagerPersistence::test_save_then_load_roundtrip PASSED [ 74%]
+tests/test_settings_persistence.py::TestStateManagerPersistence::test_set_expanded_collections_noop_skips_save PASSED [ 74%]
+tests/test_settings_persistence.py::TestStateManagerPersistence::test_set_expanded_collections_persists PASSED [ 74%]
+tests/test_settings_persistence.py::TestStateManagerPersistence::test_set_last_environment_id_persists PASSED [ 74%]
+tests/test_settings_persistence.py::TestStateManagerPersistence::test_set_open_tabs_persists PASSED [ 74%]
+tests/test_storage_collections.py::test_save_collection_uses_collection_id_as_filename PASSED [ 75%]
+tests/test_storage_collections.py::test_rename_collection_does_not_change_filename PASSED [ 75%]
+tests/test_storage_collections.py::test_load_collections_migrates_legacy_name_based_files PASSED [ 75%]
+tests/test_storage_collections.py::test_same_display_name_collections_persist_as_separate_files PASSED [ 75%]
+tests/test_storage_collections.py::test_delete_collection_removes_id_based_file PASSED [ 75%]
+tests/test_storage_environments.py::test_save_environments_serializes_hidden_keys_as_json_list PASSED [ 75%]
+tests/test_storage_environments.py::test_load_environments_restores_hidden_keys_to_set PASSED [ 75%]
+tests/test_storage_environments.py::test_save_environments_replace_failure_keeps_original_file 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.storage: save_environments_replace_failed src=/private/var/folders/nw/j_4q1l450l39rp9x46khjp6c0000gn/T/pytest-of-il/pytest-203/test_save_environments_replace0/pypost-data/environments.json.tmp dst=/private/var/folders/nw/j_4q1l450l39rp9x46khjp6c0000gn/T/pytest-of-il/pytest-203/test_save_environments_replace0/pypost-data/environments.json error=replace failed
+PASSED                                                                   [ 75%]
+tests/test_storage_environments.py::test_save_environments_encrypts_only_hidden_keys_when_enabled PASSED [ 75%]
+tests/test_storage_environments.py::test_load_environments_decrypts_encrypted_hidden_values PASSED [ 75%]
+tests/test_storage_environments.py::test_load_environments_with_missing_key_returns_empty 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.key_provider: encryption_key_rotation_lookup_failed key_id=fe3e45cc8d30366c reason=no_source_provided_key
+20:41:59 ERROR    pypost.core.storage: load_environments_failed file=/private/var/folders/nw/j_4q1l450l39rp9x46khjp6c0000gn/T/pytest-of-il/pytest-203/test_load_environments_with_mi0/pypost-data/environments.json error=Failed to decrypt environment variable 'SECRET': Encryption key is unavailable for key id fe3e45cc8d30366c.
+PASSED                                                                   [ 76%]
+tests/test_storage_environments.py::test_save_environments_encrypts_hidden_keys_from_app_settings PASSED [ 76%]
+tests/test_storage_environments.py::test_app_settings_disabled_overrides_env_enabled PASSED [ 76%]
+tests/test_storage_environments.py::test_second_save_reencrypts_only_changed_hidden_keys PASSED [ 76%]
+tests/test_storage_environments.py::test_metrics_track_encryption_and_decryption_counters PASSED [ 76%]
+tests/test_storage_environments.py::test_metrics_track_save_encryption_error_when_key_missing 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.key_provider: encryption_key_unavailable reason=no_source_provided_active_key
+20:41:59 ERROR    pypost.core.key_provider: encryption_key_unavailable reason=no_source_provided_active_key
+20:41:59 ERROR    pypost.core.environment_variables_adapter: environment_value_encrypt_failed env_name=Dev key=SECRET error=Encryption key is unavailable. Configure a supported key source.
+PASSED                                                                   [ 76%]
+tests/test_storage_environments.py::test_metrics_track_load_decryption_error_when_key_mismatch 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.key_provider: encryption_key_rotation_lookup_failed key_id=17af362531d4f4a8 reason=no_source_provided_key
+20:41:59 ERROR    pypost.core.storage: load_environments_failed file=/private/var/folders/nw/j_4q1l450l39rp9x46khjp6c0000gn/T/pytest-of-il/pytest-203/test_metrics_track_load_decryp0/pypost-data/environments.json error=Failed to decrypt environment variable 'SECRET': Encryption key is unavailable for key id 17af362531d4f4a8.
+PASSED                                                                   [ 76%]
+tests/test_storage_environments.py::test_metrics_track_load_unsupported_format_error 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.storage: load_environments_failed file=/private/var/folders/nw/j_4q1l450l39rp9x46khjp6c0000gn/T/pytest-of-il/pytest-203/test_metrics_track_load_unsupp0/pypost-data/environments.json error=Unsupported value format for environment variable 'SECRET'.
+PASSED                                                                   [ 76%]
+tests/test_storage_environments.py::test_load_environments_with_errors_all_success PASSED [ 76%]
+tests/test_storage_environments.py::test_load_environments_with_errors_partial_decrypt_failure 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.environment_secrets_codec: env_value_decrypt_failed reason=invalid_token key_id=b4477472965fa352
+PASSED                                                                   [ 77%]
+tests/test_storage_environments.py::test_load_environments_with_errors_missing_key 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.key_provider: encryption_key_rotation_lookup_failed key_id=ddda9b1ba03fb249 reason=no_source_provided_key
+PASSED                                                                   [ 77%]
+tests/test_storage_environments.py::test_load_environments_with_errors_missing_file PASSED [ 77%]
+tests/test_storage_environments.py::test_load_environments_unchanged_on_partial_failure 
+-------------------------------- live log call ---------------------------------
+20:41:59 ERROR    pypost.core.environment_secrets_codec: env_value_decrypt_failed reason=invalid_token key_id=4c76bd6ed38016fe
+20:41:59 ERROR    pypost.core.storage: load_environments_failed file=/private/var/folders/nw/j_4q1l450l39rp9x46khjp6c0000gn/T/pytest-of-il/pytest-203/test_load_environments_unchang0/pypost-data/environments.json error=Failed to decrypt environment variable 'SECRET': Encrypted environment value could not be decrypted with current key.
+PASSED                                                                   [ 77%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_add_new_tab_creates_unnamed_tab PASSED [ 77%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_add_new_tab_deep_copies_request_data PASSED [ 77%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_add_new_tab_with_request_data PASSED [ 77%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_apply_settings_updates_indent PASSED [ 77%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_clean_sibling_loads_latest_when_user_chooses_load PASSED [ 77%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_close_tab_ensures_at_least_one_tab PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_close_tab_removes_tab PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_close_tabs_for_request_ids_closes_duplicate_request_tabs PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_close_tabs_for_request_ids_closes_matching_tabs PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_close_tabs_for_request_ids_keeps_blank_tab_when_all_closed PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_close_tabs_for_request_ids_noop_for_empty_list PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_close_tabs_for_request_ids_updates_persisted_state PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_dirty_sibling_keeps_draft_when_user_chooses_keep PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_handle_close_tab_closes_current PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_handle_new_tab_opens_tab PASSED [ 78%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_handle_next_tab_cycles PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_handle_previous_tab_cycles PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_handle_switch_to_tab_invalid_index_noop PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_handle_switch_to_tab_valid_index PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_new_tab_applies_env_variables PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_on_env_hidden_keys_changed_pushes_to_request_editor PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_on_env_keys_changed_pushes_keys PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_on_env_variables_changed_updates_tabs PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_persisted_baseline_initialized_on_add_new_tab PASSED [ 79%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_rename_request_tabs_noop_for_unknown_id PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_rename_request_tabs_updates_baseline_name PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_rename_request_tabs_updates_label PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_request_saved_signal_emitted PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_restore_tabs_opens_new_tab_when_no_saved PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_restore_tabs_opens_saved_tabs PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_save_as_emits_request_save_as_completed_not_request_saved PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_save_as_preserves_original_request_id PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_save_overwrite_emits_request_persisted PASSED [ 80%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_save_overwrite_notifies_sibling_tab PASSED [ 81%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_save_overwrite_updates_all_matching_tab_labels PASSED [ 81%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_save_tabs_state_persists_ids PASSED [ 81%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_variable_set_requested_forwarded PASSED [ 81%]
+tests/test_tabs_presenter.py::TestTabsPresenter::test_widget_is_qtab_widget PASSED [ 81%]
+tests/test_tabs_presenter.py::TestRequestSync::test_is_tab_dirty_when_editor_differs_from_baseline PASSED [ 81%]
+tests/test_tabs_presenter.py::TestRequestSync::test_persisted_fields_equal_detects_url_change PASSED [ 81%]
+tests/test_tabs_presenter.py::TestRequestSync::test_snapshot_persisted_fields_deep_copy PASSED [ 81%]
+tests/test_tabs_presenter.py::TestOnRequestError::test_execution_error_body_shows_category_message 
+-------------------------------- live log call ---------------------------------
+20:42:00 ERROR    pypost.ui.presenters.tabs_presenter: request_error category=ErrorCategory.BODY message=Could not convert YAML body to JSON. detail=mapping values are not allowed here
+PASSED                                                                   [ 81%]
+tests/test_tabs_presenter.py::TestOnRequestError::test_execution_error_cancelled_no_dialog PASSED [ 81%]
+tests/test_tabs_presenter.py::TestOnRequestError::test_execution_error_detail_substring_not_treated_as_cancelled 
+-------------------------------- live log call ---------------------------------
+20:42:00 ERROR    pypost.ui.presenters.tabs_presenter: request_error category=ErrorCategory.NETWORK message=connection failed detail=operation cancelled by upstream proxy
+PASSED                                                                   [ 82%]
+tests/test_tabs_presenter.py::TestOnRequestError::test_execution_error_message_does_not_expose_raw_detail_for_network 
+-------------------------------- live log call ---------------------------------
+20:42:00 ERROR    pypost.ui.presenters.tabs_presenter: request_error category=ErrorCategory.NETWORK message=no conn detail=HTTPSConnectionPool(host='secret', port=443): Max retries exceeded
+PASSED                                                                   [ 82%]
+tests/test_tabs_presenter.py::TestOnRequestError::test_execution_error_network_shows_category_message 
+-------------------------------- live log call ---------------------------------
+20:42:00 ERROR    pypost.ui.presenters.tabs_presenter: request_error category=ErrorCategory.NETWORK message=no conn detail=connection refused
+PASSED                                                                   [ 82%]
+tests/test_tabs_presenter.py::TestOnRequestError::test_execution_error_timeout_shows_timeout_message 
+-------------------------------- live log call ---------------------------------
+20:42:00 ERROR    pypost.ui.presenters.tabs_presenter: request_error category=ErrorCategory.TIMEOUT message=timed out detail=ReadTimeout
+PASSED                                                                   [ 82%]
+tests/test_tabs_presenter.py::TestOnRequestError::test_str_cancellation_message_no_dialog PASSED [ 82%]
+tests/test_tabs_presenter.py::TestOnRequestError::test_str_error_shows_dialog 
+-------------------------------- live log call ---------------------------------
+20:42:00 ERROR    pypost.ui.presenters.tabs_presenter: request_error error_msg=connection refused
+PASSED                                                                   [ 82%]
+tests/test_tabs_presenter.py::TestTabsPresenterAlertManagerPropagation::test_alert_manager_passed_to_worker PASSED [ 82%]
+tests/test_tabs_presenter.py::TestTabsPresenterAlertManagerPropagation::test_no_alert_manager_no_exception PASSED [ 82%]
+tests/test_tabs_presenter.py::TestTabsPresenterHiddenKeysForwarding::test_hidden_keys_forwarded_to_worker_after_env_hidden_keys_changed PASSED [ 82%]
+tests/test_template_expression_tokenizer.py::TestTemplateExpressionTokenizer::test_empty_content PASSED [ 83%]
+tests/test_template_expression_tokenizer.py::TestTemplateExpressionTokenizer::test_multiple_placeholders PASSED [ 83%]
+tests/test_template_expression_tokenizer.py::TestTemplateExpressionTokenizer::test_nested_function_call PASSED [ 83%]
+tests/test_template_expression_tokenizer.py::TestTemplateExpressionTokenizer::test_no_placeholders PASSED [ 83%]
+tests/test_template_expression_tokenizer.py::TestTemplateExpressionTokenizer::test_single_placeholder PASSED [ 83%]
+tests/test_template_expression_tokenizer.py::TestTemplateExpressionTokenizer::test_whitespace_inside_delimiters PASSED [ 83%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_catalog_allow_list_matches_jinja_globals PASSED [ 83%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_attribute_access_form_returns_original_content 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 83%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_base64_function_with_variable_argument PASSED [ 83%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_empty_string_returns_empty_string PASSED [ 83%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_function_with_literal_argument_returns_original_content 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_function_with_malformed_parenthesis_returns_original_content 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_invalid_syntax_returns_original_content 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=TemplateSyntaxError token_count=0
+PASSED                                                                   [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_jinja_filter_form_returns_original_content 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_known_variable PASSED [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_md5_function_with_variable_argument PASSED [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_mixed_variant_b_functions PASSED [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_multi_argument_function_returns_original_content 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_nested_function_with_allowed_catalog PASSED [ 84%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_none_returns_empty_string PASSED [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_preserves_backward_compatible_fallback_for_typed_outcomes 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_preserves_backward_compatible_fallback_for_typed_outcomes PASSED [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_rejects_nested_unknown 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_unknown_function_returns_original_content 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_unknown_variable_renders_empty_string PASSED [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_urlencode_function_in_mixed_text PASSED [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_render_urlencode_function_with_variable_argument PASSED [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_runtime_hover_parity_invalid_spacing 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+
+tests/test_template_service.py::TestTemplateServiceRenderString::test_runtime_hover_parity_invalid_spacing PASSED [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_runtime_hover_parity_malformed_nested 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+
+tests/test_template_service.py::TestTemplateServiceRenderString::test_runtime_hover_parity_malformed_nested PASSED [ 85%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_runtime_hover_parity_nested_valid 
+tests/test_template_service.py::TestTemplateServiceRenderString::test_runtime_hover_parity_nested_valid PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceRenderString::test_runtime_hover_parity_valid_spaced_nested 
+tests/test_template_service.py::TestTemplateServiceRenderString::test_runtime_hover_parity_valid_spaced_nested PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceParse::test_parse_valid_template_returns_ast PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_allows_nested_allowed_calls PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_allows_plain_identifier PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_malformed_nested_alignment 
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_malformed_nested_alignment PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_rejects_attribute_access_form PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_rejects_jinja_filter_form PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_rejects_nested_unknown PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_reports_invalid_argument PASSED [ 86%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_reports_invalid_arity PASSED [ 87%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_reports_invalid_syntax PASSED [ 87%]
+tests/test_template_service.py::TestTemplateServiceValidationOutcomes::test_validate_reports_unknown_function PASSED [ 87%]
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_empty_content_tracks_metric PASSED [ 87%]
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_invalid_spacing_validation_failure_tracks_validation_metrics_on_hover 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+------------------------------ live log logreport ------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_invalid_spacing_validation_failure_tracks_validation_metrics_on_hover PASSED [ 87%]
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_malformed_nested_validation_failure_tracks_validation_metrics_on_hover 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+PASSED                                                                   [ 87%]
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_nested_success_tracks_success_metric PASSED [ 87%]
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_nested_validation_failure_tracks_validation_metrics 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+PASSED                                                                   [ 87%]
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_spaced_nested_success_tracks_success_metric_on_hover PASSED [ 87%]
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_success_tracks_success_metric PASSED [ 88%]
+tests/test_template_service.py::TestTemplateServiceObservability::test_render_validation_failure_tracks_validation_metrics 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 88%]
+tests/test_template_service.py::TestTemplateServiceRenderStages::test_stage_empty_returns_empty_string_and_tracks_empty_content PASSED [ 88%]
+tests/test_template_service.py::TestTemplateServiceRenderStages::test_stage_invalid_returns_original_content_without_render_error 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 88%]
+tests/test_template_service.py::TestTemplateServiceRenderStages::test_stage_render_error_returns_original_content_and_tracks_render_error 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=RuntimeError token_count=1
+PASSED                                                                   [ 88%]
+tests/test_template_service.py::TestTemplateServiceRenderStages::test_stage_success_tracks_success_metric PASSED [ 88%]
+tests/test_template_service.py::TestTemplateServiceHelperStages::test_fallback_helper_skips_render_error_for_value_error 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 88%]
+tests/test_template_service.py::TestTemplateServiceHelperStages::test_fallback_helper_tracks_render_error_for_non_value_error 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=RuntimeError token_count=1
+PASSED                                                                   [ 88%]
+tests/test_template_service.py::TestTemplateServiceHelperStages::test_tokenize_template_expressions_counts_all_tokens PASSED [ 88%]
+tests/test_template_service_caching_eval.py::TestTemplateRenderCachingPrerequisites::test_empty_content_stays_empty PASSED [ 89%]
+tests/test_template_service_caching_eval.py::TestTemplateRenderCachingPrerequisites::test_identical_inputs_produce_identical_output PASSED [ 89%]
+tests/test_template_service_caching_eval.py::TestTemplateRenderCachingPrerequisites::test_invalid_template_falls_back_each_call 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=runtime error_type=ValueError token_count=1
+PASSED                                                                   [ 89%]
+tests/test_template_service_caching_eval.py::TestTemplateRenderCachingPrerequisites::test_variable_change_produces_different_output PASSED [ 89%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_expression_pattern_matches_core_tokenizer PASSED [ 89%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_find_expression_at_index_for_nested_function PASSED [ 89%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_find_expression_at_index_for_variant_b_function PASSED [ 89%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_find_variable_at_index_inside_name PASSED [ 89%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_find_variable_at_index_on_open_brace PASSED [ 89%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_find_variable_at_index_outside_returns_none PASSED [ 89%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_get_variable_value_defined PASSED [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_get_variable_value_hidden_returns_mask PASSED [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_get_variable_value_missing PASSED [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_adjacent_placeholders PASSED [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_empty_string PASSED [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_hidden_placeholder_returns_mask PASSED [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_invalid_variant_b_function_keeps_token 
+-------------------------------- live log call ---------------------------------
+20:42:00 WARNING  pypost.core.template_service: template_render_fallback_to_original render_path=hover error_type=ValueError token_count=1
+PASSED                                                                   [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_no_placeholders_unchanged PASSED [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_repeated_variable PASSED [ 90%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_replaces_all PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_undefined_placeholder PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_underscore_name PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_variant_b_function_marks_hover_render_path PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableHoverHelper::test_resolve_text_variant_b_function_uses_runtime_resolution PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableAwareLineEditTooltips::test_mouse_over_plain_text_hides_tooltip PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableAwareLineEditTooltips::test_mouse_over_variable_shows_resolved_tooltip PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableAwareLineEditTooltips::test_mouse_over_variant_b_function_shows_runtime_value PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableAwarePlainTextEditTooltips::test_mouse_over_plain_multiline_hides_tooltip PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableAwarePlainTextEditTooltips::test_mouse_over_variable_in_body_shows_tooltip PASSED [ 91%]
+tests/test_variable_hover.py::TestVariableAwarePlainTextEditTooltips::test_mouse_over_variant_b_function_in_body_shows_runtime_value PASSED [ 92%]
+tests/test_variable_hover.py::TestVariableAwareTableWidgetTooltips::test_mouse_over_plain_table_cell_hides_tooltip PASSED [ 92%]
+tests/test_variable_hover.py::TestVariableAwareTableWidgetTooltips::test_mouse_over_variant_b_function_in_table_cell_shows_runtime_value PASSED [ 92%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[api_key] PASSED [ 92%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[_internal] PASSED [ 92%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[userId123] PASSED [ 92%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[service_url] PASSED [ 92%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[DEBUG_MODE] PASSED [ 92%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[a] PASSED [ 92%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[Z9] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[_] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_valid_names[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_invalid_names[-Variable name cannot be empty.-empty] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_invalid_names[123api-Variable name cannot start with a digit.-starts_with_digit] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_invalid_names[0_-Variable name cannot start with a digit.-starts_with_digit] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_invalid_names[api-key-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_invalid_names[user name-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_invalid_names[user.name-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 93%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_invalid_names[api key!-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_unicode_letters_allowed_by_isalnum_policy[caf\xe9] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_unicode_letters_allowed_by_isalnum_policy[\u53d8\u91cf] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableName::test_unicode_letters_allowed_by_isalnum_policy[\xfcber] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_letters_valid[na\xefve] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_letters_valid[\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_letters_valid[\u53d8\u91cf\u540d] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_letters_valid[_\u53d8\u91cf] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_letters_valid[api_\xfcber] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_letters_valid[\u03b1] PASSED [ 94%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_invalid_names[\uff11abc-Variable name cannot start with a digit.-starts_with_digit] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_invalid_names[\u0669test-Variable name cannot start with a digit.-starts_with_digit] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_invalid_names[api\U0001f511-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_invalid_names[key\u2764-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_invalid_names[caf\xe9!-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_invalid_names[api\u200bkey-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameUnicode::test_unicode_invalid_names[soft\xadhyphen-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameMixed::test_mixed_strings_reject_with_canonical_reason[api_key!-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameMixed::test_mixed_strings_reject_with_canonical_reason[valid-name-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 95%]
+tests/test_variable_name_validation.py::TestValidateVariableNameMixed::test_mixed_strings_reject_with_canonical_reason[a b-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameMixed::test_mixed_strings_reject_with_canonical_reason[letter1@domain-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameMixed::test_mixed_strings_reject_with_canonical_reason[9valid_prefix-Variable name cannot start with a digit.-starts_with_digit] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameMixed::test_mixed_strings_reject_with_canonical_reason[0_underscore-Variable name cannot start with a digit.-starts_with_digit] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameMixed::test_mixed_strings_reject_with_canonical_reason[9!-Variable name cannot start with a digit.-starts_with_digit] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameBoundaries::test_boundary_valid_names[___] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameBoundaries::test_boundary_valid_names[____] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameBoundaries::test_boundary_valid_names[__] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameBoundaries::test_boundary_valid_names[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa] PASSED [ 96%]
+tests/test_variable_name_validation.py::TestValidateVariableNameBoundaries::test_boundary_valid_names[_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] PASSED [ 97%]
+tests/test_variable_name_validation.py::TestValidateVariableNameBoundaries::test_boundary_invalid_names[ -Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 97%]
+tests/test_variable_name_validation.py::TestValidateVariableNameBoundaries::test_boundary_invalid_names[\t-Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 97%]
+tests/test_variable_name_validation.py::TestValidateVariableNameBoundaries::test_boundary_invalid_names[  -Variable name can only contain letters, numbers, and underscores.-invalid_chars] PASSED [ 97%]
+tests/test_worker.py::TestRequestWorkerError::test_worker_emits_error_on_cancelled_execution_result PASSED [ 97%]
+tests/test_worker.py::TestRequestWorkerError::test_worker_emits_finished_on_execution_result_error PASSED [ 97%]
+tests/test_worker.py::TestRequestWorkerError::test_worker_emits_finished_on_success PASSED [ 97%]
+tests/test_worker.py::TestRequestWorkerError::test_worker_wraps_unexpected_exception_as_execution_error_unknown 
+-------------------------------- live log call ---------------------------------
+20:42:00 ERROR    pypost.core.worker: RequestWorker unexpected error: boom
+Traceback (most recent call last):
+  File "/Users/il/src/pypost/pypost/core/worker.py", line 110, in run
+    result = self.service.execute(
+        self.request_data,
+    ...<7 lines>...
+        hidden_keys=self.hidden_keys,
+    )
+  File "/opt/homebrew/Cellar/python@3.14/3.14.5/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.5/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.5/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1241, in _execute_mock_call
+    raise effect
+RuntimeError: boom
+PASSED                                                                   [ 97%]
+tests/test_worker.py::TestRequestWorkerRetrySignal::test_worker_emits_retry_attempt_signal PASSED [ 97%]
+tests/test_worker.py::TestRequestWorkerAlertManagerInjection::test_alert_manager_forwarded_to_service PASSED [ 97%]
+tests/test_worker.py::TestRequestWorkerAlertManagerInjection::test_alert_manager_none_by_default PASSED [ 98%]
+tests/test_worker.py::TestRequestWorkerHiddenKeys::test_hidden_keys_forwarded_to_service_execute PASSED [ 98%]
+tests/test_worker_race.py::TestWorkerRaceCondition::test_second_send_while_running_does_not_create_second_worker PASSED [ 98%]
+tests/test_worker_race.py::TestWorkerRaceCondition::test_stale_worker_cleared_allows_new_worker PASSED [ 98%]
+tests/test_worker_race.py::TestWorkerRaceCondition::test_stale_worker_cleared_emits_debug_log PASSED [ 98%]
+tests/test_worker_race.py::TestWorkerRaceCondition::test_stop_before_run_check_stop_is_true PASSED [ 98%]
+tests/test_worker_race.py::TestWorkerRaceCondition::test_stop_flag_not_overwritten_after_stop PASSED [ 98%]
+tests/test_worker_race.py::TestWorkerRaceCondition::test_worker_not_reusable_after_stop PASSED [ 98%]
+tests/test_yaml_json_converter.py::TestConvertYamlBodyToObject::test_empty_body_raises PASSED [ 98%]
+tests/test_yaml_json_converter.py::TestConvertYamlBodyToObject::test_invalid_yaml_raises PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertYamlBodyToObject::test_multi_document_raises PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertYamlBodyToObject::test_nested_structure PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertYamlBodyToObject::test_non_json_serializable_raises PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertYamlBodyToObject::test_null_document_raises PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertYamlBodyToObject::test_valid_list PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertYamlBodyToObject::test_valid_mapping PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertJsonObjectToYaml::test_list PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertJsonObjectToYaml::test_mapping PASSED [ 99%]
+tests/test_yaml_json_converter.py::TestConvertJsonObjectToYaml::test_nested_structure PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/test_mcp_server_impl.py:13
+  /Users/il/src/pypost/tests/test_mcp_server_impl.py:13: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================== slowest durations ===============================
+4.62s call     tests/test_makefile.py::TestTargetExecution::test_test_succeeds_after_install
+4.42s call     tests/test_makefile.py::TestTargetExecution::test_lint_succeeds_after_install
+4.14s call     tests/test_makefile.py::TestTargetExecution::test_install_succeeds_with_empty_requirements
+3.10s call     tests/test_request_service.py::TestRequestServiceRetryPolicyResolution::test_app_default_used_when_no_per_request_policy
+2.89s call     tests/test_makefile.py::TestTargetExecution::test_test_fails_without_pytest_in_bare_venv
+2.84s call     tests/test_makefile.py::TestDependencyChain::test_install_depends_on_venv_test
+2.71s call     tests/test_makefile.py::TestMarkerLifecycle::test_venv_is_idempotent
+2.61s call     tests/test_makefile.py::TestExitBehavior::test_lint_fails_without_flake8_in_bare_venv
+2.59s call     tests/test_makefile.py::TestDependencyChain::test_venv_test_depends_on_marker
+2.59s call     tests/test_makefile.py::TestMarkerLifecycle::test_venv_creates_version_marker
+2.58s call     tests/test_makefile.py::TestMarkerLifecycle::test_clean_removes_venv_and_marker
+2.52s call     tests/test_makefile.py::TestDependencyChain::test_runtime_targets_depend_on_marker_only[test]
+2.51s call     tests/test_makefile.py::TestDependencyChain::test_runtime_targets_depend_on_marker_only[lint]
+2.50s call     tests/test_makefile.py::TestDependencyChain::test_runtime_targets_depend_on_marker_only[run]
+1.04s call     tests/test_request_service.py::TestRequestServiceRetryPolicyResolution::test_per_request_policy_wins_over_app_default
+
+(2835 durations < 1s hidden.)
+============= 937 passed, 1 warning, 39 subtests passed in 47.10s ==============
