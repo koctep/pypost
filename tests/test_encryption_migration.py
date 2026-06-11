@@ -353,6 +353,25 @@ def test_verify_decrypt_access_detects_corrupt_ciphertext(tmp_path, monkeypatch,
     )
 
 
+def test_verify_decrypt_access_uses_build_inventory(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    service = EncryptionMigrationService(storage)
+    settings = AppSettings(env_encryption_enabled=True)
+    inventory_called = False
+    original_build = service.build_inventory
+
+    def spy_build(s):
+        nonlocal inventory_called
+        inventory_called = True
+        return original_build(s)
+
+    monkeypatch.setattr(service, "build_inventory", spy_build)
+    report = service.verify_decrypt_access(settings)
+
+    assert inventory_called
+    assert report.inventory.environment_count == 0
+
+
 def test_deserialize_all_uses_public_storage_api(tmp_path, monkeypatch):
     storage = _make_storage(tmp_path, monkeypatch)
     service = EncryptionMigrationService(storage)

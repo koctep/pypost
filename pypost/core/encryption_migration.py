@@ -81,19 +81,17 @@ class EncryptionMigrationService:
 
     def verify_decrypt_access(self, settings: AppSettings | None) -> MigrationReport:
         logger.info("encryption_migration_verify_started")
-        self._storage.apply_encryption_settings(settings)
-        raw = self._read_raw_environments()
-        inventory = self._scan_raw_environments(raw)
-        missing = self._check_missing_kids(inventory.kid_histogram, settings)
-        inventory = replace(inventory, missing_kids=missing)
-        _log_inventory("encryption_migration_inventory_built", inventory)
+        inventory = self.build_inventory(settings)
         errors: list[str] = []
-        if missing:
+        if inventory.missing_kids:
             logger.error(
                 "encryption_migration_missing_kids count=%d",
-                len(missing),
+                len(inventory.missing_kids),
             )
-            errors.extend(f"Missing key material for kid: {kid}" for kid in sorted(missing))
+            errors.extend(
+                f"Missing key material for kid: {kid}"
+                for kid in sorted(inventory.missing_kids)
+            )
         else:
             _, decrypt_errors = self._deserialize_all(settings)
             if decrypt_errors:

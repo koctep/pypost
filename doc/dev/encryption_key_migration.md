@@ -208,12 +208,14 @@ Facade for programmatic migration (CLI and optional future Settings actions).
 #### `build_inventory(settings: AppSettings | None) -> EnvironmentInventory`
 
 Scans raw `environments.json` for envelope-shaped hidden values. Checks configured key provider
-for missing `kid` entries. Does not decrypt values.
+for missing `kid` entries. Does not decrypt values. Inventory-only; use
+`verify_decrypt_access()` when decrypt validation is required.
 
 #### `verify_decrypt_access(settings: AppSettings | None) -> MigrationReport`
 
-Builds inventory, checks missing `kid`, then deserializes every environment. Returns
-`success=False` with error details on failure.
+Calls `build_inventory()`, checks missing `kid`, then deserializes every environment via
+`load_environments_with_errors()`. Returns `success=False` with error details on failure.
+Decrypt validation is not available on `build_inventory()` — that path is verify-only.
 
 #### `bulk_re_encrypt(settings, *, dry_run=False, backup=True) -> MigrationReport`
 
