@@ -155,11 +155,19 @@ class StorageManager:
                 )
         return collections
 
-    def save_environments(self, environments: List[Environment]) -> EnvironmentSerializeStats:
+    def save_environments(
+        self,
+        environments: List[Environment],
+        *,
+        target_envelope_version: int | None = None,
+    ) -> EnvironmentSerializeStats:
         data: list[dict] = []
         stats = EnvironmentSerializeStats()
         for env in environments:
-            serialized, env_stats = self._env_adapter.serialize_environment(env)
+            serialized, env_stats = self._env_adapter.serialize_environment(
+                env,
+                target_envelope_version=target_envelope_version,
+            )
             stats += env_stats
             data.append(serialized)
             self._env_adapter.remember_environment_state(
@@ -189,6 +197,22 @@ class StorageManager:
             stats.reused_count,
             self.environments_file,
         )
+        return stats
+
+    def project_save_stats(
+        self,
+        environments: List[Environment],
+        *,
+        target_envelope_version: int | None = None,
+    ) -> EnvironmentSerializeStats:
+        """Simulate save serialization without writing (for dry-run stats)."""
+        stats = EnvironmentSerializeStats()
+        for env in environments:
+            _, env_stats = self._env_adapter.serialize_environment(
+                env,
+                target_envelope_version=target_envelope_version,
+            )
+            stats += env_stats
         return stats
 
     def load_environments(self) -> List[Environment]:
