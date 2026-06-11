@@ -120,7 +120,7 @@ class TestDeleteOpenTabsIntegration(unittest.TestCase):
         tabs_presenter.add_new_tab(req, save_state=False)
         tabs_presenter.add_new_tab(_make_request("r2", "Other"), save_state=False)
 
-        collections_presenter._handle_delete("r1", "request", "Get users")
+        collections_presenter._tree_actions.handle_delete("r1", "request", "Get users")
 
         self.assertEqual(tabs_presenter.widget.count(), 1)
         self.assertEqual(tabs_presenter.widget.widget(0).request_data.id, "r2")
@@ -136,7 +136,7 @@ class TestDeleteOpenTabsIntegration(unittest.TestCase):
         tabs_presenter.add_new_tab(req1, save_state=False)
         tabs_presenter.add_new_tab(req2, save_state=False)
 
-        collections_presenter._handle_delete("c1", "collection", "My API")
+        collections_presenter._tree_actions.handle_delete("c1", "collection", "My API")
 
         self.assertEqual(tabs_presenter.widget.count(), 1)
         self.assertEqual(tabs_presenter.widget.tabText(0), "New Request")
@@ -152,7 +152,7 @@ class TestDeleteOpenTabsIntegration(unittest.TestCase):
         tabs_presenter.add_new_tab(req1, save_state=False)
         tabs_presenter.add_new_tab(req2, save_state=False)
 
-        collections_presenter._handle_delete("r2", "request", "Delete me")
+        collections_presenter._tree_actions.handle_delete("r2", "request", "Delete me")
 
         self.assertEqual(tabs_presenter.widget.count(), 1)
         self.assertEqual(tabs_presenter.widget.widget(0).request_data.id, "r1")
@@ -167,7 +167,7 @@ class TestDeleteOpenTabsIntegration(unittest.TestCase):
         tabs_presenter.add_new_tab(req, save_state=True)
         self.assertEqual(tabs_presenter._state_manager.get_open_tabs(), ["r1"])
 
-        collections_presenter._handle_delete("r1", "request", "Persisted")
+        collections_presenter._tree_actions.handle_delete("r1", "request", "Persisted")
 
         self.assertEqual(tabs_presenter._state_manager.get_open_tabs(), [])
 

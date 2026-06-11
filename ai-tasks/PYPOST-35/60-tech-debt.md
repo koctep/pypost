@@ -11,9 +11,9 @@
 
 ## Code Quality Issues
 
-- **MainWindow delete-flow growth** ([PYPOST-326](https://pypost.atlassian.net/browse/PYPOST-326)):
-  Additional responsibilities (`show_collection_item_context_menu`, confirmation, telemetry) keep
-  accumulating in one class.
+- **MainWindow delete-flow growth** — resolved in
+  [PYPOST-326](https://pypost.atlassian.net/browse/PYPOST-326): delete flow lives in
+  `CollectionTreeActions`; `MainWindow` only wires `requests_deleted` to tabs.
 - **Name-based storage filenames** ([PYPOST-327](https://pypost.atlassian.net/browse/PYPOST-327)):
   `StorageManager` still uses `collection.name` as filename, coupling identity to mutable display
   names and risking collisions.

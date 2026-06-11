@@ -11,6 +11,21 @@ class TestMainWindow(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_main_window_has_no_collection_delete_flow_methods(self):
+        """PYPOST-326: delete flow lives in CollectionTreeActions, not MainWindow."""
+        delete_flow_names = {
+            "show_collection_item_context_menu",
+            "show_context_menu",
+            "handle_delete",
+            "confirm_delete",
+            "handle_delete_collection_item",
+        }
+        for name in delete_flow_names:
+            self.assertFalse(
+                hasattr(MainWindow, name),
+                f"MainWindow should not define {name}",
+            )
+
     def test_startup_refreshes_tree_from_request_manager(self):
         metrics = MagicMock()
         template_service = MagicMock()

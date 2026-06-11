@@ -230,7 +230,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter.load_collections()
         received = []
         presenter.collections_changed.connect(lambda: received.append(True))
-        presenter._handle_delete("c1", "collection", "My API")
+        presenter._tree_actions.handle_delete("c1", "collection", "My API")
         self.assertEqual(len(received), 1)
 
     def test_delete_request_removes_tree_node_incrementally(self):
@@ -239,7 +239,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter = self._make_presenter([col])
         presenter.load_collections()
         self.assertEqual(presenter._model.item(0).rowCount(), 1)
-        presenter._handle_delete("r1", "request", "Get users")
+        presenter._tree_actions.handle_delete("r1", "request", "Get users")
         self.assertEqual(presenter._model.rowCount(), 1)
         self.assertEqual(presenter._model.item(0).rowCount(), 0)
 
@@ -250,7 +250,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter.load_collections()
         received = []
         presenter.requests_deleted.connect(lambda ids: received.append(ids))
-        presenter._handle_delete("r1", "request", "Get users")
+        presenter._tree_actions.handle_delete("r1", "request", "Get users")
         self.assertEqual(received, [["r1"]])
 
     def test_requests_deleted_signal_emitted_for_collection_delete(self):
@@ -261,7 +261,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter.load_collections()
         received = []
         presenter.requests_deleted.connect(lambda ids: received.append(list(ids)))
-        presenter._handle_delete("c1", "collection", "My API")
+        presenter._tree_actions.handle_delete("c1", "collection", "My API")
         self.assertEqual(sorted(received[0]), ["r1", "r2"])
 
     def test_request_renamed_signal_emitted(self):
@@ -279,7 +279,9 @@ class TestCollectionsPresenter(unittest.TestCase):
 
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
         from PySide6.QtWidgets import QAbstractItemDelegate
-        presenter._on_editor_closed(None, QAbstractItemDelegate.EndEditHint.SubmitModelCache)
+        presenter._tree_actions.on_editor_closed(
+            None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
+        )
         self.assertEqual(len(received), 1)
         self.assertEqual(received[0], ("r1", "New Name"))
 
@@ -327,7 +329,9 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertFalse(presenter.widget.isExpanded(idx1))
         self.assertTrue(presenter.widget.isExpanded(idx2))
 
-    @patch.object(CollectionsPresenter, "_handle_delete")
+    @patch(
+        "pypost.ui.presenters.collection_tree_actions.CollectionTreeActions.handle_delete"
+    )
     @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
     def test_delete_confirmation_cancelled_skips_delete(self, mock_question, mock_handle_delete):
         col = _make_collection("c1", "My API")
@@ -343,7 +347,7 @@ class TestCollectionsPresenter(unittest.TestCase):
                 mock_menu.addAction.side_effect = [rename_action, delete_action]
                 mock_menu.exec.return_value = delete_action
                 mock_menu_class.return_value = mock_menu
-                presenter._show_context_menu(QPoint(0, 0))
+                presenter._tree_actions.show_context_menu(QPoint(0, 0))
         mock_handle_delete.assert_not_called()
 
     @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
@@ -367,7 +371,7 @@ class TestCollectionsPresenter(unittest.TestCase):
                 ]
                 mock_menu.exec.return_value = delete_action
                 mock_menu_class.return_value = mock_menu
-                presenter._show_context_menu(QPoint(0, 0))
+                presenter._tree_actions.show_context_menu(QPoint(0, 0))
         self.assertEqual(presenter._model.item(0).rowCount(), 0)
 
     def test_rename_cancel_restores_tree_incrementally(self):
@@ -379,7 +383,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         item.setText("Draft Name")
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
         with patch.object(presenter, "refresh_tree") as mock_refresh:
-            presenter._on_editor_closed(
+            presenter._tree_actions.on_editor_closed(
                 None, QAbstractItemDelegate.EndEditHint.RevertModelCache
             )
         self.assertIsNone(presenter._pending_rename)
@@ -395,7 +399,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         item.setText("New Name")
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
         with patch.object(presenter, "refresh_tree") as mock_refresh:
-            presenter._on_editor_closed(
+            presenter._tree_actions.on_editor_closed(
                 None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
             )
         self.assertEqual(presenter._model.item(0).child(0).text(), "GET New Name")
@@ -410,7 +414,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         item.setText("New Collection")
         presenter._pending_rename = {"item_id": "c1", "item_type": "collection"}
         with patch.object(presenter, "refresh_tree") as mock_refresh:
-            presenter._on_editor_closed(
+            presenter._tree_actions.on_editor_closed(
                 None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
             )
         self.assertEqual(presenter._model.item(0).text(), "New Collection")
@@ -426,7 +430,9 @@ class TestCollectionsPresenter(unittest.TestCase):
         item = presenter._find_collection_item("r1", "request")
         item.setText("   ")
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
-        presenter._on_editor_closed(None, QAbstractItemDelegate.EndEditHint.SubmitModelCache)
+        presenter._tree_actions.on_editor_closed(
+            None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
+        )
         mock_warning.assert_called_once()
         self.assertEqual("Old Name", req.name)
 

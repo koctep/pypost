@@ -135,12 +135,6 @@ class CollectionsPresenter(QObject):
             else:
                 self._view.expand(index)
 
-    def _show_context_menu(self, pos) -> None:
-        self._tree_actions.show_context_menu(pos)
-
-    def _on_editor_closed(self, _editor, hint) -> None:
-        self._tree_actions.on_editor_closed(_editor, hint)
-
     def remove_item_from_tree(self, item_id: str, item_type: str) -> bool:
         """Removes a collection or request node without rebuilding the full tree model."""
         item = self._find_collection_item(item_id, item_type)
@@ -166,9 +160,6 @@ class CollectionsPresenter(QObject):
                 if item_type == "request" and isinstance(data, RequestData) and data.id == item_id:
                     return req_item
         return None
-
-    def _handle_delete(self, item_id: str, item_type: str, item_label: str) -> None:
-        self._tree_actions.handle_delete(item_id, item_type, item_label)
 
     def _on_tree_expanded(self, index) -> None:
         item = self._model.itemFromIndex(index)
