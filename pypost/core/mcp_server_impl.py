@@ -22,6 +22,10 @@ from pypost.core.mcp_tool_contract import (
     tool_description,
 )
 from pypost.core.mcp_streamable_http import build_streamable_http_route
+from pypost.core.mcp_transport_routes import (
+    MCP_LEGACY_SSE_MESSAGES_PATH,
+    MCP_LEGACY_SSE_MOUNT_PATH,
+)
 from pypost.core.metrics import MetricsManager
 from pypost.core.request_service import ExecutionResult, RequestService
 from pypost.core.template_service import TemplateService
@@ -215,14 +219,14 @@ class MCPServerImpl:
             debug=True,
             routes=[
                 mcp_route,
-                Mount("/sse", app=self._create_sse_app()),
+                Mount(MCP_LEGACY_SSE_MOUNT_PATH, app=self._create_sse_app()),
             ],
             lifespan=lifespan,
         )
 
     def _create_sse_app(self) -> Starlette:
         """Legacy HTTP+SSE transport for backward-compatible clients."""
-        sse = SseServerTransport("/messages")
+        sse = SseServerTransport(MCP_LEGACY_SSE_MESSAGES_PATH)
 
         class SSEEndpoint:
             def __init__(self, server, sse_transport):
@@ -284,7 +288,7 @@ class MCPServerImpl:
         return Starlette(
             debug=True,
             routes=[
-                Mount("/messages", app=MessagesEndpoint(sse)),
+                Mount(MCP_LEGACY_SSE_MESSAGES_PATH, app=MessagesEndpoint(sse)),
                 Route("/", endpoint=handle_sse_get, methods=["GET"]),
             ],
         )

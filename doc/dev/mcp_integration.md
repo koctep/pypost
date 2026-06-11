@@ -34,6 +34,11 @@ This class contains the actual business logic of the MCP server.
     *   Primary: `http://<host>:<port>/mcp` — Streamable HTTP session (POST initialize,
       optional GET SSE stream for server messages).
     *   Legacy: GET `/sse/` + POST `/sse/messages` — deprecated HTTP+SSE transport.
+*   **Route configuration (PYPOST-152)**: HTTP path constants live in
+    `pypost/core/mcp_transport_routes.py` (`MCP_STREAMABLE_HTTP_PATH`,
+    `MCP_LEGACY_SSE_MOUNT_PATH`, `MCP_LEGACY_SSE_MESSAGES_PATH`). `MCPServerImpl` and
+    `MetricsServer` import these instead of hardcoding strings. Defaults match MCP spec /
+    PyPost docs; change in one module if paths ever need updating.
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
 *   **Tool metadata (PYPOST-553)**: `RequestData.mcp_description` is the agent-visible
     description (falls back to `name`). `RequestData.mcp_params` holds per-parameter

@@ -8,7 +8,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.routing import Route
 from starlette.types import Receive, Scope, Send
 
-MCP_STREAMABLE_HTTP_PATH = "/mcp"
+from pypost.core.mcp_transport_routes import MCP_STREAMABLE_HTTP_PATH
 
 
 class StreamableHTTPASGIApp:

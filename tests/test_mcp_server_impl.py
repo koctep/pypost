@@ -19,6 +19,11 @@ from pypost.core.mcp_server_impl import (
     _tool_result_has_error,
     format_structured_tool_result,
 )
+from pypost.core.mcp_transport_routes import (
+    MCP_LEGACY_SSE_MESSAGES_PATH,
+    MCP_LEGACY_SSE_MOUNT_PATH,
+    MCP_STREAMABLE_HTTP_PATH,
+)
 from pypost.core.mcp_tool_contract import (
     build_tool_input_schema,
     resolve_mcp_param_specs,
@@ -433,13 +438,13 @@ class TestMCPServerImplRouting(unittest.TestCase):
     def test_create_app_exposes_streamable_http_route(self):
         app = MCPServerImpl().create_app()
         route_paths = [route.path for route in app.routes if isinstance(route, Route)]
-        self.assertIn("/mcp", route_paths)
+        self.assertIn(MCP_STREAMABLE_HTTP_PATH, route_paths)
 
     def test_create_app_mounts_sse_sub_application_for_backward_compat(self):
         app = MCPServerImpl().create_app()
         mounts = [route for route in app.routes if isinstance(route, Mount)]
         self.assertEqual(len(mounts), 1)
-        self.assertEqual(mounts[0].path, "/sse")
+        self.assertEqual(mounts[0].path, MCP_LEGACY_SSE_MOUNT_PATH)
 
     def test_inner_sse_app_exposes_messages_mount_and_get_root(self):
         app = MCPServerImpl().create_app()
@@ -450,7 +455,10 @@ class TestMCPServerImplRouting(unittest.TestCase):
                 inner_paths.append(("mount", route.path))
             elif isinstance(route, Route):
                 inner_paths.append(("route", route.path, route.methods))
-        self.assertIn(("mount", "/messages"), [(p[0], p[1]) for p in inner_paths])
+        self.assertIn(
+            ("mount", MCP_LEGACY_SSE_MESSAGES_PATH),
+            [(p[0], p[1]) for p in inner_paths],
+        )
         get_roots = [
             p for p in inner_paths if p[0] == "route" and "GET" in p[2] and p[1] == "/"
         ]
@@ -458,8 +466,16 @@ class TestMCPServerImplRouting(unittest.TestCase):
 
     def test_routing_rejects_wrong_http_methods_without_live_transport(self):
         client = TestClient(MCPServerImpl().create_app(), raise_server_exceptions=False)
-        self.assertEqual(client.post("/sse").status_code, 405)
-        self.assertEqual(client.get("/sse/messages").status_code, 405)
+        self.assertEqual(
+            client.post(MCP_LEGACY_SSE_MOUNT_PATH).status_code,
+            405,
+        )
+        self.assertEqual(
+            client.get(
+                f"{MCP_LEGACY_SSE_MOUNT_PATH}{MCP_LEGACY_SSE_MESSAGES_PATH}"
+            ).status_code,
+            405,
+        )
         self.assertEqual(client.get("/unknown").status_code, 404)
 
 

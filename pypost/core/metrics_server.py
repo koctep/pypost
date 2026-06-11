@@ -13,6 +13,10 @@ from starlette.applications import Starlette
 from starlette.routing import Mount
 
 from pypost.core.mcp_streamable_http import build_streamable_http_route
+from pypost.core.mcp_transport_routes import (
+    MCP_LEGACY_SSE_MESSAGES_PATH,
+    MCP_LEGACY_SSE_MOUNT_PATH,
+)
 from pypost.core.metrics_registry import MetricsRegistry
 
 logger = logging.getLogger(__name__)
@@ -58,7 +62,7 @@ class MetricsServer:
         prometheus_app = make_asgi_app(registry=self._registry.registry)
         mcp_route, lifespan = build_streamable_http_route(self.mcp_server)
 
-        sse = SseServerTransport("/messages")
+        sse = SseServerTransport(MCP_LEGACY_SSE_MESSAGES_PATH)
 
         class SSEEndpoint:
             def __init__(self, server, sse_transport):
@@ -99,8 +103,8 @@ class MetricsServer:
             routes=[
                 Mount("/metrics", app=prometheus_app),
                 mcp_route,
-                Mount("/sse", app=SSEEndpoint(self.mcp_server, sse)),
-                Mount("/messages", app=MessagesEndpoint(sse)),
+                Mount(MCP_LEGACY_SSE_MOUNT_PATH, app=SSEEndpoint(self.mcp_server, sse)),
+                Mount(MCP_LEGACY_SSE_MESSAGES_PATH, app=MessagesEndpoint(sse)),
             ],
             lifespan=lifespan,
         )
