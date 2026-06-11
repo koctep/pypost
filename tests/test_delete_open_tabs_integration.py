@@ -12,7 +12,14 @@ from PySide6.QtWidgets import QApplication
 from pypost.models.models import Collection, RequestData
 from pypost.models.settings import AppSettings
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
-from pypost.ui.presenters.tabs_presenter import TabsPresenter
+from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
+
+
+def _request_tab_count(tabs_presenter: TabsPresenter) -> int:
+    widget = tabs_presenter.widget
+    return sum(
+        1 for i in range(widget.count()) if isinstance(widget.widget(i), RequestTab)
+    )
 
 
 def _make_collection(col_id: str, name: str, requests=None) -> Collection:
@@ -126,7 +133,7 @@ class TestDeleteOpenTabsIntegration(unittest.TestCase):
 
         collections_presenter._tree_actions.handle_delete("r1", "request", "Get users")
 
-        self.assertEqual(tabs_presenter.widget.count(), 1)
+        self.assertEqual(_request_tab_count(tabs_presenter), 1)
         self.assertEqual(tabs_presenter.widget.widget(0).request_data.id, "r2")
 
     def test_collection_delete_closes_all_affected_open_tabs(self):
@@ -142,7 +149,7 @@ class TestDeleteOpenTabsIntegration(unittest.TestCase):
 
         collections_presenter._tree_actions.handle_delete("c1", "collection", "My API")
 
-        self.assertEqual(tabs_presenter.widget.count(), 1)
+        self.assertEqual(_request_tab_count(tabs_presenter), 1)
         self.assertEqual(tabs_presenter.widget.tabText(0), "New Request")
 
     def test_request_delete_leaves_unrelated_tabs_open(self):
@@ -158,7 +165,7 @@ class TestDeleteOpenTabsIntegration(unittest.TestCase):
 
         collections_presenter._tree_actions.handle_delete("r2", "request", "Delete me")
 
-        self.assertEqual(tabs_presenter.widget.count(), 1)
+        self.assertEqual(_request_tab_count(tabs_presenter), 1)
         self.assertEqual(tabs_presenter.widget.widget(0).request_data.id, "r1")
 
     def test_delete_updates_persisted_open_tab_state(self):

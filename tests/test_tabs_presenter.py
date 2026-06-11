@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.request_sync import is_tab_dirty, persisted_fields_equal, snapshot_persisted_fields
-from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab
+from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab, PLUS_TAB_MARKER
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 
@@ -57,6 +57,22 @@ class FakeStateManager:
         self._expanded = ids
 
 
+def _request_tab_count(presenter: TabsPresenter) -> int:
+    return sum(
+        1
+        for i in range(presenter.widget.count())
+        if isinstance(presenter.widget.widget(i), RequestTab)
+    )
+
+
+def _plus_tab_index(presenter: TabsPresenter) -> int:
+    tab_bar = presenter.widget.tabBar()
+    for i in range(tab_bar.count()):
+        if tab_bar.tabData(i) == PLUS_TAB_MARKER:
+            return i
+    return -1
+
+
 class TestTabsPresenter(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -76,14 +92,14 @@ class TestTabsPresenter(unittest.TestCase):
     def test_add_new_tab_creates_unnamed_tab(self):
         p = self._make_presenter()
         p.add_new_tab()
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
         self.assertEqual(p.widget.tabText(0), "New Request")
 
     def test_add_new_tab_with_request_data(self):
         req = _make_request(name="Login")
         p = self._make_presenter()
         p.add_new_tab(req)
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
         self.assertEqual(p.widget.tabText(0), "Login")
 
     def test_add_new_tab_deep_copies_request_data(self):
@@ -106,16 +122,16 @@ class TestTabsPresenter(unittest.TestCase):
         p = self._make_presenter()
         p.add_new_tab()
         p.add_new_tab()
-        self.assertEqual(p.widget.count(), 2)
+        self.assertEqual(_request_tab_count(p), 2)
         p.close_tab(0)
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
 
     def test_close_tab_ensures_at_least_one_tab(self):
         p = self._make_presenter()
         p.add_new_tab()
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
         p.close_tab(0)
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
 
     def test_close_tabs_for_request_ids_closes_matching_tabs(self):
         req1 = _make_request("r1", "Tab1")
@@ -124,7 +140,7 @@ class TestTabsPresenter(unittest.TestCase):
         p.add_new_tab(req1, save_state=False)
         p.add_new_tab(req2, save_state=False)
         p.close_tabs_for_request_ids(["r1"])
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
         self.assertEqual(p.widget.widget(0).request_data.id, "r2")
 
     def test_close_tabs_for_request_ids_keeps_blank_tab_when_all_closed(self):
@@ -132,7 +148,7 @@ class TestTabsPresenter(unittest.TestCase):
         p = self._make_presenter()
         p.add_new_tab(req, save_state=False)
         p.close_tabs_for_request_ids(["r1"])
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
         self.assertEqual(p.widget.tabText(0), "New Request")
 
     def test_close_tabs_for_request_ids_noop_for_empty_list(self):
@@ -140,7 +156,7 @@ class TestTabsPresenter(unittest.TestCase):
         p = self._make_presenter()
         p.add_new_tab(req, save_state=False)
         p.close_tabs_for_request_ids([])
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
         self.assertEqual(p.widget.widget(0).request_data.id, "r1")
 
     def test_close_tabs_for_request_ids_closes_duplicate_request_tabs(self):
@@ -150,7 +166,7 @@ class TestTabsPresenter(unittest.TestCase):
         p.add_new_tab(req.model_copy(deep=True), save_state=False)
         p.add_new_tab(_make_request("r2", "Other"), save_state=False)
         p.close_tabs_for_request_ids(["r1"])
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
         self.assertEqual(p.widget.widget(0).request_data.id, "r2")
 
     def test_close_tabs_for_request_ids_updates_persisted_state(self):
@@ -165,7 +181,7 @@ class TestTabsPresenter(unittest.TestCase):
         req = _make_request("r1", "Saved Request")
         p = self._make_presenter(requests=[req], open_tabs=["r1"])
         p.restore_tabs()
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
         tab = p.widget.widget(0)
         self.assertIsInstance(tab, RequestTab)
         self.assertEqual(tab.request_data.id, "r1")
@@ -173,7 +189,7 @@ class TestTabsPresenter(unittest.TestCase):
     def test_restore_tabs_opens_new_tab_when_no_saved(self):
         p = self._make_presenter(open_tabs=[])
         p.restore_tabs()
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
 
     def test_save_tabs_state_persists_ids(self):
         req = _make_request("r1")
@@ -221,16 +237,41 @@ class TestTabsPresenter(unittest.TestCase):
     def test_handle_new_tab_opens_tab(self):
         p = self._make_presenter()
         p.handle_new_tab("test_source")
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
+
+    def test_plus_tab_is_last(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        plus_idx = _plus_tab_index(p)
+        self.assertGreaterEqual(plus_idx, 0)
+        self.assertEqual(plus_idx, p.widget.count() - 1)
+
+    def test_plus_tab_click_adds_request_tab(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        before = _request_tab_count(p)
+        plus_idx = _plus_tab_index(p)
+        p.widget.tabBar().tabBarClicked.emit(plus_idx)
+        self.assertEqual(_request_tab_count(p), before + 1)
+        self.assertEqual(_plus_tab_index(p), p.widget.count() - 1)
+
+    def test_plus_tab_close_is_ignored(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        plus_idx = _plus_tab_index(p)
+        p.close_tab(plus_idx)
+        self.assertEqual(_plus_tab_index(p), plus_idx)
+        self.assertEqual(_request_tab_count(p), 1)
 
     def test_handle_close_tab_closes_current(self):
         p = self._make_presenter()
         p.add_new_tab()
         p.add_new_tab()
-        self.assertEqual(p.widget.count(), 2)
+        self.assertEqual(_request_tab_count(p), 2)
         p.widget.setCurrentIndex(1)
         p.handle_close_tab()
-        self.assertEqual(p.widget.count(), 1)
+        self.assertEqual(_request_tab_count(p), 1)
 
     def test_handle_next_tab_cycles(self):
         p = self._make_presenter()

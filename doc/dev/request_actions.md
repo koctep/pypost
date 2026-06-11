@@ -16,20 +16,20 @@ This design reduces UI clutter and allows adding more actions in the same menu l
 - **`TabsPresenter` (`pypost/ui/presenters/tabs_presenter.py`)**:
   - Receives `save_requested` and `save_as_requested` from each `RequestWidget`.
   - Delegates persistence to `RequestSaveOrchestrator` and updates tab state/signals.
+  - Hosts a trailing **plus placeholder tab** with a layout-managed `+` button via
+    `QTabBar.setTabButton()` (constant `PLUS_TAB_MARKER`).
+  - Routes `+` tab clicks and `Ctrl+N` to `handle_new_tab(source=...)`.
 - **`RequestSaveOrchestrator` (`pypost/ui/request_save_orchestrator.py`)**:
   - Owns save/save-as dialogs, overwrite/stale confirmations, and `RequestManager` calls.
   - Returns `SaveResult` for the presenter to apply tab updates.
 - **`MainWindow` (`pypost/ui/main_window.py`)**:
   - Wires `request_saved` / `request_save_as_completed` to collections tree refresh.
+  - Delegates tab widget and new-tab shortcuts to `TabsPresenter`.
 - **`MetricsManager` (`pypost/core/metrics.py`)**:
   - Collects GUI action metrics:
     - `gui_send_clicks_total`
     - `gui_save_actions_total{source=<menu|shortcut>}`
     - `gui_new_tab_actions_total{source=<plus_button|shortcut|unknown>}`
-- **`MainWindow` tab controls (`pypost/ui/main_window.py`)**:
-  - Defines `TabBarWithAddButton` (custom `QTabBar`) to emit layout-change notifications.
-  - Places a `+` tab action button (`add_tab_btn`) next to the last tab.
-  - Routes both `Ctrl+N` and `+` click to `handle_new_tab(source=...)`.
 
 High-level flow:
 1. User clicks `Actions -> Save` or presses `Ctrl+S`.
@@ -37,10 +37,10 @@ High-level flow:
 3. `TabsPresenter` calls `RequestSaveOrchestrator.save_request` and emits `request_saved`.
 
 New-tab flow:
-1. User clicks `+` or presses `Ctrl+N`.
-1. `MainWindow.handle_new_tab(source=...)` logs source and tab count before action.
+1. User clicks `+` (plus tab) or presses `Ctrl+N`.
+1. `TabsPresenter.handle_new_tab(source=...)` logs source and request-tab count before action.
 1. `MetricsManager.track_gui_new_tab_action(source)` increments labeled metric.
-1. `MainWindow.add_new_tab()` creates and selects the new request tab.
+1. `TabsPresenter.add_new_tab()` inserts and selects a new request tab before the plus placeholder.
 
 Save-as flow:
 1. User clicks `Actions -> Save As...` or presses `Ctrl+Shift+S`.
@@ -98,24 +98,29 @@ Shortcut callback for `Ctrl+Shift+S`. Calls `on_save_as("shortcut")`.
 
 Records a labeled counter increment for save action source.
 
-### `MainWindow.handle_new_tab(source: str = "unknown")`
+### `TabsPresenter.handle_new_tab(source: str = "unknown")`
 
-Centralized new-tab entry point used by both keyboard and button flows.
+Centralized new-tab entry point used by both keyboard and plus-tab flows.
 
 - **source**: trigger origin (`plus_button`, `shortcut`, fallback `unknown`).
 - **Behavior**:
   1. Writes INFO log `new_tab_action_triggered source=<source> tabs_before=<count>`.
   1. Increments metric `gui_new_tab_actions_total{source=<source>}`.
-  1. Calls `add_new_tab()` once.
+  1. Calls `add_new_tab()` once (inserts before the plus placeholder tab).
 
-### `MainWindow._position_add_tab_button()`
+### Plus placeholder tab (`TabsPresenter._install_plus_tab()`)
 
-Positions `add_tab_btn` relative to `QTabWidget`/`QTabBar` geometry.
+Layout-managed `+` control using Qt tab-bar APIs:
 
-- Uses last tab rect when tabs exist.
-- Uses left offset baseline when no tabs exist.
-- Clamps X position to widget bounds to avoid clipping.
-- Triggered on tab layout changes, resize, and tab add/close operations.
+- Trailing tab marked with `PLUS_TAB_MARKER` in `QTabBar.tabData`.
+- `+` widget attached via `QTabBar.setTabButton(..., LeftSide, ...)`.
+- `tabBarClicked` on the plus index calls `handle_new_tab("plus_button")`.
+- Close requests on the plus tab are ignored; tab cycling skips the placeholder.
+- Use `_request_tab_count()` (or filter `RequestTab` widgets) instead of raw `QTabWidget.count()`.
+
+### `MainWindow.handle_new_tab(source: str = "unknown")`
+
+MainWindow delegate — forwards to `TabsPresenter.handle_new_tab()`.
 
 ### `MetricsManager.track_gui_new_tab_action(source: str)`
 
@@ -133,9 +138,9 @@ Observability endpoint configuration remains global and unchanged:
 - `settings.metrics_host`
 - `settings.metrics_port`
 
-Tab action UI uses internal constants in `MainWindow`:
-- Button size: `24x24`
-- Horizontal spacing offset: `6px`
+Tab action UI uses internal constants in `TabsPresenter`:
+- Plus button size: `ADD_TAB_BUTTON_SIZE` (24px)
+- Plus tab marker: `PLUS_TAB_MARKER` (`pypost_plus_tab`)
 
 ## Testing
 
@@ -148,7 +153,7 @@ Save-as identity regression coverage lives in `tests/test_tabs_presenter.py`:
 - `test_save_as_emits_request_save_as_completed_not_request_saved` — save-as emits
   `request_save_as_completed` (not `request_saved`) with the new ID.
 
-Run: `python -m pytest tests/test_request_save_orchestrator.py tests/test_tabs_presenter.py -k save -v`
+Run: `python -m pytest tests/test_request_save_orchestrator.py tests/test_tabs_presenter.py -k "save or plus_tab" -v`
 
 ## Troubleshooting
 
@@ -186,13 +191,13 @@ Run: `python -m pytest tests/test_request_save_orchestrator.py tests/test_tabs_p
 
 ### `+` button is not visible or overlaps tabs
 
-- Confirm `self.tab_bar.setExpanding(False)` is active.
-- Verify `_position_add_tab_button()` is called after tab add/close and on layout changes.
-- Check that the position clamp (`max_x`) still uses current tab widget width.
+- Confirm `self._tab_bar.setExpanding(False)` is active in `TabsPresenter`.
+- Verify the plus placeholder tab exists (`_plus_tab_index() >= 0`) and is the last tab.
+- Check `QTabBar.setTabButton` still attaches the `+` widget on the plus tab index.
 
 ### `Ctrl+N` works but `+` click does nothing
 
-- Confirm `add_tab_btn.clicked` is connected to `handle_new_tab("plus_button")`.
+- Confirm `tabBarClicked` on the plus index calls `handle_new_tab("plus_button")`.
 - Verify `handle_new_tab` still calls `add_new_tab()` (not an early return path).
 
 ### New-tab metrics are missing

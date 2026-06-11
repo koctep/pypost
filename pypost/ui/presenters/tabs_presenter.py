@@ -45,6 +45,9 @@ from pypost.ui.widgets.response_view import ResponseView
 
 logger = logging.getLogger(__name__)
 
+PLUS_TAB_MARKER = "pypost_plus_tab"
+ADD_TAB_BUTTON_SIZE = 24
+
 _ERROR_MESSAGES = {
     ErrorCategory.NETWORK: (
         "Could not connect to {url}. Check that the server is running and reachable."
@@ -89,20 +92,6 @@ class RequestTab(QWidget):
         self.worker: RequestWorker | None = None
 
 
-class TabBarWithAddButton(QTabBar):
-    """Tab bar that emits layout_changed so '+' button can be repositioned."""
-
-    layout_changed = Signal()
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self.layout_changed.emit()
-
-    def tabLayoutChange(self) -> None:
-        super().tabLayoutChange()
-        self.layout_changed.emit()
-
-
 class TabsPresenter(QObject):
     """Owns the QTabWidget: opening, closing, restoring tabs and worker lifecycle."""
 
@@ -142,20 +131,14 @@ class TabsPresenter(QObject):
         self._current_variables: dict = {}
         self._current_hidden_keys: set = set()
 
-        self._tab_bar = TabBarWithAddButton()
+        self._tab_bar = QTabBar()
         self._tab_bar.setExpanding(False)
 
         self._tabs = QTabWidget()
         self._tabs.setTabBar(self._tab_bar)
         self._tabs.setTabsClosable(True)
         self._tabs.tabCloseRequested.connect(self.close_tab)
-
-        self._add_tab_btn = QPushButton("+", self._tabs)
-        self._add_tab_btn.setToolTip("New Tab (Ctrl+N)")
-        self._add_tab_btn.setFixedSize(24, 24)
-        self._add_tab_btn.clicked.connect(lambda: self.handle_new_tab("plus_button"))
-        self._tab_bar.layout_changed.connect(self._position_add_tab_button)
-        self._position_add_tab_button()
+        self._install_plus_tab()
         self.request_persisted.connect(self._on_request_persisted)
 
     @property
@@ -195,18 +178,23 @@ class TabsPresenter(QObject):
             tab.persisted_baseline = snapshot_persisted_fields(request_data)
 
         name = request_data.name if request_data else "New Request"
-        self._tabs.addTab(tab, name)
+        plus_idx = self._plus_tab_index()
+        if plus_idx >= 0:
+            self._tabs.insertTab(plus_idx, tab, name)
+        else:
+            self._tabs.addTab(tab, name)
+            self._install_plus_tab()
         self._tabs.setCurrentWidget(tab)
-        self._position_add_tab_button()
 
         if save_state:
             self.save_tabs_state()
 
     def close_tab(self, index: int) -> None:
+        if self._is_plus_tab_index(index):
+            return
         self._tabs.removeTab(index)
-        if self._tabs.count() == 0:
+        if self._request_tab_count() == 0:
             self.add_new_tab(save_state=False)
-        self._position_add_tab_button()
         self.save_tabs_state()
 
     def restore_tabs(self) -> None:
@@ -302,9 +290,8 @@ class TabsPresenter(QObject):
                 indices_to_close.append(i)
         for index in reversed(indices_to_close):
             self._tabs.removeTab(index)
-        if self._tabs.count() == 0:
+        if self._request_tab_count() == 0:
             self.add_new_tab(save_state=False)
-        self._position_add_tab_button()
         self.save_tabs_state()
         logger.info(
             "close_tabs_for_deleted_requests closed_count=%d request_ids=%s",
@@ -325,7 +312,7 @@ class TabsPresenter(QObject):
                     tab.response_view.set_indent_size(settings.indent_size)
 
     def handle_new_tab(self, source: str = "unknown") -> None:
-        tabs_before = self._tabs.count()
+        tabs_before = self._request_tab_count()
         logger.info("new_tab_action_triggered source=%s tabs_before=%d", source, tabs_before)
         if self._metrics:
             self._metrics.track_gui_new_tab_action(source)
@@ -337,17 +324,29 @@ class TabsPresenter(QObject):
             self.close_tab(current_index)
 
     def handle_next_tab(self) -> None:
-        count = self._tabs.count()
-        if count > 0:
-            self._tabs.setCurrentIndex((self._tabs.currentIndex() + 1) % count)
+        indices = self._navigable_tab_indices()
+        if not indices:
+            return
+        current = self._tabs.currentIndex()
+        if current not in indices:
+            self._tabs.setCurrentIndex(indices[0])
+            return
+        pos = indices.index(current)
+        self._tabs.setCurrentIndex(indices[(pos + 1) % len(indices)])
 
     def handle_previous_tab(self) -> None:
-        count = self._tabs.count()
-        if count > 0:
-            self._tabs.setCurrentIndex((self._tabs.currentIndex() - 1) % count)
+        indices = self._navigable_tab_indices()
+        if not indices:
+            return
+        current = self._tabs.currentIndex()
+        if current not in indices:
+            self._tabs.setCurrentIndex(indices[-1])
+            return
+        pos = indices.index(current)
+        self._tabs.setCurrentIndex(indices[(pos - 1) % len(indices)])
 
     def handle_switch_to_tab(self, index: int) -> None:
-        if 0 <= index < self._tabs.count():
+        if 0 <= index < self._tabs.count() and not self._is_plus_tab_index(index):
             self._tabs.setCurrentIndex(index)
 
     def handle_send_request_global(self) -> None:
@@ -570,25 +569,44 @@ class TabsPresenter(QObject):
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
 
-    def _position_add_tab_button(self) -> None:
-        tab_count = self._tabs.count()
-        tab_bar_rect = self._tab_bar.geometry()
+    def _request_tab_count(self) -> int:
+        return sum(
+            1
+            for i in range(self._tabs.count())
+            if isinstance(self._tabs.widget(i), RequestTab)
+        )
 
-        if tab_count > 0:
-            last_rect = self._tab_bar.tabRect(tab_count - 1)
-            x_pos = tab_bar_rect.x() + last_rect.right() + 6
-            y_pos = tab_bar_rect.y() + last_rect.top()
-            y_pos += max(0, (last_rect.height() - self._add_tab_btn.height()) // 2)
-        else:
-            x_pos = tab_bar_rect.x() + 6
-            y_pos = tab_bar_rect.y()
-            y_pos += max(0, (self._tab_bar.height() - self._add_tab_btn.height()) // 2)
+    def _plus_tab_index(self) -> int:
+        for i in range(self._tab_bar.count()):
+            if self._tab_bar.tabData(i) == PLUS_TAB_MARKER:
+                return i
+        return -1
 
-        max_x = max(0, self._tabs.width() - self._add_tab_btn.width() - 6)
-        x_pos = min(x_pos, max_x)
-        self._add_tab_btn.move(x_pos, y_pos)
-        self._add_tab_btn.raise_()
-        self._add_tab_btn.show()
+    def _is_plus_tab_index(self, index: int) -> bool:
+        if not 0 <= index < self._tab_bar.count():
+            return False
+        return self._tab_bar.tabData(index) == PLUS_TAB_MARKER
+
+    def _navigable_tab_indices(self) -> list[int]:
+        return [i for i in range(self._tabs.count()) if not self._is_plus_tab_index(i)]
+
+    def _install_plus_tab(self) -> None:
+        if self._plus_tab_index() >= 0:
+            return
+        placeholder = QWidget()
+        placeholder.setObjectName("plus_tab_placeholder")
+        index = self._tabs.addTab(placeholder, "")
+        self._tab_bar.setTabData(index, PLUS_TAB_MARKER)
+        plus_btn = QPushButton("+")
+        plus_btn.setToolTip("New Tab (Ctrl+N)")
+        plus_btn.setFixedSize(ADD_TAB_BUTTON_SIZE, ADD_TAB_BUTTON_SIZE)
+        self._tab_bar.setTabButton(index, QTabBar.ButtonPosition.LeftSide, plus_btn)
+        self._tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
+        self._tab_bar.tabBarClicked.connect(self._on_tab_bar_clicked)
+
+    def _on_tab_bar_clicked(self, index: int) -> None:
+        if self._is_plus_tab_index(index):
+            self.handle_new_tab("plus_button")
 
     def _find_tab_for_sender(self) -> RequestTab | None:
         sender = self.sender()
