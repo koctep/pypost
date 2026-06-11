@@ -30,9 +30,11 @@ When creating a new variable name via the "New Variable..." option in the Respon
 ## Implementation Details
 
 ### Location
-- Primary implementation: `pypost/ui/presenters/env_presenter.py`
-- Method: `EnvPresenter.handle_variable_set_request()`
-- Helper: `EnvPresenter._is_valid_variable_name()`
+- **Rule source (shared):** `pypost/core/variable_name_validation.py`
+  - `validate_variable_name(name) -> tuple[bool, str]` — pure validation, no side effects
+- **UI integration:** `pypost/ui/presenters/env_presenter.py`
+  - `EnvPresenter.handle_variable_set_request()` — new-variable flow
+  - `EnvPresenter._is_valid_variable_name()` — delegates to core module; records metrics/logs
 
 ### Flow
 1. User right-clicks in ResponseView → Context Menu → "Set Variable" → "New Variable..."

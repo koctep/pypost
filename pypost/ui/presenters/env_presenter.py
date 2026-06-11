@@ -18,6 +18,10 @@ from pypost.core.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.storage import StorageManager
+from pypost.core.variable_name_validation import (
+    validate_variable_name,
+    validation_failure_reason,
+)
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
@@ -234,45 +238,23 @@ class EnvPresenter(QObject):
         self._on_env_changed(self._env_selector.currentIndex())
 
     def _is_valid_variable_name(self, name: str) -> tuple[bool, str]:
-        """Validate variable name for Jinja2 template compatibility.
+        """Validate variable name and record metrics/logging for the UI flow."""
+        is_valid, error_msg = validate_variable_name(name)
+        if is_valid:
+            self._metrics.track_variable_validation("valid")
+            logger.debug("variable_name_validation_attempt name=%s valid=True error=", name)
+            return True, ""
 
-        Rules:
-        - Cannot be empty
-        - Cannot start with a digit
-        - Can only contain alphanumeric characters and underscore
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
-        if not name:
-            self._metrics.track_variable_validation_failure("empty")
-            self._metrics.track_variable_validation("invalid")
-            logger.debug("variable_name_validation_attempt name=%s valid=False error=empty", name)
-            return False, "Variable name cannot be empty."
-
-        # Check if first character is a digit
-        if name[0].isdigit():
-            self._metrics.track_variable_validation_failure("starts_with_digit")
-            self._metrics.track_variable_validation("invalid")
-            logger.debug(
-                "variable_name_validation_attempt name=%s valid=False " "error=starts_with_digit",
-                name,
-            )
-            return False, "Variable name cannot start with a digit."
-
-        # Check if all characters are alphanumeric or underscore
-        if not all(c.isalnum() or c == "_" for c in name):
-            self._metrics.track_variable_validation_failure("invalid_chars")
-            self._metrics.track_variable_validation("invalid")
-            logger.debug(
-                "variable_name_validation_attempt name=%s valid=False " "error=invalid_chars",
-                name,
-            )
-            return False, "Variable name can only contain letters, numbers, and underscores."
-
-        self._metrics.track_variable_validation("valid")
-        logger.debug("variable_name_validation_attempt name=%s valid=True error=", name)
-        return True, ""
+        reason = validation_failure_reason(name)
+        if reason:
+            self._metrics.track_variable_validation_failure(reason)
+        self._metrics.track_variable_validation("invalid")
+        logger.debug(
+            "variable_name_validation_attempt name=%s valid=False error=%s",
+            name,
+            reason or "unknown",
+        )
+        return False, error_msg
 
     def handle_open_environments(self) -> None:
         """Shortcut handler — opens EnvironmentDialog."""
