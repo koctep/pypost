@@ -111,7 +111,7 @@ class SecretBackendChain:
     ) -> KeyRegistry | None:
         for index, config in enumerate(backend_configs):
             backend_type = config.get("type", "")
-            backend = _create_backend_for_type(backend_type)
+            backend = _create_secret_backend(backend_type)
             if backend is None:
                 logger.debug("secret_backend_type_unsupported type=%s", backend_type)
                 if index + 1 < len(backend_configs):
@@ -165,14 +165,10 @@ def _registry_from_vault_payload(payload: dict[str, Any]) -> KeyRegistry | None:
     return _registry_from_dict(data)
 
 
-def _create_backend_for_type(backend_type: str) -> SecretBackend | None:
-    if backend_type == "file":
-        return FileSecretBackend()
-    if backend_type == "env-indirection":
-        return EnvIndirectionSecretBackend()
-    if backend_type == "vault":
-        return VaultSecretBackend()
-    return None
+def _create_secret_backend(backend_type: str) -> SecretBackend | None:
+    from pypost.core.key_sources.factory import create_secret_backend
+
+    return create_secret_backend(backend_type)
 
 
 class SecretStoreKeySource:

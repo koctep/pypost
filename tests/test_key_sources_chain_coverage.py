@@ -9,7 +9,7 @@ from pypost.core.key_provider import ChainedKeyProvider, build_key_id
 from pypost.core.key_sources.chain import KeySourceChain
 from pypost.core.key_sources.env import EnvKeySource
 from pypost.core.key_sources.secret_store import SecretBackendChain, SecretStoreKeySource
-from pypost.ui.dialogs.settings_dialog import parse_key_source_fallback
+from pypost.core.key_source_constants import parse_key_source_fallback
 
 
 def test_parse_key_source_fallback_empty_returns_none():

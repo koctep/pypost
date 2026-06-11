@@ -14,6 +14,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from pypost.core.key_source_constants import (
+    KEY_SOURCE_ENVIRONMENT,
+    KEY_SOURCE_KEYRING,
+    KEY_SOURCE_SECRET_STORE,
+    SUPPORTED_KEY_SOURCES,
+    parse_key_source_fallback,
+)
 from pypost.models.retry import (
     RetryableCodesValidationFailure,
     RetryPolicy,
@@ -26,14 +33,6 @@ logger = logging.getLogger(__name__)
 ENCRYPTION_MODE_DEFAULT = "default"
 ENCRYPTION_MODE_ENABLED = "enabled"
 ENCRYPTION_MODE_DISABLED = "disabled"
-
-KEY_SOURCE_ENVIRONMENT = "environment"
-KEY_SOURCE_KEYRING = "keyring"
-KEY_SOURCE_SECRET_STORE = "secret_store"
-
-SUPPORTED_KEY_SOURCES = frozenset(
-    {KEY_SOURCE_ENVIRONMENT, KEY_SOURCE_KEYRING, KEY_SOURCE_SECRET_STORE},
-)
 
 KEY_SOURCE_HELP = {
     KEY_SOURCE_ENVIRONMENT: (
@@ -49,17 +48,6 @@ KEY_SOURCE_HELP = {
         "PYPOST_ENV_ENCRYPTION_SECRETS_FILE. Do not put key material in settings.json."
     ),
 }
-
-
-def parse_key_source_fallback(text: str) -> list[str] | None:
-    if not text.strip():
-        return None
-    result: list[str] = []
-    for part in text.split(","):
-        source = part.strip()
-        if source in SUPPORTED_KEY_SOURCES and source not in result:
-            result.append(source)
-    return result or None
 
 
 class SettingsDialog(QDialog):

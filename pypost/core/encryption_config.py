@@ -1,18 +1,20 @@
 import logging
 import os
-from typing import Literal, Optional
+from typing import Optional
 
 from pypost.core.key_provider import ChainedKeyProvider, KeyProvider
+from pypost.core.key_source_constants import (
+    DEFAULT_KEY_SOURCE,
+    EncryptionKeySource,
+    SUPPORTED_KEY_SOURCES,
+)
 from pypost.core.key_sources.chain import KeySourceChain
 from pypost.core.key_sources.factory import create_key_source
 from pypost.models.settings import AppSettings
 
 logger = logging.getLogger(__name__)
 
-EncryptionKeySource = Literal["environment", "keyring", "secret_store"]
-DEFAULT_KEY_SOURCE: EncryptionKeySource = "environment"
 ENCRYPTION_ENABLED_ENV = "PYPOST_ENV_ENCRYPTION_ENABLED"
-SUPPORTED_KEY_SOURCES = frozenset({"environment", "keyring", "secret_store"})
 
 
 def _env_encryption_enabled() -> bool:
