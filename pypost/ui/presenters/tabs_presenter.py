@@ -401,12 +401,7 @@ class TabsPresenter(QObject):
             return
 
         if sender_tab.worker is not None and not sender_tab.worker.isRunning():
-            logger.debug(
-                "stale_worker_cleared method=%s url=%s",
-                request_data.method,
-                request_data.url,
-            )
-            sender_tab.worker = None
+            self._clear_tab_worker(sender_tab, reason="stale", request_data=request_data)
 
         if sender_tab.worker is not None and sender_tab.worker.isRunning():
             logger.info(
@@ -478,6 +473,7 @@ class TabsPresenter(QObject):
         self.add_new_tab(request_data)
 
     def _on_request_finished(self, tab: RequestTab, response) -> None:
+        self._clear_tab_worker(tab)
         method = tab.request_data.method if tab.request_data else "UNKNOWN"
         logger.info(
             "request_finished method=%s status_code=%s elapsed_time=%.3fs size=%s",
@@ -496,6 +492,7 @@ class TabsPresenter(QObject):
         self.request_executed.emit()
 
     def _on_request_error(self, tab: RequestTab, error) -> None:
+        self._clear_tab_worker(tab)
         self._reset_tab_ui_state(tab)
 
         # Cancellation path (still a plain string)
@@ -544,10 +541,30 @@ class TabsPresenter(QObject):
     def _on_retry_attempt(self, tab: RequestTab, attempt: int, max_retries: int) -> None:
         tab.request_editor.send_btn.setText(f"Retrying\u2026 ({attempt} of {max_retries})")
 
+    def _clear_tab_worker(
+        self,
+        tab: RequestTab,
+        *,
+        reason: str = "completed",
+        request_data: RequestData | None = None,
+    ) -> None:
+        """Release tab.worker when a request ends or a stale reference is detected.
+
+        Worker finished/error signals are queued on the Qt event loop, so
+        tab.worker may still reference a dead thread until this runs. The stale
+        guard in _handle_send_request covers the window before the handler fires.
+        """
+        if tab.worker is None:
+            return
+        if reason == "stale":
+            method = request_data.method if request_data else "UNKNOWN"
+            url = request_data.url if request_data else ""
+            logger.debug("stale_worker_cleared method=%s url=%s", method, url)
+        tab.worker = None
+
     def _reset_tab_ui_state(self, tab: RequestTab) -> None:
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
-        tab.worker = None
 
     def _position_add_tab_button(self) -> None:
         tab_count = self._tabs.count()

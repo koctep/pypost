@@ -64,6 +64,24 @@ but does **not** increment `request_errors_total`.
 _on_request_error` checks `error.category == ErrorCategory.CANCELLED` and returns without
 showing a dialog. Legacy `str` cancellation payloads still use substring matching.
 
+### Tab worker lifecycle (PYPOST-401, PYPOST-415)
+
+Each tab holds at most one active `RequestWorker` in `tab.worker`. Cleanup is centralized in
+`TabsPresenter._clear_tab_worker()`:
+
+| Call site | When |
+|-----------|------|
+| `_on_request_finished` / `_on_request_error` | Normal completion path (before UI reset) |
+| `_handle_send_request` stale guard | Worker finished but Qt has not yet delivered the handler |
+
+`_reset_tab_ui_state()` only restores the Send button; it does not touch `tab.worker`.
+
+Because `finished`/`error` signals are queued on the Qt event loop, `tab.worker` may still
+reference a dead thread briefly after `isRunning()` becomes `False`. The stale guard clears
+that reference when the user sends again before the completion handler runs.
+
+Debug log `stale_worker_cleared` indicates the guard fired (see PYPOST-401 observability).
+
 ### MCP transport exceptions (PYPOST-411)
 
 `MCPClientService.run()` maps httpx exceptions from the MCP SSE client to `ExecutionError`:
@@ -94,3 +112,4 @@ showing a dialog. Legacy `str` cancellation payloads still use substring matchin
 - `tests/test_request_service.py` — `test_execute_http_does_not_pre_render_url`
 - `tests/test_http_client.py` — `test_url_template_rendered_once_per_request`
 - `tests/test_mcp_client_service.py` — httpx exception category mapping
+- `tests/test_worker_race.py` — worker stop flag and tab worker lifecycle guards
