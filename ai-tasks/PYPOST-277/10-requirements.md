@@ -1,4 +1,4 @@
-# PYPOST-274: Close debt — Makefile automation tests (PYPOST-30)
+# PYPOST-277: Close debt — Make target automation tests (PYPOST-30)
 
 ## Goals
 

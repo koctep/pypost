@@ -1,6 +1,6 @@
-# Roadmap: PYPOST-274
+# Roadmap: PYPOST-223
 
-Sprint 493 debt closure from [PYPOST-30](https://pypost.atlassian.net/browse/PYPOST-30).
+Sprint 493 debt closure from [PYPOST-27](https://pypost.atlassian.net/browse/PYPOST-27).
 
 ## Step Status
 
@@ -22,12 +22,12 @@ Sprint 493 debt closure from [PYPOST-30](https://pypost.atlassian.net/browse/PYP
 
 ### STEP 1: Requirements
 
-- `ai-tasks/PYPOST-274/10-requirements.md`
+- `ai-tasks/PYPOST-223/10-requirements.md`
 
 ### STEP 3: Development
 
-- `tests/test_makefile.py`
+- `Makefile`
 
 ### STEP 6: Review
 
-- `ai-tasks/PYPOST-274/60-tech-debt.md`
+- `ai-tasks/PYPOST-223/60-tech-debt.md`
