@@ -3,6 +3,7 @@
 import unittest
 from unittest.mock import MagicMock
 
+from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
 from pypost.core.request_service import RequestService
 from pypost.core.alert_manager import AlertManager
 from pypost.models.models import RequestData
@@ -18,6 +19,13 @@ def _make_response(status=200, body="OK"):
         body=body,
         elapsed_time=0.1,
         size=len(body),
+    )
+
+
+def _make_http_result(status=200, body="OK", url="http://x"):
+    return HTTPRequestResult(
+        response=_make_response(status, body),
+        resolved=ResolvedRequestFields(url=url, headers={}, body=""),
     )
 
 
@@ -43,7 +51,7 @@ class TestNoRetryDefault(unittest.TestCase):
 
     def test_no_retry_policy_returns_first_response(self):
         svc = _make_service()
-        svc.http_client.send_request.return_value = _make_response(200)
+        svc.http_client.send_request.return_value = _make_http_result(200)
         req = RequestData(method="GET", url="http://x")
         result = svc.execute(req)
         self.assertEqual(result.response.status_code, 200)
@@ -51,7 +59,7 @@ class TestNoRetryDefault(unittest.TestCase):
 
     def test_no_retry_policy_does_not_retry_on_503(self):
         svc = _make_service()
-        svc.http_client.send_request.return_value = _make_response(503)
+        svc.http_client.send_request.return_value = _make_http_result(503)
         req = RequestData(method="GET", url="http://x")
         result = svc.execute(req)
         self.assertEqual(result.response.status_code, 503)
@@ -59,7 +67,7 @@ class TestNoRetryDefault(unittest.TestCase):
 
     def test_max_retries_zero_policy_returns_first_response(self):
         svc = _make_service()
-        svc.http_client.send_request.return_value = _make_response(200)
+        svc.http_client.send_request.return_value = _make_http_result(200)
         req = _make_request(max_retries=0)
         result = svc.execute(req)
         self.assertEqual(result.response.status_code, 200)
@@ -72,8 +80,8 @@ class TestRetryOnRetryableStatusCode(unittest.TestCase):
     def test_retries_on_503_then_succeeds(self):
         svc = _make_service()
         svc.http_client.send_request.side_effect = [
-            _make_response(503),
-            _make_response(200),
+            _make_http_result(503),
+            _make_http_result(200),
         ]
         req = _make_request(max_retries=1)
         result = svc.execute(req)
@@ -83,10 +91,10 @@ class TestRetryOnRetryableStatusCode(unittest.TestCase):
     def test_retries_three_times_then_succeeds(self):
         svc = _make_service()
         svc.http_client.send_request.side_effect = [
-            _make_response(503),
-            _make_response(503),
-            _make_response(503),
-            _make_response(200),
+            _make_http_result(503),
+            _make_http_result(503),
+            _make_http_result(503),
+            _make_http_result(200),
         ]
         req = _make_request(max_retries=3)
         result = svc.execute(req)
@@ -95,7 +103,7 @@ class TestRetryOnRetryableStatusCode(unittest.TestCase):
 
     def test_non_retryable_status_code_not_retried(self):
         svc = _make_service()
-        svc.http_client.send_request.return_value = _make_response(404)
+        svc.http_client.send_request.return_value = _make_http_result(404)
         req = _make_request(max_retries=3)
         result = svc.execute(req)
         self.assertEqual(result.response.status_code, 404)
@@ -103,7 +111,7 @@ class TestRetryOnRetryableStatusCode(unittest.TestCase):
 
     def test_200_not_retried(self):
         svc = _make_service()
-        svc.http_client.send_request.return_value = _make_response(200)
+        svc.http_client.send_request.return_value = _make_http_result(200)
         req = _make_request(max_retries=3)
         svc.execute(req)
         self.assertEqual(svc.http_client.send_request.call_count, 1)
@@ -115,7 +123,7 @@ class TestRetryOnException(unittest.TestCase):
     def test_retries_on_network_exception_then_succeeds(self):
         svc = _make_service()
         exc = ExecutionError(category=ErrorCategory.NETWORK, message="conn reset")
-        svc.http_client.send_request.side_effect = [exc, _make_response(200)]
+        svc.http_client.send_request.side_effect = [exc, _make_http_result(200)]
         req = _make_request(max_retries=1)
         result = svc.execute(req)
         self.assertEqual(result.response.status_code, 200)
@@ -146,8 +154,8 @@ class TestRetryCallback(unittest.TestCase):
     def test_retry_callback_called_once_on_single_retry(self):
         svc = _make_service()
         svc.http_client.send_request.side_effect = [
-            _make_response(503),
-            _make_response(200),
+            _make_http_result(503),
+            _make_http_result(200),
         ]
         req = _make_request(max_retries=1)
         callback = MagicMock()
@@ -160,7 +168,7 @@ class TestRetryCallback(unittest.TestCase):
     def test_retry_callback_called_for_each_attempt(self):
         svc = _make_service()
         exc = ExecutionError(category=ErrorCategory.NETWORK, message="fail")
-        svc.http_client.send_request.side_effect = [exc, exc, _make_response(200)]
+        svc.http_client.send_request.side_effect = [exc, exc, _make_http_result(200)]
         req = _make_request(max_retries=2)
         callback = MagicMock()
         svc.execute(req, retry_callback=callback)
@@ -168,7 +176,7 @@ class TestRetryCallback(unittest.TestCase):
 
     def test_no_callback_does_not_raise(self):
         svc = _make_service()
-        svc.http_client.send_request.side_effect = [_make_response(503), _make_response(200)]
+        svc.http_client.send_request.side_effect = [_make_http_result(503), _make_http_result(200)]
         req = _make_request(max_retries=1)
         # Should not raise even with no callback
         result = svc.execute(req, retry_callback=None)
@@ -199,9 +207,9 @@ class TestRetryMetrics(unittest.TestCase):
         metrics = MagicMock()
         svc = _make_service(metrics=metrics)
         svc.http_client.send_request.side_effect = [
-            _make_response(503),
-            _make_response(503),
-            _make_response(200),
+            _make_http_result(503),
+            _make_http_result(503),
+            _make_http_result(200),
         ]
         req = _make_request(max_retries=2)
         svc.execute(req)
@@ -211,7 +219,7 @@ class TestRetryMetrics(unittest.TestCase):
         metrics = MagicMock()
         svc = _make_service(metrics=metrics)
         exc = ExecutionError(category=ErrorCategory.NETWORK, message="fail")
-        svc.http_client.send_request.side_effect = [exc, _make_response(200)]
+        svc.http_client.send_request.side_effect = [exc, _make_http_result(200)]
         req = _make_request(max_retries=1)
         svc.execute(req)
         metrics.track_retry_attempt.assert_called_once_with("GET", "network")
@@ -219,7 +227,7 @@ class TestRetryMetrics(unittest.TestCase):
     def test_no_metrics_no_error_on_retry(self):
         svc = RequestService()
         svc.http_client = MagicMock()
-        svc.http_client.send_request.side_effect = [_make_response(503), _make_response(200)]
+        svc.http_client.send_request.side_effect = [_make_http_result(503), _make_http_result(200)]
         req = _make_request(max_retries=1)
         result = svc.execute(req)
         self.assertEqual(result.response.status_code, 200)
@@ -265,7 +273,7 @@ class TestExhaustionAlert(unittest.TestCase):
         metrics = MagicMock()
         svc = _make_service(metrics=metrics, alert_manager=alert_manager)
         exc = ExecutionError(category=ErrorCategory.NETWORK, message="fail")
-        svc.http_client.send_request.side_effect = [exc, _make_response(200)]
+        svc.http_client.send_request.side_effect = [exc, _make_http_result(200)]
         req = _make_request(max_retries=1)
         svc.execute(req)
         alert_manager.emit.assert_not_called()
@@ -277,7 +285,7 @@ class TestRetryableStatusExhaustion(unittest.TestCase):
 
     def test_exhausted_status_retries_returns_execution_error(self):
         svc = _make_service()
-        svc.http_client.send_request.return_value = _make_response(503)
+        svc.http_client.send_request.return_value = _make_http_result(503)
         req = _make_request(max_retries=1)
         result = svc.execute(req)
         self.assertIsNotNone(result.execution_error)
@@ -288,9 +296,9 @@ class TestRetryableStatusExhaustion(unittest.TestCase):
     def test_detail_contains_retries_attempted_on_status_exhaustion(self):
         svc = _make_service()
         svc.http_client.send_request.side_effect = [
-            _make_response(503),
-            _make_response(503),
-            _make_response(503),
+            _make_http_result(503),
+            _make_http_result(503),
+            _make_http_result(503),
         ]
         req = _make_request(max_retries=2)
         result = svc.execute(req)
@@ -299,7 +307,7 @@ class TestRetryableStatusExhaustion(unittest.TestCase):
     def test_track_request_retry_exhaustion_on_status_exhaustion(self):
         metrics = MagicMock()
         svc = _make_service(metrics=metrics)
-        svc.http_client.send_request.return_value = _make_response(502)
+        svc.http_client.send_request.return_value = _make_http_result(502)
         req = _make_request(max_retries=0)
         svc.execute(req)
         metrics.track_request_retry_exhaustion.assert_called_once_with(req.url)
@@ -307,7 +315,7 @@ class TestRetryableStatusExhaustion(unittest.TestCase):
     def test_alert_manager_emit_on_status_exhaustion(self):
         alert_manager = MagicMock(spec=AlertManager)
         svc = _make_service(alert_manager=alert_manager)
-        svc.http_client.send_request.return_value = _make_response(503)
+        svc.http_client.send_request.return_value = _make_http_result(503)
         req = _make_request(max_retries=0)
         svc.execute(req)
         alert_manager.emit.assert_called_once()

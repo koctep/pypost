@@ -57,9 +57,9 @@ class HTTPClientSSEProbeTests(unittest.TestCase):
         with patch.object(client.session, "request", return_value=mock_response):
             result = client.send_request(req)
 
-        self.assertEqual(result.status_code, 200)
-        self.assertIn("Connection established", result.body)
-        self.assertIn("InitializeRequest", result.body)
+        self.assertEqual(result.response.status_code, 200)
+        self.assertIn("Connection established", result.response.body)
+        self.assertIn("InitializeRequest", result.response.body)
 
     def test_auto_detects_sse_by_url_and_content_type(self):
         """When GET to /sse URL, use SSE handling (URL or Content-Type)."""
@@ -73,9 +73,9 @@ class HTTPClientSSEProbeTests(unittest.TestCase):
             self.assertEqual(call_kw["timeout"], (3.0, 10.0))
             self.assertIn("text/event-stream", call_kw["headers"]["Accept"])
 
-        self.assertEqual(result.status_code, 200)
-        self.assertIn("SSE stream opened", result.body)
-        self.assertIn("1 event(s)", result.body)
+        self.assertEqual(result.response.status_code, 200)
+        self.assertIn("SSE stream opened", result.response.body)
+        self.assertIn("1 event(s)", result.response.body)
 
     def test_handles_non_200_sse_response(self):
         """When SSE endpoint returns non-200, return that status."""
@@ -90,5 +90,5 @@ class HTTPClientSSEProbeTests(unittest.TestCase):
         with patch.object(client.session, "request", return_value=mock_response):
             result = client.send_request(req)
 
-        self.assertEqual(result.status_code, 404)
-        self.assertIn("Not Found", result.body)
+        self.assertEqual(result.response.status_code, 404)
+        self.assertIn("Not Found", result.response.body)

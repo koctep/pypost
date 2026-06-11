@@ -18,8 +18,14 @@ already perform.
 
 MCP requests render URL and body once each in `RequestService._execute_mcp()`.
 
-History entries use `SensitiveDataMaskingPolicy`, which renders templates again for masked
-storage — independent of the transport hot path.
+History entries use `SensitiveDataMaskingPolicy` with resolved fields from transport
+(PYPOST-63):
+
+1. `HTTPClient.send_request()` returns `HTTPRequestResult` with `resolved` (URL, headers, body).
+2. `RequestService.execute()` passes `resolved` into `build_history_safe_fields()`.
+3. When **no hidden keys**, history reuses `resolved` without re-rendering.
+4. When **hidden keys** are present, templates are re-rendered with `***` placeholders (masking
+   requires a separate render pass).
 
 ## Error handling
 

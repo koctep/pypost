@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from prometheus_client import generate_latest
 
+from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.request_service import RequestService
@@ -37,7 +38,10 @@ def _execute_request(metrics: MetricsManager, hidden_keys) -> str:
         template_service=TemplateService(),
     )
     svc.http_client = MagicMock()
-    svc.http_client.send_request.return_value = _make_response(200)
+    svc.http_client.send_request.return_value = HTTPRequestResult(
+        response=_make_response(200),
+        resolved=ResolvedRequestFields(url="http://example.com", headers={}, body=""),
+    )
     req = RequestData(
         method="GET",
         url="http://{{host}}?token={{token}}",

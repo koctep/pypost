@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from pypost.core.alert_manager import AlertManager, AlertPayload
 from pypost.core.history_manager import HistoryManager
-from pypost.core.http_client import HTTPClient
+from pypost.core.http_client import HTTPClient, ResolvedRequestFields
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.metrics import MetricsManager
 from pypost.core.script_executor import ScriptExecutor
@@ -78,9 +78,16 @@ class RequestService:
         request: RequestData,
         variables: Dict[str, Any],
         headers_callback: Callable[[int, Dict], None] | None,
-    ) -> ResponseData:
+    ) -> tuple[ResponseData, ResolvedRequestFields]:
         url = self._template_service.render_string(request.url, variables)
         body = self._template_service.render_string(request.body, variables).strip()
+        resolved_headers = {
+            self._template_service.render_string(k, variables): self._template_service.render_string(
+                v, variables
+            )
+            for k, v in request.headers.items()
+        }
+        resolved = ResolvedRequestFields(url=url, headers=resolved_headers, body=body)
 
         operation = "list_tools"
         call_params: Dict[str, Any] | None = None
@@ -104,7 +111,7 @@ class RequestService:
             self._metrics.track_response_received(request.method, str(response.status_code))
         if headers_callback:
             headers_callback(response.status_code, response.headers)
-        return response
+        return response, resolved
 
     def _execute_http_with_retry(
         self,
@@ -115,7 +122,7 @@ class RequestService:
         headers_callback: Callable[[int, Dict], None] | None,
         retry_callback: Callable[[int, int, ExecutionError], None] | None,
         request_name: str,
-    ) -> ResponseData:
+    ) -> tuple[ResponseData, ResolvedRequestFields]:
         """Execute HTTP request with optional retry and exponential back-off."""
         policy: RetryPolicy | None = request.retry_policy
         if policy is None:
@@ -156,13 +163,15 @@ class RequestService:
             )
 
             try:
-                response = self.http_client.send_request(
+                http_result = self.http_client.send_request(
                     request,
                     variables=variables,
                     stream_callback=stream_callback,
                     stop_flag=stop_flag,
                     headers_callback=headers_callback,
                 )
+                response = http_result.response
+                resolved = http_result.resolved
             except ExecutionError as exc:
                 if exc.category == ErrorCategory.BODY:
                     raise
@@ -184,7 +193,7 @@ class RequestService:
             else:
                 # Response path — raises here are not caught by the handler above
                 if response.status_code not in retryable_codes:
-                    return response
+                    return response, resolved
                 if attempt == max_retries:
                     last_error = ExecutionError(
                         category=ErrorCategory.NETWORK,
@@ -299,11 +308,14 @@ class RequestService:
             variables = {}
 
         # 1. Execute request, catching structured errors
+        resolved_fields: ResolvedRequestFields | None = None
         try:
             if request.method == "MCP":
-                response = self._execute_mcp(request, variables, headers_callback)
+                response, resolved_fields = self._execute_mcp(
+                    request, variables, headers_callback
+                )
             else:
-                response = self._execute_http_with_retry(
+                response, resolved_fields = self._execute_http_with_retry(
                     request,
                     variables,
                     stream_callback,
@@ -366,6 +378,7 @@ class RequestService:
                     request=request,
                     variables=variables,
                     hidden_keys=hidden_keys,
+                    resolved=resolved_fields,
                 )
                 resolved_url = masked.url
                 resolved_headers = masked.headers

@@ -5,6 +5,7 @@ from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.retry import RetryPolicy
+from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
 from pypost.core.request_service import RequestService, ExecutionResult
 from pypost.core.template_service import TemplateService
 from pypost.core.history_manager import HistoryManager
@@ -16,6 +17,15 @@ def _make_response(status=200, body="OK"):
     )
 
 
+def _make_http_result(status=200, body="OK", url="http://x", headers=None):
+    return HTTPRequestResult(
+        response=_make_response(status, body),
+        resolved=ResolvedRequestFields(
+            url=url, headers=headers or {}, body=""
+        ),
+    )
+
+
 class TestRequestServiceExecuteHTTP(unittest.TestCase):
     def setUp(self):
         self.svc = RequestService(metrics=MagicMock())
@@ -23,21 +33,21 @@ class TestRequestServiceExecuteHTTP(unittest.TestCase):
         self.svc.mcp_client = MagicMock()
 
     def test_execute_http_success_returns_execution_result(self):
-        self.svc.http_client.send_request.return_value = _make_response(200)
+        self.svc.http_client.send_request.return_value = _make_http_result(200)
         req = RequestData(method="GET", url="http://x", post_script="")
         result = self.svc.execute(req)
         self.assertEqual(200, result.response.status_code)
         self.assertIsNone(result.script_error)
 
     def test_execute_passes_variables_to_http_client(self):
-        self.svc.http_client.send_request.return_value = _make_response(200)
+        self.svc.http_client.send_request.return_value = _make_http_result(200)
         req = RequestData(method="GET", url="http://x")
         self.svc.execute(req, variables={"k": "v"})
         call_kwargs = self.svc.http_client.send_request.call_args
         self.assertEqual({"k": "v"}, call_kwargs.kwargs["variables"])
 
     def test_execute_stream_callback_forwarded_to_http_client(self):
-        self.svc.http_client.send_request.return_value = _make_response(200)
+        self.svc.http_client.send_request.return_value = _make_http_result(200)
         req = RequestData(method="GET", url="http://x")
         cb = MagicMock()
         self.svc.execute(req, stream_callback=cb)
@@ -45,7 +55,7 @@ class TestRequestServiceExecuteHTTP(unittest.TestCase):
         self.assertEqual(cb, call_kwargs.kwargs["stream_callback"])
 
     def test_execute_headers_callback_forwarded_to_http_client(self):
-        self.svc.http_client.send_request.return_value = _make_response(200)
+        self.svc.http_client.send_request.return_value = _make_http_result(200)
         req = RequestData(method="GET", url="http://x")
         cb = MagicMock()
         self.svc.execute(req, headers_callback=cb)
@@ -58,7 +68,7 @@ class TestRequestServicePostScript(unittest.TestCase):
         self.svc = RequestService(metrics=MagicMock())
         self.svc.http_client = MagicMock()
         self.svc.mcp_client = MagicMock()
-        self.svc.http_client.send_request.return_value = _make_response(200)
+        self.svc.http_client.send_request.return_value = _make_http_result(200)
 
     def test_execute_post_script_populates_logs_and_variables(self):
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
@@ -128,7 +138,7 @@ class TestRequestServiceHistory(unittest.TestCase):
         )
         self.svc.http_client = MagicMock()
         self.svc.mcp_client = MagicMock()
-        self.svc.http_client.send_request.return_value = _make_response(200)
+        self.svc.http_client.send_request.return_value = _make_http_result(200)
 
     def test_history_entry_recorded_after_execute(self):
         req = RequestData(method="GET", url="http://example.com", post_script="")
@@ -139,11 +149,31 @@ class TestRequestServiceHistory(unittest.TestCase):
         self.assertEqual(200, entry.status_code)
 
     def test_history_records_resolved_url(self):
-        from pypost.core.template_service import TemplateService
-        ts = TemplateService()
-        self.svc._template_service = ts
+        self.svc.http_client.send_request.return_value = _make_http_result(
+            url="http://myserver.com/api"
+        )
         req = RequestData(method="GET", url="http://{{host}}/api", post_script="")
         self.svc.execute(req, variables={"host": "myserver.com"})
+        entry = self.history_manager.append.call_args[0][0]
+        self.assertEqual("http://myserver.com/api", entry.url)
+
+    def test_history_reuses_resolved_fields_without_rerender(self):
+        mock_ts = MagicMock()
+        svc = RequestService(
+            metrics=MagicMock(),
+            history_manager=self.history_manager,
+            template_service=mock_ts,
+        )
+        svc.http_client = MagicMock()
+        svc.http_client.send_request.return_value = HTTPRequestResult(
+            response=_make_response(200),
+            resolved=ResolvedRequestFields(
+                url="http://myserver.com/api", headers={}, body=""
+            ),
+        )
+        req = RequestData(method="GET", url="http://{{host}}/api", post_script="")
+        svc.execute(req, variables={"host": "myserver.com"})
+        mock_ts.render_string.assert_not_called()
         entry = self.history_manager.append.call_args[0][0]
         self.assertEqual("http://myserver.com/api", entry.url)
 
@@ -165,7 +195,7 @@ class TestRequestServiceHistory(unittest.TestCase):
     def test_no_history_manager_no_error(self):
         svc = RequestService()
         svc.http_client = MagicMock()
-        svc.http_client.send_request.return_value = _make_response(200)
+        svc.http_client.send_request.return_value = _make_http_result(200)
         req = RequestData(method="GET", url="http://example.com", post_script="")
         result = svc.execute(req)
         self.assertEqual(200, result.response.status_code)
@@ -208,16 +238,17 @@ class TestRequestServiceHistory(unittest.TestCase):
         self.svc.execute(req, variables={"host": "example.com"})
         self.svc._metrics.track_hidden_value_mask_applied.assert_not_called()
 
-    def test_history_stores_raw_template_when_no_template_service(self):
+    def test_history_uses_resolved_url_without_injected_template_service(self):
         from pypost.core.history_manager import HistoryManager
         history_manager = MagicMock(spec=HistoryManager)
         svc = RequestService(history_manager=history_manager)
         svc.http_client = MagicMock()
-        svc.http_client.send_request.return_value = _make_response(200)
+        svc.http_client.send_request.return_value = _make_http_result(
+            200, url="http://myserver.com/api"
+        )
         req = RequestData(method="GET", url="http://{{host}}/api", post_script="")
         svc.execute(req, variables={"host": "myserver.com"})
         entry = history_manager.append.call_args[0][0]
-        # FAILS with current code: else-branch stores raw template, not rendered value
         self.assertEqual("http://myserver.com/api", entry.url)
 
 
@@ -257,7 +288,7 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
         mock_ts.render_string.side_effect = lambda s, v: s.replace("{{h}}", v.get("h", ""))
         svc = RequestService(metrics=MagicMock(), template_service=mock_ts)
         svc.http_client = MagicMock()
-        svc.http_client.send_request.return_value = _make_response(200)
+        svc.http_client.send_request.return_value = _make_http_result(200)
         req = RequestData(method="GET", url="http://{{h}}/api", post_script="")
         svc.execute(req, variables={"h": "example.com"})
         url_render_calls = [
@@ -267,7 +298,7 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
         svc.http_client.send_request.assert_called_once()
 
     def test_script_error_populates_execution_error_script_category(self):
-        self.svc.http_client.send_request.return_value = _make_response(200)
+        self.svc.http_client.send_request.return_value = _make_http_result(200)
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
             # ScriptExecutor.execute is a @staticmethod, so mock_executor.execute (not
             # mock_executor.return_value.execute) is the correct target. If execute is ever
@@ -291,7 +322,7 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
     def test_script_error_tracks_metrics(self):
         mock_metrics = MagicMock()
         self.svc._metrics = mock_metrics
-        self.svc.http_client.send_request.return_value = _make_response(200)
+        self.svc.http_client.send_request.return_value = _make_http_result(200)
         with patch("pypost.core.request_service.ScriptExecutor") as mock_executor:
             # ScriptExecutor.execute is a @staticmethod, so mock_executor.execute (not
             # mock_executor.return_value.execute) is the correct target. If execute is ever
@@ -316,7 +347,7 @@ class TestRequestServiceRetryPolicyResolution(unittest.TestCase):
         svc = self._make_svc(
             default_retry_policy=RetryPolicy(max_retries=5, retryable_status_codes=[500])
         )
-        svc.http_client.send_request.return_value = _make_response(500)
+        svc.http_client.send_request.return_value = _make_http_result(500)
         req = RequestData(
             method="GET", url="http://x",
             retry_policy=RetryPolicy(max_retries=1, retryable_status_codes=[500]),
@@ -332,7 +363,7 @@ class TestRequestServiceRetryPolicyResolution(unittest.TestCase):
         svc = self._make_svc(
             default_retry_policy=RetryPolicy(max_retries=2, retryable_status_codes=[500])
         )
-        svc.http_client.send_request.return_value = _make_response(500)
+        svc.http_client.send_request.return_value = _make_http_result(500)
         req = RequestData(method="GET", url="http://x", retry_policy=None)
         svc.execute(req)
         self.assertEqual(3, svc.http_client.send_request.call_count)
@@ -340,7 +371,7 @@ class TestRequestServiceRetryPolicyResolution(unittest.TestCase):
     def test_hardcoded_fallback_when_both_policies_none(self):
         """AC-3: no policy at all → max_retries=0 → exactly 1 call."""
         svc = self._make_svc()
-        svc.http_client.send_request.return_value = _make_response(500)
+        svc.http_client.send_request.return_value = _make_http_result(500)
         req = RequestData(method="GET", url="http://x", retry_policy=None)
         svc.execute(req)
         self.assertEqual(1, svc.http_client.send_request.call_count)

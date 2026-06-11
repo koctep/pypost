@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
 from pypost.core.history_manager import HistoryManager
 from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
@@ -50,7 +51,14 @@ def _execute_and_persist(history_path: Path) -> None:
     hm = _history_manager_at(history_path)
     svc = RequestService(history_manager=hm, template_service=TemplateService())
     svc.http_client = MagicMock()
-    svc.http_client.send_request.return_value = _make_response(200)
+    svc.http_client.send_request.return_value = HTTPRequestResult(
+        response=_make_response(200),
+        resolved=ResolvedRequestFields(
+            url=f"http://{VISIBLE_VALUE}/api?token={HIDDEN_VALUE}",
+            headers={"Authorization": f"Bearer {HIDDEN_VALUE}"},
+            body=f'{{"token":"{HIDDEN_VALUE}","host":"{VISIBLE_VALUE}"}}',
+        ),
+    )
     svc.execute(
         _make_request(),
         variables={HIDDEN_KEY: HIDDEN_VALUE, VISIBLE_KEY: VISIBLE_VALUE},

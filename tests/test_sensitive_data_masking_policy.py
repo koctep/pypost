@@ -1,5 +1,6 @@
 import unittest
 
+from pypost.core.http_client import ResolvedRequestFields
 from pypost.core.sensitive_data_masking_policy import SensitiveDataMaskingPolicy
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
@@ -56,6 +57,21 @@ class TestSensitiveDataMaskingPolicyBuildHistorySafeFields(unittest.TestCase):
         self.assertIn("myserver.com", result.url)
         self.assertNotIn("supersecret", result.url)
         self.assertIn("***", result.url)
+
+    def test_reuses_resolved_fields_when_no_hidden_keys(self):
+        req = RequestData(method="GET", url="http://{{host}}/api")
+        resolved = ResolvedRequestFields(
+            url="http://myserver.com/api", headers={"X": "1"}, body="body"
+        )
+        result = self.policy.build_history_safe_fields(
+            request=req,
+            variables={"host": "ignored"},
+            hidden_keys=set(),
+            resolved=resolved,
+        )
+        self.assertEqual(resolved.url, result.url)
+        self.assertEqual(resolved.headers, result.headers)
+        self.assertEqual(resolved.body, result.body)
 
     def test_empty_hidden_keys_renders_but_does_not_mask(self):
         req = RequestData(method="GET", url="http://{{host}}?token={{token}}")

@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock
 import requests as requests_lib
 
-from pypost.core.http_client import HTTPClient
+from pypost.core.http_client import HTTPClient, HTTPRequestResult, ResolvedRequestFields
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -27,9 +27,9 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         self.mock_session.request.return_value = _make_response(status=200, chunks=[b'{"ok":true}'])
         req = RequestData(method="GET", url="http://x")
         result = self.client.send_request(req)
-        self.assertEqual(200, result.status_code)
-        self.assertEqual('{"ok":true}', result.body)
-        self.assertGreater(result.elapsed_time, 0)
+        self.assertEqual(200, result.response.status_code)
+        self.assertEqual('{"ok":true}', result.response.body)
+        self.assertGreater(result.response.elapsed_time, 0)
 
     def test_post_with_json_body_serialises_body_correctly(self):
         self.mock_session.request.return_value = _make_response(status=200)
@@ -152,13 +152,13 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         req = RequestData(method="GET", url="http://x")
         result = self.client.send_request(req, stop_flag=stop_flag)
         resp.close.assert_called()
-        self.assertNotIn("chunk2", result.body)
+        self.assertNotIn("chunk2", result.response.body)
 
     def test_non_2xx_response_returns_correct_status_code(self):
         self.mock_session.request.return_value = _make_response(status=404)
         req = RequestData(method="GET", url="http://x")
         result = self.client.send_request(req)
-        self.assertEqual(404, result.status_code)
+        self.assertEqual(404, result.response.status_code)
 
     def test_connection_error_raises_execution_error_network(self):
         self.mock_session.request.side_effect = requests_lib.ConnectionError("refused")
@@ -241,6 +241,26 @@ class TestHTTPClientFunctionExpressions(unittest.TestCase):
         self.client.send_request(req, variables=self.variables)
         params = self.mock_session.request.call_args[1]["params"]
         self.assertEqual({literal_key: literal_val}, params)
+
+
+class TestHTTPClientResolvedFields(unittest.TestCase):
+    def test_send_request_returns_resolved_request_fields(self):
+        client = HTTPClient(template_service=TemplateService())
+        client.session = MagicMock()
+        client.session.request.return_value = _make_response(status=200, chunks=[b"ok"])
+        req = RequestData(
+            method="POST",
+            url="http://{{host}}/api",
+            headers={"X-Token": "{{token}}"},
+            body='{"k":"{{token}}"}',
+        )
+        result = client.send_request(
+            req, variables={"host": "example.com", "token": "abc"}
+        )
+        self.assertIsInstance(result, HTTPRequestResult)
+        self.assertEqual("http://example.com/api", result.resolved.url)
+        self.assertEqual({"X-Token": "abc"}, result.resolved.headers)
+        self.assertEqual('{"k":"abc"}', result.resolved.body)
 
 
 class TestHTTPClientUrlRendering(unittest.TestCase):

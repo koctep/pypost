@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List
 
 import requests
@@ -22,6 +23,23 @@ SSE_PROBE_CONNECT_TIMEOUT = 3.0
 SSE_PROBE_MAX_EVENTS = 5
 
 
+@dataclass(frozen=True)
+class ResolvedRequestFields:
+    """Template-resolved URL, headers, and body sent on the wire."""
+
+    url: str
+    headers: Dict[str, str]
+    body: str
+
+
+@dataclass(frozen=True)
+class HTTPRequestResult:
+    """HTTP transport outcome plus resolved request fields for history reuse."""
+
+    response: ResponseData
+    resolved: ResolvedRequestFields
+
+
 class HTTPClient:
     def __init__(
         self, metrics: MetricsManager | None = None, template_service: TemplateService | None = None
@@ -41,7 +59,7 @@ class HTTPClient:
         request_data: RequestData,
         variables: Dict[str, str],
         rendered_url: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> tuple[Dict[str, Any], ResolvedRequestFields]:
         """Prepares the arguments for requests.request by rendering templates."""
         url = (
             rendered_url
@@ -99,7 +117,8 @@ class HTTPClient:
         elif request_data.body_type != "json" and stripped_body:
             kwargs["data"] = body
 
-        return kwargs
+        resolved = ResolvedRequestFields(url=url, headers=dict(headers), body=body)
+        return kwargs, resolved
 
     def _handle_sse_response(
         self, response, request_data: RequestData, start_time: float
@@ -177,7 +196,7 @@ class HTTPClient:
         stream_callback: Callable[[str], None] = None,
         stop_flag: Callable[[], bool] = None,
         headers_callback: Callable[[int, Dict], None] = None,
-    ) -> ResponseData:
+    ) -> HTTPRequestResult:
         if variables is None:
             variables = {}
 
@@ -191,7 +210,7 @@ class HTTPClient:
             logger.debug("sse_probe_detected method=%s url=%s", request_data.method, url)
 
         try:
-            kwargs = self._prepare_request_kwargs(
+            kwargs, resolved = self._prepare_request_kwargs(
                 request_data, variables, rendered_url=url
             )
             if is_sse_endpoint:
@@ -229,7 +248,10 @@ class HTTPClient:
         if request_data.method == "GET" and (
             "text/event-stream" in content_type or is_sse_endpoint
         ):
-            return self._handle_sse_response(response, request_data, start_time)
+            return HTTPRequestResult(
+                response=self._handle_sse_response(response, request_data, start_time),
+                resolved=resolved,
+            )
 
         content_parts = []
         # iter_content with None uses optimal chunk size from server (or fallback).
@@ -268,10 +290,13 @@ class HTTPClient:
             (end_time - start_time) * 1000,
             len(content.encode("utf-8")),
         )
-        return ResponseData(
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            body=content,
-            elapsed_time=end_time - start_time,
-            size=len(content.encode("utf-8")),  # Calculate size from content
+        return HTTPRequestResult(
+            response=ResponseData(
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                body=content,
+                elapsed_time=end_time - start_time,
+                size=len(content.encode("utf-8")),
+            ),
+            resolved=resolved,
         )
