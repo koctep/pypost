@@ -44,6 +44,13 @@ class TestMetricsRegistryMcpCounters(unittest.TestCase):
             out,
         )
 
+    def test_track_mcp_active_env_changed(self):
+        reg = MetricsRegistry()
+        reg.track_mcp_active_env_changed()
+        reg.track_mcp_active_env_changed()
+        out = _scrape(reg)
+        self.assertIn("mcp_active_env_changes_total 2.0", out)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -59,11 +59,11 @@ The environment selector owns MCP lifecycle and the active-variable cache used b
 
 *   **Responsibility**: Load environments, emit variable changes to the UI, start/stop MCP
     when `enable_mcp` is set on the selected environment.
-*   **Variable cache**: `_current_variables` is updated on the main thread in
+*   **Variable cache**: `EnvVariableSnapshot` is updated on the main thread in
     `_on_env_changed` whenever the user selects or edits an environment.
 *   **Supplier registration**: On init, calls
-    `MCPServerManager.set_variable_supplier(lambda: dict(self._current_variables))`.
-    The lambda returns a **copy** so MCP threadpool workers never observe partial writes.
+    `MCPServerManager.set_variable_supplier(self._env_snapshot.snapshot_variables)`.
+    The snapshot returns a **copy** so MCP threadpool workers never observe partial writes.
 *   **MCP tools overview (PYPOST-556)**: Top-bar **MCP Tools (N)** opens
     `McpToolsOverviewDialog` with all `expose_as_mcp` requests across collections (MCP name,
     collection, method, description). Count refreshes on environment change.
@@ -262,6 +262,30 @@ Freshness: the supplier is invoked on **every** `call_tool`, so edits to environ
 variables take effect on the next agent call without restarting MCP (existing restart-on-env
 change behavior is unchanged).
 
+### Active environment binding (PYPOST-137)
+
+PyPost binds MCP variable resolution to the **currently selected environment** in the UI.
+There is no per-session or per-agent environment lock — the MCP server process stays up while
+the user works, but each `call_tool` reads a fresh snapshot from the active environment.
+
+| User action | Effect on connected agents |
+| --- | --- |
+| Switch to another environment | Subsequent `call_tool` calls resolve `{{ var }}` from the new environment. Tool names stay the same; URLs, headers, and auth values may change. |
+| Edit variables in the active environment | Next `call_tool` uses updated values (supplier runs per call). |
+| Deselect environment ("No Environment") | MCP stops; in-flight sessions lose tool access. |
+| Switch between two MCP-enabled environments | Server may restart; `list_tools` may refresh. Variable context always follows the new selection. |
+
+**Agent implication:** Long-running agent sessions should not assume environment variables
+stay constant if the PyPost operator may switch environments. Operators who need stable agent
+context should avoid changing the active environment while agents are calling tools, or use
+separate PyPost instances per environment.
+
+When the active environment **identity** changes while MCP is already running, PyPost logs
+`mcp_active_env_changed` (INFO) with previous and new env ids and increments
+`mcp_active_env_changes_total` for monitoring.
+
+Per-call freshness is covered by `tests/test_mcp_server_impl.py` (`test_call_tool_invokes_variable_supplier_per_call`) and supplier wiring in `tests/test_env_presenter.py`.
+
 #### GUI parity
 
 | Path | Variables passed to `RequestService.execute()` |
@@ -288,7 +312,7 @@ DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
 *   **MCP Thread (`MCPServerManager`)**: Runs the `uvicorn` loop.
     *   **Thread Pool**: Used inside MCP Thread for blocking I/O (Request execution).
     *   **Variable supplier**: Must not call Qt APIs. `EnvPresenter` reads only
-        `_current_variables` (main-thread cache); supplier returns `dict(...)` snapshot.
+        `EnvVariableSnapshot` (main-thread cache); supplier returns `dict(...)` snapshot.
 *   **Metrics Thread (`MetricsServer` via `MetricsManager`)**: Runs its own isolated
     `uvicorn` loop for metrics and observability. Bind failures emit `start_failed(str)` on
     `MetricsManager` (PYPOST-153) with the same message style as MCP. `MainWindow` connects
@@ -347,7 +371,8 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 | Symptom | Likely cause | Resolution |
 | --- | --- | --- |
 | MCP tool URL still has `{{ base_url }}` unresolved | No environment selected, or supplier not registered | Select an environment with the variable defined; verify `EnvPresenter` wired the supplier |
-| Stale env values after editing variables | Supplier not invoked or cache not updated | `_on_env_changed` must refresh `_current_variables`; supplier runs per `call_tool` |
+| Stale env values after editing variables | Supplier not invoked or cache not updated | `_on_env_changed` must refresh `_env_snapshot`; supplier runs per `call_tool` |
+| Agent sees different hosts/auth mid-session | User switched active environment while MCP was running | Expected — see **Active environment binding**; watch `mcp_active_env_changed` logs |
 | `{{ mcp.request.x }}` works but env vars do not | Custom MCP setup without supplier | Call `set_variable_supplier` before `start_server`, or use default `EnvPresenter` wiring |
 | Env var named `mcp` ignored for nested keys | By design — merge preserves `mcp.request.*` | Rename the environment variable |
 | DEBUG shows `env_var_count=0` | "No Environment" selected or empty env | Expected when no env is active; only MCP args resolve |

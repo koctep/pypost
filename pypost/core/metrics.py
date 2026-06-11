@@ -101,6 +101,9 @@ class MetricsManager(QObject):
     ) -> None:
         self._registry.track_mcp_tool_call_duration(method, status, duration_seconds)
 
+    def track_mcp_active_env_changed(self) -> None:
+        self._registry.track_mcp_active_env_changed()
+
     def track_history_entry_appended(self, method: str) -> None:
         self._registry.track_history_entry_appended(method)
 

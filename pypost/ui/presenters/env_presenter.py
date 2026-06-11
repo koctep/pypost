@@ -285,6 +285,8 @@ class EnvPresenter(QObject):
 
     def _on_env_changed(self, index: int) -> None:
         """Resolves vars, starts/stops MCP, saves config, emits signals."""
+        previous = self._env_selector.itemData(self._current_env_index)
+        mcp_was_running = self._mcp_manager.is_running()
         selected = self._env_selector.itemData(index)
         variables: dict = {}
 
@@ -324,6 +326,24 @@ class EnvPresenter(QObject):
         self.env_keys_changed.emit(keys)
         self.env_hidden_keys_changed.emit(hidden_keys)
         self._refresh_mcp_tools_button()
+        if mcp_was_running:
+            self._track_mcp_active_env_changed(previous, selected)
+
+    def _track_mcp_active_env_changed(
+        self,
+        previous: Environment | None,
+        selected: Environment | None,
+    ) -> None:
+        prev_id = previous.id if isinstance(previous, Environment) else None
+        new_id = selected.id if isinstance(selected, Environment) else None
+        if prev_id == new_id:
+            return
+        self._metrics.track_mcp_active_env_changed()
+        logger.info(
+            "mcp_active_env_changed prev_env_id=%s new_env_id=%s",
+            prev_id or "",
+            new_id or "",
+        )
 
     def refresh_mcp_tools(self) -> None:
         """Refresh MCP tool list when collections change while server is running."""

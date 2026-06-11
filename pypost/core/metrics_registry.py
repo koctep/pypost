@@ -135,6 +135,12 @@ class MetricsRegistry:
             registry=self.registry,
         )
 
+        self.mcp_active_env_changes = Counter(
+            "mcp_active_env_changes_total",
+            "Active environment changed while MCP server was running",
+            registry=self.registry,
+        )
+
         self.history_entries_appended = Counter(
             "history_entries_appended_total",
             "Number of request history entries recorded",
@@ -264,6 +270,9 @@ class MetricsRegistry:
         self.mcp_tool_call_duration_seconds.labels(
             method=method, status=status
         ).observe(duration_seconds)
+
+    def track_mcp_active_env_changed(self) -> None:
+        self.mcp_active_env_changes.inc()
 
     def track_history_entry_appended(self, method: str) -> None:
         self.history_entries_appended.labels(method=method).inc()

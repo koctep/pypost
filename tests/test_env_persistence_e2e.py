@@ -41,6 +41,9 @@ class _FakeMCPManager:
     def stop_server(self):
         return None
 
+    def is_running(self):
+        return False
+
     def set_variable_supplier(self, supplier):  # noqa: ARG002
         return None
 

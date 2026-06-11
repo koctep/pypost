@@ -41,6 +41,8 @@ class MetricsTrackerProtocol(Protocol):
         self, method: str, status: str, duration_seconds: float
     ) -> None: ...
 
+    def track_mcp_active_env_changed(self) -> None: ...
+
     def track_history_entry_appended(self, method: str) -> None: ...
 
     def track_history_load_into_editor(self) -> None: ...
@@ -129,6 +131,9 @@ class NullMetrics:
     def track_mcp_tool_call_duration(
         self, method: str, status: str, duration_seconds: float
     ) -> None:
+        return None
+
+    def track_mcp_active_env_changed(self) -> None:
         return None
 
     def track_history_entry_appended(self, method: str) -> None:

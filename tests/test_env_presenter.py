@@ -213,6 +213,44 @@ class TestEnvPresenter(unittest.TestCase):
         p._on_env_changed(2)
         self.assertEqual(p._mcp_manager.variable_supplier(), {"B": "2"})
 
+    def test_tracks_mcp_active_env_changed_when_switching_while_running(self):
+        env_dev = _make_env("e1", "Dev", {"A": "1"}, enable_mcp=True)
+        env_prod = _make_env("e2", "Prod", {"B": "2"}, enable_mcp=True)
+        p = self._make_presenter([env_dev, env_prod])
+        p._environments = [env_dev, env_prod]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env_dev.name, env_dev)
+        p.env_selector.addItem(env_prod.name, env_prod)
+        p.env_selector.blockSignals(False)
+        p._on_env_changed(1)
+        p._on_env_changed(2)
+        p._metrics.track_mcp_active_env_changed.assert_called_once()
+
+    def test_does_not_track_mcp_active_env_changed_on_same_env_refresh(self):
+        env = _make_env("e1", "Dev", {"A": "1"}, enable_mcp=True)
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.blockSignals(False)
+        p._on_env_changed(1)
+        env.variables["A"] = "2"
+        p._on_env_changed(1)
+        p._metrics.track_mcp_active_env_changed.assert_not_called()
+
+    def test_tracks_mcp_active_env_changed_when_deselecting_while_running(self):
+        env = _make_env("e1", "Dev", enable_mcp=True)
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.blockSignals(False)
+        p._on_env_changed(1)
+        with self.assertLogs("pypost.ui.presenters.env_presenter", level=logging.INFO) as caplog:
+            p._on_env_changed(0)
+        p._metrics.track_mcp_active_env_changed.assert_called_once()
+        self.assertTrue(any("mcp_active_env_changed" in r.message for r in caplog.records))
+
     def test_on_env_changed_no_environment_emits_empty_dict(self):
         p = self._make_presenter([])
         received = []

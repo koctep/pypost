@@ -60,6 +60,20 @@ In the Cursor UI (**Settings → Features → MCP**):
 After connecting, open Cursor chat with MCP enabled. The agent should **list tools** exposed
 from your active PyPost environment and **call tools** on your behalf.
 
+## Active environment
+
+MCP tools always use the **environment currently selected** in PyPost's top bar. If you
+switch environments while an agent is connected, the next tool call resolves variables from
+the new environment — the agent is not notified automatically. Keep one environment selected
+for the duration of an agent session when you need stable URLs or credentials.
+
+## Active environment
+
+MCP tools always use the **environment currently selected** in PyPost's top bar. If you
+switch environments while an agent is connected, the next tool call resolves variables from
+the new environment — the agent is not notified automatically. Keep one environment selected
+for the duration of an agent session when you need stable URLs or credentials.
+
 **Verify in Cursor:**
 
 1. Confirm the MCP server shows as connected (no transport or handshake errors).
@@ -113,6 +127,7 @@ errors).
 | Cursor shows disconnected / transport error | Wrong URL or type (SSE instead of Streamable HTTP) | Use `http://127.0.0.1:1080/mcp` and Streamable HTTP |
 | No tools listed | MCP off, wrong environment, or no requests marked MCP Tool | Enable MCP on environment; check "MCP Tool" on requests |
 | Tool call fails | Missing env vars or bad request template | Define variables in active environment; test send in GUI first |
+| Wrong host or credentials mid-session | Active environment switched while agent connected | Reselect intended environment; avoid switching during agent use |
 | Connection refused | PyPost not running or MCP not started | Select environment with MCP enabled; check "MCP: ON" in top bar |
 
 Automated `list_tools` / `call_tool` coverage lives in `tests/test_mcp_server_integration.py`.
