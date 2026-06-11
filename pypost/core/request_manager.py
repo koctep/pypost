@@ -71,12 +71,24 @@ class RequestManager:
         # Update index
         self._rebuild_index()
 
+    def _find_collection_by_name(self, name: str, *, exclude_id: str | None = None):
+        normalized = name.strip()
+        for col in self.collections:
+            if col.id != exclude_id and col.name == normalized:
+                return col
+        return None
+
     def create_collection(self, name: str) -> Collection:
         """Creates a new collection."""
-        # Note: in a real app we may check duplicate names before persisting.
         import uuid
 
-        new_col = Collection(id=str(uuid.uuid4()), name=name, requests=[])
+        normalized = name.strip()
+        if not normalized:
+            raise ValueError("Collection name cannot be empty")
+        if self._find_collection_by_name(normalized):
+            raise ValueError(f"Collection '{normalized}' already exists")
+
+        new_col = Collection(id=str(uuid.uuid4()), name=normalized, requests=[])
         self.collections.append(new_col)
         self.storage.save_collection(new_col)
         return new_col
@@ -166,6 +178,14 @@ class RequestManager:
         normalized_name = new_name.strip()
         if not normalized_name:
             logger.warning("rename_collection_rejected_empty_name collection_id=%s", collection_id)
+            return False
+
+        if self._find_collection_by_name(normalized_name, exclude_id=collection_id):
+            logger.warning(
+                "rename_collection_rejected_duplicate_name collection_id=%s new_name=%s",
+                collection_id,
+                normalized_name,
+            )
             return False
 
         for col in self.collections:

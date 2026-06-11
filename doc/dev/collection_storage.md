@@ -29,3 +29,9 @@ Loads all `*.json` files. Legacy files whose stem equals `collection.name` (but 
 
 `RequestManager.rename_collection` updates the `name` field in JSON and calls
 `save_collection`. The on-disk filename does not change.
+
+## Duplicate display names
+
+`RequestManager.create_collection` and `rename_collection` reject duplicate
+collection display names. Persistence uses collection IDs, so same-name collections
+would not overwrite each other on disk, but the UI enforces unique names for clarity.

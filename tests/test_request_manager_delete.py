@@ -75,6 +75,17 @@ class RequestManagerDeleteTests(unittest.TestCase):
         self.assertEqual([], storage.deleted_collection_ids)
         self.assertEqual(["Team API v2"], [c.name for c in storage.saved_collections])
 
+    def test_rename_collection_rejects_duplicate_name(self):
+        c1 = Collection(id="c1", name="Team API", requests=[])
+        c2 = Collection(id="c2", name="Other API", requests=[])
+        storage = FakeStorageManager([c1, c2])
+        manager = RequestManager(storage)
+
+        renamed = manager.rename_collection("c2", "Team API")
+
+        self.assertFalse(renamed)
+        self.assertEqual("Other API", manager.get_collections()[1].name)
+
     def test_rename_collection_item_rejects_empty_name(self):
         req = RequestData(id="r1", name="Get users")
         collection = Collection(id="c1", name="Team API", requests=[req])

@@ -60,6 +60,19 @@ def test_load_collections_migrates_legacy_name_based_files(tmp_path, monkeypatch
     assert not legacy_path.exists()
 
 
+def test_same_display_name_collections_persist_as_separate_files(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    c1 = Collection(id="id-1", name="Shared Name", requests=[])
+    c2 = Collection(id="id-2", name="Shared Name", requests=[])
+
+    storage.save_collection(c1)
+    storage.save_collection(c2)
+
+    loaded = storage.load_collections()
+    assert len(loaded) == 2
+    assert {col.id for col in loaded} == {"id-1", "id-2"}
+
+
 def test_delete_collection_removes_id_based_file(tmp_path, monkeypatch):
     storage = _make_storage(tmp_path, monkeypatch)
     collection = Collection(id="del-id-1", name="To Delete", requests=[])

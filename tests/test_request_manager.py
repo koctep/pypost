@@ -29,6 +29,11 @@ class TestRequestManagerCreate(unittest.TestCase):
         self.manager.create_collection("My API")
         self.assertEqual(["My API"], [c.name for c in self.storage.saved_collections])
 
+    def test_create_collection_rejects_duplicate_name(self):
+        self.manager.create_collection("My API")
+        with self.assertRaises(ValueError):
+            self.manager.create_collection("My API")
+
 
 class TestRequestManagerSaveRequest(unittest.TestCase):
     def setUp(self):
