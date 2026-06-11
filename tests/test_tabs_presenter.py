@@ -298,6 +298,22 @@ class TestOnRequestError(unittest.TestCase):
             self.assertIn("Request Error", args[1])
             self.assertIn("server is running", args[2])
 
+    def test_execution_error_body_shows_category_message(self):
+        from pypost.models.errors import ErrorCategory, ExecutionError
+        p, tab = self._make_presenter_with_tab()
+        exc = ExecutionError(
+            category=ErrorCategory.BODY,
+            message="Could not convert YAML body to JSON.",
+            detail="mapping values are not allowed here",
+        )
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            p._on_request_error(tab, exc)
+            mock_mb.critical.assert_called_once()
+            args = mock_mb.critical.call_args[0]
+            self.assertIn("Request Error", args[1])
+            self.assertIn("Could not convert YAML body to JSON", args[2])
+            self.assertIn("mapping values are not allowed here", args[2])
+
     def test_execution_error_timeout_shows_timeout_message(self):
         from pypost.models.errors import ErrorCategory, ExecutionError
         p, tab = self._make_presenter_with_tab()
