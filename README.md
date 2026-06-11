@@ -26,7 +26,8 @@ Prometheus, agent gets context in each tool response.
 monitoring request volume, MCP tool usage, and errors. Operational events stay on your
 machine — the AI agent gets context in each tool response, not via a separate event stream.
 
-See [MCP Integration](doc/mcp_integration.md) for setup and usage.
+See [Prometheus Monitoring](doc/prometheus_monitoring.md) for scrape setup and counter
+reference, and [MCP Integration](doc/mcp_integration.md) for agent setup.
 
 ## Features
 
@@ -38,7 +39,8 @@ See [MCP Integration](doc/mcp_integration.md) for setup and usage.
     configurations (e.g., dev/prod).
 *   **Templating**: Use Jinja2 for dynamic data generation in requests.
 *   **MCP Tools**: Expose saved requests as MCP tools for local AI agents (e.g. Cursor).
-*   **Prometheus Metrics**: Scrape `/metrics` for request, MCP, and error counters (default port 9080).
+*   **Prometheus Metrics**: Scrape `/metrics` for request, MCP, and error counters (default port
+    9080). See [Prometheus Monitoring](doc/prometheus_monitoring.md).
 
 ## Requirements
 

@@ -19,6 +19,7 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
+from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.request_service import ExecutionResult
@@ -136,6 +137,22 @@ def live_mcp_server(tools, execute_result: ExecutionResult | None = None):
 
 
 class TestMCPServerIntegration(unittest.TestCase):
+    def test_mcp_client_service_list_tools_over_live_streamable_http(self):
+        """MCPClientService sync wrapper works against live server (PYPOST-560)."""
+        tool = RequestData(
+            name="Echo Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://example.com/{{ mcp.request.msg }}",
+        )
+        with live_mcp_server([tool]) as server:
+            service = MCPClientService()
+            result = service.run(server.mcp_url, "list_tools", None)
+
+        self.assertEqual(result.status_code, 200)
+        body = json.loads(result.body)
+        self.assertEqual([t["name"] for t in body["tools"]], ["echo_tool"])
+
     def test_list_tools_over_live_streamable_http(self):
         tool = RequestData(
             name="Echo Tool",
@@ -195,6 +212,42 @@ class TestMCPServerIntegration(unittest.TestCase):
             )
         finally:
             server.stop()
+
+    def test_call_tool_executes_real_outbound_http_via_stub(self):
+        """MCP tool call hits a local HTTP stub (PYPOST-564), not mocked execute."""
+        stub_port = _free_port()
+        stub_body = "stub-response"
+
+        class _StubHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                payload = stub_body.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, _format, *_args):
+                return
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", stub_port), _StubHandler)
+        server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        server_thread.start()
+        try:
+            tool = RequestData(
+                name="Stub Echo",
+                expose_as_mcp=True,
+                method="GET",
+                url=f"http://127.0.0.1:{stub_port}/echo",
+            )
+            with live_mcp_server([tool]) as mcp_server:
+                payload = anyio.run(_mcp_call_tool, mcp_server.mcp_url, "stub_echo", {})
+            self.assertFalse(payload["error"])
+            self.assertEqual(payload["status"], 200)
+            self.assertEqual(payload["body"], stub_body)
+        finally:
+            httpd.shutdown()
+            server_thread.join(timeout=2.0)
 
 
 class TestMCPServerManagerIntegration(unittest.TestCase):
