@@ -1,4 +1,6 @@
 """Tests for race condition fixes in RequestWorker and TabsPresenter."""
+import logging
+
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
@@ -113,6 +115,42 @@ class TestWorkerRaceCondition(unittest.TestCase):
             self.assertIs(tab.worker, new_worker)
             new_worker.start.assert_called_once()
             stale_worker.isRunning.assert_called_once()
+
+    def test_stale_worker_cleared_emits_debug_log(self):
+        """RC-3 observable path: stale guard emits stale_worker_cleared debug log."""
+        from pypost.ui.presenters.tabs_presenter import TabsPresenter
+        from pypost.models.settings import AppSettings
+
+        app = QApplication.instance() or QApplication([])
+
+        request_data = RequestData(id="r1", name="Test", method="GET", url="http://x")
+
+        rm = MagicMock()
+        rm.find_request.return_value = None
+        sm = MagicMock()
+        sm.get_open_tabs.return_value = []
+        sm.get_expanded_collections.return_value = []
+        sm.settings = AppSettings()
+
+        p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
+        p.add_new_tab(request_data)
+        tab = p.widget.widget(0)
+
+        stale_worker = MagicMock()
+        stale_worker.isRunning.return_value = False
+        tab.worker = stale_worker
+
+        with self.assertLogs(
+            "pypost.ui.presenters.tabs_presenter", level=logging.DEBUG
+        ) as caplog:
+            with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
+                MockWorker.return_value = MagicMock()
+                tab.request_editor.send_requested.emit(request_data)
+
+        stale_logs = [r for r in caplog.records if "stale_worker_cleared" in r.message]
+        self.assertEqual(len(stale_logs), 1)
+        self.assertIn("method=GET", stale_logs[0].message)
+        self.assertIn("url=http://x", stale_logs[0].message)
 
 
 if __name__ == "__main__":
