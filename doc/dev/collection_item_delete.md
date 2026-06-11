@@ -22,7 +22,7 @@ The goal is to allow direct cleanup from the tree without extra navigation.
     - `delete_collection_item(item_id, item_type)`
 - **`StorageManager` (`pypost/core/storage.py`)**:
   - Persists collection changes and can remove collection files:
-    - `delete_collection(collection_name)`
+    - `delete_collection(collection_id, collection_name=...)`
 - **`MetricsManager` (`pypost/core/metrics.py`)**:
   - Tracks delete-action outcomes:
     - `gui_collection_delete_actions_total{item_type,status}`

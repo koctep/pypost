@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, List
 
 from platformdirs import user_data_dir
 
@@ -61,20 +61,53 @@ class StorageManager:
                     e,
                 )
 
+    def _collection_path_by_id(self, collection_id: str) -> Path:
+        return self.collections_path / f"{collection_id}.json"
+
+    @staticmethod
+    def _is_legacy_name_file(filename: str, collection: Collection) -> bool:
+        stem = Path(filename).stem
+        return stem == collection.name and stem != collection.id
+
     def save_collection(self, collection: Collection):
-        # Ensure collections directory exists before saving (in case it was deleted)
         if not self.collections_path.exists():
             self.collections_path.mkdir(exist_ok=True, parents=True)
 
-        # Simplification: using collection name as filename.
-        file_path = self.collections_path / f"{collection.name}.json"
+        file_path = self._collection_path_by_id(collection.id)
         with open(file_path, "w") as f:
             f.write(collection.model_dump_json(indent=2))
 
-    def delete_collection(self, collection_name: str):
-        file_path = self.collections_path / f"{collection_name}.json"
-        if file_path.exists():
-            file_path.unlink()
+        legacy_path = self.collections_path / f"{collection.name}.json"
+        if legacy_path.exists() and legacy_path != file_path:
+            legacy_path.unlink()
+            logger.info(
+                "storage_collection_legacy_file_removed collection_id=%s path=%s",
+                collection.id,
+                legacy_path,
+            )
+
+    def delete_collection(self, collection_id: str, *, collection_name: str | None = None):
+        id_path = self._collection_path_by_id(collection_id)
+        if id_path.exists():
+            id_path.unlink()
+
+        if collection_name:
+            legacy_path = self.collections_path / f"{collection_name}.json"
+            if legacy_path.exists():
+                legacy_path.unlink()
+
+    def _migrate_legacy_collection_file(self, legacy_filename: str, collection: Collection) -> None:
+        legacy_path = self.collections_path / legacy_filename
+        id_path = self._collection_path_by_id(collection.id)
+        if not id_path.exists():
+            with open(id_path, "w") as f:
+                f.write(collection.model_dump_json(indent=2))
+        legacy_path.unlink(missing_ok=True)
+        logger.info(
+            "storage_collection_migrated collection_id=%s legacy=%s",
+            collection.id,
+            legacy_filename,
+        )
 
     def load_collections(self) -> List[Collection]:
         collections = []
@@ -82,17 +115,21 @@ class StorageManager:
             return collections
 
         for filename in os.listdir(self.collections_path):
-            if filename.endswith(".json"):
-                try:
-                    with open(self.collections_path / filename, "r") as f:
-                        data = json.load(f)
-                        collections.append(Collection(**data))
-                except Exception as e:
-                    logger.warning(
-                        "storage_collection_load_failed filename=%s error=%s",
-                        filename,
-                        e,
-                    )
+            if not filename.endswith(".json"):
+                continue
+            try:
+                with open(self.collections_path / filename, "r") as f:
+                    data = json.load(f)
+                    collection = Collection(**data)
+                    collections.append(collection)
+                    if self._is_legacy_name_file(filename, collection):
+                        self._migrate_legacy_collection_file(filename, collection)
+            except Exception as e:
+                logger.warning(
+                    "storage_collection_load_failed filename=%s error=%s",
+                    filename,
+                    e,
+                )
         return collections
 
     def save_environments(self, environments: List[Environment]):
