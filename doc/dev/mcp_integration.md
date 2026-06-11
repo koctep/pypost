@@ -50,6 +50,10 @@ This class contains the actual business logic of the MCP server.
     `send` channel. Wrong methods receive 405 from Starlette routing, not manual ASGI responses.
     The outer `Mount` on `MCP_LEGACY_SSE_MOUNT_PATH` has no method filter (e.g. POST `/sse`
     returns 405).
+*   **MessagesEndpoint responses (PYPOST-157)**: `MessagesEndpoint` in `mcp_legacy_sse.py` is a
+    pure ASGI delegate to `handle_post_message` — no `starlette.responses` usage and no manual
+    `_send_response` / raw ASGI status bodies. Module-level `Response` is used only by the GET
+    SSE wrapper (`handle_sse_get`) after the stream completes.
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
 *   **Tool metadata (PYPOST-553)**: `RequestData.mcp_description` is the agent-visible
     description (falls back to `name`). `RequestData.mcp_params` holds per-parameter

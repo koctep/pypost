@@ -1,10 +1,11 @@
 """Tests for module-level legacy SSE MCP endpoints."""
 
+import inspect
+import unittest
+
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-import unittest
 
 from mcp.server import Server
 from starlette.routing import Route
@@ -22,6 +23,12 @@ class TestMcpLegacySseModule(unittest.TestCase):
     def test_endpoints_are_importable_at_module_level(self):
         self.assertTrue(callable(SSEEndpoint))
         self.assertTrue(callable(MessagesEndpoint))
+
+    def test_messages_endpoint_does_not_format_responses_manually(self):
+        source = inspect.getsource(MessagesEndpoint)
+        self.assertNotIn("_send_response", source)
+        self.assertNotIn("http.response.start", source)
+        self.assertNotIn("starlette.responses", source)
 
     def test_build_legacy_sse_app_exposes_post_messages_and_get_root(self):
         app = build_legacy_sse_app(Server("test"))
