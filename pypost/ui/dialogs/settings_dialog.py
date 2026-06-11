@@ -34,6 +34,15 @@ ENCRYPTION_MODE_DEFAULT = "default"
 ENCRYPTION_MODE_ENABLED = "enabled"
 ENCRYPTION_MODE_DISABLED = "disabled"
 
+SECTION_HEADER_STYLE = "font-weight: bold; margin-top: 8px;"
+
+
+def _make_section_header(title: str) -> QLabel:
+    label = QLabel(title)
+    label.setStyleSheet(SECTION_HEADER_STYLE)
+    return label
+
+
 KEY_SOURCE_HELP = {
     KEY_SOURCE_ENVIRONMENT: (
         "Store the Fernet key in PYPOST_ENV_ENCRYPTION_KEY (shell or service env). "
@@ -198,7 +207,6 @@ class SettingsDialog(QDialog):
         self.form_layout.addRow(
             "Confirm before overwriting requests:", self.confirm_overwrite_check
         )
-        self.form_layout.addRow("", self.log_hidden_key_names_check)
         self.form_layout.addRow(
             "Environment encryption at rest:",
             self.env_encryption_mode_combo,
@@ -217,6 +225,9 @@ class SettingsDialog(QDialog):
         self.form_layout.addRow("Retry Delay (seconds):", self.retry_delay_spin)
         self.form_layout.addRow("Retry Backoff Multiplier:", self.retry_backoff_spin)
         self.form_layout.addRow("Retryable Status Codes:", self.retryable_codes_edit)
+        self.security_logging_section_label = _make_section_header("Security / Logging")
+        self.form_layout.addRow(self.security_logging_section_label)
+        self.form_layout.addRow("", self.log_hidden_key_names_check)
         self.form_layout.addRow("Alert Webhook URL:", self.alert_webhook_url_edit)
         self.form_layout.addRow("Alert Webhook Auth Header:", self.alert_webhook_auth_edit)
         self.layout.addLayout(self.form_layout)

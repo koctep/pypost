@@ -63,3 +63,25 @@ class TestSettingsDialogLogHiddenKeyNames:
             assert dlg.get_settings().log_hidden_key_names is True
         finally:
             dlg.close()
+
+
+class TestSettingsDialogSecurityLoggingSection:
+    def test_security_logging_section_header_visible(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            assert dlg.security_logging_section_label.text() == "Security / Logging"
+            assert dlg.form_layout.indexOf(dlg.security_logging_section_label) >= 0
+        finally:
+            dlg.close()
+
+    def test_security_logging_fields_grouped_after_retry_policy(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            retry_idx = dlg.form_layout.indexOf(dlg.retryable_codes_edit)
+            header_idx = dlg.form_layout.indexOf(dlg.security_logging_section_label)
+            hidden_idx = dlg.form_layout.indexOf(dlg.log_hidden_key_names_check)
+            webhook_idx = dlg.form_layout.indexOf(dlg.alert_webhook_url_edit)
+            auth_idx = dlg.form_layout.indexOf(dlg.alert_webhook_auth_edit)
+            assert retry_idx < header_idx < hidden_idx < webhook_idx < auth_idx
+        finally:
+            dlg.close()
