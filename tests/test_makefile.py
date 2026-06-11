@@ -1,4 +1,4 @@
-"""Integration tests for root Makefile automation (PYPOST-307)."""
+"""Integration tests for root Makefile automation (PYPOST-307, PYPOST-310)."""
 
 from __future__ import annotations
 
@@ -61,10 +61,27 @@ def _prerequisites(workspace: Path, target: str) -> list[str]:
     return prereqs
 
 
+def _seed_minimal_project(workspace: Path) -> None:
+    tests_dir = workspace / "tests"
+    tests_dir.mkdir(exist_ok=True)
+    (tests_dir / "test_noop.py").write_text(
+        "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n"
+        "def test_noop() -> None:\n    assert True\n",
+        encoding="utf-8",
+    )
+    pypost_dir = workspace / "pypost"
+    pypost_dir.mkdir(exist_ok=True)
+    (pypost_dir / "__init__.py").write_text("", encoding="utf-8")
+
+
 @pytest.fixture
 def make_workspace(tmp_path: Path) -> Path:
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
-    (tmp_path / "requirements.txt").write_text("# empty fixture for make install\n", encoding="utf-8")
+    (tmp_path / "requirements.txt").write_text(
+        "# empty fixture for make install\n",
+        encoding="utf-8",
+    )
+    _seed_minimal_project(tmp_path)
     return tmp_path
 
 
@@ -124,3 +141,27 @@ class TestExitBehavior:
         assert venv_result.returncode == 0, venv_result.stderr
         lint_result = _run_make(make_workspace, "lint")
         assert lint_result.returncode != 0
+
+
+class TestTargetExecution:
+    def test_install_succeeds_with_empty_requirements(self, make_workspace: Path) -> None:
+        result = _run_make(make_workspace, "install")
+        assert result.returncode == 0, result.stderr
+
+    def test_test_fails_without_pytest_in_bare_venv(self, make_workspace: Path) -> None:
+        venv_result = _run_make(make_workspace, "venv")
+        assert venv_result.returncode == 0, venv_result.stderr
+        test_result = _run_make(make_workspace, "test")
+        assert test_result.returncode != 0
+
+    def test_test_succeeds_after_install(self, make_workspace: Path) -> None:
+        install_result = _run_make(make_workspace, "install")
+        assert install_result.returncode == 0, install_result.stderr
+        test_result = _run_make(make_workspace, "test")
+        assert test_result.returncode == 0, test_result.stderr
+
+    def test_lint_succeeds_after_install(self, make_workspace: Path) -> None:
+        install_result = _run_make(make_workspace, "install")
+        assert install_result.returncode == 0, install_result.stderr
+        lint_result = _run_make(make_workspace, "lint")
+        assert lint_result.returncode == 0, lint_result.stderr

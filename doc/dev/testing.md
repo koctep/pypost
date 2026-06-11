@@ -119,16 +119,23 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest \
 
 ## Makefile automation tests
 
-`tests/test_makefile.py` (PYPOST-307) validates root `Makefile` contracts without touching
-the repository `.venv`:
+`tests/test_makefile.py` validates root `Makefile` contracts without touching the repository
+`.venv`. Scope is split across two tasks to avoid duplicate fixtures:
+
+| Task | Scope |
+| ---- | ----- |
+| [PYPOST-307](https://pypost.atlassian.net/browse/PYPOST-307) | Marker lifecycle, `make -p` prerequisite chains, bare-venv `lint` failure |
+| [PYPOST-310](https://pypost.atlassian.net/browse/PYPOST-310) | Lightweight execution smoke for `install`, `test`, and `lint` exit codes |
 
 | Area | What is checked |
 | ---- | ---------------- |
 | Marker lifecycle | `make venv` creates `.venv/.initialized-<major.minor>`; `make clean` removes `.venv` |
 | Dependency chain | `install` → `venv-test`; `run`/`test`/`lint` depend on the marker only (not `install`) |
-| Exit behavior | `clean`/`venv` succeed; unknown targets fail; `lint` fails on a bare venv without flake8 |
+| Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `test`/`lint` without tooling |
+| Target execution | `install` with empty `requirements.txt` succeeds; `test`/`lint` succeed after `install` |
 
-Each case runs GNU Make in an isolated `tmp_path` copy of the `Makefile`. Focused run:
+Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, minimal
+`tests/test_noop.py`, and `pypost/__init__.py`. Focused run:
 
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -v
