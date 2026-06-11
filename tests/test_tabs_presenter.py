@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtWidgets import QApplication
 
+from pypost.core.request_sync import is_tab_dirty, persisted_fields_equal, snapshot_persisted_fields
 from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
@@ -255,6 +256,161 @@ class TestTabsPresenter(unittest.TestCase):
         p.request_saved.connect(lambda: received.append(True))
         p._handle_save_request(req)
         self.assertEqual(len(received), 1)
+
+    def test_persisted_baseline_initialized_on_add_new_tab(self):
+        req = _make_request("r1", "Baseline")
+        p = self._make_presenter()
+        p.add_new_tab(req, save_state=False)
+        tab = p.widget.widget(0)
+        self.assertIsNotNone(tab.persisted_baseline)
+        self.assertTrue(persisted_fields_equal(tab.persisted_baseline, req))
+
+    def test_rename_request_tabs_updates_baseline_name(self):
+        req = _make_request("r1", "Old Name")
+        p = self._make_presenter()
+        p.add_new_tab(req, save_state=False)
+        tab = p.widget.widget(0)
+        p.rename_request_tabs("r1", "New Name")
+        self.assertEqual(tab.persisted_baseline.name, "New Name")
+        self.assertEqual(tab.request_data.name, "New Name")
+
+    def test_save_overwrite_emits_request_persisted(self):
+        req = _make_request("r1", "Existing")
+        rm = FakeRequestManager([req])
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(req, save_state=False)
+        tab = p.widget.widget(0)
+        tab.request_editor.url_input.setText("https://updated.example.com")
+        updated = tab.request_editor.get_request_data_from_ui()
+
+        received = []
+        p.request_persisted.connect(
+            lambda rid, snap, src: received.append((rid, snap.url, src))
+        )
+        tab.request_editor.save_requested.emit(updated)
+        self.assertEqual(len(received), 1)
+        self.assertEqual(received[0][0], "r1")
+        self.assertEqual(received[0][1], "https://updated.example.com")
+        self.assertIs(received[0][2], tab)
+
+    def test_save_overwrite_updates_all_matching_tab_labels(self):
+        req = _make_request("r1", "Old Label")
+        rm = FakeRequestManager([req])
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        tab_a = p.widget.widget(0)
+        tab_a.request_data.name = "Renamed"
+        updated = tab_a.request_editor.get_request_data_from_ui()
+        updated.name = "Renamed"
+
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            mock_box = MagicMock()
+            mock_mb.return_value = mock_box
+            mock_box.addButton.return_value = MagicMock()
+            tab_a.request_editor.save_requested.emit(updated)
+
+        self.assertEqual(p.widget.tabText(0), "Renamed")
+        self.assertEqual(p.widget.tabText(1), "Renamed")
+
+    def test_save_overwrite_notifies_sibling_tab(self):
+        req = _make_request("r1", "Shared")
+        rm = FakeRequestManager([req])
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        tab_a = p.widget.widget(0)
+        tab_a.request_editor.url_input.setText("https://saved-elsewhere.example.com")
+        updated = tab_a.request_editor.get_request_data_from_ui()
+
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            mock_box = MagicMock()
+            mock_mb.return_value = mock_box
+            dismiss_btn = MagicMock()
+            load_btn = MagicMock()
+            mock_box.addButton.side_effect = [dismiss_btn, load_btn]
+            mock_box.clickedButton.return_value = dismiss_btn
+            tab_a.request_editor.save_requested.emit(updated)
+            mock_box.exec.assert_called()
+
+    def test_dirty_sibling_keeps_draft_when_user_chooses_keep(self):
+        req = _make_request("r1", "Shared")
+        rm = FakeRequestManager([req])
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        tab_a = p.widget.widget(0)
+        tab_b = p.widget.widget(1)
+        tab_b.request_editor.url_input.setText("https://local-draft.example.com")
+        tab_a.request_editor.url_input.setText("https://saved-elsewhere.example.com")
+        updated = tab_a.request_editor.get_request_data_from_ui()
+
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            mock_box = MagicMock()
+            mock_mb.return_value = mock_box
+            keep_btn = MagicMock()
+            load_btn = MagicMock()
+            mock_box.addButton.side_effect = [keep_btn, load_btn]
+            mock_box.clickedButton.return_value = keep_btn
+            tab_a.request_editor.save_requested.emit(updated)
+
+        self.assertEqual(
+            tab_b.request_editor.url_input.text(),
+            "https://local-draft.example.com",
+        )
+        self.assertTrue(tab_b.stale_persisted)
+
+    def test_clean_sibling_loads_latest_when_user_chooses_load(self):
+        req = _make_request("r1", "Shared")
+        rm = FakeRequestManager([req])
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        p.add_new_tab(req.model_copy(deep=True), save_state=False)
+        tab_a = p.widget.widget(0)
+        tab_b = p.widget.widget(1)
+        tab_a.request_editor.url_input.setText("https://saved-elsewhere.example.com")
+        updated = tab_a.request_editor.get_request_data_from_ui()
+
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            mock_box = MagicMock()
+            mock_mb.return_value = mock_box
+            dismiss_btn = MagicMock()
+            load_btn = MagicMock()
+            mock_box.addButton.side_effect = [dismiss_btn, load_btn]
+            mock_box.clickedButton.return_value = load_btn
+            tab_a.request_editor.save_requested.emit(updated)
+
+        self.assertEqual(
+            tab_b.request_editor.url_input.text(),
+            "https://saved-elsewhere.example.com",
+        )
+        self.assertFalse(tab_b.stale_persisted)
+
+
+class TestRequestSync(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_snapshot_persisted_fields_deep_copy(self):
+        req = _make_request("r1", "Snap")
+        req.headers = {"X-Test": "1"}
+        snap = snapshot_persisted_fields(req)
+        snap.headers["X-Test"] = "2"
+        self.assertEqual(req.headers["X-Test"], "1")
+
+    def test_persisted_fields_equal_detects_url_change(self):
+        a = _make_request("r1", "A")
+        b = a.model_copy(deep=True)
+        b.url = "https://different.example.com"
+        self.assertFalse(persisted_fields_equal(a, b))
+
+    def test_is_tab_dirty_when_editor_differs_from_baseline(self):
+        req = _make_request("r1", "Dirty")
+        tab = RequestTab(req)
+        tab.persisted_baseline = snapshot_persisted_fields(req)
+        tab.request_editor.url_input.setText("https://edited.example.com")
+        self.assertTrue(is_tab_dirty(tab))
 
 
 class TestOnRequestError(unittest.TestCase):

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from pypost.core.alert_manager import AlertManager
 from pypost.core.curl_generator import CurlGenerator
+from pypost.core.request_sync import is_tab_dirty, persisted_fields_equal, snapshot_persisted_fields
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
@@ -59,6 +60,8 @@ class RequestTab(QWidget):
     ) -> None:
         super().__init__()
         self.request_data = request_data
+        self.persisted_baseline: RequestData | None = None
+        self.stale_persisted = False
         self.layout = QVBoxLayout(self)
         self.splitter = QSplitter(Qt.Vertical)
 
@@ -92,6 +95,7 @@ class TabsPresenter(QObject):
     variable_set_requested = Signal(object, str)  # (key: str | None, value: str)
     env_update_requested = Signal(object)  # payload: dict (from RequestWorker)
     request_saved = Signal()  # after save, triggers collections reload
+    request_persisted = Signal(str, object, object)  # id, snapshot, source_tab
     request_executed = Signal()  # emitted after each completed request
 
     def __init__(
@@ -131,6 +135,7 @@ class TabsPresenter(QObject):
         self._add_tab_btn.clicked.connect(lambda: self.handle_new_tab("plus_button"))
         self._tab_bar.layout_changed.connect(self._position_add_tab_button)
         self._position_add_tab_button()
+        self.request_persisted.connect(self._on_request_persisted)
 
     @property
     def widget(self) -> QTabWidget:
@@ -158,6 +163,9 @@ class TabsPresenter(QObject):
                 )
 
         self._wire_tab_signals(tab)
+
+        if request_data:
+            tab.persisted_baseline = snapshot_persisted_fields(request_data)
 
         name = request_data.name if request_data else "New Request"
         self._tabs.addTab(tab, name)
@@ -237,15 +245,16 @@ class TabsPresenter(QObject):
 
     def rename_request_tabs(self, request_id: str, new_name: str) -> None:
         """Updates tab labels after a request rename."""
+        self._sync_tab_labels_for_request(request_id, new_name)
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if (
                 isinstance(tab, RequestTab)
                 and tab.request_data
                 and tab.request_data.id == request_id
+                and tab.persisted_baseline is not None
             ):
-                tab.request_data.name = new_name
-                self._tabs.setTabText(i, new_name)
+                tab.persisted_baseline.name = new_name
 
     def close_tabs_for_request_ids(self, request_ids: list) -> None:
         """Closes tabs that reference deleted collection requests."""
@@ -536,25 +545,148 @@ class TabsPresenter(QObject):
         self._add_tab_btn.raise_()
         self._add_tab_btn.show()
 
+    def _find_tab_for_sender(self) -> RequestTab | None:
+        sender = self.sender()
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            if isinstance(tab, RequestTab) and tab.request_editor == sender:
+                return tab
+        return None
+
+    def _sync_tab_labels_for_request(self, request_id: str, new_name: str) -> None:
+        """Updates tab labels and in-memory names for all tabs sharing a request id."""
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            if (
+                isinstance(tab, RequestTab)
+                and tab.request_data
+                and tab.request_data.id == request_id
+            ):
+                tab.request_data.name = new_name
+                self._tabs.setTabText(i, new_name)
+
+    def _on_request_persisted(
+        self,
+        request_id: str,
+        snapshot: RequestData,
+        source_tab: RequestTab | None,
+    ) -> None:
+        """Notifies sibling tabs that the persisted copy changed elsewhere."""
+        self._sync_tab_labels_for_request(request_id, snapshot.name)
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            if not isinstance(tab, RequestTab) or not tab.request_data:
+                continue
+            if tab.request_data.id != request_id or tab is source_tab:
+                continue
+            if tab.persisted_baseline and persisted_fields_equal(tab.persisted_baseline, snapshot):
+                continue
+            self._offer_stale_tab_resolution(tab, snapshot)
+
+    def _offer_stale_tab_resolution(self, tab: RequestTab, snapshot: RequestData) -> None:
+        """Prompts the user when a sibling tab saved a newer persisted version."""
+        name = snapshot.name
+        if is_tab_dirty(tab):
+            message = (
+                f"'{name}' was saved in another tab. Your unsaved changes may be "
+                "outdated relative to what is on disk."
+            )
+            box = QMessageBox(self._tabs)
+            box.setIcon(QMessageBox.Warning)
+            box.setWindowTitle("Saved Request Changed")
+            box.setText(message)
+            keep_btn = box.addButton("Keep my changes", QMessageBox.RejectRole)
+            load_btn = box.addButton("Load latest", QMessageBox.AcceptRole)
+            box.setDefaultButton(keep_btn)
+            box.exec()
+            if box.clickedButton() is load_btn:
+                self._reload_tab_from_persisted(tab, snapshot)
+            else:
+                tab.stale_persisted = True
+        else:
+            message = (
+                f"'{name}' was saved in another tab. This tab may show outdated "
+                "saved content."
+            )
+            box = QMessageBox(self._tabs)
+            box.setIcon(QMessageBox.Information)
+            box.setWindowTitle("Saved Request Changed")
+            box.setText(message)
+            dismiss_btn = box.addButton("Dismiss", QMessageBox.RejectRole)
+            load_btn = box.addButton("Load latest", QMessageBox.AcceptRole)
+            box.setDefaultButton(dismiss_btn)
+            box.exec()
+            if box.clickedButton() is load_btn:
+                self._reload_tab_from_persisted(tab, snapshot)
+            else:
+                tab.stale_persisted = True
+
+    def _reload_tab_from_persisted(self, tab: RequestTab, snapshot: RequestData) -> None:
+        """Replaces tab editor content with the latest persisted snapshot."""
+        adopted = snapshot_persisted_fields(snapshot)
+        tab.request_data = adopted
+        tab.persisted_baseline = snapshot_persisted_fields(snapshot)
+        tab.request_editor.request_data = adopted
+        tab.request_editor.load_data()
+        tab.stale_persisted = False
+
+    def _check_stale_before_save(
+        self,
+        source_tab: RequestTab | None,
+        disk_request: RequestData,
+    ) -> bool:
+        """Returns False when the user cancels a save over newer on-disk content."""
+        if source_tab is None or source_tab.persisted_baseline is None:
+            return True
+        if persisted_fields_equal(source_tab.persisted_baseline, disk_request):
+            return True
+        if not source_tab.stale_persisted:
+            return True
+        reply = QMessageBox.question(
+            self._tabs,
+            "Overwrite Newer Saved Version?",
+            (
+                "A newer version of this request was saved in another tab. "
+                "Saving now will replace it on disk. Continue?"
+            ),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        return reply == QMessageBox.Yes
+
     def _handle_save_request(self, request_data: RequestData) -> None:
         existing_result = self._request_manager.find_request(request_data.id)
 
         if existing_result:
             existing_request, found_collection = existing_result
+            source_tab = self._find_tab_for_sender()
             if self._settings.confirm_overwrite_request:
+                message = (
+                    "This will overwrite the existing request "
+                    f"'{existing_request.name}'. Continue?"
+                )
+                if source_tab and source_tab.persisted_baseline and not persisted_fields_equal(
+                    source_tab.persisted_baseline,
+                    existing_request,
+                ):
+                    message = (
+                        "A newer version of this request exists on disk. "
+                        f"This will overwrite '{existing_request.name}'. Continue?"
+                    )
                 reply = QMessageBox.question(
                     self._tabs,
                     "Overwrite Request?",
-                    (
-                        "This will overwrite the existing request "
-                        f"'{existing_request.name}'. Continue?"
-                    ),
+                    message,
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No,
                 )
                 if reply == QMessageBox.No:
                     logger.info("save_request_overwrite_cancelled request_id=%s", request_data.id)
                     return
+
+            if not self._check_stale_before_save(source_tab, existing_request):
+                logger.info("save_request_stale_cancelled request_id=%s", request_data.id)
+                return
 
             self._request_manager.save_request(request_data, found_collection.id)
             logger.info(
@@ -565,13 +697,14 @@ class TabsPresenter(QObject):
             if self._metrics:
                 self._metrics.track_gui_save_action("overwrite")
 
-            for i in range(self._tabs.count()):
-                tab = self._tabs.widget(i)
-                if isinstance(tab, RequestTab) and tab.request_data.id == request_data.id:
-                    self._tabs.setTabText(i, request_data.name)
-                    tab.request_data = request_data
-                    break
+            snapshot = snapshot_persisted_fields(request_data)
+            if source_tab is not None:
+                source_tab.request_data = snapshot
+                source_tab.persisted_baseline = snapshot_persisted_fields(snapshot)
+                source_tab.stale_persisted = False
 
+            self.request_persisted.emit(request_data.id, snapshot, source_tab)
+            self._sync_tab_labels_for_request(request_data.id, request_data.name)
             self.request_saved.emit()
             return
 
@@ -611,6 +744,8 @@ class TabsPresenter(QObject):
         tab = self._tabs.widget(current_index)
         if isinstance(tab, RequestTab):
             tab.request_data = request_data
+            tab.persisted_baseline = snapshot_persisted_fields(request_data)
+            tab.stale_persisted = False
 
         self.save_tabs_state()
         self.request_saved.emit()
@@ -656,6 +791,8 @@ class TabsPresenter(QObject):
         if isinstance(tab, RequestTab):
             tab.request_data = new_request
             tab.request_editor.request_data = new_request
+            tab.persisted_baseline = snapshot_persisted_fields(new_request)
+            tab.stale_persisted = False
 
         self.save_tabs_state()
         self.request_saved.emit()
