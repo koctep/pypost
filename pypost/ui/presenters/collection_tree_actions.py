@@ -7,9 +7,17 @@ from collections.abc import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QMenu, QMessageBox, QTreeView
+from PySide6.QtWidgets import QMenu, QTreeView
 
 from pypost.core.metrics import MetricsManager
+from pypost.ui.collection_item_dialogs import (
+    confirm_delete,
+    show_delete_failure,
+    show_delete_not_found,
+    show_rename_empty_name_error,
+    show_rename_failure,
+    show_rename_not_found,
+)
 from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import RequestData
@@ -109,14 +117,7 @@ class CollectionTreeActions:
         )
         self._metrics.track_gui_collection_delete_action(item_type, "selected")
 
-        reply = QMessageBox.question(
-            self._view,
-            "Confirm Delete",
-            f"Delete '{item_label}'?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
-        if reply != QMessageBox.Yes:
+        if not confirm_delete(self._view, item_label):
             logger.info(
                 "collection_item_delete_cancelled item_type=%s item_id=%s",
                 item_type,
@@ -179,7 +180,7 @@ class CollectionTreeActions:
             item_id,
         )
         self._metrics.track_gui_collection_rename_action(item_type, "rejected_empty")
-        QMessageBox.warning(self._view, "Rename Error", "Name cannot be empty.")
+        show_rename_empty_name_error(self._view)
         item = self._find_item(item_id, item_type)
         self._pending_rename = None
         self._finish_rename_tree_update(item_id, item_type, item)
@@ -214,9 +215,7 @@ class CollectionTreeActions:
                 exc,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "error")
-            QMessageBox.critical(
-                self._view, "Rename Error", f"Failed to rename '{item.text()}': {exc}"
-            )
+            show_rename_failure(self._view, item.text(), exc)
             self._finish_rename_tree_update(item_id, item_type, item)
             return
 
@@ -228,7 +227,7 @@ class CollectionTreeActions:
                 new_name,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "not_found")
-            QMessageBox.warning(self._view, "Rename Error", f"Could not rename '{item.text()}'.")
+            show_rename_not_found(self._view, item.text())
             self._finish_rename_tree_update(item_id, item_type, item)
             return
 
@@ -258,9 +257,7 @@ class CollectionTreeActions:
                 exc,
             )
             self._metrics.track_gui_collection_delete_action(item_type, "error")
-            QMessageBox.critical(
-                self._view, "Delete Error", f"Failed to delete '{item_label}': {exc}"
-            )
+            show_delete_failure(self._view, item_label, exc)
             return
 
         if not deleted:
@@ -270,7 +267,7 @@ class CollectionTreeActions:
                 item_id,
             )
             self._metrics.track_gui_collection_delete_action(item_type, "not_found")
-            QMessageBox.warning(self._view, "Delete Error", f"Could not delete '{item_label}'.")
+            show_delete_not_found(self._view, item_label)
             return
 
         logger.info(

@@ -29,6 +29,7 @@ flowchart TB
 | `CollectionsPresenter` | Builds tree model, handles left-click open, expand state |
 | `CollectionItemRenameDelegate` | Inline rename editor lifecycle |
 | `CollectionTreeActions` | Context menu, rename callbacks, delete with confirmation |
+| `collection_item_dialogs` | Shared QMessageBox helpers for rename/delete flows |
 | `RequestManager` | `rename_collection_item`, `delete_collection_item` |
 
 Wiring in `CollectionsPresenter.__init__`:
@@ -58,6 +59,20 @@ Handles empty-name rejection from the delegate.
 
 Runs delete persistence, emits `requests_deleted` via callback, and updates the tree
 incrementally or via `refresh_tree` fallback.
+
+### `collection_item_dialogs`
+
+`pypost/ui/collection_item_dialogs.py` centralizes QMessageBox usage for collection rename
+and delete:
+
+| Helper | When used |
+|--------|-----------|
+| `confirm_delete(parent, item_label)` | Delete context-menu action (Yes/No) |
+| `show_rename_empty_name_error(parent)` | Delegate rejects empty rename |
+| `show_rename_failure(parent, label, error)` | Rename persistence exception |
+| `show_rename_not_found(parent, label)` | Rename returned false |
+| `show_delete_failure(parent, label, error)` | Delete persistence exception |
+| `show_delete_not_found(parent, label)` | Delete returned false |
 
 ### Callbacks (constructor)
 
@@ -95,14 +110,16 @@ No task-specific settings. Metrics use existing `MetricsManager` counters docume
 branching and `track_gui_collection_delete_action` call sequences (`selected` →
 `cancelled` or `succeeded`) for collection and request nodes.
 
-Patch `QMenu` and `QMessageBox` under `pypost.ui.presenters.collection_tree_actions`.
+Patch `QMenu` under `pypost.ui.presenters.collection_tree_actions`. Patch dialog helpers
+(`confirm_delete`, `show_rename_empty_name_error`, `show_delete_failure`, etc.) at the same
+import site. Unit tests for helpers live in `tests/test_collection_item_dialogs.py`.
 Related presenter tests remain in `tests/test_collections_presenter.py`.
 
 ## Troubleshooting
 
 ### Context menu tests fail after moving imports
 
-Patch `QMenu` and `QMessageBox` under `pypost.ui.presenters.collection_tree_actions`,
+Patch `QMenu` and dialog helpers under `pypost.ui.presenters.collection_tree_actions`,
 not `collections_presenter`.
 
 ### Rename pending state in tests

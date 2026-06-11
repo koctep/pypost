@@ -143,12 +143,12 @@ class TestCollectionTreeContextMenu(unittest.TestCase):
         mock_copy.assert_called_once_with(req)
         self.assertEqual(emitted, [copied])
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
-    def test_delete_cancelled_skips_persistence(self, mock_question):
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_delete_cancelled_skips_persistence(self, mock_confirm_delete):
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
         presenter.load_collections()
-        mock_question.return_value = QMessageBox.No
+        mock_confirm_delete.return_value = False
         item = presenter._model.item(0)
         rename_action = MagicMock()
         delete_action = MagicMock()
@@ -157,13 +157,13 @@ class TestCollectionTreeContextMenu(unittest.TestCase):
                 presenter._tree_actions.show_context_menu(QPoint(0, 0))
         self.assertEqual(presenter._model.rowCount(), 1)
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
-    def test_delete_confirmed_removes_request(self, mock_question):
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_delete_confirmed_removes_request(self, mock_confirm_delete):
         req = _make_request("r1", "Get users")
         col = _make_collection("c1", "My API", [req])
         presenter = self._make_presenter([col])
         presenter.load_collections()
-        mock_question.return_value = QMessageBox.Yes
+        mock_confirm_delete.return_value = True
         req_item = presenter._model.item(0).child(0)
         new_tab_action = MagicMock()
         rename_action = MagicMock()

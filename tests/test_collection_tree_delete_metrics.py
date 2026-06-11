@@ -55,7 +55,7 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
         metrics = MagicMock()
         return CollectionsPresenter(request_manager, sm, metrics, icons={}), metrics
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.critical")
+    @patch("pypost.ui.presenters.collection_tree_actions.show_delete_failure")
     def test_collection_delete_error_records_error_metric(self, _mock_critical):
         rm = FakeRequestManager(
             [_make_collection("c1", "My API")],
@@ -69,7 +69,7 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
         )
         self.assertEqual(presenter._model.rowCount(), 1)
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.critical")
+    @patch("pypost.ui.presenters.collection_tree_actions.show_delete_failure")
     def test_request_delete_error_records_error_metric(self, _mock_critical):
         req = _make_request("r1", "Get users")
         col = _make_collection("c1", "My API", [req])
@@ -80,7 +80,7 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
         metrics.track_gui_collection_delete_action.assert_called_once_with("request", "error")
         self.assertEqual(presenter._model.item(0).rowCount(), 1)
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.warning")
+    @patch("pypost.ui.presenters.collection_tree_actions.show_delete_not_found")
     def test_collection_delete_not_found_records_not_found_metric(self, _mock_warning):
         rm = FakeRequestManager([_make_collection("c1", "My API")], delete_result=False)
         presenter, metrics = self._make_presenter(rm)
@@ -91,7 +91,7 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
         )
         self.assertEqual(presenter._model.rowCount(), 1)
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.warning")
+    @patch("pypost.ui.presenters.collection_tree_actions.show_delete_not_found")
     def test_request_delete_not_found_records_not_found_metric(self, _mock_warning):
         req = _make_request("r1", "Get users")
         col = _make_collection("c1", "My API", [req])
@@ -104,7 +104,7 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
         )
         self.assertEqual(presenter._model.item(0).rowCount(), 1)
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.critical")
+    @patch("pypost.ui.presenters.collection_tree_actions.show_delete_failure")
     def test_delete_error_does_not_emit_succeeded_metric(self, _mock_critical):
         rm = FakeRequestManager(
             [_make_collection("c1", "My API")],

@@ -76,28 +76,28 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
                 mock_menu_class.return_value = mock_menu
                 yield delete_action
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
-    def test_collection_delete_no_records_cancelled_metric(self, mock_question):
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_collection_delete_no_records_cancelled_metric(self, mock_confirm_delete):
         col = _make_collection("c1", "My API")
         presenter, metrics = self._make_presenter([col])
         presenter.load_collections()
-        mock_question.return_value = QMessageBox.No
+        mock_confirm_delete.return_value = False
         item = presenter._model.item(0)
         with self._delete_via_menu(presenter, item.index(), action_count=2):
             presenter._tree_actions.show_context_menu(QPoint(0, 0))
-        mock_question.assert_called_once()
-        self.assertIn("My API", mock_question.call_args.args[2])
+        mock_confirm_delete.assert_called_once()
+        self.assertEqual("My API", mock_confirm_delete.call_args.args[1])
         metrics.track_gui_collection_delete_action.assert_has_calls(
             [call("collection", "selected"), call("collection", "cancelled")]
         )
         self.assertEqual(presenter._model.rowCount(), 1)
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
-    def test_collection_delete_yes_records_succeeded_metric(self, mock_question):
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_collection_delete_yes_records_succeeded_metric(self, mock_confirm_delete):
         col = _make_collection("c1", "My API")
         presenter, metrics = self._make_presenter([col])
         presenter.load_collections()
-        mock_question.return_value = QMessageBox.Yes
+        mock_confirm_delete.return_value = True
         item = presenter._model.item(0)
         with self._delete_via_menu(presenter, item.index(), action_count=2):
             presenter._tree_actions.show_context_menu(QPoint(0, 0))
@@ -106,13 +106,13 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         )
         self.assertEqual(presenter._model.rowCount(), 0)
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
-    def test_request_delete_no_records_cancelled_metric(self, mock_question):
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_request_delete_no_records_cancelled_metric(self, mock_confirm_delete):
         req = _make_request("r1", "Get users")
         col = _make_collection("c1", "My API", [req])
         presenter, metrics = self._make_presenter([col])
         presenter.load_collections()
-        mock_question.return_value = QMessageBox.No
+        mock_confirm_delete.return_value = False
         req_item = presenter._model.item(0).child(0)
         with self._delete_via_menu(presenter, req_item.index(), action_count=3):
             presenter._tree_actions.show_context_menu(QPoint(0, 0))
@@ -121,13 +121,13 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         )
         self.assertEqual(presenter._model.item(0).rowCount(), 1)
 
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
-    def test_request_delete_yes_records_succeeded_metric(self, mock_question):
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_request_delete_yes_records_succeeded_metric(self, mock_confirm_delete):
         req = _make_request("r1", "Get users")
         col = _make_collection("c1", "My API", [req])
         presenter, metrics = self._make_presenter([col])
         presenter.load_collections()
-        mock_question.return_value = QMessageBox.Yes
+        mock_confirm_delete.return_value = True
         req_item = presenter._model.item(0).child(0)
         with self._delete_via_menu(presenter, req_item.index(), action_count=3):
             presenter._tree_actions.show_context_menu(QPoint(0, 0))
@@ -139,12 +139,12 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
     @patch(
         "pypost.ui.presenters.collection_tree_actions.CollectionTreeActions.handle_delete"
     )
-    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
-    def test_delete_no_skips_handle_delete(self, mock_question, mock_handle_delete):
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_delete_no_skips_handle_delete(self, mock_confirm_delete, mock_handle_delete):
         col = _make_collection("c1", "My API")
         presenter, _metrics = self._make_presenter([col])
         presenter.load_collections()
-        mock_question.return_value = QMessageBox.No
+        mock_confirm_delete.return_value = False
         item = presenter._model.item(0)
         with self._delete_via_menu(presenter, item.index(), action_count=2):
             presenter._tree_actions.show_context_menu(QPoint(0, 0))
