@@ -2,7 +2,7 @@
 
 ## Overview
 
-Collection tree items now support a context-menu `Rename` action with inline editing.
+Collection tree items support a context-menu `Rename` action with inline editing.
 Supported item types:
 - Collection
 - Request inside a collection
@@ -11,11 +11,14 @@ The goal is to allow quick in-place renaming directly in the tree.
 
 ## Architecture
 
-- **`MainWindow` (`pypost/ui/main_window.py`)**:
-  - Adds `Rename` action to collection tree context menu.
-  - Starts inline edit mode in `QTreeView`.
+- **`CollectionTreeActions` (`pypost/ui/presenters/collection_tree_actions.py`)**:
+  - Adds `Rename` to the collection tree context menu.
+  - Starts inline edit mode via `QTreeView.edit(...)`.
   - Finalizes rename on editor close (commit/cancel), validates non-empty names.
-  - Refreshes tree and tabs after successful rename.
+  - Syncs the edited tree row in place after success or cancel.
+- **`CollectionsPresenter` (`pypost/ui/presenters/collections_presenter.py`)**:
+  - Wires the tree view to `CollectionTreeActions`.
+  - Owns tree model build, expand/collapse state, and left-click open.
 - **`RequestManager` (`pypost/core/request_manager.py`)**:
   - Owns rename business logic:
     - `rename_request(request_id, new_name)`
@@ -30,14 +33,14 @@ The goal is to allow quick in-place renaming directly in the tree.
 
 ## API / Usage
 
-### `MainWindow.show_collection_item_context_menu(pos)`
+### `CollectionTreeActions.show_context_menu(pos)`
 
 Entry point for right-click actions on collection tree items.
 
-- Builds a `QMenu` with `Rename` and `Delete`.
+- Builds a `QMenu` with optional **New tab** (requests), `Rename`, and `Delete`.
 - On `Rename`, records selection telemetry and starts inline editing.
 
-### `MainWindow.start_collection_item_rename(index)`
+### `CollectionTreeActions._start_rename(index)` (internal)
 
 Starts inline rename.
 
@@ -45,7 +48,7 @@ Starts inline rename.
 - For request items, shows editable request name in place.
 - Activates `QTreeView.edit(...)`.
 
-### `MainWindow.on_collection_item_editor_closed(_editor, hint)`
+### `CollectionTreeActions.on_editor_closed(_editor, hint)`
 
 Finalizes rename on editor close.
 
@@ -54,11 +57,11 @@ Finalizes rename on editor close.
 - Commit:
   - validates non-empty name,
   - calls `RequestManager.rename_collection_item(...)`,
-  - updates request tab titles when request name changed,
+  - emits `request_renamed` when request name changed,
   - syncs the edited tree item in place via `_finish_rename_tree_update` (falls back to
     `refresh_tree` only when the item cannot be found in the model).
 
-### `CollectionsPresenter._finish_rename_tree_update(item_id, item_type, item=None, *, new_name=None)`
+### `CollectionTreeActions._finish_rename_tree_update(item_id, item_type, item=None, *, new_name=None)`
 
 Updates a single tree row after rename completes or is cancelled. When `new_name` is set, the
 label and `UserRole` (for requests) reflect the renamed in-memory object. When omitted, the
@@ -85,13 +88,13 @@ Observability relies on existing global metrics server configuration:
 
 ### Right-click does not show `Rename`
 
-- Verify `collections_view` uses `Qt.CustomContextMenu`.
+- Verify the collections tree view uses `Qt.CustomContextMenu`.
 - Verify `customContextMenuRequested` is connected to
-  `show_collection_item_context_menu`.
+  `CollectionTreeActions.show_context_menu` via `CollectionsPresenter`.
 
 ### Rename fails with an error dialog
 
-- Check logs for `collection_item_rename_*` messages in `MainWindow`.
+- Check logs for `collection_item_rename_*` messages in `collection_tree_actions`.
 - Confirm item has valid `Qt.UserRole` payload (`RequestData` or collection ID).
 - Check write permissions for collection storage path.
 

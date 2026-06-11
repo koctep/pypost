@@ -11,10 +11,14 @@ The goal is to allow direct cleanup from the tree without extra navigation.
 
 ## Architecture
 
-- **`MainWindow` (`pypost/ui/main_window.py`)**:
-  - Enables custom context menu on `collections_view`.
+- **`CollectionTreeActions` (`pypost/ui/presenters/collection_tree_actions.py`)**:
+  - Builds the context menu and prompts user confirmation before delete.
   - Resolves clicked item type (`collection` or `request`).
-  - Prompts user confirmation and handles success/error UI flow.
+  - Handles success/error UI flow via `handle_delete`.
+- **`CollectionsPresenter` (`pypost/ui/presenters/collections_presenter.py`)**:
+  - Wires the tree view to `CollectionTreeActions`.
+  - Emits `requests_deleted` after successful delete.
+- **`MainWindow` (`pypost/ui/main_window.py`)**:
   - Wires `CollectionsPresenter.requests_deleted` to `TabsPresenter.close_tabs_for_request_ids`.
 - **`RequestManager` (`pypost/core/request_manager.py`)**:
   - Owns deletion business logic:
@@ -30,26 +34,20 @@ The goal is to allow direct cleanup from the tree without extra navigation.
 
 ## API / Usage
 
-### `MainWindow.show_collection_item_context_menu(pos)`
+### `CollectionTreeActions.show_context_menu(pos)`
 
 Entry point for right-click actions on collection tree items.
 
-- Builds a `QMenu` with `Delete`.
+- Builds a `QMenu` with optional **New tab**, `Rename`, and `Delete`.
 - Emits telemetry for selected/cancelled/succeeded/not-found/error outcomes.
-- Delegates deletion to `handle_delete_collection_item(...)`.
+- Delegates deletion to `handle_delete` after confirmation.
 
-### `MainWindow.confirm_delete(item_label: str) -> bool`
-
-Shows a confirmation dialog before destructive action.
-
-- Returns `True` only when user confirms.
-
-### `MainWindow.handle_delete_collection_item(item_id, item_type, item_label)`
+### `CollectionTreeActions.handle_delete(item_id, item_type, item_label)`
 
 Executes delete flow and applies UI refresh behavior.
 
 - Calls `RequestManager.delete_collection_item(...)`.
-- On success: reloads collections and restores tree state.
+- On success: removes the tree node incrementally or falls back to `refresh_tree`.
 - On failure: shows warning/critical dialogs and logs context.
 
 ### `RequestManager.delete_collection_item(item_id: str, item_type: str) -> bool`
@@ -74,12 +72,12 @@ Observability relies on existing global metrics server configuration:
 
 - Verify `collections_view` uses `Qt.CustomContextMenu`.
 - Verify `customContextMenuRequested` is connected to
-  `show_collection_item_context_menu`.
+  `CollectionTreeActions.show_context_menu` via `CollectionsPresenter`.
 
 ### Clicking `Delete` does nothing
 
 - Check confirmation dialog was not cancelled.
-- Check logs for `collection_item_delete_*` messages in `MainWindow`.
+- Check logs for `collection_item_delete_*` messages in `collection_tree_actions`.
 - Confirm item carries valid `Qt.UserRole` data (`RequestData` or collection ID string).
 
 ### Delete appears successful but item returns after reload

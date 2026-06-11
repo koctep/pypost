@@ -328,7 +328,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertTrue(presenter.widget.isExpanded(idx2))
 
     @patch.object(CollectionsPresenter, "_handle_delete")
-    @patch("pypost.ui.presenters.collections_presenter.QMessageBox.question")
+    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
     def test_delete_confirmation_cancelled_skips_delete(self, mock_question, mock_handle_delete):
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
@@ -336,7 +336,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         mock_question.return_value = QMessageBox.No
         item = presenter._model.item(0)
         with patch.object(presenter._view, "indexAt", return_value=item.index()):
-            with patch("pypost.ui.presenters.collections_presenter.QMenu") as mock_menu_class:
+            with patch("pypost.ui.presenters.collection_tree_actions.QMenu") as mock_menu_class:
                 mock_menu = MagicMock()
                 rename_action = MagicMock()
                 delete_action = MagicMock()
@@ -346,7 +346,7 @@ class TestCollectionsPresenter(unittest.TestCase):
                 presenter._show_context_menu(QPoint(0, 0))
         mock_handle_delete.assert_not_called()
 
-    @patch("pypost.ui.presenters.collections_presenter.QMessageBox.question")
+    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.question")
     def test_delete_confirmation_accepted_updates_tree(self, mock_question):
         req = _make_request("r1", "Get users")
         col = _make_collection("c1", "My API", [req])
@@ -355,7 +355,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         mock_question.return_value = QMessageBox.Yes
         req_item = presenter._model.item(0).child(0)
         with patch.object(presenter._view, "indexAt", return_value=req_item.index()):
-            with patch("pypost.ui.presenters.collections_presenter.QMenu") as mock_menu_class:
+            with patch("pypost.ui.presenters.collection_tree_actions.QMenu") as mock_menu_class:
                 mock_menu = MagicMock()
                 new_tab_action = MagicMock()
                 rename_action = MagicMock()
@@ -417,7 +417,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertEqual(col.name, "New Collection")
         mock_refresh.assert_not_called()
 
-    @patch("pypost.ui.presenters.collections_presenter.QMessageBox.warning")
+    @patch("pypost.ui.presenters.collection_tree_actions.QMessageBox.warning")
     def test_rename_empty_name_shows_warning(self, mock_warning):
         req = _make_request("r1", "Old Name")
         col = _make_collection("c1", "My API", [req])
