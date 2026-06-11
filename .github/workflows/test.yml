@@ -56,11 +56,16 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             --junit-xml=junit.xml \
+            --durations=0 --durations-min=1 \
             2>&1 | tee pytest.log
 
       - name: Verify test log guardrails
         if: success()
         run: python scripts/verify_test_log_guardrails.py pytest.log
+
+      - name: Audit test duration budgets
+        if: success()
+        run: python scripts/audit_test_durations.py pytest.log
 
   make-install-smoke:
     name: "make install smoke (slow)"
