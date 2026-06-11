@@ -190,6 +190,21 @@ class TestEnvPresenter(unittest.TestCase):
         p._on_env_changed(1)
         self.assertEqual(p._mcp_manager.hidden_keys_supplier(), {"TOKEN"})
 
+    def test_registers_variable_supplier_on_init(self):
+        p = self._make_presenter([])
+        self.assertIsNotNone(p._mcp_manager.variable_supplier)
+        self.assertEqual(p._mcp_manager.variable_supplier(), {})
+
+    def test_supplier_returns_current_variables_after_env_change(self):
+        env_dev = _make_env("e1", "Dev", {"A": "1"})
+        env_prod = _make_env("e2", "Prod", {"B": "2"})
+        p = self._make_presenter([env_dev, env_prod])
+        p.load_environments()
+        p._on_env_changed(1)
+        self.assertEqual(p._mcp_manager.variable_supplier(), {"A": "1"})
+        p._on_env_changed(2)
+        self.assertEqual(p._mcp_manager.variable_supplier(), {"B": "2"})
+
     def test_on_env_changed_no_environment_emits_empty_dict(self):
         p = self._make_presenter([])
         received = []
