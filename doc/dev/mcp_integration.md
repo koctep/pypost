@@ -39,6 +39,13 @@ This class contains the actual business logic of the MCP server.
     `MCP_LEGACY_SSE_MOUNT_PATH`, `MCP_LEGACY_SSE_MESSAGES_PATH`). `MCPServerImpl` and
     `MetricsServer` import these instead of hardcoding strings. Defaults match MCP spec /
     PyPost docs; change in one module if paths ever need updating.
+*   **Legacy SSE routing (PYPOST-155)**: Inside the `/sse` sub-app, Starlette `Route` entries
+    enforce HTTP methods declaratively: `GET /` for the SSE stream and
+    `POST {MCP_LEGACY_SSE_MESSAGES_PATH}` for client messages. Endpoints remain ASGI callables
+    (`SSEEndpoint`, `MessagesEndpoint`) because the MCP SDK's `connect_sse` and
+    `handle_post_message` write directly to the ASGI `send` channel. Wrong methods receive 405
+    from Starlette routing, not manual ASGI responses. The outer `Mount` on
+    `MCP_LEGACY_SSE_MOUNT_PATH` has no method filter (e.g. POST `/sse` returns 405).
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
 *   **Tool metadata (PYPOST-553)**: `RequestData.mcp_description` is the agent-visible
     description (falls back to `name`). `RequestData.mcp_params` holds per-parameter

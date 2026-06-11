@@ -496,22 +496,20 @@ class TestMCPServerImplRouting(unittest.TestCase):
         self.assertEqual(len(mounts), 1)
         self.assertEqual(mounts[0].path, MCP_LEGACY_SSE_MOUNT_PATH)
 
-    def test_inner_sse_app_exposes_messages_mount_and_get_root(self):
+    def test_inner_sse_app_exposes_messages_post_route_and_get_root(self):
         app = MCPServerImpl().create_app()
         sse_mount = next(route for route in app.routes if isinstance(route, Mount))
         inner_paths = []
         for route in sse_mount.app.routes:
-            if isinstance(route, Mount):
-                inner_paths.append(("mount", route.path))
-            elif isinstance(route, Route):
-                inner_paths.append(("route", route.path, route.methods))
-        self.assertIn(
-            ("mount", MCP_LEGACY_SSE_MESSAGES_PATH),
-            [(p[0], p[1]) for p in inner_paths],
-        )
-        get_roots = [
-            p for p in inner_paths if p[0] == "route" and "GET" in p[2] and p[1] == "/"
+            if isinstance(route, Route):
+                inner_paths.append((route.path, route.methods))
+        post_messages = [
+            p
+            for p in inner_paths
+            if p[0] == MCP_LEGACY_SSE_MESSAGES_PATH and "POST" in p[1]
         ]
+        self.assertEqual(len(post_messages), 1)
+        get_roots = [p for p in inner_paths if "GET" in p[1] and p[0] == "/"]
         self.assertEqual(len(get_roots), 1)
 
     def test_routing_rejects_wrong_http_methods_without_live_transport(self):

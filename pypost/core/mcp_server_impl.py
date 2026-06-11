@@ -243,21 +243,6 @@ class MCPServerImpl:
                 self.sse_transport = sse_transport
 
             async def __call__(self, scope, receive, send):
-                if scope.get("method") != "GET":
-                    await send(
-                        {
-                            "type": "http.response.start",
-                            "status": 405,
-                            "headers": [(b"content-type", b"text/plain")],
-                        }
-                    )
-                    await send(
-                        {
-                            "type": "http.response.body",
-                            "body": b"Method Not Allowed",
-                        }
-                    )
-                    return
                 async with self.sse_transport.connect_sse(scope, receive, send) as streams:
                     opts = self.server.create_initialization_options()
                     await self.server.run(streams[0], streams[1], opts)
@@ -267,27 +252,7 @@ class MCPServerImpl:
                 self.sse_transport = sse_transport
 
             async def __call__(self, scope, receive, send):
-                if scope["type"] == "http" and scope["method"] != "POST":
-                    await self._send_response(send, 405, b"Method Not Allowed")
-                    return
                 await self.sse_transport.handle_post_message(scope, receive, send)
-
-            async def _send_response(self, send, status, body):
-                await send(
-                    {
-                        "type": "http.response.start",
-                        "status": status,
-                        "headers": [
-                            (b"content-type", b"text/plain"),
-                        ],
-                    }
-                )
-                await send(
-                    {
-                        "type": "http.response.body",
-                        "body": body,
-                    }
-                )
 
         async def handle_sse_get(request):
             ep = SSEEndpoint(self.server, sse)
@@ -297,7 +262,11 @@ class MCPServerImpl:
         return Starlette(
             debug=True,
             routes=[
-                Mount(MCP_LEGACY_SSE_MESSAGES_PATH, app=MessagesEndpoint(sse)),
+                Route(
+                    MCP_LEGACY_SSE_MESSAGES_PATH,
+                    endpoint=MessagesEndpoint(sse),
+                    methods=["POST"],
+                ),
                 Route("/", endpoint=handle_sse_get, methods=["GET"]),
             ],
         )
