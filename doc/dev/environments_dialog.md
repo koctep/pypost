@@ -4,9 +4,17 @@
 The `EnvironmentDialog` class provides the UI for managing environments in PyPost. It allows users to add, delete, and copy environments, as well as modify environment variables and toggle MCP (Model Context Protocol) settings.
 
 ## Architecture
-- **Environment List (`env_list`)**: A `QListWidget` on the left side displaying all available environments. Actions for environments are accessed via a context menu.
-- **Variables Table (`vars_table`)**: A `QTableWidget` on the right side for editing variables of the currently selected environment. It includes columns for "Variable", "Value", and "Hidden".
-- **MCP Checkbox (`mcp_check`)**: A toggle to enable or disable the Model Context Protocol for the selected environment.
+
+`EnvironmentDialog` composes two widgets under `pypost/ui/widgets/environments/`:
+
+- **`EnvironmentListWidget`**: Left pane — `QListWidget`, Add button, F2/context-menu
+  rename, copy, and delete. Emits `environment_selected(int)` when the current row changes.
+- **`EnvironmentVariablesWidget`**: Right pane — variables `QTableWidget` (Variable / Value /
+  Hidden columns) and the MCP checkbox. Loads via `load_environment(Environment | None)` when
+  the selection changes.
+
+Legacy attributes on `EnvironmentDialog` (`env_list`, `vars_table`, `mcp_check`) delegate to
+the child widgets for tests and gradual migration.
 
 ## API / Usage
 

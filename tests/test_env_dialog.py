@@ -68,7 +68,7 @@ class TestEnvironmentDialog:
             dlg.close()
 
     @patch(
-        "pypost.ui.dialogs.env_dialog.confirm_delete_environment",
+        "pypost.ui.widgets.environments.environment_list_widget.confirm_delete_environment",
         return_value=True,
     )
     def test_delete_environment_removes_current_row(self, mock_question, qapp):
@@ -86,7 +86,9 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
-    @patch("pypost.ui.dialogs.env_dialog.confirm_delete_environment")
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.confirm_delete_environment",
+    )
     def test_delete_environment_cancelled_leaves_env(self, mock_confirm, qapp):
         mock_confirm.return_value = False
         envs = [Environment(name="A", variables={})]
@@ -100,7 +102,7 @@ class TestEnvironmentDialog:
             dlg.close()
 
     @patch(
-        "pypost.ui.dialogs.env_dialog.QInputDialog.getText",
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText",
         return_value=("Staging", True),
     )
     def test_add_environment_appends_named_env(self, _mock_input, qapp):
@@ -252,7 +254,7 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
-    @patch("pypost.ui.dialogs.env_dialog.QMenu.exec")
+    @patch("pypost.ui.widgets.environments.environment_variables_widget.QMenu.exec")
     def test_vars_table_context_menu_ignores_trailing_row(self, mock_exec, qapp):
         env = Environment(name="Dev", variables={})
         dlg = EnvironmentDialog([env])
