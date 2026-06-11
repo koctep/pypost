@@ -19,7 +19,12 @@ agent as a correctly working tool — with a clear name, description, and parame
 environment variables resolved, and secrets handled safely.
 
 **Principles:** safety by default; you see more than the agent — secrets stay hidden and
-are never shared with agents; reuse over rebuild; local-first.
+are never shared with agents; reuse over rebuild; local-first; operator monitors via
+Prometheus, agent gets context in each tool response.
+
+**Observability:** PyPost exposes Prometheus metrics at `/metrics` (default port 9080) for
+monitoring request volume, MCP tool usage, and errors. Operational events stay on your
+machine — the AI agent gets context in each tool response, not via a separate event stream.
 
 See [MCP Integration](doc/mcp_integration.md) for setup and usage.
 
@@ -33,6 +38,7 @@ See [MCP Integration](doc/mcp_integration.md) for setup and usage.
     configurations (e.g., dev/prod).
 *   **Templating**: Use Jinja2 for dynamic data generation in requests.
 *   **MCP Tools**: Expose saved requests as MCP tools for local AI agents (e.g. Cursor).
+*   **Prometheus Metrics**: Scrape `/metrics` for request, MCP, and error counters (default port 9080).
 
 ## Requirements
 
