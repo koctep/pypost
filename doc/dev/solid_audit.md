@@ -56,8 +56,43 @@ pytest tests/test_solid_audit_baseline.py -v
 Caps live in `scripts/audit_baseline_metrics.py`. After intentional module growth, remeasure,
 update caps with ~10% headroom, and refresh the snapshot.
 
+## Individual dialog audit (PYPOST-374)
+
+PYPOST-40 grouped `ui/dialogs/` (~400 LOC) without per-dialog SOLID scoring. PYPOST-374 audits
+each module under `pypost/ui/dialogs/` (seven files, 923 LOC as of 2026-06-11).
+
+Full report:
+[ai-tasks/PYPOST-374/30-dialogs-audit-report.md](../../ai-tasks/PYPOST-374/30-dialogs-audit-report.md)
+
+| Dialog | LOC | Primary finding |
+| --- | ---: | --- |
+| `settings_dialog.py` | 423 | P1 — multi-domain SRP violation |
+| `mcp_activity_dialog.py` | 117 | OK — data-injected read-only viewer |
+| `hotkeys_dialog.py` | 91 | P2 — hardcoded shortcut list |
+| `save_dialog.py` | 91 | OK — thin save-as form |
+| `env_dialog.py` | 89 | OK — widget composition facade |
+| `mcp_tools_overview_dialog.py` | 72 | OK — data-injected read-only viewer |
+| `about_dialog.py` | 40 | P3 — hardcoded version string |
+
+**Regenerate inventory:**
+
+```bash
+.venv/bin/python scripts/audit_dialogs_inventory.py --markdown
+```
+
+**Verify audit report lists every dialog module:**
+
+```bash
+.venv/bin/python scripts/audit_dialogs_inventory.py --check
+pytest tests/test_dialogs_audit.py -v
+```
+
+When adding a new dialog, extend `30-dialogs-audit-report.md` so `--check` and
+`test_dialogs_audit.py` keep passing.
+
 ## Related
 
 - [Architecture Overview](architecture.md)
 - [Technical Debt: PYPOST-40](tech-debt/PYPOST-40.md)
 - [Testing: SOLID audit baseline](testing.md#solid-audit-baseline-pypost-376)
+- [Testing: Dialog audit inventory](testing.md#dialog-audit-inventory-pypost-374)

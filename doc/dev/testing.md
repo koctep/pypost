@@ -387,6 +387,24 @@ Baseline date: **2026-06-11**. Audit-era vs current vs cap table:
 [ai-tasks/PYPOST-376/baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
 See also [solid_audit.md](solid_audit.md#regression-baseline-metrics-pypost-376).
 
+## Dialog audit inventory (PYPOST-374)
+
+PYPOST-374 adds a per-dialog SOLID audit and a regression guard so new files under
+`pypost/ui/dialogs/` are not omitted from the audit report.
+
+```bash
+# List dialog modules and LOC
+.venv/bin/python scripts/audit_dialogs_inventory.py --markdown
+
+# Fail if 30-dialogs-audit-report.md missing a module filename
+.venv/bin/python scripts/audit_dialogs_inventory.py --check
+
+pytest tests/test_dialogs_audit.py -v
+```
+
+Report: [ai-tasks/PYPOST-374/30-dialogs-audit-report.md](../../ai-tasks/PYPOST-374/30-dialogs-audit-report.md).
+See also [solid_audit.md](solid_audit.md#individual-dialog-audit-pypost-374).
+
 ## Error-path test logging (PYPOST-568)
 
 Many passing tests deliberately exercise failure paths (worker exceptions, retry
