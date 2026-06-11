@@ -1,4 +1,4 @@
-"""Integration tests for root Makefile automation (PYPOST-307, PYPOST-310, PYPOST-559)."""
+"""Integration tests for root Makefile automation (PYPOST-274, PYPOST-277)."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def _prerequisites(workspace: Path, target: str) -> list[str]:
     for line in proc.stdout.splitlines():
         if line.startswith(prefix):
             collecting = True
-            tail = line[len(prefix) :].strip()
+            tail = line[len(prefix):].strip()
             if tail:
                 prereqs.extend(tail.split())
             continue
@@ -117,9 +117,15 @@ class TestMarkerLifecycle:
 
 
 class TestDependencyChain:
-    def test_install_depends_on_venv_test(self, make_workspace: Path) -> None:
+    def test_install_depends_on_venv_test_and_marker(self, make_workspace: Path) -> None:
         prereqs = _prerequisites(make_workspace, "install")
         assert "venv-test" in prereqs
+        assert MARKER_REL in prereqs
+
+    def test_test_cov_depends_on_venv_test_and_marker(self, make_workspace: Path) -> None:
+        prereqs = _prerequisites(make_workspace, "test-cov")
+        assert "venv-test" in prereqs
+        assert MARKER_REL in prereqs
 
     def test_venv_test_depends_on_marker(self, make_workspace: Path) -> None:
         prereqs = _prerequisites(make_workspace, "venv-test")
@@ -154,6 +160,35 @@ class TestExitBehavior:
 
 
 class TestTargetExecution:
+    def test_venv_test_installs_pytest_and_flake8(self, make_workspace: Path) -> None:
+        venv_result = _run_make(make_workspace, "venv")
+        assert venv_result.returncode == 0, venv_result.stderr
+        venv_test_result = _run_make(make_workspace, "venv-test")
+        assert venv_test_result.returncode == 0, venv_test_result.stderr
+        bin_python = make_workspace / ".venv" / "bin" / "python"
+        proc = subprocess.run(
+            [str(bin_python), "-c", "import pytest, flake8"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        assert proc.returncode == 0, proc.stderr
+
+    def test_make_test_excludes_slow_marker(self, make_workspace: Path) -> None:
+        slow_test = make_workspace / "tests" / "test_slow_fail.py"
+        slow_test.write_text(
+            "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n"
+            "@pytest.mark.slow\n"
+            "def test_would_fail_if_run() -> None:\n"
+            "    assert False\n",
+            encoding="utf-8",
+        )
+        install_result = _run_make(make_workspace, "install")
+        assert install_result.returncode == 0, install_result.stderr
+        test_result = _run_make(make_workspace, "test")
+        assert test_result.returncode == 0, test_result.stderr
+
     def test_install_succeeds_with_empty_requirements(self, make_workspace: Path) -> None:
         result = _run_make(make_workspace, "install")
         assert result.returncode == 0, result.stderr

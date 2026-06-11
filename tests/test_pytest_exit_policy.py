@@ -69,3 +69,63 @@ def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path
         f"make must report pytest exit {PYTEST_EXIT_NO_TESTS}; stderr="
         f"{test_result.stderr!r}"
     )
+
+
+@pytest.mark.timeout(30)
+def test_pytest_rewrites_exit_code_5_to_0_when_policy_is_warn(tmp_path: Path) -> None:
+    """pytest exits 0 and prints/logs warning when empty_tests_policy is warn."""
+    empty_tests = tmp_path / "tests"
+    empty_tests.mkdir()
+    shutil.copy(REPO_ROOT / "tests" / "conftest.py", empty_tests / "conftest.py")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            str(empty_tests),
+            "-o",
+            "empty_tests_policy=warn",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=25,
+        check=False,
+    )
+    assert result.returncode == 0, (
+        f"expected exit 0, got {result.returncode}; "
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    assert "WARNING: pytest exit code 5" in result.stderr, (
+        f"expected warning message in stderr; got stderr={result.stderr!r}"
+    )
+
+
+@pytest.mark.timeout(30)
+def test_pytest_retains_exit_code_5_when_policy_is_fail(tmp_path: Path) -> None:
+    """pytest exits 5 when empty_tests_policy is fail."""
+    empty_tests = tmp_path / "tests"
+    empty_tests.mkdir()
+    shutil.copy(REPO_ROOT / "tests" / "conftest.py", empty_tests / "conftest.py")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            str(empty_tests),
+            "-o",
+            "empty_tests_policy=fail",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=25,
+        check=False,
+    )
+    assert result.returncode == PYTEST_EXIT_NO_TESTS, (
+        f"expected exit {PYTEST_EXIT_NO_TESTS}, got {result.returncode}; "
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+

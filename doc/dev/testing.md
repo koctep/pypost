@@ -349,18 +349,27 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 
 | Task | Scope |
 | ---- | ----- |
-| [PYPOST-307](https://pypost.atlassian.net/browse/PYPOST-307) | Marker lifecycle, `make -p` prerequisite chains, bare-venv `lint` failure |
-| [PYPOST-310](https://pypost.atlassian.net/browse/PYPOST-310) | Lightweight execution smoke for `install`, `test`, and `lint` exit codes |
-| [PYPOST-559](https://pypost.atlassian.net/browse/PYPOST-559) | Optional slow `make install` with real `requirements.txt` in isolated workspace |
-| [PYPOST-279](https://pypost.atlassian.net/browse/PYPOST-279) | Pytest exit code `5` (no tests collected) treated as failure in `make test` and CI |
+| [PYPOST-274] | Makefile marker lifecycle, dependency chains, exit codes |
+| [PYPOST-277] | Smoke for `venv`, `install`, `test`, `lint` (closed with PYPOST-274) |
+| [PYPOST-307] | Implementation slice: marker lifecycle, `make -p` chains, lint failure |
+| [PYPOST-310] | Implementation slice: execution smoke for install/test/lint exit codes |
+| [PYPOST-559] | Optional slow `make install` with real requirements in isolated workspace |
+| [PYPOST-279] | Pytest exit code `5` (no tests collected) policy in `make test` and CI |
+
+[PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
+[PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
+[PYPOST-307]: https://pypost.atlassian.net/browse/PYPOST-307
+[PYPOST-310]: https://pypost.atlassian.net/browse/PYPOST-310
+[PYPOST-559]: https://pypost.atlassian.net/browse/PYPOST-559
+[PYPOST-279]: https://pypost.atlassian.net/browse/PYPOST-279
 
 | Area | What is checked |
 | ---- | ---------------- |
-| Marker lifecycle | `make venv` creates `.venv/.initialized-<major.minor>`; `make clean` removes `.venv` |
-| Dependency chain | `install` → `venv-test`; `run`/`test`/`lint` depend on the marker only (not `install`) |
-| Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `test`/`lint` without tooling |
-| Target execution | `install` with empty `requirements.txt` succeeds; `test`/`lint` succeed after `install` |
-| Slow install smoke | `make install` with copied project `requirements.txt` succeeds; marked `@pytest.mark.slow` |
+| Marker lifecycle | `make venv` creates marker; `make clean` removes `.venv`; idempotent `venv` |
+| Dependency chain | `install`/`test-cov` depend on marker + `venv-test`; others depend on marker only |
+| Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `test`/`lint` |
+| Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
+| Slow install smoke | `make install` with real requirements succeeds; marked `@pytest.mark.slow` |
 
 Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, minimal
 `tests/test_noop.py`, and `pypost/__init__.py`. Focused run:
@@ -397,12 +406,19 @@ propagation — no Makefile wrapper maps codes to success):
 
 ### Empty Tests Policy (`empty_tests_policy`)
 
-To prevent false-positive CI/CD pipeline failures in empty-test repositories, templates, or newly initialized projects, PyPost supports configuring the policy for handling pytest exit code `5` (no tests collected) via the `empty_tests_policy` setting in `pytest.ini` or `pyproject.toml`.
+To prevent false-positive CI/CD pipeline failures in empty-test repositories, templates, or newly
+initialized projects, PyPost supports configuring the policy for handling pytest exit code `5`
+(no tests collected) via the `empty_tests_policy` option in `pytest.ini` or `pyproject.toml`.
 
 #### Supported Policies
 
-- `fail` (default): Exit code `5` is treated as a hard failure, causing the build/test run to fail. This is the recommended setting for mature repositories to prevent accidental deletion of tests or misconfiguration.
-- `warn` / `warning` / `ignore_and_warn`: Exit code `5` is intercepted and rewritten to `0` (success), but a highly visible warning message is printed to stderr/stdout to notify developers that no tests were executed. This is the recommended setting for empty-test or template repositories.
+- `fail` (default): Exit code `5` is treated as a hard failure, causing the build or test run to
+  fail. This is the recommended setting for mature repositories to prevent accidental deletion
+  of tests or silent test suite bypasses due to misconfiguration.
+- `warn` / `warning` / `ignore_and_warn`: Exit code `5` is intercepted and rewritten to `0`
+  (success), but a highly visible warning message is printed to stderr/stdout and logged via
+  Python's logging system to notify developers that no tests were executed. This is the
+  recommended setting for empty-test or template repositories.
 
 #### Configuration Example
 
@@ -411,6 +427,13 @@ In `pytest.ini`:
 ```ini
 [pytest]
 empty_tests_policy = warn
+```
+
+Or in `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+empty_tests_policy = "warn"
 ```
 
 Regression coverage: `tests/test_pytest_exit_policy.py`.

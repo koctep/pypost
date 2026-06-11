@@ -1,5 +1,7 @@
 """Test configuration: set Qt offscreen platform before any Qt imports."""
+import logging
 import os
+import sys
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -21,3 +23,34 @@ def pytest_runtest_setup(item):
             "(declare module/class/function timeout; see do-testing.md)",
             pytrace=False,
         )
+
+
+def pytest_addoption(parser):
+    """Register custom ini option for empty tests policy."""
+    parser.addini(
+        "empty_tests_policy",
+        help="Policy for pytest exit code 5 (no tests collected): 'fail' or 'warn'",
+        default="fail",
+    )
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Intercept exit status 5 (no tests collected) and handle per empty_tests_policy."""
+    if exitstatus == 5:
+        try:
+            policy = session.config.getini("empty_tests_policy")
+        except (AttributeError, ValueError):
+            policy = "fail"
+
+        if policy in ("warn", "warning", "ignore_and_warn"):
+            session.exitstatus = 0
+            msg = (
+                "WARNING: pytest exit code 5 (no tests collected) "
+                "intercepted and rewritten to 0 per empty_tests_policy=warn"
+            )
+            sys.stderr.write(f"\n{msg}\n")
+            sys.stderr.flush()
+
+            logger = logging.getLogger("pytest")
+            logger.warning(msg)
+
