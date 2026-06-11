@@ -4,6 +4,7 @@ import pytest
 
 from pypost.core.environment_secrets_codec import (
     EncryptedValueEnvelope,
+    EncryptedValueEnvelopeV2,
     EnvironmentSecretsCodec,
 )
 from pypost.core.key_provider import (
@@ -93,6 +94,100 @@ def test_decrypt_rejects_invalid_payload_shapes(
 ):
     with pytest.raises(EnvironmentEncryptionError, match=expected_message):
         codec.decrypt(payload)
+
+
+def test_from_payload_dispatches_v2_fernet_with_meta():
+    envelope = EncryptedValueEnvelope.from_payload(
+        {
+            "enc": True,
+            "v": 2,
+            "alg": "fernet",
+            "kid": "kid-2",
+            "ct": "token-value",
+            "meta": {"rotated_from": "kid-1"},
+        }
+    )
+    assert isinstance(envelope, EncryptedValueEnvelopeV2)
+    assert envelope.meta == {"rotated_from": "kid-1"}
+    assert envelope.to_json() == {
+        "enc": True,
+        "v": 2,
+        "alg": "fernet",
+        "kid": "kid-2",
+        "ct": "token-value",
+        "meta": {"rotated_from": "kid-1"},
+    }
+
+
+def test_from_payload_dispatches_v2_aes_gcm():
+    envelope = EncryptedValueEnvelope.from_payload(
+        {
+            "enc": True,
+            "v": 2,
+            "alg": "aes-gcm",
+            "kid": "kid-3",
+            "ct": "ciphertext",
+            "iv": "nonce",
+            "tag": "auth-tag",
+        }
+    )
+    assert isinstance(envelope, EncryptedValueEnvelopeV2)
+    assert envelope.iv == "nonce"
+    assert envelope.tag == "auth-tag"
+
+
+@pytest.mark.parametrize(
+    "payload,expected_message",
+    [
+        (
+            {
+                "enc": True,
+                "v": 2,
+                "alg": "aes-gcm",
+                "kid": "kid-3",
+                "ct": "ciphertext",
+            },
+            "missing required fields for aes-gcm",
+        ),
+        (
+            {
+                "enc": True,
+                "v": 2,
+                "alg": "fernet",
+                "kid": "kid-3",
+                "ct": "token",
+                "iv": "unexpected",
+            },
+            "unexpected fields for fernet",
+        ),
+        (
+            {"enc": True, "v": 2, "alg": "chacha20", "kid": "kid-3", "ct": "token"},
+            "Unsupported encrypted payload algorithm",
+        ),
+    ],
+)
+def test_from_payload_rejects_invalid_v2_shapes(
+    payload: dict[str, object],
+    expected_message: str,
+):
+    with pytest.raises(EnvironmentEncryptionError, match=expected_message):
+        EncryptedValueEnvelope.from_payload(payload)
+
+
+def test_decrypt_rejects_v2_payload(codec: EnvironmentSecretsCodec):
+    with pytest.raises(
+        EnvironmentEncryptionError,
+        match="uses unsupported envelope version 2",
+    ):
+        codec.decrypt(
+            {
+                "enc": True,
+                "v": 2,
+                "alg": "fernet",
+                "kid": "kid-1",
+                "ct": "token-value",
+            }
+        )
 
 
 def test_from_payload_accepts_valid_v1_envelope():

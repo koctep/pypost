@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeAlias
 
 from pypost.core.key_provider import EncryptionKey, EnvironmentEncryptionError, KeyProvider
 
@@ -11,6 +11,87 @@ except ImportError:  # pragma: no cover - exercised when dependency is absent.
     InvalidToken = Exception  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class EncryptedValueEnvelopeV2:
+    """Typed v2 encrypted environment value envelope."""
+
+    enc: bool
+    v: int
+    alg: str
+    kid: str
+    ct: str
+    iv: str | None = None
+    tag: str | None = None
+    meta: dict[str, str] | None = None
+
+    VERSION: ClassVar[int] = 2
+    FERNET_ALGORITHM: ClassVar[str] = "fernet"
+    AES_GCM_ALGORITHM: ClassVar[str] = "aes-gcm"
+    SUPPORTED_ALGORITHMS: ClassVar[frozenset[str]] = frozenset(
+        {FERNET_ALGORITHM, AES_GCM_ALGORITHM}
+    )
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> "EncryptedValueEnvelopeV2":
+        """Parse and validate a serialized v2 envelope dict."""
+        if payload.get("v") != cls.VERSION:
+            raise EnvironmentEncryptionError(
+                f"Unsupported encrypted payload version: {payload.get('v')}"
+            )
+        alg = payload.get("alg")
+        if alg not in cls.SUPPORTED_ALGORITHMS:
+            raise EnvironmentEncryptionError(
+                f"Unsupported encrypted payload algorithm: {alg}"
+            )
+        kid = payload.get("kid")
+        ct = payload.get("ct")
+        if kid is None or ct is None:
+            raise EnvironmentEncryptionError("Encrypted payload is missing required fields.")
+        iv = payload.get("iv")
+        tag = payload.get("tag")
+        if alg == cls.AES_GCM_ALGORITHM:
+            if iv is None or tag is None:
+                raise EnvironmentEncryptionError(
+                    "Encrypted payload is missing required fields for aes-gcm."
+                )
+        elif iv is not None or tag is not None:
+            raise EnvironmentEncryptionError(
+                "Encrypted payload has unexpected fields for fernet."
+            )
+        raw_meta = payload.get("meta")
+        meta: dict[str, str] | None = None
+        if raw_meta is not None:
+            if not isinstance(raw_meta, dict):
+                raise EnvironmentEncryptionError("Encrypted payload meta must be an object.")
+            meta = {str(key): str(value) for key, value in raw_meta.items()}
+        return cls(
+            enc=True,
+            v=cls.VERSION,
+            alg=str(alg),
+            kid=str(kid),
+            ct=str(ct),
+            iv=str(iv) if iv is not None else None,
+            tag=str(tag) if tag is not None else None,
+            meta=meta,
+        )
+
+    def to_json(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "enc": self.enc,
+            "v": self.v,
+            "alg": self.alg,
+            "kid": self.kid,
+            "ct": self.ct,
+        }
+        if self.iv is not None:
+            result["iv"] = self.iv
+        if self.tag is not None:
+            result["tag"] = self.tag
+        if self.meta:
+            result["meta"] = self.meta
+        return result
 
 
 @dataclass(frozen=True)
@@ -27,14 +108,23 @@ class EncryptedValueEnvelope:
     ALGORITHM: ClassVar[str] = "fernet"
 
     @classmethod
-    def from_payload(cls, payload: dict[str, Any]) -> "EncryptedValueEnvelope":
-        """Parse and validate a serialized envelope dict (v1 backward compatible)."""
+    def from_payload(
+        cls, payload: dict[str, Any]
+    ) -> "EncryptedValueEnvelope | EncryptedValueEnvelopeV2":
+        """Parse and validate a serialized envelope dict (version dispatch)."""
         if not payload.get("enc"):
             raise EnvironmentEncryptionError("Encrypted payload marker is missing.")
-        if payload.get("v") != cls.VERSION:
-            raise EnvironmentEncryptionError(
-                f"Unsupported encrypted payload version: {payload.get('v')}"
-            )
+        version = payload.get("v")
+        if version == cls.VERSION:
+            return cls._from_payload_v1(payload)
+        if version == EncryptedValueEnvelopeV2.VERSION:
+            return EncryptedValueEnvelopeV2.from_payload(payload)
+        raise EnvironmentEncryptionError(
+            f"Unsupported encrypted payload version: {version}"
+        )
+
+    @classmethod
+    def _from_payload_v1(cls, payload: dict[str, Any]) -> "EncryptedValueEnvelope":
         if payload.get("alg") != cls.ALGORITHM:
             raise EnvironmentEncryptionError(
                 f"Unsupported encrypted payload algorithm: {payload.get('alg')}"
@@ -59,6 +149,9 @@ class EncryptedValueEnvelope:
             "kid": self.kid,
             "ct": self.ct,
         }
+
+
+EnvelopePayload: TypeAlias = EncryptedValueEnvelope | EncryptedValueEnvelopeV2
 
 
 class EnvironmentSecretsCodec:
@@ -98,6 +191,15 @@ class EnvironmentSecretsCodec:
     def decrypt(self, payload: dict[str, Any]) -> str:
         self._ensure_fernet_available()
         envelope = EncryptedValueEnvelope.from_payload(payload)
+        if isinstance(envelope, EncryptedValueEnvelopeV2):
+            logger.error(
+                "env_value_decrypt_failed reason=unsupported_version version=%d algorithm=%s",
+                envelope.v,
+                envelope.alg,
+            )
+            raise EnvironmentEncryptionError(
+                "Encrypted environment value uses unsupported envelope version 2."
+            )
         key = self._key_provider.get_key_by_id(envelope.kid)
         logger.debug("env_value_decrypt_attempt key_id=%s", envelope.kid)
         return self._decrypt_token(envelope.ct, key)
@@ -112,4 +214,3 @@ class EnvironmentSecretsCodec:
             raise EnvironmentEncryptionError(
                 "Encrypted environment value could not be decrypted with current key."
             ) from exc
-

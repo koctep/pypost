@@ -162,17 +162,20 @@ fallback entries (deduplicated, unsupported names skipped).
 Builds a `ChainedKeyProvider` from `resolve_key_source_chain(settings)`. Logs
 `encryption_key_provider_built` with the effective chain.
 
-### `EncryptedValueEnvelope` (`pypost/core/environment_secrets_codec.py`)
+### `EncryptedValueEnvelope` / `EncryptedValueEnvelopeV2` (`pypost/core/environment_secrets_codec.py`)
 
-Typed v1 envelope for encrypted environment values. `encrypt()` returns an instance; persisted
+Typed envelopes for encrypted environment values. `encrypt()` returns a v1 instance; persisted
 JSON uses `to_json()`.
 
-- `VERSION` / `ALGORITHM` — schema constants (`1`, `fernet`).
-- `from_payload(payload: dict[str, Any]) -> EncryptedValueEnvelope` — parse and validate on-disk
-  envelope dicts. Raises `EnvironmentEncryptionError` for missing markers, unsupported
-  version/algorithm, or missing `kid`/`ct`. Coerces `kid` and `ct` to strings.
-- `EnvironmentSecretsCodec.decrypt(payload)` — delegates validation to `from_payload`, then resolves
-  the key by `kid` and decrypts `ct`.
+- `EncryptedValueEnvelope` — v1 schema (`VERSION=1`, `ALGORITHM=fernet`).
+- `EncryptedValueEnvelopeV2` — v2 schema (`VERSION=2`); supports `fernet` and `aes-gcm` with
+  optional `meta` and algorithm-specific `iv`/`tag` fields (see Payload Format).
+- `from_payload(payload: dict[str, Any]) -> EnvelopePayload` — version dispatch entry point.
+  Returns `EncryptedValueEnvelope` for `v=1` or `EncryptedValueEnvelopeV2` for `v=2`. Raises
+  `EnvironmentEncryptionError` for missing markers, unsupported version/algorithm, or missing
+  required fields. Coerces string fields.
+- `EnvironmentSecretsCodec.decrypt(payload)` — delegates validation to `from_payload`, decrypts
+  v1 Fernet payloads; v2 envelopes raise until algorithm handlers are implemented.
 
 ### `StorageManager.apply_encryption_settings(settings: AppSettings | None) -> None`
 
@@ -407,15 +410,29 @@ triggered and reported via logs and metrics.
 
 ## Payload Format
 
-Encrypted values are stored as envelope objects in `variables` map:
+Encrypted values are stored as envelope objects in the `variables` map. All versions share:
 
 - `enc`: encryption marker (`true`)
-- `v`: payload version (currently `1`)
-- `alg`: algorithm (`fernet`)
+- `v`: payload version (`1` or `2`)
+- `alg`: algorithm identifier
 - `kid`: key identifier (sha256 prefix of key material)
-- `ct`: ciphertext token
+- `ct`: ciphertext (algorithm-specific encoding)
 
-Validation rules and version checks are centralized in `EncryptedValueEnvelope.from_payload()`.
+### Version 1 (on-disk default)
+
+`encrypt()` emits v1 only. Fields: `enc`, `v=1`, `alg=fernet`, `kid`, `ct`.
+
+### Version 2 (designed, decrypt not yet implemented)
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `enc`, `v=2`, `alg`, `kid`, `ct` | yes | Same semantics as v1 base fields |
+| `iv`, `tag` | aes-gcm only | Base64 nonce and authentication tag |
+| `meta` | no | String-to-string metadata map |
+
+Algorithm rules: `fernet` must not include `iv`/`tag`; `aes-gcm` requires both.
+
+Validation and version dispatch are centralized in `EncryptedValueEnvelope.from_payload()`.
 Callers should not re-implement field checks before `EnvironmentSecretsCodec.decrypt()`.
 
 Plain string values remain supported for backward compatibility.
