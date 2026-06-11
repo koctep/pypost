@@ -1,5 +1,4 @@
 import logging
-import re
 from typing import Any
 
 from jinja2 import Environment
@@ -7,6 +6,7 @@ from jinja2 import Environment
 from pypost.core.function_expression_resolver import FunctionExpressionResolver
 from pypost.core.function_registry import FunctionRegistry
 from pypost.core.metrics import MetricsManager
+from pypost.core.template_expression_tokenizer import tokenize_template_expressions
 from pypost.core.template_expression_types import ValidationResult
 
 logger = logging.getLogger(__name__)
@@ -75,9 +75,10 @@ class TemplateService:
             self._record_empty_render_attempt(render_path)
             return ""
 
-        expression_count = self._count_placeholder_expressions(content)
+        expressions = tokenize_template_expressions(content)
+        expression_count = len(expressions)
         try:
-            validation = self._validate_template_content(content)
+            validation = self._validate_template_expressions(expressions)
             if not validation.is_valid:
                 self._emit_validation_failure_observability(
                     validation,
@@ -96,9 +97,6 @@ class TemplateService:
                 expression_count,
             )
 
-    def _count_placeholder_expressions(self, content: str) -> int:
-        return len(re.findall(r"\{\{\s*(.*?)\s*\}\}", content))
-
     def _record_empty_render_attempt(self, render_path: str) -> None:
         if self._metrics:
             self._metrics.track_template_expression_render_attempt(
@@ -106,8 +104,11 @@ class TemplateService:
                 outcome="empty_content",
             )
 
-    def _validate_template_content(self, content: str) -> ValidationResult:
-        return self._function_expression_resolver.validate_content(content)
+    def _validate_template_expressions(
+        self,
+        expressions: list[str],
+    ) -> ValidationResult:
+        return self._function_expression_resolver.validate_expressions(expressions)
 
     def _emit_validation_failure_observability(
         self,

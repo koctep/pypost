@@ -1,6 +1,7 @@
 import re
 
 from pypost.core.function_registry import FunctionRegistry
+from pypost.core.template_expression_tokenizer import tokenize_template_expressions
 from pypost.core.template_expression_types import ValidationResult
 
 NESTED_FUNCTION_CALLS_ALLOWED: bool = True
@@ -23,7 +24,10 @@ class FunctionExpressionResolver:
 
     def validate_content(self, content: str) -> ValidationResult:
         """Scan {{...}} tokens and validate each inner expression."""
-        expressions = re.findall(r"\{\{\s*(.*?)\s*\}\}", content)
+        return self.validate_expressions(tokenize_template_expressions(content))
+
+    def validate_expressions(self, expressions: list[str]) -> ValidationResult:
+        """Validate pre-tokenized inner expression strings."""
         for expression in expressions:
             validation_error = self._validate_expression(expression.strip())
             if validation_error:

@@ -98,6 +98,11 @@ Primary API entry points:
   - Thin delegate to `FunctionExpressionResolver.validate_content(content)`.
 - `FunctionExpressionResolver.validate_content(content) -> ValidationResult`
   - Resolver-level API for expression scanning and validation.
+- `FunctionExpressionResolver.validate_expressions(expressions) -> ValidationResult`
+  - Validates pre-tokenized inner expression strings (used by render path after a single
+    scan).
+- `tokenize_template_expressions(content) -> list[str]` (`template_expression_tokenizer`)
+  - Canonical extraction of inner text for each `{{ ... }}` placeholder.
 
 Supported validation result codes:
 
@@ -338,8 +343,8 @@ execute in this order:
 | # | Helper | Responsibility |
 |---|--------|---------------|
 | 1 | `_record_empty_render_attempt()` | Short-circuit on empty content; emit `empty_content` metric |
-| 2 | `_count_placeholder_expressions()` | Count `{{ ... }}` tokens for log context |
-| 3 | `_validate_template_content()` | Delegate validation to `FunctionExpressionResolver` |
+| 2 | `tokenize_template_expressions()` | Single scan: token list and `token_count` for logs |
+| 3 | `_validate_template_expressions()` | Delegate to `FunctionExpressionResolver.validate_expressions` |
 | 4 | `_emit_validation_failure_observability()` | Log + emit `validation_error` metric on invalid input |
 | 5 | `_render_with_jinja()` | Execute Jinja2 rendering with provided variables |
 | 6 | `_emit_render_success_observability()` | Log + emit `success` metric on successful render |
@@ -363,7 +368,7 @@ hardening — not release blockers.
 | --- | --- | --- |
 | Expression/template caching | [PYPOST-455](https://pypost.atlassian.net/browse/PYPOST-455) | No cache today; revisit after usage metrics |
 | Registry vs `env.globals` parity test | [PYPOST-457](https://pypost.atlassian.net/browse/PYPOST-457) | Explicit test not yet added |
-| Shared tokenization dedup | [PYPOST-460](https://pypost.atlassian.net/browse/PYPOST-460) | Counting and validation each scan `{{...}}` |
+| Shared tokenization dedup | — | Done in PYPOST-460 (`template_expression_tokenizer`) |
 | Empty-arg / multi-placeholder / closing-paren edge cases | [PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461) | Boundary with PYPOST-454 M1–M4 matrix |
 | Hover regex vs resolver identifier rules | — | Hover `VARIABLE_PATTERN` vs resolver `_IDENTIFIER_RE` mismatch for digit-leading names |
 | HTTPClient body / header-name integration | — | Optional; shared `render_string` path already proven |
@@ -372,7 +377,8 @@ hardening — not release blockers.
 
 Completed follow-ups referenced in this doc: PYPOST-451 (registry), PYPOST-452 (resolver),
 PYPOST-453 (nested policy), PYPOST-454 (edge-case tests), PYPOST-456 (doc polish),
-PYPOST-459 (orchestration stage helpers in `TemplateService`).
+PYPOST-459 (orchestration stage helpers in `TemplateService`), PYPOST-460 (shared
+tokenization).
 
 ## Troubleshooting
 

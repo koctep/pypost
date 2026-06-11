@@ -403,10 +403,14 @@ class TestTemplateServiceHelperStages(unittest.TestCase):
         self.metrics = MagicMock()
         self.svc = TemplateService(metrics=self.metrics)
 
-    def test_count_placeholder_expressions_counts_all_tokens(self):
+    def test_tokenize_template_expressions_counts_all_tokens(self):
+        from pypost.core.template_expression_tokenizer import (
+            tokenize_template_expressions,
+        )
+
         content = "{{name}}/{{urlencode(db)}}/{{ missing }}"
 
-        result = self.svc._count_placeholder_expressions(content)
+        result = len(tokenize_template_expressions(content))
 
         self.assertEqual(3, result)
 
