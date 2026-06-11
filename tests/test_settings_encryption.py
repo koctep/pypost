@@ -110,6 +110,18 @@ class TestSettingsDialogEnvironmentEncryption:
         finally:
             dlg.close()
 
+    def test_fallback_warning_shows_ignored_tokens(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            dlg.env_encryption_key_source_fallback_edit.setText(
+                "vault, environment, environment",
+            )
+            warning = dlg.env_encryption_fallback_warning_label.text()
+            assert "vault" in warning
+            assert "duplicate:environment" in warning
+        finally:
+            dlg.close()
+
     def test_accept_default_mode_stores_none(self, qapp):
         dlg = SettingsDialog(AppSettings(env_encryption_enabled=True))
         try:

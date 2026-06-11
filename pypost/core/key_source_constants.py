@@ -24,3 +24,22 @@ def parse_key_source_fallback(text: str) -> list[str] | None:
         if source in SUPPORTED_KEY_SOURCES and source not in result:
             result.append(source)
     return result or None
+
+
+def find_fallback_parse_issues(text: str) -> list[str]:
+    """Return unsupported or duplicate tokens ignored by parse_key_source_fallback."""
+    if not text.strip():
+        return []
+    issues: list[str] = []
+    seen: set[str] = set()
+    for part in text.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        if token not in SUPPORTED_KEY_SOURCES:
+            issues.append(token)
+        elif token in seen:
+            issues.append(f"duplicate:{token}")
+        else:
+            seen.add(token)
+    return issues

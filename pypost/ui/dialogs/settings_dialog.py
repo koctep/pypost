@@ -18,7 +18,7 @@ from pypost.core.key_source_constants import (
     KEY_SOURCE_ENVIRONMENT,
     KEY_SOURCE_KEYRING,
     KEY_SOURCE_SECRET_STORE,
-    SUPPORTED_KEY_SOURCES,
+    find_fallback_parse_issues,
     parse_key_source_fallback,
 )
 from pypost.models.retry import (
@@ -140,6 +140,13 @@ class SettingsDialog(QDialog):
         if fallback:
             self.env_encryption_key_source_fallback_edit.setText(",".join(fallback))
 
+        self.env_encryption_fallback_warning_label = QLabel()
+        self.env_encryption_fallback_warning_label.setWordWrap(True)
+        self.env_encryption_key_source_fallback_edit.textChanged.connect(
+            self._update_fallback_warning,
+        )
+        self._update_fallback_warning()
+
         self.env_encryption_help_label = QLabel()
         self.env_encryption_help_label.setWordWrap(True)
         self.env_encryption_key_source_combo.currentIndexChanged.connect(
@@ -204,6 +211,7 @@ class SettingsDialog(QDialog):
             "Encryption key source fallback:",
             self.env_encryption_key_source_fallback_edit,
         )
+        self.form_layout.addRow("", self.env_encryption_fallback_warning_label)
         self.form_layout.addRow("", self.env_encryption_help_label)
         self.form_layout.addRow("Max Retries (0 = disabled):", self.max_retries_spin)
         self.form_layout.addRow("Retry Delay (seconds):", self.retry_delay_spin)
@@ -223,6 +231,17 @@ class SettingsDialog(QDialog):
         source = self.env_encryption_key_source_combo.currentData()
         help_text = KEY_SOURCE_HELP.get(source, KEY_SOURCE_HELP[KEY_SOURCE_ENVIRONMENT])
         self.env_encryption_help_label.setText(help_text)
+
+    def _update_fallback_warning(self) -> None:
+        issues = find_fallback_parse_issues(
+            self.env_encryption_key_source_fallback_edit.text(),
+        )
+        if not issues:
+            self.env_encryption_fallback_warning_label.clear()
+            return
+        self.env_encryption_fallback_warning_label.setText(
+            "Ignored fallback entries: " + ", ".join(issues),
+        )
 
     def accept(self):
         parsed_codes = parse_retryable_status_codes(self.retryable_codes_edit.text())
