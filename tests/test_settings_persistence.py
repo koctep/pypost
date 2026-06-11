@@ -2,21 +2,32 @@
 
 Covers ConfigManager JSON save/load with an isolated config directory and StateManager
 delegation (expanded collections, open tabs, last environment) including no-op saves.
+Includes restart-level integration for request_timeout via SettingsDialog (PYPOST-445).
 """
 
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
 
+import json
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from PySide6.QtWidgets import QApplication
+
 from pypost.core.config_manager import ConfigManager
 from pypost.core.state_manager import StateManager
 from pypost.models.settings import AppSettings
+from pypost.ui.dialogs.settings_dialog import SettingsDialog
+
+
+@pytest.fixture(scope="module")
+def qapp():
+    app = QApplication.instance() or QApplication([])
+    yield app
 
 
 class TestConfigManagerPersistence(unittest.TestCase):
@@ -156,6 +167,37 @@ class TestStateManagerPersistence(unittest.TestCase):
         sm2 = StateManager(ConfigManager())
         self.assertEqual(sm2.get_expanded_collections(), ["b"])
         self.assertEqual(sm2.get_open_tabs(), ["r1", "r2"])
+
+
+def test_request_timeout_survives_settings_dialog_save_and_restart(qapp):  # noqa: ARG001
+    """PYPOST-445: Settings UI save path persists request_timeout across restart."""
+    changed_timeout = 135
+    with tempfile.TemporaryDirectory() as td:
+        with patch("pypost.core.config_manager.user_config_dir", return_value=td):
+            cm = ConfigManager()
+            dlg = SettingsDialog(cm.load_config())
+            try:
+                dlg.timeout_spin.setValue(changed_timeout)
+                dlg.accept()
+                saved = dlg.get_settings()
+                assert saved is not None
+                assert saved.request_timeout == changed_timeout
+                cm.save_config(saved)
+            finally:
+                dlg.close()
+
+            cfg_path = Path(td) / "settings.json"
+            on_disk = json.loads(cfg_path.read_text(encoding="utf-8"))
+            assert on_disk["request_timeout"] == changed_timeout
+
+            reloaded = ConfigManager().load_config()
+            assert reloaded.request_timeout == changed_timeout
+
+            dlg_after_restart = SettingsDialog(reloaded)
+            try:
+                assert dlg_after_restart.timeout_spin.value() == changed_timeout
+            finally:
+                dlg_after_restart.close()
 
 
 if __name__ == "__main__":

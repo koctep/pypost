@@ -54,14 +54,33 @@ On Save, `SettingsDialog.accept()` parses the retryable status codes line edit v
 
 Parser rules and messages are defined in `pypost/models/retry.py` (PYPOST-423).
 
+## Request timeout persistence
+
+`AppSettings.request_timeout` (default 60 seconds) is edited via the timeout spinbox.
+Save path: `SettingsDialog.accept()` → `MainWindow.open_settings()` →
+`ConfigManager.save_config()`.
+
+Restart-level integration test (PYPOST-445): `tests/test_settings_persistence.py` —
+`test_request_timeout_survives_settings_dialog_save_and_restart` drives the dialog save path,
+writes JSON via `ConfigManager`, simulates restart with a fresh `ConfigManager`, and asserts
+the spinbox reflects the persisted value on reopen.
+
+Direct ConfigManager round-trip (without dialog): `TestConfigManagerPersistence.test_save_then_load_roundtrip`.
+
 ## Tests
 
 `tests/test_settings_dialog.py`:
 
+- `TestSettingsDialogRequestTimeout` — spinbox layout, load, accept output
 - `TestSettingsDialogAlertSettings` — load/save, echo mode, keep/clear auth
 - `TestSettingsDialogRetryableCodesValidation` — blocked save + warning on invalid codes
   (PYPOST-444)
 - `TestResolveWebhookAuthHeader` — pure helper unit tests
+
+`tests/test_settings_persistence.py`:
+
+- `test_request_timeout_survives_settings_dialog_save_and_restart` — dialog save + restart
+  (PYPOST-445)
 
 Parser unit tests: `tests/test_retryable_status_codes_parse.py`.
 
