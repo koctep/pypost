@@ -24,8 +24,9 @@ None. Routing fix and E501 cleanup completed.
 
 ## Code Quality Issues
 
-- `_extract_mcp_variables`: unused Jinja2 AST branch (see above).
-  — [PYPOST-366](https://pypost.atlassian.net/browse/PYPOST-366)
+- `_extract_mcp_variables`: unused Jinja2 AST branch — **resolved** (removed in PYPOST-554).
+  — [PYPOST-366](https://pypost.atlassian.net/browse/PYPOST-366),
+  [PYPOST-372](https://pypost.atlassian.net/browse/PYPOST-372)
 
 ## Missing Tests
 
@@ -46,5 +47,5 @@ None identified.
   — [PYPOST-370](https://pypost.atlassian.net/browse/PYPOST-370)
 - If `do-testing.md` rules are extended, ensure `doc/dev/testing.md` stays in sync.
   — [PYPOST-371](https://pypost.atlassian.net/browse/PYPOST-371)
-- Optionally simplify `_extract_mcp_variables` by removing the dead Jinja2 branch.
-  — [PYPOST-372](https://pypost.atlassian.net/browse/PYPOST-372)
+- ~~Optionally simplify `_extract_mcp_variables` by removing the dead Jinja2 branch.~~
+  **Done** — method removed in PYPOST-554; closed in PYPOST-366 and PYPOST-372.
