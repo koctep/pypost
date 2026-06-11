@@ -142,6 +142,8 @@ class TabsPresenter(QObject):
         return self._tabs
 
     def add_new_tab(self, request_data: RequestData | None = None, save_state: bool = True) -> None:
+        if request_data is not None:
+            request_data = request_data.model_copy(deep=True)
         tab = RequestTab(request_data, metrics=self._metrics)
 
         if hasattr(tab.request_editor, "body_edit"):

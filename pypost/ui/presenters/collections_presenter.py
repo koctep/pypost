@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class CollectionsPresenter(QObject):
     """Owns the collections tree view: loading, rendering, rename, delete, and tab opening."""
 
-    open_request_in_tab = Signal(object)  # payload: RequestData
+    open_request_in_tab = Signal(object)  # payload: RequestData (deep copy for new tab)
     open_request_in_isolated_tab = Signal(object)  # payload: RequestData (deep copy)
     collections_changed = Signal()  # after create / delete / rename
     request_renamed = Signal(str, str)  # (request_id, new_name)
@@ -108,7 +108,7 @@ class CollectionsPresenter(QObject):
                 data.id,
                 data.name,
             )
-            self.open_request_in_tab.emit(data)
+            self.open_request_in_tab.emit(data.model_copy(deep=True))
         else:
             if self._view.isExpanded(index):
                 self._view.collapse(index)

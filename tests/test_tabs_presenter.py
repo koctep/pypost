@@ -82,6 +82,22 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(p.widget.count(), 1)
         self.assertEqual(p.widget.tabText(0), "Login")
 
+    def test_add_new_tab_deep_copies_request_data(self):
+        req = _make_request("r1", "Shared")
+        p = self._make_presenter()
+        p.add_new_tab(req, save_state=False)
+        p.add_new_tab(req, save_state=False)
+        tab_a = p.widget.widget(0)
+        tab_b = p.widget.widget(1)
+        self.assertIsNot(tab_a.request_data, req)
+        self.assertIsNot(tab_b.request_data, req)
+        self.assertIsNot(tab_a.request_data, tab_b.request_data)
+        tab_a.request_editor.url_input.setText("https://tab-a.example.com")
+        self.assertNotEqual(
+            tab_b.request_editor.url_input.text(),
+            "https://tab-a.example.com",
+        )
+
     def test_close_tab_removes_tab(self):
         p = self._make_presenter()
         p.add_new_tab()

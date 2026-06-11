@@ -2,10 +2,10 @@
 
 ## Overview
 
-Users can open multiple tabs for the same saved request. By default, the application's tree
-model serves as the single source of truth for a request. To prevent unintended sharing of
-volatile, unsaved UI state across multiple tabs editing the same request, PyPost offers an
-explicit **New tab** context menu action.
+Users can open multiple tabs for the same saved request. The Collections tree holds canonical
+saved instances from storage, but each open tab must own its own in-memory draft. Left-click
+and the **New tab** context menu both supply deep copies of `RequestData` so unsaved edits
+do not leak across tabs or back into the tree model.
 
 When the same saved request is open in more than one isolated tab, [PYPOST-408](https://pypost.atlassian.net/browse/PYPOST-408)
 adds **awareness and naming consistency**: sibling tabs are notified when another tab saves,
@@ -14,9 +14,10 @@ latest on-disk version without silent data loss.
 
 ## Architecture
 
-- **`CollectionsPresenter`**: emits `open_request_in_isolated_tab` with a deep copy of the
-  request when the user chooses **New tab** from the sidebar context menu.
-- **`TabsPresenter`**: owns tab widgets, save handling, label sync, and sibling notification.
+- **`CollectionsPresenter`**: emits deep copies on both `open_request_in_tab` (left-click) and
+  `open_request_in_isolated_tab` (**New tab** context menu).
+- **`TabsPresenter`**: owns tab widgets, save handling, label sync, and sibling notification;
+  `add_new_tab` deep-copies any non-`None` `request_data` before creating `RequestTab`.
 - **`RequestTab`**: holds per-tab `persisted_baseline` (last adopted on-disk snapshot) and
   `stale_persisted` (session flag when the user dismissed a stale notice or kept a draft).
 - **`pypost/core/request_sync.py`**: pure helpers to snapshot, compare, and detect dirty state
@@ -69,14 +70,16 @@ version when the tab baseline differs from disk (even without `stale_persisted`)
 
 ## Implementation Details
 
-1. **Context menu**
+1. **Left-click**
+   Clicking a request row in Collections emits `open_request_in_tab` with
+   `RequestData.model_copy(deep=True)`. Folder rows still expand/collapse only.
+2. **Context menu**
    The `CollectionsPresenter` provides a **New tab** option when right-clicking a request node.
-2. **Signal**
-   When clicked, the presenter emits `open_request_in_isolated_tab`. The payload is a deep copy
-   (`RequestData.model_copy(deep=True)`) of the request.
+   When chosen, it emits `open_request_in_isolated_tab` with the same deep-copy contract.
 3. **Tab injection**
-   `MainWindow` routes this signal to `TabsPresenter.add_new_tab`. Each tab receives a distinct
-   `RequestData` instance, so unsaved edits do not leak across tabs.
+   `MainWindow` routes both signals to `TabsPresenter.add_new_tab`. That method deep-copies
+   non-`None` payloads again before constructing `RequestTab`, so every caller gets an owned
+   buffer even if a shared reference is passed.
 4. **Restoration on startup**
    `TabsPresenter.restore_tabs()` passes deep copies when restoring tabs so multiple restored
    tabs do not bind to the same memory reference.
@@ -118,7 +121,7 @@ confirmation still respects `AppSettings.confirm_overwrite_request`.
 | Sibling tab never gets a stale dialog | Tabs do not share the same saved `id`, or baseline already matches disk | Confirm both tabs opened the same saved request; check `request_persisted` emission on save |
 | Tab title not updated after save rename | Label sync only runs for matching `request_data.id` | Verify `_sync_tab_labels_for_request` and that save was an overwrite, not Save As |
 | User saves over newer disk without extra prompt | Tab was not marked `stale_persisted` (user never saw/dismissed sibling notice) | Non-stale path still uses standard overwrite confirm when baseline ≠ disk |
-| Edits in tab A appear in tab B | Tabs share one `RequestData` reference (left-click path) | Use **New tab** or restored deep copies; see limitations below |
+| Edits in tab A appear in tab B | Caller bypassed `add_new_tab` or mutated shared tree `UserRole` data | Confirm tab was opened via Collections or restore; check `add_new_tab` copy path |
 
 ### Logging
 
@@ -131,10 +134,6 @@ Stale-dialog button choices (Keep / Load latest / Dismiss) are not logged.
 
 ## Limitations and Future Work
 
-- **Left-click navigation** has not been modified to force deep copies. Duplicate tabs opened
-  via left-click may still share one `RequestData` reference; stale sync applies when tabs
-  share the same `id` with separate instances (New tab, restore). See
-  [PYPOST-405](https://pypost.atlassian.net/browse/PYPOST-405) / [PYPOST-406](https://pypost.atlassian.net/browse/PYPOST-406).
 - **No persistent stale indicator** after the dialog is dismissed; `stale_persisted` is
   session-only until reload or save. A non-modal banner or tab tooltip is optional follow-up.
 - **External disk changes** (hand-edited collection files while PyPost is open) are not

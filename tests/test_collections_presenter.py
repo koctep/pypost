@@ -126,6 +126,25 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertEqual(len(received), 1)
         self.assertEqual(received[0].id, "r1")
 
+    def test_open_request_in_tab_emits_deep_copy_on_click(self):
+        req = _make_request("r1", "Get Users", "GET")
+        col = _make_collection("c1", "My API", [req])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+
+        received = []
+        presenter.open_request_in_tab.connect(received.append)
+
+        model = presenter.widget.model()
+        tree_data = model.item(0).child(0).data(Qt.UserRole)
+        req_index = model.item(0).child(0).index()
+        presenter._on_collection_clicked(req_index)
+
+        self.assertEqual(len(received), 1)
+        self.assertIsNot(received[0], tree_data)
+        received[0].url = "https://mutated.example.com"
+        self.assertNotEqual(tree_data.url, "https://mutated.example.com")
+
     def test_find_collection_item_finds_collection(self):
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
