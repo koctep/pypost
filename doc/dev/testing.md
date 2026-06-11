@@ -254,6 +254,17 @@ groups as **expected** (error-path tests), **suspicious**, or **unknown**. Basel
 capture (2026-06-11): 937 passed, 72 ERROR, 138 WARNING lines. See
 `ai-tasks/PYPOST-567/inventory.md` for the full breakdown.
 
+## Error-path test logging (PYPOST-568)
+
+Some tests intentionally trigger application ERROR logs while still passing (e.g.
+`test_worker_wraps_unexpected_exception_as_execution_error_unknown`,
+`TestOnRequestError` in `test_tabs_presenter.py`). Assertions target Qt signals and
+mocked dialogs — not log output — so failures are still detected, but CI logs look
+alarming.
+
+See `ai-tasks/PYPOST-568/error-path-test-audit.md` for per-test risk ratings and
+mitigation options (`caplog`, allowlists in PYPOST-571).
+
 ## References
 
 - [gui_testing.md](gui_testing.md) — Qt offscreen setup, `qapp` fixture, GUI test patterns
