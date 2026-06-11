@@ -9,6 +9,7 @@ from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.models.models import RequestData
+from pypost.ui.delegates import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
 
 logger = logging.getLogger(__name__)
@@ -60,8 +61,16 @@ class CollectionsPresenter(QObject):
             emit_requests_deleted=self.requests_deleted.emit,
             emit_open_isolated_tab=self.open_request_in_isolated_tab.emit,
         )
+        self._view.setItemDelegate(
+            CollectionItemRenameDelegate(
+                is_rename_index=self._tree_actions.is_rename_index,
+                on_committed=self._tree_actions.handle_rename_committed,
+                on_cancelled=self._tree_actions.handle_rename_cancelled,
+                on_rejected_empty=self._tree_actions.handle_rename_rejected_empty,
+                parent=self._view,
+            )
+        )
         self._view.customContextMenuRequested.connect(self._tree_actions.show_context_menu)
-        self._view.itemDelegate().closeEditor.connect(self._tree_actions.on_editor_closed)
 
     @property
     def widget(self) -> QTreeView:

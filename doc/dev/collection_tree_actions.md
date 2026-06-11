@@ -27,13 +27,14 @@ flowchart TB
 | Component | Role |
 |-----------|------|
 | `CollectionsPresenter` | Builds tree model, handles left-click open, expand state |
-| `CollectionTreeActions` | Context menu, rename editor close, delete with confirmation |
+| `CollectionItemRenameDelegate` | Inline rename editor lifecycle |
+| `CollectionTreeActions` | Context menu, rename callbacks, delete with confirmation |
 | `RequestManager` | `rename_collection_item`, `delete_collection_item` |
 
 Wiring in `CollectionsPresenter.__init__`:
 
+- `setItemDelegate(CollectionItemRenameDelegate)` — commit/cancel callbacks to tree actions
 - `customContextMenuRequested` → `CollectionTreeActions.show_context_menu`
-- `closeEditor` → `CollectionTreeActions.on_editor_closed`
 
 ## API / Usage
 
@@ -41,9 +42,17 @@ Wiring in `CollectionsPresenter.__init__`:
 
 Resolves the item at `pos`, builds the menu, and dispatches the selected action.
 
-### `CollectionTreeActions.on_editor_closed(_editor, hint)`
+### `CollectionTreeActions.handle_rename_committed(new_name)`
 
-Finalizes inline rename after the tree editor closes (commit or cancel).
+Finalizes a successful inline rename (persistence, metrics, tree sync).
+
+### `CollectionTreeActions.handle_rename_cancelled()`
+
+Restores the tree label after Escape cancel.
+
+### `CollectionTreeActions.handle_rename_rejected_empty()`
+
+Handles empty-name rejection from the delegate.
 
 ### `CollectionTreeActions.handle_delete(item_id, item_type, item_label)`
 

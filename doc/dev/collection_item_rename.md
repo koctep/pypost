@@ -11,13 +11,17 @@ The goal is to allow quick in-place renaming directly in the tree.
 
 ## Architecture
 
+- **`CollectionItemRenameDelegate` (`pypost/ui/delegates/collection_item_rename_delegate.py`)**:
+  - Installed on the collections tree view.
+  - Creates inline `QLineEdit` only for the pending-rename row.
+  - Validates non-empty names on commit; detects Escape cancel via `closeEditor`.
 - **`CollectionTreeActions` (`pypost/ui/presenters/collection_tree_actions.py`)**:
   - Adds `Rename` to the collection tree context menu.
-  - Starts inline edit mode via `QTreeView.edit(...)`.
-  - Finalizes rename on editor close (commit/cancel), validates non-empty names.
-  - Syncs the edited tree row in place after success or cancel.
+  - Starts inline edit via `QTreeView.edit(...)`.
+  - Handles commit/cancel callbacks from the delegate (persistence, metrics, tree sync).
 - **`CollectionsPresenter` (`pypost/ui/presenters/collections_presenter.py`)**:
-  - Wires the tree view to `CollectionTreeActions`.
+  - Wires the tree view to `CollectionTreeActions` and installs
+    `CollectionItemRenameDelegate`.
   - Owns tree model build, expand/collapse state, and left-click open.
 - **`RequestManager` (`pypost/core/request_manager.py`)**:
   - Owns rename business logic:
@@ -48,18 +52,26 @@ Starts inline rename.
 - For request items, shows editable request name in place.
 - Activates `QTreeView.edit(...)`.
 
-### `CollectionTreeActions.on_editor_closed(_editor, hint)`
+### `CollectionItemRenameDelegate`
 
-Finalizes rename on editor close.
+Inline editor for rename rows.
 
-- Cancel (`RevertModelCache`): no mutation; `_finish_rename_tree_update` restores the
-  canonical label on the edited item without rebuilding the full tree.
-- Commit:
-  - validates non-empty name,
-  - calls `RequestManager.rename_collection_item(...)`,
-  - emits `request_renamed` when request name changed,
-  - syncs the edited tree item in place via `_finish_rename_tree_update` (falls back to
-    `refresh_tree` only when the item cannot be found in the model).
+- `setEditorData`: shows request `name` (not `METHOD name`) or collection label.
+- `setModelData`: rejects empty trimmed text (tooltip + `handle_rename_rejected_empty`);
+  otherwise calls `handle_rename_committed(new_name)`.
+- `closeEditor` with `RevertModelCache`: calls `handle_rename_cancelled`.
+
+### `CollectionTreeActions.handle_rename_committed(new_name)`
+
+Persists rename via `RequestManager`, emits signals, syncs tree incrementally.
+
+### `CollectionTreeActions.handle_rename_cancelled()`
+
+Restores canonical label without persistence.
+
+### `CollectionTreeActions.handle_rename_rejected_empty()`
+
+Shows warning dialog and restores label.
 
 ### `CollectionTreeActions._finish_rename_tree_update(item_id, item_type, item=None, *, new_name=None)`
 

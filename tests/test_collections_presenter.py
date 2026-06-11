@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from PySide6.QtWidgets import QApplication, QAbstractItemDelegate, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt, QPoint
 
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
@@ -273,15 +273,8 @@ class TestCollectionsPresenter(unittest.TestCase):
         received = []
         presenter.request_renamed.connect(lambda rid, name: received.append((rid, name)))
 
-        item = presenter._find_collection_item("r1", "request")
-        item.setEditable(True)
-        item.setText("New Name")
-
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
-        from PySide6.QtWidgets import QAbstractItemDelegate
-        presenter._tree_actions.on_editor_closed(
-            None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
-        )
+        presenter._tree_actions.handle_rename_committed("New Name")
         self.assertEqual(len(received), 1)
         self.assertEqual(received[0], ("r1", "New Name"))
 
@@ -379,13 +372,9 @@ class TestCollectionsPresenter(unittest.TestCase):
         col = _make_collection("c1", "My API", [req])
         presenter = self._make_presenter([col])
         presenter.load_collections()
-        item = presenter._find_collection_item("r1", "request")
-        item.setText("Draft Name")
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
         with patch.object(presenter, "refresh_tree") as mock_refresh:
-            presenter._tree_actions.on_editor_closed(
-                None, QAbstractItemDelegate.EndEditHint.RevertModelCache
-            )
+            presenter._tree_actions.handle_rename_cancelled()
         self.assertIsNone(presenter._pending_rename)
         self.assertEqual(presenter._model.item(0).child(0).text(), "GET Old Name")
         mock_refresh.assert_not_called()
@@ -395,13 +384,9 @@ class TestCollectionsPresenter(unittest.TestCase):
         col = _make_collection("c1", "My API", [req])
         presenter = self._make_presenter([col])
         presenter.load_collections()
-        item = presenter._find_collection_item("r1", "request")
-        item.setText("New Name")
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
         with patch.object(presenter, "refresh_tree") as mock_refresh:
-            presenter._tree_actions.on_editor_closed(
-                None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
-            )
+            presenter._tree_actions.handle_rename_committed("New Name")
         self.assertEqual(presenter._model.item(0).child(0).text(), "GET New Name")
         self.assertEqual(req.name, "New Name")
         mock_refresh.assert_not_called()
@@ -410,13 +395,9 @@ class TestCollectionsPresenter(unittest.TestCase):
         col = _make_collection("c1", "Old Collection")
         presenter = self._make_presenter([col])
         presenter.load_collections()
-        item = presenter._find_collection_item("c1", "collection")
-        item.setText("New Collection")
         presenter._pending_rename = {"item_id": "c1", "item_type": "collection"}
         with patch.object(presenter, "refresh_tree") as mock_refresh:
-            presenter._tree_actions.on_editor_closed(
-                None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
-            )
+            presenter._tree_actions.handle_rename_committed("New Collection")
         self.assertEqual(presenter._model.item(0).text(), "New Collection")
         self.assertEqual(col.name, "New Collection")
         mock_refresh.assert_not_called()
@@ -427,12 +408,8 @@ class TestCollectionsPresenter(unittest.TestCase):
         col = _make_collection("c1", "My API", [req])
         presenter = self._make_presenter([col])
         presenter.load_collections()
-        item = presenter._find_collection_item("r1", "request")
-        item.setText("   ")
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
-        presenter._tree_actions.on_editor_closed(
-            None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
-        )
+        presenter._tree_actions.handle_rename_rejected_empty()
         mock_warning.assert_called_once()
         self.assertEqual("Old Name", req.name)
 

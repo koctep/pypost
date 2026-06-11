@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QAbstractItemDelegate, QMenu, QMessageBox, QTreeView
+from PySide6.QtWidgets import QMenu, QMessageBox, QTreeView
 
 from pypost.core.metrics import MetricsManager
 from pypost.core.request_sync import copy_request_for_isolated_tab
@@ -135,32 +135,61 @@ class CollectionTreeActions:
         if not item_type or not item_id:
             return
 
-        if item_type == "request" and isinstance(data, RequestData):
-            item.setText(data.name)
-
         self._pending_rename = {"item_id": item_id, "item_type": item_type}
         item.setEditable(True)
         self._view.setCurrentIndex(index)
         self._view.edit(index)
 
-    def on_editor_closed(self, _editor, hint) -> None:
+    def is_rename_index(self, index) -> bool:
+        if not self._pending_rename:
+            return False
+        item = self._model.itemFromIndex(index)
+        if item is None:
+            return False
+        item_type, item_id, _, _ = self._resolve_item_target(item)
+        return (
+            item_id == self._pending_rename["item_id"]
+            and item_type == self._pending_rename["item_type"]
+        )
+
+    def handle_rename_cancelled(self) -> None:
         if not self._pending_rename:
             return
 
         item_type = self._pending_rename["item_type"]
         item_id = self._pending_rename["item_id"]
+        logger.info(
+            "collection_item_rename_cancelled item_type=%s item_id=%s",
+            item_type,
+            item_id,
+        )
+        self._metrics.track_gui_collection_rename_action(item_type, "cancelled")
+        self._pending_rename = None
+        self._finish_rename_tree_update(item_id, item_type)
 
-        if hint == QAbstractItemDelegate.EndEditHint.RevertModelCache:
-            logger.info(
-                "collection_item_rename_cancelled item_type=%s item_id=%s",
-                item_type,
-                item_id,
-            )
-            self._metrics.track_gui_collection_rename_action(item_type, "cancelled")
-            self._pending_rename = None
-            self._finish_rename_tree_update(item_id, item_type)
+    def handle_rename_rejected_empty(self) -> None:
+        if not self._pending_rename:
             return
 
+        item_type = self._pending_rename["item_type"]
+        item_id = self._pending_rename["item_id"]
+        logger.warning(
+            "collection_item_rename_rejected_empty item_type=%s item_id=%s",
+            item_type,
+            item_id,
+        )
+        self._metrics.track_gui_collection_rename_action(item_type, "rejected_empty")
+        QMessageBox.warning(self._view, "Rename Error", "Name cannot be empty.")
+        item = self._find_item(item_id, item_type)
+        self._pending_rename = None
+        self._finish_rename_tree_update(item_id, item_type, item)
+
+    def handle_rename_committed(self, new_name: str) -> None:
+        if not self._pending_rename:
+            return
+
+        item_type = self._pending_rename["item_type"]
+        item_id = self._pending_rename["item_id"]
         item = self._find_item(item_id, item_type)
         self._pending_rename = None
 
@@ -172,18 +201,6 @@ class CollectionTreeActions:
             )
             self._metrics.track_gui_collection_rename_action(item_type, "not_found")
             self._finish_rename_tree_update(item_id, item_type)
-            return
-
-        new_name = item.text().strip()
-        if not new_name:
-            logger.warning(
-                "collection_item_rename_rejected_empty item_type=%s item_id=%s",
-                item_type,
-                item_id,
-            )
-            self._metrics.track_gui_collection_rename_action(item_type, "rejected_empty")
-            QMessageBox.warning(self._view, "Rename Error", "Name cannot be empty.")
-            self._finish_rename_tree_update(item_id, item_type, item)
             return
 
         try:
