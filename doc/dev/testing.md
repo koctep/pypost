@@ -94,7 +94,10 @@ duplicate scope: prior tickets already cover the intent.
 | --- | --- | --- | --- |
 | MCP tool Streamable HTTP (`list_tools`, `call_tool`) | `tests/test_mcp_server_integration.py` | Integration | PYPOST-368/551; `RequestService` mocked |
 | `MCPServerImpl` metrics hooks | `tests/test_mcp_server_impl.py` | Unit | PYPOST-367; `MetricsManager` mocked |
-| Metrics `read_resource("metrics://all")` | `tests/test_metrics_manager.py` | Unit | Scrapes `mcp_*_total` after `read_resource` |
+| Metrics `read_resource("metrics://all")` | `tests/test_metrics_manager.py` | Unit | Facade; scrapes `mcp_*_total` after `read_resource` |
+| `MetricsRegistry` MCP counters | `tests/test_metrics_registry.py` | Unit | PYPOST-177; pure `track_mcp_*` scrape assertions |
+| HTTP `/metrics` scrape endpoint | `tests/test_metrics_server_endpoint.py` | Unit | PYPOST-177; `TestClient` on `MetricsServer` ASGI app |
+| `MetricsServer` MCP resource counters | `tests/test_metrics_server_endpoint.py` | Unit | PYPOST-177; success, unknown URI, scrape error paths |
 | Shared bind error messages | `tests/test_server_bind.py` | Unit | PYPOST-154; `format_bind_error` / MCP wrapper |
 | Metrics server bind / startup signaling | `tests/test_metrics_server_startup.py` | Integration | PYPOST-153; port busy, deferred failure |
 | MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556; port busy, listen readiness |
@@ -110,6 +113,12 @@ Focused metrics MCP resource run:
 
 ```bash
 .venv/bin/python -m pytest tests/test_metrics_manager.py::TestMetricsManagerMcpResource -v
+```
+
+PYPOST-177 component-level metrics tests:
+
+```bash
+.venv/bin/python -m pytest tests/test_metrics_registry.py tests/test_metrics_server_endpoint.py -v
 ```
 
 ## Per-test timeouts (mandatory)
