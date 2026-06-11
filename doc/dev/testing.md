@@ -318,7 +318,24 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 ```
 
 Optional hardening: add `caplog.at_level(logging.ERROR)` assertions for medium-risk tests
-listed in the audit report. PYPOST-571 will allowlist these node ids for CI log gates.
+listed in the audit report.
+
+## CI guardrails (PYPOST-571)
+
+Proposal for enforceable CI gates so green runs cannot hide unexpected ERROR storms or
+timeout-boundary passes. Full design:
+`ai-tasks/PYPOST-571/ci-guardrails-proposal.md`.
+
+| Pillar | Summary |
+| --- | --- |
+| **Log allowlist** | `tests/expected_log_allowlist.yaml` — permit baseline ERROR prefixes from PYPOST-567; fail on unlisted lines |
+| **`caplog` contract** | Error-path tests assert logs via `caplog` **or** register prefix in allowlist; behavioral assertions remain primary |
+| **Duration budget** | Warn when test duration >80% of `pytest.mark.timeout`; fail at >95% (PYPOST-569) |
+| **Post-run script** | `scripts/verify_test_log_guardrails.py` parses captured pytest log after run; wired in CI after pytest |
+
+Phase 1 implementation: [PYPOST-572](https://pypost.atlassian.net/browse/PYPOST-572) (allowlist
++ verifier). Phase 2: [PYPOST-573](https://pypost.atlassian.net/browse/PYPOST-573) (duration
+audit). Caplog contract: [PYPOST-574](https://pypost.atlassian.net/browse/PYPOST-574).
 
 ## References
 
