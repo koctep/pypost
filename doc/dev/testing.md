@@ -117,6 +117,23 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest \
   tests.test_collection_tree_delete_metrics -v
 ```
 
+## Makefile automation tests
+
+`tests/test_makefile.py` (PYPOST-307) validates root `Makefile` contracts without touching
+the repository `.venv`:
+
+| Area | What is checked |
+| ---- | ---------------- |
+| Marker lifecycle | `make venv` creates `.venv/.initialized-<major.minor>`; `make clean` removes `.venv` |
+| Dependency chain | `install` → `venv-test`; `run`/`test`/`lint` depend on the marker only (not `install`) |
+| Exit behavior | `clean`/`venv` succeed; unknown targets fail; `lint` fails on a bare venv without flake8 |
+
+Each case runs GNU Make in an isolated `tmp_path` copy of the `Makefile`. Focused run:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -v
+```
+
 ## References
 
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — AI assistant rules
