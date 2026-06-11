@@ -17,7 +17,7 @@ $(VENV_MARKER):
 
 # Create test virtual environment tools
 venv-test: $(VENV_MARKER)
-	$(BIN)/python -m pip install pytest flake8 pytest-cov
+	$(BIN)/python -m pip install pytest flake8 pytest-cov pytest-timeout
 
 # Install dependencies
 install: $(VENV_MARKER) venv-test

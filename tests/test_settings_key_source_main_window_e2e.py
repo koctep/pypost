@@ -1,9 +1,13 @@
 """PYPOST-501: settings key source → open_settings → StorageManager encrypt/decrypt."""
 
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.key_provider import build_key_id

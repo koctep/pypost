@@ -1,7 +1,11 @@
 """Qt-level tests for EnvironmentDialog (manage environments UI)."""
-import logging
 
 import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
+import logging
+
 from unittest.mock import patch
 
 from PySide6.QtWidgets import QApplication, QMessageBox, QTableWidgetItem

@@ -1,9 +1,13 @@
 """PYPOST-490: settings → apply_settings → env manager → toggle log (PYPOST-448 debt)."""
 
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
 from PySide6.QtWidgets import QApplication
 
 from pypost.models.models import Environment

@@ -1,4 +1,8 @@
 """Tests for MCPClientService (MCP method for testing MCP endpoints)."""
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import asyncio
 import json
 import unittest

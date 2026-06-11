@@ -1,6 +1,10 @@
-from unittest.mock import MagicMock
 
 import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
+from unittest.mock import MagicMock
+
 
 from pypost.core.environment_secrets_codec import (
     EncryptedValueEnvelope,

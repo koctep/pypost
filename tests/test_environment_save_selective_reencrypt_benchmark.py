@@ -1,9 +1,13 @@
 """PYPOST-534: Guard selective re-encrypt at 100+ hidden keys (PYPOST-485)."""
 
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import json
 import time
 
-import pytest
 from prometheus_client import generate_latest
 
 from pypost.core.environment_variables_adapter import EnvironmentVariablesAdapter

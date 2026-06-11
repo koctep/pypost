@@ -6,6 +6,10 @@ dedent when line is whitespace-only.
 PYPOST-510: line-number gutter width, viewport margin, read-only gutter clicks.
 """
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import json
 import unittest
 from unittest.mock import patch

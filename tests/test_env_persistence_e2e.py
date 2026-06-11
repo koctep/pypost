@@ -1,8 +1,12 @@
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import logging
 import tempfile
 from unittest.mock import MagicMock, patch
 
-import pytest
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager

@@ -1,6 +1,10 @@
 """Settings UI and persistence for environment encryption (PYPOST-481)."""
 
+
 import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager

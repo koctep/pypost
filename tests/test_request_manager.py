@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import sys
 import types
 import unittest

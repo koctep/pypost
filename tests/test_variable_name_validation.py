@@ -1,6 +1,10 @@
 """Unit tests for Jinja2-compatible environment variable name validation."""
 
+
+
 import pytest
+
+pytestmark = pytest.mark.timeout(30)
 
 from pypost.core.variable_name_validation import (
     validate_variable_name,

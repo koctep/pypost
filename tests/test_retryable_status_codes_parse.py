@@ -1,5 +1,9 @@
 """Unit tests for parse_retryable_status_codes (PYPOST-423)."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import unittest
 
 from pypost.models.retry import (

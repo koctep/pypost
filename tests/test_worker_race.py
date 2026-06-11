@@ -1,4 +1,8 @@
 """Tests for race condition fixes in RequestWorker and TabsPresenter."""
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import unittest
 from unittest.mock import MagicMock, patch
 

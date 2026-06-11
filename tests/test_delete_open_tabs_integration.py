@@ -1,5 +1,9 @@
 """Integration tests for open-tab closure after collection item delete (PYPOST-332)."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import unittest
 from unittest.mock import MagicMock
 

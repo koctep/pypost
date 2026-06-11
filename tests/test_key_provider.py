@@ -1,8 +1,12 @@
+
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import hashlib
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from pypost.core.key_provider import (
     ChainedKeyProvider,

@@ -1,9 +1,13 @@
 """Responsiveness tests for async encrypted environment storage."""
 
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import json
 import threading
 
-import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QApplication

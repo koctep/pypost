@@ -1,5 +1,9 @@
 """Tests for pypost.core.environment_ops."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 
 from pypost.core.environment_ops import clone_environment

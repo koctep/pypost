@@ -1,4 +1,8 @@
 """Unit tests for AlertManager and AlertPayload."""
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import gc
 import json
 import logging

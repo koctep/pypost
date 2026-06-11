@@ -1,10 +1,14 @@
 """PYPOST-462: integration test for hidden-value masking across save/reload history flow."""
 
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields

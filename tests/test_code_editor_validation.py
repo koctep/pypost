@@ -1,5 +1,9 @@
 """CodeEditor format validation tests (PYPOST-512)."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import json
 import unittest
 

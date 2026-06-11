@@ -1,4 +1,8 @@
 """Tests for RequestWorker error signal behavior."""
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from unittest.mock import MagicMock, patch
 

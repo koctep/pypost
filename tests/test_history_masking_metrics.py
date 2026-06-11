@@ -1,5 +1,9 @@
 """PYPOST-464: Prometheus counter tests for hidden-value masking metrics."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 from unittest.mock import MagicMock
 
 from prometheus_client import generate_latest

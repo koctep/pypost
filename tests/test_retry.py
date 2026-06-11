@@ -1,5 +1,9 @@
 """Unit tests for retry logic in RequestService._execute_http_with_retry."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import unittest
 from unittest.mock import MagicMock
 

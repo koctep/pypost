@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import unittest
 
 from pypost.core.yaml_json_converter import (

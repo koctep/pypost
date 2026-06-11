@@ -1,5 +1,9 @@
 """Tests for request_sync copy policy and comparison helpers."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import unittest
 
 from pypost.core.request_sync import (

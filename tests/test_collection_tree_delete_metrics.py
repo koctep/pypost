@@ -1,5 +1,9 @@
 """Tests for delete metric emission by status and item type in handle_delete."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from unittest.mock import MagicMock, call, patch
 

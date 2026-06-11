@@ -1,4 +1,8 @@
 """Tests for MCPServerImpl: tool registration, schemas, and call_tool execution path."""
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import asyncio
 import unittest
 from unittest.mock import MagicMock

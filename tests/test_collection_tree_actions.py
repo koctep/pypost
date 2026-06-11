@@ -1,5 +1,9 @@
 """Direct unit tests for CollectionTreeActions (menu dispatch, rename flows)."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from unittest.mock import MagicMock, patch
 

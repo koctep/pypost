@@ -1,5 +1,9 @@
 """Direct unit tests for delete confirmation branching in CollectionTreeActions."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from unittest.mock import MagicMock, call, patch
 

@@ -1,5 +1,9 @@
 """Tests for EnvironmentStorageWorker."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import unittest
 from unittest.mock import MagicMock
 

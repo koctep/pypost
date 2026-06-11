@@ -1,8 +1,12 @@
 """CLI tests for scripts/encryption_migrate.py (PYPOST-487)."""
 
-import json
 
 import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
+import json
+
 
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment

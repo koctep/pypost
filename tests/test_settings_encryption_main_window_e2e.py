@@ -1,10 +1,14 @@
 """PYPOST-499: settings → open_settings → StorageManager encryption policy (PYPOST-481 debt)."""
 
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import json
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.storage import StorageManager

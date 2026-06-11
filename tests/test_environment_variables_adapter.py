@@ -1,4 +1,8 @@
+
 import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 from prometheus_client import generate_latest
 
 from pypost.core.environment_variables_adapter import EnvironmentVariablesAdapter

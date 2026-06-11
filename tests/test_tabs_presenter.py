@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtWidgets import QApplication
@@ -426,9 +430,13 @@ class TestTabsPresenter(unittest.TestCase):
         with patch(
             "pypost.ui.presenters.tabs_presenter.prompt_clean_sibling_tab_reload",
             return_value=False,
-        ):
+        ), patch(
+            "pypost.ui.presenters.tabs_presenter.prompt_dirty_sibling_tab_reload",
+            new=MagicMock(),
+        ) as mock_dirty_prompt:
             tab_a.request_editor.save_requested.emit(updated)
 
+        mock_dirty_prompt.assert_not_called()
         self.assertEqual(p.widget.tabText(0), "Renamed")
         self.assertEqual(p.widget.tabText(1), "Renamed")
 

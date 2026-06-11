@@ -1,5 +1,9 @@
 """Unit tests for collection item QMessageBox helpers."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from unittest.mock import patch
 

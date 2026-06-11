@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import unittest
 
 from pypost.core.template_expression_tokenizer import tokenize_template_expressions

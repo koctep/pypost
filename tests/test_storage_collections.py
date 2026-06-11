@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import json
 
 from pypost.core.storage import StorageManager

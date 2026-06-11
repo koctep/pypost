@@ -1,7 +1,11 @@
+
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from pypost.core.key_provider import build_key_id
 from pypost.core.key_sources.secret_store import (

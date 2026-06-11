@@ -1,5 +1,9 @@
 """Unit tests for MetricsManager Prometheus counter tracking (PYPOST-79)."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import asyncio
 import unittest
 

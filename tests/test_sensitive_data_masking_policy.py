@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import unittest
 
 from pypost.core.http_client import ResolvedRequestFields

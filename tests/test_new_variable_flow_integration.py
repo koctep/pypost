@@ -1,8 +1,12 @@
 """Integration tests for ResponseView → EnvPresenter new variable creation (PYPOST-475/480)."""
 
-from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
+from unittest.mock import MagicMock, patch
+
 from PySide6.QtWidgets import QApplication, QMessageBox, QInputDialog
 
 from pypost.models.models import Environment

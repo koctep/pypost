@@ -1,8 +1,12 @@
 """Settings UI for encryption migration verify and re-encrypt (PYPOST-527)."""
 
-from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
+from unittest.mock import MagicMock, patch
+
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from pypost.core.encryption_migration import MigrationReport

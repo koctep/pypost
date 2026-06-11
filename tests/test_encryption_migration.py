@@ -1,8 +1,12 @@
 """Tests for encryption migration service (PYPOST-487)."""
 
-import json
 
 import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
+import json
+
 
 from pypost.core.encryption_migration import (
     EncryptionMigrationService,

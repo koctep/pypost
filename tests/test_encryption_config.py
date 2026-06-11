@@ -1,8 +1,12 @@
 """Unit tests for encryption settings resolution (PYPOST-481/483)."""
 
-import json
 
 import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
+import json
+
 
 from pypost.core.encryption_config import (
     build_key_provider,

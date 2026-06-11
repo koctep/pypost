@@ -1,9 +1,13 @@
 """PYPOST-502: expanded key provider chain and secret-store unit coverage."""
 
+
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import json
 from unittest.mock import MagicMock
 
-import pytest
 
 from pypost.core.key_provider import ChainedKeyProvider, build_key_id
 from pypost.core.key_sources.chain import KeySourceChain

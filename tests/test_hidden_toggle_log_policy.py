@@ -1,5 +1,9 @@
 """Unit tests for HiddenToggleLogPolicy (PYPOST-448)."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy

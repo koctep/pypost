@@ -1,6 +1,10 @@
-import json
 
 import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
+import json
+
 from prometheus_client import generate_latest
 
 from pypost.core.metrics import MetricsManager

@@ -10,6 +10,10 @@ PYPOST-130 / PYPOST-133: resolve_text edge cases (batch 2 / PYPOST-15 path).
 PYPOST-131: QToolTip + PlainTextEdit (JSON body) contract, same mixin as CodeEditor body.
 """
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from typing import Tuple
 from unittest.mock import MagicMock, patch

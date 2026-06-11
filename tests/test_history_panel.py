@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtCore import QPoint

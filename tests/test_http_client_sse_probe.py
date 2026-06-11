@@ -1,4 +1,8 @@
 """Tests for HTTPClient SSE probe (PYPOST-39)."""
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 from unittest.mock import MagicMock, patch
 

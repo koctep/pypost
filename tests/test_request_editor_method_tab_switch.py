@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import sys
 import unittest
 from PySide6.QtWidgets import QApplication

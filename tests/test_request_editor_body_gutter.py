@@ -1,5 +1,9 @@
 """RequestWidget integration tests for Body tab line-number gutter (PYPOST-516)."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import sys
 import unittest
 

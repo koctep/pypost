@@ -1,5 +1,9 @@
 """RequestWidget integration tests for Body tab validation banner (PYPOST-521)."""
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import sys
 import unittest
 

@@ -1,6 +1,10 @@
 """Qt-level tests for SettingsDialog (request timeout visibility and persistence)."""
 
+
 import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 from PySide6.QtWidgets import QApplication
 
 from pypost.models.settings import AppSettings

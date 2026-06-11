@@ -5,6 +5,10 @@ documents; rules cover keywords, numbers, strings, and object keys. Assertions u
 QTextLayout format ranges (QTextCursor.charFormat ignores QSyntaxHighlighter ranges).
 """
 
+import pytest
+
+pytestmark = pytest.mark.timeout(60)
+
 import unittest
 
 from PySide6.QtGui import QColor, QTextDocument

@@ -1,9 +1,13 @@
 """Integration tests for migration with keyring/secret_store primaries (PYPOST-531)."""
 
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from pypost.core.encryption_migration import EncryptionMigrationService
 from pypost.core.key_provider import build_key_id

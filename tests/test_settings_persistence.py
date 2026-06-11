@@ -4,6 +4,10 @@ Covers ConfigManager JSON save/load with an isolated config directory and StateM
 delegation (expanded collections, open tabs, last environment) including no-op saves.
 """
 
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
 import shutil
 import tempfile
 import unittest

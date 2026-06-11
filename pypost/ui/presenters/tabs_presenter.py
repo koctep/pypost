@@ -596,7 +596,6 @@ class TabsPresenter(QObject):
         source_tab: RequestTab | None,
     ) -> None:
         """Notifies sibling tabs that the persisted copy changed elsewhere."""
-        self._sync_tab_labels_for_request(request_id, snapshot.name)
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if not isinstance(tab, RequestTab) or not tab.request_data:
@@ -606,6 +605,7 @@ class TabsPresenter(QObject):
             if tab.persisted_baseline and persisted_fields_equal(tab.persisted_baseline, snapshot):
                 continue
             self._offer_stale_tab_resolution(tab, snapshot)
+        self._sync_tab_labels_for_request(request_id, snapshot.name)
 
     def _offer_stale_tab_resolution(self, tab: RequestTab, snapshot: RequestData) -> None:
         """Prompts the user when a sibling tab saved a newer persisted version."""

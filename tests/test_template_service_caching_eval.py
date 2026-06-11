@@ -4,6 +4,10 @@ Caching is not implemented. Evaluation concluded deferral — see
 doc/dev/template_expression_functions.md (Caching evaluation).
 """
 
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+
 import unittest
 
 from pypost.core.template_service import TemplateService
