@@ -30,6 +30,64 @@ Key metrics for MCP testing:
 | `requests_sent_total` | `method` | HTTP requests sent |
 | `responses_received_total` | `method`, `status_code` | HTTP responses received |
 
+## Per-test timeouts (mandatory)
+
+Every test must declare an explicit timeout so the suite cannot hang indefinitely.
+Agent rules: [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md).
+
+### Declaration
+
+Use module-level `pytestmark` (preferred), class-level, or per-function markers:
+
+```python
+import pytest
+
+pytestmark = pytest.mark.timeout(30)
+```
+
+Qt / event-loop tests use the default signal-based timeout (do not use `method="thread"`):
+
+```python
+pytestmark = pytest.mark.timeout(60)
+```
+
+### Recommended tiers
+
+| Test kind | Suggested timeout (seconds) |
+| --------- | --------------------------- |
+| Pure unit (mocked I/O) | 10–30 |
+| Qt widget / presenter | 30–60 |
+| Integration / e2e / benchmark | 60–120 |
+
+### Enforcement
+
+[`tests/conftest.py`](../../tests/conftest.py) fails setup for any test without a closest
+`timeout` marker. [`pytest.ini`](../../pytest.ini) registers the marker; `pytest-timeout` is
+installed via `make venv-test`. There is no global default in `pytest.ini` — each test module,
+class, or function must declare its own timeout.
+
+```bash
+make test
+```
+
+### PYPOST-400 regression surface
+
+Worker/error-handling and related DI regressions (SSE probe, history flush):
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_http_client_sse_probe.py \
+  tests/test_history_manager.py \
+  tests/test_worker.py \
+  tests/test_retry.py \
+  tests/test_tabs_presenter.py::TestOnRequestError \
+  -v --tb=short
+```
+
+When using `HistoryManager` with `tempfile.TemporaryDirectory`, call `hm.flush()` before the
+context exits. SSE probe tests must inject `TemplateService()` (or rely on the `HTTPClient`
+default from PYPOST-403).
+
 ## Collections tree test helpers
 
 Shared fixtures for presenter and `CollectionTreeActions` tests live in
