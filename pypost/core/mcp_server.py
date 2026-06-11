@@ -9,6 +9,7 @@ from typing import List, Optional
 import uvicorn
 from PySide6.QtCore import QObject, Signal
 
+from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
@@ -30,6 +31,7 @@ def format_mcp_bind_error(exc: OSError, host: str, port: int) -> str:
 class MCPServerManager(QObject):
     status_changed = Signal(bool)  # True = running, False = stopped
     start_failed = Signal(str)  # operator-facing bind / startup error
+    activity_recorded = Signal(object)  # payload: McpActivityEntry
 
     def __init__(
         self, metrics: MetricsManager | None = None, template_service: TemplateService | None = None
@@ -38,7 +40,12 @@ class MCPServerManager(QObject):
         self._server_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._server_instance: Optional[uvicorn.Server] = None
-        self._impl = MCPServerImpl(metrics=metrics, template_service=template_service)
+        self._activity_log = McpActivityLog(on_append=self._emit_activity)
+        self._impl = MCPServerImpl(
+            metrics=metrics,
+            template_service=template_service,
+            activity_log=self._activity_log,
+        )
         if template_service is not None:
             logger.debug(
                 "MCPServerManager: propagating TemplateService id=%d", id(template_service)
@@ -48,6 +55,13 @@ class MCPServerManager(QObject):
         self._variable_supplier: Callable[[], dict[str, str]] | None = None
         self._hidden_keys_supplier: Callable[[], set[str]] | None = None
         self._startup_notified = False
+
+    @property
+    def activity_log(self) -> McpActivityLog:
+        return self._activity_log
+
+    def _emit_activity(self, entry: McpActivityEntry) -> None:
+        self.activity_recorded.emit(entry)
 
     def set_variable_supplier(
         self, supplier: Callable[[], dict[str, str]] | None

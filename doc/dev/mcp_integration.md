@@ -61,6 +61,9 @@ The environment selector owns MCP lifecycle and the active-variable cache used b
 *   **MCP tools overview (PYPOST-556)**: Top-bar **MCP Tools (N)** opens
     `McpToolsOverviewDialog` with all `expose_as_mcp` requests across collections (MCP name,
     collection, method, description). Count refreshes on environment change.
+*   **MCP activity log (PYPOST-141)**: Top-bar **MCP Activity (N)** opens
+    `McpActivityDialog` with recent inbound `list_tools` and `call_tool` operations. Count
+    reflects session entries; dialog live-refreshes while open via `activity_recorded`.
 *   **Status label**: Shows `MCP: Starting (host:port)...` after `start_server` until
     `status_changed(True)`; `MCP: ON` only when listening; `start_failed` shows a warning
     dialog and resets to `MCP: OFF`.
@@ -101,6 +104,26 @@ former monolithic `MetricsManager` into focused modules:
 `collect_mcp_tool_overview(collections)` in `pypost/core/mcp_tools_overview.py` builds
 sorted `McpToolOverviewEntry` rows. `EnvPresenter` opens `McpToolsOverviewDialog` from the
 top bar. Overview is read-only and does not require MCP to be running.
+
+### MCP activity inspection (PYPOST-141)
+
+`McpActivityLog` in `pypost/core/mcp_activity_log.py` stores a thread-safe ring buffer (default
+100 entries) of `McpActivityEntry` records. `MCPServerImpl` appends on each `list_tools` and
+`call_tool` invocation when a log is injected (via `MCPServerManager`).
+
+| Field | `list_tools` | `call_tool` |
+| --- | --- | --- |
+| `operation` | `list_tools` | `call_tool` |
+| `tool_count` | number of tools returned | — |
+| `tool_name` | — | MCP tool name |
+| `mcp_arg_count` | — | count of agent arguments (values never stored) |
+| `http_status` | — | upstream HTTP status from execution |
+| `duration_ms` | — | wall time for handler |
+| `outcome` | `success` | `success` or `error` |
+| `detail` | — | short error message when applicable |
+
+`MCPServerManager.activity_recorded` emits each new entry for UI refresh. `EnvPresenter`
+opens `McpActivityDialog` from **MCP Activity (N)** in the top bar.
 
 ### Tool Execution
 

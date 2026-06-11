@@ -10,6 +10,7 @@ from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication, QWidget, QInputDialog, QMessageBox
 
 from pypost.core.key_provider import EnvironmentEncryptionError
+from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.models.models import Environment, Collection, RequestData
 from pypost.models.settings import AppSettings
@@ -42,11 +43,13 @@ class FakeConfigManager:
 class FakeMCPManager:
     status_changed = MagicMock()
     start_failed = MagicMock()
+    activity_recorded = MagicMock()
 
     def __init__(self):
         self.started = []
         self.stopped = 0
         self._running = False
+        self.activity_log = McpActivityLog()
 
     def start_server(self, port, tools, host="127.0.0.1"):
         self.started.append((port, host, tools))
@@ -72,6 +75,8 @@ def _make_mcp_manager():
     mgr.status_changed.connect = MagicMock()
     mgr.start_failed = MagicMock()
     mgr.start_failed.connect = MagicMock()
+    mgr.activity_recorded = MagicMock()
+    mgr.activity_recorded.connect = MagicMock()
     return mgr
 
 
@@ -263,6 +268,18 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter(collections=[col])
         p._refresh_mcp_tools_button()
         self.assertEqual(p.mcp_tools_btn.text(), "MCP Tools (1)")
+
+    def test_mcp_activity_button_shows_count(self):
+        p = self._make_presenter([])
+        p._mcp_manager.activity_log.append(McpActivityEntry.new_list_tools(2))
+        p._refresh_mcp_activity_button()
+        self.assertEqual(p.mcp_activity_btn.text(), "MCP Activity (1)")
+
+    def test_mcp_activity_recorded_updates_button(self):
+        p = self._make_presenter([])
+        p._mcp_manager.activity_log.append(McpActivityEntry.new_list_tools(1))
+        p._on_mcp_activity_recorded(McpActivityEntry.new_list_tools(99))
+        self.assertEqual(p.mcp_activity_btn.text(), "MCP Activity (1)")
 
     def test_on_env_changed_shows_starting_when_mcp_enabled(self):
         env = _make_env("e1", "MCP-Env", enable_mcp=True)

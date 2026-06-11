@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from collections.abc import Callable
 from typing import Any, Dict, List
 
@@ -12,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 from starlette.routing import Mount, Route
 
+from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_secrets_policy import McpSecretsPolicy
 from pypost.core.mcp_tool_contract import (
     build_tool_input_schema,
@@ -65,10 +67,12 @@ class MCPServerImpl:
         template_service: TemplateService | None = None,
         variable_supplier: Callable[[], dict[str, str]] | None = None,
         hidden_keys_supplier: Callable[[], set[str]] | None = None,
+        activity_log: McpActivityLog | None = None,
     ):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
         self._metrics = metrics
+        self._activity_log = activity_log
         self._template_service = template_service
         self._variable_supplier = variable_supplier or (lambda: {})
         self._hidden_keys_supplier = hidden_keys_supplier or (lambda: set())
@@ -95,6 +99,8 @@ class MCPServerImpl:
                     inputSchema=schema,
                 )
             )
+        if self._activity_log is not None:
+            self._activity_log.append(McpActivityEntry.new_list_tools(len(tools)))
         return tools
 
     async def call_tool(self, name: str, arguments: dict) -> List[Any]:
@@ -102,6 +108,8 @@ class MCPServerImpl:
             raise ValueError(f"Tool {name} not found")
 
         request_data = self.tools_map[name]
+        mcp_arg_count = len(arguments or {})
+        started = time.perf_counter()
 
         # Track MCP request
         if self._metrics:
@@ -113,16 +121,44 @@ class MCPServerImpl:
                 self._execute_request_sync, request_data, arguments
             )
             output_text = format_structured_tool_result(result)
+            duration_ms = (time.perf_counter() - started) * 1000.0
+            has_error = _tool_result_has_error(result)
+            outcome = "error" if has_error else "success"
 
             if self._metrics:
-                outcome = "error" if _tool_result_has_error(result) else "success"
                 self._metrics.track_mcp_response_sent(request_data.method, outcome)
+
+            if self._activity_log is not None:
+                detail = None
+                if result.execution_error is not None:
+                    detail = result.execution_error.message
+                self._activity_log.append(
+                    McpActivityEntry.new_call_tool(
+                        name,
+                        outcome=outcome,
+                        mcp_arg_count=mcp_arg_count,
+                        http_status=result.response.status_code,
+                        detail=detail,
+                        duration_ms=duration_ms,
+                    )
+                )
 
             return [TextContent(type="text", text=output_text)]
         except Exception as e:
+            duration_ms = (time.perf_counter() - started) * 1000.0
             # Track MCP response error
             if self._metrics:
                 self._metrics.track_mcp_response_sent(request_data.method, "error")
+            if self._activity_log is not None:
+                self._activity_log.append(
+                    McpActivityEntry.new_call_tool(
+                        name,
+                        outcome="error",
+                        mcp_arg_count=mcp_arg_count,
+                        detail=str(e),
+                        duration_ms=duration_ms,
+                    )
+                )
             return [TextContent(type="text", text=f"Error executing request: {str(e)}")]
 
     def set_variable_supplier(

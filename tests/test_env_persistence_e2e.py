@@ -14,6 +14,7 @@ from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
+from pypost.core.mcp_activity_log import McpActivityLog
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.core.constants import HIDDEN_MASK
 
@@ -30,6 +31,9 @@ class _FakeMCPManager:
         self.status_changed.connect = MagicMock()
         self.start_failed = MagicMock()
         self.start_failed.connect = MagicMock()
+        self.activity_recorded = MagicMock()
+        self.activity_recorded.connect = MagicMock()
+        self.activity_log = McpActivityLog()
 
     def start_server(self, port, tools, host="127.0.0.1"):  # noqa: ARG002
         return None

@@ -26,6 +26,7 @@ from pypost.core.variable_name_validation import (
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
+from pypost.ui.dialogs.mcp_activity_dialog import McpActivityDialog
 from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ class EnvPresenter(QObject):
 
         self._mcp_manager.status_changed.connect(self._on_mcp_status_changed)
         self._mcp_manager.start_failed.connect(self._on_mcp_start_failed)
+        self._mcp_manager.activity_recorded.connect(self._on_mcp_activity_recorded)
         self._mcp_manager.set_variable_supplier(
             lambda: dict(self._current_variables)
         )
@@ -94,10 +96,15 @@ class EnvPresenter(QObject):
         self._mcp_tools_btn = QPushButton("MCP Tools (0)")
         self._mcp_tools_btn.clicked.connect(self._open_mcp_tools_overview)
 
+        self._mcp_activity_btn = QPushButton("MCP Activity (0)")
+        self._mcp_activity_btn.clicked.connect(self._open_mcp_activity)
+        self._mcp_activity_dialog: McpActivityDialog | None = None
+
         layout.addWidget(self._env_label)
         layout.addWidget(self._env_selector)
         layout.addWidget(self._manage_btn)
         layout.addWidget(self._mcp_tools_btn)
+        layout.addWidget(self._mcp_activity_btn)
         layout.addWidget(self._mcp_status_label)
         layout.addStretch()
 
@@ -121,6 +128,10 @@ class EnvPresenter(QObject):
     @property
     def manage_btn(self) -> QPushButton:
         return self._manage_btn
+
+    @property
+    def mcp_activity_btn(self) -> QPushButton:
+        return self._mcp_activity_btn
 
     @property
     def mcp_tools_btn(self) -> QPushButton:
@@ -351,6 +362,28 @@ class EnvPresenter(QObject):
         logger.info("mcp_tools_overview_opened tool_count=%d", len(entries))
         dialog = McpToolsOverviewDialog(entries, self._widget)
         dialog.exec()
+
+    def _open_mcp_activity(self) -> None:
+        entries = self._mcp_manager.activity_log.get_entries()
+        logger.info("mcp_activity_dialog_opened entry_count=%d", len(entries))
+        dialog = McpActivityDialog(entries, self._widget)
+        self._mcp_activity_dialog = dialog
+        dialog.finished.connect(self._on_mcp_activity_dialog_closed)
+        dialog.exec()
+
+    def _on_mcp_activity_dialog_closed(self) -> None:
+        self._mcp_activity_dialog = None
+
+    def _on_mcp_activity_recorded(self, _entry: object) -> None:
+        self._refresh_mcp_activity_button()
+        if self._mcp_activity_dialog is not None:
+            self._mcp_activity_dialog.set_entries(
+                self._mcp_manager.activity_log.get_entries()
+            )
+
+    def _refresh_mcp_activity_button(self) -> None:
+        count = self._mcp_manager.activity_log.count()
+        self._mcp_activity_btn.setText(f"MCP Activity ({count})")
 
     def _open_env_manager(self) -> None:
         current_env_name = self._env_selector.currentText()
