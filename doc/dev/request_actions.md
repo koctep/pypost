@@ -13,9 +13,14 @@ This design reduces UI clutter and allows adding more actions in the same menu l
 - **`RequestWidget` (`pypost/ui/widgets/request_editor.py`)**:
   - Builds action controls for each request tab.
   - Owns `Send` button, `Actions` tool button, and `Save` menu action.
+- **`TabsPresenter` (`pypost/ui/presenters/tabs_presenter.py`)**:
+  - Receives `save_requested` and `save_as_requested` from each `RequestWidget`.
+  - Delegates persistence to `RequestSaveOrchestrator` and updates tab state/signals.
+- **`RequestSaveOrchestrator` (`pypost/ui/request_save_orchestrator.py`)**:
+  - Owns save/save-as dialogs, overwrite/stale confirmations, and `RequestManager` calls.
+  - Returns `SaveResult` for the presenter to apply tab updates.
 - **`MainWindow` (`pypost/ui/main_window.py`)**:
-  - Receives `save_requested` and `send_requested` signals.
-  - Executes the existing save workflow via `handle_save_request`.
+  - Wires `request_saved` / `request_save_as_completed` to collections tree refresh.
 - **`MetricsManager` (`pypost/core/metrics.py`)**:
   - Collects GUI action metrics:
     - `gui_send_clicks_total`
@@ -29,7 +34,7 @@ This design reduces UI clutter and allows adding more actions in the same menu l
 High-level flow:
 1. User clicks `Actions -> Save` or presses `Ctrl+S`.
 2. `RequestWidget.on_save(source=...)` updates request data and emits `save_requested`.
-3. `MainWindow.handle_save_request` runs the persistence flow.
+3. `TabsPresenter` calls `RequestSaveOrchestrator.save_request` and emits `request_saved`.
 
 New-tab flow:
 1. User clicks `+` or presses `Ctrl+N`.
@@ -41,7 +46,7 @@ Save-as flow:
 1. User clicks `Actions -> Save As...` or presses `Ctrl+Shift+S`.
 1. `RequestWidget.on_save_as(source=...)` updates request data and emits
    `save_as_requested`.
-1. `MainWindow.handle_save_as_request` opens save dialog and persists a new request ID.
+1. `RequestSaveOrchestrator.save_as_request` opens save dialog and persists a new request ID.
 1. `Save As...` uses a UI snapshot copy of request data; source request is not mutated in-place.
 
 ## API / Usage
@@ -134,6 +139,8 @@ Tab action UI uses internal constants in `MainWindow`:
 
 ## Testing
 
+Save orchestrator unit tests live in `tests/test_request_save_orchestrator.py`.
+
 Save-as identity regression coverage lives in `tests/test_tabs_presenter.py`:
 
 - `test_save_as_preserves_original_request_id` — save-as must persist a new request ID and leave
@@ -141,7 +148,7 @@ Save-as identity regression coverage lives in `tests/test_tabs_presenter.py`:
 - `test_save_as_emits_request_save_as_completed_not_request_saved` — save-as emits
   `request_save_as_completed` (not `request_saved`) with the new ID.
 
-Run: `python -m pytest tests/test_tabs_presenter.py -k save_as -v`
+Run: `python -m pytest tests/test_request_save_orchestrator.py tests/test_tabs_presenter.py -k save -v`
 
 ## Troubleshooting
 
@@ -174,7 +181,7 @@ Run: `python -m pytest tests/test_tabs_presenter.py -k save_as -v`
 
 ### Save action works but data is not persisted
 
-- Inspect `MainWindow.handle_save_request` flow.
+- Inspect `RequestSaveOrchestrator.save_request` and `TabsPresenter._handle_save_request`.
 - Check collection and storage files for write permissions.
 
 ### `+` button is not visible or overlaps tabs

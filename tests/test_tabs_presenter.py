@@ -308,7 +308,7 @@ class TestTabsPresenter(unittest.TestCase):
         mock_dialog.request_name = "Copy"
 
         with patch(
-            "pypost.ui.presenters.tabs_presenter.SaveRequestDialog",
+            "pypost.ui.request_save_orchestrator.SaveRequestDialog",
             return_value=mock_dialog,
         ):
             p._handle_save_as_request(req)
@@ -340,7 +340,7 @@ class TestTabsPresenter(unittest.TestCase):
         mock_dialog.request_name = "Copy"
 
         with patch(
-            "pypost.ui.presenters.tabs_presenter.SaveRequestDialog",
+            "pypost.ui.request_save_orchestrator.SaveRequestDialog",
             return_value=mock_dialog,
         ):
             p._handle_save_as_request(save_as_input)

@@ -1,5 +1,4 @@
 import logging
-import uuid
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
@@ -30,7 +29,11 @@ from pypost.core.worker import RequestWorker
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
-from pypost.ui.dialogs.save_dialog import SaveRequestDialog
+from pypost.ui.request_save_orchestrator import (
+    RequestSaveOrchestrator,
+    SaveAction,
+    StaleCheckContext,
+)
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 
@@ -124,6 +127,12 @@ class TabsPresenter(QObject):
         self._template_service = template_service
         self._alert_manager = alert_manager
         logger.debug("TabsPresenter: alert_manager_injected=%s", alert_manager is not None)
+        self._save_orchestrator = RequestSaveOrchestrator(
+            request_manager,
+            state_manager,
+            settings,
+            metrics=metrics,
+        )
         self._current_variables: dict = {}
         self._current_hidden_keys: set = set()
 
@@ -641,172 +650,65 @@ class TabsPresenter(QObject):
         tab.request_editor.load_data()
         tab.stale_persisted = False
 
-    def _check_stale_before_save(
-        self,
-        source_tab: RequestTab | None,
-        disk_request: RequestData,
-    ) -> bool:
-        """Returns False when the user cancels a save over newer on-disk content."""
-        if source_tab is None or source_tab.persisted_baseline is None:
-            return True
-        if persisted_fields_equal(source_tab.persisted_baseline, disk_request):
-            return True
-        if not source_tab.stale_persisted:
-            return True
-        reply = QMessageBox.question(
-            self._tabs,
-            "Overwrite Newer Saved Version?",
-            (
-                "A newer version of this request was saved in another tab. "
-                "Saving now will replace it on disk. Continue?"
-            ),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+    def _stale_context_for_tab(self, source_tab: RequestTab | None) -> StaleCheckContext | None:
+        if source_tab is None:
+            return None
+        return StaleCheckContext(
+            persisted_baseline=source_tab.persisted_baseline,
+            stale_persisted=source_tab.stale_persisted,
         )
-        return reply == QMessageBox.Yes
+
+    def _apply_save_result_to_tab(self, tab: RequestTab, request: RequestData) -> None:
+        tab.request_data = request
+        tab.persisted_baseline = snapshot_persisted_fields(request)
+        tab.stale_persisted = False
 
     def _handle_save_request(self, request_data: RequestData) -> None:
-        existing_result = self._request_manager.find_request(request_data.id)
+        source_tab = self._find_tab_for_sender()
+        result = self._save_orchestrator.save_request(
+            request_data,
+            self._tabs,
+            stale_context=self._stale_context_for_tab(source_tab),
+        )
+        if result.action == SaveAction.CANCELLED:
+            return
 
-        if existing_result:
-            existing_request, found_collection = existing_result
-            source_tab = self._find_tab_for_sender()
-            if self._settings.confirm_overwrite_request:
-                message = (
-                    "This will overwrite the existing request "
-                    f"'{existing_request.name}'. Continue?"
-                )
-                if source_tab and source_tab.persisted_baseline and not persisted_fields_equal(
-                    source_tab.persisted_baseline,
-                    existing_request,
-                ):
-                    message = (
-                        "A newer version of this request exists on disk. "
-                        f"This will overwrite '{existing_request.name}'. Continue?"
-                    )
-                reply = QMessageBox.question(
-                    self._tabs,
-                    "Overwrite Request?",
-                    message,
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No,
-                )
-                if reply == QMessageBox.No:
-                    logger.info("save_request_overwrite_cancelled request_id=%s", request_data.id)
-                    return
-
-            if not self._check_stale_before_save(source_tab, existing_request):
-                logger.info("save_request_stale_cancelled request_id=%s", request_data.id)
-                return
-
-            self._request_manager.save_request(request_data, found_collection.id)
-            logger.info(
-                "save_request_overwrite_succeeded request_id=%s collection_id=%s",
-                request_data.id,
-                found_collection.id,
-            )
-            if self._metrics:
-                self._metrics.track_gui_save_action("overwrite")
-
-            snapshot = snapshot_persisted_fields(request_data)
-            if source_tab is not None:
+        if result.action == SaveAction.OVERWRITE:
+            snapshot = result.request
+            if source_tab is not None and snapshot is not None:
                 source_tab.request_data = snapshot
                 source_tab.persisted_baseline = snapshot_persisted_fields(snapshot)
                 source_tab.stale_persisted = False
-
             self.request_persisted.emit(request_data.id, snapshot, source_tab)
             self._sync_tab_labels_for_request(request_data.id, request_data.name)
             self.request_saved.emit()
             return
 
-        collections = self._request_manager.get_collections()
-        dialog = SaveRequestDialog(collections, self._tabs)
-        if not dialog.exec():
-            return
-
-        request_data.name = dialog.request_name
-        target_collection_id = dialog.selected_collection_id
-
-        if not target_collection_id and dialog.new_collection_name:
-            new_col = self._request_manager.create_collection(dialog.new_collection_name)
-            target_collection_id = new_col.id
-
-        if not target_collection_id:
-            logger.warning("save_request_failed reason=missing_target_collection")
-            return
-
-        self._request_manager.save_request(request_data, target_collection_id)
-        logger.info(
-            "save_request_new_succeeded request_id=%s name=%s collection_id=%s",
-            request_data.id,
-            request_data.name,
-            target_collection_id,
-        )
-        if self._metrics:
-            self._metrics.track_gui_save_action("new")
-
-        current_expanded = self._state_manager.get_expanded_collections()
-        if target_collection_id not in current_expanded:
-            current_expanded.append(target_collection_id)
-            self._state_manager.set_expanded_collections(current_expanded)
-
-        current_index = self._tabs.currentIndex()
-        self._tabs.setTabText(current_index, request_data.name)
-        tab = self._tabs.widget(current_index)
-        if isinstance(tab, RequestTab):
-            tab.request_data = request_data
-            tab.persisted_baseline = snapshot_persisted_fields(request_data)
-            tab.stale_persisted = False
-
-        self.save_tabs_state()
-        self.request_saved.emit()
+        if result.action == SaveAction.CREATED_NEW and result.request is not None:
+            current_index = self._tabs.currentIndex()
+            self._tabs.setTabText(current_index, result.request.name)
+            tab = self._tabs.widget(current_index)
+            if isinstance(tab, RequestTab):
+                self._apply_save_result_to_tab(tab, result.request)
+            self.save_tabs_state()
+            self.request_saved.emit()
 
     def _handle_save_as_request(self, request_data: RequestData) -> None:
-        logger.info("save_as_flow_started source_request_id=%s", request_data.id)
-        collections = self._request_manager.get_collections()
-        dialog = SaveRequestDialog(collections, self._tabs)
-        if not dialog.exec():
-            logger.info("save_as_flow_cancelled source_request_id=%s", request_data.id)
+        result = self._save_orchestrator.save_as_request(request_data, self._tabs)
+        if result.action != SaveAction.SAVE_AS or result.request is None:
             return
 
-        target_collection_id = dialog.selected_collection_id
-        if not target_collection_id and dialog.new_collection_name:
-            new_col = self._request_manager.create_collection(dialog.new_collection_name)
-            target_collection_id = new_col.id
-
-        if not target_collection_id:
-            logger.warning("save_as_flow_failed reason=missing_target_collection")
-            return
-
-        new_request = request_data.model_copy(
-            deep=True,
-            update={"id": str(uuid.uuid4()), "name": dialog.request_name},
-        )
-        self._request_manager.save_request(new_request, target_collection_id)
-        logger.info(
-            "save_as_flow_completed source_request_id=%s new_request_id=%s"
-            " target_collection_id=%s",
-            request_data.id,
-            new_request.id,
-            target_collection_id,
-        )
-
-        current_expanded = self._state_manager.get_expanded_collections()
-        if target_collection_id not in current_expanded:
-            current_expanded.append(target_collection_id)
-            self._state_manager.set_expanded_collections(current_expanded)
-
+        new_request = result.request
         current_index = self._tabs.currentIndex()
         self._tabs.setTabText(current_index, new_request.name)
         tab = self._tabs.widget(current_index)
         if isinstance(tab, RequestTab):
             tab.request_data = new_request
             tab.request_editor.request_data = new_request
-            tab.persisted_baseline = snapshot_persisted_fields(new_request)
-            tab.stale_persisted = False
+            self._apply_save_result_to_tab(tab, new_request)
 
         self.save_tabs_state()
-        self.request_save_as_completed.emit(new_request, target_collection_id)
+        self.request_save_as_completed.emit(new_request, result.collection_id or "")
 
     def _handle_copy_curl_request(self, request_data: RequestData) -> None:
         try:
