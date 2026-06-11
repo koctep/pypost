@@ -45,3 +45,16 @@ N/A
 ## Troubleshooting
 - **Hidden Values Losing Data**: Ensure that when `HIDDEN_MASK` is displayed, the real value is stored in `Qt.ItemDataRole.UserRole`. Check `_extract_real_value` and `_make_value_item` for details on how the value is preserved.
 - **Duplicate Environment Names**: When copying an environment, the UI validates that the new name is not empty and does not already exist, prompting the user again if invalid.
+
+## Testing
+
+Automated Qt/offscreen coverage lives in `tests/test_env_dialog.py` (module timeout 60s).
+The suite exercises:
+
+- Environment list selection, add/delete, and rename validation
+- **Copy / duplicate** via `_duplicate_environment_at_row` and context-menu wiring
+  (QInputDialog cancel, empty name, duplicate name — patched dialogs/message boxes)
+- Variables table: hidden flags, moves, deletes, trailing add row, invalid name revert
+- MCP checkbox sync and logging (`caplog` for masked vs readable hidden keys)
+
+Run: `pytest tests/test_env_dialog.py -q`

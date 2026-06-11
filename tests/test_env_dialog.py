@@ -455,3 +455,214 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText",
+        return_value=("Staging Copy", True),
+    )
+    def test_duplicate_environment_clones_model_and_selects_new_row(
+        self, _mock_input, qapp
+    ):
+        source = Environment(
+            name="Staging",
+            variables={"API_KEY": "secret", "HOST": "localhost"},
+            hidden_keys={"API_KEY"},
+            enable_mcp=True,
+        )
+        envs = [Environment(name="Dev", variables={}), source]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg._env_list_widget._duplicate_environment_at_row(1)
+            assert len(envs) == 3
+            assert envs[1].name == "Staging"
+            copy_env = envs[2]
+            assert copy_env.name == "Staging Copy"
+            assert copy_env.variables == source.variables
+            assert copy_env.hidden_keys == source.hidden_keys
+            assert copy_env.enable_mcp is True
+            assert copy_env.id != source.id
+            assert dlg.env_list.currentRow() == 2
+            assert dlg.env_list.item(2).text() == "Staging Copy"
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText",
+        return_value=("", False),
+    )
+    def test_duplicate_environment_cancelled_leaves_list_unchanged(
+        self, _mock_input, qapp
+    ):
+        envs = [Environment(name="Dev", variables={"a": "1"})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg._env_list_widget._duplicate_environment_at_row(0)
+            assert len(envs) == 1
+            assert envs[0].name == "Dev"
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.show_copy_environment_empty_name_error"
+    )
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText"
+    )
+    def test_duplicate_environment_empty_name_reprompts(
+        self, mock_get_text, mock_empty_error, qapp
+    ):
+        mock_get_text.side_effect = [("   ", True), ("Valid Copy", True)]
+        envs = [Environment(name="Dev", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg._env_list_widget._duplicate_environment_at_row(0)
+            assert mock_empty_error.call_count == 1
+            assert len(envs) == 2
+            assert envs[1].name == "Valid Copy"
+            assert mock_get_text.call_count == 2
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.show_copy_environment_duplicate_name_error"
+    )
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText"
+    )
+    def test_duplicate_environment_duplicate_name_reprompts(
+        self, mock_get_text, mock_dup_error, qapp
+    ):
+        mock_get_text.side_effect = [("Dev", True), ("Dev Copy", True)]
+        envs = [Environment(name="Dev", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg._env_list_widget._duplicate_environment_at_row(0)
+            assert mock_dup_error.call_count == 1
+            mock_dup_error.assert_called_with(dlg._env_list_widget, "Dev")
+            assert len(envs) == 2
+            assert envs[1].name == "Dev Copy"
+            assert mock_get_text.call_count == 2
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText",
+        return_value=("Copy of Dev", True),
+    )
+    def test_duplicate_environment_logs_copied_event(self, _mock_input, qapp, caplog):
+        envs = [Environment(name="Dev", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            with caplog.at_level(logging.INFO):
+                dlg._env_list_widget._duplicate_environment_at_row(0)
+            assert any(
+                "environment_copied source_name=Dev new_name=Copy of Dev" in r.message
+                for r in caplog.records
+            )
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText",
+        return_value=("", False),
+    )
+    def test_add_environment_cancelled_leaves_list_unchanged(self, _mock_input, qapp):
+        envs = [Environment(name="Base", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg.add_environment()
+            assert len(envs) == 1
+            assert envs[0].name == "Base"
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText",
+        return_value=("", True),
+    )
+    def test_add_environment_empty_name_not_appended(self, _mock_input, qapp):
+        envs = [Environment(name="Base", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg.add_environment()
+            assert len(envs) == 1
+        finally:
+            dlg.close()
+
+    def test_add_variable_via_trailing_row_appends_to_model(self, qapp):
+        env = Environment(name="Dev", variables={"existing": "1"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            trailing_row = len(env.variables)
+            dlg.vars_table.setItem(trailing_row, 0, QTableWidgetItem("new_key"))
+            dlg.vars_table.setItem(trailing_row, 1, QTableWidgetItem("new_val"))
+            item = dlg.vars_table.item(trailing_row, 0)
+            dlg.on_var_changed(item)
+            assert env.variables == {"existing": "1", "new_key": "new_val"}
+            assert dlg.vars_table.rowCount() == 3
+        finally:
+            dlg.close()
+
+    def test_edit_existing_key_to_invalid_name_reverts(self, qapp):
+        env = Environment(name="Dev", variables={"valid_key": "1"})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg.vars_table.item(0, 0).setText("123bad")
+            item = dlg.vars_table.item(0, 0)
+            dlg.on_var_changed(item)
+            assert list(env.variables.keys()) == ["valid_key"]
+            assert dlg.vars_table.item(0, 0).text() == "valid_key"
+        finally:
+            dlg.close()
+
+    def test_on_env_selected_invalid_row_clears_table_and_disables_mcp(self, qapp):
+        env = Environment(name="Dev", variables={"k": "v"}, enable_mcp=True)
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            assert dlg.mcp_check.isEnabled()
+            dlg.on_env_selected(-1)
+            assert dlg.vars_table.rowCount() == 0
+            assert not dlg.mcp_check.isEnabled()
+            assert not dlg.mcp_check.isChecked()
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText",
+        return_value=("Dev Copy", True),
+    )
+    def test_env_list_context_menu_copy_duplicates_environment(
+        self, _mock_input, qapp
+    ):
+        envs = [Environment(name="Dev", variables={"x": "1"})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            list_widget = dlg._env_list_widget
+            item = dlg.env_list.item(0)
+            rename_action = object()
+            copy_action = object()
+            delete_action = object()
+
+            with patch.object(list_widget.env_list, "itemAt", return_value=item):
+                with patch(
+                    "pypost.ui.widgets.environments.environment_list_widget.QMenu"
+                ) as mock_menu_cls:
+                    mock_menu = mock_menu_cls.return_value
+                    mock_menu.addAction.side_effect = [
+                        rename_action,
+                        copy_action,
+                        delete_action,
+                    ]
+                    mock_menu.exec.return_value = copy_action
+                    from PySide6.QtCore import QPoint
+
+                    list_widget._on_env_list_context_menu(QPoint(0, 0))
+
+            assert len(envs) == 2
+            assert envs[1].name == "Dev Copy"
+            assert envs[1].variables == {"x": "1"}
+        finally:
+            dlg.close()
+
