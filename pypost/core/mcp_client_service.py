@@ -1,11 +1,11 @@
 """MCP client service for testing MCP endpoints via full protocol handshake."""
 
-import asyncio
 import json
 import logging
 import time
 from typing import Any
 
+import anyio
 import httpx
 from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
@@ -44,13 +44,13 @@ class MCPClientService:
         start_time = time.time()
         logger.debug("mcp_operation_start url=%s operation=%s", url, operation)
         try:
-            result = asyncio.run(
-                asyncio.wait_for(
-                    self._run_async(url, operation, call_params or {}),
-                    timeout=MCP_TOTAL_TIMEOUT,
-                )
+            result = anyio.run(
+                self._run_with_timeout,
+                url,
+                operation,
+                call_params or {},
             )
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             logger.error(
                 "mcp_operation_timeout url=%s operation=%s timeout=%.1f",
                 url,
@@ -131,6 +131,15 @@ class MCPClientService:
             size=len(body_str.encode("utf-8")),
         )
 
+    async def _run_with_timeout(
+        self,
+        url: str,
+        operation: str,
+        call_params: dict[str, Any],
+    ) -> str | dict:
+        with anyio.fail_after(MCP_TOTAL_TIMEOUT):
+            return await self._run_async(url, operation, call_params)
+
     async def _run_async(
         self,
         url: str,
@@ -142,17 +151,17 @@ class MCPClientService:
             async with streamable_http_client(
                 url, http_client=http_client
             ) as (read_stream, write_stream, _get_session_id):
-                session = ClientSession(read_stream, write_stream)
-                await session.initialize()
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
 
-                if operation == "list_tools":
-                    result = await session.list_tools()
-                    return result.model_dump(mode="json")
-                if operation == "call_tool":
-                    name = call_params.get("name")
-                    if not name:
-                        raise ValueError("call_tool requires 'name' in body")
-                    arguments = call_params.get("arguments") or {}
-                    result = await session.call_tool(name, arguments)
-                    return result.model_dump(mode="json")
-                raise ValueError(f"Unknown operation: {operation}")
+                    if operation == "list_tools":
+                        result = await session.list_tools()
+                        return result.model_dump(mode="json")
+                    if operation == "call_tool":
+                        name = call_params.get("name")
+                        if not name:
+                            raise ValueError("call_tool requires 'name' in body")
+                        arguments = call_params.get("arguments") or {}
+                        result = await session.call_tool(name, arguments)
+                        return result.model_dump(mode="json")
+                    raise ValueError(f"Unknown operation: {operation}")

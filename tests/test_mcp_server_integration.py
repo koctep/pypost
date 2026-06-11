@@ -10,6 +10,7 @@ import threading
 import time
 import unittest
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import MagicMock
 
 import anyio

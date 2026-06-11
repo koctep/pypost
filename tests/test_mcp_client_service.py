@@ -3,7 +3,6 @@ import pytest
 
 pytestmark = pytest.mark.timeout(60)
 
-import asyncio
 import json
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -83,14 +82,14 @@ class MCPClientServiceTests(unittest.TestCase):
         self.assertEqual(ctx.exception.category, ErrorCategory.TIMEOUT)
 
     def test_timeout_raises_execution_error_timeout(self):
-        """asyncio.TimeoutError raises ExecutionError with TIMEOUT category."""
+        """TimeoutError raises ExecutionError with TIMEOUT category."""
         service = MCPClientService()
 
         with patch.object(
             service,
             "_run_async",
             new_callable=AsyncMock,
-            side_effect=asyncio.TimeoutError(),
+            side_effect=TimeoutError("timed out"),
         ):
             with self.assertRaises(ExecutionError) as ctx:
                 service.run("http://localhost:1080/mcp", "list_tools", None)
