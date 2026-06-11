@@ -98,7 +98,9 @@ class TestMcpServerImplActivity(unittest.TestCase):
             url="http://example.com",
         )
         impl.register_tools([req])
-        impl.request_service.execute = MagicMock(return_value=_exec_result("ok"))
+        mock_svc = MagicMock()
+        mock_svc.execute.return_value = _exec_result("ok")
+        impl._create_request_service = lambda: mock_svc
         asyncio.run(impl.call_tool("echo", {"host": "x"}))
         entries = log.get_entries()
         self.assertEqual(len(entries), 1)

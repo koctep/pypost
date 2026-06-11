@@ -84,9 +84,6 @@ class MCPServerImpl:
             logger.debug(
                 "MCPServerImpl: using injected TemplateService id=%d", id(template_service)
             )
-        self.request_service = RequestService(
-            metrics=self._metrics, template_service=self._template_service
-        )
 
         # Register handlers
         self.server.list_tools()(self.list_tools)
@@ -196,9 +193,17 @@ class MCPServerImpl:
         execution_env = McpSecretsPolicy.execution_environment_variables(env_vars)
         return _merge_execution_variables(execution_env, mcp_args)
 
+    def _create_request_service(self) -> RequestService:
+        """Return an isolated RequestService for one MCP tool invocation (PYPOST-138)."""
+        logger.debug("MCPServerImpl: creating RequestService for MCP call")
+        return RequestService(
+            metrics=self._metrics,
+            template_service=self._template_service,
+        )
+
     def _execute_request_sync(self, request_data: RequestData, args: dict):
         variables = self._build_execution_variables(args)
-        return self.request_service.execute(request_data, variables)
+        return self._create_request_service().execute(request_data, variables)
 
     def register_tools(self, requests: List[RequestData]):
         self.tools_map.clear()

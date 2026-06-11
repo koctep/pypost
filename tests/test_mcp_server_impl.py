@@ -61,6 +61,13 @@ def _parse_tool_result(text: str) -> dict:
     return json.loads(text)
 
 
+def _stub_request_service(impl, mock_svc=None):
+    """Replace per-call RequestService factory with a mock (PYPOST-138)."""
+    mock_svc = mock_svc or MagicMock()
+    impl._create_request_service = lambda: mock_svc
+    return mock_svc
+
+
 class TestMCPServerImpl(unittest.TestCase):
     def test_register_tools_keeps_only_exposed_and_normalizes_names(self):
         impl = MCPServerImpl()
@@ -214,10 +221,10 @@ class TestMCPServerImpl(unittest.TestCase):
             headers={"Authorization": "Bearer {{ api_key }}"},
         )
         impl.register_tools([req])
-        impl.request_service = MagicMock()
-        impl.request_service.execute.return_value = _exec_result("ok")
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("ok")
         asyncio.run(impl.call_tool("auth", {}))
-        passed_ctx = impl.request_service.execute.call_args[0][1]
+        passed_ctx = mock_svc.execute.call_args[0][1]
         self.assertEqual(passed_ctx["api_key"], "real-secret")
 
     def test_call_tool_raises_when_unknown(self):
@@ -234,11 +241,11 @@ class TestMCPServerImpl(unittest.TestCase):
         impl = MCPServerImpl(metrics=metrics)
         req = RequestData(name="Tool", expose_as_mcp=True, method="GET", url="http://u")
         impl.register_tools([req])
-        impl.request_service = MagicMock()
-        impl.request_service.execute.return_value = _exec_result("response-body")
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("response-body")
         out = asyncio.run(impl.call_tool("tool", {"x": "y"}))
-        impl.request_service.execute.assert_called_once()
-        passed_req, passed_ctx = impl.request_service.execute.call_args[0]
+        mock_svc.execute.assert_called_once()
+        passed_req, passed_ctx = mock_svc.execute.call_args[0]
         self.assertIs(passed_req, req)
         self.assertEqual(passed_ctx, {"mcp": {"request": {"x": "y"}}})
         self.assertIsInstance(out[0], TextContent)
@@ -282,10 +289,10 @@ class TestMCPServerImpl(unittest.TestCase):
             url="{{ base_url }}/{{ mcp.request.id }}",
         )
         impl.register_tools([req])
-        impl.request_service = MagicMock()
-        impl.request_service.execute.return_value = _exec_result("ok")
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("ok")
         asyncio.run(impl.call_tool("tool", {"id": "1"}))
-        _req, passed_ctx = impl.request_service.execute.call_args[0]
+        _req, passed_ctx = mock_svc.execute.call_args[0]
         self.assertEqual(
             passed_ctx,
             {
@@ -299,12 +306,12 @@ class TestMCPServerImpl(unittest.TestCase):
         impl = MCPServerImpl(variable_supplier=lambda: remaining.pop(0))
         req = RequestData(name="Tool", expose_as_mcp=True, method="GET", url="http://u")
         impl.register_tools([req])
-        impl.request_service = MagicMock()
-        impl.request_service.execute.return_value = _exec_result("ok")
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("ok")
         asyncio.run(impl.call_tool("tool", {}))
         asyncio.run(impl.call_tool("tool", {}))
-        first_ctx = impl.request_service.execute.call_args_list[0][0][1]
-        second_ctx = impl.request_service.execute.call_args_list[1][0][1]
+        first_ctx = mock_svc.execute.call_args_list[0][0][1]
+        second_ctx = mock_svc.execute.call_args_list[1][0][1]
         self.assertEqual(first_ctx["base_url"], "http://staging")
         self.assertEqual(second_ctx["base_url"], "http://prod")
 
@@ -339,26 +346,55 @@ class TestMCPServerImpl(unittest.TestCase):
         direct = direct_svc.execute(req, merged)
 
         impl = MCPServerImpl(variable_supplier=lambda: dict(env_vars))
-        impl.request_service = RequestService()
-        impl.request_service.http_client = MagicMock()
-        impl.request_service.http_client.send_request.return_value = http_result
+        captured_services = []
+
+        def tracking_create():
+            svc = RequestService()
+            svc.http_client = MagicMock()
+            svc.http_client.send_request.return_value = http_result
+            captured_services.append(svc)
+            return svc
+
+        impl._create_request_service = tracking_create
         via_mcp = impl._execute_request_sync(req, mcp_args)
 
         direct_url = direct_svc.http_client.send_request.call_args.kwargs.get(
             "variables"
         )
-        mcp_url_vars = impl.request_service.http_client.send_request.call_args.kwargs.get(
+        mcp_url_vars = captured_services[0].http_client.send_request.call_args.kwargs.get(
             "variables"
         )
         self.assertEqual(direct_url, mcp_url_vars)
         self.assertEqual(via_mcp.response.body, direct.response.body)
 
+    def test_execute_request_sync_creates_fresh_request_service_per_call(self):
+        """Each MCP execution gets its own HTTPClient session (PYPOST-138)."""
+        from pypost.core.request_service import RequestService
+
+        impl = MCPServerImpl()
+        created: list[RequestService] = []
+        original_create = impl._create_request_service
+
+        def tracking_create():
+            svc = original_create()
+            created.append(svc)
+            return svc
+
+        impl._create_request_service = tracking_create
+        req = RequestData(name="Tool", expose_as_mcp=True, method="GET", url="http://u")
+        impl._execute_request_sync(req, {})
+        impl._execute_request_sync(req, {})
+        self.assertEqual(len(created), 2)
+        self.assertIsNot(created[0], created[1])
+        self.assertIsNot(created[0].http_client, created[1].http_client)
+        self.assertIsNot(created[0].http_client.session, created[1].http_client.session)
+
     def test_call_tool_returns_structured_json_with_script_logs_and_error(self):
         impl = MCPServerImpl()
         req = RequestData(name="T", expose_as_mcp=True, method="GET", url="http://u")
         impl.register_tools([req])
-        impl.request_service = MagicMock()
-        impl.request_service.execute.return_value = _exec_result(
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result(
             "base", logs=["log line"], script_error="bad script"
         )
         out = asyncio.run(impl.call_tool("t", {}))
@@ -373,8 +409,8 @@ class TestMCPServerImpl(unittest.TestCase):
         impl = MCPServerImpl()
         req = RequestData(name="T", expose_as_mcp=True, method="GET", url="http://u")
         impl.register_tools([req])
-        impl.request_service = MagicMock()
-        impl.request_service.execute.return_value = _exec_result(
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result(
             "not found", status_code=404
         )
         out = asyncio.run(impl.call_tool("t", {}))
@@ -388,8 +424,8 @@ class TestMCPServerImpl(unittest.TestCase):
         impl = MCPServerImpl(metrics=metrics)
         req = RequestData(name="T", expose_as_mcp=True, method="POST", url="http://u")
         impl.register_tools([req])
-        impl.request_service = MagicMock()
-        impl.request_service.execute.side_effect = RuntimeError("execute failed")
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.side_effect = RuntimeError("execute failed")
         out = asyncio.run(impl.call_tool("t", {}))
         self.assertIn("execute failed", out[0].text)
         self.assertFalse(out[0].text.strip().startswith("{"))

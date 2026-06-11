@@ -94,8 +94,10 @@ class _LiveMCPServer:
         self.impl = MCPServerImpl()
         self.impl.register_tools(tools)
         if execute_result is not None:
-            self.impl.request_service = MagicMock()
-            self.impl.request_service.execute.return_value = execute_result
+            mock_svc = MagicMock()
+            mock_svc.execute.return_value = execute_result
+            self.impl._create_request_service = lambda: mock_svc
+            self._mock_request_service = mock_svc
         self._thread: threading.Thread | None = None
         self._server: uvicorn.Server | None = None
 
@@ -186,8 +188,8 @@ class TestMCPServerIntegration(unittest.TestCase):
         )
         with live_mcp_server([tool], execute_result=_exec_result("hello")) as server:
             anyio.run(_mcp_call_tool, server.mcp_url, "greet", {"name": "world"})
-            server.impl.request_service.execute.assert_called_once()
-            _req, ctx = server.impl.request_service.execute.call_args[0]
+            server._mock_request_service.execute.assert_called_once()
+            _req, ctx = server._mock_request_service.execute.call_args[0]
             self.assertEqual(ctx, {"mcp": {"request": {"name": "world"}}})
 
     def test_call_tool_passes_env_and_mcp_variables_to_request_service(self):
@@ -202,7 +204,7 @@ class TestMCPServerIntegration(unittest.TestCase):
         server.start()
         try:
             anyio.run(_mcp_call_tool, server.mcp_url, "fetch", {"id": "1"})
-            _req, ctx = server.impl.request_service.execute.call_args[0]
+            _req, ctx = server._mock_request_service.execute.call_args[0]
             self.assertEqual(
                 ctx,
                 {
@@ -262,8 +264,9 @@ class TestMCPServerManagerIntegration(unittest.TestCase):
             url="http://example.com/m",
         )
         manager = MCPServerManager()
-        manager._impl.request_service = MagicMock()
-        manager._impl.request_service.execute.return_value = _exec_result("from-manager")
+        mock_svc = MagicMock()
+        mock_svc.execute.return_value = _exec_result("from-manager")
+        manager._impl._create_request_service = lambda: mock_svc
         manager.start_server(port, [tool], host="127.0.0.1")
         try:
             _wait_for_port("127.0.0.1", port)

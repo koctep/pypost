@@ -48,7 +48,10 @@ This class contains the actual business logic of the MCP server.
     Merges discovered names with explicit `mcp_params` and builds JSON Schema via
     `build_tool_input_schema`.
     Undeclared placeholders default to `type: string`, `required: true` (backward compatible).
-*   **Execution**: Delegates request execution to `RequestService`.
+*   **Execution**: Delegates request execution to a fresh `RequestService` per `call_tool`
+    invocation so each MCP tool call owns an isolated `HTTPClient` / `requests.Session`
+    (PYPOST-138). Synchronous work runs in Starlette's threadpool via
+    `run_in_threadpool`.
 *   **Environment variables (PYPOST-550)**: At `call_tool` time, snapshots active
     environment variables via an injected `variable_supplier`, merges them with MCP tool
     arguments, and passes the combined dict to `RequestService.execute()` (GUI parity).
@@ -167,10 +170,7 @@ opens `McpActivityDialog` from **MCP Activity (N)** in the top bar.
     -   Calls `variable_supplier()` for a snapshot of the active environment's flat keys
         (e.g. `base_url`, `api_key`).
     -   Merges with MCP tool arguments via `_merge_execution_variables` (see below).
-5.  `RequestService.execute()` is called with the merged dict.
-    -   It renders templates (environment placeholders **and** `{{ mcp.request.* }}`).
-    -   Executes the HTTP request via `HTTPClient`.
-    -   Runs any post-request scripts via `ScriptExecutor` (same variable dict as GUI).
+5.  `_create_request_service()` builds a new `RequestService` (and `HTTPClient`) for this call.
 6.  `RequestService.execute()` is called with the merged dict.
     -   It renders templates (environment placeholders **and** `{{ mcp.request.* }}`).
     -   Executes the HTTP request via `HTTPClient`.

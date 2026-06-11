@@ -47,7 +47,6 @@ class TestMCPServerManagerStartup(unittest.TestCase):
         port = _free_port()
         tool = RequestData(name="Ping", expose_as_mcp=True, method="GET", url="http://x")
         manager = MCPServerManager()
-        manager._impl.request_service = MagicMock()
         statuses: list[bool] = []
         manager.status_changed.connect(statuses.append)
         manager.start_server(port, [tool], host="127.0.0.1")
@@ -124,7 +123,6 @@ class TestMCPServerManagerUpdateTools(unittest.TestCase):
             name="B", id="b", expose_as_mcp=True, method="GET", url="http://b"
         )
         manager = MCPServerManager()
-        manager._impl.request_service = MagicMock()
         manager.start_server(port, [tool_a], host="127.0.0.1")
         try:
             deadline = time.time() + 10.0
@@ -146,7 +144,6 @@ class TestMCPServerManagerUpdateTools(unittest.TestCase):
             name="Ping", expose_as_mcp=True, method="GET", url="http://x"
         )
         manager = MCPServerManager()
-        manager._impl.request_service = MagicMock()
         manager.start_server(port, [tool], host="127.0.0.1")
         try:
             deadline = time.time() + 10.0

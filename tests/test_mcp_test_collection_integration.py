@@ -96,8 +96,10 @@ class _LiveMCPServer:
         self.impl = MCPServerImpl()
         self.impl.register_tools(tools)
         if execute_result is not None:
-            self.impl.request_service = MagicMock()
-            self.impl.request_service.execute.return_value = execute_result
+            mock_svc = MagicMock()
+            mock_svc.execute.return_value = execute_result
+            self.impl._create_request_service = lambda: mock_svc
+            self._mock_request_service = mock_svc
         self._thread: threading.Thread | None = None
         self._server: uvicorn.Server | None = None
 
@@ -170,8 +172,8 @@ class TestMcpTestCollectionIntegration(unittest.TestCase):
         by_name = {request.name: request for request in tools}
         with live_mcp_server(tools, execute_result=_exec_result("matched")) as server:
             anyio.run(_mcp_call_tool, server.mcp_url, "sse_probe_metrics", {})
-            server.impl.request_service.execute.assert_called_once()
-            executed_request, _ctx = server.impl.request_service.execute.call_args[0]
+            server._mock_request_service.execute.assert_called_once()
+            executed_request, _ctx = server._mock_request_service.execute.call_args[0]
             self.assertEqual(executed_request.name, by_name["SSE Probe Metrics"].name)
             self.assertEqual(executed_request.url, by_name["SSE Probe Metrics"].url)
 
