@@ -21,7 +21,8 @@ Addressed in PYPOST-14 by implementing `StateManager`.
 
 - **[FIXED] Unit tests for tree state save/restore** ([PYPOST-388](https://pypost.atlassian.net/browse/PYPOST-388)):
   `tests/test_collections_presenter.py` and `tests/test_settings_persistence.py`.
-- No tests for edge cases (e.g., ID exists in settings but collection is gone). — [PYPOST-389](https://pypost.atlassian.net/browse/PYPOST-389)
+- **[FIXED] Edge-case tests (stale collection ids in settings)** ([PYPOST-389](https://pypost.atlassian.net/browse/PYPOST-389)):
+  `test_restore_tree_state_skips_stale_saved_collection_ids` in `tests/test_collections_presenter.py`.
 
 ## Performance Concerns
 

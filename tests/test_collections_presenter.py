@@ -315,7 +315,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertTrue(presenter.widget.isExpanded(index))
 
     def test_restore_tree_state_skips_stale_saved_collection_ids(self):
-        """PYPOST-93: expanded list references unknown ids; valid rows still restore."""
+        """PYPOST-389: expanded list references unknown ids; valid rows still restore."""
         col = _make_collection("c1", "My API")
         presenter = self._make_presenter([col])
         presenter._state_manager._expanded = ["deleted-collection", "c1"]
