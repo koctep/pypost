@@ -40,7 +40,21 @@ class FakeRequestManager:
 
     def rename_collection_item(self, item_id, item_type, new_name):
         self.renamed.append((item_id, item_type, new_name))
-        return True
+        normalized = new_name.strip()
+        if not normalized:
+            return False
+        if item_type == "request":
+            for col in self.collections:
+                for req in col.requests:
+                    if req.id == item_id:
+                        req.name = normalized
+                        return True
+        elif item_type == "collection":
+            for col in self.collections:
+                if col.id == item_id:
+                    col.name = normalized
+                    return True
+        return False
 
 
 class FakeStateManager:
@@ -356,15 +370,52 @@ class TestCollectionsPresenter(unittest.TestCase):
                 presenter._show_context_menu(QPoint(0, 0))
         self.assertEqual(presenter._model.item(0).rowCount(), 0)
 
-    def test_rename_cancel_restores_tree_via_reload(self):
+    def test_rename_cancel_restores_tree_incrementally(self):
         req = _make_request("r1", "Old Name")
         col = _make_collection("c1", "My API", [req])
         presenter = self._make_presenter([col])
         presenter.load_collections()
+        item = presenter._find_collection_item("r1", "request")
+        item.setText("Draft Name")
         presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
-        presenter._on_editor_closed(None, QAbstractItemDelegate.EndEditHint.RevertModelCache)
+        with patch.object(presenter, "refresh_tree") as mock_refresh:
+            presenter._on_editor_closed(
+                None, QAbstractItemDelegate.EndEditHint.RevertModelCache
+            )
         self.assertIsNone(presenter._pending_rename)
         self.assertEqual(presenter._model.item(0).child(0).text(), "GET Old Name")
+        mock_refresh.assert_not_called()
+
+    def test_rename_success_updates_tree_incrementally(self):
+        req = _make_request("r1", "Old Name")
+        col = _make_collection("c1", "My API", [req])
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        item = presenter._find_collection_item("r1", "request")
+        item.setText("New Name")
+        presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
+        with patch.object(presenter, "refresh_tree") as mock_refresh:
+            presenter._on_editor_closed(
+                None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
+            )
+        self.assertEqual(presenter._model.item(0).child(0).text(), "GET New Name")
+        self.assertEqual(req.name, "New Name")
+        mock_refresh.assert_not_called()
+
+    def test_rename_collection_success_updates_tree_incrementally(self):
+        col = _make_collection("c1", "Old Collection")
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        item = presenter._find_collection_item("c1", "collection")
+        item.setText("New Collection")
+        presenter._pending_rename = {"item_id": "c1", "item_type": "collection"}
+        with patch.object(presenter, "refresh_tree") as mock_refresh:
+            presenter._on_editor_closed(
+                None, QAbstractItemDelegate.EndEditHint.SubmitModelCache
+            )
+        self.assertEqual(presenter._model.item(0).text(), "New Collection")
+        self.assertEqual(col.name, "New Collection")
+        mock_refresh.assert_not_called()
 
     @patch("pypost.ui.presenters.collections_presenter.QMessageBox.warning")
     def test_rename_empty_name_shows_warning(self, mock_warning):

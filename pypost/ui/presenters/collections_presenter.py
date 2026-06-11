@@ -223,8 +223,7 @@ class CollectionsPresenter(QObject):
             )
             self._metrics.track_gui_collection_rename_action(item_type, "cancelled")
             self._pending_rename = None
-            self.refresh_tree()
-            self.restore_tree_state()
+            self._finish_rename_tree_update(item_id, item_type)
             return
 
         item = self._find_collection_item(item_id, item_type)
@@ -237,8 +236,7 @@ class CollectionsPresenter(QObject):
                 item_id,
             )
             self._metrics.track_gui_collection_rename_action(item_type, "not_found")
-            self.refresh_tree()
-            self.restore_tree_state()
+            self._finish_rename_tree_update(item_id, item_type)
             return
 
         new_name = item.text().strip()
@@ -250,8 +248,7 @@ class CollectionsPresenter(QObject):
             )
             self._metrics.track_gui_collection_rename_action(item_type, "rejected_empty")
             QMessageBox.warning(self._view, "Rename Error", "Name cannot be empty.")
-            self.refresh_tree()
-            self.restore_tree_state()
+            self._finish_rename_tree_update(item_id, item_type, item)
             return
 
         try:
@@ -268,8 +265,7 @@ class CollectionsPresenter(QObject):
             QMessageBox.critical(
                 self._view, "Rename Error", f"Failed to rename '{item.text()}': {exc}"
             )
-            self.refresh_tree()
-            self.restore_tree_state()
+            self._finish_rename_tree_update(item_id, item_type, item)
             return
 
         if not renamed:
@@ -281,8 +277,7 @@ class CollectionsPresenter(QObject):
             )
             self._metrics.track_gui_collection_rename_action(item_type, "not_found")
             QMessageBox.warning(self._view, "Rename Error", f"Could not rename '{item.text()}'.")
-            self.refresh_tree()
-            self.restore_tree_state()
+            self._finish_rename_tree_update(item_id, item_type, item)
             return
 
         logger.info(
@@ -296,9 +291,64 @@ class CollectionsPresenter(QObject):
         if item_type == "request":
             self.request_renamed.emit(item_id, new_name)
 
-        self.refresh_tree()
-        self.restore_tree_state()
+        self._finish_rename_tree_update(item_id, item_type, item, new_name=new_name)
         self.collections_changed.emit()
+
+    def _canonical_item_label(self, item_id: str, item_type: str) -> str | None:
+        for col in self._request_manager.get_collections():
+            if item_type == "collection" and col.id == item_id:
+                return col.name
+            if item_type == "request":
+                for req in col.requests:
+                    if req.id == item_id:
+                        return f"{req.method} {req.name}"
+        return None
+
+    def _sync_rename_tree_item(
+        self,
+        item: QStandardItem,
+        item_id: str,
+        item_type: str,
+        *,
+        new_name: str | None = None,
+    ) -> None:
+        item.setEditable(False)
+        if new_name is not None:
+            if item_type == "request":
+                for col in self._request_manager.get_collections():
+                    for req in col.requests:
+                        if req.id == item_id:
+                            item.setData(req, Qt.UserRole)
+                            item.setText(f"{req.method} {req.name}")
+                            return
+            else:
+                item.setText(new_name)
+            return
+
+        label = self._canonical_item_label(item_id, item_type)
+        if label is not None:
+            item.setText(label)
+
+    def _finish_rename_tree_update(
+        self,
+        item_id: str,
+        item_type: str,
+        item: QStandardItem | None = None,
+        *,
+        new_name: str | None = None,
+    ) -> None:
+        if item is None:
+            item = self._find_collection_item(item_id, item_type)
+        if item is None:
+            logger.warning(
+                "collection_item_rename_tree_sync_fallback item_type=%s item_id=%s",
+                item_type,
+                item_id,
+            )
+            self.refresh_tree()
+            self.restore_tree_state()
+            return
+        self._sync_rename_tree_item(item, item_id, item_type, new_name=new_name)
 
     def remove_item_from_tree(self, item_id: str, item_type: str) -> bool:
         """Removes a collection or request node without rebuilding the full tree model."""

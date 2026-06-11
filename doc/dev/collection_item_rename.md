@@ -49,12 +49,21 @@ Starts inline rename.
 
 Finalizes rename on editor close.
 
-- Cancel (`RevertModelCache`): no mutation, tree is reloaded.
+- Cancel (`RevertModelCache`): no mutation; `_finish_rename_tree_update` restores the
+  canonical label on the edited item without rebuilding the full tree.
 - Commit:
   - validates non-empty name,
   - calls `RequestManager.rename_collection_item(...)`,
   - updates request tab titles when request name changed,
-  - reloads tree and restores state.
+  - syncs the edited tree item in place via `_finish_rename_tree_update` (falls back to
+    `refresh_tree` only when the item cannot be found in the model).
+
+### `CollectionsPresenter._finish_rename_tree_update(item_id, item_type, item=None, *, new_name=None)`
+
+Updates a single tree row after rename completes or is cancelled. When `new_name` is set, the
+label and `UserRole` (for requests) reflect the renamed in-memory object. When omitted, the
+label is restored from `RequestManager`. Calls `refresh_tree` only if the target item is missing
+from the model.
 
 ### `RequestManager.rename_collection_item(item_id: str, item_type: str, new_name: str) -> bool`
 
