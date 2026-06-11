@@ -70,6 +70,9 @@ flowchart LR
   failure.
 - **`HTTPClient` (`pypost/core/http_client.py`)** — Branch in `_prepare_request_kwargs` when
   `body_type == "yaml"` and `yaml_as_json` is true; raises `ExecutionError(BODY)` on conversion
+  failure (increments `yaml_to_json_conversion_failed_total` when metrics are enabled).
+- **`CurlGenerator` (`pypost/core/curl_generator.py`)** — Copy cURL uses the same YAML→JSON
+  conversion for the `-d` body when `yaml_as_json` is enabled (history copy keeps stored body).
   failure.
 - **`RequestService` (`pypost/core/request_service.py`)** — `ErrorCategory.BODY` is non-retryable
   in `_execute_http_with_retry` (re-raised immediately).

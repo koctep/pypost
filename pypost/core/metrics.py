@@ -149,6 +149,12 @@ class MetricsManager:
             registry=self.registry,
         )
 
+        self.yaml_to_json_conversion_failed = Counter(
+            "yaml_to_json_conversion_failed_total",
+            "Number of YAML-to-JSON body conversion failures at send time",
+            registry=self.registry,
+        )
+
         self.history_record_errors = Counter(
             "history_record_errors_total",
             "Number of history recording failures",
@@ -380,6 +386,9 @@ class MetricsManager:
 
     def track_request_error(self, category: ErrorCategory) -> None:
         self.request_errors.labels(category=category.value).inc()
+
+    def track_yaml_to_json_conversion_failed(self) -> None:
+        self.yaml_to_json_conversion_failed.inc()
 
     def track_history_record_error(self) -> None:
         self.history_record_errors.inc()

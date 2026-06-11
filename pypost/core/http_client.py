@@ -78,6 +78,8 @@ class HTTPClient:
                     url,
                     exc,
                 )
+                if self._metrics is not None:
+                    self._metrics.track_yaml_to_json_conversion_failed()
                 raise ExecutionError(
                     category=ErrorCategory.BODY,
                     message="Could not convert YAML body to JSON.",

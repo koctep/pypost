@@ -85,6 +85,12 @@ class TestMetricsManagerHistoryAndErrors(unittest.TestCase):
         out = _scrape(mm)
         self.assertIn('request_errors_total{category="timeout"} 1.0', out)
 
+    def test_track_yaml_to_json_conversion_failed(self):
+        mm = MetricsManager()
+        mm.track_yaml_to_json_conversion_failed()
+        out = _scrape(mm)
+        self.assertIn("yaml_to_json_conversion_failed_total 1.0", out)
+
 
 class TestMetricsManagerRetryExhaustion(unittest.TestCase):
     def test_track_retry_attempt_uppercases_method(self):

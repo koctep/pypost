@@ -79,6 +79,7 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         with self.assertRaises(ExecutionError) as ctx:
             self.client.send_request(req)
         self.assertEqual(ctx.exception.category, ErrorCategory.BODY)
+        self.client._metrics.track_yaml_to_json_conversion_failed.assert_called_once()
         self.mock_session.request.assert_not_called()
 
     def test_yaml_as_json_whitespace_body_skips_body_kwargs(self):
