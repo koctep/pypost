@@ -118,7 +118,10 @@ No task-specific settings. Metrics use existing `MetricsManager` counters docume
 
 `tests/helpers/collections_tree.py` provides shared fixtures (`FakeRequestManager`,
 `patch_tree_context_menu`, `patch_rename_context_menu`, `build_isolated_tree_actions()`,
-etc.) for presenter integration and isolated `CollectionTreeActions` tests. The isolated harness builds a minimal
+`wire_rename_delegate`, `wait_for_rename_editor`, `commit_inline_rename`,
+`cancel_inline_rename`, etc.) for presenter integration and isolated `CollectionTreeActions`
+tests. Pass `with_rename_delegate=True` to `build_isolated_tree_actions` for end-to-end rename
+editor tests. The isolated harness builds a minimal
 `QTreeView` + `QStandardItemModel` with `MagicMock` callbacks (no `CollectionsPresenter`).
 
 `tests/test_collection_tree_actions.py` covers menu dispatch and rename callbacks in isolation:
@@ -159,6 +162,17 @@ and `track_gui_collection_rename_action` for `selected`, `cancelled`, `succeeded
 | `test_rename_empty_name_records_rejected_empty_metric` | Empty name → `rejected_empty` |
 | `test_rename_selected_does_not_emit_succeeded_metric` | Menu select does not emit `succeeded` |
 | Presenter `test_context_menu_rename_*` | Full presenter wiring for menu → edit |
+
+`tests/test_collection_tree_rename_delegate_e2e.py` exercises the full inline editor path
+(context menu → real `QTreeView.edit` → delegate commit/cancel/empty-name) for collection and
+request nodes:
+
+| E2E test | Behavior |
+|----------|----------|
+| `test_request_rename_commit_via_delegate_records_succeeded_metric` | Menu → edit → commit → `succeeded` |
+| `test_collection_rename_commit_via_delegate_records_succeeded_metric` | Collection commit via delegate |
+| `test_request_rename_cancel_via_delegate_records_cancelled_metric` | Delegate cancel → `cancelled` |
+| `test_request_rename_empty_name_via_delegate_records_rejected_empty_metric` | Empty commit → `rejected_empty` |
 
 Patch `QMenu` under `pypost.ui.presenters.collection_tree_actions`. Patch dialog helpers
 (`confirm_delete`, `show_rename_empty_name_error`, `show_delete_failure`, etc.) at the same

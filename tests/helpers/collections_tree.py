@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Iterator
@@ -9,9 +10,10 @@ from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QTreeView
+from PySide6.QtWidgets import QAbstractItemDelegate, QApplication, QLineEdit, QTreeView
 
 from pypost.models.models import Collection, RequestData
+from pypost.ui.delegates.collection_item_rename_delegate import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
 
 _QMENU_PATCH = "pypost.ui.presenters.collection_tree_actions.QMenu"
@@ -191,7 +193,52 @@ class IsolatedTreeActions:
             self._collection_items_by_id[col.id] = col_item
 
 
-def build_isolated_tree_actions(collections=None) -> IsolatedTreeActions:
+def wire_rename_delegate(harness: IsolatedTreeActions) -> None:
+    """Install CollectionItemRenameDelegate wired to tree actions (production parity)."""
+    harness.view.setItemDelegate(
+        CollectionItemRenameDelegate(
+            is_rename_index=harness.actions.is_rename_index,
+            on_committed=harness.actions.handle_rename_committed,
+            on_cancelled=harness.actions.handle_rename_cancelled,
+            on_rejected_empty=harness.actions.handle_rename_rejected_empty,
+            parent=harness.view,
+        )
+    )
+
+
+def wait_for_rename_editor(view: QTreeView, *, timeout_ms: int = 2000) -> QLineEdit:
+    """Poll until the inline rename QLineEdit appears after QTreeView.edit."""
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        QApplication.processEvents()
+        editors = [editor for editor in view.findChildren(QLineEdit) if editor.isVisible()]
+        if editors:
+            return editors[-1]
+    raise AssertionError("Rename editor did not appear")
+
+
+def commit_inline_rename(view: QTreeView, editor: QLineEdit, new_name: str) -> None:
+    """Commit rename text through the view delegate (simulates Enter)."""
+    editor.setText(new_name)
+    view.commitData(editor)
+    QApplication.processEvents()
+
+
+def cancel_inline_rename(
+    view: QTreeView,
+    editor: QLineEdit,
+) -> None:
+    """Cancel inline rename via delegate closeEditor (simulates Escape)."""
+    delegate = view.itemDelegate()
+    delegate.closeEditor.emit(editor, QAbstractItemDelegate.EndEditHint.RevertModelCache)
+    QApplication.processEvents()
+
+
+def build_isolated_tree_actions(
+    collections=None,
+    *,
+    with_rename_delegate: bool = False,
+) -> IsolatedTreeActions:
     harness = IsolatedTreeActions(
         actions=None,  # type: ignore[arg-type]
         view=QTreeView(),
@@ -214,6 +261,8 @@ def build_isolated_tree_actions(collections=None) -> IsolatedTreeActions:
         emit_requests_deleted=harness.emit_requests_deleted,
         emit_open_isolated_tab=harness.emit_open_isolated_tab,
     )
+    if with_rename_delegate:
+        wire_rename_delegate(harness)
     if collections:
         harness.load_collections()
     return harness
