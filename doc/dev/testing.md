@@ -30,6 +30,21 @@ Key metrics for MCP testing:
 | `requests_sent_total` | `method` | HTTP requests sent |
 | `responses_received_total` | `method`, `status_code` | HTTP responses received |
 
+## GUI / Qt widget tests
+
+PyPost runs Qt tests headlessly with `QT_QPA_PLATFORM=offscreen` and a module-scoped `qapp`
+fixture (`tests/conftest.py`). The project does not use the `pytest-qt` package; tests call
+widget methods and assert on labels, models, and mocked dialogs.
+
+See [gui_testing.md](gui_testing.md) for patterns, representative modules, focused commands,
+and troubleshooting.
+
+ResponseView search bar coverage (PYPOST-365):
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_response_view_search.py -v
+```
+
 ## Per-test timeouts (mandatory)
 
 Every test must declare an explicit timeout so the suite cannot hang indefinitely.
@@ -143,6 +158,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -v
 
 ## References
 
+- [gui_testing.md](gui_testing.md) — Qt offscreen setup, `qapp` fixture, GUI test patterns
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — AI assistant rules
 - [MCP Integration](mcp_integration.md) — MCP setup
 - [Collection item delete](collection_item_delete.md) — delete flow and metric matrix
