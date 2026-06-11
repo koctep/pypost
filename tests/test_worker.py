@@ -179,5 +179,30 @@ class TestRequestWorkerHiddenKeys(unittest.TestCase):
         self.assertEqual({"token"}, exec_mock.call_args.kwargs["hidden_keys"])
 
 
+@pytest.mark.timeout(60)
+def test_worker_wraps_unexpected_exception_logs_error(caplog):
+    """ERROR log is explicit under caplog contract (PYPOST-574)."""
+    import logging
+    from unittest.mock import MagicMock, patch
+
+    from pypost.core.worker import RequestWorker
+    from pypost.models.errors import ErrorCategory, ExecutionError
+    from pypost.models.models import RequestData
+
+    req = RequestData(method="GET", url="http://x")
+    worker = RequestWorker(req, variables={}, metrics=MagicMock())
+    received = []
+    worker.error.connect(lambda e: received.append(e))
+
+    with caplog.at_level(logging.ERROR, logger="pypost.core.worker"):
+        with patch.object(worker.service, "execute", side_effect=RuntimeError("boom")):
+            worker.run()
+
+    assert len(received) == 1
+    assert isinstance(received[0], ExecutionError)
+    assert received[0].category == ErrorCategory.UNKNOWN
+    assert any("unexpected error" in r.message for r in caplog.records)
+
+
 if __name__ == "__main__":
     unittest.main()
