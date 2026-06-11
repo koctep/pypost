@@ -94,11 +94,12 @@ Observability relies on existing global metrics server configuration:
 
 ## Testing
 
-Confirmation-dialog Yes/No branching (PYPOST-330):
+Delete metric emission by status and item type:
 
 | Layer | File | Scenarios |
 | --- | --- | --- |
-| Confirmation + metrics | `tests/test_collection_tree_delete_confirmation.py` | No → `cancelled`, Yes → `succeeded`; collection and request nodes; `handle_delete` skipped on No |
+| Confirmation + metrics | `tests/test_collection_tree_delete_confirmation.py` | `selected` / `cancelled` / `succeeded` for collection and request; `handle_delete` skipped on No |
+| `handle_delete` failures | `tests/test_collection_tree_delete_metrics.py` | `error` on exception; `not_found` on false return; collection and request nodes |
 
 Automated coverage for open-tab closure after delete (PYPOST-332):
 
@@ -112,6 +113,8 @@ Focused run:
 
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_collection_tree_delete_confirmation.py \
+  tests/test_collection_tree_delete_metrics.py \
   tests/test_delete_open_tabs_integration.py \
   tests/test_tabs_presenter.py -k "close_tabs" \
   tests/test_collections_presenter.py -k "requests_deleted"
