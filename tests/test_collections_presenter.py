@@ -15,6 +15,7 @@ from tests.helpers.collections_tree import (
     FakeStateManager,
     make_collection,
     make_request,
+    patch_rename_context_menu,
     patch_view_context_menu,
 )
 
@@ -439,6 +440,45 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter._tree_actions.handle_rename_rejected_empty()
         mock_warning.assert_called_once()
         self.assertEqual("Old Name", req.name)
+
+    def test_context_menu_rename_starts_inline_edit(self):
+        req = make_request("r1", "Get users")
+        col = make_collection("c1", "My API", [req])
+        rm = FakeRequestManager([col])
+        sm = FakeStateManager()
+        metrics = MagicMock()
+        presenter = CollectionsPresenter(rm, sm, metrics, icons={})
+        presenter.load_collections()
+        req_item = presenter._model.item(0).child(0)
+        with patch.object(presenter._view, "edit") as mock_edit:
+            with patch_rename_context_menu(
+                presenter._view, req_item.index(), action_count=3
+            ):
+                presenter._tree_actions.show_context_menu(QPoint(0, 0))
+        self.assertIsNotNone(presenter._pending_rename)
+        mock_edit.assert_called_once()
+        metrics.track_gui_collection_rename_action.assert_called_once_with(
+            "request", "selected"
+        )
+
+    def test_context_menu_rename_collection_starts_inline_edit(self):
+        col = make_collection("c1", "My API")
+        rm = FakeRequestManager([col])
+        sm = FakeStateManager()
+        metrics = MagicMock()
+        presenter = CollectionsPresenter(rm, sm, metrics, icons={})
+        presenter.load_collections()
+        item = presenter._model.item(0)
+        with patch.object(presenter._view, "edit") as mock_edit:
+            with patch_rename_context_menu(presenter._view, item.index(), action_count=2):
+                presenter._tree_actions.show_context_menu(QPoint(0, 0))
+        self.assertEqual(
+            presenter._pending_rename, {"item_id": "c1", "item_type": "collection"}
+        )
+        mock_edit.assert_called_once()
+        metrics.track_gui_collection_rename_action.assert_called_once_with(
+            "collection", "selected"
+        )
 
 
 if __name__ == "__main__":

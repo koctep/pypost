@@ -122,6 +122,20 @@ def patch_delete_context_menu(view, item_index, *, action_count: int = 2) -> Ite
         yield delete_action
 
 
+@contextmanager
+def patch_rename_context_menu(view, item_index, *, action_count: int = 2) -> Iterator[MagicMock]:
+    """Patch view and QMenu for rename-selected context-menu flows."""
+    rename_action = MagicMock()
+    delete_action = MagicMock()
+    if action_count == 2:
+        actions = [rename_action, delete_action]
+    else:
+        new_tab_action = MagicMock()
+        actions = [new_tab_action, rename_action, delete_action]
+    with patch_view_context_menu(view, item_index, actions, rename_action):
+        yield rename_action
+
+
 @dataclass
 class IsolatedTreeActions:
     actions: CollectionTreeActions

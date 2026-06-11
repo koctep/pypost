@@ -117,8 +117,8 @@ No task-specific settings. Metrics use existing `MetricsManager` counters docume
 ## Automated tests
 
 `tests/helpers/collections_tree.py` provides shared fixtures (`FakeRequestManager`,
-`patch_tree_context_menu`, `build_isolated_tree_actions()`, etc.) for presenter integration
-and isolated `CollectionTreeActions` tests. The isolated harness builds a minimal
+`patch_tree_context_menu`, `patch_rename_context_menu`, `build_isolated_tree_actions()`,
+etc.) for presenter integration and isolated `CollectionTreeActions` tests. The isolated harness builds a minimal
 `QTreeView` + `QStandardItemModel` with `MagicMock` callbacks (no `CollectionsPresenter`).
 
 `tests/test_collection_tree_actions.py` covers menu dispatch and rename callbacks in isolation:
@@ -140,6 +140,25 @@ and isolated `CollectionTreeActions` tests. The isolated harness builds a minima
 `tests/test_collection_tree_delete_confirmation.py` asserts Yes/No confirmation
 branching and `track_gui_collection_delete_action` call sequences (`selected` →
 `cancelled` or `succeeded`) for collection and request nodes.
+
+`tests/test_collection_tree_rename_context_menu.py` asserts rename context-menu dispatch
+and `track_gui_collection_rename_action` for `selected`, `cancelled`, `succeeded`, and
+`rejected_empty` on collection and request nodes (isolated harness).
+
+`tests/test_collection_tree_rename_metrics.py` asserts presenter-level rename metrics for
+`error`, `not_found`, `rejected_empty`, and `cancelled` (mirrors delete metrics module).
+
+| Rename test | Behavior |
+|-------------|----------|
+| `test_collection_rename_selected_records_selected_metric` | Collection Rename → `selected` + inline edit |
+| `test_request_rename_selected_records_selected_metric` | Request Rename → `selected` + pending state |
+| `test_collection_rename_cancel_records_cancelled_metric` | Escape cancel → `cancelled` |
+| `test_request_rename_cancel_records_cancelled_metric` | Request cancel restores label |
+| `test_collection_rename_commit_records_succeeded_metric` | Collection commit → `succeeded` |
+| `test_request_rename_commit_records_succeeded_metric` | Request commit → `succeeded` |
+| `test_rename_empty_name_records_rejected_empty_metric` | Empty name → `rejected_empty` |
+| `test_rename_selected_does_not_emit_succeeded_metric` | Menu select does not emit `succeeded` |
+| Presenter `test_context_menu_rename_*` | Full presenter wiring for menu → edit |
 
 Patch `QMenu` under `pypost.ui.presenters.collection_tree_actions`. Patch dialog helpers
 (`confirm_delete`, `show_rename_empty_name_error`, `show_delete_failure`, etc.) at the same
