@@ -9,7 +9,10 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from pypost.ui.widgets.code_editor import CodeEditor
+from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.fold.json_structure_scanner import JsonStructureScanner
+from pypost.ui.widgets.fold.xml_structure_scanner import XmlStructureScanner
+from pypost.ui.widgets.fold.yaml_structure_scanner import YamlStructureScanner
 
 
 def _wait_for_scan(editor: CodeEditor) -> None:
@@ -60,6 +63,66 @@ _NESTED_JSON = json.dumps(
 )
 
 _REMAP_JSON = json.dumps({"a": {"b": 1}, "c": 2}, indent=2)
+
+_NESTED_YAML = """users:
+  - id: 1
+    name: Ada
+  - id: 2
+    name: Bob
+"""
+
+_NESTED_XML = """<root>
+  <users>
+    <user id="1">
+      <name>Ada</name>
+    </user>
+  </users>
+</root>
+"""
+
+
+class TestYamlStructureScanner(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_valid_nested_yaml_finds_regions(self):
+        from PySide6.QtGui import QTextDocument
+
+        doc = QTextDocument()
+        doc.setPlainText(_NESTED_YAML)
+        regions = YamlStructureScanner().scan(doc)
+        self.assertGreater(len(regions), 0)
+
+    def test_invalid_yaml_returns_no_regions(self):
+        from PySide6.QtGui import QTextDocument
+
+        doc = QTextDocument()
+        doc.setPlainText("users:\n  - bad: [")
+        regions = YamlStructureScanner().scan(doc)
+        self.assertEqual(regions, [])
+
+
+class TestXmlStructureScanner(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_valid_nested_xml_finds_regions(self):
+        from PySide6.QtGui import QTextDocument
+
+        doc = QTextDocument()
+        doc.setPlainText(_NESTED_XML)
+        regions = XmlStructureScanner().scan(doc)
+        self.assertGreater(len(regions), 0)
+
+    def test_invalid_xml_returns_no_regions(self):
+        from PySide6.QtGui import QTextDocument
+
+        doc = QTextDocument()
+        doc.setPlainText("<root><unclosed>")
+        regions = XmlStructureScanner().scan(doc)
+        self.assertEqual(regions, [])
 
 
 class TestJsonStructureScanner(unittest.TestCase):
@@ -205,6 +268,53 @@ def _replace_once(editor: CodeEditor, old: str, new: str) -> None:
     cursor.setPosition(start + len(old), QTextCursor.MoveMode.KeepAnchor)
     cursor.insertText(new)
     cursor.endEditBlock()
+
+
+class TestYamlXmlCodeEditorFolding(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_yaml_collapse_hides_descendant_blocks(self):
+        ed = CodeEditor()
+        ed.set_body_format(BodyFormat.YAML)
+        ed.setPlainText(_NESTED_YAML)
+        _wait_for_scan(ed)
+        regions = ed.fold_controller().regions()
+        self.assertGreater(len(regions), 0)
+        root = next(r for r in regions if r.region_id == "/")
+        ed.fold_controller().toggle(root.region_id)
+        visible = _visible_block_numbers(ed)
+        for block_num in range(root.start_block + 1, root.end_block + 1):
+            self.assertNotIn(block_num, visible)
+        self.assertEqual(ed.toPlainText(), _NESTED_YAML)
+
+    def test_xml_collapse_hides_descendant_blocks(self):
+        ed = CodeEditor()
+        ed.set_body_format(BodyFormat.XML)
+        ed.setPlainText(_NESTED_XML)
+        _wait_for_scan(ed)
+        regions = ed.fold_controller().regions()
+        users = next(r for r in regions if r.region_id == "/root/users[0]")
+        ed.fold_controller().toggle(users.region_id)
+        visible = _visible_block_numbers(ed)
+        for block_num in range(users.start_block + 1, users.end_block + 1):
+            self.assertNotIn(block_num, visible)
+        self.assertEqual(ed.toPlainText(), _NESTED_XML)
+
+    def test_invalid_yaml_has_no_fold_regions(self):
+        ed = CodeEditor()
+        ed.set_body_format(BodyFormat.YAML)
+        ed.setPlainText("bad:\n  - [")
+        _wait_for_scan(ed)
+        self.assertEqual(ed.fold_controller().regions(), [])
+
+    def test_invalid_xml_has_no_fold_regions(self):
+        ed = CodeEditor()
+        ed.set_body_format(BodyFormat.XML)
+        ed.setPlainText("<root>")
+        _wait_for_scan(ed)
+        self.assertEqual(ed.fold_controller().regions(), [])
 
 
 class TestFoldRemappingAfterEdits(unittest.TestCase):

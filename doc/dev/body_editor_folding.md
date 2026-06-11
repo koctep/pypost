@@ -6,8 +6,8 @@ The request Body tab `CodeEditor` supports collapsing and expanding nested secti
 body content. Hidden lines remain in the document (`toPlainText()` is unchanged) so save and send
 use the full payload. Collapse state is session-only and resets when body text is replaced.
 
-YAML and XML scanners are registered; the format selector on the Body tab sets `BodyFormat`.
-Concrete YAML/XML region detection ships in PYPOST-518.
+YAML and XML scanners are implemented; the format selector on the Body tab sets `BodyFormat`
+and activates the matching scanner.
 
 ## Architecture
 
@@ -17,7 +17,10 @@ Concrete YAML/XML region detection ships in PYPOST-518.
   scanner by `BodyFormat`; `PLAIN` returns no regions.
 - **`JsonStructureScanner` (`pypost/ui/widgets/fold/json_structure_scanner.py`)** — Validates
   JSON then detects nestable `{`/`[` regions with JSON Pointer–style `region_id` values.
-- **`YamlStructureScanner` / `XmlStructureScanner`** — Stubs returning `[]` until implemented.
+- **`YamlStructureScanner` (`yaml_structure_scanner.py`)** — Uses `yaml.compose_all()` node marks
+  for mapping/sequence regions; invalid YAML returns no regions.
+- **`XmlStructureScanner` (`xml_structure_scanner.py`)** — Validates with `ElementTree` then
+  scans tags for multi-line elements; invalid XML returns no regions.
 - **`FoldController` (`pypost/ui/widgets/fold/fold_controller.py`)** — Debounced scan
   (200 ms), collapsed `region_id` set, applies `QTextBlock.setVisible()` on descendants.
 - **`CodeEditor` (`pypost/ui/widgets/code_editor.py`)** — Owns `FoldController`; widens gutter
@@ -87,5 +90,5 @@ Re-collapse after the document is valid again.
 
 ### YAML/XML bodies do not fold
 
-Expected until YAML/XML structure scanners are implemented (PYPOST-518). Select the matching
-format in the Body tab selector so folding activates when scanners ship.
+Confirm the Body tab format selector matches the document (JSON/YAML/XML). Invalid syntax yields
+no fold regions for any format.
