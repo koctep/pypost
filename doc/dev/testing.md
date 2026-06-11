@@ -256,14 +256,34 @@ capture (2026-06-11): 937 passed, 72 ERROR, 138 WARNING lines. See
 
 ## Error-path test logging (PYPOST-568)
 
-Some tests intentionally trigger application ERROR logs while still passing (e.g.
-`test_worker_wraps_unexpected_exception_as_execution_error_unknown`,
-`TestOnRequestError` in `test_tabs_presenter.py`). Assertions target Qt signals and
-mocked dialogs — not log output — so failures are still detected, but CI logs look
-alarming.
+Many passing tests deliberately exercise failure paths (worker exceptions, retry
+exhaustion, delete errors, request error dialogs). Production code correctly logs these at
+ERROR; pytest live CLI logging (`log_cli_level = WARNING`) surfaces them during green runs.
 
-See `ai-tasks/PYPOST-568/error-path-test-audit.md` for per-test risk ratings and
-mitigation options (`caplog`, allowlists in PYPOST-571).
+PYPOST-568 audited 22 ERROR inventory rows across four modules. All are intentional
+error-path tests with strong or moderate behavioral assertions; none rated high false-positive
+risk. Full per-test ratings: `ai-tasks/PYPOST-568/error-path-test-audit.md`.
+
+| Module | ERROR tests | Primary logger |
+| --- | ---: | --- |
+| `tests/test_retry.py` | 12 | `pypost.core.request_service` |
+| `tests/test_tabs_presenter.py` | 6 | `pypost.ui.presenters.tabs_presenter` |
+| `tests/test_collection_tree_delete_metrics.py` | 3 | `pypost.ui.presenters.collection_tree_actions` |
+| `tests/test_worker.py` | 1 | `pypost.core.worker` |
+
+Re-verify after worker/presenter/retry changes:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_worker.py \
+  tests/test_tabs_presenter.py::TestOnRequestError \
+  tests/test_collection_tree_delete_metrics.py \
+  tests/test_retry.py \
+  -v --tb=short
+```
+
+Optional hardening: add `caplog.at_level(logging.ERROR)` assertions for medium-risk tests
+listed in the audit report. PYPOST-571 will allowlist these node ids for CI log gates.
 
 ## References
 
