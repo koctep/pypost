@@ -12,6 +12,8 @@ PYPOST-486 runs encrypted load/save off the UI thread via
 desktop window.
 PYPOST-482 extracts environment variable serialization and encryption policy from
 `StorageManager` into `EnvironmentVariablesAdapter` for clearer boundaries and unit testing.
+PYPOST-484 centralizes v1 envelope schema validation in the typed
+`EncryptedValueEnvelope.from_payload()` model used by `EnvironmentSecretsCodec.decrypt`.
 PYPOST-487 adds operator migration tooling and the
 [Encryption Key Migration](encryption_key_migration.md) runbook (verify, bulk re-encrypt,
 encrypt-plaintext).
@@ -131,6 +133,18 @@ fallback entries (deduplicated, unsupported names skipped).
 
 Builds a `ChainedKeyProvider` from `resolve_key_source_chain(settings)`. Logs
 `encryption_key_provider_built` with the effective chain.
+
+### `EncryptedValueEnvelope` (`pypost/core/environment_secrets_codec.py`)
+
+Typed v1 envelope for encrypted environment values. `encrypt()` returns an instance; persisted
+JSON uses `to_json()`.
+
+- `VERSION` / `ALGORITHM` — schema constants (`1`, `fernet`).
+- `from_payload(payload: dict[str, Any]) -> EncryptedValueEnvelope` — parse and validate on-disk
+  envelope dicts. Raises `EnvironmentEncryptionError` for missing markers, unsupported
+  version/algorithm, or missing `kid`/`ct`. Coerces `kid` and `ct` to strings.
+- `EnvironmentSecretsCodec.decrypt(payload)` — delegates validation to `from_payload`, then resolves
+  the key by `kid` and decrypts `ct`.
 
 ### `StorageManager.apply_encryption_settings(settings: AppSettings | None) -> None`
 
@@ -331,6 +345,9 @@ Encrypted values are stored as envelope objects in `variables` map:
 - `alg`: algorithm (`fernet`)
 - `kid`: key identifier (sha256 prefix of key material)
 - `ct`: ciphertext token
+
+Validation rules and version checks are centralized in `EncryptedValueEnvelope.from_payload()`.
+Callers should not re-implement field checks before `EnvironmentSecretsCodec.decrypt()`.
 
 Plain string values remain supported for backward compatibility.
 

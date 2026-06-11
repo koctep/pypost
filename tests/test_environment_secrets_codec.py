@@ -2,7 +2,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pypost.core.environment_secrets_codec import EnvironmentSecretsCodec
+from pypost.core.environment_secrets_codec import (
+    EncryptedValueEnvelope,
+    EnvironmentSecretsCodec,
+)
 from pypost.core.key_provider import (
     EncryptionKey,
     EnvironmentEncryptionError,
@@ -50,6 +53,39 @@ def _build_key_provider_with_active_key(raw_key: str) -> MagicMock:
         ),
     ],
 )
+def test_from_payload_rejects_invalid_shapes(
+    payload: dict[str, object],
+    expected_message: str,
+):
+    with pytest.raises(EnvironmentEncryptionError, match=expected_message):
+        EncryptedValueEnvelope.from_payload(payload)
+
+
+@pytest.mark.parametrize(
+    "payload,expected_message",
+    [
+        (
+            {"enc": False, "v": 1, "alg": "fernet", "kid": "abc", "ct": "token"},
+            "Encrypted payload marker is missing",
+        ),
+        (
+            {"enc": True, "v": 999, "alg": "fernet", "kid": "abc", "ct": "token"},
+            "Unsupported encrypted payload version",
+        ),
+        (
+            {"enc": True, "v": 1, "alg": "aes-gcm", "kid": "abc", "ct": "token"},
+            "Unsupported encrypted payload algorithm",
+        ),
+        (
+            {"enc": True, "v": 1, "alg": "fernet", "ct": "token"},
+            "Encrypted payload is missing required fields",
+        ),
+        (
+            {"enc": True, "v": 1, "alg": "fernet", "kid": "abc"},
+            "Encrypted payload is missing required fields",
+        ),
+    ],
+)
 def test_decrypt_rejects_invalid_payload_shapes(
     codec: EnvironmentSecretsCodec,
     payload: dict[str, object],
@@ -57,6 +93,27 @@ def test_decrypt_rejects_invalid_payload_shapes(
 ):
     with pytest.raises(EnvironmentEncryptionError, match=expected_message):
         codec.decrypt(payload)
+
+
+def test_from_payload_accepts_valid_v1_envelope():
+    envelope = EncryptedValueEnvelope.from_payload(
+        {
+            "enc": True,
+            "v": 1,
+            "alg": "fernet",
+            "kid": "kid-1",
+            "ct": "token-value",
+        }
+    )
+    assert envelope.kid == "kid-1"
+    assert envelope.ct == "token-value"
+    assert envelope.to_json() == {
+        "enc": True,
+        "v": 1,
+        "alg": "fernet",
+        "kid": "kid-1",
+        "ct": "token-value",
+    }
 
 
 def test_decrypt_raises_on_invalid_ciphertext_token():

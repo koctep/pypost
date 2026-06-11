@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from pypost.core.key_provider import EncryptionKey, EnvironmentEncryptionError, KeyProvider
 
@@ -15,11 +15,41 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class EncryptedValueEnvelope:
+    """Typed v1 encrypted environment value envelope."""
+
     enc: bool
     v: int
     alg: str
     kid: str
     ct: str
+
+    VERSION: ClassVar[int] = 1
+    ALGORITHM: ClassVar[str] = "fernet"
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> "EncryptedValueEnvelope":
+        """Parse and validate a serialized envelope dict (v1 backward compatible)."""
+        if not payload.get("enc"):
+            raise EnvironmentEncryptionError("Encrypted payload marker is missing.")
+        if payload.get("v") != cls.VERSION:
+            raise EnvironmentEncryptionError(
+                f"Unsupported encrypted payload version: {payload.get('v')}"
+            )
+        if payload.get("alg") != cls.ALGORITHM:
+            raise EnvironmentEncryptionError(
+                f"Unsupported encrypted payload algorithm: {payload.get('alg')}"
+            )
+        kid = payload.get("kid")
+        ct = payload.get("ct")
+        if kid is None or ct is None:
+            raise EnvironmentEncryptionError("Encrypted payload is missing required fields.")
+        return cls(
+            enc=True,
+            v=cls.VERSION,
+            alg=cls.ALGORITHM,
+            kid=str(kid),
+            ct=str(ct),
+        )
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -34,8 +64,8 @@ class EncryptedValueEnvelope:
 class EnvironmentSecretsCodec:
     """Encodes and decodes encrypted environment values."""
 
-    VERSION = 1
-    ALGORITHM = "fernet"
+    VERSION = EncryptedValueEnvelope.VERSION
+    ALGORITHM = EncryptedValueEnvelope.ALGORITHM
 
     def __init__(self, key_provider: KeyProvider) -> None:
         self._key_provider = key_provider
@@ -67,11 +97,10 @@ class EnvironmentSecretsCodec:
 
     def decrypt(self, payload: dict[str, Any]) -> str:
         self._ensure_fernet_available()
-        self._validate_payload(payload)
-        key_id = str(payload["kid"])
-        key = self._key_provider.get_key_by_id(key_id)
-        logger.debug("env_value_decrypt_attempt key_id=%s", key_id)
-        return self._decrypt_token(payload["ct"], key)
+        envelope = EncryptedValueEnvelope.from_payload(payload)
+        key = self._key_provider.get_key_by_id(envelope.kid)
+        logger.debug("env_value_decrypt_attempt key_id=%s", envelope.kid)
+        return self._decrypt_token(envelope.ct, key)
 
     def _decrypt_token(self, token: str, key: EncryptionKey) -> str:
         try:
@@ -84,16 +113,3 @@ class EnvironmentSecretsCodec:
                 "Encrypted environment value could not be decrypted with current key."
             ) from exc
 
-    def _validate_payload(self, payload: dict[str, Any]) -> None:
-        if not payload.get("enc"):
-            raise EnvironmentEncryptionError("Encrypted payload marker is missing.")
-        if payload.get("v") != self.VERSION:
-            raise EnvironmentEncryptionError(
-                f"Unsupported encrypted payload version: {payload.get('v')}"
-            )
-        if payload.get("alg") != self.ALGORITHM:
-            raise EnvironmentEncryptionError(
-                f"Unsupported encrypted payload algorithm: {payload.get('alg')}"
-            )
-        if "kid" not in payload or "ct" not in payload:
-            raise EnvironmentEncryptionError("Encrypted payload is missing required fields.")
