@@ -67,6 +67,24 @@ incrementally or via `refresh_tree` fallback.
 No task-specific settings. Metrics use existing `MetricsManager` counters documented in
 `doc/dev/collection_item_rename.md` and `doc/dev/collection_item_delete.md`.
 
+## Automated tests
+
+`tests/test_collection_tree_actions.py` covers right-click menu behavior via
+`CollectionsPresenter` and `CollectionTreeActions`:
+
+| Test | Behavior |
+|------|----------|
+| `test_invalid_index_skips_context_menu` | Blank click — no menu |
+| `test_collection_menu_offers_rename_and_delete` | Collection node actions |
+| `test_request_menu_offers_new_tab_rename_delete` | Request node actions |
+| `test_rename_selected_starts_inline_edit` | Rename dispatches inline edit |
+| `test_new_tab_selected_emits_open_isolated_tab` | New tab copies request, emits signal |
+| `test_delete_cancelled_skips_persistence` | Delete No — tree unchanged |
+| `test_delete_confirmed_removes_request` | Delete Yes — row removed |
+
+Patch `QMenu` and `QMessageBox` under `pypost.ui.presenters.collection_tree_actions`.
+Related presenter tests remain in `tests/test_collections_presenter.py`.
+
 ## Troubleshooting
 
 ### Context menu tests fail after moving imports
