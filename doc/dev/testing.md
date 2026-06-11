@@ -107,6 +107,29 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_test_collection.py -v
 ```
 
+## MCP test collection integration (PYPOST-181)
+
+Live Streamable HTTP round-trip tests load exposed tools from the committed MCP test
+collection (`examples/collections/mcp.json`) via `tests/helpers/mcp_test_collection.py`.
+The harness starts `MCPServerImpl` on an ephemeral port and uses the official MCP Python SDK
+(`list_tools`, `call_tool`). Upstream HTTP is mocked through `RequestService` for CI
+determinism — same pattern as `tests/test_mcp_server_integration.py`.
+
+| Module | Scope |
+| --- | --- |
+| `tests/helpers/mcp_test_collection.py` | `mcp_exposed_requests()` plus PYPOST-180 loaders |
+| `tests/test_mcp_test_collection_integration.py` | Live `list_tools`, per-tool `call_tool`, request forwarding |
+
+Assertions include expected tool names (`sse_probe_metrics`, `sse_probe_main`), structured
+JSON envelopes on `call_tool`, and that the correct collection `RequestData` is passed to
+`RequestService.execute`.
+
+Focused run:
+
+```bash
+.venv/bin/python -m pytest tests/test_mcp_test_collection_integration.py -v
+```
+
 ## MCP and metrics test coverage
 
 PYPOST-370 closed the PYPOST-38 debt item for automated MCP tools and metrics tests as
@@ -115,6 +138,7 @@ duplicate scope: prior tickets already cover the intent.
 | Concern | Module | Level | Notes |
 | --- | --- | --- | --- |
 | MCP tool Streamable HTTP (`list_tools`, `call_tool`) | `tests/test_mcp_server_integration.py` | Integration | PYPOST-368/551; `RequestService` mocked |
+| MCP test collection live round-trip | `tests/test_mcp_test_collection_integration.py` | Integration | PYPOST-181; collection tools, `RequestService` mocked |
 | `MCPServerImpl` metrics hooks | `tests/test_mcp_server_impl.py` | Unit | PYPOST-367; `MetricsManager` mocked |
 | Metrics `read_resource("metrics://all")` | `tests/test_metrics_manager.py` | Unit | Facade; scrapes `mcp_*_total` after `read_resource` |
 | `MetricsRegistry` MCP counters | `tests/test_metrics_registry.py` | Unit | PYPOST-177; pure `track_mcp_*` scrape assertions |

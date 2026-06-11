@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pypost.models.models import Collection, Environment
+from pypost.models.models import Collection, Environment, RequestData
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MCP_COLLECTION_PATH = REPO_ROOT / "examples" / "collections" / "mcp.json"
@@ -29,6 +29,15 @@ def load_mcp_test_environments() -> list[Environment]:
     """Load and validate committed MCP test environment entries."""
     data = json.loads(MCP_TEST_ENV_PATH.read_text(encoding="utf-8"))
     return [Environment.model_validate(item) for item in data]
+
+
+def mcp_exposed_requests() -> list[RequestData]:
+    """Return expose_as_mcp requests from the committed MCP test collection."""
+    return [
+        request
+        for request in load_mcp_test_collection().requests
+        if request.expose_as_mcp
+    ]
 
 
 def mcp_test_environment() -> Environment:
