@@ -310,13 +310,16 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 #### Schema pipeline
 
 ```
-_extract_mcp_variables(req)
+McpSecretsPolicy.extract_mcp_request_variables(req)  ← regex on {{ mcp.request.VAR }}
         │
         ▼
-_resolve_mcp_param_specs(req, discovered)  ← merges mcp_params overrides
+resolve_mcp_param_specs(req, discovered)  ← merges mcp_params overrides
         │
         ▼
-_build_tool_input_schema(specs)  → Tool.inputSchema
+McpSecretsPolicy.filter_agent_param_specs(...)  ← drops env-only / hidden keys
+        │
+        ▼
+build_tool_input_schema(specs)  → Tool.inputSchema
 ```
 
 #### UI
