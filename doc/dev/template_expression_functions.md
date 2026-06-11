@@ -266,7 +266,22 @@ satisfies table-cell equivalence (PYPOST-453 precedent).
 - `test_malformed_nested_expressions` — M1–M4 matrix
 - `test_nested_spacing_variants` — S1–S5 matrix
 
-**Render, parity, security, observability** (`tests/test_template_service.py`):
+**Unit tests — `TemplateService`** (`tests/test_template_service.py`, PYPOST-147):
+
+Isolated coverage for `pypost/core/template_service.py` (closes PYPOST-18 missing-test debt):
+
+| Class | Public API / behavior |
+| --- | --- |
+| `TestTemplateServiceRenderString` | `render_string` — variables, catalog, nesting, fallback |
+| `TestTemplateServiceParse` | `parse` → Jinja AST |
+| `TestTemplateServiceValidationOutcomes` | `validate_function_expressions` — codes, plain identifiers |
+| `TestTemplateServiceObservability` | Metrics + `render_path` labels |
+| `TestTemplateServiceRenderStages` | Staged render outcomes (incl. mocked render error) |
+| `TestTemplateServiceHelperStages` | Fallback helper metrics branching |
+
+Scoped run: 49 tests + subtests (2026-06-11).
+
+**Render, parity, security, observability** (highlights within the file above):
 
 - Catalog functions, nested chains, fallback on invalid forms
 - Jinja filter/attribute rejection (security negatives)

@@ -193,6 +193,10 @@ class TestTemplateServiceValidationOutcomes(unittest.TestCase):
         self.assertFalse(result.is_valid)
         self.assertEqual("invalid_arity", result.code)
 
+    def test_validate_allows_plain_identifier(self):
+        result = self.svc.validate_function_expressions("{{name}}")
+        self.assertTrue(result.is_valid)
+
     def test_validate_allows_nested_allowed_calls(self):
         result = self.svc.validate_function_expressions("{{md5(urlencode(db))}}")
         self.assertTrue(result.is_valid)
