@@ -29,7 +29,7 @@ flowchart TB
 | `CollectionsPresenter` | Builds tree model, left-click open, expand/collapse state |
 | `CollectionItemRenameDelegate` | Inline rename editor lifecycle |
 | `CollectionTreeActions` | Context menu, rename callbacks, delete with confirmation |
-| `collection_item_dialogs` | Shared QMessageBox helpers for rename/delete flows |
+| `collection_item_dialogs` | Shared QMessageBox helpers for collection, tab, env, and history flows |
 | `RequestManager` | `rename_collection_item`, `delete_collection_item` |
 
 Wiring in `CollectionsPresenter.__init__`:
@@ -78,16 +78,24 @@ incrementally or via `refresh_tree` fallback.
 ### `collection_item_dialogs`
 
 `pypost/ui/collection_item_dialogs.py` centralizes QMessageBox usage for collection rename
-and delete:
+and delete, plus tab, environment, and history flows (PYPOST-539):
 
 | Helper | When used |
 |--------|-----------|
-| `confirm_delete(parent, item_label)` | Delete context-menu action (Yes/No) |
+| `confirm_delete(parent, item_label)` | Collection delete context-menu (Yes/No) |
 | `show_rename_empty_name_error(parent)` | Delegate rejects empty rename |
 | `show_rename_failure(parent, label, error)` | Rename persistence exception |
 | `show_rename_not_found(parent, label)` | Rename returned false |
 | `show_delete_failure(parent, label, error)` | Delete persistence exception |
 | `show_delete_not_found(parent, label)` | Delete returned false |
+| `show_request_failed_error(parent, error)` | Plain-string request failure in tabs |
+| `show_request_error(parent, message)` | Structured request error in tabs |
+| `prompt_dirty_sibling_tab_reload(parent, name)` | Dirty sibling tab saved elsewhere |
+| `prompt_clean_sibling_tab_reload(parent, name)` | Clean sibling tab saved elsewhere |
+| `confirm_delete_environment(parent, env_name)` | Environment dialog delete (Yes/No) |
+| `show_copy_environment_empty_name_error(parent)` | Environment copy with empty name |
+| `show_copy_environment_duplicate_name_error(parent, name)` | Environment copy duplicate name |
+| `confirm_clear_history(parent)` | History panel clear-all (Yes/No) |
 
 ### Callbacks (constructor)
 
@@ -135,7 +143,8 @@ branching and `track_gui_collection_delete_action` call sequences (`selected` â†
 
 Patch `QMenu` under `pypost.ui.presenters.collection_tree_actions`. Patch dialog helpers
 (`confirm_delete`, `show_rename_empty_name_error`, `show_delete_failure`, etc.) at the same
-import site. Unit tests for helpers live in `tests/test_collection_item_dialogs.py`.
+import site used by the caller (e.g. `pypost.ui.presenters.tabs_presenter.show_request_error`).
+Unit tests for helpers live in `tests/test_collection_item_dialogs.py`.
 Presenter wiring and integration paths remain in `tests/test_collections_presenter.py`.
 
 ### Tree expand/collapse state tests (PYPOST-388)

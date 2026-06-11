@@ -68,8 +68,8 @@ class TestEnvironmentDialog:
             dlg.close()
 
     @patch(
-        "pypost.ui.dialogs.env_dialog.QMessageBox.question",
-        return_value=QMessageBox.StandardButton.Yes,
+        "pypost.ui.dialogs.env_dialog.confirm_delete_environment",
+        return_value=True,
     )
     def test_delete_environment_removes_current_row(self, mock_question, qapp):
         envs = [
@@ -86,9 +86,9 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
-    @patch("pypost.ui.dialogs.env_dialog.QMessageBox.question")
-    def test_delete_environment_cancelled_leaves_env(self, mock_question, qapp):
-        mock_question.return_value = QMessageBox.StandardButton.No
+    @patch("pypost.ui.dialogs.env_dialog.confirm_delete_environment")
+    def test_delete_environment_cancelled_leaves_env(self, mock_confirm, qapp):
+        mock_confirm.return_value = False
         envs = [Environment(name="A", variables={})]
         dlg = EnvironmentDialog(envs)
         try:

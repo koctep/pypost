@@ -3,13 +3,19 @@ import logging
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
-    QMessageBox,
     QPushButton,
     QSplitter,
     QTabBar,
     QTabWidget,
     QVBoxLayout,
     QWidget,
+)
+
+from pypost.ui.collection_item_dialogs import (
+    prompt_clean_sibling_tab_reload,
+    prompt_dirty_sibling_tab_reload,
+    show_request_error,
+    show_request_failed_error,
 )
 
 from pypost.core.alert_manager import AlertManager
@@ -498,7 +504,7 @@ class TabsPresenter(QObject):
                 logger.info("request_cancelled error_msg=%s", error)
                 return
             logger.error("request_error error_msg=%s", error)
-            QMessageBox.critical(self._tabs, "Error", f"Request failed: {error}")
+            show_request_failed_error(self._tabs, error)
             return
 
         # Structured ExecutionError path
@@ -519,7 +525,7 @@ class TabsPresenter(QObject):
                 error.message,
                 error.detail,
             )
-            QMessageBox.critical(self._tabs, "Request Error", user_msg)
+            show_request_error(self._tabs, user_msg)
 
     def _on_script_output(self, tab: RequestTab, logs, err) -> None:
         if logs:
@@ -607,39 +613,14 @@ class TabsPresenter(QObject):
         """Prompts the user when a sibling tab saved a newer persisted version."""
         name = snapshot.name
         if is_tab_dirty(tab):
-            message = (
-                f"'{name}' was saved in another tab. Your unsaved changes may be "
-                "outdated relative to what is on disk."
-            )
-            box = QMessageBox(self._tabs)
-            box.setIcon(QMessageBox.Warning)
-            box.setWindowTitle("Saved Request Changed")
-            box.setText(message)
-            keep_btn = box.addButton("Keep my changes", QMessageBox.RejectRole)
-            load_btn = box.addButton("Load latest", QMessageBox.AcceptRole)
-            box.setDefaultButton(keep_btn)
-            box.exec()
-            if box.clickedButton() is load_btn:
+            if prompt_dirty_sibling_tab_reload(self._tabs, name):
                 self._reload_tab_from_persisted(tab, snapshot)
             else:
                 tab.stale_persisted = True
+        elif prompt_clean_sibling_tab_reload(self._tabs, name):
+            self._reload_tab_from_persisted(tab, snapshot)
         else:
-            message = (
-                f"'{name}' was saved in another tab. This tab may show outdated "
-                "saved content."
-            )
-            box = QMessageBox(self._tabs)
-            box.setIcon(QMessageBox.Information)
-            box.setWindowTitle("Saved Request Changed")
-            box.setText(message)
-            dismiss_btn = box.addButton("Dismiss", QMessageBox.RejectRole)
-            load_btn = box.addButton("Load latest", QMessageBox.AcceptRole)
-            box.setDefaultButton(dismiss_btn)
-            box.exec()
-            if box.clickedButton() is load_btn:
-                self._reload_tab_from_persisted(tab, snapshot)
-            else:
-                tab.stale_persisted = True
+            tab.stale_persisted = True
 
     def _reload_tab_from_persisted(self, tab: RequestTab, snapshot: RequestData) -> None:
         """Replaces tab editor content with the latest persisted snapshot."""

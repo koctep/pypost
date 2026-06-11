@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMenu,
-    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -20,15 +19,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.constants import HIDDEN_MASK
 from pypost.core.environment_ops import (
     clone_environment,
     validate_environment_rename,
     validate_environment_variable_name,
 )
-from pypost.ui.delegates import EnvironmentNameDelegate
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.models.models import Environment
-from pypost.core.constants import HIDDEN_MASK
+from pypost.ui.collection_item_dialogs import (
+    confirm_delete_environment,
+    show_copy_environment_duplicate_name_error,
+    show_copy_environment_empty_name_error,
+)
+from pypost.ui.delegates import EnvironmentNameDelegate
 
 logger = logging.getLogger(__name__)
 
@@ -150,14 +154,7 @@ class EnvironmentDialog(QDialog):
             return
 
         deleted_env = self.environments[row]
-        confirm = QMessageBox.question(
-            self,
-            "Delete Environment",
-            f'Are you sure you want to delete "{deleted_env.name}"?',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if confirm != QMessageBox.StandardButton.Yes:
+        if not confirm_delete_environment(self, deleted_env.name):
             return
 
         logger.info("environment_deleted env_name=%s", deleted_env.name)
@@ -350,15 +347,11 @@ class EnvironmentDialog(QDialog):
                 return
             stripped = name.strip()
             if not stripped:
-                QMessageBox.warning(self, "Copy Environment", "Name cannot be empty.")
+                show_copy_environment_empty_name_error(self)
                 default_name = name
                 continue
             if any(e.name == stripped for e in self.environments):
-                QMessageBox.warning(
-                    self,
-                    "Copy Environment",
-                    f'An environment named "{stripped}" already exists.',
-                )
+                show_copy_environment_duplicate_name_error(self, stripped)
                 default_name = stripped
                 continue
             break

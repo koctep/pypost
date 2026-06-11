@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMenu,
-    QMessageBox,
     QPushButton,
     QSplitter,
     QTextEdit,
@@ -20,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.ui.collection_item_dialogs import confirm_clear_history
 from pypost.core.curl_generator import CurlGenerator
 from pypost.core.history_manager import HistoryManager
 from pypost.models.models import HistoryEntry, RequestData
@@ -165,14 +165,7 @@ class HistoryPanel(QWidget):
 
     def _on_clear_history(self) -> None:
         """Confirms then clears all history entries."""
-        reply = QMessageBox.question(
-            self,
-            "Clear History",
-            "Are you sure you want to clear all request history?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
-        if reply == QMessageBox.No:
+        if not confirm_clear_history(self):
             return
         self._history_manager.clear()
         self.refresh()

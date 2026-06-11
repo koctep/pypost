@@ -423,10 +423,10 @@ class TestTabsPresenter(unittest.TestCase):
         updated = tab_a.request_editor.get_request_data_from_ui()
         updated.name = "Renamed"
 
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
-            mock_box = MagicMock()
-            mock_mb.return_value = mock_box
-            mock_box.addButton.return_value = MagicMock()
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.prompt_clean_sibling_tab_reload",
+            return_value=False,
+        ):
             tab_a.request_editor.save_requested.emit(updated)
 
         self.assertEqual(p.widget.tabText(0), "Renamed")
@@ -442,15 +442,12 @@ class TestTabsPresenter(unittest.TestCase):
         tab_a.request_editor.url_input.setText("https://saved-elsewhere.example.com")
         updated = tab_a.request_editor.get_request_data_from_ui()
 
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
-            mock_box = MagicMock()
-            mock_mb.return_value = mock_box
-            dismiss_btn = MagicMock()
-            load_btn = MagicMock()
-            mock_box.addButton.side_effect = [dismiss_btn, load_btn]
-            mock_box.clickedButton.return_value = dismiss_btn
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.prompt_clean_sibling_tab_reload",
+            return_value=False,
+        ) as mock_prompt:
             tab_a.request_editor.save_requested.emit(updated)
-            mock_box.exec.assert_called()
+            mock_prompt.assert_called()
 
     def test_dirty_sibling_keeps_draft_when_user_chooses_keep(self):
         req = _make_request("r1", "Shared")
@@ -464,13 +461,10 @@ class TestTabsPresenter(unittest.TestCase):
         tab_a.request_editor.url_input.setText("https://saved-elsewhere.example.com")
         updated = tab_a.request_editor.get_request_data_from_ui()
 
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
-            mock_box = MagicMock()
-            mock_mb.return_value = mock_box
-            keep_btn = MagicMock()
-            load_btn = MagicMock()
-            mock_box.addButton.side_effect = [keep_btn, load_btn]
-            mock_box.clickedButton.return_value = keep_btn
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.prompt_dirty_sibling_tab_reload",
+            return_value=False,
+        ):
             tab_a.request_editor.save_requested.emit(updated)
 
         self.assertEqual(
@@ -490,13 +484,10 @@ class TestTabsPresenter(unittest.TestCase):
         tab_a.request_editor.url_input.setText("https://saved-elsewhere.example.com")
         updated = tab_a.request_editor.get_request_data_from_ui()
 
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
-            mock_box = MagicMock()
-            mock_mb.return_value = mock_box
-            dismiss_btn = MagicMock()
-            load_btn = MagicMock()
-            mock_box.addButton.side_effect = [dismiss_btn, load_btn]
-            mock_box.clickedButton.return_value = load_btn
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.prompt_clean_sibling_tab_reload",
+            return_value=True,
+        ):
             tab_a.request_editor.save_requested.emit(updated)
 
         self.assertEqual(
@@ -548,15 +539,19 @@ class TestOnRequestError(unittest.TestCase):
 
     def test_str_cancellation_message_no_dialog(self):
         p, tab = self._make_presenter_with_tab()
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.show_request_failed_error"
+        ) as mock_show:
             p._on_request_error(tab, "request cancelled")
-            mock_mb.critical.assert_not_called()
+            mock_show.assert_not_called()
 
     def test_str_error_shows_dialog(self):
         p, tab = self._make_presenter_with_tab()
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.show_request_failed_error"
+        ) as mock_show:
             p._on_request_error(tab, "connection refused")
-            mock_mb.critical.assert_called_once()
+            mock_show.assert_called_once()
 
     def test_execution_error_network_shows_category_message(self):
         from pypost.models.errors import ErrorCategory, ExecutionError
@@ -566,12 +561,11 @@ class TestOnRequestError(unittest.TestCase):
             message="no conn",
             detail="connection refused",
         )
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+        with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
             p._on_request_error(tab, exc)
-            mock_mb.critical.assert_called_once()
-            args = mock_mb.critical.call_args[0]
-            self.assertIn("Request Error", args[1])
-            self.assertIn("server is running", args[2])
+            mock_show.assert_called_once()
+            args = mock_show.call_args[0]
+            self.assertIn("server is running", args[1])
 
     def test_execution_error_body_shows_category_message(self):
         from pypost.models.errors import ErrorCategory, ExecutionError
@@ -581,13 +575,12 @@ class TestOnRequestError(unittest.TestCase):
             message="Could not convert YAML body to JSON.",
             detail="mapping values are not allowed here",
         )
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+        with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
             p._on_request_error(tab, exc)
-            mock_mb.critical.assert_called_once()
-            args = mock_mb.critical.call_args[0]
-            self.assertIn("Request Error", args[1])
-            self.assertIn("Could not convert YAML body to JSON", args[2])
-            self.assertIn("mapping values are not allowed here", args[2])
+            mock_show.assert_called_once()
+            args = mock_show.call_args[0]
+            self.assertIn("Could not convert YAML body to JSON", args[1])
+            self.assertIn("mapping values are not allowed here", args[1])
 
     def test_execution_error_timeout_shows_timeout_message(self):
         from pypost.models.errors import ErrorCategory, ExecutionError
@@ -597,10 +590,10 @@ class TestOnRequestError(unittest.TestCase):
             message="timed out",
             detail="ReadTimeout",
         )
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+        with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
             p._on_request_error(tab, exc)
-            args = mock_mb.critical.call_args[0]
-            self.assertIn("timed out", args[2])
+            args = mock_show.call_args[0]
+            self.assertIn("timed out", args[1])
 
     def test_execution_error_cancelled_no_dialog(self):
         from pypost.models.errors import ErrorCategory, ExecutionError
@@ -610,9 +603,9 @@ class TestOnRequestError(unittest.TestCase):
             message="something",
             detail="request aborted by user",
         )
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+        with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
             p._on_request_error(tab, exc)
-            mock_mb.critical.assert_not_called()
+            mock_show.assert_not_called()
 
     def test_execution_error_message_does_not_expose_raw_detail_for_network(self):
         """NETWORK message uses URL not raw detail."""
@@ -624,11 +617,11 @@ class TestOnRequestError(unittest.TestCase):
             message="no conn",
             detail=raw_detail,
         )
-        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+        with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
             p._on_request_error(tab, exc)
-            args = mock_mb.critical.call_args[0]
+            args = mock_show.call_args[0]
             # The NETWORK template uses {url}, not {detail}
-            self.assertNotIn(raw_detail, args[2])
+            self.assertNotIn(raw_detail, args[1])
 
 
 class TestTabsPresenterAlertManagerPropagation(unittest.TestCase):
