@@ -24,7 +24,7 @@
 - No integration/UI-level test currently verifies that masked values shown in History panel remain
   masked across persistence-reload cycle under real application wiring.
 - No explicit negative test confirms metric `hidden_value_masks_applied_total` is not incremented
-  when `hidden_keys` is empty.
+  when `hidden_keys` is empty. **Closed:** [PYPOST-464](https://pypost.atlassian.net/browse/PYPOST-464).
 - Full regression run for the whole project test suite is pending due to missing local dependencies
   (`pytest`, `pydantic`, `PySide6`, `requests`, `jinja2`, `platformdirs`).
 
@@ -45,7 +45,7 @@
   Normal/Medium, Type: Debt).
 - Add explicit tests for masking metric behavior with empty vs non-empty `hidden_keys`. Jira:
   [PYPOST-464](https://pypost.atlassian.net/browse/PYPOST-464) (Priority: Normal/Medium, Type:
-  Debt).
+  Debt). **Done** — see `tests/test_history_masking_metrics.py`.
 - Provision CI/local test environment with required dependencies and run full regression for this
   task before merge. Jira: [PYPOST-465](https://pypost.atlassian.net/browse/PYPOST-465) (Priority:
   Low, Type: Debt).

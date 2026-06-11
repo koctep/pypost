@@ -92,6 +92,7 @@ TabsPresenter._current_hidden_keys
 | `tests/test_sensitive_data_masking_policy.py` | Policy unit tests |
 | `tests/test_request_service.py` | History masking integration tests |
 | `tests/test_history_masking_e2e.py` | End-to-end execute → persist → reload → HistoryPanel (PYPOST-462) |
+| `tests/test_history_masking_metrics.py` | Prometheus scrape tests for masking metric counter (PYPOST-464) |
 | `tests/test_worker.py` | `hidden_keys` forwarding tests |
 | `tests/test_tabs_presenter.py` | Presenter wiring tests |
 | `doc/dev/sensitive_data_masking_policy.md` | Long-form dev reference |
@@ -123,8 +124,18 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_history_masking_e2e.py -v
 ```
 
+Metric counter scrape tests (PYPOST-464):
+
+```bash
+.venv/bin/python -m pytest tests/test_history_masking_metrics.py -v
+```
+
 `test_hidden_values_stay_masked_after_history_reload_in_panel` verifies execute → persist →
 reload → HistoryPanel display; see `doc/dev/sensitive_data_masking_policy.md` for scope detail.
+
+PYPOST-464 tests scrape a real `MetricsManager` registry and assert
+`hidden_value_masks_applied_total` is absent for empty/`None` `hidden_keys` and equals `1.0`
+when hidden keys are present.
 
 ---
 
@@ -135,4 +146,4 @@ reload → HistoryPanel display; see `doc/dev/sensitive_data_masking_policy.md` 
 | PYPOST-437 | Introduced `hidden_keys` on `Environment`; display-level masking |
 | PYPOST-462 | End-to-end integration test for mask → persist → reload → display cycle (done) |
 | PYPOST-463 | Follow-up: refactor history-recording block in `RequestService.execute` |
-| PYPOST-464 | Follow-up: explicit metric tests for empty vs non-empty `hidden_keys` |
+| PYPOST-464 | Explicit metric scrape tests for empty vs non-empty `hidden_keys` (done) |

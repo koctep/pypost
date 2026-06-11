@@ -99,11 +99,26 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_history_masking_e2e.py -v
 ```
 
+### Metric counter tests (PYPOST-464)
+
+`tests/test_history_masking_metrics.py` scrapes a real `MetricsManager` registry after
+`RequestService.execute` and asserts `hidden_value_masks_applied_total` behavior:
+
+- Counter line is **absent** when `hidden_keys` is empty (`set()`) or `None`.
+- Counter equals **`1.0`** for `surface="history"` when `hidden_keys` is non-empty.
+
+Run the metric tests alone:
+
+```bash
+.venv/bin/python -m pytest tests/test_history_masking_metrics.py -v
+```
+
 Broader history-masking regression:
 
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_sensitive_data_masking_policy.py \
   tests/test_request_service.py \
+  tests/test_history_masking_metrics.py \
   tests/test_history_masking_e2e.py -v
 ```
