@@ -2,18 +2,20 @@ from PySide6.QtCore import QRegularExpression
 from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 
 from pypost.core.template_expression_tokenizer import TEMPLATE_PLACEHOLDER_PATTERN
+from pypost.ui.theme.json_syntax_theme import DEFAULT_JSON_SYNTAX_COLORS, JsonSyntaxColors
 
 
 class JsonHighlighter(QSyntaxHighlighter):
     """Highlighter for JSON syntax and template placeholders."""
 
-    def __init__(self, document):
+    def __init__(self, document, colors: JsonSyntaxColors | None = None):
         super().__init__(document)
+        self._colors = colors or DEFAULT_JSON_SYNTAX_COLORS
 
         self.rules = []
 
         keyword_format = QTextCharFormat()
-        keyword_format.setForeground(QColor("darkblue"))
+        keyword_format.setForeground(QColor(self._colors.keyword))
         keyword_format.setFontWeight(QFont.Bold)
         keywords = ["true", "false", "null"]
         for word in keywords:
@@ -21,21 +23,21 @@ class JsonHighlighter(QSyntaxHighlighter):
             self.rules.append((pattern, keyword_format))
 
         number_format = QTextCharFormat()
-        number_format.setForeground(QColor("blue"))
+        number_format.setForeground(QColor(self._colors.number))
         self.rules.append(
             (QRegularExpression(r"\b-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?\b"), number_format)
         )
 
         string_format = QTextCharFormat()
-        string_format.setForeground(QColor("green"))
+        string_format.setForeground(QColor(self._colors.string))
         self.rules.append((QRegularExpression(r'"[^"\\]*(\\.[^"\\]*)*"'), string_format))
 
         key_format = QTextCharFormat()
-        key_format.setForeground(QColor("purple"))
+        key_format.setForeground(QColor(self._colors.key))
         self.key_rule = (QRegularExpression(r'("[^"\\]*(\\.[^"\\]*)*")\s*:'), key_format)
 
         variable_format = QTextCharFormat()
-        variable_format.setForeground(QColor("darkorange"))
+        variable_format.setForeground(QColor(self._colors.placeholder))
         variable_format.setFontWeight(QFont.Bold)
         self.variable_format = variable_format
 

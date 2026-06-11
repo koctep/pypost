@@ -1,4 +1,4 @@
-"""JsonHighlighter tests (PYPOST-103, PYPOST-124, PYPOST-399).
+"""JsonHighlighter tests (PYPOST-103, PYPOST-124, PYPOST-399, PYPOST-398).
 
 RequestEditor/ResponseView attach JsonHighlighter to JSON body documents. Rules cover
 keywords, numbers, strings, object keys, and template placeholders. Assertions use
@@ -14,6 +14,7 @@ import unittest
 from PySide6.QtGui import QColor, QTextDocument
 from PySide6.QtWidgets import QApplication, QTextEdit
 
+from pypost.ui.theme.json_syntax_theme import JsonSyntaxColors
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
 
@@ -156,6 +157,24 @@ class TestJsonHighlighter(unittest.TestCase):
         edit.setPlainText("")
         hl.rehighlight()
         self.assertEqual(edit.toPlainText(), "")
+
+    def test_custom_theme_colors_are_applied(self):
+        colors = JsonSyntaxColors(
+            keyword="red",
+            number="cyan",
+            string="magenta",
+            key="yellow",
+            placeholder="gray",
+        )
+        text = '{"k": true, "n": 1, "s": "{{x}}"}'
+        edit = QTextEdit()
+        highlighter = JsonHighlighter(edit.document(), colors=colors)
+        edit.setPlainText(text)
+        highlighter.rehighlight()
+        self.assertEqual(_hex_color_at(edit.document(), text.index("k")), QColor("yellow").name())
+        self.assertEqual(_hex_color_at(edit.document(), text.index("true")), QColor("red").name())
+        self.assertEqual(_hex_color_at(edit.document(), text.index("1")), QColor("cyan").name())
+        self.assertEqual(_hex_color_at(edit.document(), text.index("{{")), QColor("gray").name())
 
 
 if __name__ == "__main__":

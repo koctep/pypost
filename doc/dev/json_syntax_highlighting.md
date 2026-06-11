@@ -9,13 +9,16 @@ It extends `QSyntaxHighlighter` and runs on each `QTextDocument` block during ed
 
 ## Highlighted elements
 
-| Pattern | Color | Weight |
-| ------- | ----- | ------ |
-| `true`, `false`, `null` | darkblue | bold |
-| Numeric literals | blue | normal |
-| Quoted strings | green | normal |
-| Object keys (`"key":`) | purple | normal |
-| Template placeholders `{{...}}` | darkorange | bold |
+Colors are defined in `pypost/ui/theme/json_syntax_theme.py` as `JsonSyntaxColors` and
+applied by `JsonHighlighter`. Defaults:
+
+| Pattern | Color field | Default | Weight |
+| ------- | ----------- | ------- | ------ |
+| `true`, `false`, `null` | `keyword` | darkblue | bold |
+| Numeric literals | `number` | blue | normal |
+| Quoted strings | `string` | green | normal |
+| Object keys (`"key":`) | `key` | purple | normal |
+| Template placeholders `{{...}}` | `placeholder` | darkorange | bold |
 
 Placeholder detection uses `TEMPLATE_PLACEHOLDER_PATTERN` from
 `pypost.core.template_expression_tokenizer` — the same regex as template expression parsing
@@ -36,12 +39,17 @@ darkorange for the full `{{...}}` token.
 ## Wiring
 
 ```python
-JsonHighlighter(self.body_edit.document())   # RequestEditor
-JsonHighlighter(self.body_view.document())    # ResponseView
+from pypost.ui.theme.json_syntax_theme import DEFAULT_JSON_SYNTAX_COLORS
+
+JsonHighlighter(self.body_edit.document())  # RequestEditor — default theme
+JsonHighlighter(self.body_view.document())  # ResponseView — default theme
+
+# Optional custom palette (e.g. future dark theme):
+JsonHighlighter(document, colors=DEFAULT_JSON_SYNTAX_COLORS)
 ```
 
-No configuration surface — colors are fixed for the default light editor theme. Dark-theme
-support is tracked separately (PYPOST-395).
+`RequestEditor` and `ResponseView` use the default theme. Override `colors` when injecting
+a non-default `JsonSyntaxColors` instance (see PYPOST-395 for dark-theme follow-up).
 
 ## Testing
 
