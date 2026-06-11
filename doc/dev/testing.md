@@ -237,6 +237,41 @@ Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, mini
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -v
 ```
 
+## Pytest live logging (`log_cli`) (PYPOST-570)
+
+`pytest.ini` enables live application logs during test runs:
+
+| Setting | Value |
+| --- | --- |
+| `log_cli` | `true` |
+| `log_cli_level` | `WARNING` |
+| `log_format` | timestamp, level, logger name, message |
+
+Every `make test` and CI invocation therefore prints application WARNING and ERROR lines to
+stdout while tests run. On a green full-suite capture (PYPOST-567 baseline) that produced
+**72 ERROR** and **138 WARNING** live-log lines across **126** tests — mostly intentional
+error-path output, not test failures.
+
+**Recommendation** (see `ai-tasks/PYPOST-570/log-cli-review.md`):
+
+1. **Keep** `pytest.ini` defaults for local runs (helps correlate logs with failing tests).
+2. **Disable in CI** with `-o log_cli=false` on the workflow pytest command (follow-up PR).
+3. **PYPOST-571** — allowlist guardrail so CI still fails on unexpected ERROR lines without
+   printing known noise on every green run.
+
+Local overrides:
+
+```bash
+# Quiet run (matches recommended CI behavior)
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -o log_cli=false
+
+# Extra verbose
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -o log_cli_level=DEBUG
+```
+
+Inventory capture still requires live logging enabled (default `make test` or explicit
+`-o log_cli=true`).
+
 ## Test log inventory (PYPOST-567)
 
 A green `make test` run can still emit many ERROR/WARNING lines because `pytest.ini`
