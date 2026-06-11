@@ -116,6 +116,13 @@ typically surfaces the empty-name path, not `invalid_chars`.
 - **Logging**: DEBUG logs for failed validation attempts only (reduces noise on the happy
   path); INFO logs for successful variable setting. Prometheus metrics still count every
   valid and invalid attempt.
+- **Logging policy** ([PYPOST-473](https://pypost.atlassian.net/browse/PYPOST-473),
+  reviewed in [PYPOST-479](https://pypost.atlassian.net/browse/PYPOST-479)):
+  - PYPOST-163 introduced per-attempt DEBUG logging for every validation.
+  - PYPOST-473 tuned the UI flow to **failure-only** DEBUG; successful validations rely on
+    `gui_variable_validation_total{result="valid"}` instead of log lines.
+  - A separate debug toggle was considered and rejected — metrics cover the success path.
+  - PYPOST-479 confirmed this policy; no further logging changes required.
 - **Metrics**:
   - `gui_variable_validation_total{result="valid|invalid"}` — tracks validation attempts
   - `gui_variable_validation_failures_total{reason="empty|starts_with_digit|invalid_chars"}`
