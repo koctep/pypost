@@ -13,8 +13,10 @@
 
 ## Missing Tests
 
-- Integration test with real outbound HTTP (e.g. local stub server) — [PYPOST-370](https://pypost.atlassian.net/browse/PYPOST-370)
-- Metrics server MCP resource round-trip — out of scope for PYPOST-38 debt chain.
+- Integration test with real outbound HTTP (e.g. local stub server) — follow-up debt from
+  PYPOST-370 closure.
+- Metrics server MCP resource live SSE round-trip — follow-up debt from PYPOST-370 closure.
+  Unit coverage: `tests/test_metrics_manager.py::TestMetricsManagerMcpResource`.
 
 ## Performance Concerns
 

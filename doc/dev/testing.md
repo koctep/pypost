@@ -82,6 +82,26 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_server_integration.py -v
 ```
 
+## MCP and metrics test coverage
+
+PYPOST-370 closed the PYPOST-38 debt item for automated MCP tools and metrics tests as
+duplicate scope: prior tickets already cover the intent.
+
+| Concern | Module | Level | Notes |
+| --- | --- | --- | --- |
+| MCP tool SSE (`list_tools`, `call_tool`) | `tests/test_mcp_server_integration.py` | Integration | PYPOST-368; `RequestService` mocked |
+| `MCPServerImpl` metrics hooks | `tests/test_mcp_server_impl.py` | Unit | PYPOST-367; `MetricsManager` mocked |
+| Metrics `read_resource("metrics://all")` | `tests/test_metrics_manager.py` | Unit | Scrapes `mcp_*_total` after `read_resource` |
+
+Not covered by the above (follow-up debt): live metrics-server MCP SSE round-trip and
+integration tests with real outbound HTTP via a local stub server.
+
+Focused metrics MCP resource run:
+
+```bash
+.venv/bin/python -m pytest tests/test_metrics_manager.py::TestMetricsManagerMcpResource -v
+```
+
 ## Per-test timeouts (mandatory)
 
 Every test must declare an explicit timeout so the suite cannot hang indefinitely.
