@@ -146,11 +146,23 @@ class EnvironmentDialog(QDialog):
     def delete_environment(self, row: int | None = None) -> None:
         if row is None:
             row = self.env_list.currentRow()
-        if row >= 0:
-            deleted_env = self.environments[row]
-            logger.info("environment_deleted env_name=%s", deleted_env.name)
-            del self.environments[row]
-            self.env_list.takeItem(row)
+        if row < 0:
+            return
+
+        deleted_env = self.environments[row]
+        confirm = QMessageBox.question(
+            self,
+            "Delete Environment",
+            f'Are you sure you want to delete "{deleted_env.name}"?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        logger.info("environment_deleted env_name=%s", deleted_env.name)
+        del self.environments[row]
+        self.env_list.takeItem(row)
 
     def _on_vars_table_context_menu(self, pos) -> None:
         row = self.vars_table.rowAt(pos.y())

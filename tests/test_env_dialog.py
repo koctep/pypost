@@ -4,7 +4,7 @@ import logging
 import pytest
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QApplication, QTableWidgetItem
+from PySide6.QtWidgets import QApplication, QMessageBox, QTableWidgetItem
 
 from pypost.models.models import Environment
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
@@ -67,7 +67,11 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
-    def test_delete_environment_removes_current_row(self, qapp):
+    @patch(
+        "pypost.ui.dialogs.env_dialog.QMessageBox.question",
+        return_value=QMessageBox.StandardButton.Yes,
+    )
+    def test_delete_environment_removes_current_row(self, mock_question, qapp):
         envs = [
             Environment(name="A", variables={}),
             Environment(name="B", variables={}),
@@ -78,6 +82,20 @@ class TestEnvironmentDialog:
             dlg.delete_environment()
             assert len(envs) == 1
             assert envs[0].name == "B"
+            mock_question.assert_called_once()
+        finally:
+            dlg.close()
+
+    @patch("pypost.ui.dialogs.env_dialog.QMessageBox.question")
+    def test_delete_environment_cancelled_leaves_env(self, mock_question, qapp):
+        mock_question.return_value = QMessageBox.StandardButton.No
+        envs = [Environment(name="A", variables={})]
+        dlg = EnvironmentDialog(envs)
+        try:
+            dlg.env_list.setCurrentRow(0)
+            dlg.delete_environment()
+            assert len(envs) == 1
+            assert envs[0].name == "A"
         finally:
             dlg.close()
 
