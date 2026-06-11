@@ -53,6 +53,7 @@ def _format_migration_report(report: MigrationReport) -> str:
         f"Hidden values: {inv.hidden_value_count}",
         f"Encrypted envelopes: {inv.encrypted_envelope_count}",
         f"Plaintext hidden: {inv.plaintext_hidden_count}",
+        f"Invalid hidden: {inv.invalid_hidden_count}",
     ]
     if inv.kid_histogram:
         lines.append("Key IDs:")

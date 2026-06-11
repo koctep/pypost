@@ -38,6 +38,7 @@ def _format_inventory(report: MigrationReport) -> str:
         f"hidden_values: {inv.hidden_value_count}",
         f"encrypted_envelopes: {inv.encrypted_envelope_count}",
         f"plaintext_hidden: {inv.plaintext_hidden_count}",
+        f"invalid_hidden: {inv.invalid_hidden_count}",
     ]
     if inv.kid_histogram:
         lines.append("kid_histogram:")
@@ -110,12 +111,13 @@ def main(argv: list[str] | None = None) -> int:
         exit_code = _emit_report(service.verify_decrypt_access(settings))
     elif args.command == "report":
         inventory = service.build_inventory(settings)
+        quality_errors = inventory.data_quality_errors
         report = MigrationReport(
             inventory=inventory,
             dry_run=False,
             backup_path=None,
-            errors=(),
-            success=True,
+            errors=quality_errors,
+            success=not quality_errors,
         )
         exit_code = _emit_report(report)
     elif args.command == "re-encrypt":

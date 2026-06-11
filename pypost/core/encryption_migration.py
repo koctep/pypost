@@ -25,8 +25,10 @@ class EnvironmentInventory:
     hidden_value_count: int
     encrypted_envelope_count: int
     plaintext_hidden_count: int
+    invalid_hidden_count: int
     kid_histogram: dict[str, int]
     missing_kids: frozenset[str]
+    data_quality_errors: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -41,13 +43,16 @@ class MigrationReport:
 def _log_inventory(event: str, inventory: EnvironmentInventory) -> None:
     logger.info(
         "%s environment_count=%d hidden_value_count=%d "
-        "encrypted_envelope_count=%d plaintext_hidden_count=%d missing_kid_count=%d",
+        "encrypted_envelope_count=%d plaintext_hidden_count=%d "
+        "invalid_hidden_count=%d missing_kid_count=%d data_quality_error_count=%d",
         event,
         inventory.environment_count,
         inventory.hidden_value_count,
         inventory.encrypted_envelope_count,
         inventory.plaintext_hidden_count,
+        inventory.invalid_hidden_count,
         len(inventory.missing_kids),
+        len(inventory.data_quality_errors),
     )
 
 
@@ -62,6 +67,23 @@ def backup_environments_file(path: Path) -> Path:
 
 def _is_encrypted_envelope(value: Any) -> bool:
     return isinstance(value, dict) and value.get("enc") is True
+
+
+def _environment_label(item: dict[str, Any]) -> str:
+    name = item.get("name")
+    if name:
+        return str(name)
+    env_id = item.get("id")
+    if env_id:
+        return str(env_id)
+    return "unknown"
+
+
+def _invalid_hidden_message(env_label: str, key: str, value: Any) -> str:
+    return (
+        f"{env_label}: hidden key {key} has invalid type "
+        f"({type(value).__name__}, expected envelope or string)"
+    )
 
 
 class EncryptionMigrationService:
@@ -83,7 +105,13 @@ class EncryptionMigrationService:
         logger.info("encryption_migration_verify_started")
         inventory = self.build_inventory(settings)
         errors: list[str] = []
-        if inventory.missing_kids:
+        if inventory.data_quality_errors:
+            logger.error(
+                "encryption_migration_data_quality_errors count=%d",
+                len(inventory.data_quality_errors),
+            )
+            errors.extend(inventory.data_quality_errors)
+        elif inventory.missing_kids:
             logger.error(
                 "encryption_migration_missing_kids count=%d",
                 len(inventory.missing_kids),
@@ -206,12 +234,19 @@ class EncryptionMigrationService:
                     success=True,
                 )
 
-        if inventory.missing_kids:
-            logger.error(
-                "encryption_migration_missing_kids count=%d",
-                len(inventory.missing_kids),
-            )
-            errors = tuple(
+        quality_errors = inventory.data_quality_errors
+        if quality_errors or inventory.missing_kids:
+            if quality_errors:
+                logger.error(
+                    "encryption_migration_data_quality_errors count=%d",
+                    len(quality_errors),
+                )
+            if inventory.missing_kids:
+                logger.error(
+                    "encryption_migration_missing_kids count=%d",
+                    len(inventory.missing_kids),
+                )
+            errors = quality_errors + tuple(
                 f"Missing key material for kid: {kid}" for kid in sorted(inventory.missing_kids)
             )
             logger.warning(
@@ -309,8 +344,11 @@ class EncryptionMigrationService:
         hidden_value_count = 0
         encrypted_envelope_count = 0
         plaintext_hidden_count = 0
+        invalid_hidden_count = 0
+        data_quality_errors: list[str] = []
 
         for item in raw:
+            env_label = _environment_label(item)
             hidden_keys = set(item.get("hidden_keys") or [])
             variables = item.get("variables") or {}
             for key in hidden_keys:
@@ -325,14 +363,21 @@ class EncryptionMigrationService:
                         kid_histogram[kid] = kid_histogram.get(kid, 0) + 1
                 elif isinstance(value, str):
                     plaintext_hidden_count += 1
+                else:
+                    invalid_hidden_count += 1
+                    data_quality_errors.append(
+                        _invalid_hidden_message(env_label, key, value)
+                    )
 
         return EnvironmentInventory(
             environment_count=len(raw),
             hidden_value_count=hidden_value_count,
             encrypted_envelope_count=encrypted_envelope_count,
             plaintext_hidden_count=plaintext_hidden_count,
+            invalid_hidden_count=invalid_hidden_count,
             kid_histogram=kid_histogram,
             missing_kids=frozenset(),
+            data_quality_errors=tuple(data_quality_errors),
         )
 
     def _check_missing_kids(
@@ -365,6 +410,8 @@ class EncryptionMigrationService:
         inventory: EnvironmentInventory,
         active_kid: str,
     ) -> bool:
+        if inventory.invalid_hidden_count > 0:
+            return False
         if inventory.plaintext_hidden_count > 0:
             return False
         if inventory.encrypted_envelope_count == 0:
@@ -384,6 +431,8 @@ class EncryptionMigrationService:
             hidden_value_count=inventory.hidden_value_count,
             encrypted_envelope_count=encryptable,
             plaintext_hidden_count=0,
+            invalid_hidden_count=inventory.invalid_hidden_count,
             kid_histogram=kid_histogram,
             missing_kids=frozenset(),
+            data_quality_errors=inventory.data_quality_errors,
         )

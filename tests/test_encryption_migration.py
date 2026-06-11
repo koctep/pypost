@@ -26,6 +26,121 @@ def _make_storage(tmp_path, monkeypatch) -> StorageManager:
     return StorageManager()
 
 
+def test_build_inventory_flags_invalid_numeric_hidden(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    settings = AppSettings(env_encryption_enabled=True)
+    payload = [
+        {
+            "id": "e1",
+            "name": "Bad",
+            "variables": {"TOKEN": 42},
+            "hidden_keys": ["TOKEN"],
+            "enable_mcp": False,
+        }
+    ]
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+
+    inventory = EncryptionMigrationService(storage).build_inventory(settings)
+
+    assert inventory.hidden_value_count == 1
+    assert inventory.invalid_hidden_count == 1
+    assert inventory.encrypted_envelope_count == 0
+    assert inventory.plaintext_hidden_count == 0
+    assert len(inventory.data_quality_errors) == 1
+    assert "Bad: hidden key TOKEN" in inventory.data_quality_errors[0]
+    assert "int" in inventory.data_quality_errors[0]
+
+
+def test_build_inventory_flags_malformed_dict_hidden(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    settings = AppSettings(env_encryption_enabled=True)
+    payload = [
+        {
+            "id": "e1",
+            "name": "Malformed",
+            "variables": {"SECRET": {"v": 1, "alg": "fernet"}},
+            "hidden_keys": ["SECRET"],
+            "enable_mcp": False,
+        }
+    ]
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+
+    inventory = EncryptionMigrationService(storage).build_inventory(settings)
+
+    assert inventory.invalid_hidden_count == 1
+    assert inventory.data_quality_errors[0].startswith("Malformed: hidden key SECRET")
+
+
+def test_verify_decrypt_access_fails_on_data_quality_errors(tmp_path, monkeypatch, caplog):
+    storage = _make_storage(tmp_path, monkeypatch)
+    settings = AppSettings(env_encryption_enabled=True)
+    payload = [
+        {
+            "id": "e1",
+            "name": "Bad",
+            "variables": {"TOKEN": True},
+            "hidden_keys": ["TOKEN"],
+            "enable_mcp": False,
+        }
+    ]
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+
+    with caplog.at_level("ERROR"):
+        report = EncryptionMigrationService(storage).verify_decrypt_access(settings)
+
+    assert report.success is False
+    assert report.inventory.invalid_hidden_count == 1
+    assert report.errors == report.inventory.data_quality_errors
+    assert any(
+        "encryption_migration_data_quality_errors count=1" in record.message
+        for record in caplog.records
+    )
+
+
+def test_bulk_re_encrypt_aborts_on_invalid_hidden(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+
+    encrypted_env = Environment(
+        id="e1",
+        name="Encrypted",
+        variables={"SECRET": "hidden"},
+        hidden_keys={"SECRET"},
+    )
+    storage.apply_encryption_settings(settings)
+    storage.save_environments([encrypted_env])
+
+    bad_payload = {
+        "id": "e2",
+        "name": "Bad",
+        "variables": {"TOKEN": ["not", "a", "string"]},
+        "hidden_keys": ["TOKEN"],
+        "enable_mcp": False,
+    }
+    with open(storage.environments_file, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    data.append(bad_payload)
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2)
+
+    before_mtime = storage.environments_file.stat().st_mtime
+    report = EncryptionMigrationService(storage).bulk_re_encrypt(
+        settings,
+        dry_run=False,
+        backup=False,
+    )
+
+    assert report.success is False
+    assert report.inventory.invalid_hidden_count == 1
+    assert storage.environments_file.stat().st_mtime == before_mtime
+
+
 def test_build_inventory_counts_plaintext_and_encrypted(tmp_path, monkeypatch):
     fernet = pytest.importorskip("cryptography.fernet")
     storage = _make_storage(tmp_path, monkeypatch)
@@ -62,6 +177,8 @@ def test_build_inventory_counts_plaintext_and_encrypted(tmp_path, monkeypatch):
     assert inventory.hidden_value_count == 2
     assert inventory.encrypted_envelope_count == 1
     assert inventory.plaintext_hidden_count == 1
+    assert inventory.invalid_hidden_count == 0
+    assert inventory.data_quality_errors == ()
     assert len(inventory.kid_histogram) == 1
 
 

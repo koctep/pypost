@@ -25,8 +25,10 @@ def _empty_report(*, success: bool = True) -> MigrationReport:
         hidden_value_count=0,
         encrypted_envelope_count=0,
         plaintext_hidden_count=0,
+        invalid_hidden_count=0,
         kid_histogram={},
         missing_kids=frozenset(),
+        data_quality_errors=(),
     )
     return MigrationReport(
         inventory=inventory,

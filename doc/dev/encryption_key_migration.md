@@ -171,7 +171,28 @@ python scripts/encryption_migrate.py encrypt-plaintext [--dry-run] [--no-backup]
 | `re-encrypt` | Yes (unless `--dry-run`) | Rewrite all hidden values under the current active key |
 | `encrypt-plaintext` | Yes (unless `--dry-run`) | Encrypt plain hidden strings after enabling encryption |
 
-**Exit codes:** `0` on success; `1` on verification or migration failure (errors printed to stderr).
+**Exit codes:** `0` on success; `1` on verification or migration failure. In human mode, errors print
+to stderr; with `--json`, errors are included in the JSON payload on stdout.
+
+**JSON example** (`report --json`):
+
+```json
+{
+  "command": "report",
+  "success": true,
+  "dry_run": false,
+  "backup_path": null,
+  "errors": [],
+  "inventory": {
+    "environment_count": 0,
+    "hidden_value_count": 0,
+    "encrypted_envelope_count": 0,
+    "plaintext_hidden_count": 0,
+    "kid_histogram": {},
+    "missing_kids": []
+  }
+}
+```
 
 **Example output:**
 
@@ -193,7 +214,7 @@ under the active key.
 Use before production cutover or after rotation:
 
 - [ ] `verify` exits 0
-- [ ] `report` shows `missing_kids` empty (section omitted when none)
+- [ ] `report` shows `missing_kids` empty and `invalid_hidden: 0` (sections omitted when none)
 - [ ] Backup of `environments.json` exists
 - [ ] Primary source yields active key (app can save a test hidden value)
 - [ ] Fallback tested when configured
@@ -223,15 +244,16 @@ Facade for programmatic migration (CLI and optional future Settings actions).
 
 #### `build_inventory(settings: AppSettings | None) -> EnvironmentInventory`
 
-Scans raw `environments.json` for envelope-shaped hidden values. Checks configured key provider
-for missing `kid` entries. Does not decrypt values. Inventory-only; use
-`verify_decrypt_access()` when decrypt validation is required.
+Scans raw `environments.json` for envelope-shaped hidden values. Classifies each hidden value as
+encrypted envelope, plaintext string, or invalid (any other JSON type or dict without `enc: true`).
+Checks configured key provider for missing `kid` entries. Does not decrypt values.
+Inventory-only; use `verify_decrypt_access()` when decrypt validation is required.
 
 #### `verify_decrypt_access(settings: AppSettings | None) -> MigrationReport`
 
-Calls `build_inventory()`, checks missing `kid`, then deserializes every environment via
-`load_environments_with_errors()`. Returns `success=False` with error details on failure.
-Decrypt validation is not available on `build_inventory()` — that path is verify-only.
+Calls `build_inventory()`, fails on `data_quality_errors` or missing `kid`, then deserializes every
+environment via `load_environments_with_errors()`. Returns `success=False` with error details on
+failure. Decrypt validation is not available on `build_inventory()` — that path is verify-only.
 
 #### `bulk_re_encrypt(settings, *, dry_run=False, backup=True) -> MigrationReport`
 
@@ -252,7 +274,8 @@ Copies `environments.json` to `{stem}.backup.{UTC-timestamp}{suffix}` alongside 
 ### Data types
 
 - `EnvironmentInventory` — `environment_count`, `hidden_value_count`, `encrypted_envelope_count`,
-  `plaintext_hidden_count`, `kid_histogram`, `missing_kids`
+  `plaintext_hidden_count`, `invalid_hidden_count`, `kid_histogram`, `missing_kids`,
+  `data_quality_errors` (per-field messages for invalid hidden shapes)
 - `MigrationReport` — `inventory`, `dry_run`, `backup_path`, `errors`, `success`
 
 ## Configuration
@@ -266,7 +289,8 @@ Migration uses the same policy as runtime encryption. No new settings fields.
 | `env_encryption_key_source_fallback` | Chain order for `kid` lookup |
 | `PYPOST_ENV_ENCRYPTION_KEY`, `KEYS_FILE`, `SECRETS_FILE` | Source-specific key material (see [encryption doc](environment_encryption_at_rest.md#configuration)) |
 
-Data directory defaults follow `ConfigManager` / `StorageManager` (same as the desktop app).
+Data directory defaults follow `ConfigManager` / `StorageManager` (same as the desktop app). Pass
+`StorageManager(data_dir=...)` or CLI `--data-dir` to override.
 
 ## Fallback and safe-failure matrix
 
@@ -328,10 +352,11 @@ cp environments.json.backup.20260611T120000Z environments.json
 
 ### CLI cannot find settings or data directory
 
-**Cause:** Running outside the normal app context without the expected data dir.
+**Cause:** Running outside the normal app context without the expected data dir, or `--data-dir`
+points at a path that does not exist.
 
-**Fix:** Run from the same user account and environment as PyPost, or set data paths per project
-setup. Ensure `ConfigManager` can load `settings.json`.
+**Fix:** Run from the same user account and environment as PyPost, pass `--data-dir` to a restored
+copy, or set data paths per project setup. Ensure `ConfigManager` can load `settings.json`.
 
 ### Settings changed but CLI sees old key source
 
