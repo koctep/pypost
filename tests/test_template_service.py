@@ -62,6 +62,13 @@ class TestTemplateServiceRenderString(unittest.TestCase):
         result = self.svc.render_string(content, {"db": "a b"})
         self.assertEqual("4c85f5eb3a20b8ad41bddfdd57ff6347", result)
 
+    def test_catalog_allow_list_matches_jinja_globals(self):
+        """TemplateService init binds every catalog name on env.globals."""
+        registry = self.svc._function_registry
+        for name in registry.allowed_names():
+            self.assertIn(name, self.svc.env.globals)
+            self.assertIs(self.svc.env.globals[name], registry.get(name))
+
     def test_runtime_hover_parity_nested_valid(self):
         content = "{{md5(urlencode(db))}}"
         variables = {"db": "a b"}

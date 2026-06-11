@@ -38,6 +38,16 @@ class TestFunctionRegistry(unittest.TestCase):
         self.assertEqual(env.globals["other"], 1)
         self.assertIs(env.globals["md5"], first)
 
+    def test_catalog_allow_list_matches_env_globals(self):
+        """Every allowed catalog name is bound on env.globals to its implementation."""
+        reg = FunctionRegistry()
+        env = Environment()
+        reg.register_into_env(env)
+        for name in reg.allowed_names():
+            self.assertIn(name, env.globals)
+            self.assertIs(env.globals[name], reg.get(name))
+            self.assertTrue(callable(env.globals[name]))
+
 
 if __name__ == "__main__":
     unittest.main()

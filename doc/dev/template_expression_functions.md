@@ -382,7 +382,7 @@ hardening — not release blockers.
 | Item | Jira | Notes |
 | --- | --- | --- |
 | Expression/template caching | [PYPOST-455](https://pypost.atlassian.net/browse/PYPOST-455) | No cache today; revisit after usage metrics |
-| Registry vs `env.globals` parity test | [PYPOST-457](https://pypost.atlassian.net/browse/PYPOST-457) | Explicit test not yet added |
+| Registry vs `env.globals` parity test | — | Done in PYPOST-457 (`test_function_registry`, `test_template_service`) |
 | Shared tokenization dedup | — | Done in PYPOST-460 (`template_expression_tokenizer`) |
 | Empty-arg / multi-placeholder / closing-paren edge cases | [PYPOST-461](https://pypost.atlassian.net/browse/PYPOST-461) | Boundary with PYPOST-454 M1–M4 matrix |
 | Hover regex vs resolver identifier rules | — | Hover `VARIABLE_PATTERN` vs resolver `_IDENTIFIER_RE` mismatch for digit-leading names |
@@ -392,8 +392,8 @@ hardening — not release blockers.
 
 Completed follow-ups referenced in this doc: PYPOST-451 (registry), PYPOST-452 (resolver),
 PYPOST-453 (nested policy), PYPOST-454 (edge-case tests), PYPOST-456 (doc polish),
-PYPOST-459 (orchestration stage helpers in `TemplateService`), PYPOST-460 (shared
-tokenization).
+PYPOST-457 (registry/globals parity test), PYPOST-459 (orchestration stage helpers in
+`TemplateService`), PYPOST-460 (shared tokenization).
 
 ## Troubleshooting
 
