@@ -25,9 +25,11 @@ This class acts as the bridge between the PySide6 UI and the background MCP serv
 This class contains the actual business logic of the MCP server.
 
 *   **Framework**: Uses `Starlette` + `mcp` SDK + `uvicorn`.
-*   **Transport**: Implements **SSE (Server-Sent Events)** over HTTP.
-    *   GET `/sse`: Establishes the connection.
-    *   POST `/sse/messages`: Receives client messages.
+*   **Transport**: **Streamable HTTP** (current MCP spec) at `GET/POST /mcp`, with optional
+    legacy **SSE** under `/sse` for backward-compatible clients.
+    *   Primary: `http://<host>:<port>/mcp` — Streamable HTTP session (POST initialize,
+      optional GET SSE stream for server messages).
+    *   Legacy: GET `/sse/` + POST `/sse/messages` — deprecated HTTP+SSE transport.
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
 *   **Schema Generation**: Automatically generates JSON Schema for tools by parsing the request URL, headers, and body using `TemplateService` (Jinja2 AST) to find variables matching the pattern `{{ mcp.request.VAR_NAME }}`.
 *   **Execution**: Delegates request execution to `RequestService`.
@@ -53,7 +55,8 @@ PyPost also exposes a separate MCP server dedicated to observability.
 
 *   **Role**: Provides application metrics via MCP Resources.
 *   **Framework**: Same stack as the main server (`Starlette` + `mcp` SDK + `uvicorn`).
-*   **Hybrid Server**: Hosts both the Prometheus metrics endpoint (`/metrics`) and the MCP SSE endpoints (`/sse`, `/messages`) on the same port (default 9080).
+*   **Hybrid Server**: Hosts Prometheus (`/metrics`), Streamable HTTP MCP (`/mcp`), and
+    legacy SSE (`/sse`, `/messages`) on the same port (default 9080).
 *   **Resources**:
     *   `metrics://all`: Returns the full Prometheus metrics dump as `text/plain`.
 
@@ -70,7 +73,7 @@ PyPost also exposes a separate MCP server dedicated to observability.
 
 ### Tool Execution
 
-1.  External Client sends a `call_tool` request via SSE/HTTP.
+1.  External Client sends a `call_tool` request via Streamable HTTP (`/mcp`).
 2.  `MCPServerImpl.call_tool` is invoked (async).
 3.  **Context Switching**: Since `RequestService` is synchronous, execution is offloaded to a thread pool using `starlette.concurrency.run_in_threadpool`.
 4.  `_execute_request_sync` builds the variables dict:
@@ -173,6 +176,17 @@ arguments.
 
 No new settings. MCP tools use variables from the **currently selected environment** when
 `enable_mcp=True`. Port and host remain in `AppSettings` (`mcp_port`, `mcp_host`).
+
+### Agent connection URL
+
+Configure local MCP clients (Cursor, Claude Desktop, etc.) with Streamable HTTP:
+
+| Server | Default port | URL |
+| --- | --- | --- |
+| Request tools | 1080 | `http://127.0.0.1:1080/mcp` |
+| Metrics / observability | 9080 | `http://127.0.0.1:9080/mcp` |
+
+Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 
 ## Troubleshooting
 

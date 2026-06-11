@@ -10,6 +10,7 @@ from prometheus_client import CollectorRegistry, Counter, generate_latest, make_
 from starlette.applications import Starlette
 from starlette.routing import Mount
 
+from pypost.core.mcp_streamable_http import build_streamable_http_route
 from pypost.models.errors import ErrorCategory
 
 logger = logging.getLogger(__name__)
@@ -243,10 +244,10 @@ class MetricsManager:
         raise ValueError(f"Resource {uri} not found")
 
     def _create_app(self) -> Starlette:
-        # 1. Prometheus app
         prometheus_app = make_asgi_app(registry=self.registry)
+        mcp_route, lifespan = build_streamable_http_route(self.mcp_server)
 
-        # 2. MCP Transport setup (SSE)
+        # Legacy HTTP+SSE transport for backward-compatible clients
         sse = SseServerTransport("/messages")
 
         class SSEEndpoint:
@@ -286,13 +287,14 @@ class MetricsManager:
                     }
                 )
 
-        # 3. Combine in Starlette
         return Starlette(
             routes=[
                 Mount("/metrics", app=prometheus_app),
+                mcp_route,
                 Mount("/sse", app=SSEEndpoint(self.mcp_server, sse)),
                 Mount("/messages", app=MessagesEndpoint(sse)),
-            ]
+            ],
+            lifespan=lifespan,
         )
 
     def start_server(self, host: str, port: int):

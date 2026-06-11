@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 from starlette.routing import Mount, Route
 
+from pypost.core.mcp_streamable_http import build_streamable_http_route
 from pypost.core.metrics import MetricsManager
 from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
@@ -195,6 +196,18 @@ class MCPServerImpl:
         return vars_found
 
     def create_app(self) -> Starlette:
+        mcp_route, lifespan = build_streamable_http_route(self.server)
+        return Starlette(
+            debug=True,
+            routes=[
+                mcp_route,
+                Mount("/sse", app=self._create_sse_app()),
+            ],
+            lifespan=lifespan,
+        )
+
+    def _create_sse_app(self) -> Starlette:
+        """Legacy HTTP+SSE transport for backward-compatible clients."""
         sse = SseServerTransport("/messages")
 
         class SSEEndpoint:
@@ -227,7 +240,6 @@ class MCPServerImpl:
                 self.sse_transport = sse_transport
 
             async def __call__(self, scope, receive, send):
-                # Ensure we only handle POST requests if it's HTTP
                 if scope["type"] == "http" and scope["method"] != "POST":
                     await self._send_response(send, 405, b"Method Not Allowed")
                     return
@@ -250,21 +262,15 @@ class MCPServerImpl:
                     }
                 )
 
-        # MCP client POSTs to /sse/messages (root_path + endpoint).
-        # Both under Mount("/sse") so scope["root_path"]="/sse".
         async def handle_sse_get(request):
             ep = SSEEndpoint(self.server, sse)
             await ep(request.scope, request.receive, request._send)
             return Response()
 
-        sse_app = Starlette(
+        return Starlette(
             debug=True,
             routes=[
                 Mount("/messages", app=MessagesEndpoint(sse)),
                 Route("/", endpoint=handle_sse_get, methods=["GET"]),
             ],
-        )
-        return Starlette(
-            debug=True,
-            routes=[Mount("/sse", app=sse_app)],
         )

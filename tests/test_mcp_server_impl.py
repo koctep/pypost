@@ -242,7 +242,12 @@ class TestMCPServerImplRouting(unittest.TestCase):
         app = MCPServerImpl().create_app()
         self.assertIsInstance(app, Starlette)
 
-    def test_create_app_mounts_sse_sub_application(self):
+    def test_create_app_exposes_streamable_http_route(self):
+        app = MCPServerImpl().create_app()
+        route_paths = [route.path for route in app.routes if isinstance(route, Route)]
+        self.assertIn("/mcp", route_paths)
+
+    def test_create_app_mounts_sse_sub_application_for_backward_compat(self):
         app = MCPServerImpl().create_app()
         mounts = [route for route in app.routes if isinstance(route, Mount)]
         self.assertEqual(len(mounts), 1)
@@ -263,7 +268,7 @@ class TestMCPServerImplRouting(unittest.TestCase):
         ]
         self.assertEqual(len(get_roots), 1)
 
-    def test_routing_rejects_wrong_http_methods_without_live_sse(self):
+    def test_routing_rejects_wrong_http_methods_without_live_transport(self):
         client = TestClient(MCPServerImpl().create_app(), raise_server_exceptions=False)
         self.assertEqual(client.post("/sse").status_code, 405)
         self.assertEqual(client.get("/sse/messages").status_code, 405)

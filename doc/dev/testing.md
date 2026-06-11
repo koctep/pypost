@@ -9,7 +9,8 @@ Prometheus metrics. Rules for the AI are defined in `.cursor/lsr/do-testing.md`.
 
 - **PyPost running** — `make run` or `python -m pypost.main`
 - **MCP enabled** — in Manage Environments, check "Enable MCP Server"
-- **Cursor connected** — add SSE server URL `http://<host>:1080/sse` (or `http://<host>:1080/sse/`)
+- **Cursor connected** — add MCP server URL `http://<host>:1080/mcp` (Streamable HTTP).
+  Legacy SSE clients may still use `http://<host>:1080/sse/`.
 - **Host** — use the host from PyPost settings (e.g. `localhost`, `dev.int`)
 
 ## Testing via MCP
@@ -51,9 +52,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_response_view_se
 ## MCP server unit tests
 
 Automated pytest coverage for `MCPServerImpl` and Starlette routing lives in
-`tests/test_mcp_server_impl.py` (PYPOST-367). Tests mock `RequestService` and avoid live SSE
-handshakes; routing cases inspect the `Mount("/sse")` tree and assert HTTP 405/404 on wrong
-methods.
+`tests/test_mcp_server_impl.py` (PYPOST-367). Tests mock `RequestService` and avoid live
+transport handshakes; routing cases assert `/mcp` and legacy `Mount("/sse")` structure.
 
 | Class | Scope |
 | --- | --- |
@@ -69,10 +69,10 @@ Focused run:
 
 ## MCP server integration tests
 
-Live SSE round-trip coverage (tool list + call against a running uvicorn server) lives in
-`tests/test_mcp_server_integration.py` (PYPOST-368). Tests use the official MCP Python SDK
-(`sse_client`, `ClientSession`) with `anyio.run`, start the server on an ephemeral port, and
-mock `RequestService.execute` for deterministic tool output.
+Live Streamable HTTP round-trip coverage (tool list + call against a running uvicorn server)
+lives in `tests/test_mcp_server_integration.py` (PYPOST-368, PYPOST-551). Tests use the
+official MCP Python SDK (`streamable_http_client`, `ClientSession`) with `anyio.run`, start
+the server on an ephemeral port, and mock `RequestService.execute` for deterministic output.
 
 | Class | Scope |
 | --- | --- |

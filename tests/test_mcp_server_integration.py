@@ -1,4 +1,4 @@
-"""Integration tests: live MCP server over SSE with MCP client round-trip (PYPOST-368)."""
+"""Integration tests: live MCP server over Streamable HTTP round-trip (PYPOST-368/551)."""
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
@@ -14,7 +14,8 @@ from unittest.mock import MagicMock
 import anyio
 import uvicorn
 from mcp.client.session import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._httpx_utils import create_mcp_http_client
 
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.mcp_server_impl import MCPServerImpl
@@ -55,20 +56,30 @@ def _exec_result(body: str = "ok") -> ExecutionResult:
     )
 
 
-async def _mcp_list_tools(sse_url: str) -> list[str]:
-    async with sse_client(sse_url, timeout=3, sse_read_timeout=15) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.list_tools()
-            return [tool.name for tool in result.tools]
+async def _mcp_list_tools(mcp_url: str) -> list[str]:
+    async with create_mcp_http_client() as http_client:
+        async with streamable_http_client(mcp_url, http_client=http_client) as (
+            read,
+            write,
+            _,
+        ):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.list_tools()
+                return [tool.name for tool in result.tools]
 
 
-async def _mcp_call_tool(sse_url: str, name: str, arguments: dict | None = None) -> str:
-    async with sse_client(sse_url, timeout=3, sse_read_timeout=15) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(name, arguments or {})
-            return result.content[0].text
+async def _mcp_call_tool(mcp_url: str, name: str, arguments: dict | None = None) -> str:
+    async with create_mcp_http_client() as http_client:
+        async with streamable_http_client(mcp_url, http_client=http_client) as (
+            read,
+            write,
+            _,
+        ):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(name, arguments or {})
+                return result.content[0].text
 
 
 class _LiveMCPServer:
@@ -86,8 +97,8 @@ class _LiveMCPServer:
         self._server: uvicorn.Server | None = None
 
     @property
-    def sse_url(self) -> str:
-        return f"http://{self.host}:{self.port}/sse/"
+    def mcp_url(self) -> str:
+        return f"http://{self.host}:{self.port}/mcp"
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run_uvicorn, daemon=True)
@@ -123,7 +134,7 @@ def live_mcp_server(tools, execute_result: ExecutionResult | None = None):
 
 
 class TestMCPServerIntegration(unittest.TestCase):
-    def test_list_tools_over_live_sse(self):
+    def test_list_tools_over_live_streamable_http(self):
         tool = RequestData(
             name="Echo Tool",
             expose_as_mcp=True,
@@ -131,10 +142,10 @@ class TestMCPServerIntegration(unittest.TestCase):
             url="http://example.com/{{ mcp.request.msg }}",
         )
         with live_mcp_server([tool]) as server:
-            names = anyio.run(_mcp_list_tools, server.sse_url)
+            names = anyio.run(_mcp_list_tools, server.mcp_url)
             self.assertEqual(names, ["echo_tool"])
 
-    def test_call_tool_over_live_sse_returns_response_body(self):
+    def test_call_tool_over_live_streamable_http_returns_response_body(self):
         tool = RequestData(
             name="Ping",
             expose_as_mcp=True,
@@ -142,7 +153,7 @@ class TestMCPServerIntegration(unittest.TestCase):
             url="http://example.com/ping",
         )
         with live_mcp_server([tool], execute_result=_exec_result("pong")) as server:
-            text = anyio.run(_mcp_call_tool, server.sse_url, "ping", {})
+            text = anyio.run(_mcp_call_tool, server.mcp_url, "ping", {})
             self.assertIn("pong", text)
 
     def test_call_tool_passes_mcp_arguments_to_request_service(self):
@@ -153,7 +164,7 @@ class TestMCPServerIntegration(unittest.TestCase):
             url="http://example.com/{{ mcp.request.name }}",
         )
         with live_mcp_server([tool], execute_result=_exec_result("hello")) as server:
-            anyio.run(_mcp_call_tool, server.sse_url, "greet", {"name": "world"})
+            anyio.run(_mcp_call_tool, server.mcp_url, "greet", {"name": "world"})
             server.impl.request_service.execute.assert_called_once()
             _req, ctx = server.impl.request_service.execute.call_args[0]
             self.assertEqual(ctx, {"mcp": {"request": {"name": "world"}}})
@@ -169,7 +180,7 @@ class TestMCPServerIntegration(unittest.TestCase):
         server.impl.set_variable_supplier(lambda: {"base_url": "http://api"})
         server.start()
         try:
-            anyio.run(_mcp_call_tool, server.sse_url, "fetch", {"id": "1"})
+            anyio.run(_mcp_call_tool, server.mcp_url, "fetch", {"id": "1"})
             _req, ctx = server.impl.request_service.execute.call_args[0]
             self.assertEqual(
                 ctx,
@@ -199,8 +210,8 @@ class TestMCPServerManagerIntegration(unittest.TestCase):
         manager.start_server(port, [tool], host="127.0.0.1")
         try:
             _wait_for_port("127.0.0.1", port)
-            sse_url = f"http://127.0.0.1:{port}/sse/"
-            text = anyio.run(_mcp_call_tool, sse_url, "mgr_tool", {})
+            mcp_url = f"http://127.0.0.1:{port}/mcp"
+            text = anyio.run(_mcp_call_tool, mcp_url, "mgr_tool", {})
             self.assertIn("from-manager", text)
             self.assertTrue(manager.is_running())
         finally:

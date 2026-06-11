@@ -8,7 +8,8 @@ from typing import Any
 
 import httpx
 from mcp.client.session import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._httpx_utils import create_mcp_http_client
 
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.response import ResponseData
@@ -16,7 +17,7 @@ from pypost.models.response import ResponseData
 logger = logging.getLogger(__name__)
 
 MCP_CONNECT_TIMEOUT = 3.0
-MCP_SSE_READ_TIMEOUT = 10.0
+MCP_READ_TIMEOUT = 10.0
 MCP_TOTAL_TIMEOUT = 25.0
 
 
@@ -30,10 +31,10 @@ class MCPClientService:
         call_params: dict[str, Any] | None = None,
     ) -> ResponseData:
         """
-        Run MCP operation (list_tools or call_tool) against the given SSE endpoint.
+        Run MCP operation (list_tools or call_tool) against the given MCP endpoint.
 
         Args:
-            url: MCP SSE endpoint URL (e.g. http://localhost:1080/sse).
+            url: Streamable HTTP MCP URL (e.g. http://localhost:1080/mcp).
             operation: "list_tools" or "call_tool".
             call_params: For call_tool, {"name": str, "arguments": dict}.
 
@@ -136,23 +137,22 @@ class MCPClientService:
         operation: str,
         call_params: dict[str, Any],
     ) -> str | dict:
-        async with sse_client(
-            url,
-            timeout=MCP_CONNECT_TIMEOUT,
-            sse_read_timeout=MCP_SSE_READ_TIMEOUT,
-        ) as (read_stream, write_stream):
-            session = ClientSession(read_stream, write_stream)
-            await session.initialize()
+        timeout = httpx.Timeout(MCP_CONNECT_TIMEOUT, read=MCP_READ_TIMEOUT)
+        async with create_mcp_http_client(timeout=timeout) as http_client:
+            async with streamable_http_client(
+                url, http_client=http_client
+            ) as (read_stream, write_stream, _get_session_id):
+                session = ClientSession(read_stream, write_stream)
+                await session.initialize()
 
-            if operation == "list_tools":
-                result = await session.list_tools()
-                return result.model_dump(mode="json")
-            elif operation == "call_tool":
-                name = call_params.get("name")
-                if not name:
-                    raise ValueError("call_tool requires 'name' in body")
-                arguments = call_params.get("arguments") or {}
-                result = await session.call_tool(name, arguments)
-                return result.model_dump(mode="json")
-            else:
+                if operation == "list_tools":
+                    result = await session.list_tools()
+                    return result.model_dump(mode="json")
+                if operation == "call_tool":
+                    name = call_params.get("name")
+                    if not name:
+                        raise ValueError("call_tool requires 'name' in body")
+                    arguments = call_params.get("arguments") or {}
+                    result = await session.call_tool(name, arguments)
+                    return result.model_dump(mode="json")
                 raise ValueError(f"Unknown operation: {operation}")

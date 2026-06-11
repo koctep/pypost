@@ -23,7 +23,7 @@ class MCPClientServiceTests(unittest.TestCase):
         with patch.object(
             service, "_run_async", new_callable=AsyncMock, return_value=mock_result
         ):
-            result = service.run("http://localhost:1080/sse", "list_tools", None)
+            result = service.run("http://localhost:1080/mcp", "list_tools", None)
 
         self.assertEqual(result.status_code, 200)
         self.assertIn("Content-Type", result.headers)
@@ -42,7 +42,7 @@ class MCPClientServiceTests(unittest.TestCase):
             service, "_run_async", new_callable=AsyncMock, return_value=mock_result
         ):
             result = service.run(
-                "http://localhost:1080/sse",
+                "http://localhost:1080/mcp",
                 "call_tool",
                 {"name": "foo", "arguments": {"x": 1}},
             )
@@ -63,7 +63,7 @@ class MCPClientServiceTests(unittest.TestCase):
             side_effect=httpx.ConnectError("Connection refused"),
         ):
             with self.assertRaises(ExecutionError) as ctx:
-                service.run("http://localhost:1080/sse", "list_tools", None)
+                service.run("http://localhost:1080/mcp", "list_tools", None)
 
         self.assertEqual(ctx.exception.category, ErrorCategory.NETWORK)
 
@@ -78,7 +78,7 @@ class MCPClientServiceTests(unittest.TestCase):
             side_effect=httpx.ReadTimeout("read timed out"),
         ):
             with self.assertRaises(ExecutionError) as ctx:
-                service.run("http://localhost:1080/sse", "list_tools", None)
+                service.run("http://localhost:1080/mcp", "list_tools", None)
 
         self.assertEqual(ctx.exception.category, ErrorCategory.TIMEOUT)
 
@@ -93,7 +93,7 @@ class MCPClientServiceTests(unittest.TestCase):
             side_effect=asyncio.TimeoutError(),
         ):
             with self.assertRaises(ExecutionError) as ctx:
-                service.run("http://localhost:1080/sse", "list_tools", None)
+                service.run("http://localhost:1080/mcp", "list_tools", None)
 
         self.assertEqual(ctx.exception.category, ErrorCategory.TIMEOUT)
 
@@ -108,6 +108,6 @@ class MCPClientServiceTests(unittest.TestCase):
             side_effect=RuntimeError("something broke"),
         ):
             with self.assertRaises(ExecutionError) as ctx:
-                service.run("http://localhost:1080/sse", "list_tools", None)
+                service.run("http://localhost:1080/mcp", "list_tools", None)
 
         self.assertEqual(ctx.exception.category, ErrorCategory.UNKNOWN)
