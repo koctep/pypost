@@ -41,6 +41,12 @@ flowchart TB
 
 ## API / Usage
 
+### `McpSecretsPolicy.extract_mcp_request_variables(request)`
+
+Discovers agent tool input names from `{{ mcp.request.VAR }}` placeholders in the
+request URL, body, headers, and params. Uses module-level `_MCP_REQUEST_VAR_PATTERN`
+(compiled via `import re` at file top — see `mcp_secrets_policy.py`).
+
 ### `McpSecretsPolicy.filter_agent_param_specs(specs, request, template_service, hidden_keys)`
 
 Returns a copy of MCP param metadata with env-only and hidden keys removed.
