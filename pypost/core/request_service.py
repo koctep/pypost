@@ -260,6 +260,94 @@ class RequestService:
             detail=f"retries_attempted: {max_retries}",
         )
 
+    def _build_history_entry(
+        self,
+        request: RequestData,
+        variables: Dict[str, Any],
+        result: ExecutionResult,
+        resolved_fields: ResolvedRequestFields | None,
+        hidden_keys: set[str] | None,
+        collection_name: str | None,
+        request_name: str | None,
+    ) -> tuple[HistoryEntry, int]:
+        """Build a masked HistoryEntry from execution context."""
+        hidden_key_count = len(hidden_keys or set())
+        masked = self._masking_policy.build_history_safe_fields(
+            request=request,
+            variables=variables,
+            hidden_keys=hidden_keys,
+            resolved=resolved_fields,
+        )
+        entry = HistoryEntry(
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
+            method=request.method,
+            url=masked.url,
+            headers=masked.headers,
+            body=masked.body,
+            status_code=result.response.status_code,
+            response_time_ms=result.response.elapsed_time * 1000.0,
+            collection_name=collection_name,
+            request_name=request_name,
+        )
+        return entry, hidden_key_count
+
+    def _emit_history_masking_observability(
+        self,
+        method: str,
+        hidden_key_count: int,
+    ) -> None:
+        """Log and metric for sensitive-data masking during history write."""
+        logger.debug(
+            "history_masking_applied method=%s hidden_key_count=%d",
+            method,
+            hidden_key_count,
+        )
+        if self._metrics and hidden_key_count > 0:
+            self._metrics.track_hidden_value_mask_applied("history")
+
+    def _emit_history_entry_observability(self, entry: HistoryEntry) -> None:
+        """Log and metric after a history entry is persisted."""
+        logger.debug(
+            "history_entry_recorded method=%s url=%s status=%d response_time_ms=%.1f",
+            entry.method,
+            entry.url,
+            entry.status_code,
+            entry.response_time_ms,
+        )
+        if self._metrics:
+            self._metrics.track_history_entry_appended(entry.method)
+
+    def _record_execution_history(
+        self,
+        request: RequestData,
+        variables: Dict[str, Any],
+        result: ExecutionResult,
+        resolved_fields: ResolvedRequestFields | None,
+        collection_name: str | None,
+        request_name: str | None,
+        hidden_keys: set[str] | None,
+    ) -> None:
+        """Record history entry; must not raise."""
+        if not self._history_manager:
+            return
+        try:
+            entry, hidden_key_count = self._build_history_entry(
+                request,
+                variables,
+                result,
+                resolved_fields,
+                hidden_keys,
+                collection_name,
+                request_name,
+            )
+            self._emit_history_masking_observability(request.method, hidden_key_count)
+            self._history_manager.append(entry)
+            self._emit_history_entry_observability(entry)
+        except Exception as exc:
+            logger.error("history_record_failed error=%s", exc)
+            if self._metrics:
+                self._metrics.track_history_record_error()
+
     def _emit_exhaustion_alert(
         self,
         request: RequestData,
@@ -371,49 +459,14 @@ class RequestService:
         )
 
         # 3. Record history entry (must not raise)
-        if self._history_manager:
-            try:
-                hidden_key_count = len(hidden_keys or set())
-                masked = self._masking_policy.build_history_safe_fields(
-                    request=request,
-                    variables=variables,
-                    hidden_keys=hidden_keys,
-                    resolved=resolved_fields,
-                )
-                resolved_url = masked.url
-                resolved_headers = masked.headers
-                resolved_body = masked.body
-                logger.debug(
-                    "history_masking_applied method=%s hidden_key_count=%d",
-                    request.method,
-                    hidden_key_count,
-                )
-                if self._metrics and hidden_key_count > 0:
-                    self._metrics.track_hidden_value_mask_applied("history")
-                entry = HistoryEntry(
-                    timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
-                    method=request.method,
-                    url=resolved_url,
-                    headers=resolved_headers,
-                    body=resolved_body,
-                    status_code=result.response.status_code,
-                    response_time_ms=result.response.elapsed_time * 1000.0,
-                    collection_name=collection_name,
-                    request_name=request_name,
-                )
-                self._history_manager.append(entry)
-                logger.debug(
-                    "history_entry_recorded method=%s url=%s status=%d" " response_time_ms=%.1f",
-                    entry.method,
-                    entry.url,
-                    entry.status_code,
-                    entry.response_time_ms,
-                )
-                if self._metrics:
-                    self._metrics.track_history_entry_appended(entry.method)
-            except Exception as exc:
-                logger.error("history_record_failed error=%s", exc)
-                if self._metrics:
-                    self._metrics.track_history_record_error()
+        self._record_execution_history(
+            request,
+            variables,
+            result,
+            resolved_fields,
+            collection_name,
+            request_name,
+            hidden_keys,
+        )
 
         return result

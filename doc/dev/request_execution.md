@@ -19,10 +19,15 @@ already perform.
 MCP requests render URL and body once each in `RequestService._execute_mcp()`.
 
 History entries use `SensitiveDataMaskingPolicy` with resolved fields from transport
-(PYPOST-63):
+(PYPOST-63). Recording is orchestrated by private helpers (PYPOST-463):
 
 1. `HTTPClient.send_request()` returns `HTTPRequestResult` with `resolved` (URL, headers, body).
-2. `RequestService.execute()` passes `resolved` into `build_history_safe_fields()`.
+2. `RequestService._record_execution_history()` delegates to:
+   - `_build_history_entry()` — applies `build_history_safe_fields()` and constructs
+     `HistoryEntry`
+   - `_emit_history_masking_observability()` — pre-append debug log and masking metric
+   - `HistoryManager.append()`
+   - `_emit_history_entry_observability()` — post-append debug log and append metric
 3. When **no hidden keys**, history reuses `resolved` without re-rendering.
 4. When **hidden keys** are present, templates are re-rendered with `***` placeholders (masking
    requires a separate render pass).
