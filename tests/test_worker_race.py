@@ -37,6 +37,19 @@ class TestWorkerRaceCondition(unittest.TestCase):
         call_kwargs = mock_exec.call_args.kwargs
         self.assertTrue(call_kwargs["stop_flag"]())
 
+    def test_worker_not_reusable_after_stop(self):
+        """PYPOST-417: stop() permanently sets the cancel flag for the instance."""
+        worker = _make_worker()
+        worker.stop()
+
+        with patch.object(worker.service, "execute", return_value=_ok_result()) as mock_exec:
+            worker.run()
+        self.assertTrue(mock_exec.call_args.kwargs["stop_flag"]())
+
+        with patch.object(worker.service, "execute", return_value=_ok_result()) as mock_exec2:
+            worker.run()
+        self.assertTrue(mock_exec2.call_args.kwargs["stop_flag"]())
+
     def test_stop_flag_not_overwritten_after_stop(self):
         """REQ-5.2b: run() must not overwrite a stop() that occurred before it started."""
         worker = _make_worker()

@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 class RequestWorker(QThread):
+    """Execute one HTTP/MCP request on a background thread.
+
+    One-shot lifecycle: allocate a new instance per send. After ``stop()`` sets the
+    cooperative cancel flag, the instance must not be reused — ``_stop_event`` is never
+    cleared. ``TabsPresenter`` follows this by creating a fresh worker for each request.
+    """
+
     finished = Signal(ResponseData)
     error = Signal(object)  # carries ExecutionError; falls back to str for cancellation
     retry_attempt = Signal(int, int, object)  # attempt, max_retries, ExecutionError
@@ -64,7 +71,11 @@ class RequestWorker(QThread):
         self._stop_event = threading.Event()
 
     def stop(self):
-        """Request the worker to stop processing."""
+        """Request cooperative cancellation of the in-flight execution.
+
+        Sets ``_stop_event`` permanently for this instance. Do not call ``start()`` again
+        on this worker; create a new ``RequestWorker`` for subsequent sends.
+        """
         logger.debug(
             "worker_stop_requested method=%s url=%s",
             self.request_data.method,

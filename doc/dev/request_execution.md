@@ -82,6 +82,18 @@ that reference when the user sends again before the completion handler runs.
 
 Debug log `stale_worker_cleared` indicates the guard fired (see PYPOST-401 observability).
 
+### One-shot worker instances (PYPOST-417)
+
+`RequestWorker` is **not reusable** after `stop()`. The cooperative cancel flag
+(`threading.Event`) is cleared only in `__init__` and set by `stop()`; it is never reset in
+`run()`. Calling `start()` again on a stopped instance would run with `stop_flag()` always
+true, silently cancelling the new request.
+
+**Contract:** one `RequestWorker` per send. `TabsPresenter._handle_send_request` always
+constructs a new worker; completion handlers clear `tab.worker` via `_clear_tab_worker()`.
+
+See `tests/test_worker_race.py::test_worker_not_reusable_after_stop`.
+
 ### MCP transport exceptions (PYPOST-411)
 
 `MCPClientService.run()` maps httpx exceptions from the MCP SSE client to `ExecutionError`:
