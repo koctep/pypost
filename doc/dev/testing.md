@@ -2,8 +2,26 @@
 
 ## Overview
 
-PyPost can be tested by the AI assistant in Cursor using the embedded MCP server and
-Prometheus metrics. Rules for the AI are defined in `.cursor/lsr/do-testing.md`.
+PyPost testing spans **automated pytest** (local and CI) and **optional AI-assisted checks**
+(MCP tools, Prometheus metrics). This document is the developer reference for pytest, CI
+guardrails, and coverage. Agent authoring rules live in
+[`.cursor/lsr/do-testing.md`](../../.cursor/lsr/do-testing.md) — not a substitute for
+`make test`.
+
+### Automated pytest (primary)
+
+```bash
+make test          # fast suite (excludes -m slow)
+make test-cov      # with coverage report
+make test-slow     # network-heavy Makefile smoke
+```
+
+See § Per-test timeouts, § CI guardrails, and § Makefile automation tests below.
+
+### AI-assisted verification (supplementary)
+
+PyPost can also be exercised by the AI assistant in Cursor using the embedded MCP server and
+Prometheus metrics when validating UI flows manually.
 
 ## Prerequisites
 
@@ -490,7 +508,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 ```
 
 Optional hardening: add `caplog.at_level(logging.ERROR)` assertions for medium-risk tests
-listed in the audit report.
+listed in the audit report. Agent rules (C1–C5): `.cursor/lsr/do-testing.md` § Error-path
+logging. Example retrofit: `tests/test_worker.py::test_worker_wraps_unexpected_exception_logs_error`.
 
 ## CI guardrails (PYPOST-571 / PYPOST-572)
 
@@ -534,8 +553,34 @@ When adding an intentional error-path test that emits a new ERROR pattern, add a
 `tests/expected_log_allowlist.yaml` in the same PR. Prefer structured event prefixes
 (`request_execution_failed`, `mcp_operation_failed`, etc.) over raw message substrings.
 
-Phase 2: [PYPOST-573](https://pypost.atlassian.net/browse/PYPOST-573) (duration audit).
-Caplog contract: [PYPOST-574](https://pypost.atlassian.net/browse/PYPOST-574).
+### Phase 2 — duration budget audit (PYPOST-573)
+
+The main CI pytest run includes `--durations=0 --durations-min=1` (output in `pytest.log`).
+After the log verifier:
+
+```bash
+python scripts/audit_test_durations.py pytest.log
+```
+
+| Utilization | Action |
+| --- | --- |
+| ≥ 80% of `pytest.mark.timeout` | GitHub Actions `::warning` annotation |
+| ≥ 95% | CI step fails (`exit 1`) |
+
+Local reproduction:
+
+```bash
+make test 2>&1 | tee tests.txt
+python scripts/audit_test_durations.py tests.txt
+```
+
+Phase 2 caplog contract: [PYPOST-574](https://pypost.atlassian.net/browse/PYPOST-574).
+
+### Documentation sync (PYPOST-371)
+
+Agent timeout, Qt, caplog, and run commands in `.cursor/lsr/do-testing.md` must stay aligned
+with the matching sections in this file. When either document changes testing policy, update
+both in the same PR or file a Debt follow-up.
 
 ## References
 
