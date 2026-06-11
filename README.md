@@ -18,8 +18,8 @@ your API client — PyPost closes that gap.
 agent as a correctly working tool — with a clear name, description, and parameters,
 environment variables resolved, and secrets handled safely.
 
-**Principles:** safety by default; what you see is what the agent sees; reuse over
-rebuild; local-first.
+**Principles:** safety by default; you see more than the agent — secrets stay hidden and
+are never shared with agents; reuse over rebuild; local-first.
 
 See [MCP Integration](doc/mcp_integration.md) for setup and usage.
 
