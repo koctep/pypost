@@ -343,4 +343,5 @@ audit). Caplog contract: [PYPOST-574](https://pypost.atlassian.net/browse/PYPOST
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — AI assistant rules
 - [MCP Integration](mcp_integration.md) — MCP setup
 - [Collection item delete](collection_item_delete.md) — delete flow and metric matrix
-- [pypost/core/metrics.py](../../pypost/core/metrics.py) — metric definitions
+- [pypost/core/metrics_registry.py](../../pypost/core/metrics_registry.py) — counter definitions
+- [pypost/core/metrics.py](../../pypost/core/metrics.py) — `MetricsManager` facade

@@ -65,9 +65,16 @@ The environment selector owns MCP lifecycle and the active-variable cache used b
     `status_changed(True)`; `MCP: ON` only when listening; `start_failed` shows a warning
     dialog and resets to `MCP: OFF`.
 
-### 4. `MetricsManager` (`pypost/core/metrics.py`)
+### 4. Metrics observability stack (`pypost/core/metrics*.py`)
 
-PyPost also exposes a separate MCP server dedicated to observability.
+PyPost also exposes a separate MCP server dedicated to observability. PYPOST-75 split the
+former monolithic `MetricsManager` into focused modules:
+
+| Module | Class | Responsibility |
+| --- | --- | --- |
+| `pypost/core/metrics_registry.py` | `MetricsRegistry` | Prometheus counters and `track_*` methods (no I/O) |
+| `pypost/core/metrics_server.py` | `MetricsServer` | MCP resources, Starlette app, uvicorn thread lifecycle |
+| `pypost/core/metrics.py` | `MetricsManager` | Facade composed at `main.py`; same injection API as before |
 
 *   **Role**: Provides application metrics via MCP Resources.
 *   **Framework**: Same stack as the main server (`Starlette` + `mcp` SDK + `uvicorn`).
@@ -226,7 +233,8 @@ DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
     *   **Thread Pool**: Used inside MCP Thread for blocking I/O (Request execution).
     *   **Variable supplier**: Must not call Qt APIs. `EnvPresenter` reads only
         `_current_variables` (main-thread cache); supplier returns `dict(...)` snapshot.
-*   **Metrics Thread (`MetricsManager`)**: Runs its own isolated `uvicorn` loop for metrics and observability.
+*   **Metrics Thread (`MetricsServer` via `MetricsManager`)**: Runs its own isolated
+    `uvicorn` loop for metrics and observability.
 
 ## API / Usage
 

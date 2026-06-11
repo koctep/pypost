@@ -13,7 +13,9 @@ refactor (protocols, composition root) remains future work — see [PYPOST-46](h
 
 | Service | Created in | Injected into |
 | --- | --- | --- |
-| `MetricsManager` | `main.py` | `MainWindow`, presenters, workers |
+| `MetricsManager` (facade) | `main.py` | `MainWindow`, presenters, workers |
+| `MetricsRegistry` (counters) | inside `MetricsManager` | use directly in counter-only unit tests |
+| `MetricsServer` (uvicorn/MCP) | inside `MetricsManager` | started via `metrics.start_server()` in `main.py` |
 | `TemplateService` | `main.py` | `MainWindow`, `MCPServerManager`, `TabsPresenter` → workers |
 
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
