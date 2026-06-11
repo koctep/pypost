@@ -30,7 +30,7 @@
       "id": "mcp-list-tools",
       "name": "List Tools",
       "method": "MCP",
-      "url": "http://127.0.0.1:1080/sse",
+      "url": "http://127.0.0.1:1080/mcp",
       "headers": {},
       "params": {},
       "body": "",

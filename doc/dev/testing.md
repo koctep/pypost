@@ -92,7 +92,7 @@ duplicate scope: prior tickets already cover the intent.
 
 | Concern | Module | Level | Notes |
 | --- | --- | --- | --- |
-| MCP tool SSE (`list_tools`, `call_tool`) | `tests/test_mcp_server_integration.py` | Integration | PYPOST-368; `RequestService` mocked |
+| MCP tool Streamable HTTP (`list_tools`, `call_tool`) | `tests/test_mcp_server_integration.py` | Integration | PYPOST-368/551; `RequestService` mocked |
 | `MCPServerImpl` metrics hooks | `tests/test_mcp_server_impl.py` | Unit | PYPOST-367; `MetricsManager` mocked |
 | Metrics `read_resource("metrics://all")` | `tests/test_metrics_manager.py` | Unit | Scrapes `mcp_*_total` after `read_resource` |
 
