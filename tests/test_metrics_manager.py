@@ -57,6 +57,21 @@ class TestMetricsManagerGuiTracking(unittest.TestCase):
             out,
         )
 
+    def test_track_gui_new_tab_action_known_sources(self):
+        mm = MetricsManager()
+        mm.track_gui_new_tab_action("plus_button")
+        mm.track_gui_new_tab_action("shortcut")
+        out = _scrape(mm)
+        self.assertIn('gui_new_tab_actions_total{source="plus_button"} 1.0', out)
+        self.assertIn('gui_new_tab_actions_total{source="shortcut"} 1.0', out)
+
+    def test_track_gui_new_tab_action_invalid_source_maps_to_unknown(self):
+        mm = MetricsManager()
+        mm.track_gui_new_tab_action("test_source")
+        out = _scrape(mm)
+        self.assertIn('gui_new_tab_actions_total{source="unknown"} 1.0', out)
+        self.assertNotIn('source="test_source"', out)
+
     def test_track_gui_method_body_autoswitch(self):
         mm = MetricsManager()
         mm.track_gui_method_body_autoswitch("POST")

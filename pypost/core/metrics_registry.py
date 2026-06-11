@@ -4,6 +4,16 @@ from prometheus_client import CollectorRegistry, Counter
 
 from pypost.models.errors import ErrorCategory
 
+_NEW_TAB_ACTION_SOURCES = frozenset(
+    {"plus_button", "shortcut", "unknown", "collections_context"}
+)
+
+
+def _normalize_new_tab_source(source: str) -> str:
+    if source in _NEW_TAB_ACTION_SOURCES:
+        return source
+    return "unknown"
+
 
 class MetricsRegistry:
     """Owns Prometheus counters and pure tracking methods."""
@@ -209,7 +219,8 @@ class MetricsRegistry:
         self.gui_save_as_actions.labels(source=source).inc()
 
     def track_gui_new_tab_action(self, source: str) -> None:
-        self.gui_new_tab_actions.labels(source=source).inc()
+        normalized = _normalize_new_tab_source(source)
+        self.gui_new_tab_actions.labels(source=normalized).inc()
 
     def track_gui_copy_curl_action(self) -> None:
         self.gui_copy_curl_actions.inc()
