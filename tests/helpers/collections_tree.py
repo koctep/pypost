@@ -1,9 +1,11 @@
-"""Shared harness for CollectionTreeActions unit tests in isolation."""
+"""Shared fixtures for collections tree and CollectionTreeActions tests."""
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from unittest.mock import MagicMock
+from typing import Iterator
+from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
@@ -11,6 +13,8 @@ from PySide6.QtWidgets import QTreeView
 
 from pypost.models.models import Collection, RequestData
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
+
+_QMENU_PATCH = "pypost.ui.presenters.collection_tree_actions.QMenu"
 
 
 def make_collection(col_id: str, name: str, requests=None) -> Collection:
@@ -24,6 +28,8 @@ def make_request(req_id: str, name: str, method: str = "GET") -> RequestData:
 class FakeRequestManager:
     def __init__(self, collections=None):
         self.collections = collections or []
+        self.deleted = []
+        self.renamed = []
         self.storage = MagicMock()
         self.storage.load_collections.return_value = self.collections
 
@@ -34,6 +40,7 @@ class FakeRequestManager:
         return self.collections
 
     def delete_collection_item(self, item_id, item_type):
+        self.deleted.append((item_id, item_type))
         if item_type == "request":
             for col in self.collections:
                 col.requests = [req for req in col.requests if req.id != item_id]
@@ -42,18 +49,77 @@ class FakeRequestManager:
         return True
 
     def rename_collection_item(self, item_id, item_type, new_name):
-        if item_type == "collection":
-            for col in self.collections:
-                if col.id == item_id:
-                    col.name = new_name
-                    return True
-        elif item_type == "request":
+        self.renamed.append((item_id, item_type, new_name))
+        normalized = new_name.strip()
+        if not normalized:
+            return False
+        if item_type == "request":
             for col in self.collections:
                 for req in col.requests:
                     if req.id == item_id:
-                        req.name = new_name
+                        req.name = normalized
                         return True
-        return True
+        elif item_type == "collection":
+            for col in self.collections:
+                if col.id == item_id:
+                    col.name = normalized
+                    return True
+        return False
+
+
+class FakeStateManager:
+    def __init__(self):
+        self._expanded = []
+
+    def get_expanded_collections(self):
+        return list(self._expanded)
+
+    def set_expanded_collections(self, ids):
+        self._expanded = ids
+
+
+class FakeMetrics:
+    def track_gui_collection_delete_action(self, *args):
+        pass
+
+    def track_gui_collection_rename_action(self, *args):
+        pass
+
+
+@contextmanager
+def patch_tree_context_menu(actions, selected) -> Iterator[MagicMock]:
+    """Patch CollectionTreeActions QMenu; yield the mock menu instance."""
+    with patch(_QMENU_PATCH) as mock_menu_class:
+        mock_menu = MagicMock()
+        mock_menu.addAction.side_effect = list(actions)
+        mock_menu.exec.return_value = selected
+        mock_menu_class.return_value = mock_menu
+        yield mock_menu
+
+
+@contextmanager
+def patch_view_context_menu(view, item_index, actions, selected) -> Iterator[MagicMock]:
+    """Patch view.indexAt and CollectionTreeActions QMenu."""
+    with patch.object(view, "indexAt", return_value=item_index):
+        with patch_tree_context_menu(actions, selected) as mock_menu:
+            yield mock_menu
+
+
+def make_delete_menu_actions(action_count: int) -> tuple[list[MagicMock], MagicMock]:
+    rename_action = MagicMock()
+    delete_action = MagicMock()
+    if action_count == 2:
+        return [rename_action, delete_action], delete_action
+    new_tab_action = MagicMock()
+    return [new_tab_action, rename_action, delete_action], delete_action
+
+
+@contextmanager
+def patch_delete_context_menu(view, item_index, *, action_count: int = 2) -> Iterator[MagicMock]:
+    """Patch view and QMenu for delete-selected context-menu flows."""
+    actions, delete_action = make_delete_menu_actions(action_count)
+    with patch_view_context_menu(view, item_index, actions, delete_action):
+        yield delete_action
 
 
 @dataclass

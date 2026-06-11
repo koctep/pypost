@@ -1,16 +1,16 @@
 """Direct unit tests for CollectionTreeActions (menu dispatch, rename flows)."""
 
 import unittest
-from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QPoint, QModelIndex
 from PySide6.QtWidgets import QApplication
 
-from tests.collection_tree_actions_test_support import (
+from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
     make_collection,
     make_request,
+    patch_view_context_menu,
 )
 
 
@@ -18,15 +18,6 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
-
-    @contextmanager
-    def _patch_menu(self, actions, selected):
-        with patch("pypost.ui.presenters.collection_tree_actions.QMenu") as mock_menu_class:
-            mock_menu = MagicMock()
-            mock_menu.addAction.side_effect = list(actions)
-            mock_menu.exec.return_value = selected
-            mock_menu_class.return_value = mock_menu
-            yield mock_menu
 
     def test_invalid_index_skips_context_menu(self):
         harness = build_isolated_tree_actions([make_collection("c1", "My API")])
@@ -39,9 +30,10 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
     def test_collection_menu_offers_rename_and_delete(self):
         harness = build_isolated_tree_actions([make_collection("c1", "My API")])
         item = harness.model.item(0)
-        with patch.object(harness.view, "indexAt", return_value=item.index()):
-            with self._patch_menu([MagicMock(), MagicMock()], None) as mock_menu:
-                harness.actions.show_context_menu(QPoint(0, 0))
+        with patch_view_context_menu(
+            harness.view, item.index(), [MagicMock(), MagicMock()], None
+        ) as mock_menu:
+            harness.actions.show_context_menu(QPoint(0, 0))
         self.assertEqual(mock_menu.addAction.call_count, 2)
         labels = [call.args[0] for call in mock_menu.addAction.call_args_list]
         self.assertEqual(labels, ["Rename", "Delete"])
@@ -51,9 +43,10 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
         req_item = harness.model.item(0).child(0)
-        with patch.object(harness.view, "indexAt", return_value=req_item.index()):
-            with self._patch_menu([MagicMock(), MagicMock(), MagicMock()], None) as mock_menu:
-                harness.actions.show_context_menu(QPoint(0, 0))
+        with patch_view_context_menu(
+            harness.view, req_item.index(), [MagicMock(), MagicMock(), MagicMock()], None
+        ) as mock_menu:
+            harness.actions.show_context_menu(QPoint(0, 0))
         labels = [call.args[0] for call in mock_menu.addAction.call_args_list]
         self.assertEqual(labels, ["New tab", "Rename", "Delete"])
 
@@ -64,12 +57,14 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         req_item = harness.model.item(0).child(0)
         rename_action = MagicMock()
         delete_action = MagicMock()
-        with patch.object(harness.view, "indexAt", return_value=req_item.index()):
-            with patch.object(harness.view, "edit") as mock_edit:
-                with self._patch_menu(
-                    [MagicMock(), rename_action, delete_action], rename_action
-                ):
-                    harness.actions.show_context_menu(QPoint(0, 0))
+        with patch.object(harness.view, "edit") as mock_edit:
+            with patch_view_context_menu(
+                harness.view,
+                req_item.index(),
+                [MagicMock(), rename_action, delete_action],
+                rename_action,
+            ):
+                harness.actions.show_context_menu(QPoint(0, 0))
         self.assertIsNotNone(harness.actions.pending_rename)
         mock_edit.assert_called_once()
 
@@ -84,11 +79,13 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         new_tab_action = MagicMock()
         rename_action = MagicMock()
         delete_action = MagicMock()
-        with patch.object(harness.view, "indexAt", return_value=req_item.index()):
-            with self._patch_menu(
-                [new_tab_action, rename_action, delete_action], new_tab_action
-            ):
-                harness.actions.show_context_menu(QPoint(0, 0))
+        with patch_view_context_menu(
+            harness.view,
+            req_item.index(),
+            [new_tab_action, rename_action, delete_action],
+            new_tab_action,
+        ):
+            harness.actions.show_context_menu(QPoint(0, 0))
         mock_copy.assert_called_once_with(req)
         harness.emit_open_isolated_tab.assert_called_once_with(copied)
 
@@ -99,9 +96,10 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         item = harness.model.item(0)
         rename_action = MagicMock()
         delete_action = MagicMock()
-        with patch.object(harness.view, "indexAt", return_value=item.index()):
-            with self._patch_menu([rename_action, delete_action], delete_action):
-                harness.actions.show_context_menu(QPoint(0, 0))
+        with patch_view_context_menu(
+            harness.view, item.index(), [rename_action, delete_action], delete_action
+        ):
+            harness.actions.show_context_menu(QPoint(0, 0))
         self.assertEqual(harness.model.rowCount(), 1)
 
     @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
@@ -114,11 +112,13 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         new_tab_action = MagicMock()
         rename_action = MagicMock()
         delete_action = MagicMock()
-        with patch.object(harness.view, "indexAt", return_value=req_item.index()):
-            with self._patch_menu(
-                [new_tab_action, rename_action, delete_action], delete_action
-            ):
-                harness.actions.show_context_menu(QPoint(0, 0))
+        with patch_view_context_menu(
+            harness.view,
+            req_item.index(),
+            [new_tab_action, rename_action, delete_action],
+            delete_action,
+        ):
+            harness.actions.show_context_menu(QPoint(0, 0))
         self.assertEqual(harness.model.item(0).rowCount(), 0)
 
     def test_rename_cancel_restores_tree_incrementally(self):

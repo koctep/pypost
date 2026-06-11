@@ -108,9 +108,10 @@ No task-specific settings. Metrics use existing `MetricsManager` counters docume
 
 ## Automated tests
 
-`tests/collection_tree_actions_test_support.py` provides `build_isolated_tree_actions()` —
-a minimal `QTreeView` + `QStandardItemModel` harness that constructs `CollectionTreeActions`
-directly with `MagicMock` callbacks (no `CollectionsPresenter`).
+`tests/helpers/collections_tree.py` provides shared fixtures (`FakeRequestManager`,
+`patch_tree_context_menu`, `build_isolated_tree_actions()`, etc.) for presenter integration
+and isolated `CollectionTreeActions` tests. The isolated harness builds a minimal
+`QTreeView` + `QStandardItemModel` with `MagicMock` callbacks (no `CollectionsPresenter`).
 
 `tests/test_collection_tree_actions.py` covers menu dispatch and rename callbacks in isolation:
 
