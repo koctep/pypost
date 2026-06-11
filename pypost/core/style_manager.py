@@ -37,8 +37,13 @@ class StyleManager:
 
         return combined_style
 
-    def apply_styles(self, app_or_widget):
+    def _font_size_rule(self, font_size: int) -> str:
+        return f"\n/* Application font size */\nQWidget {{ font-size: {font_size}pt; }}\n"
+
+    def apply_styles(self, app_or_widget, font_size: int | None = None):
         """Applies the loaded styles to the given application or widget."""
         style_sheet = self.load_styles()
+        if font_size is not None:
+            style_sheet += self._font_size_rule(font_size)
         # Replace existing stylesheet to avoid accumulation on reload
         app_or_widget.setStyleSheet(style_sheet)

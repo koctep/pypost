@@ -52,8 +52,9 @@ class TestApplySettingsFont:
         # apply_styles calls setStyleSheet("") which resets app font — this is the
         # real-world condition the fix must survive.
         with patch.object(
-            window.style_manager, "apply_styles",
-            side_effect=lambda app: app.setStyleSheet(""),
+            window.style_manager,
+            "apply_styles",
+            side_effect=lambda app, font_size=None: app.setStyleSheet(""),
         ):
             window.apply_settings(settings)
         assert qapp.font().pointSize() == 16
@@ -62,8 +63,9 @@ class TestApplySettingsFont:
         window = _make_window(qapp)
         settings = AppSettings(font_size=8)
         with patch.object(
-            window.style_manager, "apply_styles",
-            side_effect=lambda app: app.setStyleSheet(""),
+            window.style_manager,
+            "apply_styles",
+            side_effect=lambda app, font_size=None: app.setStyleSheet(""),
         ):
             window.apply_settings(settings)
         assert qapp.font().pointSize() == 8
@@ -71,12 +73,19 @@ class TestApplySettingsFont:
     def test_font_size_second_call_wins(self, qapp):
         window = _make_window(qapp)
         with patch.object(
-            window.style_manager, "apply_styles",
-            side_effect=lambda app: app.setStyleSheet(""),
+            window.style_manager,
+            "apply_styles",
+            side_effect=lambda app, font_size=None: app.setStyleSheet(""),
         ):
             window.apply_settings(AppSettings(font_size=14))
             window.apply_settings(AppSettings(font_size=20))
         assert qapp.font().pointSize() == 20
+
+    def test_apply_styles_receives_font_size(self, qapp):
+        window = _make_window(qapp)
+        with patch.object(window.style_manager, "apply_styles") as apply_styles:
+            window.apply_settings(AppSettings(font_size=18))
+        apply_styles.assert_called_once_with(qapp, font_size=18)
 
     def test_show_event_reapplies_settings_once(self, qapp):
         window = _make_window(qapp)

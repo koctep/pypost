@@ -203,25 +203,13 @@ class MainWindow(QMainWindow):
         logger.debug("apply_settings_start font_size=%d", settings.font_size)
         app = QApplication.instance()
         if app:
-            self.style_manager.apply_styles(app)
+            self.style_manager.apply_styles(app, font_size=settings.font_size)
             font = app.font()
             font.setPointSize(settings.font_size)
             app.setFont(font)
             logger.debug(
                 "apply_settings_font_applied point_size=%d", app.font().pointSize()
             )
-            for w in [
-                self.collections.widget,
-                self.env.env_selector,
-                self.tabs.widget,
-                self.env.manage_btn,
-                self.settings_btn,
-                self.env.env_label,
-                self.tabs.widget.tabBar(),
-            ]:
-                w.setFont(font)
-            if self.menuBar():
-                self.menuBar().setFont(font)
         self.tabs.apply_settings(settings)
         self.env.apply_settings(settings)
 

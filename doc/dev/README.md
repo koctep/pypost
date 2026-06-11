@@ -27,6 +27,7 @@ set up your development environment, and contribute to the project.
 1. [Body Editor Validation (PYPOST-512)](body_editor_validation.md)
 1. [Body Format Selector (PYPOST-513)](body_format_selector.md)
 1. [YAML as JSON Send Conversion (PYPOST-514)](yaml_as_json.md)
+1. [UI Font Size and Global Styles (PYPOST-106)](ui_font_and_styles.md)
 
 ## Quick Start
 
