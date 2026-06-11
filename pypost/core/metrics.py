@@ -179,6 +179,15 @@ class MetricsManager:
             ["endpoint"],
             registry=self.registry,
         )
+        self._legacy_email_notification_failures_total = Counter(
+            "email_notification_failures_total",
+            (
+                "DEPRECATED: mirrors request_retry_exhaustions_total for dashboard "
+                "migration; remove after sunset (see doc/dev/metric_rename_migration.md)"
+            ),
+            ["endpoint"],
+            registry=self.registry,
+        )
         self.template_expression_render_attempts = Counter(
             "template_expression_render_attempts_total",
             "TemplateService render attempts for function placeholders in {{...}}",
@@ -402,7 +411,9 @@ class MetricsManager:
         ).inc()
 
     def track_request_retry_exhaustion(self, endpoint: str) -> None:
-        self._request_retry_exhaustions_total.labels(endpoint=endpoint).inc()
+        labels = {"endpoint": endpoint}
+        self._request_retry_exhaustions_total.labels(**labels).inc()
+        self._legacy_email_notification_failures_total.labels(**labels).inc()
 
     def track_template_expression_render_attempt(
         self,

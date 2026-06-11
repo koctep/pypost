@@ -114,6 +114,10 @@ class TestMetricsManagerRetryExhaustion(unittest.TestCase):
             'request_retry_exhaustions_total{endpoint="https://api.example/x"} 1.0',
             out,
         )
+        self.assertIn(
+            'email_notification_failures_total{endpoint="https://api.example/x"} 1.0',
+            out,
+        )
 
 
 class TestMetricsManagerMcpResource(unittest.TestCase):
