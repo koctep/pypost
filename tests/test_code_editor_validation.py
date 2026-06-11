@@ -134,6 +134,30 @@ class TestCodeEditorValidation(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("Line 2", editor.validation_controller()._error_label.text())
 
+    def test_validation_error_line_correct_with_folded_blocks(self):
+        editor = CodeEditor()
+        valid = json.dumps({"a": {"b": 1}, "c": 2}, indent=2)
+        editor.setPlainText(valid)
+        editor.fold_controller()._run_scan()
+        inner = next(
+            r for r in editor.fold_controller().regions() if r.region_id == "/a"
+        )
+        editor.fold_controller().toggle(inner.region_id)
+
+        broken = valid.replace('"c": 2', '"c": bad')
+        cursor = editor.textCursor()
+        cursor.select(cursor.SelectionType.Document)
+        cursor.insertText(broken)
+        _wait_for_validate(editor)
+
+        errors = editor.validation_controller().errors()
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0].line, 5)
+        block = editor.document().findBlockByNumber(errors[0].line - 1)
+        self.assertTrue(block.isValid())
+        self.assertTrue(block.isVisible())
+        self.assertIn("Line 5", editor.validation_controller()._error_label.text())
+
     def test_invalid_xml_shows_error_banner(self):
         editor = CodeEditor()
         editor.show()
