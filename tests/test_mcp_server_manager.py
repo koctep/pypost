@@ -100,6 +100,15 @@ class TestMCPServerManagerStartup(unittest.TestCase):
         self.assertTrue(statuses)
         self.assertFalse(statuses[-1])
 
+    def test_set_variable_supplier_forwards_to_impl(self):
+        manager = MCPServerManager()
+        supplier = lambda: {"token": "abc"}
+
+        manager.set_variable_supplier(supplier)
+
+        self.assertIs(manager._impl._variable_supplier, supplier)
+        self.assertEqual(manager._impl._variable_supplier(), {"token": "abc"})
+
 
 if __name__ == "__main__":
     unittest.main()
