@@ -8,8 +8,8 @@
 ## Follow-up Tasks
 
 - Migrate remaining direct `QMessageBox` callers (e.g. `env_presenter`, `save_dialog`,
-  `settings_dialog`, `request_save_orchestrator`) to shared helpers or a renamed module when
-  scope expands.
+  `settings_dialog`, `request_save_orchestrator`) to shared helpers. —
+  [PYPOST-547](https://pypost.atlassian.net/browse/PYPOST-547)
 
 ## Non-blockers
 
