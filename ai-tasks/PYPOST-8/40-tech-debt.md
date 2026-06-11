@@ -26,7 +26,9 @@ Addressed in PYPOST-14 by implementing `StateManager`.
 
 ## Performance Concerns
 
-- **Linear Search on Restore**: `restore_tree_state` iterates through all root level items. With a huge number of collections (thousands), this might be slow, but for typical usage (dozens of collections), it's instant. — [PYPOST-390](https://pypost.atlassian.net/browse/PYPOST-390)
+- **[FIXED] Linear Search on Restore** ([PYPOST-390](https://pypost.atlassian.net/browse/PYPOST-390)):
+  `restore_tree_state` uses `_collection_items_by_id` for O(expanded) lookup instead of
+  scanning all root rows.
 
 ## Follow-up Tasks
 

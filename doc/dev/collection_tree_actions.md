@@ -45,6 +45,11 @@ Collection rows store a collection id (`str`) in `Qt.UserRole`; request rows sto
 - `_on_tree_expanded` / `_on_tree_collapsed` — persist expanded collection ids in `StateManager`
 - `restore_tree_state` — re-expand saved collection nodes after model rebuild
 
+`CollectionsPresenter` keeps `_collection_items_by_id` (`dict[str, QStandardItem]`) in sync on
+`refresh_tree`, `_insert_collection_into_tree`, and `remove_item_from_tree`. Restore iterates
+only saved expanded ids and looks up each collection in O(1) instead of scanning every root
+row (PYPOST-390). `_find_collection_item` uses the same index for collection lookups.
+
 Request indices are ignored by expand/collapse persistence (unchanged behavior).
 
 ## API / Usage
@@ -135,6 +140,8 @@ Related presenter tests remain in `tests/test_collections_presenter.py`.
 | `test_tree_expansion_saved_and_restored_after_reload` | Round-trip after `load_collections` |
 | `test_restore_tree_state_skips_stale_saved_collection_ids` | Stale ids ignored (PYPOST-389) |
 | `test_restore_tree_state_expands_only_collections_in_saved_list` | Subset expansion (PYPOST-391) |
+| `test_restore_tree_state_expands_via_collection_index` | Many collections; subset restore (PYPOST-390) |
+| `test_collection_index_updated_on_incremental_insert_and_remove` | Index sync on insert/remove (PYPOST-390) |
 
 `tests/test_settings_persistence.py` (`TestStateManagerPersistence`) covers disk persistence
 of `expanded_collections` via real `StateManager` + `ConfigManager`.

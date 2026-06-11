@@ -39,6 +39,7 @@ class CollectionsPresenter(QObject):
         self._icons = icons
 
         self._model = QStandardItemModel()
+        self._collection_items_by_id: dict[str, QStandardItem] = {}
         self._view = QTreeView()
         self._view.setHeaderHidden(True)
         self._view.setModel(self._model)
@@ -107,6 +108,7 @@ class CollectionsPresenter(QObject):
     def refresh_tree(self) -> None:
         """Rebuilds tree model from RequestManager in-memory collections."""
         self._model.clear()
+        self._collection_items_by_id.clear()
 
         collections = self._request_manager.get_collections()
         total_requests = sum(len(col.requests) for col in collections)
@@ -121,6 +123,7 @@ class CollectionsPresenter(QObject):
             for req in col.requests:
                 col_item.appendRow(self._make_request_item(req))
             self._model.appendRow(col_item)
+            self._collection_items_by_id[col.id] = col_item
 
     def add_saved_request_to_tree(self, request: RequestData, collection_id: str) -> bool:
         """Insert a newly saved request without rebuilding the full tree model."""
@@ -153,6 +156,7 @@ class CollectionsPresenter(QObject):
         for req in collection.requests:
             col_item.appendRow(self._make_request_item(req))
         self._model.appendRow(col_item)
+        self._collection_items_by_id[collection.id] = col_item
         self._expand_collection_if_saved(collection.id, col_item)
         logger.info(
             "insert_collection_into_tree_completed collection_id=%s request_count=%d",
@@ -168,12 +172,10 @@ class CollectionsPresenter(QObject):
 
     def restore_tree_state(self) -> None:
         """Re-expands nodes from StateManager state."""
-        root = self._model.invisibleRootItem()
-        expanded = self._state_manager.get_expanded_collections()
-        for row in range(root.rowCount()):
-            item = root.child(row)
-            if self._is_collection_item(item.index()) and item.data(Qt.UserRole) in expanded:
-                self._view.setExpanded(item.index(), True)
+        for collection_id in self._state_manager.get_expanded_collections():
+            col_item = self._collection_items_by_id.get(collection_id)
+            if col_item is not None:
+                self._view.setExpanded(col_item.index(), True)
 
     def _on_collection_clicked(self, index) -> None:
         item = self._model.itemFromIndex(index)
@@ -198,6 +200,8 @@ class CollectionsPresenter(QObject):
             return False
         parent = item.parent() or self._model.invisibleRootItem()
         parent.removeRow(item.row())
+        if item_type == "collection":
+            self._collection_items_by_id.pop(item_id, None)
         logger.info(
             "collection_tree_item_removed item_type=%s item_id=%s",
             item_type,
@@ -206,10 +210,10 @@ class CollectionsPresenter(QObject):
         return True
 
     def _find_collection_item(self, item_id: str, item_type: str) -> QStandardItem | None:
+        if item_type == "collection":
+            return self._collection_items_by_id.get(item_id)
         for row in range(self._model.rowCount()):
             col_item = self._model.item(row)
-            if item_type == "collection" and col_item.data(Qt.UserRole) == item_id:
-                return col_item
             for child_row in range(col_item.rowCount()):
                 req_item = col_item.child(child_row)
                 data = req_item.data(Qt.UserRole)

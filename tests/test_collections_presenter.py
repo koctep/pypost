@@ -340,6 +340,30 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertFalse(presenter.widget.isExpanded(idx1))
         self.assertTrue(presenter.widget.isExpanded(idx2))
 
+    def test_restore_tree_state_expands_via_collection_index(self):
+        """PYPOST-390: restore uses id index — O(expanded) not O(all collections)."""
+        collections = [_make_collection(f"c{i}", f"Col {i}") for i in range(50)]
+        presenter = self._make_presenter(collections)
+        presenter._state_manager._expanded = ["c49", "c10"]
+        presenter.load_collections()
+        self.assertEqual(len(presenter._collection_items_by_id), 50)
+        presenter.restore_tree_state()
+        model = presenter.widget.model()
+        for i in range(50):
+            index = model.item(i).index()
+            expected = i in (10, 49)
+            self.assertEqual(presenter.widget.isExpanded(index), expected)
+
+    def test_collection_index_updated_on_incremental_insert_and_remove(self):
+        """PYPOST-390: collection id index stays in sync with incremental tree edits."""
+        presenter = self._make_presenter([])
+        presenter.load_collections()
+        col = _make_collection("c-new", "New")
+        presenter._insert_collection_into_tree(col)
+        self.assertIn("c-new", presenter._collection_items_by_id)
+        presenter.remove_item_from_tree("c-new", "collection")
+        self.assertNotIn("c-new", presenter._collection_items_by_id)
+
     @patch(
         "pypost.ui.presenters.collection_tree_actions.CollectionTreeActions.handle_delete"
     )
