@@ -147,6 +147,31 @@ typically surfaces the empty-name path, not `invalid_chars`.
 - `""` (empty string)
 - `" "`, `"\t"` (whitespace-only at core layer; see UI vs core behavior)
 
+## Performance
+
+Variable name validation is a pure in-memory string scan (empty check, first-character
+digit check, then `all()` over characters). It runs **once per user confirmation** when
+creating or renaming a variable — not on every keystroke or template render.
+
+Micro-benchmark on a typical dev machine (CPython, `time.perf_counter`, 200k iterations):
+
+| Scenario | Approx. latency |
+| --- | --- |
+| Valid short name (`api_key`, 7 chars) | ~0.3 µs/call |
+| Valid long name (500 chars) | ~8.6 µs/call |
+| `validation_failure_reason` + `validate_variable_name` (mixed batch) | ~1.6 µs/op |
+
+The UI wrapper (`EnvPresenter._is_valid_variable_name`) adds Prometheus counter updates and
+a DEBUG log on failure only — still microseconds total.
+
+**Context:** `QInputDialog` interaction and environment save/I/O are milliseconds to seconds.
+Validation overhead is orders of magnitude below perceptible UI latency. No optimization or
+dedicated performance monitoring is required unless validation rules change materially
+(for example switching to `isidentifier()` with heavier Unicode normalization).
+
+Confirmed in [PYPOST-476](https://pypost.atlassian.net/browse/PYPOST-476) (PYPOST-163
+follow-up).
+
 ## Test Coverage
 
 Automated contract tests live in `tests/test_variable_name_validation.py`:
