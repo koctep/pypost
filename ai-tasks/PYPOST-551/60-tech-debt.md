@@ -12,7 +12,7 @@
 | TD-1 | Low | Dual SSE + Streamable HTTP maintenance | Legacy `/sse` mounts kept for transition; remove when ecosystem drops SSE-only clients. |
 | TD-2 | Low | `HTTPClient` SSE probe uses `"/sse" in url` heuristic | Pre-existing (PYPOST-430); does not detect `/mcp` probes; saved requests may need URL updates. |
 | TD-3 | Low | `MCPClientService.run` uses `asyncio.run` | Pre-existing (PYPOST-368); `anyio.run` may be more reliable with SDK task groups. |
-| TD-4 | Low | User-facing `doc/mcp_integration.md` still describes SSE URL | Out of Step 7 dev-docs scope; update when refreshing end-user MCP setup guide. |
+| TD-4 | Low | User-facing `doc/mcp_integration.md` still describes SSE URL | [PYPOST-578](https://pypost.atlassian.net/browse/PYPOST-578) |
 | TD-5 | Low | `config/test/README.md` example URLs still reference `/sse` | Update when refreshing test collection examples. |
 
 ## Worklog
