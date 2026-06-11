@@ -95,8 +95,13 @@ duplicate scope: prior tickets already cover the intent.
 | MCP tool Streamable HTTP (`list_tools`, `call_tool`) | `tests/test_mcp_server_integration.py` | Integration | PYPOST-368/551; `RequestService` mocked |
 | `MCPServerImpl` metrics hooks | `tests/test_mcp_server_impl.py` | Unit | PYPOST-367; `MetricsManager` mocked |
 | Metrics `read_resource("metrics://all")` | `tests/test_metrics_manager.py` | Unit | Scrapes `mcp_*_total` after `read_resource` |
+| Shared bind error messages | `tests/test_server_bind.py` | Unit | PYPOST-154; `format_bind_error` / MCP wrapper |
 | Metrics server bind / startup signaling | `tests/test_metrics_server_startup.py` | Integration | PYPOST-153; port busy, deferred failure |
 | MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556; port busy, listen readiness |
+
+PYPOST-154 verified end-to-end port-in-use handling for both MCP and metrics (closes
+PYPOST-20 bind-error debt). Implementation is in PYPOST-556 and PYPOST-153; 154 adds shared
+helper tests and documentation.
 
 Not covered by the above (follow-up debt): live metrics-server MCP SSE round-trip and
 integration tests with real outbound HTTP via a local stub server.

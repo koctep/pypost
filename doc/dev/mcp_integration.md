@@ -105,6 +105,16 @@ former monolithic `MetricsManager` into focused modules:
 7.  After `startup()` completes, `MCPServerManager` emits `status_changed(True)`.
 8.  On bind failure, `start_failed` carries a user-visible message; UI stays OFF.
 
+### Metrics server startup (PYPOST-153 / PYPOST-154)
+
+1.  `main.py` creates `MetricsManager` and calls `start_server(metrics_host, metrics_port)`
+    before `MainWindow` is constructed.
+2.  `MetricsServer` runs uvicorn in a background thread (same pattern as MCP).
+3.  After `startup()` completes, logs `metrics_server_listening`.
+4.  On bind failure, `MetricsManager.start_failed` carries a user-visible message.
+5.  `MainWindow.connect_start_failed` replays failures that occurred before the window opened
+    and shows `QMessageBox.warning` via `_on_metrics_start_failed`.
+
 ### MCP tools overview (PYPOST-556)
 
 `collect_mcp_tool_overview(collections)` in `pypost/core/mcp_tools_overview.py` builds
@@ -326,6 +336,7 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 | DEBUG shows `env_var_count=0` | "No Environment" selected or empty env | Expected when no env is active; only MCP args resolve |
 | UI shows MCP ON but agent cannot connect | Status used to flip before bind (fixed PYPOST-556) or wrong port | Wait for ON after Starting; check Settings port; read `start_failed` dialog |
 | Port busy on MCP start | Another process on `mcp_port` | Dialog explains conflict; free port or change Settings |
+| Port busy on metrics start | Another process on `metrics_port` (default 9080) | Dialog on main window open; free port or change Settings |
 
 ### Tool metadata authoring (PYPOST-553)
 
