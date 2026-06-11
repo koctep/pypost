@@ -7,11 +7,9 @@ from typing import Any, Dict, List
 from starlette.applications import Starlette
 
 from mcp.server import Server
-from mcp.server.sse import SseServerTransport
 from mcp.types import TextContent, Tool
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import Response
-from starlette.routing import Mount, Route
+from starlette.routing import Mount
 
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_secrets_policy import McpSecretsPolicy
@@ -21,11 +19,9 @@ from pypost.core.mcp_tool_contract import (
     resolve_mcp_param_specs,
     tool_description,
 )
+from pypost.core.mcp_legacy_sse import build_legacy_sse_app
 from pypost.core.mcp_streamable_http import build_streamable_http_route
-from pypost.core.mcp_transport_routes import (
-    MCP_LEGACY_SSE_MESSAGES_PATH,
-    MCP_LEGACY_SSE_MOUNT_PATH,
-)
+from pypost.core.mcp_transport_routes import MCP_LEGACY_SSE_MOUNT_PATH
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_service import ExecutionResult, RequestService
 from pypost.core.template_service import TemplateService
@@ -235,38 +231,4 @@ class MCPServerImpl:
 
     def _create_sse_app(self) -> Starlette:
         """Legacy HTTP+SSE transport for backward-compatible clients."""
-        sse = SseServerTransport(MCP_LEGACY_SSE_MESSAGES_PATH)
-
-        class SSEEndpoint:
-            def __init__(self, server, sse_transport):
-                self.server = server
-                self.sse_transport = sse_transport
-
-            async def __call__(self, scope, receive, send):
-                async with self.sse_transport.connect_sse(scope, receive, send) as streams:
-                    opts = self.server.create_initialization_options()
-                    await self.server.run(streams[0], streams[1], opts)
-
-        class MessagesEndpoint:
-            def __init__(self, sse_transport):
-                self.sse_transport = sse_transport
-
-            async def __call__(self, scope, receive, send):
-                await self.sse_transport.handle_post_message(scope, receive, send)
-
-        async def handle_sse_get(request):
-            ep = SSEEndpoint(self.server, sse)
-            await ep(request.scope, request.receive, request._send)
-            return Response()
-
-        return Starlette(
-            debug=True,
-            routes=[
-                Route(
-                    MCP_LEGACY_SSE_MESSAGES_PATH,
-                    endpoint=MessagesEndpoint(sse),
-                    methods=["POST"],
-                ),
-                Route("/", endpoint=handle_sse_get, methods=["GET"]),
-            ],
-        )
+        return build_legacy_sse_app(self.server, debug=True)

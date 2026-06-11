@@ -9,18 +9,14 @@ from collections.abc import Callable
 
 import uvicorn
 from mcp.server import Server
-from mcp.server.sse import SseServerTransport
 from mcp.types import Resource, TextResourceContents
 from prometheus_client import generate_latest, make_asgi_app
 from starlette.applications import Starlette
-from starlette.responses import Response
-from starlette.routing import Mount, Route
+from starlette.routing import Mount
 
+from pypost.core.mcp_legacy_sse import build_legacy_sse_app
 from pypost.core.mcp_streamable_http import build_streamable_http_route
-from pypost.core.mcp_transport_routes import (
-    MCP_LEGACY_SSE_MESSAGES_PATH,
-    MCP_LEGACY_SSE_MOUNT_PATH,
-)
+from pypost.core.mcp_transport_routes import MCP_LEGACY_SSE_MOUNT_PATH
 from pypost.core.metrics_registry import MetricsRegistry
 from pypost.core.server_bind import format_bind_error
 
@@ -91,40 +87,7 @@ class MetricsServer:
 
     def _create_sse_app(self) -> Starlette:
         """Legacy HTTP+SSE transport (same layout as MCPServerImpl)."""
-        sse = SseServerTransport(MCP_LEGACY_SSE_MESSAGES_PATH)
-
-        class SSEEndpoint:
-            def __init__(self, server, sse_transport):
-                self.server = server
-                self.sse_transport = sse_transport
-
-            async def __call__(self, scope, receive, send):
-                async with self.sse_transport.connect_sse(scope, receive, send) as streams:
-                    opts = self.server.create_initialization_options()
-                    await self.server.run(streams[0], streams[1], opts)
-
-        class MessagesEndpoint:
-            def __init__(self, sse_transport):
-                self.sse_transport = sse_transport
-
-            async def __call__(self, scope, receive, send):
-                await self.sse_transport.handle_post_message(scope, receive, send)
-
-        async def handle_sse_get(request):
-            ep = SSEEndpoint(self.mcp_server, sse)
-            await ep(request.scope, request.receive, request._send)
-            return Response()
-
-        return Starlette(
-            routes=[
-                Route(
-                    MCP_LEGACY_SSE_MESSAGES_PATH,
-                    endpoint=MessagesEndpoint(sse),
-                    methods=["POST"],
-                ),
-                Route("/", endpoint=handle_sse_get, methods=["GET"]),
-            ],
-        )
+        return build_legacy_sse_app(self.mcp_server)
 
     def _create_app(self) -> Starlette:
         prometheus_app = make_asgi_app(registry=self._registry.registry)
