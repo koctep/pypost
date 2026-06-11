@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 SSE_PROBE_TIMEOUT = 10.0
 SSE_PROBE_CONNECT_TIMEOUT = 3.0
 SSE_PROBE_MAX_EVENTS = 5
+DEFAULT_REQUEST_TIMEOUT = 30.0
 
 
 @dataclass(frozen=True)
@@ -94,7 +95,7 @@ class HTTPClient:
             "headers": headers,
             "params": params,
             "stream": True,
-            "timeout": 30.0,
+            "timeout": DEFAULT_REQUEST_TIMEOUT,
         }
 
         if request_data.body_type == "yaml" and request_data.yaml_as_json and stripped_body:

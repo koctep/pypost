@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import MagicMock
 import requests as requests_lib
 
-from pypost.core.http_client import HTTPClient, HTTPRequestResult, ResolvedRequestFields
+from pypost.core.http_client import DEFAULT_REQUEST_TIMEOUT, HTTPClient, HTTPRequestResult, ResolvedRequestFields
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -279,7 +279,7 @@ class TestHTTPClientPrepareRequestKwargs(unittest.TestCase):
         self.assertEqual("GET", kwargs["method"])
         self.assertEqual("http://example.com", kwargs["url"])
         self.assertTrue(kwargs["stream"])
-        self.assertEqual(30.0, kwargs["timeout"])
+        self.assertEqual(DEFAULT_REQUEST_TIMEOUT, kwargs["timeout"])
         self.assertEqual({}, kwargs["headers"])
         self.assertEqual({}, kwargs["params"])
         self.assertNotIn("json", kwargs)
