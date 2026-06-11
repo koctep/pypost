@@ -4,7 +4,7 @@ import json
 import unittest
 
 from PySide6.QtCore import QPoint, QRect, Qt
-from PySide6.QtGui import QPaintEvent, QPainter
+from PySide6.QtGui import QPaintEvent, QPainter, QTextCursor
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -58,6 +58,8 @@ _NESTED_JSON = json.dumps(
     {"users": [{"id": 1, "name": "Ada"}, {"id": 2, "name": "Bob"}]},
     indent=2,
 )
+
+_REMAP_JSON = json.dumps({"a": {"b": 1}, "c": 2}, indent=2)
 
 
 class TestJsonStructureScanner(unittest.TestCase):
@@ -192,6 +194,89 @@ class TestCodeEditorFolding(unittest.TestCase):
             _visible_block_numbers(ed),
             list(range(ed.blockCount())),
         )
+
+
+def _replace_once(editor: CodeEditor, old: str, new: str) -> None:
+    cursor = editor.textCursor()
+    cursor.beginEditBlock()
+    full = editor.toPlainText()
+    start = full.index(old)
+    cursor.setPosition(start)
+    cursor.setPosition(start + len(old), QTextCursor.MoveMode.KeepAnchor)
+    cursor.insertText(new)
+    cursor.endEditBlock()
+
+
+class TestFoldRemappingAfterEdits(unittest.TestCase):
+    """PYPOST-517: collapse state survives edits when region boundaries are unchanged."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_collapse_preserved_when_edit_outside_region(self):
+        ed = CodeEditor()
+        ed.setPlainText(_REMAP_JSON)
+        _wait_for_scan(ed)
+        inner = next(r for r in ed.fold_controller().regions() if r.region_id == "/a")
+        ed.fold_controller().toggle(inner.region_id)
+        self.assertTrue(ed.fold_controller().is_collapsed(inner.region_id))
+
+        _replace_once(ed, '"c": 2', '"c": 3')
+        _wait_for_scan(ed)
+        self.assertTrue(ed.fold_controller().is_collapsed(inner.region_id))
+        visible = _visible_block_numbers(ed)
+        for block_num in range(inner.start_block + 1, inner.end_block + 1):
+            self.assertNotIn(block_num, visible)
+
+    def test_collapse_dropped_when_region_boundaries_change(self):
+        ed = CodeEditor()
+        ed.setPlainText(_REMAP_JSON)
+        _wait_for_scan(ed)
+        inner = next(r for r in ed.fold_controller().regions() if r.region_id == "/a")
+        ed.fold_controller().toggle(inner.region_id)
+        self.assertTrue(ed.fold_controller().is_collapsed(inner.region_id))
+
+        _replace_once(ed, '"b": 1', '"b": 1,\n    "x": 0')
+        _wait_for_scan(ed)
+        self.assertFalse(ed.fold_controller().is_collapsed(inner.region_id))
+        self.assertEqual(
+            _visible_block_numbers(ed),
+            list(range(ed.blockCount())),
+        )
+
+    def test_nested_collapse_remapping_after_paste_outside(self):
+        ed = CodeEditor()
+        ed.setPlainText(_NESTED_JSON)
+        _wait_for_scan(ed)
+        users = next(r for r in ed.fold_controller().regions() if r.region_id == "/users")
+        ed.fold_controller().toggle(users.region_id)
+        self.assertTrue(ed.fold_controller().is_collapsed(users.region_id))
+
+        _replace_once(ed, "  ]\n}", '  ],\n  "tag": "v1"\n}')
+        _wait_for_scan(ed)
+        self.assertTrue(ed.fold_controller().is_collapsed(users.region_id))
+        visible = _visible_block_numbers(ed)
+        for block_num in range(users.start_block + 1, users.end_block + 1):
+            self.assertNotIn(block_num, visible)
+
+    def test_nested_collapse_dropped_after_bracket_edit_inside_region(self):
+        ed = CodeEditor()
+        ed.setPlainText(_NESTED_JSON)
+        _wait_for_scan(ed)
+        users = next(r for r in ed.fold_controller().regions() if r.region_id == "/users")
+        first_user = next(
+            r for r in ed.fold_controller().regions() if r.region_id == "/users/0"
+        )
+        ed.fold_controller().toggle(users.region_id)
+        ed.fold_controller().toggle(first_user.region_id)
+        self.assertTrue(ed.fold_controller().is_collapsed(users.region_id))
+        self.assertTrue(ed.fold_controller().is_collapsed(first_user.region_id))
+
+        _replace_once(ed, '"name": "Ada"', '"name": "Ada",\n      "role": "admin"')
+        _wait_for_scan(ed)
+        self.assertFalse(ed.fold_controller().is_collapsed(first_user.region_id))
+        self.assertFalse(ed.fold_controller().is_collapsed(users.region_id))
 
 
 if __name__ == "__main__":
