@@ -153,6 +153,30 @@ class TestCollectionTreeRenameMetrics(unittest.TestCase):
             "request", "cancelled"
         )
 
+    def test_collection_rename_succeeded_records_succeeded_metric(self):
+        rm = FakeRequestManager([_make_collection("c1", "My API")])
+        presenter, metrics = self._make_presenter(rm)
+        presenter.load_collections()
+        presenter._pending_rename = {"item_id": "c1", "item_type": "collection"}
+        presenter._tree_actions.handle_rename_committed("New API")
+        metrics.track_gui_collection_rename_action.assert_called_once_with(
+            "collection", "succeeded"
+        )
+        self.assertEqual(presenter._model.item(0).text(), "New API")
+
+    def test_request_rename_succeeded_records_succeeded_metric(self):
+        req = _make_request("r1", "Get users")
+        col = _make_collection("c1", "My API", [req])
+        rm = FakeRequestManager([col])
+        presenter, metrics = self._make_presenter(rm)
+        presenter.load_collections()
+        presenter._pending_rename = {"item_id": "r1", "item_type": "request"}
+        presenter._tree_actions.handle_rename_committed("Fetch users")
+        metrics.track_gui_collection_rename_action.assert_called_once_with(
+            "request", "succeeded"
+        )
+        self.assertEqual(presenter._model.item(0).child(0).text(), "GET Fetch users")
+
     @patch("pypost.ui.presenters.collection_tree_actions.show_rename_failure")
     def test_rename_error_does_not_emit_succeeded_metric(self, _mock_critical):
         rm = FakeRequestManager(
