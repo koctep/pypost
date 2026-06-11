@@ -104,6 +104,7 @@ Before promoting to the next stage:
 | **M6** | Rotate active key | Update registry per [rotation workflow](environment_encryption_at_rest.md#key-rotation-workflow); `verify` |
 | **M7** | Bulk re-encrypt under active key | `re-encrypt` (backup is default) or Settings → **Re-encrypt all environments** |
 | **M8** | Retire historical key material | Only after M7 confirms no envelopes reference retired `kid` |
+| **M9** | Upgrade v1 envelopes to v2 fernet | `upgrade-v2` (backup is default) |
 
 ### M3 — Change primary key source (cutover)
 
@@ -138,6 +139,22 @@ until re-encrypted.
 6. Confirm `kid_histogram` shows a single active `kid`.
 7. Remove retired keys from registry (M8).
 
+### M9 — Upgrade v1 envelopes to v2 fernet
+
+After [v2 decrypt support](environment_encryption_at_rest.md#version-2-decrypt-supported-encrypt-still-v1-only)
+is available, operators can normalize on-disk envelopes to v2 without changing key material
+semantics (v2 fernet uses the same Fernet token in `ct` as v1).
+
+1. `python scripts/encryption_migrate.py report` — note `v1_envelopes` count.
+2. `python scripts/encryption_migrate.py verify`
+3. `python scripts/encryption_migrate.py upgrade-v2 --dry-run`
+4. `python scripts/encryption_migrate.py upgrade-v2`
+5. Confirm `v1_envelopes: 0` and `v2_envelopes` matches hidden value count.
+
+Also encrypts plain hidden strings as v2 when present. Skips when every hidden value is already v2.
+Runtime saves through the desktop app still emit v1 until a future change; use `upgrade-v2` for
+bulk normalization.
+
 ## Operator surfaces
 
 ### Settings (desktop)
@@ -148,8 +165,10 @@ Open **Settings** from the main window. Under **Encryption migration**:
   form (saved or not). Results appear in an information or warning dialog.
 - **Re-encrypt all environments** — asks for confirmation, creates a timestamped backup, then
   bulk re-encrypts under the active key. Same safety properties as the CLI `re-encrypt` command.
+  The result dialog includes **Re-encrypted** and **Reused** counts when the migration service
+  returns `reencrypt_stats` (same fields as CLI `reencrypt_stats`).
 
-`encrypt-plaintext` and dry-run are CLI-only.
+`encrypt-plaintext` and dry-run are CLI-only. `upgrade-v2` is CLI-only.
 
 ### Operator CLI
 
@@ -162,6 +181,7 @@ python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PA
 python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PATH] report
 python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PATH] re-encrypt [--dry-run] [--no-backup]
 python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PATH] encrypt-plaintext [--dry-run] [--no-backup]
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PATH] upgrade-v2 [--dry-run] [--no-backup]
 ```
 
 | Flag | Purpose |
@@ -176,6 +196,7 @@ python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PA
 | `report` | No | Inventory `kid` histogram and plaintext/encrypted counts |
 | `re-encrypt` | Yes (unless `--dry-run`) | Rewrite all hidden values under the current active key |
 | `encrypt-plaintext` | Yes (unless `--dry-run`) | Encrypt plain hidden strings after enabling encryption |
+| `upgrade-v2` | Yes (unless `--dry-run`) | Rewrite v1 envelopes (and plain hidden strings) as v2 fernet |
 
 **Exit codes:** `0` on success; `1` on verification or migration failure. In human mode, errors print
 to stderr; with `--json`, errors are included in the JSON payload on stdout.
@@ -234,6 +255,8 @@ to stderr; with `--json`, errors are included in the JSON payload on stdout.
 environments: 3
 hidden_values: 12
 encrypted_envelopes: 10
+v1_envelopes: 8
+v2_envelopes: 2
 plaintext_hidden: 2
 kid_histogram:
   abc123def4567890: 8
@@ -245,7 +268,8 @@ reencrypt_stats:
 
 `reencrypt_stats` appears on `re-encrypt` and `encrypt-plaintext` when the command completes a
 rewrite or skips because every hidden value already uses the active `kid`. Omitted on `verify` and
-`report`. Dry-run does not include `reencrypt_stats` (no save occurs).
+`report`. Dry-run includes projected `reencrypt_stats` using the same serialize path as a live
+save without writing.
 
 Envelope reuse during bulk save requires the stored `kid` to match the active key (PYPOST-535), so
 kid rotation re-encrypts historical envelopes even when plaintext is unchanged.
@@ -314,6 +338,14 @@ active key.
 Same rewrite path as `bulk_re_encrypt`, but succeeds immediately when `plaintext_hidden_count` is 0.
 Requires encryption enabled.
 
+#### `upgrade_envelopes_to_v2(settings, *, dry_run=False, backup=True) -> MigrationReport`
+
+Loads all environments, decrypts v1 and v2 envelopes, saves with `target_envelope_version=2` so
+hidden values are written as v2 fernet under the active key. Also encrypts plain hidden strings as
+v2. Succeeds immediately without backup or file I/O when every hidden value is already a v2 envelope
+and there is no plaintext hidden data. Requires encryption enabled. Uses the same safety properties
+as `bulk_re_encrypt` (backup, dry-run, fail closed).
+
 #### `backup_environments_file(path: Path) -> Path`
 
 Copies `environments.json` to `{stem}.backup.{UTC-timestamp}{suffix}` alongside the original.
@@ -321,8 +353,8 @@ Copies `environments.json` to `{stem}.backup.{UTC-timestamp}{suffix}` alongside 
 ### Data types
 
 - `EnvironmentInventory` — `environment_count`, `hidden_value_count`, `encrypted_envelope_count`,
-  `plaintext_hidden_count`, `invalid_hidden_count`, `kid_histogram`, `missing_kids`,
-  `data_quality_errors` (per-field messages for invalid hidden shapes)
+  `v1_envelope_count`, `v2_envelope_count`, `plaintext_hidden_count`, `invalid_hidden_count`,
+  `kid_histogram`, `missing_kids`, `data_quality_errors` (per-field messages for invalid hidden shapes)
 - `MigrationReport` — `inventory`, `dry_run`, `backup_path`, `errors`, `success`,
   `reencrypt_stats` (optional; `encrypted_count` / `reused_count` from bulk save)
 - `ReencryptStats` — aggregate selective re-encrypt counts for operator output
@@ -387,6 +419,11 @@ or secret-store spec). Run `report` to see the histogram. See
 
 **Expected** when `plaintext_hidden_count` is 0 — all hidden values are already envelopes.
 
+### `upgrade-v2` succeeds immediately with no file change
+
+**Expected** when `v1_envelopes` is 0 and there is no plaintext hidden data — all hidden values are
+already v2 envelopes.
+
 ### Dry-run `kid_histogram` shows one key but live file shows many
 
 **Expected.** Dry-run projects counts after re-encryption under the active key without writing.
@@ -423,12 +460,16 @@ Focused suites:
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_encryption_migration.py \
   tests/test_encryption_migration_key_sources.py \
+  tests/test_encryption_migration_vault.py \
   tests/test_encryption_migrate_cli.py
 ```
 
 `test_encryption_migration_key_sources.py` covers Stage 2 (keyring primary) and Stage 3
 (secret_store primary) verify and bulk re-encrypt paths using mocked keyring and file-based
 secret-store fixtures.
+
+`test_encryption_migration_vault.py` covers Stage 4 (Vault-backed secret_store primary) verify
+and bulk re-encrypt paths using a mocked Vault KV HTTP response — no live Vault server required.
 
 Full regression:
 

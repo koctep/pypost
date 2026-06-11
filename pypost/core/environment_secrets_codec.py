@@ -1,5 +1,6 @@
 import base64
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, ClassVar, TypeAlias
 
@@ -191,6 +192,54 @@ class EnvironmentSecretsCodec:
             alg=self.ALGORITHM,
             kid=key.key_id,
             ct=token.decode("utf-8"),
+        )
+
+    def encrypt_v2(
+        self,
+        value: str,
+        *,
+        algorithm: str = EncryptedValueEnvelopeV2.FERNET_ALGORITHM,
+    ) -> EncryptedValueEnvelopeV2:
+        self._ensure_crypto_available()
+        key = self._key_provider.get_current_key()
+        if algorithm == EncryptedValueEnvelopeV2.FERNET_ALGORITHM:
+            token = Fernet(key.key.encode("utf-8")).encrypt(value.encode("utf-8"))
+            logger.debug(
+                "env_value_encrypted algorithm=%s version=%d key_id=%s",
+                algorithm,
+                EncryptedValueEnvelopeV2.VERSION,
+                key.key_id,
+            )
+            return EncryptedValueEnvelopeV2(
+                enc=True,
+                v=EncryptedValueEnvelopeV2.VERSION,
+                alg=algorithm,
+                kid=key.key_id,
+                ct=token.decode("utf-8"),
+            )
+        if algorithm == EncryptedValueEnvelopeV2.AES_GCM_ALGORITHM:
+            aes_key = self._fernet_key_to_aes_bytes(key.key)
+            nonce = os.urandom(12)
+            encrypted = AESGCM(aes_key).encrypt(nonce, value.encode("utf-8"), None)
+            ciphertext = encrypted[:-16]
+            tag = encrypted[-16:]
+            logger.debug(
+                "env_value_encrypted algorithm=%s version=%d key_id=%s",
+                algorithm,
+                EncryptedValueEnvelopeV2.VERSION,
+                key.key_id,
+            )
+            return EncryptedValueEnvelopeV2(
+                enc=True,
+                v=EncryptedValueEnvelopeV2.VERSION,
+                alg=algorithm,
+                kid=key.key_id,
+                ct=base64.b64encode(ciphertext).decode("utf-8"),
+                iv=base64.b64encode(nonce).decode("utf-8"),
+                tag=base64.b64encode(tag).decode("utf-8"),
+            )
+        raise EnvironmentEncryptionError(
+            f"Unsupported encrypted payload algorithm: {algorithm}"
         )
 
     def decrypt(self, payload: dict[str, Any]) -> str:

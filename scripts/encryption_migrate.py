@@ -40,6 +40,8 @@ def _inventory_to_dict(inventory: EnvironmentInventory) -> dict[str, Any]:
         "environment_count": inventory.environment_count,
         "hidden_value_count": inventory.hidden_value_count,
         "encrypted_envelope_count": inventory.encrypted_envelope_count,
+        "v1_envelope_count": inventory.v1_envelope_count,
+        "v2_envelope_count": inventory.v2_envelope_count,
         "plaintext_hidden_count": inventory.plaintext_hidden_count,
         "invalid_hidden_count": inventory.invalid_hidden_count,
         "kid_histogram": dict(inventory.kid_histogram),
@@ -78,6 +80,8 @@ def _format_inventory(report: MigrationReport) -> str:
         f"environments: {inv.environment_count}",
         f"hidden_values: {inv.hidden_value_count}",
         f"encrypted_envelopes: {inv.encrypted_envelope_count}",
+        f"v1_envelopes: {inv.v1_envelope_count}",
+        f"v2_envelopes: {inv.v2_envelope_count}",
         f"plaintext_hidden: {inv.plaintext_hidden_count}",
         f"invalid_hidden: {inv.invalid_hidden_count}",
     ]
@@ -171,6 +175,14 @@ def _build_parser() -> argparse.ArgumentParser:
     encrypt_plain.add_argument("--dry-run", action="store_true")
     encrypt_plain.add_argument("--no-backup", action="store_true")
 
+    upgrade_v2 = subparsers.add_parser(
+        "upgrade-v2",
+        help="Re-encrypt v1 hidden envelopes to v2 fernet under the active key.",
+    )
+    _add_global_options(upgrade_v2)
+    upgrade_v2.add_argument("--dry-run", action="store_true")
+    upgrade_v2.add_argument("--no-backup", action="store_true")
+
     return parser
 
 
@@ -235,6 +247,14 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "encrypt-plaintext":
         backup = not args.no_backup
         report = service.encrypt_plaintext_hidden(
+            settings,
+            dry_run=args.dry_run,
+            backup=backup,
+        )
+        exit_code = _emit_report(report, command=args.command, as_json=args.json)
+    elif args.command == "upgrade-v2":
+        backup = not args.no_backup
+        report = service.upgrade_envelopes_to_v2(
             settings,
             dry_run=args.dry_run,
             backup=backup,

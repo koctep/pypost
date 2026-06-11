@@ -460,7 +460,8 @@ Encrypted values are stored as envelope objects in the `variables` map. All vers
 | `meta` | no | String-to-string metadata map |
 
 Algorithm rules: `fernet` must not include `iv`/`tag`; `aes-gcm` requires both. `encrypt()` still
-emits v1 only; v2 is for migration and external tooling until v2 encrypt is added.
+emits v1 only for runtime saves. `encrypt_v2()` emits v2 fernet (or aes-gcm) for migration tooling.
+Use `encryption_migrate upgrade-v2` to bulk-rewrite v1 on-disk envelopes to v2 fernet.
 
 Validation and version dispatch are centralized in `EncryptedValueEnvelope.from_payload()`.
 Callers should not re-implement field checks before `EnvironmentSecretsCodec.decrypt()`.

@@ -283,6 +283,22 @@ def test_from_payload_accepts_valid_v1_envelope():
     }
 
 
+def test_encrypt_v2_fernet_roundtrip():
+    fernet = pytest.importorskip("cryptography.fernet")
+    raw_key = fernet.Fernet.generate_key().decode("utf-8")
+    key_id = build_key_id(raw_key)
+    key_provider = _build_key_provider_with_active_key(raw_key)
+    key_provider.get_current_key.return_value = EncryptionKey(key=raw_key, key_id=key_id)
+    codec = EnvironmentSecretsCodec(key_provider)
+
+    envelope = codec.encrypt_v2("secret-value")
+
+    assert envelope.v == 2
+    assert envelope.alg == "fernet"
+    assert envelope.kid == key_id
+    assert codec.decrypt(envelope.to_json()) == "secret-value"
+
+
 def test_decrypt_raises_on_invalid_ciphertext_token():
     fernet = pytest.importorskip("cryptography.fernet")
     key = fernet.Fernet.generate_key().decode("utf-8")

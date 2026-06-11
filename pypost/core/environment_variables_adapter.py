@@ -75,7 +75,12 @@ class EnvironmentVariablesAdapter:
         self._persisted_variables.clear()
         self._persisted_plaintext.clear()
 
-    def serialize_environment(self, env: Environment) -> tuple[dict[str, Any], EnvironmentSerializeStats]:
+    def serialize_environment(
+        self,
+        env: Environment,
+        *,
+        target_envelope_version: int | None = None,
+    ) -> tuple[dict[str, Any], EnvironmentSerializeStats]:
         payload = env.model_dump(mode="json")
         variables: dict[str, Any] = dict(payload.get("variables", {}))
         hidden_keys = set(env.hidden_keys)
@@ -96,12 +101,16 @@ class EnvironmentVariablesAdapter:
                     previous_plaintext.get(key),
                     previous_payload,
                     active_kid=active_kid,
+                    target_envelope_version=target_envelope_version,
                 ):
                     serialized_variables[key] = previous_payload
                     reused_count += 1
                     continue
                 try:
-                    envelope = self._secrets_codec.encrypt(current_plaintext)
+                    if target_envelope_version == 2:
+                        envelope = self._secrets_codec.encrypt_v2(current_plaintext)
+                    else:
+                        envelope = self._secrets_codec.encrypt(current_plaintext)
                     serialized_variables[key] = envelope.to_json()
                     encrypted_count += 1
                     if self._metrics:
@@ -173,6 +182,7 @@ class EnvironmentVariablesAdapter:
         previous_payload: Any,
         *,
         active_kid: str | None = None,
+        target_envelope_version: int | None = None,
     ) -> bool:
         if previous_plaintext != current_plaintext:
             return False
@@ -180,6 +190,10 @@ class EnvironmentVariablesAdapter:
             return False
         if previous_payload.get("enc") is not True:
             return False
+        if target_envelope_version is not None:
+            previous_version = previous_payload.get("v", 1)
+            if previous_version != target_envelope_version:
+                return False
         if active_kid is not None:
             return str(previous_payload.get("kid", "")) == active_kid
         return True

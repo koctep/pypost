@@ -10,6 +10,7 @@ import json
 
 from pypost.core.encryption_migration import (
     EncryptionMigrationService,
+    ReencryptStats,
     backup_environments_file,
 )
 from pypost.core.key_provider import build_key_id
@@ -302,6 +303,7 @@ def test_bulk_re_encrypt_dry_run_projects_active_kid(tmp_path, monkeypatch):
     assert report.success is True
     assert report.dry_run is True
     assert report.inventory.kid_histogram == {historical_id: 1}
+    assert report.reencrypt_stats == ReencryptStats(encrypted_count=1, reused_count=0)
 
     write_report = service.bulk_re_encrypt(settings, dry_run=False, backup=True)
     assert write_report.success is True
@@ -371,6 +373,7 @@ def test_encrypt_plaintext_hidden_dry_run_projects_active_kid(tmp_path, monkeypa
     assert report.inventory.plaintext_hidden_count == 0
     assert report.inventory.encrypted_envelope_count == 1
     assert report.inventory.kid_histogram == {active_id: 1}
+    assert report.reencrypt_stats == ReencryptStats(encrypted_count=1, reused_count=0)
     after = service.build_inventory(settings)
     assert after.plaintext_hidden_count == 1
 
@@ -607,3 +610,156 @@ def test_backup_environments_file_creates_timestamped_copy(tmp_path):
     assert backup.exists()
     assert backup.name.startswith("environments.backup.")
     assert backup.read_text(encoding="utf-8") == "[]"
+
+
+def test_build_inventory_counts_v1_and_v2_envelopes(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    kid = build_key_id(key)
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+
+    storage.apply_encryption_settings(settings)
+    storage.save_environments(
+        [
+            Environment(
+                id="e1",
+                name="V1",
+                variables={"SECRET": "hidden"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    with open(storage.environments_file, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    token = data[0]["variables"]["SECRET"]["ct"]
+    data.append(
+        {
+            "id": "e2",
+            "name": "V2",
+            "variables": {
+                "TOKEN": {
+                    "enc": True,
+                    "v": 2,
+                    "alg": "fernet",
+                    "kid": kid,
+                    "ct": token,
+                }
+            },
+            "hidden_keys": ["TOKEN"],
+            "enable_mcp": False,
+        }
+    )
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2)
+
+    inventory = EncryptionMigrationService(storage).build_inventory(settings)
+
+    assert inventory.v1_envelope_count == 1
+    assert inventory.v2_envelope_count == 1
+    assert inventory.encrypted_envelope_count == 2
+
+
+def test_upgrade_envelopes_to_v2_rewrites_v1(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+    storage.apply_encryption_settings(settings)
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    before = EncryptionMigrationService(storage).build_inventory(settings)
+    assert before.v1_envelope_count == 1
+    assert before.v2_envelope_count == 0
+
+    report = EncryptionMigrationService(storage).upgrade_envelopes_to_v2(
+        settings,
+        backup=False,
+    )
+
+    assert report.success is True
+    after = EncryptionMigrationService(storage).build_inventory(settings)
+    assert after.v1_envelope_count == 0
+    assert after.v2_envelope_count == 1
+
+    with open(storage.environments_file, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload[0]["variables"]["SECRET"]["v"] == 2
+
+
+def test_upgrade_envelopes_to_v2_skips_when_already_v2(tmp_path, monkeypatch, caplog):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+    storage.apply_encryption_settings(settings)
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    service = EncryptionMigrationService(storage)
+    assert service.upgrade_envelopes_to_v2(settings, backup=False).success is True
+
+    before_mtime = storage.environments_file.stat().st_mtime
+    with caplog.at_level("INFO"):
+        report = service.upgrade_envelopes_to_v2(settings, backup=False)
+
+    assert report.success is True
+    assert storage.environments_file.stat().st_mtime == before_mtime
+    assert any(
+        "encryption_migration_operation_skipped operation=upgrade_v2 reason=already_v2"
+        in record.message
+        for record in caplog.records
+    )
+
+
+def test_upgrade_envelopes_to_v2_dry_run_projects_v2_inventory(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    active_id = build_key_id(key)
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+    storage.apply_encryption_settings(settings)
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    report = EncryptionMigrationService(storage).upgrade_envelopes_to_v2(
+        settings,
+        dry_run=True,
+        backup=False,
+    )
+
+    assert report.success is True
+    assert report.inventory.v1_envelope_count == 0
+    assert report.inventory.v2_envelope_count == 1
+    assert report.inventory.kid_histogram == {active_id: 1}
+    assert report.reencrypt_stats == ReencryptStats(encrypted_count=1, reused_count=0)
+
+    on_disk = EncryptionMigrationService(storage).build_inventory(settings)
+    assert on_disk.v1_envelope_count == 1

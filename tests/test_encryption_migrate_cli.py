@@ -149,6 +149,68 @@ def test_cli_re_encrypt_dry_run(tmp_path, monkeypatch, capsys):
     assert code == 0
     assert "dry_run: true" in captured.out
     assert f"  {historical_id}: 1" in captured.out
+    assert "reencrypt_stats:" in captured.out
+    assert "  encrypted: 1" in captured.out
+    assert "  reused: 0" in captured.out
+
+
+def test_cli_re_encrypt_dry_run_json_includes_reencrypt_stats(tmp_path, monkeypatch, capsys):
+    fernet = pytest.importorskip("cryptography.fernet")
+    _patch_dirs(tmp_path, monkeypatch)
+    active_key = fernet.Fernet.generate_key().decode("utf-8")
+    historical_key = fernet.Fernet.generate_key().decode("utf-8")
+    from pypost.core.key_provider import build_key_id
+    from pypost.core.key_sources.env import EnvKeySource
+
+    active_id = build_key_id(active_key)
+    historical_id = build_key_id(historical_key)
+    registry_path = tmp_path / "keys.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "active_key_id": active_id,
+                "keys": {active_id: active_key, historical_id: historical_key},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(EnvKeySource.KEYS_FILE, str(registry_path))
+    monkeypatch.delenv(EnvKeySource.ENV_KEY, raising=False)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=True))
+
+    storage = StorageManager()
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    registry_path.write_text(
+        json.dumps(
+            {
+                "active_key_id": historical_id,
+                "keys": {active_id: active_key, historical_id: historical_key},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    main = _import_cli_main()
+    code = main(["re-encrypt", "--dry-run", "--no-backup", "--json"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    payload = json.loads(captured.out)
+    assert payload["dry_run"] is True
+    assert payload["reencrypt_stats"] == {
+        "encrypted_count": 1,
+        "reused_count": 0,
+    }
 
 
 def test_cli_report_json_output(tmp_path, monkeypatch, capsys):
@@ -302,6 +364,82 @@ def test_cli_config_and_data_dir_override(tmp_path, monkeypatch, capsys):
     assert code == 0
     assert "environments: 1" in captured.out
     assert "encrypted_envelopes: 1" in captured.out
+
+
+def test_cli_upgrade_v2_rewrites_v1_envelopes(tmp_path, monkeypatch, capsys):
+    fernet = pytest.importorskip("cryptography.fernet")
+    _patch_dirs(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=True))
+
+    storage = StorageManager()
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    main = _import_cli_main()
+    code = main(["upgrade-v2", "--no-backup"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "v1_envelopes: 0" in captured.out
+    assert "v2_envelopes: 1" in captured.out
+
+    with open(storage.environments_file, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload[0]["variables"]["SECRET"]["v"] == 2
+
+
+def test_cli_upgrade_v2_dry_run(tmp_path, monkeypatch, capsys):
+    fernet = pytest.importorskip("cryptography.fernet")
+    _patch_dirs(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=True))
+
+    storage = StorageManager()
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    main = _import_cli_main()
+    code = main(["upgrade-v2", "--dry-run", "--no-backup"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "dry_run: true" in captured.out
+    assert "v2_envelopes: 1" in captured.out
+
+    with open(storage.environments_file, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload[0]["variables"]["SECRET"]["v"] == 1
+
+
+def test_cli_upgrade_v2_requires_encryption_enabled(tmp_path, monkeypatch, capsys):
+    _patch_dirs(tmp_path, monkeypatch)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=False))
+    main = _import_cli_main()
+
+    code = main(["upgrade-v2"])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "Encryption is not enabled" in captured.err
 
 
 def test_cli_verify_json_includes_errors(tmp_path, monkeypatch, capsys):
