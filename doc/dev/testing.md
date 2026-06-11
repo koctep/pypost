@@ -111,7 +111,7 @@ the server on an ephemeral port, and mock `RequestService.execute` for determini
 
 | Class | Scope |
 | --- | --- |
-| `TestMCPServerIntegration` | `list_tools`, `call_tool`, MCP argument forwarding |
+| `TestMCPServerIntegration` | `list_tools`, `call_tool`, MCP argument forwarding, and `MCPClientService` sync wrapper (PYPOST-560) |
 | `TestMCPServerManagerIntegration` | `MCPServerManager` thread + uvicorn lifecycle |
 
 Focused run:
