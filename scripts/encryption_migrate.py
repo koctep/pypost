@@ -123,6 +123,12 @@ def _add_global_options(parser: argparse.ArgumentParser) -> None:
         metavar="PATH",
         help="Override PyPost data directory (environments.json location).",
     )
+    parser.add_argument(
+        "--config-dir",
+        type=Path,
+        metavar="PATH",
+        help="Override PyPost config directory (settings.json location).",
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -178,16 +184,27 @@ def _build_storage(data_dir: Path | None) -> StorageManager:
     return StorageManager(data_dir=resolved)
 
 
+def _build_config_manager(config_dir: Path | None) -> ConfigManager:
+    if config_dir is None:
+        return ConfigManager()
+    resolved = config_dir.expanduser().resolve()
+    if not resolved.is_dir():
+        print(f"config directory does not exist: {resolved}", file=sys.stderr)
+        raise SystemExit(1)
+    return ConfigManager(config_dir=resolved)
+
+
 def main(argv: list[str] | None = None) -> int:
     _configure_logging()
     args = _build_parser().parse_args(argv)
     logger.info(
-        "encryption_migrate_command_started command=%s json=%s data_dir=%s",
+        "encryption_migrate_command_started command=%s json=%s data_dir=%s config_dir=%s",
         args.command,
         args.json,
         args.data_dir,
+        args.config_dir,
     )
-    settings = ConfigManager().load_config()
+    settings = _build_config_manager(args.config_dir).load_config()
     service = EncryptionMigrationService(_build_storage(args.data_dir))
 
     if args.command == "verify":

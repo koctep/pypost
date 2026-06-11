@@ -158,16 +158,17 @@ available). The CLI loads `AppSettings` via `ConfigManager` and respects `PYPOST
 env overrides the same way the desktop app does.
 
 ```bash
-python scripts/encryption_migrate.py [--json] [--data-dir PATH] verify
-python scripts/encryption_migrate.py [--json] [--data-dir PATH] report
-python scripts/encryption_migrate.py [--json] [--data-dir PATH] re-encrypt [--dry-run] [--no-backup]
-python scripts/encryption_migrate.py [--json] [--data-dir PATH] encrypt-plaintext [--dry-run] [--no-backup]
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PATH] verify
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PATH] report
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PATH] re-encrypt [--dry-run] [--no-backup]
+python scripts/encryption_migrate.py [--json] [--data-dir PATH] [--config-dir PATH] encrypt-plaintext [--dry-run] [--no-backup]
 ```
 
 | Flag | Purpose |
 | --- | --- |
 | `--json` | Emit one JSON document on stdout (inventory, errors, success). For CI and scripting. |
-| `--data-dir PATH` | Use `PATH` as the PyPost data directory (`environments.json`). Settings still load from `ConfigManager`. Useful when verifying a restored copy before swap-in. |
+| `--data-dir PATH` | Use `PATH` as the PyPost data directory (`environments.json`). Useful when verifying a restored copy before swap-in. |
+| `--config-dir PATH` | Use `PATH` as the PyPost config directory (`settings.json`). Useful when backup-restore copies settings alongside data. |
 
 | Command | Writes | Purpose |
 | --- | --- | --- |
@@ -338,7 +339,8 @@ Migration uses the same policy as runtime encryption. No new settings fields.
 | `PYPOST_ENV_ENCRYPTION_KEY`, `KEYS_FILE`, `SECRETS_FILE` | Source-specific key material (see [encryption doc](environment_encryption_at_rest.md#configuration)) |
 
 Data directory defaults follow `ConfigManager` / `StorageManager` (same as the desktop app). Pass
-`StorageManager(data_dir=...)` or CLI `--data-dir` to override.
+`StorageManager(data_dir=...)` or CLI `--data-dir` to override data paths; pass CLI `--config-dir`
+to override the config directory when running against restored settings.
 
 ## Fallback and safe-failure matrix
 
@@ -400,11 +402,11 @@ cp environments.json.backup.20260611T120000Z environments.json
 
 ### CLI cannot find settings or data directory
 
-**Cause:** Running outside the normal app context without the expected data dir, or `--data-dir`
-points at a path that does not exist.
+**Cause:** Running outside the normal app context without the expected paths, or `--data-dir` /
+`--config-dir` points at a path that does not exist.
 
-**Fix:** Run from the same user account and environment as PyPost, pass `--data-dir` to a restored
-copy, or set data paths per project setup. Ensure `ConfigManager` can load `settings.json`.
+**Fix:** Run from the same user account and environment as PyPost, pass `--data-dir` and/or
+`--config-dir` to restored copies, or set paths per project setup.
 
 ### Settings changed but CLI sees old key source
 

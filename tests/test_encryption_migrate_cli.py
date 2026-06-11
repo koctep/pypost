@@ -211,6 +211,99 @@ def test_cli_data_dir_missing_exits(tmp_path, monkeypatch, capsys):
     assert "does not exist" in captured.err
 
 
+def test_cli_config_dir_override(tmp_path, monkeypatch, capsys):
+    fernet = pytest.importorskip("cryptography.fernet")
+    _patch_dirs(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=False))
+
+    alt_config = tmp_path / "restored-config"
+    alt_config.mkdir()
+    (alt_config / "settings.json").write_text(
+        json.dumps(AppSettings(env_encryption_enabled=True).model_dump()),
+        encoding="utf-8",
+    )
+
+    storage = StorageManager()
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    storage.save_environments(
+        [
+            Environment(
+                name="Dev",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    main = _import_cli_main()
+    code = main(["verify", "--config-dir", str(alt_config)])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "encrypted_envelopes: 1" in captured.out
+
+
+def test_cli_config_dir_missing_exits(tmp_path, monkeypatch, capsys):
+    _patch_dirs(tmp_path, monkeypatch)
+    _write_settings(tmp_path, AppSettings())
+    main = _import_cli_main()
+    missing = tmp_path / "no-such-config"
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["report", "--config-dir", str(missing)])
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert "config directory does not exist" in captured.err
+
+
+def test_cli_config_and_data_dir_override(tmp_path, monkeypatch, capsys):
+    fernet = pytest.importorskip("cryptography.fernet")
+    _patch_dirs(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    _write_settings(tmp_path, AppSettings(env_encryption_enabled=False))
+
+    alt_config = tmp_path / "restored-config"
+    alt_config.mkdir()
+    (alt_config / "settings.json").write_text(
+        json.dumps(AppSettings(env_encryption_enabled=True).model_dump()),
+        encoding="utf-8",
+    )
+
+    alt_data = tmp_path / "restored-data"
+    alt_data.mkdir()
+    storage = StorageManager(data_dir=alt_data)
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    storage.save_environments(
+        [
+            Environment(
+                name="Restored",
+                variables={"SECRET": "value"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    main = _import_cli_main()
+    code = main(
+        [
+            "report",
+            "--config-dir",
+            str(alt_config),
+            "--data-dir",
+            str(alt_data),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "environments: 1" in captured.out
+    assert "encrypted_envelopes: 1" in captured.out
+
+
 def test_cli_verify_json_includes_errors(tmp_path, monkeypatch, capsys):
     fernet = pytest.importorskip("cryptography.fernet")
     _patch_dirs(tmp_path, monkeypatch)

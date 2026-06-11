@@ -7,8 +7,17 @@ from pypost.models.settings import AppSettings
 
 
 class ConfigManager:
-    def __init__(self, app_name="pypost", app_author=None):
-        self.config_dir = Path(user_config_dir(app_name, app_author))
+    def __init__(
+        self,
+        app_name="pypost",
+        app_author=None,
+        *,
+        config_dir: Path | str | None = None,
+    ):
+        if config_dir is not None:
+            self.config_dir = Path(config_dir)
+        else:
+            self.config_dir = Path(user_config_dir(app_name, app_author))
         self.config_path = self.config_dir / "settings.json"
         self._ensure_config_dir()
 
