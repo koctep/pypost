@@ -153,16 +153,31 @@ Tab action UI uses internal constants in `RequestTabHeader`:
 
 ## Testing
 
-Save orchestrator unit tests live in `tests/test_request_save_orchestrator.py`.
+Save-as orchestrator tests live in `tests/test_request_save_orchestrator.py` (mocked
+`SaveRequestDialog`):
 
-Save-as identity regression coverage lives in `tests/test_tabs_presenter.py`:
+| Test | Behavior verified |
+| ---- | ----------------- |
+| `test_save_as_assigns_new_request_id` | Happy path: new UUID, dialog name, target collection |
+| `test_save_as_cancelled_when_dialog_dismissed` | User dismisses dialog → no persistence |
+| `test_save_as_cancelled_when_missing_target_collection` | No collection selected/created → cancelled |
+| `test_save_as_creates_new_collection_via_dialog` | New collection name from dialog is created and used |
+| `test_save_as_expands_target_collection` | Target collection added to expanded state |
+| `test_save_as_preserves_source_request_in_manager` | Source entity on disk unchanged; copy persisted separately |
 
-- `test_save_as_preserves_original_request_id` — save-as must persist a new request ID and leave
-  the source entity registered under its original ID in `RequestManager`.
+Presenter-level save-as coverage in `tests/test_tabs_presenter.py`:
+
+- `test_save_as_preserves_original_request_id` — tab rebound to new ID; source ID unchanged in
+  manager and input snapshot.
 - `test_save_as_emits_request_save_as_completed_not_request_saved` — save-as emits
   `request_save_as_completed` (not `request_saved`) with the new ID.
 
-Run: `python -m pytest tests/test_tab_header.py tests/test_request_save_orchestrator.py tests/test_tabs_presenter.py -k "save or plus_tab" -v`
+Run:
+
+```bash
+QT_QPA_PLATFORM=offscreen python -m pytest \
+  tests/test_request_save_orchestrator.py tests/test_tabs_presenter.py -k save_as -v
+```
 
 ## Troubleshooting
 
