@@ -2,7 +2,7 @@ from PySide6.QtCore import QRegularExpression
 from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 
 from pypost.core.template_expression_tokenizer import TEMPLATE_PLACEHOLDER_PATTERN
-from pypost.ui.theme.json_syntax_theme import DEFAULT_JSON_SYNTAX_COLORS, JsonSyntaxColors
+from pypost.ui.theme.json_syntax_theme import JsonSyntaxColors, resolve_json_syntax_colors
 
 
 class JsonHighlighter(QSyntaxHighlighter):
@@ -10,8 +10,16 @@ class JsonHighlighter(QSyntaxHighlighter):
 
     def __init__(self, document, colors: JsonSyntaxColors | None = None):
         super().__init__(document)
-        self._colors = colors or DEFAULT_JSON_SYNTAX_COLORS
+        self._colors = colors or resolve_json_syntax_colors()
+        self._build_rules()
 
+    def set_colors(self, colors: JsonSyntaxColors) -> None:
+        """Rebind token colors and re-highlight the document."""
+        self._colors = colors
+        self._build_rules()
+        self.rehighlight()
+
+    def _build_rules(self) -> None:
         self.rules = []
 
         keyword_format = QTextCharFormat()

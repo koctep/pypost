@@ -1,4 +1,4 @@
-"""JsonHighlighter tests (PYPOST-103, PYPOST-124, PYPOST-399, PYPOST-398).
+"""JsonHighlighter tests (PYPOST-103, PYPOST-124, PYPOST-399, PYPOST-398, PYPOST-395).
 
 RequestEditor/ResponseView attach JsonHighlighter to JSON body documents. Rules cover
 keywords, numbers, strings, object keys, and template placeholders. Assertions use
@@ -14,7 +14,12 @@ import unittest
 from PySide6.QtGui import QColor, QTextDocument
 from PySide6.QtWidgets import QApplication, QTextEdit
 
-from pypost.ui.theme.json_syntax_theme import JsonSyntaxColors
+from pypost.ui.theme.json_syntax_theme import (
+    DARK_JSON_SYNTAX_COLORS,
+    DEFAULT_JSON_SYNTAX_COLORS,
+    JsonSyntaxColors,
+    resolve_json_syntax_colors,
+)
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
 
@@ -175,6 +180,54 @@ class TestJsonHighlighter(unittest.TestCase):
         self.assertEqual(_hex_color_at(edit.document(), text.index("true")), QColor("red").name())
         self.assertEqual(_hex_color_at(edit.document(), text.index("1")), QColor("cyan").name())
         self.assertEqual(_hex_color_at(edit.document(), text.index("{{")), QColor("gray").name())
+
+    def test_dark_palette_colors_are_applied(self):
+        text = '{"enabled": true, "name": "api", "count": 7, "url": "{{host}}"}'
+        edit = QTextEdit()
+        highlighter = JsonHighlighter(edit.document(), colors=DARK_JSON_SYNTAX_COLORS)
+        edit.setPlainText(text)
+        highlighter.rehighlight()
+        dark = DARK_JSON_SYNTAX_COLORS
+        self.assertEqual(
+            _hex_color_at(edit.document(), text.index("enabled")),
+            QColor(dark.key).name(),
+        )
+        self.assertEqual(
+            _hex_color_at(edit.document(), text.index("true")),
+            QColor(dark.keyword).name(),
+        )
+        self.assertEqual(
+            _hex_color_at(edit.document(), text.index("api")),
+            QColor(dark.string).name(),
+        )
+        self.assertEqual(
+            _hex_color_at(edit.document(), text.index("7")),
+            QColor(dark.number).name(),
+        )
+        self.assertEqual(
+            _hex_color_at(edit.document(), text.index("host")),
+            QColor(dark.placeholder).name(),
+        )
+
+    def test_resolve_json_syntax_colors_returns_light_by_default(self):
+        self.assertEqual(resolve_json_syntax_colors(dark=False), DEFAULT_JSON_SYNTAX_COLORS)
+        self.assertEqual(resolve_json_syntax_colors(dark=True), DARK_JSON_SYNTAX_COLORS)
+
+    def test_set_colors_rebinds_highlighting(self):
+        text = '{"k": true}'
+        edit = QTextEdit()
+        highlighter = JsonHighlighter(edit.document(), colors=DEFAULT_JSON_SYNTAX_COLORS)
+        edit.setPlainText(text)
+        highlighter.rehighlight()
+        self.assertEqual(
+            _hex_color_at(edit.document(), text.index("true")),
+            QColor("darkblue").name(),
+        )
+        highlighter.set_colors(DARK_JSON_SYNTAX_COLORS)
+        self.assertEqual(
+            _hex_color_at(edit.document(), text.index("true")),
+            QColor(DARK_JSON_SYNTAX_COLORS.keyword).name(),
+        )
 
 
 if __name__ == "__main__":

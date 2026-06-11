@@ -10,7 +10,7 @@ It extends `QSyntaxHighlighter` and runs on each `QTextDocument` block during ed
 ## Highlighted elements
 
 Colors are defined in `pypost/ui/theme/json_syntax_theme.py` as `JsonSyntaxColors` and
-applied by `JsonHighlighter`. Defaults:
+applied by `JsonHighlighter`. Light-theme defaults (`DEFAULT_JSON_SYNTAX_COLORS`):
 
 | Pattern | Color field | Default | Weight |
 | ------- | ----------- | ------- | ------ |
@@ -19,6 +19,11 @@ applied by `JsonHighlighter`. Defaults:
 | Quoted strings | `string` | green | normal |
 | Object keys (`"key":`) | `key` | purple | normal |
 | Template placeholders `{{...}}` | `placeholder` | darkorange | bold |
+
+Dark-theme palette (`DARK_JSON_SYNTAX_COLORS`) uses lighter hex colors for readability on
+dark backgrounds. `resolve_json_syntax_colors()` picks light or dark based on the application
+`QPalette` window lightness (`is_dark_palette()`). `TabsPresenter.apply_settings` refreshes
+highlighter colors on open tabs when settings are applied.
 
 Placeholder detection uses `TEMPLATE_PLACEHOLDER_PATTERN` from
 `pypost.core.template_expression_tokenizer` — the same regex as template expression parsing
@@ -39,17 +44,23 @@ darkorange for the full `{{...}}` token.
 ## Wiring
 
 ```python
-from pypost.ui.theme.json_syntax_theme import DEFAULT_JSON_SYNTAX_COLORS
+from pypost.ui.theme.json_syntax_theme import (
+    DARK_JSON_SYNTAX_COLORS,
+    resolve_json_syntax_colors,
+)
 
-JsonHighlighter(self.body_edit.document())  # RequestEditor — default theme
-JsonHighlighter(self.body_view.document())  # ResponseView — default theme
+JsonHighlighter(self.body_edit.document())  # resolves palette at construction
+JsonHighlighter(self.body_view.document())
 
-# Optional custom palette (e.g. future dark theme):
-JsonHighlighter(document, colors=DEFAULT_JSON_SYNTAX_COLORS)
+# Runtime rebinding (used by TabsPresenter.apply_settings):
+highlighter.set_colors(resolve_json_syntax_colors())
+
+# Explicit palette override:
+JsonHighlighter(document, colors=DARK_JSON_SYNTAX_COLORS)
 ```
 
-`RequestEditor` and `ResponseView` use the default theme. Override `colors` when injecting
-a non-default `JsonSyntaxColors` instance (see PYPOST-395 for dark-theme follow-up).
+`RequestEditor` and `ResponseView` construct `JsonHighlighter` without `colors`, so the
+active palette is resolved automatically. Call `set_colors` to refresh after palette changes.
 
 ## Testing
 

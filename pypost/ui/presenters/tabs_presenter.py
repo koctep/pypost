@@ -38,6 +38,7 @@ from pypost.ui.request_save_orchestrator import (
     SaveAction,
     StaleCheckContext,
 )
+from pypost.ui.theme.json_syntax_theme import resolve_json_syntax_colors
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 from pypost.ui.widgets.tab_header import PLUS_TAB_MARKER, RequestTabHeader
@@ -297,16 +298,21 @@ class TabsPresenter(QObject):
         )
 
     def apply_settings(self, settings: AppSettings) -> None:
-        """Updates font/indent in all tabs."""
+        """Updates font/indent and JSON syntax colors in all tabs."""
         self._settings = settings
+        json_colors = resolve_json_syntax_colors()
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
                 if hasattr(tab.request_editor, "body_edit"):
                     tab.request_editor.body_edit.update_indent_size(settings.indent_size)
                     tab.request_editor.body_edit.reformat_text()
+                if hasattr(tab.request_editor, "json_highlighter"):
+                    tab.request_editor.json_highlighter.set_colors(json_colors)
                 if hasattr(tab.response_view, "set_indent_size"):
                     tab.response_view.set_indent_size(settings.indent_size)
+                if hasattr(tab.response_view, "json_highlighter"):
+                    tab.response_view.json_highlighter.set_colors(json_colors)
 
     def handle_new_tab(self, source: str = "unknown") -> None:
         tabs_before = self._request_tab_count()
