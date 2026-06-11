@@ -184,6 +184,10 @@ class TabsPresenter(QObject):
                 tab.request_editor.set_hidden_keys(
                     self._current_hidden_keys,
                 )
+        if self._template_service and hasattr(
+            tab.request_editor, "set_template_service"
+        ):
+            tab.request_editor.set_template_service(self._template_service)
 
         self._wire_tab_signals(tab)
 

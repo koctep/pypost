@@ -5,6 +5,20 @@ from pydantic import BaseModel, Field
 
 from pypost.models.retry import RetryPolicy
 
+_MCP_PARAM_TYPES = frozenset({"string", "integer", "number", "boolean", "array", "object"})
+
+
+class McpToolParam(BaseModel):
+    """Agent-visible metadata for one MCP tool parameter."""
+
+    type: str = "string"
+    description: str = ""
+    required: bool = True
+
+    def model_post_init(self, __context) -> None:
+        if self.type not in _MCP_PARAM_TYPES:
+            raise ValueError(f"Unsupported MCP param type: {self.type}")
+
 
 class RequestData(BaseModel):
     """In-memory request draft for the editor and collection persistence.
@@ -27,6 +41,8 @@ class RequestData(BaseModel):
     yaml_as_json: bool = False
     post_script: str = ""  # Python script to execute after response
     expose_as_mcp: bool = False  # Expose this request as an MCP tool
+    mcp_description: str = ""  # Agent-visible tool description (falls back to name)
+    mcp_params: Dict[str, McpToolParam] = Field(default_factory=dict)
     retry_policy: Optional[RetryPolicy] = None
 
 

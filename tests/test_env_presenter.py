@@ -41,6 +41,7 @@ class FakeConfigManager:
 
 class FakeMCPManager:
     status_changed = MagicMock()
+    start_failed = MagicMock()
 
     def __init__(self):
         self.started = []
@@ -61,11 +62,16 @@ class FakeMCPManager:
     def set_variable_supplier(self, supplier):
         self.variable_supplier = supplier
 
+    def set_hidden_keys_supplier(self, supplier):
+        self.hidden_keys_supplier = supplier
+
 
 def _make_mcp_manager():
     mgr = FakeMCPManager()
     mgr.status_changed = MagicMock()
     mgr.status_changed.connect = MagicMock()
+    mgr.start_failed = MagicMock()
+    mgr.start_failed.connect = MagicMock()
     return mgr
 
 
@@ -151,6 +157,21 @@ class TestEnvPresenter(unittest.TestCase):
         p._on_env_changed(1)
         self.assertEqual(received[-1], {"TOKEN"})
 
+    def test_hidden_keys_supplier_returns_current_hidden_keys(self):
+        env = Environment(
+            id="e1",
+            name="Dev",
+            variables={"TOKEN": "abc"},
+            hidden_keys={"TOKEN"},
+        )
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.blockSignals(False)
+        p._on_env_changed(1)
+        self.assertEqual(p._mcp_manager.hidden_keys_supplier(), {"TOKEN"})
+
     def test_on_env_changed_no_environment_emits_empty_dict(self):
         p = self._make_presenter([])
         received = []
@@ -235,6 +256,39 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter([])
         p._on_mcp_status_changed(False)
         self.assertEqual(p.mcp_status_label.text(), "MCP: OFF")
+
+    def test_mcp_tools_button_shows_count(self):
+        req = RequestData(id="r1", name="Tool", expose_as_mcp=True)
+        col = Collection(id="c1", name="API", requests=[req])
+        p = self._make_presenter(collections=[col])
+        p._refresh_mcp_tools_button()
+        self.assertEqual(p.mcp_tools_btn.text(), "MCP Tools (1)")
+
+    def test_on_env_changed_shows_starting_when_mcp_enabled(self):
+        env = _make_env("e1", "MCP-Env", enable_mcp=True)
+        p = self._make_presenter([env])
+        p._settings.mcp_port = 1080
+        p._settings.mcp_host = "127.0.0.1"
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.blockSignals(False)
+        p._on_env_changed(1)
+        self.assertIn("Starting", p.mcp_status_label.text())
+
+    def test_mcp_start_failed_shows_warning(self):
+        p = self._make_presenter([])
+        shown = []
+
+        def capture_warning(*args, **kwargs):
+            shown.append(args)
+            return QMessageBox.StandardButton.Ok
+
+        with patch.object(QMessageBox, "warning", side_effect=capture_warning):
+            p._on_mcp_start_failed("Port is busy")
+        self.assertEqual(p.mcp_status_label.text(), "MCP: OFF")
+        self.assertEqual(len(shown), 1)
+        self.assertIn("Port is busy", shown[0][2])
 
     def test_valid_variable_name_does_not_emit_debug_log(self):
         p = self._make_presenter()

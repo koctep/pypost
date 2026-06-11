@@ -28,6 +28,8 @@ class _FakeMCPManager:
     def __init__(self):
         self.status_changed = MagicMock()
         self.status_changed.connect = MagicMock()
+        self.start_failed = MagicMock()
+        self.start_failed.connect = MagicMock()
 
     def start_server(self, port, tools, host="127.0.0.1"):  # noqa: ARG002
         return None
@@ -36,6 +38,9 @@ class _FakeMCPManager:
         return None
 
     def set_variable_supplier(self, supplier):  # noqa: ARG002
+        return None
+
+    def set_hidden_keys_supplier(self, supplier):  # noqa: ARG002
         return None
 
 

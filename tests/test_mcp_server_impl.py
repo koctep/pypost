@@ -4,6 +4,7 @@ import pytest
 pytestmark = pytest.mark.timeout(60)
 
 import asyncio
+import json
 import unittest
 from unittest.mock import MagicMock
 
@@ -12,14 +13,24 @@ from starlette.applications import Starlette
 from starlette.routing import Mount, Route
 from starlette.testclient import TestClient
 
-from pypost.core.mcp_server_impl import MCPServerImpl, _merge_execution_variables
+from pypost.core.mcp_server_impl import (
+    MCPServerImpl,
+    _merge_execution_variables,
+    _tool_result_has_error,
+    format_structured_tool_result,
+)
+from pypost.core.mcp_tool_contract import (
+    build_tool_input_schema,
+    resolve_mcp_param_specs,
+    tool_description,
+)
 from pypost.core.request_service import ExecutionResult
 from pypost.models.errors import ErrorCategory, ExecutionError
-from pypost.models.models import RequestData
+from pypost.models.models import McpToolParam, RequestData
 from pypost.models.response import ResponseData
 
 
-def _exec_result(body="ok", logs=None, script_error=None):
+def _exec_result(body="ok", logs=None, script_error=None, status_code=200):
     execution_error = None
     if script_error:
         execution_error = ExecutionError(
@@ -29,7 +40,7 @@ def _exec_result(body="ok", logs=None, script_error=None):
         )
     return ExecutionResult(
         response=ResponseData(
-            status_code=200,
+            status_code=status_code,
             headers={},
             body=body,
             elapsed_time=0.01,
@@ -39,6 +50,10 @@ def _exec_result(body="ok", logs=None, script_error=None):
         script_logs=logs or [],
         execution_error=execution_error,
     )
+
+
+def _parse_tool_result(text: str) -> dict:
+    return json.loads(text)
 
 
 class TestMCPServerImpl(unittest.TestCase):
@@ -59,6 +74,60 @@ class TestMCPServerImpl(unittest.TestCase):
         impl.register_tools([first])
         impl.register_tools([second])
         self.assertEqual(list(impl.tools_map.keys()), ["b"])
+
+    def test_list_tools_uses_mcp_description_when_set(self):
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Echo",
+            mcp_description="Returns an echo response",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://example.com",
+        )
+        impl.register_tools([req])
+        tools = asyncio.run(impl.list_tools())
+        self.assertEqual(tools[0].description, "Returns an echo response")
+
+    def test_list_tools_falls_back_to_request_name_for_description(self):
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Echo Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://example.com",
+        )
+        impl.register_tools([req])
+        tools = asyncio.run(impl.list_tools())
+        self.assertEqual(tools[0].description, "Echo Tool")
+
+    def test_list_tools_schema_uses_param_metadata(self):
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Echo",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://{{ mcp.request.host }}/p",
+            mcp_params={
+                "host": McpToolParam(
+                    type="string",
+                    description="Target host",
+                    required=True,
+                ),
+                "limit": McpToolParam(
+                    type="integer",
+                    description="Max items",
+                    required=False,
+                ),
+            },
+        )
+        impl.register_tools([req])
+        tools = asyncio.run(impl.list_tools())
+        schema = tools[0].inputSchema
+        self.assertEqual(schema["properties"]["host"]["type"], "string")
+        self.assertEqual(schema["properties"]["host"]["description"], "Target host")
+        self.assertEqual(schema["properties"]["limit"]["type"], "integer")
+        self.assertEqual(schema["required"], ["host"])
+        self.assertNotIn("limit", schema["required"])
 
     def test_list_tools_builds_input_schema_from_mcp_request_placeholders(self):
         impl = MCPServerImpl()
@@ -84,6 +153,59 @@ class TestMCPServerImpl(unittest.TestCase):
         impl.register_tools([])
         self.assertEqual(asyncio.run(impl.list_tools()), [])
 
+    def test_list_tools_excludes_hidden_env_placeholders_from_schema(self):
+        impl = MCPServerImpl(
+            hidden_keys_supplier=lambda: {"api_key"},
+            variable_supplier=lambda: {"api_key": "secret-value", "base_url": "http://api"},
+        )
+        req = RequestData(
+            name="Auth",
+            expose_as_mcp=True,
+            method="GET",
+            url="{{ base_url }}/items",
+            headers={"Authorization": "Bearer {{ api_key }}"},
+        )
+        impl.register_tools([req])
+        schema = asyncio.run(impl.list_tools())[0].inputSchema
+        self.assertNotIn("api_key", schema.get("properties", {}))
+        self.assertNotIn("base_url", schema.get("properties", {}))
+
+    def test_list_tools_strips_hidden_key_from_explicit_mcp_params(self):
+        impl = MCPServerImpl(hidden_keys_supplier=lambda: {"token"})
+        req = RequestData(
+            name="Auth",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://example.com",
+            mcp_params={
+                "token": McpToolParam(type="string", required=True),
+                "page": McpToolParam(type="integer", required=False),
+            },
+        )
+        impl.register_tools([req])
+        schema = asyncio.run(impl.list_tools())[0].inputSchema
+        self.assertNotIn("token", schema.get("properties", {}))
+        self.assertIn("page", schema.get("properties", {}))
+
+    def test_call_tool_uses_real_hidden_env_values_at_execution(self):
+        impl = MCPServerImpl(
+            hidden_keys_supplier=lambda: {"api_key"},
+            variable_supplier=lambda: {"api_key": "real-secret"},
+        )
+        req = RequestData(
+            name="Auth",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://example.com",
+            headers={"Authorization": "Bearer {{ api_key }}"},
+        )
+        impl.register_tools([req])
+        impl.request_service = MagicMock()
+        impl.request_service.execute.return_value = _exec_result("ok")
+        asyncio.run(impl.call_tool("auth", {}))
+        passed_ctx = impl.request_service.execute.call_args[0][1]
+        self.assertEqual(passed_ctx["api_key"], "real-secret")
+
     def test_call_tool_raises_when_unknown(self):
         impl = MCPServerImpl()
 
@@ -106,7 +228,10 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertIs(passed_req, req)
         self.assertEqual(passed_ctx, {"mcp": {"request": {"x": "y"}}})
         self.assertIsInstance(out[0], TextContent)
-        self.assertEqual(out[0].text, "response-body")
+        payload = _parse_tool_result(out[0].text)
+        self.assertEqual(payload["status"], 200)
+        self.assertFalse(payload["error"])
+        self.assertEqual(payload["body"], "response-body")
         metrics.track_mcp_request_received.assert_called_once_with("GET")
         metrics.track_mcp_response_sent.assert_called_once_with("GET", "success")
 
@@ -209,7 +334,7 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertEqual(direct_url, mcp_url_vars)
         self.assertEqual(via_mcp.response.body, direct.response.body)
 
-    def test_call_tool_appends_script_logs_and_error_to_body(self):
+    def test_call_tool_returns_structured_json_with_script_logs_and_error(self):
         impl = MCPServerImpl()
         req = RequestData(name="T", expose_as_mcp=True, method="GET", url="http://u")
         impl.register_tools([req])
@@ -218,12 +343,26 @@ class TestMCPServerImpl(unittest.TestCase):
             "base", logs=["log line"], script_error="bad script"
         )
         out = asyncio.run(impl.call_tool("t", {}))
-        text = out[0].text
-        self.assertIn("base", text)
-        self.assertIn("Script Logs", text)
-        self.assertIn("log line", text)
-        self.assertIn("Script Error", text)
-        self.assertIn("bad script", text)
+        payload = _parse_tool_result(out[0].text)
+        self.assertEqual(payload["body"], "base")
+        self.assertTrue(payload["error"])
+        self.assertEqual(payload["logs"], ["log line"])
+        self.assertEqual(payload["error_category"], "script")
+        self.assertEqual(payload["error_message"], "Post-script execution failed.")
+
+    def test_call_tool_upstream_http_error_is_not_execution_error(self):
+        impl = MCPServerImpl()
+        req = RequestData(name="T", expose_as_mcp=True, method="GET", url="http://u")
+        impl.register_tools([req])
+        impl.request_service = MagicMock()
+        impl.request_service.execute.return_value = _exec_result(
+            "not found", status_code=404
+        )
+        out = asyncio.run(impl.call_tool("t", {}))
+        payload = _parse_tool_result(out[0].text)
+        self.assertEqual(payload["status"], 404)
+        self.assertFalse(payload["error"])
+        self.assertEqual(payload["body"], "not found")
 
     def test_call_tool_on_execute_exception_returns_error_content_and_metrics(self):
         metrics = MagicMock()
@@ -234,7 +373,56 @@ class TestMCPServerImpl(unittest.TestCase):
         impl.request_service.execute.side_effect = RuntimeError("execute failed")
         out = asyncio.run(impl.call_tool("t", {}))
         self.assertIn("execute failed", out[0].text)
+        self.assertFalse(out[0].text.strip().startswith("{"))
         metrics.track_mcp_response_sent.assert_called_once_with("POST", "error")
+
+
+class TestStructuredToolResultHelpers(unittest.TestCase):
+    def test_tool_result_has_error_when_execution_error_set(self):
+        result = _exec_result(script_error="fail")
+        self.assertTrue(_tool_result_has_error(result))
+
+    def test_tool_result_has_error_when_status_zero(self):
+        result = _exec_result(status_code=0)
+        self.assertTrue(_tool_result_has_error(result))
+
+    def test_tool_result_not_error_for_upstream_404(self):
+        result = _exec_result("missing", status_code=404)
+        self.assertFalse(_tool_result_has_error(result))
+
+    def test_format_structured_tool_result_omits_empty_logs(self):
+        text = format_structured_tool_result(_exec_result("ok"))
+        payload = json.loads(text)
+        self.assertNotIn("logs", payload)
+        self.assertEqual(payload["status"], 200)
+        self.assertFalse(payload["error"])
+        self.assertEqual(payload["body"], "ok")
+
+
+class TestMcpToolSchemaHelpers(unittest.TestCase):
+    def test_tool_description_prefers_mcp_description(self):
+        req = RequestData(name="N", mcp_description="  Agent text  ")
+        self.assertEqual(tool_description(req), "Agent text")
+
+    def test_tool_description_falls_back_to_name(self):
+        req = RequestData(name="Fallback")
+        self.assertEqual(tool_description(req), "Fallback")
+
+    def test_resolve_param_specs_merges_discovered_and_explicit(self):
+        req = RequestData(
+            mcp_params={
+                "extra": McpToolParam(type="boolean", required=False),
+            }
+        )
+        specs = resolve_mcp_param_specs(req, {"host"})
+        self.assertEqual(specs["host"].type, "string")
+        self.assertEqual(specs["extra"].type, "boolean")
+
+    def test_build_tool_input_schema_omits_empty_description(self):
+        schema = build_tool_input_schema(
+            {"id": McpToolParam(type="string", description="")}
+        )
+        self.assertNotIn("description", schema["properties"]["id"])
 
 
 class TestMCPServerImplRouting(unittest.TestCase):

@@ -1,5 +1,7 @@
 import asyncio
+import errno
 import logging
+import sys
 import threading
 from collections.abc import Callable
 from typing import List, Optional
@@ -15,8 +17,19 @@ from pypost.models.models import RequestData
 logger = logging.getLogger(__name__)
 
 
+def format_mcp_bind_error(exc: OSError, host: str, port: int) -> str:
+    """Return an operator-facing message for MCP bind failures."""
+    if exc.errno in (errno.EADDRINUSE, errno.EADDRNOTAVAIL, 10048, 10013):
+        return (
+            f"Cannot start MCP server on {host}:{port}: port is busy or unavailable. "
+            "Choose another port in Settings or stop the process using this port."
+        )
+    return f"Cannot start MCP server on {host}:{port}: {exc.strerror or exc}"
+
+
 class MCPServerManager(QObject):
     status_changed = Signal(bool)  # True = running, False = stopped
+    start_failed = Signal(str)  # operator-facing bind / startup error
 
     def __init__(
         self, metrics: MetricsManager | None = None, template_service: TemplateService | None = None
@@ -33,12 +46,20 @@ class MCPServerManager(QObject):
         self._current_port = 1080
         self._current_host = "127.0.0.1"
         self._variable_supplier: Callable[[], dict[str, str]] | None = None
+        self._hidden_keys_supplier: Callable[[], set[str]] | None = None
+        self._startup_notified = False
 
     def set_variable_supplier(
         self, supplier: Callable[[], dict[str, str]] | None
     ) -> None:
         self._variable_supplier = supplier
         self._impl.set_variable_supplier(supplier)
+
+    def set_hidden_keys_supplier(
+        self, supplier: Callable[[], set[str]] | None
+    ) -> None:
+        self._hidden_keys_supplier = supplier
+        self._impl.set_hidden_keys_supplier(supplier)
 
     def start_server(self, port: int, tools: List[RequestData], host: str = "127.0.0.1"):
         if self.is_running():
@@ -48,13 +69,11 @@ class MCPServerManager(QObject):
         self._current_host = host
         self._impl.register_tools(tools)
         self._stop_event.clear()
+        self._startup_notified = False
 
         self._server_thread = threading.Thread(target=self._run_uvicorn, daemon=True)
         self._server_thread.start()
-        logger.info("MCP server started on %s:%d", host, port)
-        # Status emitted in thread is safer, or here if we trust it starts.
-        # Let's emit here for UI responsiveness.
-        self.status_changed.emit(True)
+        logger.info("MCP server starting on %s:%d", host, port)
 
     def stop_server(self):
         if not self.is_running():
@@ -69,6 +88,7 @@ class MCPServerManager(QObject):
             self._server_thread.join(timeout=2.0)
             self._server_thread = None
 
+        self._server_instance = None
         logger.info("MCP server stopped")
         self.status_changed.emit(False)
 
@@ -81,18 +101,72 @@ class MCPServerManager(QObject):
             self.stop_server()
             self.start_server(self._current_port, tools, self._current_host)
 
+    def _notify_started(self) -> None:
+        if self._startup_notified or self._stop_event.is_set():
+            return
+        self._startup_notified = True
+        logger.info(
+            "mcp_server_listening host=%s port=%d",
+            self._current_host,
+            self._current_port,
+        )
+        self.status_changed.emit(True)
+
+    def _notify_start_failed(self, message: str) -> None:
+        logger.error(
+            "mcp_server_start_failed host=%s port=%d message=%s",
+            self._current_host,
+            self._current_port,
+            message,
+        )
+        self.start_failed.emit(message)
+        self.status_changed.emit(False)
+
     def _run_uvicorn(self):
-        app = self._impl.create_app()
-        # Ensure we run a new event loop for this thread
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        original_exit = sys.exit
 
-        config = uvicorn.Config(
-            app=app, host=self._current_host, port=self._current_port, loop="asyncio"
-        )
-        self._server_instance = uvicorn.Server(config)
+        def thread_exit(code=0):
+            if code != 0:
+                raise OSError(
+                    errno.EADDRINUSE,
+                    f"bind failed on {self._current_host}:{self._current_port}",
+                )
+            original_exit(code)
 
-        # Override install_signal_handlers because we are not in main thread
-        self._server_instance.install_signal_handlers = lambda: None
+        sys.exit = thread_exit
+        try:
+            app = self._impl.create_app()
+            config = uvicorn.Config(
+                app=app, host=self._current_host, port=self._current_port, loop="asyncio"
+            )
+            self._server_instance = uvicorn.Server(config)
 
-        loop.run_until_complete(self._server_instance.serve())
+            # Override install_signal_handlers because we are not in main thread
+            self._server_instance.install_signal_handlers = lambda: None
+
+            original_startup = self._server_instance.startup
+
+            async def startup_with_notify(sockets=None):
+                await original_startup(sockets=sockets)
+                self._notify_started()
+
+            self._server_instance.startup = startup_with_notify
+
+            loop.run_until_complete(self._server_instance.serve())
+        except OSError as exc:
+            self._notify_start_failed(
+                format_mcp_bind_error(exc, self._current_host, self._current_port)
+            )
+        except Exception as exc:
+            logger.exception("mcp_server_start_failed")
+            self._notify_start_failed(f"MCP server failed to start: {exc}")
+        finally:
+            sys.exit = original_exit
+            loop.close()
+            if not self._stop_event.is_set() and not self._startup_notified:
+                self.status_changed.emit(False)
+            elif not self._stop_event.is_set() and self._startup_notified:
+                logger.warning("mcp_server_unexpected_exit")
+                self.status_changed.emit(False)

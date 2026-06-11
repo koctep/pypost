@@ -17,7 +17,11 @@ This class acts as the bridge between the PySide6 UI and the background MCP serv
 *   **Responsibility**: Lifecycle management (Start/Stop/Restart).
 *   **Threading**: It spawns a dedicated `threading.Thread` to run the `uvicorn` server. This is necessary because `uvicorn` blocks the thread it runs in, and we cannot block the main Qt GUI thread.
 *   **Configuration**: Supports configurable `host` and `port` via `start_server`.
-*   **Communication**: Uses Qt Signals (`status_changed`) to notify the UI about server state.
+*   **Communication**: Uses Qt Signals (`status_changed`, `start_failed`) to notify the UI
+    about server state. `status_changed(True)` is emitted only after uvicorn completes
+    `startup()` (socket bound and listening), not when the worker thread starts
+    (PYPOST-556). Bind failures emit `start_failed(str)` with an operator-facing message and
+    `status_changed(False)`.
 *   **Shutdown**: Handles the complex logic of stopping `uvicorn` from another thread by setting flags and waiting for the thread to join.
 
 ### 2. `MCPServerImpl` (`pypost/core/mcp_server_impl.py`)
@@ -31,7 +35,13 @@ This class contains the actual business logic of the MCP server.
       optional GET SSE stream for server messages).
     *   Legacy: GET `/sse/` + POST `/sse/messages` — deprecated HTTP+SSE transport.
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
-*   **Schema Generation**: Automatically generates JSON Schema for tools by parsing the request URL, headers, and body using `TemplateService` (Jinja2 AST) to find variables matching the pattern `{{ mcp.request.VAR_NAME }}`.
+*   **Tool metadata (PYPOST-553)**: `RequestData.mcp_description` is the agent-visible
+    description (falls back to `name`). `RequestData.mcp_params` holds per-parameter
+    `McpToolParam` records (`type`, `description`, `required`).
+*   **Schema Generation**: Discovers `{{ mcp.request.VAR_NAME }}` placeholders in URL,
+    headers, params, and body (regex + optional `TemplateService` parse). Merges discovered
+    names with explicit `mcp_params` and builds JSON Schema via `_build_tool_input_schema`.
+    Undeclared placeholders default to `type: string`, `required: true` (backward compatible).
 *   **Execution**: Delegates request execution to `RequestService`.
 *   **Environment variables (PYPOST-550)**: At `call_tool` time, snapshots active
     environment variables via an injected `variable_supplier`, merges them with MCP tool
@@ -48,6 +58,12 @@ The environment selector owns MCP lifecycle and the active-variable cache used b
 *   **Supplier registration**: On init, calls
     `MCPServerManager.set_variable_supplier(lambda: dict(self._current_variables))`.
     The lambda returns a **copy** so MCP threadpool workers never observe partial writes.
+*   **MCP tools overview (PYPOST-556)**: Top-bar **MCP Tools (N)** opens
+    `McpToolsOverviewDialog` with all `expose_as_mcp` requests across collections (MCP name,
+    collection, method, description). Count refreshes on environment change.
+*   **Status label**: Shows `MCP: Starting (host:port)...` after `start_server` until
+    `status_changed(True)`; `MCP: ON` only when listening; `start_failed` shows a warning
+    dialog and resets to `MCP: OFF`.
 
 ### 4. `MetricsManager` (`pypost/core/metrics.py`)
 
@@ -70,6 +86,14 @@ PyPost also exposes a separate MCP server dedicated to observability.
 4.  Inside the thread, a new `asyncio` event loop is created.
 5.  `MCPServerImpl.create_app()` builds the Starlette app.
 6.  `uvicorn.Server.serve()` is called to start listening on the specified host and port.
+7.  After `startup()` completes, `MCPServerManager` emits `status_changed(True)`.
+8.  On bind failure, `start_failed` carries a user-visible message; UI stays OFF.
+
+### MCP tools overview (PYPOST-556)
+
+`collect_mcp_tool_overview(collections)` in `pypost/core/mcp_tools_overview.py` builds
+sorted `McpToolOverviewEntry` rows. `EnvPresenter` opens `McpToolsOverviewDialog` from the
+top bar. Overview is read-only and does not require MCP to be running.
 
 ### Tool Execution
 
@@ -84,7 +108,55 @@ PyPost also exposes a separate MCP server dedicated to observability.
     -   It renders templates (environment placeholders **and** `{{ mcp.request.* }}`).
     -   Executes the HTTP request via `HTTPClient`.
     -   Runs any post-request scripts via `ScriptExecutor` (same variable dict as GUI).
-6.  Response body (plus any script logs/errors) is returned as `TextContent` to the MCP Client.
+6.  `RequestService.execute()` is called with the merged dict.
+    -   It renders templates (environment placeholders **and** `{{ mcp.request.* }}`).
+    -   Executes the HTTP request via `HTTPClient`.
+    -   Runs any post-request scripts via `ScriptExecutor` (same variable dict as GUI).
+7.  `format_structured_tool_result()` builds a JSON envelope (`status`, `error`, `body`,
+    optional `logs`, `error_category`, `error_message`) returned as `TextContent`.
+
+### Structured tool results (PYPOST-557)
+
+Every execution-path `call_tool` response is JSON text with a fixed envelope:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status` | `int` | HTTP status from upstream; `0` when PyPost could not complete the request |
+| `error` | `bool` | `true` when PyPost execution failed; `false` for completed HTTP calls (including 4xx/5xx) |
+| `body` | `str` | Response body from upstream or synthetic error body |
+| `logs` | `string[]` | Optional post-request script log lines |
+| `error_category` | `string` | Optional `ErrorCategory` value when `execution_error` is set |
+| `error_message` | `string` | Optional human-readable execution error message |
+
+Example success:
+
+```json
+{"status": 200, "error": false, "body": "{\"id\": 1}"}
+```
+
+Example upstream 404 (not an execution error):
+
+```json
+{"status": 404, "error": false, "body": "Not Found"}
+```
+
+Example network failure:
+
+```json
+{
+  "status": 0,
+  "error": true,
+  "body": "{\"error\": \"...\", \"detail\": \"...\"}",
+  "error_category": "network",
+  "error_message": "Could not connect to ..."
+}
+```
+
+**Protocol errors** (unknown tool, unexpected internal exception) are **not** JSON envelopes —
+unknown tools raise; internal failures return plain `Error executing request: …` text.
+
+Metrics: `track_mcp_response_sent` uses outcome `"error"` when the envelope `error` flag is
+`true`, else `"success"`.
 
 ### Environment variable injection (PYPOST-550)
 
@@ -136,13 +208,15 @@ change behavior is unchanged).
 
 Hidden variables: masking applies to UI/history only. MCP execution uses real stored values,
 consistent with GUI sends. MCP inbound tools do not record history, so `hidden_keys` is not
-wired on this path.
+wired on the execution path for masking — but **PYPOST-554** supplies `hidden_keys` to
+`McpSecretsPolicy` so `list_tools` schemas exclude hidden and env-only placeholders. See
+`doc/dev/mcp_secrets_policy.md`.
 
 #### Observability
 
 DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
-`env_var_count` and `mcp_arg_count` (no names or values). See
-`ai-tasks/PYPOST-550/50-observability.md`.
+`env_var_count`, `hidden_key_count`, and `mcp_arg_count` (no names or values). See
+`ai-tasks/PYPOST-554/50-observability.md` and `doc/dev/mcp_secrets_policy.md`.
 
 ## Threading Model
 
@@ -162,6 +236,11 @@ Register a callable that returns the current active environment variables as `di
 Called by `EnvPresenter` at init. Forwarded to `MCPServerImpl`. Pass `None` to reset to an
 empty dict.
 
+### `MCPServerManager.set_hidden_keys_supplier(supplier)`
+
+Register a callable returning the active environment's `hidden_keys` set. Called by
+`EnvPresenter` at init. Used by `McpSecretsPolicy` during `list_tools` schema generation.
+
 ### `MCPServerImpl._build_execution_variables(mcp_args)`
 
 Internal. Invokes `_variable_supplier()`, logs merge counts at DEBUG, returns merged dict for
@@ -171,6 +250,14 @@ Internal. Invokes `_variable_supplier()`, logs merge counts at DEBUG, returns me
 
 Pure merge helper; unit-tested independently. Spread env vars first, then set `"mcp"` from tool
 arguments.
+
+### `format_structured_tool_result(result)`
+
+Public helper. Serializes `ExecutionResult` to the JSON envelope documented above.
+
+### `_tool_result_has_error(result)`
+
+Internal. Returns `true` when `execution_error` is set or `response.status_code == 0`.
 
 ## Configuration
 
@@ -197,12 +284,67 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 | `{{ mcp.request.x }}` works but env vars do not | Custom MCP setup without supplier | Call `set_variable_supplier` before `start_server`, or use default `EnvPresenter` wiring |
 | Env var named `mcp` ignored for nested keys | By design — merge preserves `mcp.request.*` | Rename the environment variable |
 | DEBUG shows `env_var_count=0` | "No Environment" selected or empty env | Expected when no env is active; only MCP args resolve |
+| UI shows MCP ON but agent cannot connect | Status used to flip before bind (fixed PYPOST-556) or wrong port | Wait for ON after Starting; check Settings port; read `start_failed` dialog |
+| Port busy on MCP start | Another process on `mcp_port` | Dialog explains conflict; free port or change Settings |
+
+### Tool metadata authoring (PYPOST-553)
+
+#### Model
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `mcp_description` | `str` | Shown in `list_tools`; empty → `name` |
+| `mcp_params` | `Dict[str, McpToolParam]` | Keyed by parameter name |
+
+`McpToolParam`: `type` (`string`, `integer`, `number`, `boolean`, `array`, `object`),
+`description`, `required` (default `True`).
+
+#### Schema pipeline
+
+```
+_extract_mcp_variables(req)
+        │
+        ▼
+_resolve_mcp_param_specs(req, discovered)  ← merges mcp_params overrides
+        │
+        ▼
+_build_tool_input_schema(specs)  → Tool.inputSchema
+```
+
+#### UI
+
+`RequestWidget` **MCP** tab: tool description (`QPlainTextEdit`) and `McpParamsTable`
+(name, type, description, required). Persisted via `_PERSISTED_FIELD_NAMES` in
+`request_sync.py`.
+
+#### Agent contract preview (PYPOST-555)
+
+Read-only panel **Agent preview (list_tools)** on the MCP tab shows what local MCP clients
+receive without starting the server or calling `list_tools` over HTTP.
+
+| Preview section | Source |
+| --- | --- |
+| Tool name | `normalize_mcp_tool_name(request.name)` |
+| Description | `tool_description(request)` |
+| `inputSchema` | `build_tool_input_schema` after `McpSecretsPolicy.filter_agent_param_specs` |
+| Hidden variable policy | Names excluded as `hidden env key` or `env-only` |
+
+Implementation: `pypost/core/mcp_tool_contract.py` (`build_mcp_tool_contract_preview`,
+`format_mcp_tool_contract_preview`). Shared helpers (`tool_description`,
+`resolve_mcp_param_specs`, `build_tool_input_schema`) are also used by `MCPServerImpl`.
+
+The preview refreshes when MCP metadata or template-bearing fields change and when
+`set_hidden_keys` / `set_template_service` run (wired from `TabsPresenter` and
+`env_hidden_keys_changed`).
 
 ## Limitations & Tech Debt
 
 *   **Synchronous Execution**: The core uses `requests` (sync). Ideally, we should move to `httpx` for async support to avoid `run_in_threadpool`.
 *   **Parsing**: Schema generation uses `TemplateService` for AST parsing, but complex Jinja2 constructs might still need attention.
-*   **Schema vs execution**: `list_tools` JSON Schema still exposes only `mcp.request.*` placeholders; environment variables are resolved at execution time and are not listed as tool inputs.
+*   **Schema vs execution**: `list_tools` JSON Schema lists `mcp.request.*` placeholders
+    (plus non-forbidden explicit `mcp_params`); environment and hidden variables are resolved
+    at execution time and are not listed as tool inputs (PYPOST-554).
+*   **UI sync**: MCP params table is manual; auto-populate from template scan is deferred (see `ai-tasks/PYPOST-553/60-tech-debt.md`).
 *   **Dual variable sources in EnvPresenter**: `current_variables` property reads the combo box while MCP uses `_current_variables` cache (see `ai-tasks/PYPOST-550/60-tech-debt.md`).
 
 See `ai-tasks/PYPOST-20/40-tech-debt.md` for more details.

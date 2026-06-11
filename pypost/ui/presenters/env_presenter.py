@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.environment_storage_gateway import EnvironmentStorageGateway
+from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.storage import StorageManager
@@ -25,6 +26,7 @@ from pypost.core.variable_name_validation import (
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
+from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,7 @@ class EnvPresenter(QObject):
         self._environments: list[Environment] = []
         self._current_env_index: int = 0
         self._current_variables: dict[str, str] = {}
+        self._current_hidden_keys: set[str] = set()
         self._pending_env_manager_refresh = False
         self._storage_gateway = EnvironmentStorageGateway(storage, parent=self)
         self._storage_gateway.load_completed.connect(self._on_storage_load_completed)
@@ -64,8 +67,12 @@ class EnvPresenter(QObject):
         self._storage_gateway.save_failed.connect(self._on_storage_save_failed)
 
         self._mcp_manager.status_changed.connect(self._on_mcp_status_changed)
+        self._mcp_manager.start_failed.connect(self._on_mcp_start_failed)
         self._mcp_manager.set_variable_supplier(
             lambda: dict(self._current_variables)
+        )
+        self._mcp_manager.set_hidden_keys_supplier(
+            lambda: set(self._current_hidden_keys)
         )
 
         # Build top-bar widget
@@ -84,9 +91,13 @@ class EnvPresenter(QObject):
         self._mcp_status_label = QLabel("MCP: OFF")
         self._mcp_status_label.setStyleSheet("color: gray;")
 
+        self._mcp_tools_btn = QPushButton("MCP Tools (0)")
+        self._mcp_tools_btn.clicked.connect(self._open_mcp_tools_overview)
+
         layout.addWidget(self._env_label)
         layout.addWidget(self._env_selector)
         layout.addWidget(self._manage_btn)
+        layout.addWidget(self._mcp_tools_btn)
         layout.addWidget(self._mcp_status_label)
         layout.addStretch()
 
@@ -110,6 +121,10 @@ class EnvPresenter(QObject):
     @property
     def manage_btn(self) -> QPushButton:
         return self._manage_btn
+
+    @property
+    def mcp_tools_btn(self) -> QPushButton:
+        return self._mcp_tools_btn
 
     @property
     def mcp_status_label(self) -> QLabel:
@@ -279,6 +294,7 @@ class EnvPresenter(QObject):
                     tools=tools,
                     host=self._settings.mcp_host,
                 )
+                self._show_mcp_starting()
             else:
                 self._mcp_manager.stop_server()
         else:
@@ -289,12 +305,24 @@ class EnvPresenter(QObject):
         self._config_manager.save_config(self._settings)
         self._current_env_index = index
         self._current_variables = dict(variables)
+        hidden_keys = selected.hidden_keys if isinstance(selected, Environment) else set()
+        self._current_hidden_keys = set(hidden_keys)
 
         keys = list(variables.keys()) if isinstance(selected, Environment) else None
-        hidden_keys = selected.hidden_keys if isinstance(selected, Environment) else set()
         self.env_variables_changed.emit(variables)
         self.env_keys_changed.emit(keys)
         self.env_hidden_keys_changed.emit(hidden_keys)
+        self._refresh_mcp_tools_button()
+
+    def _refresh_mcp_tools_button(self) -> None:
+        count = len(self._get_mcp_tools())
+        self._mcp_tools_btn.setText(f"MCP Tools ({count})")
+
+    def _show_mcp_starting(self) -> None:
+        self._mcp_status_label.setText(
+            f"MCP: Starting ({self._settings.mcp_host}:{self._settings.mcp_port})..."
+        )
+        self._mcp_status_label.setStyleSheet("color: #b8860b; font-weight: bold;")
 
     def _on_mcp_status_changed(self, is_running: bool) -> None:
         if is_running:
@@ -311,6 +339,18 @@ class EnvPresenter(QObject):
             logger.info("mcp_server_stopped")
             self._mcp_status_label.setText("MCP: OFF")
             self._mcp_status_label.setStyleSheet("color: gray;")
+
+    def _on_mcp_start_failed(self, message: str) -> None:
+        logger.error("mcp_server_start_failed_ui message=%s", message)
+        self._mcp_status_label.setText("MCP: OFF")
+        self._mcp_status_label.setStyleSheet("color: gray;")
+        QMessageBox.warning(self._widget, "MCP Server Failed to Start", message)
+
+    def _open_mcp_tools_overview(self) -> None:
+        entries = collect_mcp_tool_overview(self._get_collections())
+        logger.info("mcp_tools_overview_opened tool_count=%d", len(entries))
+        dialog = McpToolsOverviewDialog(entries, self._widget)
+        dialog.exec()
 
     def _open_env_manager(self) -> None:
         current_env_name = self._env_selector.currentText()

@@ -30,6 +30,8 @@ _PERSISTED_FIELD_NAMES = (
     "yaml_as_json",
     "post_script",
     "expose_as_mcp",
+    "mcp_description",
+    "mcp_params",
     "retry_policy",
 )
 

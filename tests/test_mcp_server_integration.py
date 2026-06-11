@@ -4,6 +4,7 @@ import pytest
 pytestmark = pytest.mark.timeout(120)
 
 import asyncio
+import json
 import socket
 import threading
 import time
@@ -69,7 +70,7 @@ async def _mcp_list_tools(mcp_url: str) -> list[str]:
                 return [tool.name for tool in result.tools]
 
 
-async def _mcp_call_tool(mcp_url: str, name: str, arguments: dict | None = None) -> str:
+async def _mcp_call_tool(mcp_url: str, name: str, arguments: dict | None = None) -> dict:
     async with create_mcp_http_client() as http_client:
         async with streamable_http_client(mcp_url, http_client=http_client) as (
             read,
@@ -79,7 +80,7 @@ async def _mcp_call_tool(mcp_url: str, name: str, arguments: dict | None = None)
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(name, arguments or {})
-                return result.content[0].text
+                return json.loads(result.content[0].text)
 
 
 class _LiveMCPServer:
@@ -153,8 +154,10 @@ class TestMCPServerIntegration(unittest.TestCase):
             url="http://example.com/ping",
         )
         with live_mcp_server([tool], execute_result=_exec_result("pong")) as server:
-            text = anyio.run(_mcp_call_tool, server.mcp_url, "ping", {})
-            self.assertIn("pong", text)
+            payload = anyio.run(_mcp_call_tool, server.mcp_url, "ping", {})
+            self.assertFalse(payload["error"])
+            self.assertEqual(payload["status"], 200)
+            self.assertEqual(payload["body"], "pong")
 
     def test_call_tool_passes_mcp_arguments_to_request_service(self):
         tool = RequestData(
@@ -211,8 +214,9 @@ class TestMCPServerManagerIntegration(unittest.TestCase):
         try:
             _wait_for_port("127.0.0.1", port)
             mcp_url = f"http://127.0.0.1:{port}/mcp"
-            text = anyio.run(_mcp_call_tool, mcp_url, "mgr_tool", {})
-            self.assertIn("from-manager", text)
+            payload = anyio.run(_mcp_call_tool, mcp_url, "mgr_tool", {})
+            self.assertEqual(payload["body"], "from-manager")
+            self.assertFalse(payload["error"])
             self.assertTrue(manager.is_running())
         finally:
             manager.stop_server()
