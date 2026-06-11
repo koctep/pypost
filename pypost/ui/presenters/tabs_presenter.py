@@ -99,7 +99,8 @@ class TabsPresenter(QObject):
 
     variable_set_requested = Signal(object, str)  # (key: str | None, value: str)
     env_update_requested = Signal(object)  # payload: dict (from RequestWorker)
-    request_saved = Signal()  # after save, triggers collections reload
+    request_saved = Signal()  # after save, triggers collections tree refresh
+    request_save_as_completed = Signal(object, str)  # RequestData, collection_id
     request_persisted = Signal(str, object, object)  # id, snapshot, source_tab
     request_executed = Signal()  # emitted after each completed request
 
@@ -805,7 +806,7 @@ class TabsPresenter(QObject):
             tab.stale_persisted = False
 
         self.save_tabs_state()
-        self.request_saved.emit()
+        self.request_save_as_completed.emit(new_request, target_collection_id)
 
     def _handle_copy_curl_request(self, request_data: RequestData) -> None:
         try:

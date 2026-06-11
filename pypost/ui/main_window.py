@@ -157,6 +157,7 @@ class MainWindow(QMainWindow):
         self.tabs.env_update_requested.connect(self.env.on_env_update)
         self.tabs.request_saved.connect(self.collections.refresh_tree)
         self.tabs.request_saved.connect(self.collections.restore_tree_state)
+        self.tabs.request_save_as_completed.connect(self.collections.add_saved_request_to_tree)
         self.tabs.request_executed.connect(self.history_panel.refresh)
         self.history_panel.load_into_editor.connect(self.tabs.load_request_from_history)
         self.history_panel.curl_copied.connect(self._on_curl_copied)

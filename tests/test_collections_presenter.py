@@ -422,6 +422,50 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertEqual(col.name, "New Collection")
         mock_refresh.assert_not_called()
 
+    def test_add_saved_request_to_tree_existing_collection(self):
+        col = _make_collection("c1", "My API")
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        new_req = _make_request("r2", "New Request", "POST")
+        col.requests.append(new_req)
+
+        with patch.object(presenter, "refresh_tree") as mock_refresh:
+            added = presenter.add_saved_request_to_tree(new_req, "c1")
+
+        self.assertTrue(added)
+        self.assertEqual(presenter._model.item(0).rowCount(), 1)
+        self.assertIn("New Request", presenter._model.item(0).child(0).text())
+        mock_refresh.assert_not_called()
+
+    def test_add_saved_request_to_tree_new_collection(self):
+        presenter = self._make_presenter([])
+        presenter.load_collections()
+        new_req = _make_request("r1", "First Request")
+        new_col = _make_collection("c-new", "New Collection", [new_req])
+        presenter._request_manager.collections = [new_col]
+
+        with patch.object(presenter, "refresh_tree") as mock_refresh:
+            added = presenter.add_saved_request_to_tree(new_req, "c-new")
+
+        self.assertTrue(added)
+        self.assertEqual(presenter._model.rowCount(), 1)
+        self.assertEqual(presenter._model.item(0).text(), "New Collection")
+        self.assertEqual(presenter._model.item(0).rowCount(), 1)
+        mock_refresh.assert_not_called()
+
+    def test_add_saved_request_to_tree_expands_saved_collection(self):
+        col = _make_collection("c1", "My API")
+        presenter = self._make_presenter([col])
+        presenter._state_manager._expanded = ["c1"]
+        presenter.load_collections()
+        new_req = _make_request("r2", "Expanded Request")
+        col.requests.append(new_req)
+
+        presenter.add_saved_request_to_tree(new_req, "c1")
+
+        index = presenter._model.item(0).index()
+        self.assertTrue(presenter.widget.isExpanded(index))
+
     @patch("pypost.ui.presenters.collection_tree_actions.show_rename_empty_name_error")
     def test_rename_empty_name_shows_warning(self, mock_warning):
         req = _make_request("r1", "Old Name")

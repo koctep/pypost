@@ -8,7 +8,7 @@ from pypost.core.metrics import MetricsManager
 from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
-from pypost.models.models import RequestData
+from pypost.models.models import Collection, RequestData
 from pypost.ui.delegates import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
 
@@ -84,6 +84,26 @@ class CollectionsPresenter(QObject):
     def _pending_rename(self, value: dict | None) -> None:
         self._tree_actions._pending_rename = value
 
+    def _make_collection_item(self, col: Collection) -> QStandardItem:
+        col_item = QStandardItem(col.name)
+        col_item.setData(col.id, Qt.UserRole)
+        col_item.setEditable(False)
+        if "collection" in self._icons:
+            col_item.setIcon(self._icons["collection"])
+        return col_item
+
+    def _make_request_item(self, req: RequestData) -> QStandardItem:
+        req_item = QStandardItem(f"{req.method} {req.name}")
+        req_item.setData(req, Qt.UserRole)
+        req_item.setEditable(False)
+        if req.method in self._icons:
+            req_item.setIcon(self._icons[req.method])
+        return req_item
+
+    def _expand_collection_if_saved(self, collection_id: str, col_item: QStandardItem) -> None:
+        if collection_id in self._state_manager.get_expanded_collections():
+            self._view.setExpanded(col_item.index(), True)
+
     def refresh_tree(self) -> None:
         """Rebuilds tree model from RequestManager in-memory collections."""
         self._model.clear()
@@ -97,21 +117,49 @@ class CollectionsPresenter(QObject):
         )
 
         for col in collections:
-            col_item = QStandardItem(col.name)
-            col_item.setData(col.id, Qt.UserRole)
-            col_item.setEditable(False)
-            if "collection" in self._icons:
-                col_item.setIcon(self._icons["collection"])
-
+            col_item = self._make_collection_item(col)
             for req in col.requests:
-                req_item = QStandardItem(f"{req.method} {req.name}")
-                req_item.setData(req, Qt.UserRole)
-                req_item.setEditable(False)
-                if req.method in self._icons:
-                    req_item.setIcon(self._icons[req.method])
-                col_item.appendRow(req_item)
-
+                col_item.appendRow(self._make_request_item(req))
             self._model.appendRow(col_item)
+
+    def add_saved_request_to_tree(self, request: RequestData, collection_id: str) -> bool:
+        """Insert a newly saved request without rebuilding the full tree model."""
+        col_item = self._find_collection_item(collection_id, "collection")
+        if col_item is None:
+            for col in self._request_manager.get_collections():
+                if col.id == collection_id:
+                    return self._insert_collection_into_tree(col)
+            logger.warning(
+                "add_saved_request_to_tree_failed reason=collection_not_found"
+                " collection_id=%s request_id=%s",
+                collection_id,
+                request.id,
+            )
+            return False
+
+        col_item.appendRow(self._make_request_item(request))
+        self._expand_collection_if_saved(collection_id, col_item)
+        logger.info(
+            "add_saved_request_to_tree_completed collection_id=%s request_id=%s",
+            collection_id,
+            request.id,
+        )
+        return True
+
+    def _insert_collection_into_tree(self, collection: Collection) -> bool:
+        if self._find_collection_item(collection.id, "collection") is not None:
+            return False
+        col_item = self._make_collection_item(collection)
+        for req in collection.requests:
+            col_item.appendRow(self._make_request_item(req))
+        self._model.appendRow(col_item)
+        self._expand_collection_if_saved(collection.id, col_item)
+        logger.info(
+            "insert_collection_into_tree_completed collection_id=%s request_count=%d",
+            collection.id,
+            len(collection.requests),
+        )
+        return True
 
     def load_collections(self) -> None:
         """Reloads collections from storage and rebuilds the tree model."""

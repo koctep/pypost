@@ -284,6 +284,40 @@ class TestTabsPresenter(unittest.TestCase):
         if hasattr(tab.request_editor, 'set_variables'):
             pass  # verified by side effects; no crash = pass
 
+    def test_save_as_emits_request_save_as_completed_not_request_saved(self):
+        from pypost.models.models import Collection
+
+        req = _make_request("r1", "Source")
+        col = Collection(id="c1", name="API", requests=[req])
+        rm = FakeRequestManager([req])
+        rm.collections = [col]
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(req, save_state=False)
+
+        save_as_received = []
+        saved_received = []
+        p.request_save_as_completed.connect(
+            lambda request, collection_id: save_as_received.append((request.id, collection_id))
+        )
+        p.request_saved.connect(lambda: saved_received.append(True))
+
+        mock_dialog = MagicMock()
+        mock_dialog.exec.return_value = True
+        mock_dialog.selected_collection_id = "c1"
+        mock_dialog.new_collection_name = ""
+        mock_dialog.request_name = "Copy"
+
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.SaveRequestDialog",
+            return_value=mock_dialog,
+        ):
+            p._handle_save_as_request(req)
+
+        self.assertEqual(len(save_as_received), 1)
+        self.assertNotEqual(save_as_received[0][0], "r1")
+        self.assertEqual(save_as_received[0][1], "c1")
+        self.assertEqual(len(saved_received), 0)
+
     def test_request_saved_signal_emitted(self):
         req = _make_request("r1", "Existing")
         rm = FakeRequestManager([req])

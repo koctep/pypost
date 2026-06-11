@@ -43,12 +43,20 @@ in-app CRUD or tab save when RequestManager memory is already up to date.
 
 Calls `reload_collections()` then `refresh_tree()`. Full resync from disk plus UI rebuild.
 
+### `CollectionsPresenter.add_saved_request_to_tree(request, collection_id)`
+
+Inserts one saved request node under an existing collection, or appends a new collection row when
+the target collection is not yet in the tree. Use after save-as when RequestManager memory is
+already current ([PYPOST-319](https://pypost.atlassian.net/browse/PYPOST-319)).
+
 ## MainWindow wiring
 
 - **Startup:** `RequestManager` loads in `__init__`; MainWindow calls
   `collections.refresh_tree()` once (no double reload).
 - **After tab save:** `TabsPresenter.request_saved` → `collections.refresh_tree()` (save already
   updated RequestManager memory).
+- **After save-as:** `TabsPresenter.request_save_as_completed` →
+  `collections.add_saved_request_to_tree()` (incremental insert; no full tree rebuild).
 
 ## Configuration
 
