@@ -379,8 +379,13 @@ Focused suites:
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_encryption_migration.py \
+  tests/test_encryption_migration_key_sources.py \
   tests/test_encryption_migrate_cli.py
 ```
+
+`test_encryption_migration_key_sources.py` covers Stage 2 (keyring primary) and Stage 3
+(secret_store primary) verify and bulk re-encrypt paths using mocked keyring and file-based
+secret-store fixtures.
 
 Full regression:
 
