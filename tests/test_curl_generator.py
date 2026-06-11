@@ -116,6 +116,39 @@ def test_curl_generator_with_complex_body():
         assert curl_cmd == expected
 
 
+def test_curl_generator_yaml_as_json_exports_json_wire_body():
+    request = RequestData(
+        method="POST",
+        url="https://api.example.com/users",
+        body_type="yaml",
+        yaml_as_json=True,
+        body="name: test\nid: 1\n",
+    )
+    template_service = TemplateService()
+
+    with patch("sys.platform", "linux"):
+        curl_cmd = CurlGenerator.generate(request, {}, template_service)
+        assert "-d" in curl_cmd
+        assert "name" in curl_cmd
+        assert "test" in curl_cmd
+        assert "name:" not in curl_cmd
+
+
+def test_curl_generator_yaml_without_flag_keeps_yaml_body():
+    request = RequestData(
+        method="POST",
+        url="https://api.example.com/users",
+        body_type="yaml",
+        yaml_as_json=False,
+        body="name: test\n",
+    )
+    template_service = TemplateService()
+
+    with patch("sys.platform", "linux"):
+        curl_cmd = CurlGenerator.generate(request, {}, template_service)
+        assert "name: test" in curl_cmd
+
+
 def test_curl_generator_from_history():
     entry = HistoryEntry(
         id="123",

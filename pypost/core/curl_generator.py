@@ -1,3 +1,4 @@
+import json
 import logging
 import shlex
 import subprocess
@@ -5,6 +6,7 @@ import sys
 import urllib.parse
 
 from pypost.core.template_service import TemplateService
+from pypost.core.yaml_json_converter import convert_yaml_body_to_object
 from pypost.models.models import HistoryEntry, RequestData
 
 logger = logging.getLogger(__name__)
@@ -80,8 +82,12 @@ class CurlGenerator:
                 request.body, variables, render_path="curl"
             )
             if rendered_body:
+                wire_body = rendered_body
+                if request.body_type == "yaml" and request.yaml_as_json:
+                    parsed = convert_yaml_body_to_object(rendered_body)
+                    wire_body = json.dumps(parsed)
                 parts.append("-d")
-                parts.append(rendered_body)
+                parts.append(wire_body)
 
         if sys.platform == "win32":
             return subprocess.list2cmdline(parts)
