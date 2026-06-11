@@ -86,6 +86,24 @@ class TestJsonHighlighter(unittest.TestCase):
         pos = text.index("true")
         self.assertEqual(_hex_color_at(edit.document(), pos), QColor("darkblue").name())
 
+    def test_highlights_template_variable_in_string_value(self):
+        text = '{"url": "{{baseUrl}}/api"}'
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("baseUrl")
+        self.assertEqual(_hex_color_at(edit.document(), pos), QColor("darkorange").name())
+
+    def test_highlights_function_expression_placeholder(self):
+        text = '{"path": "{{urlencode(db)}}"}'
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("urlencode")
+        self.assertEqual(_hex_color_at(edit.document(), pos), QColor("darkorange").name())
+
+    def test_variable_highlight_overrides_string_green(self):
+        text = '{"k": "{{x}}"}'
+        edit = self._edit_with_highlighted(text)
+        brace_pos = text.index("{{")
+        self.assertEqual(_hex_color_at(edit.document(), brace_pos), QColor("darkorange").name())
+
     def test_empty_document_does_not_raise(self):
         edit = QTextEdit()
         hl = JsonHighlighter(edit.document())
