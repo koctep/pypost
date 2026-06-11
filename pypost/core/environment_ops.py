@@ -3,6 +3,30 @@
 from pypost.models.models import Environment
 
 
+def validate_environment_rename(
+    new_name: str,
+    old_name: str,
+    existing_names: list[str],
+    row: int,
+) -> tuple[bool, str, str]:
+    """Validate an environment rename.
+
+    Returns:
+        Tuple of (accepted, normalized_name, error_message).
+        accepted is True for a successful rename or a same-name no-op.
+        normalized_name is the stripped new name when accepted; empty on reject.
+        error_message is set when accepted is False.
+    """
+    stripped = new_name.strip()
+    if not stripped:
+        return False, "", "Name cannot be empty."
+    if stripped == old_name:
+        return True, old_name, ""
+    if any(name == stripped for i, name in enumerate(existing_names) if i != row):
+        return False, "", f'An environment named "{stripped}" already exists.'
+    return True, stripped, ""
+
+
 def clone_environment(source: Environment, new_name: str) -> Environment:
     """Build a new Environment copied from source with a new name and id.
 

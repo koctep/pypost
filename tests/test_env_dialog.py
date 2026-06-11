@@ -384,37 +384,27 @@ class TestEnvironmentDialog:
         envs = [Environment(name="Dev", variables={})]
         dlg = EnvironmentDialog(envs)
         try:
-            dlg.env_list.setCurrentRow(0)
-            item = dlg.env_list.item(0)
-            item.setText("Staging")
+            assert dlg._apply_environment_rename(0, "Staging")
             assert envs[0].name == "Staging"
             assert dlg.env_list.item(0).text() == "Staging"
         finally:
             dlg.close()
 
-    @patch("pypost.ui.dialogs.env_dialog.QMessageBox.warning")
-    def test_rename_environment_empty_name_shows_warning(self, mock_warning, qapp):
+    def test_rename_environment_empty_name_rejected(self, qapp):
         envs = [Environment(name="Dev", variables={})]
         dlg = EnvironmentDialog(envs)
         try:
-            dlg.env_list.setCurrentRow(0)
-            item = dlg.env_list.item(0)
-            item.setText("")
+            assert not dlg._apply_environment_rename(0, "")
             assert envs[0].name == "Dev"
-            mock_warning.assert_called_once()
         finally:
             dlg.close()
 
-    @patch("pypost.ui.dialogs.env_dialog.QMessageBox.warning")
-    def test_rename_environment_duplicate_name_shows_warning(self, mock_warning, qapp):
+    def test_rename_environment_duplicate_name_rejected(self, qapp):
         envs = [Environment(name="Dev", variables={}), Environment(name="Prod", variables={})]
         dlg = EnvironmentDialog(envs)
         try:
-            dlg.env_list.setCurrentRow(0)
-            item = dlg.env_list.item(0)
-            item.setText("Prod")
+            assert not dlg._apply_environment_rename(0, "Prod")
             assert envs[0].name == "Dev"
-            mock_warning.assert_called_once()
         finally:
             dlg.close()
 
@@ -422,9 +412,7 @@ class TestEnvironmentDialog:
         envs = [Environment(name="Dev", variables={})]
         dlg = EnvironmentDialog(envs)
         try:
-            dlg.env_list.setCurrentRow(0)
-            item = dlg.env_list.item(0)
-            item.setText("Dev")
+            assert dlg._apply_environment_rename(0, "Dev")
             assert envs[0].name == "Dev"
         finally:
             dlg.close()

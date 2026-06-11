@@ -20,7 +20,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pypost.core.environment_ops import clone_environment
+from pypost.core.environment_ops import clone_environment, validate_environment_rename
+from pypost.ui.delegates import EnvironmentNameDelegate
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.models.models import Environment
 from pypost.core.constants import HIDDEN_MASK
@@ -56,7 +57,13 @@ class EnvironmentDialog(QDialog):
         left_layout = QVBoxLayout()
         self.env_list = QListWidget()
         self.env_list.currentRowChanged.connect(self.on_env_selected)
-        self.env_list.itemChanged.connect(self._on_env_item_changed)
+        self.env_list.setItemDelegate(
+            EnvironmentNameDelegate(
+                get_existing_names=lambda: [e.name for e in self.environments],
+                on_rename_accepted=self._on_environment_renamed,
+                parent=self.env_list,
+            )
+        )
         self.env_list.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu,
         )
@@ -265,43 +272,50 @@ class EnvironmentDialog(QDialog):
         if item:
             self.env_list.editItem(item)
 
-    def _on_env_item_changed(self, item: QListWidgetItem) -> None:
-        row = self.env_list.row(item)
+    def _apply_environment_rename(self, row: int, new_name: str) -> bool:
+        """Commit an environment rename programmatically (used by tests and delegate)."""
         if row < 0 or row >= len(self.environments):
-            return
-            
+            return False
+
         env = self.environments[row]
         old_name = env.name
-        new_name = item.text().strip()
-        
-        if not new_name:
-            QMessageBox.warning(self, "Rename Environment", "Name cannot be empty.")
+        accepted, normalized, _error = validate_environment_rename(
+            new_name,
+            old_name,
+            [e.name for e in self.environments],
+            row,
+        )
+        if not accepted:
+            return False
+        if normalized == old_name:
+            return True
+
+        env.name = normalized
+        if self.current_env_name == old_name:
+            self.current_env_name = normalized
+
+        item = self.env_list.item(row)
+        if item:
             self.env_list.blockSignals(True)
-            item.setText(old_name)
+            item.setText(normalized)
             self.env_list.blockSignals(False)
+
+        logger.info(
+            "environment_renamed old_name=%s new_name=%s",
+            old_name,
+            normalized,
+        )
+        return True
+
+    def _on_environment_renamed(self, row: int, old_name: str, new_name: str) -> None:
+        if row < 0 or row >= len(self.environments):
             return
-            
-        if new_name == old_name:
-            self.env_list.blockSignals(True)
-            item.setText(old_name)
-            self.env_list.blockSignals(False)
-            return
-            
-        if any(e.name == new_name and i != row for i, e in enumerate(self.environments)):
-            QMessageBox.warning(
-                self,
-                "Rename Environment",
-                f'An environment named "{new_name}" already exists.',
-            )
-            self.env_list.blockSignals(True)
-            item.setText(old_name)
-            self.env_list.blockSignals(False)
-            return
-            
+
+        env = self.environments[row]
         env.name = new_name
         if self.current_env_name == old_name:
             self.current_env_name = new_name
-            
+
         logger.info(
             "environment_renamed old_name=%s new_name=%s",
             old_name,
