@@ -12,6 +12,7 @@ from PySide6.QtCore import QObject, Signal
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.metrics import MetricsManager
+from pypost.core.server_bind import format_bind_error
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 
@@ -20,12 +21,7 @@ logger = logging.getLogger(__name__)
 
 def format_mcp_bind_error(exc: OSError, host: str, port: int) -> str:
     """Return an operator-facing message for MCP bind failures."""
-    if exc.errno in (errno.EADDRINUSE, errno.EADDRNOTAVAIL, 10048, 10013):
-        return (
-            f"Cannot start MCP server on {host}:{port}: port is busy or unavailable. "
-            "Choose another port in Settings or stop the process using this port."
-        )
-    return f"Cannot start MCP server on {host}:{port}: {exc.strerror or exc}"
+    return format_bind_error(exc, host, port, "MCP server")
 
 
 class MCPServerManager(QObject):

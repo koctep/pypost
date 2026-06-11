@@ -1,16 +1,39 @@
 """Metrics facade composing registry (counters) and server (uvicorn/MCP)."""
 
+from PySide6.QtCore import QObject, Signal
+
 from pypost.core.metrics_registry import MetricsRegistry
 from pypost.core.metrics_server import MetricsServer
 from pypost.models.errors import ErrorCategory
 
 
-class MetricsManager:
+class MetricsManager(QObject):
     """Facade for Prometheus counters and the observability HTTP/MCP server."""
 
+    start_failed = Signal(str)  # operator-facing bind / startup error
+
     def __init__(self) -> None:
+        super().__init__()
         self._registry = MetricsRegistry()
         self._server = MetricsServer(self._registry)
+        self._pending_start_failure: str | None = None
+        self._start_failed_connected = False
+        self._server.set_start_failed_handler(self._handle_start_failed)
+
+    def _handle_start_failed(self, message: str) -> None:
+        if self._start_failed_connected:
+            self.start_failed.emit(message)
+            return
+        self._pending_start_failure = message
+
+    def connect_start_failed(self, slot) -> None:
+        """Connect UI slot and replay a failure that occurred before connect."""
+        self.start_failed.connect(slot)
+        self._start_failed_connected = True
+        pending = self._pending_start_failure
+        if pending is not None:
+            self._pending_start_failure = None
+            slot(pending)
 
     @property
     def registry(self):

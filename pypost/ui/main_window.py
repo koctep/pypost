@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QVBoxLayout,
@@ -45,6 +46,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PyPost")
         self.resize(1200, 800)
         self.metrics = metrics
+        self.metrics.connect_start_failed(self._on_metrics_start_failed)
         self.template_service = template_service
         self.storage = StorageManager(metrics=self.metrics)
         if config_manager is not None:
@@ -258,6 +260,10 @@ class MainWindow(QMainWindow):
             self.settings.env_encryption_key_source,
         )
         self.env._on_env_changed(self.env.env_selector.currentIndex())
+
+    def _on_metrics_start_failed(self, message: str) -> None:
+        logger.error("metrics_server_start_failed_ui message=%s", message)
+        QMessageBox.warning(self, "Metrics Server Failed to Start", message)
 
     def handle_exit(self) -> None:
         logger.info("main_window_exit_requested")

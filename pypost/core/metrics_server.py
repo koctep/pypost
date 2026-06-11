@@ -1,8 +1,11 @@
 """Metrics HTTP/MCP server lifecycle (uvicorn thread)."""
 
 import asyncio
+import errno
 import logging
+import sys
 import threading
+from collections.abc import Callable
 
 import uvicorn
 from mcp.server import Server
@@ -18,6 +21,7 @@ from pypost.core.mcp_transport_routes import (
     MCP_LEGACY_SSE_MOUNT_PATH,
 )
 from pypost.core.metrics_registry import MetricsRegistry
+from pypost.core.server_bind import format_bind_error
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +34,26 @@ class MetricsServer:
         self.server_instance = None
         self.thread = None
         self.server_lock = threading.Lock()
+        self._current_host = "127.0.0.1"
+        self._current_port = 9080
+        self._stop_event = threading.Event()
+        self._startup_notified = False
+        self._start_failed_handler: Callable[[str], None] | None = None
+        self._pending_start_failure: str | None = None
 
         self.mcp_server = Server("pypost-metrics")
         self.mcp_server.list_resources()(self.list_resources)
         self.mcp_server.read_resource()(self.read_resource)
+
+    def set_start_failed_handler(
+        self, handler: Callable[[str], None] | None
+    ) -> None:
+        """Register a callback for bind/startup failures (may run off main thread)."""
+        self._start_failed_handler = handler
+        pending = self._pending_start_failure
+        if pending is not None and handler is not None:
+            self._pending_start_failure = None
+            handler(pending)
 
     async def list_resources(self) -> list[Resource]:
         return [
@@ -117,31 +137,90 @@ class MetricsServer:
 
             self._current_host = host
             self._current_port = port
+            self._stop_event.clear()
+            self._startup_notified = False
 
             self.thread = threading.Thread(target=self._run_uvicorn, daemon=True)
             self.thread.start()
-            logger.info("Metrics server started on %s:%d", host, port)
+            logger.info("Metrics server starting on %s:%d", host, port)
+
+    def _notify_started(self) -> None:
+        if self._startup_notified or self._stop_event.is_set():
+            return
+        self._startup_notified = True
+        logger.info(
+            "metrics_server_listening host=%s port=%d",
+            self._current_host,
+            self._current_port,
+        )
+
+    def _notify_start_failed(self, message: str) -> None:
+        logger.error(
+            "metrics_server_start_failed host=%s port=%d message=%s",
+            self._current_host,
+            self._current_port,
+            message,
+        )
+        handler = self._start_failed_handler
+        if handler is None:
+            self._pending_start_failure = message
+            return
+        handler(message)
 
     def _run_uvicorn(self) -> None:
-        app = self._create_app()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        original_exit = sys.exit
 
-        config = uvicorn.Config(
-            app=app,
-            host=self._current_host,
-            port=self._current_port,
-            loop="asyncio",
-            log_level="warning",
-        )
-        self.server_instance = uvicorn.Server(config)
-        self.server_instance.install_signal_handlers = lambda: None
+        def thread_exit(code=0):
+            if code != 0:
+                raise OSError(
+                    errno.EADDRINUSE,
+                    f"bind failed on {self._current_host}:{self._current_port}",
+                )
+            original_exit(code)
 
-        loop.run_until_complete(self.server_instance.serve())
+        sys.exit = thread_exit
+        try:
+            app = self._create_app()
+            config = uvicorn.Config(
+                app=app,
+                host=self._current_host,
+                port=self._current_port,
+                loop="asyncio",
+                log_level="warning",
+            )
+            self.server_instance = uvicorn.Server(config)
+            self.server_instance.install_signal_handlers = lambda: None
+
+            original_startup = self.server_instance.startup
+
+            async def startup_with_notify(sockets=None):
+                await original_startup(sockets=sockets)
+                self._notify_started()
+
+            self.server_instance.startup = startup_with_notify
+
+            loop.run_until_complete(self.server_instance.serve())
+        except OSError as exc:
+            self._notify_start_failed(
+                format_bind_error(
+                    exc, self._current_host, self._current_port, "metrics server"
+                )
+            )
+        except Exception as exc:
+            logger.exception("metrics_server_start_failed")
+            self._notify_start_failed(f"Metrics server failed to start: {exc}")
+        finally:
+            sys.exit = original_exit
+            loop.close()
+            if not self._stop_event.is_set() and self._startup_notified:
+                logger.warning("metrics_server_unexpected_exit")
 
     def stop_server(self) -> None:
         """Stop the metrics server."""
         with self.server_lock:
+            self._stop_event.set()
             if self.server_instance:
                 self.server_instance.should_exit = True
 

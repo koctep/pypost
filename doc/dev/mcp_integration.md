@@ -83,6 +83,7 @@ former monolithic `MetricsManager` into focused modules:
 | `pypost/core/metrics_registry.py` | `MetricsRegistry` | Prometheus counters and `track_*` methods (no I/O) |
 | `pypost/core/metrics_server.py` | `MetricsServer` | MCP resources, Starlette app, uvicorn thread lifecycle |
 | `pypost/core/metrics.py` | `MetricsManager` | Facade composed at `main.py`; same injection API as before |
+| `pypost/core/server_bind.py` | `format_bind_error` | Shared operator-facing bind failure messages |
 
 *   **Role**: Provides application metrics via MCP Resources.
 *   **Framework**: Same stack as the main server (`Starlette` + `mcp` SDK + `uvicorn`).
@@ -262,7 +263,10 @@ DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
     *   **Variable supplier**: Must not call Qt APIs. `EnvPresenter` reads only
         `_current_variables` (main-thread cache); supplier returns `dict(...)` snapshot.
 *   **Metrics Thread (`MetricsServer` via `MetricsManager`)**: Runs its own isolated
-    `uvicorn` loop for metrics and observability.
+    `uvicorn` loop for metrics and observability. Bind failures emit `start_failed(str)` on
+    `MetricsManager` (PYPOST-153) with the same message style as MCP. `MainWindow` connects
+    via `connect_start_failed` so failures during early startup are replayed. Success is logged
+    as `metrics_server_listening`, not when the thread starts.
 
 ## API / Usage
 
