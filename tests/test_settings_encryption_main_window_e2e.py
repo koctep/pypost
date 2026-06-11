@@ -98,7 +98,7 @@ def _open_settings_with_mode(window, mode_data: str) -> AppSettings:
         patch.object(SettingsDialog, "__init__", init_and_configure),
         patch.object(SettingsDialog, "exec", exec_accept),
         patch.object(window.style_manager, "apply_styles"),
-        patch.object(window.env, "_on_env_changed"),
+        patch.object(window.env, "reload_current_env"),
     ):
         window.open_settings()
     return window.settings

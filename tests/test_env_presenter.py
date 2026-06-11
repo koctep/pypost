@@ -135,6 +135,19 @@ class TestEnvPresenter(unittest.TestCase):
         self.assertEqual(len(received), 1)
         self.assertEqual(received[-1], {"KEY": "VALUE"})
 
+    def test_reload_current_env_refreshes_current_selection(self):
+        env = _make_env("e1", "Dev", {"KEY": "VALUE"})
+        p = self._make_presenter([env])
+        p._environments = [env]
+        p.env_selector.blockSignals(True)
+        p.env_selector.addItem(env.name, env)
+        p.env_selector.setCurrentIndex(1)
+        p.env_selector.blockSignals(False)
+        received = []
+        p.env_variables_changed.connect(received.append)
+        p.reload_current_env()
+        self.assertEqual(received[-1], {"KEY": "VALUE"})
+
     def test_env_keys_changed_emitted(self):
         env = _make_env("e1", "Dev", {"A": "1", "B": "2"})
         p = self._make_presenter([env])

@@ -148,6 +148,10 @@ class EnvPresenter(QObject):
     def apply_settings(self, settings: AppSettings) -> None:
         self._settings = settings
 
+    def reload_current_env(self) -> None:
+        """Re-resolves variables and MCP state for the current combo selection."""
+        self._on_env_changed(self._env_selector.currentIndex())
+
     def wait_storage_idle(self, timeout_ms: int = 30000) -> bool:
         return self._storage_gateway.wait_idle(timeout_ms)
 

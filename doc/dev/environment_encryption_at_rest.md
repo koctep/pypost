@@ -216,7 +216,8 @@ Call sites:
 
 - `MainWindow.__init__` — apply settings on startup.
 - `MainWindow.open_settings()` — waits for `EnvPresenter.wait_storage_idle()`, then re-applies
-  after the user saves Settings.
+  after the user saves Settings. Calls `EnvPresenter.reload_current_env()` to refresh the active
+  environment (variables, MCP, signals) without reaching into private handlers.
 
 ### `EnvironmentLoadFailure` (`pypost/core/storage.py`)
 

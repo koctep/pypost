@@ -259,7 +259,7 @@ class MainWindow(QMainWindow):
             self.settings.env_encryption_enabled,
             self.settings.env_encryption_key_source,
         )
-        self.env._on_env_changed(self.env.env_selector.currentIndex())
+        self.env.reload_current_env()
 
     def _on_metrics_start_failed(self, message: str) -> None:
         logger.error("metrics_server_start_failed_ui message=%s", message)
