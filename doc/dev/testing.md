@@ -199,8 +199,8 @@ the 70% project target.
 
 | Setting | Value |
 | --- | --- |
-| Enforcement | `--cov-fail-under=60` in `pytest.ini` `addopts` |
-| CI summary display | `THRESHOLD=60` in `.github/workflows/test.yml` |
+| Enforcement | `--cov-fail-under=70` in `pytest.ini` `addopts` |
+| CI summary display | `THRESHOLD=70` in `.github/workflows/test.yml` |
 | Project target | 70% (follow-up when ready) |
 
 Audit current coverage:
