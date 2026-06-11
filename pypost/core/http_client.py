@@ -37,11 +37,17 @@ class HTTPClient:
             logger.debug("HTTPClient: using default TemplateService")
 
     def _prepare_request_kwargs(
-        self, request_data: RequestData, variables: Dict[str, str]
+        self,
+        request_data: RequestData,
+        variables: Dict[str, str],
+        rendered_url: str | None = None,
     ) -> Dict[str, Any]:
         """Prepares the arguments for requests.request by rendering templates."""
-        # Render templates
-        url = self._template_service.render_string(request_data.url, variables)
+        url = (
+            rendered_url
+            if rendered_url is not None
+            else self._template_service.render_string(request_data.url, variables)
+        )
 
         headers = {}
         for k, v in request_data.headers.items():
@@ -185,7 +191,9 @@ class HTTPClient:
             logger.debug("sse_probe_detected method=%s url=%s", request_data.method, url)
 
         try:
-            kwargs = self._prepare_request_kwargs(request_data, variables)
+            kwargs = self._prepare_request_kwargs(
+                request_data, variables, rendered_url=url
+            )
             if is_sse_endpoint:
                 kwargs["timeout"] = (SSE_PROBE_CONNECT_TIMEOUT, SSE_PROBE_TIMEOUT)
                 headers = dict(kwargs.get("headers", {}))

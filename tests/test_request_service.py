@@ -251,18 +251,20 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
         result = self.svc.execute(req)
         self.assertEqual(result.response.status_code, 0)
 
-    def test_template_error_populates_execution_error_template_category(self):
-        svc = RequestService(
-            metrics=MagicMock(), template_service=TemplateService()
-        )
+    def test_execute_http_does_not_pre_render_url(self):
+        """URL template is rendered once inside HTTPClient, not in a guard step."""
+        mock_ts = MagicMock()
+        mock_ts.render_string.side_effect = lambda s, v: s.replace("{{h}}", v.get("h", ""))
+        svc = RequestService(metrics=MagicMock(), template_service=mock_ts)
         svc.http_client = MagicMock()
-        # Force template rendering to fail
-        svc._template_service = MagicMock()
-        svc._template_service.render_string.side_effect = Exception("bad template")
-        req = RequestData(method="GET", url="{{ broken", post_script="")
-        with self.assertRaises(ExecutionError) as ctx:
-            svc.execute(req)
-        self.assertEqual(ctx.exception.category, ErrorCategory.TEMPLATE)
+        svc.http_client.send_request.return_value = _make_response(200)
+        req = RequestData(method="GET", url="http://{{h}}/api", post_script="")
+        svc.execute(req, variables={"h": "example.com"})
+        url_render_calls = [
+            c for c in mock_ts.render_string.call_args_list if c.args[0] == req.url
+        ]
+        self.assertEqual(0, len(url_render_calls))
+        svc.http_client.send_request.assert_called_once()
 
     def test_script_error_populates_execution_error_script_category(self):
         self.svc.http_client.send_request.return_value = _make_response(200)

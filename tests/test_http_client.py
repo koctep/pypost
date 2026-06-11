@@ -243,6 +243,25 @@ class TestHTTPClientFunctionExpressions(unittest.TestCase):
         self.assertEqual({literal_key: literal_val}, params)
 
 
+class TestHTTPClientUrlRendering(unittest.TestCase):
+    def test_url_template_rendered_once_per_request(self):
+        """send_request must not render the URL twice (_prepare_request_kwargs reuses it)."""
+        mock_ts = MagicMock()
+        url_template = "http://x/{{ path }}"
+        mock_ts.render_string.side_effect = lambda s, v: (
+            "http://x/items" if s == url_template else s
+        )
+        client = HTTPClient(template_service=mock_ts)
+        client.session = MagicMock()
+        client.session.request.return_value = _make_response(200, chunks=[b"ok"])
+        req = RequestData(method="GET", url=url_template)
+        client.send_request(req, variables={"path": "items"})
+        url_render_calls = [
+            c for c in mock_ts.render_string.call_args_list if c.args[0] == url_template
+        ]
+        self.assertEqual(1, len(url_render_calls))
+
+
 class TestHTTPClientInjection(unittest.TestCase):
     def test_injected_template_service_is_used_not_default(self):
         """A TemplateService passed at construction is the one called during send_request."""

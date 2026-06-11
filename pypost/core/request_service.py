@@ -298,23 +298,7 @@ class RequestService:
         if variables is None:
             variables = {}
 
-        # 1. Template render guard — convert Jinja2 errors to ExecutionError(TEMPLATE)
-        if self._template_service:
-            try:
-                self._template_service.render_string(request.url, variables)
-            except Exception as exc:
-                logger.error(
-                    "template_render_failed url=%r detail=%s",
-                    request.url,
-                    exc,
-                )
-                raise ExecutionError(
-                    category=ErrorCategory.TEMPLATE,
-                    message="Template rendering failed.",
-                    detail=str(exc),
-                ) from exc
-
-        # 2. Execute request, catching structured errors
+        # 1. Execute request, catching structured errors
         try:
             if request.method == "MCP":
                 response = self._execute_mcp(request, variables, headers_callback)
@@ -350,7 +334,7 @@ class RequestService:
         script_logs = []
         script_error = None
 
-        # 3. Execute post-request script if exists
+        # 2. Execute post-request script if exists
         if request.post_script:
             updated_variables, script_logs, script_error = ScriptExecutor.execute(
                 request.post_script, request, response, variables
@@ -374,7 +358,7 @@ class RequestService:
             execution_error=exec_error_from_script,
         )
 
-        # 4. Record history entry (must not raise)
+        # 3. Record history entry (must not raise)
         if self._history_manager:
             try:
                 hidden_key_count = len(hidden_keys or set())
