@@ -80,6 +80,15 @@ class TestMCPServerImpl(unittest.TestCase):
         impl.register_tools([second])
         self.assertEqual(list(impl.tools_map.keys()), ["b"])
 
+    def test_register_tools_sets_mcp_server_up_metric(self):
+        metrics = MagicMock()
+        impl = MCPServerImpl(metrics=metrics)
+        req = RequestData(name="Tool", expose_as_mcp=True, method="GET", url="http://u")
+        impl.register_tools([req])
+        metrics.set_mcp_server_up.assert_called_once_with(True)
+        impl.register_tools([])
+        metrics.set_mcp_server_up.assert_called_with(False)
+
     def test_list_tools_uses_mcp_description_when_set(self):
         impl = MCPServerImpl()
         req = RequestData(
@@ -239,6 +248,11 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertEqual(payload["body"], "response-body")
         metrics.track_mcp_request_received.assert_called_once_with("GET")
         metrics.track_mcp_response_sent.assert_called_once_with("GET", "success")
+        metrics.track_mcp_tool_call_duration.assert_called_once()
+        duration_args = metrics.track_mcp_tool_call_duration.call_args[0]
+        self.assertEqual(duration_args[0], "GET")
+        self.assertEqual(duration_args[1], "success")
+        self.assertGreaterEqual(duration_args[2], 0.0)
 
     def test_merge_execution_variables_combines_env_and_mcp_args(self):
         merged = _merge_execution_variables(

@@ -1,6 +1,6 @@
 """Prometheus counter registry and tracking methods (no I/O)."""
 
-from prometheus_client import CollectorRegistry, Counter
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
 from pypost.models.errors import ErrorCategory
 
@@ -122,6 +122,19 @@ class MetricsRegistry:
             registry=self.registry,
         )
 
+        self.mcp_server_up = Gauge(
+            "mcp_server_up",
+            "Whether the MCP tool server has registered tools (1=ready, 0=idle)",
+            registry=self.registry,
+        )
+
+        self.mcp_tool_call_duration_seconds = Histogram(
+            "mcp_tool_call_duration_seconds",
+            "MCP tool call execution duration in seconds",
+            ["method", "status"],
+            registry=self.registry,
+        )
+
         self.history_entries_appended = Counter(
             "history_entries_appended_total",
             "Number of request history entries recorded",
@@ -168,15 +181,6 @@ class MetricsRegistry:
         self._request_retry_exhaustions_total = Counter(
             "request_retry_exhaustions_total",
             "Outbound HTTP requests where all configured retries were exhausted",
-            ["endpoint"],
-            registry=self.registry,
-        )
-        self._legacy_email_notification_failures_total = Counter(
-            "email_notification_failures_total",
-            (
-                "DEPRECATED: mirrors request_retry_exhaustions_total for dashboard "
-                "migration; remove after sunset (see doc/dev/metric_rename_migration.md)"
-            ),
             ["endpoint"],
             registry=self.registry,
         )
@@ -251,6 +255,16 @@ class MetricsRegistry:
     def track_mcp_response_sent(self, method: str, status: str) -> None:
         self.mcp_responses_sent.labels(method=method, status=status).inc()
 
+    def set_mcp_server_up(self, ready: bool) -> None:
+        self.mcp_server_up.set(1 if ready else 0)
+
+    def track_mcp_tool_call_duration(
+        self, method: str, status: str, duration_seconds: float
+    ) -> None:
+        self.mcp_tool_call_duration_seconds.labels(
+            method=method, status=status
+        ).observe(duration_seconds)
+
     def track_history_entry_appended(self, method: str) -> None:
         self.history_entries_appended.labels(method=method).inc()
 
@@ -275,9 +289,7 @@ class MetricsRegistry:
         ).inc()
 
     def track_request_retry_exhaustion(self, endpoint: str) -> None:
-        labels = {"endpoint": endpoint}
-        self._request_retry_exhaustions_total.labels(**labels).inc()
-        self._legacy_email_notification_failures_total.labels(**labels).inc()
+        self._request_retry_exhaustions_total.labels(endpoint=endpoint).inc()
 
     def track_template_expression_render_attempt(
         self,

@@ -131,6 +131,9 @@ class MCPServerImpl:
 
             if self._metrics:
                 self._metrics.track_mcp_response_sent(request_data.method, outcome)
+                self._metrics.track_mcp_tool_call_duration(
+                    request_data.method, outcome, duration_ms / 1000.0
+                )
 
             if self._activity_log is not None:
                 detail = None
@@ -153,6 +156,9 @@ class MCPServerImpl:
             # Track MCP response error
             if self._metrics:
                 self._metrics.track_mcp_response_sent(request_data.method, "error")
+                self._metrics.track_mcp_tool_call_duration(
+                    request_data.method, "error", duration_ms / 1000.0
+                )
             if self._activity_log is not None:
                 self._activity_log.append(
                     McpActivityEntry.new_call_tool(
@@ -203,6 +209,8 @@ class MCPServerImpl:
             if req.expose_as_mcp:
                 tool_name = normalize_mcp_tool_name(req.name)
                 self.tools_map[tool_name] = req
+        if self._metrics:
+            self._metrics.set_mcp_server_up(bool(self.tools_map))
 
     def _generate_schema(self, req: RequestData) -> dict:
         hidden_keys = self._hidden_keys_supplier()

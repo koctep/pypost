@@ -129,8 +129,15 @@ class TestMetricsManagerRetryExhaustion(unittest.TestCase):
             'request_retry_exhaustions_total{endpoint="https://api.example/x"} 1.0',
             out,
         )
+
+    def test_track_mcp_server_up_and_tool_call_duration(self):
+        mm = MetricsManager()
+        mm.set_mcp_server_up(True)
+        mm.track_mcp_tool_call_duration("GET", "success", 0.05)
+        out = _scrape(mm)
+        self.assertIn("mcp_server_up 1.0", out)
         self.assertIn(
-            'email_notification_failures_total{endpoint="https://api.example/x"} 1.0',
+            'mcp_tool_call_duration_seconds_count{method="GET",status="success"} 1.0',
             out,
         )
 

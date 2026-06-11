@@ -7,15 +7,18 @@ that records **outbound HTTP retry exhaustion** from `email_notification_failure
 `request_retry_exhaustions_total`. The old name implied email-only failures; the new name
 matches actual behavior (all configured retries exhausted for any outbound request).
 
-[PYPOST-443](https://pypost.atlassian.net/browse/PYPOST-443) adds **transitional dual export**
-and this operator migration guide so Grafana dashboards and Prometheus rules can be updated
+[PYPOST-443](https://pypost.atlassian.net/browse/PYPOST-443) added **transitional dual export**
+and this operator migration guide so Grafana dashboards and Prometheus rules could be updated
 without a monitoring gap.
 
-| Aspect | Legacy (deprecated) | Canonical (current) |
-| ------ | ------------------- | ------------------- |
-| Counter name | `email_notification_failures_total` | `request_retry_exhaustions_total` |
+[PYPOST-558](https://pypost.atlassian.net/browse/PYPOST-558) **removed** the deprecated alias
+after the sunset window. Only the canonical counter is exported now.
+
+| Aspect | Legacy (removed) | Canonical (current) |
+| ------ | ---------------- | ------------------- |
+| Counter name | ~~`email_notification_failures_total`~~ | `request_retry_exhaustions_total` |
 | Labels | `endpoint` | `endpoint` (unchanged) |
-| Status | Mirrored alias; scheduled for removal | Use for all new queries |
+| Status | Removed in PYPOST-558 | Use for all queries |
 
 ## Architecture
 
@@ -24,16 +27,13 @@ flowchart LR
   RS[RequestService._emit_exhaustion_alert]
   MM[MetricsManager.track_request_retry_exhaustion]
   CAN[request_retry_exhaustions_total]
-  LEG[email_notification_failures_total deprecated alias]
   RS --> MM
   MM --> CAN
-  MM --> LEG
 ```
 
-- **Single increment path:** `track_request_retry_exhaustion(endpoint)` increments both series
-  with the same `endpoint` label value.
-- **Implementation:** `pypost/core/metrics.py` — see
-  `_request_retry_exhaustions_total` and `_legacy_email_notification_failures_total`.
+- **Single increment path:** `track_request_retry_exhaustion(endpoint)` increments the
+  canonical series with the `endpoint` label value.
+- **Implementation:** `pypost/core/metrics_registry.py` — `_request_retry_exhaustions_total`.
 - **Call site:** `pypost/core/request_service.py` — unchanged from PYPOST-422.
 
 ## Rollout checklist (operators)
@@ -63,22 +63,21 @@ rate(email_notification_failures_total[5m])
 rate(request_retry_exhaustions_total[5m])
 ```
 
-During the transition window, both series receive identical increments — panels using either
-name show the same data **after** PYPOST-443 is deployed.
+During the PYPOST-443 transition window, both series received identical increments. After
+PYPOST-558, only the canonical name is exported.
 
 ### 3. Deploy and verify
 
 1. Deploy the new PyPost build.
 2. Scrape `/metrics/` (default port 9080) or MCP `metrics://all`.
-3. Confirm both series appear:
+3. Confirm the canonical series appears:
 
    ```text
    request_retry_exhaustions_total{endpoint="..."}
-   email_notification_failures_total{endpoint="..."}
    ```
 
-4. Trigger or wait for a retry exhaustion event; verify both counters increment together.
-5. Update dashboards and alerts to the canonical name.
+4. Trigger or wait for a retry exhaustion event; verify the counter increments.
+5. Update dashboards and alerts to the canonical name if not already done.
 6. Re-run verification on updated queries.
 
 ### 4. Communicate
@@ -89,22 +88,17 @@ name show the same data **after** PYPOST-443 is deployed.
 
 ## Sunset timeline
 
-The deprecated alias `email_notification_failures_total` is **temporary**. Target removal:
-**next major release after all known consumers migrate**, or **6 months after PYPOST-443
-ships**, whichever is later (operator confirmation required before removal).
-
-After sunset, only `request_retry_exhaustions_total` is exported. Queries using the legacy
-name return no data.
+The deprecated alias `email_notification_failures_total` was removed in **PYPOST-558**
+after the PYPOST-443 transition window. Queries using the legacy name return no data on
+current builds.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Action |
 | ------- | ------------ | ------ |
-| No data for either metric | No retry exhaustions yet, or scrape target wrong | Check `/metrics/` endpoint and logs (`retry_exhausted` in `pypost.core.request_service`) |
-| Legacy name works, canonical empty | Build predates PYPOST-422 | Upgrade to PYPOST-422+ |
-| Canonical works, legacy empty | Build predates PYPOST-443 | Upgrade for alias window, or migrate queries to canonical |
-| Both flat but errors spike | Non-exhaustion error path | Check `request_errors_total`; exhaustion is a subset |
-| Duplicate concern | Two series, one event | Expected during transition; values should match per `endpoint` |
+| No data for canonical metric | No retry exhaustions yet, or scrape target wrong | Check `/metrics/` endpoint and logs (`retry_exhausted` in `pypost.core.request_service`) |
+| Legacy name returns no data | Build includes PYPOST-558+ | Migrate queries to `request_retry_exhaustions_total` |
+| Metric flat but errors spike | Non-exhaustion error path | Check `request_errors_total`; exhaustion is a subset |
 
 ## Related documentation
 
@@ -118,5 +112,5 @@ name return no data.
 python3 -m pytest tests/test_metrics_manager.py tests/test_retry.py -q
 ```
 
-Expect scrape output to include both `request_retry_exhaustions_total` and
-`email_notification_failures_total` after `track_request_retry_exhaustion` is called.
+Expect scrape output to include `request_retry_exhaustions_total` after
+`track_request_retry_exhaustion` is called.

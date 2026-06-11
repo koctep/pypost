@@ -93,6 +93,14 @@ class MetricsManager(QObject):
     def track_mcp_response_sent(self, method: str, status: str) -> None:
         self._registry.track_mcp_response_sent(method, status)
 
+    def set_mcp_server_up(self, ready: bool) -> None:
+        self._registry.set_mcp_server_up(ready)
+
+    def track_mcp_tool_call_duration(
+        self, method: str, status: str, duration_seconds: float
+    ) -> None:
+        self._registry.track_mcp_tool_call_duration(method, status, duration_seconds)
+
     def track_history_entry_appended(self, method: str) -> None:
         self._registry.track_history_entry_appended(method)
 

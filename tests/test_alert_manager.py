@@ -207,6 +207,14 @@ class TestAlertManagerAccumulation(unittest.TestCase):
         mgr.close()
         self.assertEqual(self._line_count(), N + 1)
 
+    def test_close_twice_is_idempotent(self):
+        """PYPOST-441: double close must not raise and must keep log output stable."""
+        mgr = AlertManager(log_path=self.log_path)
+        mgr.emit(_make_payload())
+        mgr.close()
+        mgr.close()
+        self.assertEqual(self._line_count(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
