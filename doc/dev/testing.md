@@ -45,6 +45,28 @@ ResponseView search bar coverage (PYPOST-365):
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_response_view_search.py -v
 ```
 
+## MCP server unit tests
+
+Automated pytest coverage for `MCPServerImpl` and Starlette routing lives in
+`tests/test_mcp_server_impl.py` (PYPOST-367). Tests mock `RequestService` and avoid live SSE
+handshakes; routing cases inspect the `Mount("/sse")` tree and assert HTTP 405/404 on wrong
+methods.
+
+| Class | Scope |
+| --- | --- |
+| `TestMCPServerImpl` | Tool registration, schemas, `call_tool`, metrics, script output |
+| `TestMCPServerImplRouting` | `create_app()` route structure and method guards |
+| `TestMCPServerImplInjection` | Constructor `TemplateService` injection |
+
+Focused run:
+
+```bash
+.venv/bin/python -m pytest tests/test_mcp_server_impl.py -v
+```
+
+Integration tests that start a live MCP server and invoke tools are tracked separately
+(PYPOST-368).
+
 ## Per-test timeouts (mandatory)
 
 Every test must declare an explicit timeout so the suite cannot hang indefinitely.

@@ -1,4 +1,4 @@
-"""Tests for MCPServerImpl: tool registration, schemas, and call_tool execution path."""
+"""Tests for MCPServerImpl: tool registration, schemas, routing, and call_tool path."""
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
@@ -8,6 +8,9 @@ import unittest
 from unittest.mock import MagicMock
 
 from mcp.types import TextContent
+from starlette.applications import Starlette
+from starlette.routing import Mount, Route
+from starlette.testclient import TestClient
 
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.request_service import ExecutionResult
@@ -133,6 +136,39 @@ class TestMCPServerImpl(unittest.TestCase):
         out = asyncio.run(impl.call_tool("t", {}))
         self.assertIn("execute failed", out[0].text)
         metrics.track_mcp_response_sent.assert_called_once_with("POST", "error")
+
+
+class TestMCPServerImplRouting(unittest.TestCase):
+    def test_create_app_returns_starlette_application(self):
+        app = MCPServerImpl().create_app()
+        self.assertIsInstance(app, Starlette)
+
+    def test_create_app_mounts_sse_sub_application(self):
+        app = MCPServerImpl().create_app()
+        mounts = [route for route in app.routes if isinstance(route, Mount)]
+        self.assertEqual(len(mounts), 1)
+        self.assertEqual(mounts[0].path, "/sse")
+
+    def test_inner_sse_app_exposes_messages_mount_and_get_root(self):
+        app = MCPServerImpl().create_app()
+        sse_mount = next(route for route in app.routes if isinstance(route, Mount))
+        inner_paths = []
+        for route in sse_mount.app.routes:
+            if isinstance(route, Mount):
+                inner_paths.append(("mount", route.path))
+            elif isinstance(route, Route):
+                inner_paths.append(("route", route.path, route.methods))
+        self.assertIn(("mount", "/messages"), [(p[0], p[1]) for p in inner_paths])
+        get_roots = [
+            p for p in inner_paths if p[0] == "route" and "GET" in p[2] and p[1] == "/"
+        ]
+        self.assertEqual(len(get_roots), 1)
+
+    def test_routing_rejects_wrong_http_methods_without_live_sse(self):
+        client = TestClient(MCPServerImpl().create_app(), raise_server_exceptions=False)
+        self.assertEqual(client.post("/sse").status_code, 405)
+        self.assertEqual(client.get("/sse/messages").status_code, 405)
+        self.assertEqual(client.get("/unknown").status_code, 404)
 
 
 class TestMCPServerImplInjection(unittest.TestCase):
