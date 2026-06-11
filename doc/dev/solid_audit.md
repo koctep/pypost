@@ -10,8 +10,9 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 
 ## Key Findings
 
-- **MainWindow** (1040 LOC): Acts as a "god object" with many responsibilities. Decompose into
-  presenters (CollectionsPresenter, TabsPresenter, EnvironmentPresenter).
+- **MainWindow** (282 file / 246 class LOC as of 2026-06-11 baseline; 1040 at audit time):
+  Acts as a composition root after PYPOST-43 presenter split. Regression caps in
+  [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
 - **Singletons/globals**: MetricsManager and template_service hinder testability and DIP.
   Replace with constructor injection.
 - **Direct instantiation**: RequestService still creates default HTTP/MCP clients when not
@@ -26,7 +27,37 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 | P2 | HTTPClient protocol; ~~unified collection loading~~ (PYPOST-47); item_type strategy; split MetricsManager |
 | P3 | StorageInterface; ExecuteRequestProtocol |
 
+## Regression baseline metrics (PYPOST-376)
+
+The audit report recorded qualitative findings but no numeric regression anchors. PYPOST-376 adds
+LOC baselines and caps so god-object regressions (especially `MainWindow` growth) fail CI.
+
+| Metric | Audit era (PYPOST-40) | Baseline (2026-06-11) | Cap |
+| --- | ---: | ---: | ---: |
+| `main_window.py` file LOC | 1040 | 282 | 300 |
+| `MainWindow` class LOC | 1040 | 246 | 260 |
+
+Full module table: [ai-tasks/PYPOST-376/baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
+
+**Regenerate snapshot:**
+
+```bash
+.venv/bin/python scripts/audit_baseline_metrics.py \
+  --markdown ai-tasks/PYPOST-376/baseline-metrics.md
+```
+
+**Verify caps (local or CI):**
+
+```bash
+.venv/bin/python scripts/audit_baseline_metrics.py --check
+pytest tests/test_solid_audit_baseline.py -v
+```
+
+Caps live in `scripts/audit_baseline_metrics.py`. After intentional module growth, remeasure,
+update caps with ~10% headroom, and refresh the snapshot.
+
 ## Related
 
 - [Architecture Overview](architecture.md)
 - [Technical Debt: PYPOST-40](tech-debt/PYPOST-40.md)
+- [Testing: SOLID audit baseline](testing.md#solid-audit-baseline-pypost-376)

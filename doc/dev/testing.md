@@ -365,6 +365,28 @@ groups as **expected** (error-path tests), **suspicious**, or **unknown**. Basel
 capture (2026-06-11): 937 passed, 72 ERROR, 138 WARNING lines. See
 `ai-tasks/PYPOST-567/inventory.md` for the full breakdown.
 
+## SOLID audit baseline (PYPOST-376)
+
+PYPOST-40 identified maintainability risks but did not define numeric regression thresholds.
+PYPOST-376 records LOC baselines and caps for audit-scoped modules (especially
+`main_window.py` and presenters).
+
+```bash
+# Regenerate human-readable snapshot
+.venv/bin/python scripts/audit_baseline_metrics.py \
+  --markdown ai-tasks/PYPOST-376/baseline-metrics.md
+
+# Fail if any cap exceeded
+.venv/bin/python scripts/audit_baseline_metrics.py --check
+
+# CI regression tests
+pytest tests/test_solid_audit_baseline.py -v
+```
+
+Baseline date: **2026-06-11**. Audit-era vs current vs cap table:
+[ai-tasks/PYPOST-376/baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
+See also [solid_audit.md](solid_audit.md#regression-baseline-metrics-pypost-376).
+
 ## Error-path test logging (PYPOST-568)
 
 Many passing tests deliberately exercise failure paths (worker exceptions, retry
