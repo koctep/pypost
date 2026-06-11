@@ -6,14 +6,7 @@ from typing import TYPE_CHECKING, Any, List
 
 from platformdirs import user_data_dir
 
-from pypost.core.encryption_config import (
-    build_key_provider,
-    resolve_encryption_enabled,
-    resolve_key_source,
-    resolve_key_source_chain,
-)
-from pypost.core.environment_secrets_codec import EnvironmentSecretsCodec
-from pypost.core.key_provider import EnvironmentEncryptionError
+from pypost.core.environment_variables_adapter import EnvironmentVariablesAdapter
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import AppSettings
 
@@ -34,29 +27,11 @@ class StorageManager:
         self.collections_path = self.data_dir / "collections"
         self.environments_file = self.data_dir / "environments.json"
         self._metrics = metrics
-        self._encryption_settings: AppSettings | None = None
-        self._secrets_codec = EnvironmentSecretsCodec(build_key_provider(None))
+        self._env_adapter = EnvironmentVariablesAdapter(metrics=metrics)
         self._ensure_paths()
 
     def apply_encryption_settings(self, settings: AppSettings | None) -> None:
-        self._encryption_settings = settings
-        key_source = resolve_key_source(settings)
-        source_chain = resolve_key_source_chain(settings)
-        self._secrets_codec = EnvironmentSecretsCodec(build_key_provider(settings))
-        enabled = resolve_encryption_enabled(settings)
-        policy_source = (
-            "settings"
-            if settings is not None and settings.env_encryption_enabled is not None
-            else "env_fallback"
-        )
-        logger.info(
-            "storage_encryption_config_applied enabled=%s key_source=%s "
-            "source_chain=%s policy_source=%s",
-            enabled,
-            key_source,
-            ",".join(source_chain),
-            policy_source,
-        )
+        self._env_adapter.apply_encryption_settings(settings)
 
     def _ensure_paths(self):
         if not self.data_dir.exists():
@@ -121,7 +96,7 @@ class StorageManager:
         return collections
 
     def save_environments(self, environments: List[Environment]):
-        data = [self._serialize_environment(env) for env in environments]
+        data = [self._env_adapter.serialize_environment(env) for env in environments]
         tmp_file = self.environments_file.with_suffix(".json.tmp")
         with open(tmp_file, "w") as f:
             json.dump(data, f, indent=2)
@@ -149,7 +124,9 @@ class StorageManager:
         try:
             with open(self.environments_file, "r") as f:
                 data = json.load(f)
-                environments = [self._deserialize_environment(item) for item in data]
+                environments = [
+                    self._env_adapter.deserialize_environment(item) for item in data
+                ]
                 logger.info(
                     "load_environments_completed count=%d file=%s",
                     len(environments),
@@ -163,96 +140,3 @@ class StorageManager:
                 e,
             )
             return []
-
-    def _is_encryption_enabled(self) -> bool:
-        return resolve_encryption_enabled(self._encryption_settings)
-
-    def _serialize_environment(self, env: Environment) -> dict[str, Any]:
-        payload = env.model_dump(mode="json")
-        variables: dict[str, Any] = dict(payload.get("variables", {}))
-        hidden_keys = set(env.hidden_keys)
-        should_encrypt = self._is_encryption_enabled()
-        encrypted_count = 0
-
-        serialized_variables: dict[str, Any] = {}
-        for key, value in variables.items():
-            if should_encrypt and key in hidden_keys:
-                try:
-                    envelope = self._secrets_codec.encrypt(str(value))
-                    serialized_variables[key] = envelope.to_json()
-                    encrypted_count += 1
-                    if self._metrics:
-                        self._metrics.track_environment_value_encryption()
-                except EnvironmentEncryptionError as exc:
-                    if self._metrics:
-                        self._metrics.track_environment_encryption_error(
-                            "save",
-                            "encrypt_failed",
-                        )
-                    logger.error(
-                        "environment_value_encrypt_failed env_name=%s key=%s error=%s",
-                        env.name,
-                        key,
-                        exc,
-                    )
-                    raise
-            else:
-                serialized_variables[key] = str(value)
-
-        payload["variables"] = serialized_variables
-        logger.info(
-            "environment_serialized env_name=%s encryption_enabled=%s encrypted_count=%d "
-            "total_variables=%d",
-            env.name,
-            should_encrypt,
-            encrypted_count,
-            len(serialized_variables),
-        )
-        return payload
-
-    def _deserialize_environment(self, raw_env: dict[str, Any]) -> Environment:
-        variables_raw: dict[str, Any] = dict(raw_env.get("variables", {}))
-        decoded_variables: dict[str, str] = {}
-        decrypted_count = 0
-        for key, value in variables_raw.items():
-            decoded_value, decrypted = self._decode_variable_value(key, value)
-            decoded_variables[str(key)] = decoded_value
-            if decrypted:
-                decrypted_count += 1
-
-        normalized = dict(raw_env)
-        normalized["variables"] = decoded_variables
-        logger.info(
-            "environment_deserialized env_name=%s decrypted_count=%d total_variables=%d",
-            normalized.get("name", "unknown"),
-            decrypted_count,
-            len(decoded_variables),
-        )
-        return Environment(**normalized)
-
-    def _decode_variable_value(self, key: str, value: Any) -> tuple[str, bool]:
-        if isinstance(value, str):
-            return value, False
-        if isinstance(value, dict) and value.get("enc") is True:
-            try:
-                decoded = self._secrets_codec.decrypt(value)
-                if self._metrics:
-                    self._metrics.track_environment_value_decryption()
-                return decoded, True
-            except EnvironmentEncryptionError as exc:
-                if self._metrics:
-                    self._metrics.track_environment_encryption_error(
-                        "load",
-                        "decrypt_failed",
-                    )
-                raise EnvironmentEncryptionError(
-                    f"Failed to decrypt environment variable '{key}': {exc}"
-                ) from exc
-        if self._metrics:
-            self._metrics.track_environment_encryption_error(
-                "load",
-                "unsupported_format",
-            )
-        raise EnvironmentEncryptionError(
-            f"Unsupported value format for environment variable '{key}'."
-        )

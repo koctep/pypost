@@ -10,6 +10,8 @@ configurable fallback order, and a rotation-friendly key registry model.
 PYPOST-486 runs encrypted load/save off the UI thread via
 [Async Environment Storage](environment_storage_async.md) so large datasets do not freeze the
 desktop window.
+PYPOST-482 extracts environment variable serialization and encryption policy from
+`StorageManager` into `EnvironmentVariablesAdapter` for clearer boundaries and unit testing.
 
 This feature protects hidden-key values in persisted environment storage (`environments.json`).
 Runtime request execution is unchanged: components still consume plain
@@ -30,9 +32,10 @@ flowchart TD
   KSC --> SSS[SecretStoreKeySource]
   SSS --> SBC[SecretBackendChain]
   SBC --> SBF[FileSecretBackend]
-  SM --> ESC[EnvironmentSecretsCodec]
+  SM --> EVA[EnvironmentVariablesAdapter]
+  EVA --> ESC[EnvironmentSecretsCodec]
   ESC --> CKP
-  ESC --> ENV[(environments.json)]
+  SM --> ENV[(environments.json)]
 ```
 
 | Component | Module | Responsibility |
@@ -41,7 +44,8 @@ flowchart TD
 | Policy resolver | `pypost/core/encryption_config.py` | Enabled flag, chain, provider factory |
 | Key sources | `pypost/core/key_sources/` | Env, keyring, secret-store resolution |
 | Key provider | `pypost/core/key_provider.py` | `ChainedKeyProvider` facade for codec |
-| Storage orchestration | `pypost/core/storage.py` | Apply resolved policy on save/load |
+| Storage orchestration | `pypost/core/storage.py` | Paths, collections, atomic env file I/O |
+| Variable encoding | `pypost/core/environment_variables_adapter.py` | Policy, serialize/deserialize, metrics/logs |
 | Settings UI | `pypost/ui/dialogs/settings_dialog.py` | Encryption and source controls |
 | Controller wiring | `pypost/ui/main_window.py` | Apply settings on init and after save |
 | Crypto codec | `pypost/core/environment_secrets_codec.py` | Envelope encrypt/decrypt |
@@ -77,8 +81,9 @@ are still registered.
 1. User edits environment values in UI.
 2. `EnvPresenter` saves via the async gateway (encryption on) or calls
    `StorageManager.save_environments()` directly (encryption off).
-3. `StorageManager.save_environments()` serializes environment payload.
-4. Hidden-key values are encrypted with `EnvironmentSecretsCodec` when encryption is enabled.
+3. `StorageManager.save_environments()` delegates payload encoding to
+   `EnvironmentVariablesAdapter.serialize_environment()`.
+4. The adapter encrypts hidden-key values via `EnvironmentSecretsCodec` when encryption is enabled.
 5. Data is written atomically to `environments.json`.
 6. On load, encrypted payloads are decrypted before creating `Environment` instances (load may
    run on a worker thread when encryption is enabled).
@@ -428,6 +433,7 @@ Primary coverage files:
 - `tests/test_encryption_config.py`
 - `tests/test_settings_encryption.py`
 - `tests/test_environment_secrets_codec.py`
+- `tests/test_environment_variables_adapter.py`
 - `tests/test_key_provider.py`
 - `tests/test_key_sources_secret_store.py`
 - `tests/test_storage_environments.py`
