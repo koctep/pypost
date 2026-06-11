@@ -24,14 +24,18 @@ these requests directly from the chat interface.
    - You should see "MCP: ON" in the top bar.
 
 3. **Connect Agent**:
-   - Use the **Streamable HTTP** MCP URL (current MCP spec):
+   - Use the **Streamable HTTP** MCP URL (current MCP spec). This is the recommended
+     transport for new setups:
 
    ```
    http://127.0.0.1:1080/mcp
    ```
 
+   `http://localhost:1080/mcp` is equivalent when PyPost listens on localhost.
+
    Replace host/port if you changed MCP settings. The observability MCP server (metrics
-   resources) uses port **9080** by default: `http://127.0.0.1:9080/mcp`.
+   resources) uses port **9080** by default: `http://127.0.0.1:9080/mcp`. See
+   [Prometheus Monitoring](prometheus_monitoring.md) for the `/metrics` scrape endpoint.
 
 ### Cursor
 
