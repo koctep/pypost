@@ -30,5 +30,7 @@ Addressed in PYPOST-14 by implementing `StateManager`.
 
 ## Follow-up Tasks
 
-- Write tests to verify UI state preservation. — [PYPOST-391](https://pypost.atlassian.net/browse/PYPOST-391)
+- **[FIXED] UI state preservation tests** ([PYPOST-391](https://pypost.atlassian.net/browse/PYPOST-391)):
+  `test_restore_tree_state_expands_only_collections_in_saved_list` in
+  `tests/test_collections_presenter.py`.
 - Consider debouncing settings saving if I/O performance issues arise. — [PYPOST-392](https://pypost.atlassian.net/browse/PYPOST-392)

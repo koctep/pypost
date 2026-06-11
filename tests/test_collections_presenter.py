@@ -327,7 +327,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         self.assertEqual(["deleted-collection", "c1"], presenter._state_manager._expanded)
 
     def test_restore_tree_state_expands_only_collections_in_saved_list(self):
-        """PYPOST-95: Qt tree — only ids listed in state are expanded after restore."""
+        """PYPOST-391: Qt tree — only ids listed in state are expanded after restore."""
         c1 = _make_collection("c1", "First")
         c2 = _make_collection("c2", "Second")
         presenter = self._make_presenter([c1, c2])
