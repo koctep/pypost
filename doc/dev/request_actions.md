@@ -132,6 +132,17 @@ Tab action UI uses internal constants in `MainWindow`:
 - Button size: `24x24`
 - Horizontal spacing offset: `6px`
 
+## Testing
+
+Save-as identity regression coverage lives in `tests/test_tabs_presenter.py`:
+
+- `test_save_as_preserves_original_request_id` — save-as must persist a new request ID and leave
+  the source entity registered under its original ID in `RequestManager`.
+- `test_save_as_emits_request_save_as_completed_not_request_saved` — save-as emits
+  `request_save_as_completed` (not `request_saved`) with the new ID.
+
+Run: `python -m pytest tests/test_tabs_presenter.py -k save_as -v`
+
 ## Troubleshooting
 
 ### `Save` is not visible in main screen

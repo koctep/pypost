@@ -318,6 +318,49 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(save_as_received[0][1], "c1")
         self.assertEqual(len(saved_received), 0)
 
+    def test_save_as_preserves_original_request_id(self):
+        from pypost.models.models import Collection
+
+        source = _make_request("r1", "Source")
+        source.url = "https://original.example.com"
+        col = Collection(id="c1", name="API", requests=[source])
+        rm = FakeRequestManager([source])
+        rm.collections = [col]
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(source, save_state=False)
+
+        tab = p.widget.widget(0)
+        tab.request_editor.url_input.setText("https://copy.example.com")
+        save_as_input = tab.request_editor.get_request_data_from_ui()
+
+        mock_dialog = MagicMock()
+        mock_dialog.exec.return_value = True
+        mock_dialog.selected_collection_id = "c1"
+        mock_dialog.new_collection_name = ""
+        mock_dialog.request_name = "Copy"
+
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.SaveRequestDialog",
+            return_value=mock_dialog,
+        ):
+            p._handle_save_as_request(save_as_input)
+
+        original_lookup = rm.find_request("r1")
+        self.assertIsNotNone(original_lookup)
+        stored_original, _ = original_lookup
+        self.assertEqual(stored_original.id, "r1")
+        self.assertEqual(stored_original.url, "https://original.example.com")
+
+        self.assertEqual(len(rm.saved), 1)
+        saved_request, saved_collection_id = rm.saved[0]
+        self.assertNotEqual(saved_request.id, "r1")
+        self.assertEqual(saved_request.url, "https://copy.example.com")
+        self.assertEqual(saved_collection_id, "c1")
+
+        self.assertEqual(save_as_input.id, "r1")
+        self.assertEqual(tab.request_data.id, saved_request.id)
+        self.assertEqual(tab.request_editor.request_data.id, saved_request.id)
+
     def test_request_saved_signal_emitted(self):
         req = _make_request("r1", "Existing")
         rm = FakeRequestManager([req])
