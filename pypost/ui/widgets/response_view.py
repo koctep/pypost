@@ -22,6 +22,9 @@ from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
 logger = logging.getLogger(__name__)
 
+LARGE_DOC_CHAR_THRESHOLD = 100 * 1024
+MATCH_COUNT_CAP = 1000
+
 
 class ResponseView(QWidget):
     variable_set_requested = Signal(object, str)
@@ -115,22 +118,31 @@ class ResponseView(QWidget):
             self._metrics.track_gui_response_search_action(source=source, has_matches=(total > 0))
         logger.debug("response_search_find source=%s matches=%d", source, total)
 
-    def _count_matches(self) -> int:
+    def _is_large_document(self) -> bool:
+        return len(self.body_view.toPlainText()) > LARGE_DOC_CHAR_THRESHOLD
+
+    def _count_matches(self) -> tuple[int, bool]:
         text = self.search_input.text()
         if not text:
-            return 0
+            return 0, False
         saved = self.body_view.textCursor()
         doc = self.body_view.document()
         cursor = QTextCursor(doc)
         flags = self._search_flags(backward=False)
         count = 0
+        capped = False
+        match_cap = MATCH_COUNT_CAP if self._is_large_document() else None
         while True:
             cursor = doc.find(text, cursor, flags)
             if cursor.isNull():
                 break
             count += 1
+            if match_cap is not None and count >= match_cap:
+                probe = doc.find(text, cursor, flags)
+                capped = not probe.isNull()
+                break
         self.body_view.setTextCursor(saved)
-        return count
+        return count, capped
 
     def _current_match_index(self) -> int:
         text = self.search_input.text()
@@ -159,15 +171,17 @@ class ResponseView(QWidget):
         if not text:
             self.search_status_label.setText("")
             return 0
-        total = self._count_matches()
+        total, capped = self._count_matches()
         if total == 0:
             self.search_status_label.setText("No matches")
             return 0
         current = self._current_match_index()
+        total_label = f"{total}+" if capped else str(total)
         if current > 0:
-            self.search_status_label.setText(f"{current} of {total}")
+            self.search_status_label.setText(f"{current} of {total_label}")
         else:
-            self.search_status_label.setText(f"{total} match(es)")
+            suffix = "+" if capped else ""
+            self.search_status_label.setText(f"{total}{suffix} match(es)")
         return total
 
     def _on_search_text_changed(self) -> None:

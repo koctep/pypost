@@ -98,6 +98,30 @@ class TestResponseViewSearch:
         finally:
             view.close()
 
+    def test_large_document_shows_capped_match_counter(self, qapp):
+        view = ResponseView()
+        try:
+            chunk = "hit" + ("x" * 50)
+            body = chunk * 2500
+            assert len(body) > 100 * 1024
+            view.body_view.setPlainText(body)
+            view.search_input.setText("hit")
+            view._on_search_text_changed()
+            assert view.search_status_label.text() == "1 of 1000+"
+        finally:
+            view.close()
+
+    def test_large_document_exact_count_when_below_cap(self, qapp):
+        view = ResponseView()
+        try:
+            body = ("z" * (100 * 1024 + 1)) + "foo bar foo baz foo"
+            view.body_view.setPlainText(body)
+            view.search_input.setText("foo")
+            view._on_search_text_changed()
+            assert view.search_status_label.text() == "1 of 3"
+        finally:
+            view.close()
+
     def test_display_response_clears_search(self, qapp):
         view = ResponseView()
         try:

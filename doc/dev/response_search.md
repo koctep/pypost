@@ -9,7 +9,7 @@ Features:
 - Search input with placeholder "Search..."
 - Previous/Next navigation between matches
 - Match case option (case-sensitive search)
-- Match counter (e.g. "2 of 5" or "No matches")
+- Match counter (e.g. "2 of 5", "2 of 1000+" for large bodies, or "No matches")
 - Ctrl+F to focus search input
 - Enter to find next match
 
@@ -35,9 +35,14 @@ Finds the next occurrence of the search text from the current cursor position.
 
 Finds the previous occurrence using `FindBackward` flag.
 
-### `ResponseView._count_matches() -> int`
+### `ResponseView._count_matches() -> tuple[int, bool]`
 
-Counts total matches in the document. Restores cursor after counting.
+Counts matches in the document. Restores cursor after counting. Returns `(count, capped)` where
+`capped` is `True` when the body exceeds 100KB and more than 1000 matches may exist.
+
+### `ResponseView._is_large_document() -> bool`
+
+Returns `True` when the displayed body text exceeds 100KB (102 400 characters).
 
 ### `ResponseView._current_match_index() -> int`
 
@@ -45,7 +50,8 @@ Returns the 1-based index of the match containing the current cursor, or 0 if no
 
 ### `ResponseView._update_match_count() -> int`
 
-Updates the status label ("N of M", "No matches", or "N match(es)"). Returns total match count.
+Updates the status label ("N of M", "N of M+" when capped, "No matches", or "N match(es)").
+Returns total match count (minimum of actual matches and the cap when capped).
 
 ### `ResponseView._on_search_text_changed()`
 
@@ -75,8 +81,12 @@ No configuration. Search is cleared automatically when:
 
 ### Match counter shows "No matches" after typing
 
-- Search runs on every keystroke. For very large responses (100KB+), there may be a delay.
-- See [60-tech-debt.md](../../ai-tasks/PYPOST-37/60-tech-debt.md) for performance notes.
+- Check "Match case" and that the query appears in the displayed body.
+
+### Match counter shows "N of 1000+" on large responses
+
+- Bodies over 100KB stop counting after 1000 matches; the "+" indicates the true total may be
+  higher. Navigation (Next/Previous) still finds all matches.
 
 ### Ctrl+F does not focus search
 
