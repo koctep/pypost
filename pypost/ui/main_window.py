@@ -260,6 +260,9 @@ class MainWindow(QMainWindow):
 
     def handle_exit(self) -> None:
         logger.info("main_window_exit_requested")
+        if resolve_encryption_enabled(self.settings):
+            idle = self.env.wait_storage_idle()
+            logger.info("main_window_exit_storage_idle completed=%s", idle)
         QApplication.instance().quit()
 
     def handle_show_hotkeys(self) -> None:
