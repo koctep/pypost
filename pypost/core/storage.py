@@ -133,7 +133,15 @@ class StorageManager:
         return collections
 
     def save_environments(self, environments: List[Environment]):
-        data = [self._env_adapter.serialize_environment(env) for env in environments]
+        data: list[dict] = []
+        for env in environments:
+            serialized = self._env_adapter.serialize_environment(env)
+            data.append(serialized)
+            self._env_adapter.remember_environment_state(
+                env.id,
+                serialized.get("variables", {}),
+                dict(env.variables),
+            )
         tmp_file = self.environments_file.with_suffix(".json.tmp")
         with open(tmp_file, "w") as f:
             json.dump(data, f, indent=2)
@@ -161,9 +169,15 @@ class StorageManager:
         try:
             with open(self.environments_file, "r") as f:
                 data = json.load(f)
-                environments = [
-                    self._env_adapter.deserialize_environment(item) for item in data
-                ]
+                environments = []
+                for item in data:
+                    env = self._env_adapter.deserialize_environment(item)
+                    environments.append(env)
+                    self._env_adapter.remember_environment_state(
+                        env.id,
+                        item.get("variables", {}),
+                        dict(env.variables),
+                    )
                 logger.info(
                     "load_environments_completed count=%d file=%s",
                     len(environments),

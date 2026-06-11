@@ -92,6 +92,68 @@ def test_metrics_track_encryption_and_decryption(monkeypatch):
     assert "environment_value_decryptions_total 1.0" in scraped
 
 
+def test_second_save_reuses_unchanged_hidden_envelopes(monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_ENABLED", "true")
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+
+    metrics = MetricsManager()
+    adapter = EnvironmentVariablesAdapter(metrics=metrics)
+    env = Environment(
+        id="e1",
+        name="Dev",
+        variables={"A": "one", "B": "two", "VISIBLE": "public"},
+        hidden_keys={"A", "B"},
+    )
+
+    first = adapter.serialize_environment(env)
+    adapter.remember_environment_state(env.id, first["variables"], dict(env.variables))
+
+    second = adapter.serialize_environment(env)
+
+    assert second["variables"]["A"] == first["variables"]["A"]
+    assert second["variables"]["B"] == first["variables"]["B"]
+    scraped = _scrape_metrics(metrics)
+    assert "environment_value_encryptions_total 2.0" in scraped
+
+
+def test_changed_hidden_key_reencrypts_only_that_value(monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_ENABLED", "true")
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+
+    metrics = MetricsManager()
+    adapter = EnvironmentVariablesAdapter(metrics=metrics)
+    env = Environment(
+        id="e1",
+        name="Dev",
+        variables={"A": "one", "B": "two"},
+        hidden_keys={"A", "B"},
+    )
+
+    first = adapter.serialize_environment(env)
+    adapter.remember_environment_state(env.id, first["variables"], dict(env.variables))
+
+    env.variables["B"] = "changed"
+    second = adapter.serialize_environment(env)
+
+    assert second["variables"]["A"] == first["variables"]["A"]
+    assert second["variables"]["B"] != first["variables"]["B"]
+    scraped = _scrape_metrics(metrics)
+    assert "environment_value_encryptions_total 3.0" in scraped
+
+
+def test_apply_encryption_settings_clears_persisted_state(monkeypatch):
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_ENABLED", "true")
+    adapter = EnvironmentVariablesAdapter()
+    adapter.remember_environment_state("e1", {"SECRET": {"enc": True}}, {"SECRET": "x"})
+    adapter.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    assert adapter._persisted_variables == {}
+    assert adapter._persisted_plaintext == {}
+
+
 def test_metrics_track_unsupported_format_error():
     metrics = MetricsManager()
     adapter = EnvironmentVariablesAdapter(metrics=metrics)

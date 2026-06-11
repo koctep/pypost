@@ -12,6 +12,8 @@ PYPOST-486 runs encrypted load/save off the UI thread via
 desktop window.
 PYPOST-482 extracts environment variable serialization and encryption policy from
 `StorageManager` into `EnvironmentVariablesAdapter` for clearer boundaries and unit testing.
+PYPOST-485 optimizes save performance by reusing unchanged encrypted envelopes instead of
+re-encrypting every hidden key on each persist.
 PYPOST-484 centralizes v1 envelope schema validation in the typed
 `EncryptedValueEnvelope.from_payload()` model used by `EnvironmentSecretsCodec.decrypt`.
 PYPOST-487 adds operator migration tooling and the
@@ -89,6 +91,9 @@ are still registered.
 3. `StorageManager.save_environments()` delegates payload encoding to
    `EnvironmentVariablesAdapter.serialize_environment()`.
 4. The adapter encrypts hidden-key values via `EnvironmentSecretsCodec` when encryption is enabled.
+   Unchanged hidden values reuse the prior on-disk envelope (selective re-encrypt); changed or
+   newly hidden values are encrypted fresh. Snapshots refresh on load/save; policy changes clear
+   the cache via `apply_encryption_settings`.
 5. Data is written atomically to `environments.json`.
 6. On load, encrypted payloads are decrypted before creating `Environment` instances (load may
    run on a worker thread when encryption is enabled).

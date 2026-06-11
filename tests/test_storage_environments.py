@@ -202,6 +202,39 @@ def test_app_settings_disabled_overrides_env_enabled(tmp_path, monkeypatch):
     assert payload[0]["variables"]["SECRET"] == "plain"
 
 
+def test_second_save_reencrypts_only_changed_hidden_keys(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    monkeypatch.setattr(
+        "pypost.core.storage.user_data_dir",
+        lambda app_name, app_author: str(tmp_path / "pypost-data"),
+    )
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_ENABLED", "true")
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    metrics = MetricsManager()
+    storage = StorageManager(metrics=metrics)
+
+    env = Environment(
+        id="e1",
+        name="Dev",
+        variables={"A": "one", "B": "two"},
+        hidden_keys={"A", "B"},
+    )
+    storage.save_environments([env])
+    with open(storage.environments_file, "r") as f:
+        first_payload = json.load(f)
+
+    env.variables["B"] = "changed"
+    storage.save_environments([env])
+    with open(storage.environments_file, "r") as f:
+        second_payload = json.load(f)
+
+    assert second_payload[0]["variables"]["A"] == first_payload[0]["variables"]["A"]
+    assert second_payload[0]["variables"]["B"] != first_payload[0]["variables"]["B"]
+    scraped = _scrape_metrics(metrics)
+    assert "environment_value_encryptions_total 3.0" in scraped
+
+
 def test_metrics_track_encryption_and_decryption_counters(tmp_path, monkeypatch):
     fernet = pytest.importorskip("cryptography.fernet")
     monkeypatch.setattr(
