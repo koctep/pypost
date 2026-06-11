@@ -3,9 +3,8 @@
 ## Overview
 
 The request Body tab `CodeEditor` validates content against the active body format and shows
-inline errors while the user edits. JSON is fully supported (default format). YAML and XML
-validators are registered; the Body tab format selector sets `BodyFormat`. Concrete YAML/XML
-parsers ship in PYPOST-519.
+inline errors while the user edits. JSON, YAML, and XML are supported; the Body tab format
+selector sets `BodyFormat` and activates the matching validator.
 
 Errors do not modify body text — save and send use the full `toPlainText()` content.
 
@@ -16,7 +15,10 @@ Errors do not modify body text — save and send use the full `toPlainText()` co
 - **`BodyValidator` registry (`pypost/ui/widgets/validate/body_validator.py`)** — Selects
   validator by `BodyFormat`; `PLAIN` returns no errors.
 - **`JsonBodyValidator`** — Uses `json.loads()`; maps `JSONDecodeError` to one error.
-- **`YamlBodyValidator` / `XmlBodyValidator`** — Stubs returning `[]` until implemented.
+- **`YamlBodyValidator`** — Uses `yaml.safe_load_all()`; maps `YAMLError.problem_mark` to one
+  error.
+- **`XmlBodyValidator`** — Uses `ElementTree.fromstring()`; maps `ParseError.position` to one
+  error.
 - **`ValidationController`** — Debounced validation (200 ms), applies
   `setExtraSelections()` for line/column markers and an error banner label.
 - **`CodeEditor`** — Owns `ValidationController`; `set_body_format()` switches validator.
@@ -64,11 +66,6 @@ valid (no error).
 
 Errors use 1-based document line numbers. Folded hidden lines keep their logical numbers; the
 error line must be visible or expanded to see the highlight.
-
-### YAML/XML bodies show no validation errors
-
-Expected until YAML/XML validators are implemented (PYPOST-519). Select the matching format in
-the Body tab selector so validation activates when parsers ship.
 
 ### Error banner overlaps text
 

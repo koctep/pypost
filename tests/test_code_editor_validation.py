@@ -10,6 +10,8 @@ from PySide6.QtWidgets import QApplication
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.validate.json_body_validator import JsonBodyValidator
+from pypost.ui.widgets.validate.xml_body_validator import XmlBodyValidator
+from pypost.ui.widgets.validate.yaml_body_validator import YamlBodyValidator
 
 
 def _wait_for_validate(editor: CodeEditor) -> None:
@@ -35,6 +37,40 @@ class TestJsonBodyValidator(unittest.TestCase):
         errors = JsonBodyValidator().validate(doc)
         self.assertEqual(len(errors), 1)
         self.assertEqual(errors[0].line, 2)
+        self.assertGreater(errors[0].column, 0)
+        self.assertTrue(errors[0].message)
+
+
+class TestYamlBodyValidator(unittest.TestCase):
+    def test_valid_yaml_returns_no_errors(self):
+        doc = QTextDocument()
+        doc.setPlainText("users:\n  - id: 1\n")
+        errors = YamlBodyValidator().validate(doc)
+        self.assertEqual(errors, [])
+
+    def test_invalid_yaml_reports_line_and_column(self):
+        doc = QTextDocument()
+        doc.setPlainText("users:\n  - [")
+        errors = YamlBodyValidator().validate(doc)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0].line, 2)
+        self.assertGreater(errors[0].column, 0)
+        self.assertTrue(errors[0].message)
+
+
+class TestXmlBodyValidator(unittest.TestCase):
+    def test_valid_xml_returns_no_errors(self):
+        doc = QTextDocument()
+        doc.setPlainText("<root><item/></root>")
+        errors = XmlBodyValidator().validate(doc)
+        self.assertEqual(errors, [])
+
+    def test_invalid_xml_reports_line_and_column(self):
+        doc = QTextDocument()
+        doc.setPlainText("<root><item></other></root>")
+        errors = XmlBodyValidator().validate(doc)
+        self.assertEqual(len(errors), 1)
+        self.assertGreater(errors[0].line, 0)
         self.assertGreater(errors[0].column, 0)
         self.assertTrue(errors[0].message)
 
@@ -88,6 +124,27 @@ class TestCodeEditorValidation(unittest.TestCase):
 
         editor.setPlainText('{"fixed": true}')
         self.assertEqual(editor.validation_controller().errors(), [])
+
+    def test_invalid_yaml_shows_error_banner(self):
+        editor = CodeEditor()
+        editor.set_body_format(BodyFormat.YAML)
+        editor.setPlainText("key:\n  - [")
+        _wait_for_validate(editor)
+        errors = editor.validation_controller().errors()
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Line 2", editor.validation_controller()._error_label.text())
+
+    def test_invalid_xml_shows_error_banner(self):
+        editor = CodeEditor()
+        editor.show()
+        editor.resize(400, 200)
+        QTest.qWaitForWindowExposed(editor)
+        editor.set_body_format(BodyFormat.XML)
+        editor.setPlainText("<root><item></other></root>")
+        _wait_for_validate(editor)
+        errors = editor.validation_controller().errors()
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Line 1", editor.validation_controller()._error_label.text())
 
 
 if __name__ == "__main__":
