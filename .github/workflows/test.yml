@@ -35,16 +35,18 @@ jobs:
             libxcb-cursor0 \
             libxkbcommon0
 
+      # Pip wheel cache keyed on requirements.txt content hash (PYPOST-311).
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
       - name: Install test tools
-        run: python -m pip install pytest pytest-cov flake8
+        run: python -m pip install pytest pytest-cov flake8 pytest-timeout
 
       - name: Install application dependencies
         run: python -m pip install -r requirements.txt
@@ -66,30 +68,6 @@ jobs:
       - name: Audit test duration budgets
         if: success()
         run: python scripts/audit_test_durations.py pytest.log
-
-  make-install-smoke:
-    name: "make install smoke (slow)"
-    runs-on: ubuntu-latest
-    env:
-      QT_QPA_PLATFORM: offscreen
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Upgrade pip
-        run: python -m pip install --upgrade pip
-
-      - name: Install pytest tooling
-        run: python -m pip install pytest pytest-timeout
-
-      - name: Run slow Makefile install smoke
-        run: |
-          python -m pytest tests/test_makefile.py -m slow -v --tb=short
 
       - name: Write job summary
         if: always()
@@ -148,3 +126,29 @@ jobs:
           name: coverage-report-${{ matrix.python-version }}
           path: coverage.xml
           if-no-files-found: warn
+
+  make-install-smoke:
+    name: "make install smoke (slow)"
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same pip cache key as main matrix — invalidates when requirements.txt changes.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install pytest tooling
+        run: python -m pip install pytest pytest-timeout
+
+      - name: Run slow Makefile install smoke
+        run: |
+          python -m pytest tests/test_makefile.py -m slow -v --tb=short

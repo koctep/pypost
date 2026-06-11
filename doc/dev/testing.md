@@ -16,7 +16,24 @@ make test-cov      # with coverage report
 make test-slow     # network-heavy Makefile smoke
 ```
 
-See § Per-test timeouts, § CI guardrails, and § Makefile automation tests below.
+See § Reproducible test environment, § Per-test timeouts, § CI guardrails, and § Makefile
+automation tests below.
+
+## Reproducible test environment (PYPOST-465)
+
+Use this checklist on a **clean checkout** to match CI regression coverage locally.
+
+| Step | Command / detail |
+| --- | --- |
+| **Python** | 3.11+ recommended ([README](../../README.md)); CI matrix runs **3.11** and **3.13** |
+| **Install** | `make install` — creates `.venv`, installs test tooling via `venv-test` (`pytest`, `pytest-cov`, `pytest-timeout`, `flake8`), then app deps from `requirements.txt` |
+| **Fast regression** | `make test` — full suite except `-m slow` |
+| **Slow smoke** | `make test-slow` — Makefile install smoke (`tests/test_makefile.py`) |
+| **Coverage** | `make test-cov` — fast suite with `--cov=pypost` |
+| **CI parity** | Main job (`.github/workflows/test.yml`) installs the same test tools, including **`pytest-timeout`** (aligned with local `venv-test`) |
+
+`run`, `test`, and `lint` do not auto-install dependencies — run `make install` first after
+clone or Python version change. See [setup.md](setup.md).
 
 ### AI-assisted verification (supplementary)
 
@@ -388,7 +405,27 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -m s
 
 CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest (`pytest.ini`
 `addopts`) and `make test` exclude `-m slow`. A separate `make-install-smoke` job in
-`.github/workflows/test.yml` runs `-m slow` Makefile tests on Python 3.11 with pip caching.
+`.github/workflows/test.yml` runs `-m slow` Makefile tests on Python 3.11.
+
+## CI dependency caching (PYPOST-311)
+
+Both CI jobs use `actions/setup-python@v5` with `cache: pip` and an explicit
+`cache-dependency-path: requirements.txt`. The cache stores downloaded pip wheels under the
+runner home directory and restores them before dependency installation.
+
+| Aspect | Behavior |
+| --- | --- |
+| **Cache key** | OS + Python version + SHA-256 hash of `requirements.txt` |
+| **Invalidation** | Any edit to `requirements.txt` produces a new key (cold install) |
+| **Scope** | Main `test` matrix (3.11, 3.13) and `make-install-smoke` (3.11) |
+| **Not cached** | CI test tooling (`pytest`, `flake8`, etc.) — small, installed outside the lock file |
+| **Local dev** | `make install` uses Makefile `.venv`; GitHub cache applies to CI only |
+
+The slow install smoke runs `make install` in an isolated `tmp_path` workspace; pip still
+reuses cached wheels from the restored `~/.cache/pip` on the runner.
+
+Verify cache behavior in the GitHub Actions log for the `setup-python` step (`Cache hit` /
+`Cache miss`). First run after a dependency change is expected to miss and download fresh wheels.
 
 ## Pytest exit codes (PYPOST-279)
 

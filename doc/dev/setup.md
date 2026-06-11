@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+ (CI matrix: 3.11 and 3.13; see [README](../README.md))
 - pip (Python package installer)
 - Git
 
@@ -96,25 +96,26 @@ The project uses a `Makefile` to simplify common tasks:
 
 ### Unit tests (pytest)
 
-The repository root is not installed as a package by default.  Root `pytest.ini` sets
+The repository root is not installed as a package by default. Root `pytest.ini` sets
 `pythonpath = .` so `import pypost` succeeds when pytest runs from the repo root **without**
 setting `PYTHONPATH` (see PYPOST-434).
 
-After `make install` (or with an activated venv that has test dependencies):
+**Reproducible test environment** (PYPOST-465): on a clean checkout, run `make install` once —
+it provisions app deps (`requirements.txt`) and test tooling (`pytest`, `pytest-cov`,
+`pytest-timeout`, `flake8` via `venv-test`). Then run full regression with:
 
 ```bash
-make test
+make test        # fast suite (-m "not slow")
+make test-slow   # Makefile install smoke
+make test-cov    # fast suite with coverage
 ```
 
-Equivalent manual invocation:
+See [testing.md](testing.md) § Reproducible test environment for the full checklist and CI
+parity notes (main job includes `pytest-timeout`, matching local `venv-test`).
 
-```bash
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/
-```
-
-CI runs the same suite on every push and pull request via `.github/workflows/test.yml`
-(Python 3.11 and 3.13) on **GitHub-hosted `ubuntu-latest`**.  `sudo apt-get` installs EGL/GL/XCB
-packages so PySide6 can import under `QT_QPA_PLATFORM=offscreen`.  Jobs do not use a Docker
+CI runs the fast suite on every push and pull request via `.github/workflows/test.yml`
+(Python 3.11 and 3.13) on **GitHub-hosted `ubuntu-latest`**. `sudo apt-get` installs EGL/GL/XCB
+packages so PySide6 can import under `QT_QPA_PLATFORM=offscreen`. Jobs do not use a Docker
 container so `actions/setup-python` toolcache builds match the runner libc.
 
 ## Troubleshooting
