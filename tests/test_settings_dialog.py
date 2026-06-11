@@ -7,8 +7,15 @@ pytestmark = pytest.mark.timeout(60)
 
 from PySide6.QtWidgets import QApplication
 
+from PySide6.QtWidgets import QLineEdit
+
 from pypost.models.settings import AppSettings
-from pypost.ui.dialogs.settings_dialog import SettingsDialog
+from pypost.ui.dialogs.settings_dialog import (
+    SettingsDialog,
+    WEBHOOK_AUTH_KEEP_PLACEHOLDER,
+    WEBHOOK_AUTH_NEW_PLACEHOLDER,
+    _resolve_webhook_auth_header,
+)
 
 
 @pytest.fixture(scope="module")
@@ -84,8 +91,146 @@ class TestSettingsDialogSecurityLoggingSection:
             retry_idx = dlg.form_layout.indexOf(dlg.retryable_codes_edit)
             header_idx = dlg.form_layout.indexOf(dlg.security_logging_section_label)
             hidden_idx = dlg.form_layout.indexOf(dlg.log_hidden_key_names_check)
+            log_path_idx = dlg.form_layout.indexOf(dlg.alert_log_path_edit)
             webhook_idx = dlg.form_layout.indexOf(dlg.alert_webhook_url_edit)
             auth_idx = dlg.form_layout.indexOf(dlg.alert_webhook_auth_edit)
-            assert retry_idx < header_idx < hidden_idx < webhook_idx < auth_idx
+            assert (
+                retry_idx
+                < header_idx
+                < hidden_idx
+                < log_path_idx
+                < webhook_idx
+                < auth_idx
+            )
         finally:
             dlg.close()
+
+
+class TestSettingsDialogAlertSettings:
+    def test_alert_log_path_loads_from_settings(self, qapp):
+        dlg = SettingsDialog(AppSettings(alert_log_path="/tmp/custom-alerts.log"))
+        try:
+            assert dlg.alert_log_path_edit.text() == "/tmp/custom-alerts.log"
+        finally:
+            dlg.close()
+
+    def test_accept_persists_alert_log_path(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            dlg.alert_log_path_edit.setText("/var/log/pypost-alerts.log")
+            dlg.accept()
+            assert dlg.get_settings().alert_log_path == "/var/log/pypost-alerts.log"
+        finally:
+            dlg.close()
+
+    def test_accept_clears_alert_log_path_when_empty(self, qapp):
+        dlg = SettingsDialog(AppSettings(alert_log_path="/tmp/old.log"))
+        try:
+            dlg.alert_log_path_edit.clear()
+            dlg.accept()
+            assert dlg.get_settings().alert_log_path is None
+        finally:
+            dlg.close()
+
+    def test_webhook_auth_uses_password_echo_mode(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            assert (
+                dlg.alert_webhook_auth_edit.echoMode() == QLineEdit.EchoMode.Password
+            )
+        finally:
+            dlg.close()
+
+    def test_webhook_auth_does_not_display_stored_value(self, qapp):
+        dlg = SettingsDialog(
+            AppSettings(alert_webhook_auth_header="Bearer secret-token"),
+        )
+        try:
+            assert dlg.alert_webhook_auth_edit.text() == ""
+            assert dlg.alert_webhook_auth_edit.placeholderText() == WEBHOOK_AUTH_KEEP_PLACEHOLDER
+            assert dlg.form_layout.indexOf(dlg.alert_webhook_auth_clear_check) >= 0
+        finally:
+            dlg.close()
+
+    def test_webhook_auth_placeholder_when_not_configured(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            assert dlg.alert_webhook_auth_edit.placeholderText() == WEBHOOK_AUTH_NEW_PLACEHOLDER
+            assert dlg.form_layout.indexOf(dlg.alert_webhook_auth_clear_check) < 0
+        finally:
+            dlg.close()
+
+    def test_accept_keeps_webhook_auth_when_field_empty(self, qapp):
+        dlg = SettingsDialog(
+            AppSettings(alert_webhook_auth_header="Bearer keep-me"),
+        )
+        try:
+            dlg.accept()
+            assert dlg.get_settings().alert_webhook_auth_header == "Bearer keep-me"
+        finally:
+            dlg.close()
+
+    def test_accept_updates_webhook_auth_when_entered(self, qapp):
+        dlg = SettingsDialog(AppSettings(alert_webhook_auth_header="Bearer old"))
+        try:
+            dlg.alert_webhook_auth_edit.setText("Bearer new-token")
+            dlg.accept()
+            assert dlg.get_settings().alert_webhook_auth_header == "Bearer new-token"
+        finally:
+            dlg.close()
+
+    def test_accept_clears_webhook_auth_when_remove_checked(self, qapp):
+        dlg = SettingsDialog(
+            AppSettings(alert_webhook_auth_header="Bearer remove-me"),
+        )
+        try:
+            dlg.alert_webhook_auth_clear_check.setChecked(True)
+            dlg.accept()
+            assert dlg.get_settings().alert_webhook_auth_header is None
+        finally:
+            dlg.close()
+
+    def test_accept_persists_webhook_url(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            dlg.alert_webhook_url_edit.setText("https://hooks.example.com/alert")
+            dlg.accept()
+            assert (
+                dlg.get_settings().alert_webhook_url == "https://hooks.example.com/alert"
+            )
+        finally:
+            dlg.close()
+
+
+class TestResolveWebhookAuthHeader:
+    def test_returns_none_when_clear_requested(self):
+        assert _resolve_webhook_auth_header(
+            "",
+            had_stored_auth=True,
+            stored_auth="Bearer old",
+            clear_requested=True,
+        ) is None
+
+    def test_returns_entered_value_when_non_empty(self):
+        assert _resolve_webhook_auth_header(
+            "Bearer new",
+            had_stored_auth=True,
+            stored_auth="Bearer old",
+            clear_requested=False,
+        ) == "Bearer new"
+
+    def test_keeps_stored_when_empty_and_had_auth(self):
+        assert _resolve_webhook_auth_header(
+            "",
+            had_stored_auth=True,
+            stored_auth="Bearer old",
+            clear_requested=False,
+        ) == "Bearer old"
+
+    def test_returns_none_when_empty_and_no_stored_auth(self):
+        assert _resolve_webhook_auth_header(
+            "",
+            had_stored_auth=False,
+            stored_auth=None,
+            clear_requested=False,
+        ) is None

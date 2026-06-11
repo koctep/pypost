@@ -1,5 +1,8 @@
 import logging
 
+from pathlib import Path
+
+from platformdirs import user_data_dir
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -42,6 +45,30 @@ ENCRYPTION_MODE_ENABLED = "enabled"
 ENCRYPTION_MODE_DISABLED = "disabled"
 
 SECTION_HEADER_STYLE = "font-weight: bold; margin-top: 8px;"
+ALERT_LOG_FILENAME = "pypost-alerts.log"
+WEBHOOK_AUTH_KEEP_PLACEHOLDER = "Leave blank to keep configured value"
+WEBHOOK_AUTH_NEW_PLACEHOLDER = "Bearer <token>"
+
+
+def _default_alert_log_path() -> str:
+    return str(Path(user_data_dir("pypost")) / ALERT_LOG_FILENAME)
+
+
+def _resolve_webhook_auth_header(
+    entered: str,
+    *,
+    had_stored_auth: bool,
+    stored_auth: str | None,
+    clear_requested: bool,
+) -> str | None:
+    if clear_requested:
+        return None
+    stripped = entered.strip()
+    if stripped:
+        return stripped
+    if had_stored_auth:
+        return stored_auth
+    return None
 
 
 def _make_section_header(title: str) -> QLabel:
@@ -247,13 +274,26 @@ class SettingsDialog(QDialog):
             ",".join(str(c) for c in current_policy.retryable_status_codes)
         )
 
+        self._had_webhook_auth = bool(current_settings.alert_webhook_auth_header)
+
+        self.alert_log_path_edit = QLineEdit()
+        self.alert_log_path_edit.setPlaceholderText(
+            f"Empty for default ({_default_alert_log_path()})",
+        )
+        self.alert_log_path_edit.setText(current_settings.alert_log_path or "")
+
         self.alert_webhook_url_edit = QLineEdit()
         self.alert_webhook_url_edit.setPlaceholderText("https://hooks.example.com/alert")
         self.alert_webhook_url_edit.setText(current_settings.alert_webhook_url or "")
 
         self.alert_webhook_auth_edit = QLineEdit()
-        self.alert_webhook_auth_edit.setPlaceholderText("Bearer <token>")
-        self.alert_webhook_auth_edit.setText(current_settings.alert_webhook_auth_header or "")
+        self.alert_webhook_auth_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.alert_webhook_auth_edit.setPlaceholderText(
+            WEBHOOK_AUTH_KEEP_PLACEHOLDER if self._had_webhook_auth else WEBHOOK_AUTH_NEW_PLACEHOLDER,
+        )
+
+        self.alert_webhook_auth_clear_check = QCheckBox("Remove stored authorization header")
+        self.alert_webhook_auth_clear_check.setVisible(self._had_webhook_auth)
 
         self.form_layout.addRow("Application Font Size:", self.font_size_spin)
         self.form_layout.addRow("JSON Indent Size:", self.indent_size_spin)
@@ -289,8 +329,11 @@ class SettingsDialog(QDialog):
         self.security_logging_section_label = _make_section_header("Security / Logging")
         self.form_layout.addRow(self.security_logging_section_label)
         self.form_layout.addRow("", self.log_hidden_key_names_check)
+        self.form_layout.addRow("Alert Log Path:", self.alert_log_path_edit)
         self.form_layout.addRow("Alert Webhook URL:", self.alert_webhook_url_edit)
         self.form_layout.addRow("Alert Webhook Auth Header:", self.alert_webhook_auth_edit)
+        if self._had_webhook_auth:
+            self.form_layout.addRow("", self.alert_webhook_auth_clear_check)
         self.layout.addLayout(self.form_layout)
 
         # Buttons
@@ -382,8 +425,14 @@ class SettingsDialog(QDialog):
             retry_backoff_multiplier=self.retry_backoff_spin.value(),
             retryable_status_codes=parsed_codes,
         )
+        alert_log_path = self.alert_log_path_edit.text().strip() or None
         webhook_url = self.alert_webhook_url_edit.text().strip() or None
-        webhook_auth = self.alert_webhook_auth_edit.text().strip() or None
+        webhook_auth = _resolve_webhook_auth_header(
+            self.alert_webhook_auth_edit.text(),
+            had_stored_auth=self._had_webhook_auth,
+            stored_auth=self.current_settings.alert_webhook_auth_header,
+            clear_requested=self.alert_webhook_auth_clear_check.isChecked(),
+        )
         encryption_mode = self.env_encryption_mode_combo.currentData()
         if encryption_mode == ENCRYPTION_MODE_ENABLED:
             env_encryption_enabled = True
@@ -410,7 +459,7 @@ class SettingsDialog(QDialog):
             default_retry_policy=retry_policy,
             alert_webhook_url=webhook_url,
             alert_webhook_auth_header=webhook_auth,
-            alert_log_path=self.current_settings.alert_log_path,
+            alert_log_path=alert_log_path,
             env_encryption_enabled=env_encryption_enabled,
             env_encryption_key_source=self.env_encryption_key_source_combo.currentData(),
             env_encryption_key_source_fallback=parse_key_source_fallback(
