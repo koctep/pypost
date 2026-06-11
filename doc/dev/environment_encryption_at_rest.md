@@ -12,6 +12,9 @@ PYPOST-486 runs encrypted load/save off the UI thread via
 desktop window.
 PYPOST-482 extracts environment variable serialization and encryption policy from
 `StorageManager` into `EnvironmentVariablesAdapter` for clearer boundaries and unit testing.
+PYPOST-487 adds operator migration tooling and the
+[Encryption Key Migration](encryption_key_migration.md) runbook (verify, bulk re-encrypt,
+encrypt-plaintext).
 
 This feature protects hidden-key values in persisted environment storage (`environments.json`).
 Runtime request execution is unchanged: components still consume plain
@@ -287,8 +290,9 @@ Operator steps:
 3. **Verify** — load environments; confirm pre-rotation values decrypt and new saves use the new
    active key (`kid` on new envelopes matches the new active key).
 4. **Complete** — mixed `kid` values in `environments.json` are expected until optional bulk
-   re-encryption (PYPOST-487). Removing historical key material too soon breaks decrypt for
-   values still referencing that `kid`.
+   re-encryption. Removing historical key material too soon breaks decrypt for values still
+   referencing that `kid`. Use the [Encryption Key Migration](encryption_key_migration.md) runbook
+   and `scripts/encryption_migrate.py re-encrypt` for bulk rewrite under the active key.
 
 Backward compatibility: deployments with only `PYPOST_ENV_ENCRYPTION_KEY` behave as before — a
 single key serves as active and satisfies `get_key_by_id` when `kid` matches.
@@ -430,7 +434,8 @@ paths. Only `type: file` is supported in v1.
 ### Settings change does not re-encrypt existing values immediately
 
 **Expected behavior.** Policy applies on the next save/load. Edit and save an environment (or
-trigger a bulk save) to encrypt plain-text hidden values after enabling encryption.
+run `scripts/encryption_migrate.py encrypt-plaintext`) to encrypt plain-text hidden values after
+enabling encryption. See [Encryption Key Migration](encryption_key_migration.md).
 
 ### Env var or registry file changes ignored while app is running
 
@@ -463,8 +468,11 @@ Primary coverage files:
 - `tests/test_environment_storage_worker.py`
 - `tests/test_environment_storage_gateway.py`
 - `tests/test_env_storage_responsiveness.py`
+- `tests/test_encryption_migration.py`
+- `tests/test_encryption_migrate_cli.py`
 
 Async orchestration details: [environment_storage_async.md](environment_storage_async.md).
+Migration procedures: [encryption_key_migration.md](encryption_key_migration.md).
 
 Project-wide regression:
 
