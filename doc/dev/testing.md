@@ -85,6 +85,28 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_server_integration.py -v
 ```
 
+## MCP test collection groundwork (PYPOST-180)
+
+Committed manual-test artifacts under `examples/collections/mcp.json` and
+`config/test/environments.json` are validated in CI without starting a live MCP server.
+Shared loaders live in `tests/helpers/mcp_test_collection.py` for reuse by
+[PYPOST-181](https://pypost.atlassian.net/browse/PYPOST-181) integration tests.
+
+| Module | Scope |
+| --- | --- |
+| `tests/helpers/mcp_test_collection.py` | Repo paths, constants, `load_mcp_test_collection()` |
+| `tests/test_mcp_test_collection.py` | Model parse, MCP tool overview, contract previews, env flags |
+
+Assertions include expected exposed tools (`sse_probe_metrics`, `sse_probe_main`), List Tools
+not exposed as an MCP tool, and MCP Test environment `enable_mcp: true`. Doc URL consistency
+remains in `tests/test_mcp_user_docs.py` (PYPOST-552).
+
+Focused run:
+
+```bash
+.venv/bin/python -m pytest tests/test_mcp_test_collection.py -v
+```
+
 ## MCP and metrics test coverage
 
 PYPOST-370 closed the PYPOST-38 debt item for automated MCP tools and metrics tests as
