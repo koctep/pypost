@@ -4,7 +4,7 @@ import pytest
 from prometheus_client import generate_latest
 
 from pypost.core.metrics import MetricsManager
-from pypost.core.key_provider import EnvironmentEncryptionError
+from pypost.core.key_provider import EnvironmentEncryptionError, build_key_id
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
@@ -343,3 +343,124 @@ def test_metrics_track_load_unsupported_format_error(tmp_path, monkeypatch):
         'environment_encryption_errors_total{reason="unsupported_format",stage="load"} 1.0'
         in scraped
     )
+
+
+def test_load_environments_with_errors_all_success(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+    storage.apply_encryption_settings(settings)
+
+    env = Environment(
+        id="e1",
+        name="Dev",
+        variables={"SECRET": "s3cr3t"},
+        hidden_keys={"SECRET"},
+    )
+    storage.save_environments([env])
+
+    environments, failures = storage.load_environments_with_errors()
+
+    assert failures == ()
+    assert environments == storage.load_environments()
+    assert len(environments) == 1
+    assert environments[0].variables["SECRET"] == "s3cr3t"
+
+
+def _save_two_envs_one_corrupt(storage, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    kid = build_key_id(key)
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+    storage.apply_encryption_settings(settings)
+    storage.save_environments(
+        [
+            Environment(
+                id="e1",
+                name="Bad",
+                variables={"SECRET": "bad"},
+                hidden_keys={"SECRET"},
+            ),
+            Environment(
+                id="e2",
+                name="Good",
+                variables={"TOKEN": "good"},
+                hidden_keys={"TOKEN"},
+            ),
+        ]
+    )
+    with open(storage.environments_file, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    data[0]["variables"]["SECRET"] = {
+        "enc": True,
+        "v": 1,
+        "alg": "fernet",
+        "kid": kid,
+        "ct": "this-is-not-a-valid-fernet-token",
+    }
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2)
+    return settings
+
+
+def test_load_environments_with_errors_partial_decrypt_failure(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    _save_two_envs_one_corrupt(storage, monkeypatch)
+
+    environments, failures = storage.load_environments_with_errors()
+
+    assert len(environments) == 1
+    assert environments[0].name == "Good"
+    assert environments[0].id == "e2"
+    assert len(failures) == 1
+    assert failures[0].name == "Bad"
+    assert failures[0].environment_id == "e1"
+    assert "decrypt" in failures[0].reason.lower()
+    assert failures[0].format_operator_message() == f"Bad: {failures[0].reason}"
+
+
+def test_load_environments_with_errors_missing_key(tmp_path, monkeypatch):
+    fernet = pytest.importorskip("cryptography.fernet")
+    storage = _make_storage(tmp_path, monkeypatch)
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    settings = AppSettings(env_encryption_enabled=True)
+    storage.apply_encryption_settings(settings)
+    storage.save_environments(
+        [
+            Environment(
+                id="e1",
+                name="Dev",
+                variables={"SECRET": "s3cr3t"},
+                hidden_keys={"SECRET"},
+            )
+        ]
+    )
+
+    monkeypatch.delenv("PYPOST_ENV_ENCRYPTION_KEY", raising=False)
+    environments, failures = storage.load_environments_with_errors()
+
+    assert environments == []
+    assert len(failures) == 1
+    assert failures[0].name == "Dev"
+    assert "decrypt" in failures[0].reason.lower()
+
+
+def test_load_environments_with_errors_missing_file(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    storage.environments_file.unlink()
+
+    environments, failures = storage.load_environments_with_errors()
+
+    assert environments == []
+    assert failures == ()
+
+
+def test_load_environments_unchanged_on_partial_failure(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    _save_two_envs_one_corrupt(storage, monkeypatch)
+
+    assert storage.load_environments() == []

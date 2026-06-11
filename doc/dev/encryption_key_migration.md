@@ -38,7 +38,7 @@ flowchart TD
   CLI --> EMS
   EMS --> INV
   EMS --> REP
-  EMS --> SM
+  EMS -->|"load_environments_with_errors()"| SM
   CM --> AS
   SM --> EVA
   EVA --> ESC
@@ -52,7 +52,8 @@ flowchart TD
 | Operator CLI | `scripts/encryption_migrate.py` | Headless subcommands; loads `AppSettings` via `ConfigManager` |
 | Inventory | `EnvironmentInventory` | Per-env and aggregate `kid`/plaintext stats |
 | Report | `MigrationReport` | Structured outcome: counts, errors, dry-run, backup path |
-| Storage | `pypost/core/storage.py` | Unchanged I/O; migration calls load/save |
+| Storage | `pypost/core/storage.py` | Atomic I/O; migration uses `load_environments_with_errors()` |
+| Load failure | `EnvironmentLoadFailure` | Structured per-env decrypt/deserialize failure from storage |
 | Adapter | `pypost/core/environment_variables_adapter.py` | Lazy encrypt-on-save; migration relies on re-save |
 
 **Safety properties:**
@@ -184,6 +185,22 @@ Use before production cutover or after rotation:
 
 ## API / Usage (developers)
 
+### `StorageManager.load_environments_with_errors()` (PYPOST-525)
+
+Supported batch load for migration and other operator tooling. Unlike `load_environments()`, it
+continues after individual decrypt or deserialize failures and returns structured
+`EnvironmentLoadFailure` records.
+
+```python
+storage.apply_encryption_settings(settings)
+environments, failures = storage.load_environments_with_errors()
+operator_lines = tuple(f.format_operator_message() for f in failures)
+```
+
+`EncryptionMigrationService._deserialize_all()` wraps this call. Desktop UI code must continue to
+use `load_environments()` only. Full contract and logging: [Environment Encryption at Rest —
+load contracts](environment_encryption_at_rest.md#environment-load-contracts-pypost-525).
+
 ### `EncryptionMigrationService(storage: StorageManager)`
 
 Facade for programmatic migration (CLI and optional future Settings actions).
@@ -245,6 +262,17 @@ cutovers.
 | Legacy env-only, single var | Env key is active | `get_key_by_id` only when `kid` matches | Rotation requires registry (Stage 1+) |
 
 ## Troubleshooting
+
+### `verify` lists environment names with decrypt errors
+
+**Symptoms:** stderr lines like `Dev: Failed to decrypt environment variable 'SECRET': …`.
+
+**Cause:** One or more stored environments failed full deserialize during
+`load_environments_with_errors()`. Migration fails closed before any write.
+
+**Fix:** For each listed environment, restore key material for the envelope `kid`, repair corrupt
+payloads, or restore `environments.json` from backup. See
+[dual load contract troubleshooting](environment_encryption_at_rest.md#migration-verify-lists-per-environment-errors-but-desktop-shows-no-environments).
 
 ### `verify` reports missing `kid`
 

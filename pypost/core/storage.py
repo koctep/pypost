@@ -1,12 +1,15 @@
 import json
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, List
 
 from platformdirs import user_data_dir
+from pydantic import ValidationError
 
 from pypost.core.environment_variables_adapter import EnvironmentVariablesAdapter
+from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import AppSettings
 
@@ -14,6 +17,19 @@ if TYPE_CHECKING:
     from pypost.core.metrics import MetricsManager
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class EnvironmentLoadFailure:
+    """One stored environment record that failed decrypt or deserialize."""
+
+    name: str
+    environment_id: str | None
+    reason: str
+
+    def format_operator_message(self) -> str:
+        """Human-readable line for CLI and MigrationReport.errors."""
+        return f"{self.name}: {self.reason}"
 
 
 class StorageManager:
@@ -191,3 +207,100 @@ class StorageManager:
                 e,
             )
             return []
+
+    def load_environments_with_errors(
+        self,
+    ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]:
+        """Load all stored environments, collecting per-record failures.
+
+        Unlike load_environments(), continues after individual decrypt or
+        deserialize failures and returns both successful environments and
+        structured failure details.
+
+        Caller must invoke apply_encryption_settings() before this method when
+        encryption policy matters (same as load_environments).
+
+        Returns:
+            A pair (environments, failures). environments preserves on-disk order
+            for successfully loaded records only. failures lists every record that
+            could not be deserialized.
+
+        File-level behavior (missing file, invalid JSON, non-list root):
+            Returns ([], ()) and logs an error — same effective outcome as an empty
+            store. Per-environment reporting applies only to valid list entries.
+        """
+        if not self.environments_file.exists():
+            return [], ()
+
+        try:
+            with open(self.environments_file, "r") as f:
+                data = json.load(f)
+        except Exception as e:
+            logger.error(
+                "load_environments_with_errors_failed file=%s error=%s",
+                self.environments_file,
+                e,
+            )
+            return [], ()
+
+        if not isinstance(data, list):
+            logger.error(
+                "load_environments_with_errors_failed file=%s error=%s",
+                self.environments_file,
+                "root is not a list",
+            )
+            return [], ()
+
+        environments: list[Environment] = []
+        failures: list[EnvironmentLoadFailure] = []
+
+        for item in data:
+            env_name = str(item.get("name", "unknown"))
+            raw_id = item.get("id")
+            environment_id = raw_id if isinstance(raw_id, str) else None
+
+            try:
+                env = self._env_adapter.deserialize_environment(item)
+                environments.append(env)
+                self._env_adapter.remember_environment_state(
+                    env.id,
+                    item.get("variables", {}),
+                    dict(env.variables),
+                )
+            except EnvironmentEncryptionError as exc:
+                failures.append(
+                    EnvironmentLoadFailure(
+                        name=env_name,
+                        environment_id=environment_id,
+                        reason=str(exc),
+                    )
+                )
+            except ValidationError as exc:
+                failures.append(
+                    EnvironmentLoadFailure(
+                        name=env_name,
+                        environment_id=environment_id,
+                        reason=str(exc),
+                    )
+                )
+            except Exception as exc:
+                logger.error(
+                    "load_environments_with_errors_item_failed name=%s error=%s",
+                    env_name,
+                    exc,
+                )
+                failures.append(
+                    EnvironmentLoadFailure(
+                        name=env_name,
+                        environment_id=environment_id,
+                        reason=str(exc),
+                    )
+                )
+
+        logger.info(
+            "load_environments_with_errors_completed count=%d error_count=%d file=%s",
+            len(environments),
+            len(failures),
+            self.environments_file,
+        )
+        return environments, tuple(failures)

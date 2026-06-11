@@ -353,6 +353,38 @@ def test_verify_decrypt_access_detects_corrupt_ciphertext(tmp_path, monkeypatch,
     )
 
 
+def test_deserialize_all_uses_public_storage_api(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    service = EncryptionMigrationService(storage)
+    settings = AppSettings(env_encryption_enabled=True)
+    env = Environment(name="Dev", variables={"A": "1"})
+
+    load_called = False
+    deserialize_called = False
+
+    def spy_load():
+        nonlocal load_called
+        load_called = True
+        return [env], ()
+
+    original_deserialize = storage._env_adapter.deserialize_environment
+
+    def spy_deserialize(item):
+        nonlocal deserialize_called
+        deserialize_called = True
+        return original_deserialize(item)
+
+    monkeypatch.setattr(storage, "load_environments_with_errors", spy_load)
+    monkeypatch.setattr(storage._env_adapter, "deserialize_environment", spy_deserialize)
+
+    environments, errors = service._deserialize_all(settings)
+
+    assert load_called
+    assert not deserialize_called
+    assert environments == [env]
+    assert errors == ()
+
+
 def test_backup_environments_file_creates_timestamped_copy(tmp_path):
     source = tmp_path / "environments.json"
     source.write_text("[]", encoding="utf-8")

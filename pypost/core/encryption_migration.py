@@ -257,6 +257,7 @@ class EncryptionMigrationService:
                 success=True,
             )
 
+        self._storage.apply_encryption_settings(settings)
         self._storage.save_environments(environments)
         final_inventory = self.build_inventory(settings)
         logger.info(
@@ -340,16 +341,9 @@ class EncryptionMigrationService:
         settings: AppSettings | None,
     ) -> tuple[list[Environment], tuple[str, ...]]:
         self._storage.apply_encryption_settings(settings)
-        raw = self._read_raw_environments()
-        environments: list[Environment] = []
-        errors: list[str] = []
-        for item in raw:
-            env_name = str(item.get("name", "unknown"))
-            try:
-                environments.append(self._storage._env_adapter.deserialize_environment(item))
-            except EnvironmentEncryptionError as exc:
-                errors.append(f"{env_name}: {exc}")
-        return environments, tuple(errors)
+        environments, failures = self._storage.load_environments_with_errors()
+        errors = tuple(failure.format_operator_message() for failure in failures)
+        return environments, errors
 
     @staticmethod
     def _projected_inventory_after_encrypt(

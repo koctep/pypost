@@ -19,6 +19,9 @@ PYPOST-484 centralizes v1 envelope schema validation in the typed
 PYPOST-487 adds operator migration tooling and the
 [Encryption Key Migration](encryption_key_migration.md) runbook (verify, bulk re-encrypt,
 encrypt-plaintext).
+PYPOST-525 adds `StorageManager.load_environments_with_errors()` so migration tooling reports
+per-environment decrypt failures through a supported public API without changing desktop load
+behavior.
 
 This feature protects hidden-key values in persisted environment storage (`environments.json`).
 Runtime request execution is unchanged: components still consume plain
@@ -51,7 +54,7 @@ flowchart TD
 | Policy resolver | `pypost/core/encryption_config.py` | Enabled flag, chain, provider factory |
 | Key sources | `pypost/core/key_sources/` | Env, keyring, secret-store resolution |
 | Key provider | `pypost/core/key_provider.py` | `ChainedKeyProvider` facade for codec |
-| Storage orchestration | `pypost/core/storage.py` | Paths, collections, atomic env file I/O |
+| Storage orchestration | `pypost/core/storage.py` | Paths, collections, atomic env file I/O; desktop and migration load contracts |
 | Variable encoding | `pypost/core/environment_variables_adapter.py` | Policy, serialize/deserialize, metrics/logs |
 | Settings UI | `pypost/ui/dialogs/settings_dialog.py` | Encryption and source controls |
 | Controller wiring | `pypost/ui/main_window.py` | Apply settings on init and after save |
@@ -100,6 +103,26 @@ are still registered.
 
 Changing encryption settings does **not** immediately re-save all environments. The new policy
 applies on the next save or load cycle.
+
+### Environment load contracts (PYPOST-525)
+
+Two public load methods coexist on `StorageManager`:
+
+| Method | Consumer | On per-item failure | On file-level failure |
+| --- | --- | --- | --- |
+| `load_environments()` | Desktop UI (`EnvPresenter`, async gateway) | Returns `[]`; logs `load_environments_failed` | Returns `[]` |
+| `load_environments_with_errors()` | `EncryptionMigrationService` | Continues batch; returns `EnvironmentLoadFailure` | Returns `([], ())`; logs `load_environments_with_errors_failed` |
+
+Desktop resilience is unchanged: any decrypt or deserialize error still yields an empty list for
+the UI. Migration needs every failure listed while still loading remaining environments.
+
+```mermaid
+flowchart LR
+  UI[Desktop UI] -->|"load_environments()"| SM[StorageManager]
+  EMS[EncryptionMigrationService] -->|"load_environments_with_errors()"| SM
+  SM --> EVA[EnvironmentVariablesAdapter]
+  SM --> ENV[(environments.json)]
+```
 
 ## API / Usage
 
@@ -162,6 +185,47 @@ Call sites:
 - `MainWindow.__init__` — apply settings on startup.
 - `MainWindow.open_settings()` — waits for `EnvPresenter.wait_storage_idle()`, then re-applies
   after the user saves Settings.
+
+### `EnvironmentLoadFailure` (`pypost/core/storage.py`)
+
+Frozen value object for one stored environment record that failed decrypt or deserialize during a
+migration-oriented batch load.
+
+| Field | Source | Notes |
+| --- | --- | --- |
+| `name` | `raw_env.get("name", "unknown")` | Operator-facing identity |
+| `environment_id` | `raw_env.get("id")` when present | Stable id for logs; optional |
+| `reason` | `str(exc)` from caught exception | Sanitized; no key material |
+
+`format_operator_message() -> str` returns `"name: reason"` for CLI and `MigrationReport.errors`.
+
+### `StorageManager.load_environments_with_errors() -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]`
+
+Loads every record in `environments.json`, collecting per-item failures without stopping the
+batch.
+
+**Prerequisites:** call `apply_encryption_settings(settings)` first when encryption policy
+matters (same as `load_environments()`).
+
+**Returns:**
+
+- `environments` — successfully deserialized records in on-disk order (failed records omitted).
+- `failures` — one `EnvironmentLoadFailure` per record that could not be deserialized.
+
+**Per-item exceptions:** `EnvironmentEncryptionError` and Pydantic `ValidationError` become
+failures and the loop continues. Other unexpected exceptions log
+`load_environments_with_errors_item_failed` and are also recorded as failures.
+
+**File-level behavior:** missing file returns `([], ())` silently. Invalid JSON or a non-list root
+logs `load_environments_with_errors_failed` and returns `([], ())`. File-level errors are not
+included in the failure tuple.
+
+**Logging:** batch completion logs `load_environments_with_errors_completed` with `count`,
+`error_count`, and `file`. Event names are distinct from desktop `load_environments_failed` for
+log filtering.
+
+**Primary consumer:** `EncryptionMigrationService._deserialize_all()` maps failures via
+`format_operator_message()`. See [Encryption Key Migration](encryption_key_migration.md).
 
 ### Settings UI
 
@@ -388,6 +452,18 @@ mention `encryption_key_unavailable` with `reason=no_source_provided_active_key`
 **Fix:** provision key material in the primary source (and fallbacks if configured). For env-only
 setups, export a valid Fernet key in `PYPOST_ENV_ENCRYPTION_KEY`. Disable encryption in Settings
 until key material is configured.
+
+### Migration verify lists per-environment errors but desktop shows no environments
+
+**Symptoms:** `encryption_migrate verify` prints `"Dev: … could not be decrypted"` for one
+environment while the desktop app shows an empty environment list.
+
+**Cause:** Expected dual-contract behavior (PYPOST-525). `load_environments_with_errors()`
+continues the batch and reports each failure; `load_environments()` returns `[]` when any record
+fails.
+
+**Fix:** repair or remove the failing stored environment (restore key material, fix corrupt
+envelope, or restore from backup). Re-run `verify` until exit code 0.
 
 ### Environments missing or empty after load (decrypt failure)
 
