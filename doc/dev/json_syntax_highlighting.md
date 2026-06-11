@@ -48,6 +48,11 @@ support is tracked separately (PYPOST-395).
 `tests/test_json_highlighter.py` asserts foreground colors via `QTextBlock.layout().formats()`
 because `QTextCursor.charFormat()` ignores `QSyntaxHighlighter` ranges.
 
+JSON syntax coverage includes keywords (`true`/`false`/`null`), integers and floats (including
+zero and scientific notation), string values, object keys, array strings, escaped characters
+inside strings, and multiline documents. Template placeholder tests cover plain variables and
+function expressions overriding string green.
+
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_json_highlighter.py -q
 ```

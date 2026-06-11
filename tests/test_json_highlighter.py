@@ -1,7 +1,7 @@
-"""JsonHighlighter tests (PYPOST-103).
+"""JsonHighlighter tests (PYPOST-103, PYPOST-124, PYPOST-399).
 
-PYPOST-100 (gap analysis): RequestEditor/ResponseView attach JsonHighlighter to JSON body
-documents; rules cover keywords, numbers, strings, and object keys. Assertions use
+RequestEditor/ResponseView attach JsonHighlighter to JSON body documents. Rules cover
+keywords, numbers, strings, object keys, and template placeholders. Assertions use
 QTextLayout format ranges (QTextCursor.charFormat ignores QSyntaxHighlighter ranges).
 """
 
@@ -68,10 +68,42 @@ class TestJsonHighlighter(unittest.TestCase):
         pos = text.index("3")
         self.assertEqual(_hex_color_at(edit.document(), pos), QColor("blue").name())
 
+    def test_highlights_integer_number(self):
+        text = '{"count": 42}'
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("42")
+        self.assertEqual(_hex_color_at(edit.document(), pos), QColor("blue").name())
+
+    def test_highlights_zero_number(self):
+        text = '{"n": 0}'
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("0", text.index(":"))
+        self.assertEqual(_hex_color_at(edit.document(), pos), QColor("blue").name())
+
+    def test_highlights_scientific_notation_number(self):
+        text = '{"x": 1.5e10}'
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("1")
+        self.assertEqual(_hex_color_at(edit.document(), pos), QColor("blue").name())
+        pos_exp = text.index("e")
+        self.assertEqual(_hex_color_at(edit.document(), pos_exp), QColor("blue").name())
+
     def test_highlights_json_string_value_green(self):
         text = '{"k": "hello"}'
         edit = self._edit_with_highlighted(text)
         pos = text.index("h")
+        self.assertEqual(_hex_color_at(edit.document(), pos), QColor("green").name())
+
+    def test_highlights_array_string_green_not_purple(self):
+        text = '["item"]'
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("i")
+        self.assertEqual(_hex_color_at(edit.document(), pos), QColor("green").name())
+
+    def test_highlights_escaped_characters_in_string(self):
+        text = '{"m": "a\\"b"}'
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("a", text.index(":"))
         self.assertEqual(_hex_color_at(edit.document(), pos), QColor("green").name())
 
     def test_highlights_json_object_key_purple(self):
@@ -85,6 +117,20 @@ class TestJsonHighlighter(unittest.TestCase):
         edit = self._edit_with_highlighted(text)
         pos = text.index("true")
         self.assertEqual(_hex_color_at(edit.document(), pos), QColor("darkblue").name())
+
+    def test_combined_json_syntax_colors(self):
+        text = '{"enabled": true, "name": "api", "count": 7}'
+        edit = self._edit_with_highlighted(text)
+        darkblue = QColor("darkblue").name()
+        purple = QColor("purple").name()
+        green = QColor("green").name()
+        blue = QColor("blue").name()
+        self.assertEqual(_hex_color_at(edit.document(), text.index("enabled")), purple)
+        self.assertEqual(_hex_color_at(edit.document(), text.index("true")), darkblue)
+        self.assertEqual(_hex_color_at(edit.document(), text.index("name")), purple)
+        self.assertEqual(_hex_color_at(edit.document(), text.index("api")), green)
+        self.assertEqual(_hex_color_at(edit.document(), text.index("count")), purple)
+        self.assertEqual(_hex_color_at(edit.document(), text.index("7")), blue)
 
     def test_highlights_template_variable_in_string_value(self):
         text = '{"url": "{{baseUrl}}/api"}'
