@@ -22,6 +22,8 @@ logging policy for hidden-flag toggle events (variable key names in diagnostic l
   - Emits `env_hidden_flag_changed` INFO log on toggle (key name policy: PYPOST-448).
   - PYPOST-467: context-menu **Delete** on populated variable rows (see
     [Environment Variable Delete](environment_variable_delete.md)).
+- **Shared mask constant**: `pypost.core.constants.HIDDEN_MASK` (`********`)
+  - Used by environment manager UI, hover previews, and toggle log redaction.
 - **Toggle log policy**: `pypost.core.hidden_toggle_log_policy.HiddenToggleLogPolicy`
   - Formats variable key name for `env_hidden_flag_changed` log events.
 - **Hover resolution**: `pypost.ui.widgets.mixins.VariableHoverHelper`

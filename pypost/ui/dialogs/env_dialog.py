@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from pypost.core.environment_ops import clone_environment
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.models.models import Environment
-from pypost.ui.widgets.mixins import HIDDEN_MASK
+from pypost.core.constants import HIDDEN_MASK
 
 logger = logging.getLogger(__name__)
 

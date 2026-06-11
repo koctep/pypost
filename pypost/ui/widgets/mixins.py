@@ -3,10 +3,9 @@ from typing import Dict, Optional, Set, Tuple
 
 from PySide6.QtWidgets import QToolTip, QWidget
 
+from pypost.core.constants import HIDDEN_MASK
 from pypost.core.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
-
-HIDDEN_MASK = "********"
 
 
 class VariableHoverHelper:

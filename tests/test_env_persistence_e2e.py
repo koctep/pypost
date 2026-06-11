@@ -10,7 +10,7 @@ from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.presenters.env_presenter import EnvPresenter
-from pypost.ui.widgets.mixins import HIDDEN_MASK
+from pypost.core.constants import HIDDEN_MASK
 
 
 @pytest.fixture(scope="module")

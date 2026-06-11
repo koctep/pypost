@@ -3,7 +3,7 @@
 import unittest
 
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
-from pypost.ui.widgets.mixins import HIDDEN_MASK
+from pypost.core.constants import HIDDEN_MASK
 
 
 class TestHiddenToggleLogPolicy(unittest.TestCase):

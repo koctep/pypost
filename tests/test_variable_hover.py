@@ -18,11 +18,8 @@ from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QMouseEvent, QTextCursor
 from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit, QTableWidgetItem
 
-from pypost.ui.widgets.mixins import (
-    HIDDEN_MASK,
-    VariableHoverHelper,
-    VariableHoverMixin,
-)
+from pypost.core.constants import HIDDEN_MASK
+from pypost.ui.widgets.mixins import VariableHoverHelper, VariableHoverMixin
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareTableWidget
 
 

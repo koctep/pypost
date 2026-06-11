@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication, QTableWidgetItem
 
 from pypost.models.models import Environment
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
-from pypost.ui.widgets.mixins import HIDDEN_MASK
+from pypost.core.constants import HIDDEN_MASK
 
 
 @pytest.fixture(scope="module")

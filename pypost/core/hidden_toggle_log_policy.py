@@ -1,4 +1,4 @@
-from pypost.ui.widgets.mixins import HIDDEN_MASK
+from pypost.core.constants import HIDDEN_MASK
 
 
 class HiddenToggleLogPolicy:
