@@ -302,6 +302,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-307](https://pypost.atlassian.net/browse/PYPOST-307) | Marker lifecycle, `make -p` prerequisite chains, bare-venv `lint` failure |
 | [PYPOST-310](https://pypost.atlassian.net/browse/PYPOST-310) | Lightweight execution smoke for `install`, `test`, and `lint` exit codes |
 | [PYPOST-559](https://pypost.atlassian.net/browse/PYPOST-559) | Optional slow `make install` with real `requirements.txt` in isolated workspace |
+| [PYPOST-279](https://pypost.atlassian.net/browse/PYPOST-279) | Pytest exit code `5` (no tests collected) treated as failure in `make test` and CI |
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -329,6 +330,29 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -m s
 CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest (`pytest.ini`
 `addopts`) and `make test` exclude `-m slow`. A separate `make-install-smoke` job in
 `.github/workflows/test.yml` runs `-m slow` Makefile tests on Python 3.11 with pip caching.
+
+## Pytest exit codes (PYPOST-279)
+
+Pytest uses distinct exit codes. PyPost treats them as follows in `make test` and CI (native
+propagation — no Makefile wrapper maps codes to success):
+
+| Code | Meaning | CI / `make test` |
+| --- | --- | --- |
+| `0` | All tests passed | Success |
+| `1` | Tests failed | Failure |
+| `2` | User interrupt | Failure |
+| `3` | Internal error | Failure |
+| `4` | pytest usage error | Failure |
+| `5` | No tests collected | **Failure** — misconfiguration, not an acceptable empty state |
+
+Exit code `5` indicates zero tests were collected (empty `tests/`, broken discovery path, or
+marker filter excluding everything). With a mature suite this always blocks merges.
+
+Regression coverage: `tests/test_pytest_exit_policy.py`.
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_pytest_exit_policy.py -v
+```
 
 ## Pytest live logging (`log_cli`) (PYPOST-570)
 
