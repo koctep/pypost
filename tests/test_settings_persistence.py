@@ -16,6 +16,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager
@@ -167,6 +168,38 @@ class TestStateManagerPersistence(unittest.TestCase):
         sm2 = StateManager(ConfigManager())
         self.assertEqual(sm2.get_expanded_collections(), ["b"])
         self.assertEqual(sm2.get_open_tabs(), ["r1", "r2"])
+
+    def test_flush_pending_save_noop_when_nothing_pending(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+        with patch.object(cm, "save_config", wraps=cm.save_config) as wrapped:
+            sm.flush_pending_save()
+            wrapped.assert_not_called()
+
+    def test_save_immediately_persists_without_waiting_for_debounce(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+        sm.set_expanded_collections(["immediate"])
+        sm.save()
+
+        sm2 = StateManager(ConfigManager())
+        self.assertEqual(sm2.get_expanded_collections(), ["immediate"])
+
+
+def test_state_manager_debounced_save_persists_after_timer(qapp):  # noqa: ARG001
+    """Debounced timer path persists UI state without flush_pending_save."""
+    with tempfile.TemporaryDirectory() as td:
+        with patch("pypost.core.config_manager.user_config_dir", return_value=td):
+            cm = ConfigManager()
+            sm = StateManager(cm)
+            with patch.object(cm, "save_config", wraps=cm.save_config) as wrapped:
+                sm.set_expanded_collections(["debounced"])
+                wrapped.assert_not_called()
+                QTest.qWait(350)
+                wrapped.assert_called_once()
+
+            sm2 = StateManager(ConfigManager())
+            assert sm2.get_expanded_collections() == ["debounced"]
 
 
 def test_request_timeout_survives_settings_dialog_save_and_restart(qapp):  # noqa: ARG001
