@@ -55,7 +55,11 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 - **HTTPClient**: Handles the actual network communication using `requests`. Responsible for rendering templates and preparing request parameters.
 - **ScriptExecutor**: Runs user-defined Python scripts in a sandboxed environment to manipulate variables.
 - **TemplateService**: A service that manages the Jinja2 Environment and processes strings like `{{base_url}}/api`.
-- **MetricsManager**: A singleton service managing the observability server. It runs an isolated `uvicorn` server providing both Prometheus metrics (`/metrics`) and an MCP interface (`/sse`) for accessing metrics as resources.
+- **MetricsManager**: Composition-root facade (constructed in `main.py`) composing
+  `MetricsRegistry` (Prometheus counters) and `MetricsServer` (observability HTTP/MCP). Runs an
+  isolated `uvicorn` server providing Prometheus metrics (`/metrics`), Streamable HTTP MCP
+  (`/mcp`), and legacy SSE for accessing metrics as resources. See
+  [mcp_integration.md](mcp_integration.md).
 - **Storage**: Manages saving and loading collections and environments to/from the filesystem (JSON
   format). When environment encryption is enabled, `EnvironmentStorageGateway` delegates encrypted
   load/save to `EnvironmentStorageWorker` on a background thread (see

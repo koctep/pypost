@@ -19,7 +19,14 @@ from main.py. See audit R2, R3.
 reloads use `RequestManager.reload_collections()` only. See [collection_loading.md](../collection_loading.md).
 See audit R5.
 
-## 4. Request Execution Protocol
+## 4. Metrics Module Split
+
+**Resolved in PYPOST-49** (implemented in [PYPOST-75](../mcp_integration.md)). Counters live in
+`MetricsRegistry`; uvicorn/MCP lifecycle lives in `MetricsServer`; `MetricsManager` remains the
+injection facade. See [mcp_integration.md](../mcp_integration.md) and
+[testability.md](../testability.md). See audit R7.
+
+## 5. Request Execution Protocol
 
 RequestService accepts optional `http_client` and `mcp_client` constructor injection (PYPOST-382).
 RequestWorker and MCPServerImpl still create RequestService internally. Introduce protocols for
@@ -30,6 +37,6 @@ full testability. See [testability.md](../testability.md) and audit R4, R9.
 - **Prerequisite:** PYPOST-52 — Add test coverage for refactoring safety (blocks P1)
 - **P1:** PYPOST-43 (MainWindow), PYPOST-44 (MetricsManager), PYPOST-45 (template_service)
 - **P2:** PYPOST-46 (HTTPClient protocol), ~~PYPOST-47 (collection loading)~~, PYPOST-48
-  (item_type strategy), PYPOST-49 (MetricsManager split)
+  (item_type strategy), ~~PYPOST-49 (MetricsManager split)~~
 - **P3:** PYPOST-50 (StorageInterface), PYPOST-51 (ExecuteRequestProtocol)
 - Consider automated audit tooling (radon, pylint) in CI.
