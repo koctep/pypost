@@ -1,8 +1,27 @@
 # PyPost
 
 PyPost is a lightweight HTTP client with a graphical interface, written in Python using
-PySide6. The application is designed for API testing and sending HTTP requests, providing a
-convenient tool for developers, similar to Postman.
+PySide6. It helps developers test APIs and turn saved HTTP requests into tools for local
+AI agents via the Model Context Protocol (MCP).
+
+## Vision
+
+**Turn your existing HTTP requests into safe MCP tools for your local AI agent — in
+seconds, through the UI, without writing server code.**
+
+Today, giving an AI agent access to your APIs usually means building and maintaining an
+MCP server by hand: re-describing endpoints, auth, and parameters, with little control
+over what the agent sees or whether secrets leak. You already have working requests in
+your API client — PyPost closes that gap.
+
+**North star:** any request you mark as an MCP tool is reliably available to your local
+agent as a correctly working tool — with a clear name, description, and parameters,
+environment variables resolved, and secrets handled safely.
+
+**Principles:** safety by default; what you see is what the agent sees; reuse over
+rebuild; local-first.
+
+See [MCP Integration](doc/mcp_integration.md) for setup and usage.
 
 ## Features
 
@@ -13,6 +32,7 @@ convenient tool for developers, similar to Postman.
 *   **Environment Variables**: Support for environment variables to switch between
     configurations (e.g., dev/prod).
 *   **Templating**: Use Jinja2 for dynamic data generation in requests.
+*   **MCP Tools**: Expose saved requests as MCP tools for local AI agents (e.g. Cursor).
 
 ## Requirements
 
