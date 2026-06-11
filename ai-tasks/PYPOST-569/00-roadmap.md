@@ -4,4 +4,5 @@ Recommended branch: `docs/PYPOST-569-timeout-audit`
 
 - [x] All steps — analysis only
 
-Artifacts: `ai-tasks/PYPOST-569/timeout-audit.md`, `durations.txt`
+Artifacts: `timeout-audit.md`, `timeout-audit.csv`, `durations.txt`, `durations-full.txt`,
+`scripts/parse_timeout_audit.py`
