@@ -2,10 +2,9 @@
 
 import json
 import threading
-import time
 
 import pytest
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QApplication
 
@@ -47,11 +46,23 @@ def qt_app():
     return app
 
 
-def _process_until_complete(qt_app, spy, *, timeout_s: float = 30.0) -> None:
-    deadline = time.monotonic() + timeout_s
-    while spy.count() == 0 and time.monotonic() < deadline:
-        qt_app.processEvents()
-    assert spy.count() == 1
+def _process_until(predicate, *, timeout_ms: int = 10_000) -> None:
+    """Run the event loop until predicate() is true or timeout (default 10s)."""
+    loop = QEventLoop()
+    elapsed = [0]
+
+    def tick() -> None:
+        elapsed[0] += 10
+        if predicate() or elapsed[0] >= timeout_ms:
+            loop.quit()
+
+    timer = QTimer()
+    timer.setInterval(10)
+    timer.timeout.connect(tick)
+    timer.start()
+    loop.exec()
+    timer.stop()
+    assert predicate(), f"condition not met within {timeout_ms}ms"
 
 
 def test_event_loop_stays_responsive_during_encrypted_load(
@@ -73,9 +84,12 @@ def test_event_loop_stays_responsive_during_encrypted_load(
     timer.start()
 
     spy = QSignalSpy(gateway.load_completed)
+    fail_spy = QSignalSpy(gateway.load_failed)
     gateway.load_async()
 
-    _process_until_complete(qt_app, spy)
+    _process_until(lambda: spy.count() >= 1 or fail_spy.count() >= 1)
+    if fail_spy.count() >= 1:
+        pytest.fail(f"load failed: {fail_spy.at(0)[0]}")
     assert timer_fired, "event loop should process timer during async load"
     assert len(spy.at(0)[0]) == len(environments)
 
@@ -102,9 +116,12 @@ def test_event_loop_stays_responsive_during_encrypted_save(
     timer.start()
 
     spy = QSignalSpy(gateway.save_completed)
+    fail_spy = QSignalSpy(gateway.save_failed)
     gateway.save_async(environments)
 
-    _process_until_complete(qt_app, spy)
+    _process_until(lambda: spy.count() >= 1 or fail_spy.count() >= 1)
+    if fail_spy.count() >= 1:
+        pytest.fail(f"save failed: {fail_spy.at(0)[0]}")
     assert timer_fired, "event loop should process timer during async save"
 
 
@@ -128,12 +145,10 @@ def test_apply_encryption_settings_after_wait_idle_no_mixed_persistence(
     storage.save_environments = gated_save
 
     save_spy = QSignalSpy(gateway.save_completed)
+    fail_spy = QSignalSpy(gateway.save_failed)
     gateway.save_async(environments)
 
-    deadline = time.monotonic() + 5.0
-    while not save_started.is_set() and time.monotonic() < deadline:
-        qt_app.processEvents()
-    assert save_started.is_set()
+    _process_until(save_started.is_set, timeout_ms=5_000)
     assert gateway.is_busy()
 
     assert gateway.wait_idle(timeout_ms=100) is False
@@ -141,7 +156,12 @@ def test_apply_encryption_settings_after_wait_idle_no_mixed_persistence(
 
     release_save.set()
     assert gateway.wait_idle() is True
-    _process_until_complete(qt_app, save_spy)
+    _process_until(
+        lambda: save_spy.count() >= 1 or fail_spy.count() >= 1,
+        timeout_ms=10_000,
+    )
+    if fail_spy.count() >= 1:
+        pytest.fail(f"save failed: {fail_spy.at(0)[0]}")
 
     with open(storage.environments_file, "r") as f:
         payload = json.load(f)
