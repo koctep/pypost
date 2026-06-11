@@ -82,7 +82,7 @@ jobs:
               "import xml.etree.ElementTree as ET; \
                r = ET.parse('coverage.xml').getroot().get('line-rate','0'); \
                print(f'{float(r)*100:.1f}')")
-            THRESHOLD=50
+            THRESHOLD=60
             if python -c "exit(0 if float('$COV') >= $THRESHOLD else 1)"; then
               STATUS=":white_check_mark: PASS"
             else

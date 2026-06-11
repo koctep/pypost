@@ -192,6 +192,27 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest \
   tests.test_collection_tree_delete_metrics -v
 ```
 
+## Coverage threshold
+
+PYPOST-88 introduced a minimum line-coverage gate; PYPOST-432 raised it incrementally toward
+the 70% project target.
+
+| Setting | Value |
+| --- | --- |
+| Enforcement | `--cov-fail-under=60` in `pytest.ini` `addopts` |
+| CI summary display | `THRESHOLD=60` in `.github/workflows/test.yml` |
+| Project target | 70% (follow-up when ready) |
+
+Audit current coverage:
+
+```bash
+make test-cov
+```
+
+Look for `TOTAL ... XX%` and `Required test coverage of 60% reached` in the output. To raise
+the threshold, update both `pytest.ini` and the `THRESHOLD` variable in `test.yml` together.
+See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
+
 ## Makefile automation tests
 
 `tests/test_makefile.py` validates root `Makefile` contracts without touching the repository
