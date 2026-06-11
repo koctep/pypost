@@ -19,6 +19,7 @@ set up your development environment, and contribute to the project.
 1. [Environment Encryption at Rest](environment_encryption_at_rest.md)
 1. [Async Environment Storage (PYPOST-486)](environment_storage_async.md)
 1. [Template Expression Functions (PYPOST-450)](template_expression_functions.md)
+1. [Body Editor Line Numbers (PYPOST-510)](body_editor_line_numbers.md)
 
 ## Quick Start
 

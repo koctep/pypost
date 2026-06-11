@@ -1,9 +1,10 @@
 import json
 
-from PySide6.QtCore import QMimeData, Qt
-from PySide6.QtGui import QFontMetrics, QKeyEvent, QTextCursor
+from PySide6.QtCore import QMimeData, Qt, QRect
+from PySide6.QtGui import QFontMetrics, QKeyEvent, QPaintEvent, QPainter, QTextCursor
 from PySide6.QtWidgets import QPlainTextEdit
 
+from pypost.ui.widgets.line_number_area import LineNumberArea
 from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
 
 
@@ -13,6 +14,11 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self.indent_size = indent_size
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
+        self._line_number_area = LineNumberArea(self)
+        self.blockCountChanged.connect(self._update_line_number_area_width)
+        self.updateRequest.connect(self._update_line_number_area)
+        self._update_line_number_area_width(0)
+
         self.update_indent_size(indent_size)
 
     def update_indent_size(self, new_size: int):
@@ -21,6 +27,69 @@ class CodeEditor(VariableAwarePlainTextEdit):
         font = self.document().defaultFont()
         font_metrics = QFontMetrics(font)
         self.setTabStopDistance(self.indent_size * font_metrics.horizontalAdvance(" "))
+
+    def line_number_area_width(self) -> int:
+        digits = max(1, len(str(self.blockCount())))
+        font_metrics = QFontMetrics(self.document().defaultFont())
+        space = 3 + font_metrics.horizontalAdvance("9") * digits
+        return space
+
+    def _update_line_number_area_width(self, _block_count: int):
+        width = self.line_number_area_width()
+        self.setViewportMargins(width, 0, 0, 0)
+        cr = self.contentsRect()
+        if cr.height() > 0:
+            self._line_number_area.setGeometry(QRect(cr.left(), cr.top(), width, cr.height()))
+
+    def _update_line_number_area(self, rect: QRect, dy: int):
+        if dy:
+            self._line_number_area.scroll(0, dy)
+        else:
+            self._line_number_area.update(
+                0, rect.y(), self._line_number_area.width(), rect.height()
+            )
+
+        if rect.contains(self.viewport().rect()):
+            self._update_line_number_area_width(0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        cr = self.contentsRect()
+        self._line_number_area.setGeometry(
+            QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
+        )
+
+    def line_number_area_paint_event(self, event: QPaintEvent):
+        painter = QPainter(self._line_number_area)
+        painter.fillRect(event.rect(), self.palette().color(self.backgroundRole()))
+
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = round(
+            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+        )
+        bottom = top + round(self.blockBoundingRect(block).height())
+
+        gutter_color = self.palette().color(self.foregroundRole())
+        gutter_color.setAlpha(128)
+        painter.setPen(gutter_color)
+
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                number = str(block_number + 1)
+                painter.drawText(
+                    0,
+                    top,
+                    self._line_number_area.width() - 3,
+                    self.fontMetrics().height(),
+                    Qt.AlignmentFlag.AlignRight,
+                    number,
+                )
+
+            block = block.next()
+            top = bottom
+            bottom = top + round(self.blockBoundingRect(block).height())
+            block_number += 1
 
     def reformat_text(self):
         """Reformat current text with new indent size."""
