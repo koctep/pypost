@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 LARGE_DOC_CHAR_THRESHOLD = 100 * 1024
 MATCH_COUNT_CAP = 1000
+MATCH_INDEX_SAFETY_LIMIT = 10000
 SEARCH_DEBOUNCE_MS = 250
 
 
@@ -176,7 +177,7 @@ class ResponseView(QWidget):
             )
             if start <= current_pos <= end:
                 return idx
-            if idx > 10000:
+            if idx > MATCH_INDEX_SAFETY_LIMIT:
                 return 0
 
     def _update_match_count(self) -> int:
