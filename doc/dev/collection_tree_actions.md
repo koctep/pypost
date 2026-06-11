@@ -108,8 +108,11 @@ No task-specific settings. Metrics use existing `MetricsManager` counters docume
 
 ## Automated tests
 
-`tests/test_collection_tree_actions.py` covers right-click menu behavior via
-`CollectionsPresenter` and `CollectionTreeActions`:
+`tests/collection_tree_actions_test_support.py` provides `build_isolated_tree_actions()` —
+a minimal `QTreeView` + `QStandardItemModel` harness that constructs `CollectionTreeActions`
+directly with `MagicMock` callbacks (no `CollectionsPresenter`).
+
+`tests/test_collection_tree_actions.py` covers menu dispatch and rename callbacks in isolation:
 
 | Test | Behavior |
 |------|----------|
@@ -117,9 +120,13 @@ No task-specific settings. Metrics use existing `MetricsManager` counters docume
 | `test_collection_menu_offers_rename_and_delete` | Collection node actions |
 | `test_request_menu_offers_new_tab_rename_delete` | Request node actions |
 | `test_rename_selected_starts_inline_edit` | Rename dispatches inline edit |
-| `test_new_tab_selected_emits_open_isolated_tab` | New tab copies request, emits signal |
+| `test_new_tab_selected_emits_open_isolated_tab` | New tab copies request, emits callback |
 | `test_delete_cancelled_skips_persistence` | Delete No — tree unchanged |
 | `test_delete_confirmed_removes_request` | Delete Yes — row removed |
+| `test_rename_cancel_restores_tree_incrementally` | Escape cancel restores label |
+| `test_rename_commit_updates_request_tree_and_emits` | Request rename + callbacks |
+| `test_rename_commit_updates_collection_tree` | Collection rename |
+| `test_rename_rejected_empty_shows_warning` | Empty name rejection |
 
 `tests/test_collection_tree_delete_confirmation.py` asserts Yes/No confirmation
 branching and `track_gui_collection_delete_action` call sequences (`selected` →
@@ -128,7 +135,7 @@ branching and `track_gui_collection_delete_action` call sequences (`selected` �
 Patch `QMenu` under `pypost.ui.presenters.collection_tree_actions`. Patch dialog helpers
 (`confirm_delete`, `show_rename_empty_name_error`, `show_delete_failure`, etc.) at the same
 import site. Unit tests for helpers live in `tests/test_collection_item_dialogs.py`.
-Related presenter tests remain in `tests/test_collections_presenter.py`.
+Presenter wiring and integration paths remain in `tests/test_collections_presenter.py`.
 
 ### Tree expand/collapse state tests (PYPOST-388)
 
@@ -155,5 +162,5 @@ not `collections_presenter`.
 
 ### Rename pending state in tests
 
-Set `presenter._pending_rename` — the property delegates to
-`presenter._tree_actions._pending_rename`.
+For isolated tests, set `harness.actions._pending_rename` directly. In presenter tests,
+`presenter._pending_rename` delegates to `presenter._tree_actions._pending_rename`.

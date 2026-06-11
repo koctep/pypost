@@ -1,67 +1,23 @@
-"""GUI tests for collection tree right-click context menu behavior."""
+"""Direct unit tests for CollectionTreeActions (menu dispatch, rename flows)."""
 
 import unittest
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QPoint, QModelIndex
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication
 
-from pypost.models.models import Collection, RequestData
-from pypost.ui.presenters.collections_presenter import CollectionsPresenter
-
-
-def _make_collection(col_id: str, name: str, requests=None) -> Collection:
-    return Collection(id=col_id, name=name, requests=requests or [])
-
-
-def _make_request(req_id: str, name: str, method: str = "GET") -> RequestData:
-    return RequestData(id=req_id, name=name, method=method)
+from tests.collection_tree_actions_test_support import (
+    build_isolated_tree_actions,
+    make_collection,
+    make_request,
+)
 
 
-class FakeRequestManager:
-    def __init__(self, collections=None):
-        self.collections = collections or []
-        self.storage = MagicMock()
-        self.storage.load_collections.return_value = self.collections
-
-    def reload_collections(self):
-        self.collections = self.storage.load_collections()
-
-    def get_collections(self):
-        return self.collections
-
-    def delete_collection_item(self, item_id, item_type):
-        if item_type == "request":
-            for col in self.collections:
-                col.requests = [req for req in col.requests if req.id != item_id]
-        elif item_type == "collection":
-            self.collections = [col for col in self.collections if col.id != item_id]
-        return True
-
-    def rename_collection_item(self, item_id, item_type, new_name):
-        return True
-
-
-class FakeStateManager:
-    def get_expanded_collections(self):
-        return []
-
-    def set_expanded_collections(self, ids):
-        pass
-
-
-class TestCollectionTreeContextMenu(unittest.TestCase):
+class TestCollectionTreeActionsIsolated(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
-
-    def _make_presenter(self, collections=None):
-        col = collections or []
-        rm = FakeRequestManager(col)
-        sm = FakeStateManager()
-        metrics = MagicMock()
-        return CollectionsPresenter(rm, sm, metrics, icons={})
 
     @contextmanager
     def _patch_menu(self, actions, selected):
@@ -73,107 +29,140 @@ class TestCollectionTreeContextMenu(unittest.TestCase):
             yield mock_menu
 
     def test_invalid_index_skips_context_menu(self):
-        presenter = self._make_presenter([_make_collection("c1", "My API")])
-        presenter.load_collections()
+        harness = build_isolated_tree_actions([make_collection("c1", "My API")])
         invalid = QModelIndex()
-        with patch.object(presenter._view, "indexAt", return_value=invalid):
+        with patch.object(harness.view, "indexAt", return_value=invalid):
             with patch("pypost.ui.presenters.collection_tree_actions.QMenu") as mock_menu_class:
-                presenter._tree_actions.show_context_menu(QPoint(0, 0))
+                harness.actions.show_context_menu(QPoint(0, 0))
         mock_menu_class.assert_not_called()
 
     def test_collection_menu_offers_rename_and_delete(self):
-        presenter = self._make_presenter([_make_collection("c1", "My API")])
-        presenter.load_collections()
-        item = presenter._model.item(0)
-        with patch.object(presenter._view, "indexAt", return_value=item.index()):
+        harness = build_isolated_tree_actions([make_collection("c1", "My API")])
+        item = harness.model.item(0)
+        with patch.object(harness.view, "indexAt", return_value=item.index()):
             with self._patch_menu([MagicMock(), MagicMock()], None) as mock_menu:
-                presenter._tree_actions.show_context_menu(QPoint(0, 0))
+                harness.actions.show_context_menu(QPoint(0, 0))
         self.assertEqual(mock_menu.addAction.call_count, 2)
         labels = [call.args[0] for call in mock_menu.addAction.call_args_list]
         self.assertEqual(labels, ["Rename", "Delete"])
 
     def test_request_menu_offers_new_tab_rename_delete(self):
-        req = _make_request("r1", "Get users")
-        col = _make_collection("c1", "My API", [req])
-        presenter = self._make_presenter([col])
-        presenter.load_collections()
-        req_item = presenter._model.item(0).child(0)
-        with patch.object(presenter._view, "indexAt", return_value=req_item.index()):
+        req = make_request("r1", "Get users")
+        col = make_collection("c1", "My API", [req])
+        harness = build_isolated_tree_actions([col])
+        req_item = harness.model.item(0).child(0)
+        with patch.object(harness.view, "indexAt", return_value=req_item.index()):
             with self._patch_menu([MagicMock(), MagicMock(), MagicMock()], None) as mock_menu:
-                presenter._tree_actions.show_context_menu(QPoint(0, 0))
+                harness.actions.show_context_menu(QPoint(0, 0))
         labels = [call.args[0] for call in mock_menu.addAction.call_args_list]
         self.assertEqual(labels, ["New tab", "Rename", "Delete"])
 
     def test_rename_selected_starts_inline_edit(self):
-        req = _make_request("r1", "Get users")
-        col = _make_collection("c1", "My API", [req])
-        presenter = self._make_presenter([col])
-        presenter.load_collections()
-        req_item = presenter._model.item(0).child(0)
+        req = make_request("r1", "Get users")
+        col = make_collection("c1", "My API", [req])
+        harness = build_isolated_tree_actions([col])
+        req_item = harness.model.item(0).child(0)
         rename_action = MagicMock()
         delete_action = MagicMock()
-        with patch.object(presenter._view, "indexAt", return_value=req_item.index()):
-            with patch.object(presenter._view, "edit") as mock_edit:
+        with patch.object(harness.view, "indexAt", return_value=req_item.index()):
+            with patch.object(harness.view, "edit") as mock_edit:
                 with self._patch_menu(
                     [MagicMock(), rename_action, delete_action], rename_action
                 ):
-                    presenter._tree_actions.show_context_menu(QPoint(0, 0))
-        self.assertIsNotNone(presenter._tree_actions.pending_rename)
+                    harness.actions.show_context_menu(QPoint(0, 0))
+        self.assertIsNotNone(harness.actions.pending_rename)
         mock_edit.assert_called_once()
 
     @patch("pypost.ui.presenters.collection_tree_actions.copy_request_for_isolated_tab")
     def test_new_tab_selected_emits_open_isolated_tab(self, mock_copy):
-        req = _make_request("r1", "Get users")
-        copied = _make_request("r1-copy", "Get users")
+        req = make_request("r1", "Get users")
+        copied = make_request("r1-copy", "Get users")
         mock_copy.return_value = copied
-        col = _make_collection("c1", "My API", [req])
-        presenter = self._make_presenter([col])
-        presenter.load_collections()
-        emitted = []
-        presenter.open_request_in_isolated_tab.connect(lambda data: emitted.append(data))
-        req_item = presenter._model.item(0).child(0)
+        col = make_collection("c1", "My API", [req])
+        harness = build_isolated_tree_actions([col])
+        req_item = harness.model.item(0).child(0)
         new_tab_action = MagicMock()
         rename_action = MagicMock()
         delete_action = MagicMock()
-        with patch.object(presenter._view, "indexAt", return_value=req_item.index()):
+        with patch.object(harness.view, "indexAt", return_value=req_item.index()):
             with self._patch_menu(
                 [new_tab_action, rename_action, delete_action], new_tab_action
             ):
-                presenter._tree_actions.show_context_menu(QPoint(0, 0))
+                harness.actions.show_context_menu(QPoint(0, 0))
         mock_copy.assert_called_once_with(req)
-        self.assertEqual(emitted, [copied])
+        harness.emit_open_isolated_tab.assert_called_once_with(copied)
 
     @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
     def test_delete_cancelled_skips_persistence(self, mock_confirm_delete):
-        col = _make_collection("c1", "My API")
-        presenter = self._make_presenter([col])
-        presenter.load_collections()
+        harness = build_isolated_tree_actions([make_collection("c1", "My API")])
         mock_confirm_delete.return_value = False
-        item = presenter._model.item(0)
+        item = harness.model.item(0)
         rename_action = MagicMock()
         delete_action = MagicMock()
-        with patch.object(presenter._view, "indexAt", return_value=item.index()):
+        with patch.object(harness.view, "indexAt", return_value=item.index()):
             with self._patch_menu([rename_action, delete_action], delete_action):
-                presenter._tree_actions.show_context_menu(QPoint(0, 0))
-        self.assertEqual(presenter._model.rowCount(), 1)
+                harness.actions.show_context_menu(QPoint(0, 0))
+        self.assertEqual(harness.model.rowCount(), 1)
 
     @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
     def test_delete_confirmed_removes_request(self, mock_confirm_delete):
-        req = _make_request("r1", "Get users")
-        col = _make_collection("c1", "My API", [req])
-        presenter = self._make_presenter([col])
-        presenter.load_collections()
+        req = make_request("r1", "Get users")
+        col = make_collection("c1", "My API", [req])
+        harness = build_isolated_tree_actions([col])
         mock_confirm_delete.return_value = True
-        req_item = presenter._model.item(0).child(0)
+        req_item = harness.model.item(0).child(0)
         new_tab_action = MagicMock()
         rename_action = MagicMock()
         delete_action = MagicMock()
-        with patch.object(presenter._view, "indexAt", return_value=req_item.index()):
+        with patch.object(harness.view, "indexAt", return_value=req_item.index()):
             with self._patch_menu(
                 [new_tab_action, rename_action, delete_action], delete_action
             ):
-                presenter._tree_actions.show_context_menu(QPoint(0, 0))
-        self.assertEqual(presenter._model.item(0).rowCount(), 0)
+                harness.actions.show_context_menu(QPoint(0, 0))
+        self.assertEqual(harness.model.item(0).rowCount(), 0)
+
+    def test_rename_cancel_restores_tree_incrementally(self):
+        req = make_request("r1", "Old Name")
+        col = make_collection("c1", "My API", [req])
+        harness = build_isolated_tree_actions([col])
+        harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
+        harness.actions.handle_rename_cancelled()
+        self.assertIsNone(harness.actions.pending_rename)
+        self.assertEqual(harness.model.item(0).child(0).text(), "GET Old Name")
+        harness.refresh_tree.assert_not_called()
+
+    def test_rename_commit_updates_request_tree_and_emits(self):
+        req = make_request("r1", "Old Name")
+        col = make_collection("c1", "My API", [req])
+        harness = build_isolated_tree_actions([col])
+        harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
+        harness.actions.handle_rename_committed("New Name")
+        self.assertEqual(harness.model.item(0).child(0).text(), "GET New Name")
+        self.assertEqual(req.name, "New Name")
+        harness.emit_request_renamed.assert_called_once_with("r1", "New Name")
+        harness.emit_collections_changed.assert_called_once()
+        harness.refresh_tree.assert_not_called()
+
+    def test_rename_commit_updates_collection_tree(self):
+        col = make_collection("c1", "Old Collection")
+        harness = build_isolated_tree_actions([col])
+        harness.actions._pending_rename = {"item_id": "c1", "item_type": "collection"}
+        harness.actions.handle_rename_committed("New Collection")
+        self.assertEqual(harness.model.item(0).text(), "New Collection")
+        self.assertEqual(col.name, "New Collection")
+        harness.emit_request_renamed.assert_not_called()
+        harness.emit_collections_changed.assert_called_once()
+
+    @patch("pypost.ui.presenters.collection_tree_actions.show_rename_empty_name_error")
+    def test_rename_rejected_empty_shows_warning(self, mock_warning):
+        req = make_request("r1", "Old Name")
+        col = make_collection("c1", "My API", [req])
+        harness = build_isolated_tree_actions([col])
+        harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
+        harness.actions.handle_rename_rejected_empty()
+        mock_warning.assert_called_once_with(harness.view)
+        self.assertEqual(req.name, "Old Name")
+        self.assertIsNone(harness.actions.pending_rename)
 
 
 if __name__ == "__main__":
