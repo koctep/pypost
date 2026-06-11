@@ -42,11 +42,27 @@ Saved through `SettingsDialog.accept()` → `MainWindow.open_settings()` →
 dialog updates persistence but does not reconfigure the live instance until the
 application restarts.
 
+## Retryable status codes validation
+
+On Save, `SettingsDialog.accept()` parses the retryable status codes line edit via
+`parse_retryable_status_codes`. Invalid input blocks persistence:
+
+- `new_settings` is not set; dialog stays open.
+- `show_invalid_retryable_status_codes` shows a warning (delegates to `QMessageBox.warning`).
+- A structured WARNING is logged:
+  `retryable_codes_settings_validation_failed reason=<empty_segment|invalid_token|out_of_range>`.
+
+Parser rules and messages are defined in `pypost/models/retry.py` (PYPOST-423).
+
 ## Tests
 
 `tests/test_settings_dialog.py`:
 
 - `TestSettingsDialogAlertSettings` — load/save, echo mode, keep/clear auth
+- `TestSettingsDialogRetryableCodesValidation` — blocked save + warning on invalid codes
+  (PYPOST-444)
 - `TestResolveWebhookAuthHeader` — pure helper unit tests
+
+Parser unit tests: `tests/test_retryable_status_codes_parse.py`.
 
 See also `doc/dev/gui_testing.md`.

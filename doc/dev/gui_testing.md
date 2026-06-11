@@ -28,7 +28,7 @@ Representative modules:
 | Module | Focus |
 | --- | --- |
 | `tests/test_env_dialog.py` | Environment dialog widgets and MCP toggle |
-| `tests/test_settings_dialog.py` | Settings form fields (including alert log path and masked webhook auth) |
+| `tests/test_settings_dialog.py` | Settings form fields, alert auth, retryable codes save validation (PYPOST-444) |
 | `tests/test_settings_encryption_migration_ui.py` | Migration buttons and QMessageBox delegation |
 | `tests/test_new_variable_flow_integration.py` | ResponseView → EnvPresenter signals |
 | `tests/test_response_view_search.py` | Response body search bar (PYPOST-365) |

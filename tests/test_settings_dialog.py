@@ -1,9 +1,13 @@
 """Qt-level tests for SettingsDialog (request timeout visibility and persistence)."""
 
 
+import logging
+
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
+
+from unittest.mock import patch
 
 from PySide6.QtWidgets import QApplication
 
@@ -197,6 +201,36 @@ class TestSettingsDialogAlertSettings:
             dlg.accept()
             assert (
                 dlg.get_settings().alert_webhook_url == "https://hooks.example.com/alert"
+            )
+        finally:
+            dlg.close()
+
+
+class TestSettingsDialogRetryableCodesValidation:
+    @patch("pypost.ui.dialogs.settings_dialog.show_invalid_retryable_status_codes")
+    def test_accept_blocks_save_and_shows_warning_on_invalid_codes(
+        self,
+        mock_show_invalid,
+        qapp,
+        caplog,
+    ):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            dlg.retryable_codes_edit.setText("500,abc")
+            with caplog.at_level(
+                logging.WARNING,
+                logger="pypost.ui.dialogs.settings_dialog",
+            ):
+                dlg.accept()
+            assert dlg.new_settings is None
+            mock_show_invalid.assert_called_once()
+            assert mock_show_invalid.call_args.args[0] is dlg
+            message = mock_show_invalid.call_args.args[1]
+            assert "whole number" in message
+            assert any(
+                "retryable_codes_settings_validation_failed" in record.message
+                and "reason=invalid_token" in record.message
+                for record in caplog.records
             )
         finally:
             dlg.close()
