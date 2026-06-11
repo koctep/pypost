@@ -64,8 +64,23 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_server_impl.py -v
 ```
 
-Integration tests that start a live MCP server and invoke tools are tracked separately
-(PYPOST-368).
+## MCP server integration tests
+
+Live SSE round-trip coverage (tool list + call against a running uvicorn server) lives in
+`tests/test_mcp_server_integration.py` (PYPOST-368). Tests use the official MCP Python SDK
+(`sse_client`, `ClientSession`) with `anyio.run`, start the server on an ephemeral port, and
+mock `RequestService.execute` for deterministic tool output.
+
+| Class | Scope |
+| --- | --- |
+| `TestMCPServerIntegration` | `list_tools`, `call_tool`, MCP argument forwarding |
+| `TestMCPServerManagerIntegration` | `MCPServerManager` thread + uvicorn lifecycle |
+
+Focused run:
+
+```bash
+.venv/bin/python -m pytest tests/test_mcp_server_integration.py -v
+```
 
 ## Per-test timeouts (mandatory)
 
