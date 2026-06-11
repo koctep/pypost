@@ -163,7 +163,7 @@ class VariableHoverMixin:
             self._hidden_keys,
         )
         QToolTip.showText(
-            event.globalPos(),
+            event.globalPosition().toPoint(),
             value,
             self,  # type: ignore
         )

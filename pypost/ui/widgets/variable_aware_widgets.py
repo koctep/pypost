@@ -18,7 +18,7 @@ class VariableAwareLineEdit(VariableHoverMixin, QLineEdit):
             return "", 0
 
         # Calculate character index under cursor
-        index = self.cursorPositionAt(event.pos())
+        index = self.cursorPositionAt(event.position().toPoint())
         return text, index
 
 
@@ -30,7 +30,7 @@ class VariableAwarePlainTextEdit(VariableHoverMixin, QPlainTextEdit):
         VariableHoverMixin.__init__(self)
 
     def _get_text_at_cursor(self, event) -> Tuple[str, int]:
-        cursor = self.cursorForPosition(event.pos())
+        cursor = self.cursorForPosition(event.position().toPoint())
         text = self.toPlainText()
         index = cursor.position()
         return text, index
@@ -52,7 +52,7 @@ class VariableAwareTableWidget(QTableWidget):
         self._hidden_keys = hidden_keys
 
     def mouseMoveEvent(self, event):
-        item = self.itemAt(event.pos())
+        item = self.itemAt(event.position().toPoint())
         if item:
             text = item.text()
             if VariableHoverHelper.EXPRESSION_PATTERN.search(text):
@@ -62,7 +62,7 @@ class VariableAwareTableWidget(QTableWidget):
                     self._hidden_keys,
                 )
                 QToolTip.showText(
-                    event.globalPos(),
+                    event.globalPosition().toPoint(),
                     resolved,
                     self,
                 )
