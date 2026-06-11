@@ -13,7 +13,8 @@ from mcp.server.sse import SseServerTransport
 from mcp.types import Resource, TextResourceContents
 from prometheus_client import generate_latest, make_asgi_app
 from starlette.applications import Starlette
-from starlette.routing import Mount
+from starlette.responses import Response
+from starlette.routing import Mount, Route
 
 from pypost.core.mcp_streamable_http import build_streamable_http_route
 from pypost.core.mcp_transport_routes import (
@@ -43,7 +44,7 @@ class MetricsServer:
 
         self.mcp_server = Server("pypost-metrics")
         self.mcp_server.list_resources()(self.list_resources)
-        self.mcp_server.read_resource()(self.read_resource)
+        self.mcp_server.read_resource()(self._mcp_read_resource)
 
     def set_start_failed_handler(
         self, handler: Callable[[str], None] | None
@@ -65,23 +66,31 @@ class MetricsServer:
             )
         ]
 
+    async def _scrape_metrics_text(self) -> str:
+        self._registry.track_mcp_request_received("read_resource:metrics")
+        try:
+            data = generate_latest(self._registry.registry).decode("utf-8")
+            self._registry.track_mcp_response_sent("read_resource:metrics", "success")
+            return data
+        except Exception:
+            self._registry.track_mcp_response_sent("read_resource:metrics", "error")
+            raise
+
+    async def _mcp_read_resource(self, uri) -> str:
+        uri_str = str(uri)
+        if uri_str != "metrics://all":
+            raise ValueError(f"Resource {uri_str} not found")
+        return await self._scrape_metrics_text()
+
     async def read_resource(self, uri: str) -> list[TextResourceContents]:
-        if uri == "metrics://all":
-            self._registry.track_mcp_request_received("read_resource:metrics")
-            try:
-                data = generate_latest(self._registry.registry).decode("utf-8")
-                self._registry.track_mcp_response_sent("read_resource:metrics", "success")
-                return [TextResourceContents(uri=uri, mimeType="text/plain", text=data)]
-            except Exception:
-                self._registry.track_mcp_response_sent("read_resource:metrics", "error")
-                raise
+        uri_str = str(uri)
+        if uri_str != "metrics://all":
+            raise ValueError(f"Resource {uri_str} not found")
+        data = await self._scrape_metrics_text()
+        return [TextResourceContents(uri=uri_str, mimeType="text/plain", text=data)]
 
-        raise ValueError(f"Resource {uri} not found")
-
-    def _create_app(self) -> Starlette:
-        prometheus_app = make_asgi_app(registry=self._registry.registry)
-        mcp_route, lifespan = build_streamable_http_route(self.mcp_server)
-
+    def _create_sse_app(self) -> Starlette:
+        """Legacy HTTP+SSE transport (same layout as MCPServerImpl)."""
         sse = SseServerTransport(MCP_LEGACY_SSE_MESSAGES_PATH)
 
         class SSEEndpoint:
@@ -90,9 +99,24 @@ class MetricsServer:
                 self.sse_transport = sse_transport
 
             async def __call__(self, scope, receive, send):
+                if scope.get("method") != "GET":
+                    await send(
+                        {
+                            "type": "http.response.start",
+                            "status": 405,
+                            "headers": [(b"content-type", b"text/plain")],
+                        }
+                    )
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": b"Method Not Allowed",
+                        }
+                    )
+                    return
                 async with self.sse_transport.connect_sse(scope, receive, send) as streams:
-                    init_opts = self.server.create_initialization_options()
-                    await self.server.run(streams[0], streams[1], init_opts)
+                    opts = self.server.create_initialization_options()
+                    await self.server.run(streams[0], streams[1], opts)
 
         class MessagesEndpoint:
             def __init__(self, sse_transport):
@@ -119,12 +143,27 @@ class MetricsServer:
                     }
                 )
 
+        async def handle_sse_get(request):
+            ep = SSEEndpoint(self.mcp_server, sse)
+            await ep(request.scope, request.receive, request._send)
+            return Response()
+
+        return Starlette(
+            routes=[
+                Mount(MCP_LEGACY_SSE_MESSAGES_PATH, app=MessagesEndpoint(sse)),
+                Route("/", endpoint=handle_sse_get, methods=["GET"]),
+            ],
+        )
+
+    def _create_app(self) -> Starlette:
+        prometheus_app = make_asgi_app(registry=self._registry.registry)
+        mcp_route, lifespan = build_streamable_http_route(self.mcp_server)
+
         return Starlette(
             routes=[
                 Mount("/metrics", app=prometheus_app),
                 mcp_route,
-                Mount(MCP_LEGACY_SSE_MOUNT_PATH, app=SSEEndpoint(self.mcp_server, sse)),
-                Mount(MCP_LEGACY_SSE_MESSAGES_PATH, app=MessagesEndpoint(sse)),
+                Mount(MCP_LEGACY_SSE_MOUNT_PATH, app=self._create_sse_app()),
             ],
             lifespan=lifespan,
         )
