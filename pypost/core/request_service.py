@@ -9,7 +9,7 @@ from pypost.core.alert_manager import AlertManager, AlertPayload
 from pypost.core.history_manager import HistoryManager
 from pypost.core.http_client import HTTPClient, ResolvedRequestFields
 from pypost.core.mcp_client_service import MCPClientService
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.script_executor import ScriptExecutor
 from pypost.core.sensitive_data_masking_policy import SensitiveDataMaskingPolicy
 from pypost.core.template_service import TemplateService
@@ -52,7 +52,7 @@ class RequestService:
         http_client: HTTPClient | None = None,
         mcp_client: MCPClientService | None = None,
     ) -> None:
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
         self._history_manager = history_manager
         self._template_service = template_service
         self._alert_manager = alert_manager
@@ -115,11 +115,9 @@ class RequestService:
             except json.JSONDecodeError:
                 pass
 
-        if self._metrics:
-            self._metrics.track_request_sent(request.method)
+        self._metrics.track_request_sent(request.method)
         response = self.mcp_client.run(url, operation, call_params)
-        if self._metrics:
-            self._metrics.track_response_received(request.method, str(response.status_code))
+        self._metrics.track_response_received(request.method, str(response.status_code))
         if headers_callback:
             headers_callback(response.status_code, response.headers)
         return response, resolved
@@ -228,8 +226,7 @@ class RequestService:
                 )
 
             # Emit retry signal and track metrics
-            if self._metrics:
-                self._metrics.track_retry_attempt(request.method, last_error.category.value)
+            self._metrics.track_retry_attempt(request.method, last_error.category.value)
             if retry_callback:
                 retry_callback(attempt + 1, max_retries, last_error)
 
@@ -313,7 +310,7 @@ class RequestService:
             method,
             hidden_key_count,
         )
-        if self._metrics and hidden_key_count > 0:
+        if hidden_key_count > 0:
             self._metrics.track_hidden_value_mask_applied("history")
 
     def _emit_history_entry_observability(self, entry: HistoryEntry) -> None:
@@ -325,8 +322,7 @@ class RequestService:
             entry.status_code,
             entry.response_time_ms,
         )
-        if self._metrics:
-            self._metrics.track_history_entry_appended(entry.method)
+        self._metrics.track_history_entry_appended(entry.method)
 
     def _record_execution_history(
         self,
@@ -356,8 +352,7 @@ class RequestService:
             self._emit_history_entry_observability(entry)
         except Exception as exc:
             logger.error("history_record_failed error=%s", exc)
-            if self._metrics:
-                self._metrics.track_history_record_error()
+            self._metrics.track_history_record_error()
 
     def _emit_exhaustion_alert(
         self,
@@ -377,8 +372,7 @@ class RequestService:
             error.message,
             error.detail,
         )
-        if self._metrics:
-            self._metrics.track_request_retry_exhaustion(request.url)
+        self._metrics.track_request_retry_exhaustion(request.url)
         if self._alert_manager:
             self._alert_manager.emit(
                 AlertPayload(
@@ -431,7 +425,7 @@ class RequestService:
                 exc.category,
                 exc.detail,
             )
-            if self._metrics and exc.category != ErrorCategory.CANCELLED:
+            if exc.category != ErrorCategory.CANCELLED:
                 self._metrics.track_request_error(exc.category)
             return ExecutionResult(
                 response=_error_response(exc),
@@ -457,8 +451,7 @@ class RequestService:
                 message="Post-script execution failed.",
                 detail=script_error,
             )
-            if self._metrics:
-                self._metrics.track_request_error(ErrorCategory.SCRIPT)
+            self._metrics.track_request_error(ErrorCategory.SCRIPT)
 
         result = ExecutionResult(
             response=response,

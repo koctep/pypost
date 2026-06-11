@@ -26,7 +26,7 @@ from pypost.core.mcp_transport_routes import (
     MCP_LEGACY_SSE_MESSAGES_PATH,
     MCP_LEGACY_SSE_MOUNT_PATH,
 )
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_service import ExecutionResult, RequestService
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
@@ -75,7 +75,7 @@ class MCPServerImpl:
     ):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
         self._activity_log = activity_log
         self._template_service = template_service
         self._variable_supplier = variable_supplier or (lambda: {})
@@ -116,8 +116,7 @@ class MCPServerImpl:
         started = time.perf_counter()
 
         # Track MCP request
-        if self._metrics:
-            self._metrics.track_mcp_request_received(request_data.method)
+        self._metrics.track_mcp_request_received(request_data.method)
 
         # Execute request in threadpool since RequestService is synchronous
         try:
@@ -129,11 +128,10 @@ class MCPServerImpl:
             has_error = _tool_result_has_error(result)
             outcome = "error" if has_error else "success"
 
-            if self._metrics:
-                self._metrics.track_mcp_response_sent(request_data.method, outcome)
-                self._metrics.track_mcp_tool_call_duration(
-                    request_data.method, outcome, duration_ms / 1000.0
-                )
+            self._metrics.track_mcp_response_sent(request_data.method, outcome)
+            self._metrics.track_mcp_tool_call_duration(
+                request_data.method, outcome, duration_ms / 1000.0
+            )
 
             if self._activity_log is not None:
                 detail = None
@@ -154,11 +152,10 @@ class MCPServerImpl:
         except Exception as e:
             duration_ms = (time.perf_counter() - started) * 1000.0
             # Track MCP response error
-            if self._metrics:
-                self._metrics.track_mcp_response_sent(request_data.method, "error")
-                self._metrics.track_mcp_tool_call_duration(
-                    request_data.method, "error", duration_ms / 1000.0
-                )
+            self._metrics.track_mcp_response_sent(request_data.method, "error")
+            self._metrics.track_mcp_tool_call_duration(
+                request_data.method, "error", duration_ms / 1000.0
+            )
             if self._activity_log is not None:
                 self._activity_log.append(
                     McpActivityEntry.new_call_tool(
@@ -209,8 +206,7 @@ class MCPServerImpl:
             if req.expose_as_mcp:
                 tool_name = normalize_mcp_tool_name(req.name)
                 self.tools_map[tool_name] = req
-        if self._metrics:
-            self._metrics.set_mcp_server_up(bool(self.tools_map))
+        self._metrics.set_mcp_server_up(bool(self.tools_map))
 
     def _generate_schema(self, req: RequestData) -> dict:
         hidden_keys = self._hidden_keys_supplier()

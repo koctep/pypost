@@ -5,7 +5,7 @@ from jinja2 import Environment
 
 from pypost.core.function_expression_resolver import FunctionExpressionResolver
 from pypost.core.function_registry import FunctionRegistry
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_expression_tokenizer import tokenize_template_expressions
 from pypost.core.template_expression_types import ValidationResult
 
@@ -22,7 +22,7 @@ class TemplateService:
 
     def __init__(self, metrics: MetricsTrackerProtocol | None = None):
         self.env = Environment()
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
         self._function_registry = FunctionRegistry()
         self._function_registry.register_into_env(self.env)
         self._function_expression_resolver = FunctionExpressionResolver(
@@ -98,11 +98,10 @@ class TemplateService:
             )
 
     def _record_empty_render_attempt(self, render_path: str) -> None:
-        if self._metrics:
-            self._metrics.track_template_expression_render_attempt(
-                render_path=render_path,
-                outcome="empty_content",
-            )
+        self._metrics.track_template_expression_render_attempt(
+            render_path=render_path,
+            outcome="empty_content",
+        )
 
     def _validate_template_expressions(
         self,
@@ -124,16 +123,15 @@ class TemplateService:
             validation.function_name or "n/a",
             expression_count,
         )
-        if self._metrics:
-            self._metrics.track_template_expression_render_attempt(
-                render_path=render_path,
-                outcome="validation_error",
-            )
-            self._metrics.track_template_expression_validation_failure(
-                render_path=render_path,
-                code=validation.code or "unknown",
-                function_name=validation.function_name,
-            )
+        self._metrics.track_template_expression_render_attempt(
+            render_path=render_path,
+            outcome="validation_error",
+        )
+        self._metrics.track_template_expression_validation_failure(
+            render_path=render_path,
+            code=validation.code or "unknown",
+            function_name=validation.function_name,
+        )
 
     def _render_with_jinja(self, content: str, variables: dict[str, Any]) -> str:
         template = self.env.from_string(content)
@@ -144,11 +142,10 @@ class TemplateService:
         render_path: str,
         expression_count: int,
     ) -> None:
-        if self._metrics:
-            self._metrics.track_template_expression_render_attempt(
-                render_path=render_path,
-                outcome="success",
-            )
+        self._metrics.track_template_expression_render_attempt(
+            render_path=render_path,
+            outcome="success",
+        )
         logger.debug(
             "template_expression_render_succeeded render_path=%s token_count=%d",
             render_path,
@@ -162,7 +159,7 @@ class TemplateService:
         render_path: str,
         expression_count: int,
     ) -> str:
-        if not isinstance(exc, ValueError) and self._metrics:
+        if not isinstance(exc, ValueError):
             self._metrics.track_template_expression_render_attempt(
                 render_path=render_path,
                 outcome="render_error",

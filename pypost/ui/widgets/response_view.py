@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.models.response import ResponseData
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
@@ -34,7 +34,7 @@ class ResponseView(QWidget):
     def __init__(self, indent_size=2, metrics: MetricsTrackerProtocol | None = None):
         super().__init__()
         self.indent_size = indent_size
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
         self.current_env_keys = None
         self.init_ui()
 
@@ -112,10 +112,9 @@ class ResponseView(QWidget):
 
     def _track_search_result(self, source: str) -> None:
         total = self._update_match_count()
-        if self._metrics:
-            self._metrics.track_gui_response_search_action(
-                source=source, has_matches=(total > 0)
-            )
+        self._metrics.track_gui_response_search_action(
+            source=source, has_matches=(total > 0)
+        )
         logger.debug("response_search_find source=%s matches=%d", source, total)
 
     def _find_next(self, source: str = "next") -> None:
@@ -217,8 +216,7 @@ class ResponseView(QWidget):
         self.body_view.moveCursor(QTextCursor.Start)
         self.body_view.find(text, self._search_flags(backward=False))
         total = self._update_match_count()
-        if self._metrics:
-            self._metrics.track_gui_response_search_action(source="typed", has_matches=(total > 0))
+        self._metrics.track_gui_response_search_action(source="typed", has_matches=(total > 0))
         logger.debug("response_search_typed query_len=%d matches=%d", len(text), total)
 
     def show_context_menu(self, pos):

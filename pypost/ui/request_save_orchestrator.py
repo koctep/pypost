@@ -9,7 +9,7 @@ from enum import Enum, auto
 
 from PySide6.QtWidgets import QWidget
 
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_manager import RequestManager
 from pypost.core.request_sync import persisted_fields_equal, snapshot_persisted_fields
 from pypost.core.state_manager import StateManager
@@ -59,7 +59,7 @@ class RequestSaveOrchestrator:
         self._request_manager = request_manager
         self._state_manager = state_manager
         self._settings = settings
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
 
     def save_request(
         self,
@@ -150,8 +150,7 @@ class RequestSaveOrchestrator:
             request_data.id,
             collection_id,
         )
-        if self._metrics:
-            self._metrics.track_gui_save_action("overwrite")
+        self._metrics.track_gui_save_action("overwrite")
 
         snapshot = snapshot_persisted_fields(request_data)
         return SaveResult(
@@ -179,8 +178,7 @@ class RequestSaveOrchestrator:
             request_data.name,
             target_collection_id,
         )
-        if self._metrics:
-            self._metrics.track_gui_save_action("new")
+        self._metrics.track_gui_save_action("new")
 
         self._ensure_collection_expanded(target_collection_id)
         return SaveResult(

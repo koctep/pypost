@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pypost.core.encryption_config import (
     build_key_provider,
@@ -10,11 +10,9 @@ from pypost.core.encryption_config import (
 )
 from pypost.core.environment_secrets_codec import EnvironmentSecretsCodec
 from pypost.core.key_provider import EnvironmentEncryptionError
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
-
-if TYPE_CHECKING:
-    from pypost.core.metrics_protocol import MetricsTrackerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +32,8 @@ class EnvironmentSerializeStats:
 class EnvironmentVariablesAdapter:
     """Serializes and deserializes environment variables with optional encryption."""
 
-    def __init__(self, metrics: "MetricsTrackerProtocol | None" = None) -> None:
-        self._metrics = metrics
+    def __init__(self, metrics: MetricsTrackerProtocol | None = None) -> None:
+        self._metrics = resolve_metrics(metrics)
         self._encryption_settings: AppSettings | None = None
         self._secrets_codec = EnvironmentSecretsCodec(build_key_provider(None))
         self._persisted_variables: dict[str, dict[str, Any]] = {}
@@ -113,14 +111,12 @@ class EnvironmentVariablesAdapter:
                         envelope = self._secrets_codec.encrypt(current_plaintext)
                     serialized_variables[key] = envelope.to_json()
                     encrypted_count += 1
-                    if self._metrics:
-                        self._metrics.track_environment_value_encryption()
+                    self._metrics.track_environment_value_encryption()
                 except EnvironmentEncryptionError as exc:
-                    if self._metrics:
-                        self._metrics.track_environment_encryption_error(
-                            "save",
-                            "encrypt_failed",
-                        )
+                    self._metrics.track_environment_encryption_error(
+                        "save",
+                        "encrypt_failed",
+                    )
                     logger.error(
                         "environment_value_encrypt_failed env_name=%s key=%s error=%s",
                         env.name,
@@ -204,23 +200,20 @@ class EnvironmentVariablesAdapter:
         if isinstance(value, dict) and value.get("enc") is True:
             try:
                 decoded = self._secrets_codec.decrypt(value)
-                if self._metrics:
-                    self._metrics.track_environment_value_decryption()
+                self._metrics.track_environment_value_decryption()
                 return decoded, True
             except EnvironmentEncryptionError as exc:
-                if self._metrics:
-                    self._metrics.track_environment_encryption_error(
-                        "load",
-                        "decrypt_failed",
-                    )
+                self._metrics.track_environment_encryption_error(
+                    "load",
+                    "decrypt_failed",
+                )
                 raise EnvironmentEncryptionError(
                     f"Failed to decrypt environment variable '{key}': {exc}"
                 ) from exc
-        if self._metrics:
-            self._metrics.track_environment_encryption_error(
-                "load",
-                "unsupported_format",
-            )
+        self._metrics.track_environment_encryption_error(
+            "load",
+            "unsupported_format",
+        )
         raise EnvironmentEncryptionError(
             f"Unsupported value format for environment variable '{key}'."
         )

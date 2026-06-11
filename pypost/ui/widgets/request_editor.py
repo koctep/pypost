@@ -24,7 +24,7 @@ from pypost.core.mcp_tool_contract import (
     build_mcp_tool_contract_preview,
     format_mcp_tool_contract_preview,
 )
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
@@ -62,7 +62,7 @@ class RequestWidget(QWidget):
     def __init__(self, request_data: RequestData = None, metrics: MetricsTrackerProtocol | None = None):
         super().__init__()
         self._loading = False
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
         self._template_service: TemplateService | None = None
         self._hidden_keys: set[str] = set()
         VariableHoverHelper.set_metrics(metrics)
@@ -220,8 +220,7 @@ class RequestWidget(QWidget):
             self.body_edit.setPlaceholderText("")
         if not self._loading and method in ("POST", "PUT"):
             self.detail_tabs.setCurrentWidget(self.body_tab)
-            if self._metrics:
-                self._metrics.track_gui_method_body_autoswitch(method)
+            self._metrics.track_gui_method_body_autoswitch(method)
 
     def _set_body_format_combo(self, body_format: BodyFormat) -> None:
         index = self.body_format_combo.findData(body_format)
@@ -341,16 +340,14 @@ class RequestWidget(QWidget):
         return request_data
 
     def on_send(self):
-        if self._metrics:
-            self._metrics.track_gui_send_click()
+        self._metrics.track_gui_send_click()
         current_request = self.get_request_data_from_ui()
         self.request_data = current_request
         self.send_requested.emit(current_request)
 
     def on_save(self, source: str = "unknown"):
         logger.info("save_action_triggered source=%s", source)
-        if self._metrics:
-            self._metrics.track_gui_save_action(source)
+        self._metrics.track_gui_save_action(source)
         current_request = self.get_request_data_from_ui()
         self.request_data = current_request
         self.save_requested.emit(current_request)
@@ -372,8 +369,7 @@ class RequestWidget(QWidget):
 
     def on_save_as(self, source: str = "unknown"):
         logger.info("save_as_action_triggered source=%s", source)
-        if self._metrics:
-            self._metrics.track_gui_save_as_action(source)
+        self._metrics.track_gui_save_as_action(source)
         current_request = self.get_request_data_from_ui()
         self.save_as_requested.emit(current_request)
 
@@ -382,8 +378,7 @@ class RequestWidget(QWidget):
 
     def handle_copy_curl_menu_action(self):
         logger.info("copy_curl_action_triggered")
-        if self._metrics:
-            self._metrics.track_gui_copy_curl_action()
+        self._metrics.track_gui_copy_curl_action()
         current_request = self.get_request_data_from_ui()
         self.copy_curl_requested.emit(current_request)
 

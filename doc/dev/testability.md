@@ -23,11 +23,19 @@ broader protocol work continues in [PYPOST-46](https://pypost.atlassian.net/brow
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
 `TemplateService` chain.
 
-## MetricsTrackerProtocol
+## MetricsTrackerProtocol and NullMetrics
 
-Tracking consumers (`RequestService`, `HTTPClient`, presenters, workers) type-hint
-`MetricsTrackerProtocol | None`. The composition root still constructs `MetricsManager`,
-which satisfies the protocol structurally.
+Tracking consumers accept `MetricsTrackerProtocol | None` and normalize with
+`resolve_metrics()` to `NULL_METRICS` when omitted ([PYPOST-74](https://pypost.atlassian.net/browse/PYPOST-74)).
+Call sites invoke `self._metrics.track_*()` directly — no `if self._metrics` guards.
+
+```python
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
+
+class RequestService:
+    def __init__(self, metrics: MetricsTrackerProtocol | None = None):
+        self._metrics = resolve_metrics(metrics)
+```
 
 ```python
 from unittest.mock import MagicMock
@@ -37,7 +45,8 @@ from pypost.core.metrics_protocol import MetricsTrackerProtocol
 metrics = MagicMock(spec=MetricsTrackerProtocol)
 ```
 
-See [PYPOST-73 dev notes](../../ai-tasks/PYPOST-73/70-dev-docs.md).
+See [PYPOST-73](../../ai-tasks/PYPOST-73/70-dev-docs.md) and
+[PYPOST-74](../../ai-tasks/PYPOST-74/70-dev-docs.md) dev notes.
 
 ## RequestService
 
@@ -45,7 +54,7 @@ See [PYPOST-73 dev notes](../../ai-tasks/PYPOST-73/70-dev-docs.md).
 
 | Parameter | Default when omitted | Test use |
 | --- | --- | --- |
-| `metrics` | `None` | `MagicMock(spec=MetricsTrackerProtocol)`; assert `track_*` calls |
+| `metrics` | `NULL_METRICS` (no-op) | `MagicMock(spec=MetricsTrackerProtocol)`; assert `track_*` calls |
 | `template_service` | `None` | `TemplateService()` for render paths |
 | `history_manager` | `None` | `MagicMock(spec=HistoryManager)` |
 | `alert_manager` | `None` | `MagicMock(spec=AlertManager)` |
@@ -90,7 +99,7 @@ approaches work. Constructor injection is preferred for new tests.
 
 | Parameter | Default when omitted | Test use |
 | --- | --- | --- |
-| `metrics` | `None` | `MagicMock(spec=MetricsTrackerProtocol)` |
+| `metrics` | `NULL_METRICS` (no-op) | `MagicMock(spec=MetricsTrackerProtocol)` |
 | `template_service` | new `TemplateService()` | `MagicMock()` with `render_string` side effect |
 | `session` | new `requests.Session()` | `MagicMock()` — stub `session.request` |
 
@@ -166,7 +175,6 @@ For signal/slot tests, mock presenters with real Qt widgets where needed — see
 
 | Gap | Follow-up |
 | --- | --- |
-| `NullMetrics` no-op (remove `if self._metrics` guards) | [PYPOST-75](https://pypost.atlassian.net/browse/PYPOST-75) |
 | `HTTPClient` protocol / interface | [PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46) |
 | `RequestWorker` accepts `RequestService` injection | [PYPOST-379](https://pypost.atlassian.net/browse/PYPOST-379) |
 | MainWindow presenter decomposition | [PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43) |

@@ -25,7 +25,7 @@ from pypost.core.request_sync import (
     snapshot_persisted_fields,
 )
 from pypost.core.history_manager import HistoryManager
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.core.template_service import TemplateService
@@ -116,7 +116,7 @@ class TabsPresenter(QObject):
         self._request_manager = request_manager
         self._state_manager = state_manager
         self._settings = settings
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
         self._history_manager = history_manager
         self._template_service = template_service
         self._alert_manager = alert_manager
@@ -317,8 +317,7 @@ class TabsPresenter(QObject):
     def handle_new_tab(self, source: str = "unknown") -> None:
         tabs_before = self._request_tab_count()
         logger.info("new_tab_action_triggered source=%s tabs_before=%d", source, tabs_before)
-        if self._metrics:
-            self._metrics.track_gui_new_tab_action(source)
+        self._metrics.track_gui_new_tab_action(source)
         self.add_new_tab()
 
     def handle_close_tab(self) -> None:
@@ -426,8 +425,7 @@ class TabsPresenter(QObject):
             request_data.url,
             request_data.id,
         )
-        if self._metrics:
-            self._metrics.track_request_sent(request_data.method)
+        self._metrics.track_request_sent(request_data.method)
 
         sender_tab.response_view.clear_body()
         sender_tab.request_editor.send_btn.setText("Stop")
@@ -474,8 +472,7 @@ class TabsPresenter(QObject):
             request_data.method,
             request_data.url,
         )
-        if self._metrics:
-            self._metrics.track_history_load_into_editor()
+        self._metrics.track_history_load_into_editor()
         self.add_new_tab(request_data)
 
     def _on_request_finished(self, tab: RequestTab, response) -> None:
@@ -488,8 +485,7 @@ class TabsPresenter(QObject):
             response.elapsed_time,
             response.size,
         )
-        if self._metrics:
-            self._metrics.track_response_received(method, str(response.status_code))
+        self._metrics.track_response_received(method, str(response.status_code))
         tab.response_view.display_response(response)
         self._reset_tab_ui_state(tab)
         tab.response_view.status_label.setText(f"Status: {response.status_code}")

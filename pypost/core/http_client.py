@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List
 
 import requests
 
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_service import TemplateService
 from pypost.core.yaml_json_converter import (
     YamlBodyConversionError,
@@ -49,7 +49,7 @@ class HTTPClient:
         session: requests.Session | None = None,
     ):
         self.session = session if session is not None else requests.Session()
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
         self._template_service = (
             template_service if template_service is not None else TemplateService()
         )
@@ -108,8 +108,7 @@ class HTTPClient:
                     url,
                     exc,
                 )
-                if self._metrics is not None:
-                    self._metrics.track_yaml_to_json_conversion_failed()
+                self._metrics.track_yaml_to_json_conversion_failed()
                 raise ExecutionError(
                     category=ErrorCategory.BODY,
                     message="Could not convert YAML body to JSON.",
@@ -207,8 +206,7 @@ class HTTPClient:
             variables = {}
 
         start_time = time.time()
-        if self._metrics:
-            self._metrics.track_request_sent(request_data.method)
+        self._metrics.track_request_sent(request_data.method)
 
         url = self._template_service.render_string(request_data.url, variables)
         is_sse_endpoint = request_data.method == "GET" and "/sse" in url.rstrip("/")
@@ -287,8 +285,7 @@ class HTTPClient:
         end_time = time.time()
 
         # 3. Process response
-        if self._metrics:
-            self._metrics.track_response_received(request_data.method, str(response.status_code))
+        self._metrics.track_response_received(request_data.method, str(response.status_code))
         logger.debug(
             "request_complete method=%s status=%d elapsed_ms=%.0f size=%d",
             request_data.method,

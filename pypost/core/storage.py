@@ -13,6 +13,7 @@ from pypost.core.environment_variables_adapter import (
     EnvironmentVariablesAdapter,
 )
 from pypost.core.key_provider import EnvironmentEncryptionError
+from pypost.core.metrics_protocol import resolve_metrics
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import AppSettings
 
@@ -49,7 +50,7 @@ class StorageManager:
             self.data_dir = Path(user_data_dir(app_name, app_author))
         self.collections_path = self.data_dir / "collections"
         self.environments_file = self.data_dir / "environments.json"
-        self._metrics = metrics
+        self._metrics = resolve_metrics(metrics)
         self._env_adapter = EnvironmentVariablesAdapter(metrics=metrics)
         self._ensure_paths()
 
