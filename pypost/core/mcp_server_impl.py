@@ -26,7 +26,7 @@ from pypost.core.mcp_transport_routes import (
     MCP_LEGACY_SSE_MESSAGES_PATH,
     MCP_LEGACY_SSE_MOUNT_PATH,
 )
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_service import ExecutionResult, RequestService
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
@@ -67,7 +67,7 @@ class MCPServerImpl:
     def __init__(
         self,
         name: str = "pypost-server",
-        metrics: MetricsManager | None = None,
+        metrics: MetricsTrackerProtocol | None = None,
         template_service: TemplateService | None = None,
         variable_supplier: Callable[[], dict[str, str]] | None = None,
         hidden_keys_supplier: Callable[[], set[str]] | None = None,

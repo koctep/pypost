@@ -5,7 +5,7 @@ from PySide6.QtCore import QThread, Signal
 
 from pypost.core.alert_manager import AlertManager
 from pypost.core.history_manager import HistoryManager
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -37,7 +37,7 @@ class RequestWorker(QThread):
         request_data: RequestData,
         variables: dict = None,
         hidden_keys: set[str] | None = None,
-        metrics: MetricsManager | None = None,
+        metrics: MetricsTrackerProtocol | None = None,
         history_manager: HistoryManager | None = None,
         collection_name: str | None = None,
         template_service: TemplateService | None = None,

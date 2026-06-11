@@ -5,7 +5,7 @@ from jinja2 import Environment
 
 from pypost.core.function_expression_resolver import FunctionExpressionResolver
 from pypost.core.function_registry import FunctionRegistry
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.template_expression_tokenizer import tokenize_template_expressions
 from pypost.core.template_expression_types import ValidationResult
 
@@ -20,7 +20,7 @@ class TemplateService:
         "invalid_syntax": "Invalid template function expression",
     }
 
-    def __init__(self, metrics: MetricsManager | None = None):
+    def __init__(self, metrics: MetricsTrackerProtocol | None = None):
         self.env = Environment()
         self._metrics = metrics
         self._function_registry = FunctionRegistry()

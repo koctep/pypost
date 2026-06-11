@@ -9,7 +9,7 @@ from enum import Enum, auto
 
 from PySide6.QtWidgets import QWidget
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_manager import RequestManager
 from pypost.core.request_sync import persisted_fields_equal, snapshot_persisted_fields
 from pypost.core.state_manager import StateManager
@@ -54,7 +54,7 @@ class RequestSaveOrchestrator:
         request_manager: RequestManager,
         state_manager: StateManager,
         settings: AppSettings,
-        metrics: MetricsManager | None = None,
+        metrics: MetricsTrackerProtocol | None = None,
     ) -> None:
         self._request_manager = request_manager
         self._state_manager = state_manager

@@ -17,7 +17,7 @@ from pypost.models.models import Collection, Environment
 from pypost.models.settings import AppSettings
 
 if TYPE_CHECKING:
-    from pypost.core.metrics import MetricsManager
+    from pypost.core.metrics_protocol import MetricsTrackerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class StorageManager:
         self,
         app_name: str = "pypost",
         app_author=None,
-        metrics: "MetricsManager | None" = None,
+        metrics: "MetricsTrackerProtocol | None" = None,
         data_dir: str | Path | None = None,
     ):
         if data_dir is not None:

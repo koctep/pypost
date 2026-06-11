@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QMenu, QTreeView
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.ui.collection_item_dialogs import (
     confirm_delete,
     show_delete_failure,
@@ -33,7 +33,7 @@ class CollectionTreeActions:
         view: QTreeView,
         model: QStandardItemModel,
         request_manager: RequestManager,
-        metrics: MetricsManager,
+        metrics: MetricsTrackerProtocol,
         *,
         find_item: Callable[[str, str], QStandardItem | None],
         remove_item: Callable[[str, str], bool],

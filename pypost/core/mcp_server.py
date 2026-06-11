@@ -11,7 +11,7 @@ from PySide6.QtCore import QObject, Signal
 
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_server_impl import MCPServerImpl
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.server_bind import format_bind_error
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
@@ -30,7 +30,9 @@ class MCPServerManager(QObject):
     activity_recorded = Signal(object)  # payload: McpActivityEntry
 
     def __init__(
-        self, metrics: MetricsManager | None = None, template_service: TemplateService | None = None
+        self,
+        metrics: MetricsTrackerProtocol | None = None,
+        template_service: TemplateService | None = None,
     ):
         super().__init__()
         self._server_thread: Optional[threading.Thread] = None

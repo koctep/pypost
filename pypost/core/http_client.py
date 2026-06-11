@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List
 
 import requests
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.template_service import TemplateService
 from pypost.core.yaml_json_converter import (
     YamlBodyConversionError,
@@ -44,7 +44,7 @@ class HTTPRequestResult:
 class HTTPClient:
     def __init__(
         self,
-        metrics: MetricsManager | None = None,
+        metrics: MetricsTrackerProtocol | None = None,
         template_service: TemplateService | None = None,
         session: requests.Session | None = None,
     ):

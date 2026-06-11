@@ -17,7 +17,7 @@ from pypost.core.env_variable_snapshot import EnvVariableSnapshot
 from pypost.core.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
 from pypost.core.mcp_server import MCPServerManager
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.storage import StorageManager
 from pypost.core.variable_name_validation import (
     validate_variable_name,
@@ -53,7 +53,7 @@ class EnvPresenter(QObject):
         mcp_manager: MCPServerManager,
         settings: AppSettings,
         get_collections: Callable,
-        metrics: MetricsManager,
+        metrics: MetricsTrackerProtocol,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)

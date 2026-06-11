@@ -9,7 +9,7 @@ from pypost.core.alert_manager import AlertManager, AlertPayload
 from pypost.core.history_manager import HistoryManager
 from pypost.core.http_client import HTTPClient, ResolvedRequestFields
 from pypost.core.mcp_client_service import MCPClientService
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.script_executor import ScriptExecutor
 from pypost.core.sensitive_data_masking_policy import SensitiveDataMaskingPolicy
 from pypost.core.template_service import TemplateService
@@ -44,7 +44,7 @@ def _error_response(exc: ExecutionError) -> ResponseData:
 class RequestService:
     def __init__(
         self,
-        metrics: MetricsManager | None = None,
+        metrics: MetricsTrackerProtocol | None = None,
         template_service: TemplateService | None = None,
         history_manager: HistoryManager | None = None,
         alert_manager: AlertManager | None = None,

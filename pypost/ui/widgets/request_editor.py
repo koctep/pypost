@@ -24,7 +24,7 @@ from pypost.core.mcp_tool_contract import (
     build_mcp_tool_contract_preview,
     format_mcp_tool_contract_preview,
 )
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
@@ -59,7 +59,7 @@ class RequestWidget(QWidget):
     save_as_requested = Signal(RequestData)
     copy_curl_requested = Signal(RequestData)
 
-    def __init__(self, request_data: RequestData = None, metrics: MetricsManager | None = None):
+    def __init__(self, request_data: RequestData = None, metrics: MetricsTrackerProtocol | None = None):
         super().__init__()
         self._loading = False
         self._metrics = metrics

@@ -4,7 +4,7 @@ from typing import Dict, Optional, Set, Tuple
 from PySide6.QtWidgets import QToolTip, QWidget
 
 from pypost.core.constants import HIDDEN_MASK
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.template_expression_tokenizer import TEMPLATE_PLACEHOLDER_PATTERN
 from pypost.core.template_service import TemplateService
 
@@ -19,7 +19,7 @@ class VariableHoverHelper:
     _template_service = TemplateService()
 
     @classmethod
-    def set_metrics(cls, metrics: MetricsManager | None) -> None:
+    def set_metrics(cls, metrics: MetricsTrackerProtocol | None) -> None:
         """
         Rebuild helper TemplateService so hover path exports observability metrics.
         """

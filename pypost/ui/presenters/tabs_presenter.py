@@ -25,7 +25,7 @@ from pypost.core.request_sync import (
     snapshot_persisted_fields,
 )
 from pypost.core.history_manager import HistoryManager
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.core.template_service import TemplateService
@@ -72,7 +72,7 @@ class RequestTab(QWidget):
     def __init__(
         self,
         request_data: RequestData | None = None,
-        metrics: MetricsManager | None = None,
+        metrics: MetricsTrackerProtocol | None = None,
     ) -> None:
         super().__init__()
         self.request_data = request_data
@@ -106,7 +106,7 @@ class TabsPresenter(QObject):
         request_manager: RequestManager,
         state_manager: StateManager,
         settings: AppSettings,
-        metrics: MetricsManager | None = None,
+        metrics: MetricsTrackerProtocol | None = None,
         history_manager: HistoryManager | None = None,
         template_service: TemplateService | None = None,
         alert_manager: AlertManager | None = None,

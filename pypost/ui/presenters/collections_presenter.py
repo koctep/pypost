@@ -4,7 +4,7 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QTreeView
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
@@ -28,7 +28,7 @@ class CollectionsPresenter(QObject):
         self,
         request_manager: RequestManager,
         state_manager: StateManager,
-        metrics: MetricsManager,
+        metrics: MetricsTrackerProtocol,
         icons: dict,
         parent: QObject | None = None,
     ) -> None:

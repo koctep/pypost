@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.models.response import ResponseData
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
@@ -31,7 +31,7 @@ SEARCH_DEBOUNCE_MS = 250
 class ResponseView(QWidget):
     variable_set_requested = Signal(object, str)
 
-    def __init__(self, indent_size=2, metrics: MetricsManager | None = None):
+    def __init__(self, indent_size=2, metrics: MetricsTrackerProtocol | None = None):
         super().__init__()
         self.indent_size = indent_size
         self._metrics = metrics

@@ -4,8 +4,9 @@
 
 The PYPOST-40 audit flagged `RequestService`, `HTTPClient`, and `MainWindow` as hard to unit
 test because dependencies were created internally. PYPOST-382 adds **constructor injection
-seams** where practical and documents established mocking patterns. A full dependency-inversion
-refactor (protocols, composition root) remains future work — see [PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46).
+seams** where practical and documents established mocking patterns. Metrics consumers now
+depend on `MetricsTrackerProtocol` ([PYPOST-73](https://pypost.atlassian.net/browse/PYPOST-73));
+broader protocol work continues in [PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46).
 
 ## Composition root
 
@@ -14,6 +15,7 @@ refactor (protocols, composition root) remains future work — see [PYPOST-46](h
 | Service | Created in | Injected into |
 | --- | --- | --- |
 | `MetricsManager` (facade) | `main.py` | `MainWindow`, presenters, workers |
+| `MetricsTrackerProtocol` | type hint at consumers | `MagicMock(spec=MetricsTrackerProtocol)` in tests |
 | `MetricsRegistry` (counters) | inside `MetricsManager` | use directly in counter-only unit tests |
 | `MetricsServer` (uvicorn/MCP) | inside `MetricsManager` | started via `metrics.start_server()` in `main.py` |
 | `TemplateService` | `main.py` | `MainWindow`, `MCPServerManager`, `TabsPresenter` → workers |
@@ -21,13 +23,29 @@ refactor (protocols, composition root) remains future work — see [PYPOST-46](h
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
 `TemplateService` chain.
 
+## MetricsTrackerProtocol
+
+Tracking consumers (`RequestService`, `HTTPClient`, presenters, workers) type-hint
+`MetricsTrackerProtocol | None`. The composition root still constructs `MetricsManager`,
+which satisfies the protocol structurally.
+
+```python
+from unittest.mock import MagicMock
+
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
+
+metrics = MagicMock(spec=MetricsTrackerProtocol)
+```
+
+See [PYPOST-73 dev notes](../../ai-tasks/PYPOST-73/70-dev-docs.md).
+
 ## RequestService
 
 ### Injectable dependencies
 
 | Parameter | Default when omitted | Test use |
 | --- | --- | --- |
-| `metrics` | `None` | `MagicMock()`; assert `track_*` calls |
+| `metrics` | `None` | `MagicMock(spec=MetricsTrackerProtocol)`; assert `track_*` calls |
 | `template_service` | `None` | `TemplateService()` for render paths |
 | `history_manager` | `None` | `MagicMock(spec=HistoryManager)` |
 | `alert_manager` | `None` | `MagicMock(spec=AlertManager)` |
@@ -72,7 +90,7 @@ approaches work. Constructor injection is preferred for new tests.
 
 | Parameter | Default when omitted | Test use |
 | --- | --- | --- |
-| `metrics` | `None` | `MagicMock()` |
+| `metrics` | `None` | `MagicMock(spec=MetricsTrackerProtocol)` |
 | `template_service` | new `TemplateService()` | `MagicMock()` with `render_string` side effect |
 | `session` | new `requests.Session()` | `MagicMock()` — stub `session.request` |
 
@@ -148,6 +166,7 @@ For signal/slot tests, mock presenters with real Qt widgets where needed — see
 
 | Gap | Follow-up |
 | --- | --- |
+| `NullMetrics` no-op (remove `if self._metrics` guards) | [PYPOST-75](https://pypost.atlassian.net/browse/PYPOST-75) |
 | `HTTPClient` protocol / interface | [PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46) |
 | `RequestWorker` accepts `RequestService` injection | [PYPOST-379](https://pypost.atlassian.net/browse/PYPOST-379) |
 | MainWindow presenter decomposition | [PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43) |

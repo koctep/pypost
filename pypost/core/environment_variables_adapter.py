@@ -14,7 +14,7 @@ from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 
 if TYPE_CHECKING:
-    from pypost.core.metrics import MetricsManager
+    from pypost.core.metrics_protocol import MetricsTrackerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class EnvironmentSerializeStats:
 class EnvironmentVariablesAdapter:
     """Serializes and deserializes environment variables with optional encryption."""
 
-    def __init__(self, metrics: "MetricsManager | None" = None) -> None:
+    def __init__(self, metrics: "MetricsTrackerProtocol | None" = None) -> None:
         self._metrics = metrics
         self._encryption_settings: AppSettings | None = None
         self._secrets_codec = EnvironmentSecretsCodec(build_key_provider(None))
