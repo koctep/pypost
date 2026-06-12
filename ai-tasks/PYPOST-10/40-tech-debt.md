@@ -29,4 +29,6 @@ Addressed in PYPOST-14 by implementing `StateManager`.
 ## Follow-up Tasks
 
 - Write tests to verify UI state preservation. — [PYPOST-95](https://pypost.atlassian.net/browse/PYPOST-95)
-- Consider debouncing settings saving if I/O performance issues arise. — [PYPOST-96](https://pypost.atlassian.net/browse/PYPOST-96)
+- **[FIXED] Consider debouncing settings saving** ([PYPOST-96](https://pypost.atlassian.net/browse/PYPOST-96)):
+  Addressed proactively in [PYPOST-386](https://pypost.atlassian.net/browse/PYPOST-386) (300 ms
+  `StateManager` debounce); verified and closed in PYPOST-90/PYPOST-96.
