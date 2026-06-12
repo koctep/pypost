@@ -7,7 +7,9 @@ test because dependencies were created internally. PYPOST-382 adds **constructor
 seams** where practical and documents established mocking patterns. Metrics consumers now
 depend on `MetricsTrackerProtocol` ([PYPOST-73](https://pypost.atlassian.net/browse/PYPOST-73));
 HTTP transport consumers depend on `HTTPClientProtocol`
-([PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46)); persistence consumers depend on
+([PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46)); request execution consumers
+depend on `ExecuteRequestProtocol`
+([PYPOST-51](https://pypost.atlassian.net/browse/PYPOST-51)); persistence consumers depend on
 `StorageInterface` ([PYPOST-50](https://pypost.atlassian.net/browse/PYPOST-50)); collection
 item dispatch uses a strategy registry
 ([PYPOST-48](https://pypost.atlassian.net/browse/PYPOST-48)).
@@ -306,6 +308,30 @@ storage = FakeStorageManager([collection])
 ```
 
 **Coverage:** `tests/test_storage_interface.py`, `tests/test_request_manager.py`.
+
+## ExecuteRequestProtocol
+
+`RequestWorker` and `MCPServerImpl` depend on `ExecuteRequestProtocol` (structural typing)
+instead of the concrete `RequestService` class for the `execute` surface. Production still
+constructs `RequestService` when no executor is injected.
+
+```python
+from pypost.core.execute_request_protocol import ExecuteRequestProtocol
+
+class RequestWorker:
+  def __init__(self, ...):
+      self.service: ExecuteRequestProtocol = RequestService(...)
+```
+
+```python
+from unittest.mock import MagicMock
+
+from pypost.core.execute_request_protocol import ExecuteRequestProtocol
+
+mock_executor = MagicMock(spec=ExecuteRequestProtocol)
+```
+
+**Coverage:** `tests/test_execute_request_protocol.py`.
 
 ## Out of scope (future tickets)
 

@@ -51,5 +51,5 @@ full testability. See [testability.md](../testability.md) and audit R4, R9.
 - **P1:** PYPOST-43 (MainWindow), PYPOST-44 (MetricsManager), PYPOST-45 (template_service)
 - **P2:** PYPOST-46 (HTTPClient protocol), ~~PYPOST-47 (collection loading)~~,
   ~~PYPOST-48 (item_type strategy)~~, ~~PYPOST-49 (MetricsManager split)~~
-- **P3:** ~~PYPOST-50 (StorageInterface)~~, PYPOST-51 (ExecuteRequestProtocol)
+- **P3:** ~~PYPOST-50 (StorageInterface)~~, ~~PYPOST-51 (ExecuteRequestProtocol)~~
 - Consider automated audit tooling (radon, pylint) in CI.

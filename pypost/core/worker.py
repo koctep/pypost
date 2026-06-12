@@ -6,6 +6,7 @@ from PySide6.QtCore import QThread, Signal
 from pypost.core.alert_manager import AlertManager
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.execute_request_protocol import ExecuteRequestProtocol
 from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -61,7 +62,7 @@ class RequestWorker(QThread):
             default_retry_policy is not None,
             default_retry_policy.max_retries if default_retry_policy is not None else "N/A",
         )
-        self.service = RequestService(
+        self.service: ExecuteRequestProtocol = RequestService(
             metrics=metrics,
             history_manager=history_manager,
             template_service=template_service,

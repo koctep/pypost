@@ -23,6 +23,7 @@ from pypost.core.mcp_legacy_sse import build_legacy_sse_app
 from pypost.core.mcp_streamable_http import build_streamable_http_route
 from pypost.core.mcp_transport_routes import MCP_LEGACY_SSE_MOUNT_PATH
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
+from pypost.core.execute_request_protocol import ExecuteRequestProtocol
 from pypost.core.request_service import ExecutionResult, RequestService
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
@@ -189,7 +190,7 @@ class MCPServerImpl:
         execution_env = McpSecretsPolicy.execution_environment_variables(env_vars)
         return _merge_execution_variables(execution_env, mcp_args)
 
-    def _create_request_service(self) -> RequestService:
+    def _create_request_service(self) -> ExecuteRequestProtocol:
         """Return an isolated RequestService for one MCP tool invocation (PYPOST-138)."""
         logger.debug("MCPServerImpl: creating RequestService for MCP call")
         return RequestService(
