@@ -84,6 +84,14 @@ ResponseView search bar coverage (PYPOST-365):
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_response_view_search.py -v
 ```
 
+RequestWidget GUI action metrics (PYPOST-170): Send click and Save/Save As/Copy cURL entry
+points increment Prometheus counters; tests inject `MetricsManager` and scrape the registry.
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_request_editor_gui_metrics.py -v
+```
+
 ## Response search flow integration (PYPOST-357)
 
 RequestTab-level wiring tests load a response via `display_response`, then drive search through
@@ -217,6 +225,7 @@ duplicate scope: prior tickets already cover the intent.
 | Metrics server bind / startup signaling | `tests/test_metrics_server_startup.py` | Integration | PYPOST-153; port busy, deferred failure |
 | Live HTTP `/metrics` scrape after uvicorn start | `tests/test_metrics_server_integration.py` | Integration | PYPOST-169; real socket bind + urllib GET |
 | Live metrics MCP resource round-trip | `tests/test_metrics_server_integration.py` | Integration | PYPOST-563; Streamable HTTP and SSE |
+| RequestWidget GUI action counters | `tests/test_request_editor_gui_metrics.py` | Integration | PYPOST-170; Send click + Save/Copy cURL scrape |
 | MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556; port busy, listen readiness |
 
 PYPOST-154 verified end-to-end port-in-use handling for both MCP and metrics (closes
