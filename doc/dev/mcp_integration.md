@@ -150,6 +150,23 @@ former monolithic `MetricsManager` into focused modules:
 5.  `MainWindow.connect_start_failed` replays failures that occurred before the window opened
     and shows `QMessageBox.warning` via `_on_metrics_start_failed`.
 
+### Metrics server lifecycle locking (PYPOST-171)
+
+`MetricsServer` owns `server_lock` (`threading.Lock`) for start/stop only. `MetricsManager`
+delegates lifecycle calls without adding its own lock.
+
+*   **Guarded state**: daemon `thread`, `server_instance`, and join during `stop_server`.
+*   **Callers**: `main.py` (`start_server` at boot, `stop_server` at shutdown) and
+    `MainWindow` (`restart_server` when metrics host/port change). All run on the Qt main
+    thread today — infrequent, serialized lifecycle operations.
+*   **Counters**: `track_*` methods do not take `server_lock`; Prometheus registry handles
+    concurrent increments from workers and the metrics thread.
+*   **Restart**: `restart_server` calls `stop_server` then `start_server` (two lock
+    acquisitions). Acceptable while only the main thread invokes lifecycle methods.
+*   **Caveat**: `start_server` may call `stop_server` while holding a non-reentrant `Lock`
+    if a previous thread is still alive. Production uses `restart_server` for that case;
+    do not add concurrent lifecycle callers without revisiting lock type or inlining stop.
+
 ### MCP tools overview (PYPOST-556)
 
 `collect_mcp_tool_overview(collections)` in `pypost/core/mcp_tools_overview.py` builds
