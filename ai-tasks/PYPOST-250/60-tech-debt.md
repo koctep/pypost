@@ -37,7 +37,7 @@ both `type: ignore` suppressions while preserving the multiple-inheritance MRO.
 **Description**: Some widgets still use untyped `event` parameters and deprecated
 `event.pos()` in non-hover paths.
 
-**Tracking**: No Jira issue (separate hygiene sweep).
+- **Tracking**: — [PYPOST-595](https://pypost.atlassian.net/browse/PYPOST-595)
 
 ---
 

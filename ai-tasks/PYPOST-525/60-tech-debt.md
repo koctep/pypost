@@ -37,8 +37,8 @@ separately from inventory. TD-2 consolidation remains a future optimization, not
 
 | ID | Priority | Description | Jira |
 | --- | --- | --- | --- |
-| TD-2 | Low | Unify inventory scan and decrypt load to avoid duplicate file reads in migration | PYPOST-487 debt; not expanded here |
-| TD-3 | Low | Skip bulk re-encrypt when inventory shows no ciphertext to rotate | PYPOST-487 debt |
-| — | Low | Optional refactor: extract shared deserialize loop for `load_environments` and `load_environments_with_errors` | No ticket; only if both methods evolve together |
+| TD-2 | Low | Unify inventory scan and decrypt load to avoid duplicate file reads in migration | PYPOST-487 debt; not expanded here | [PYPOST-638](https://pypost.atlassian.net/browse/PYPOST-638) |
+| TD-3 | Low | Skip bulk re-encrypt when inventory shows no ciphertext to rotate | PYPOST-487 debt | [PYPOST-639](https://pypost.atlassian.net/browse/PYPOST-639) |
+| — | Low | Optional refactor: extract shared deserialize loop for `load_environments` and `load_environments_with_errors` | [PYPOST-678](https://pypost.atlassian.net/browse/PYPOST-678) |
 
 No new follow-up Jira issues required for PYPOST-525 completion.

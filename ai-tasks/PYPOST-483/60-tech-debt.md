@@ -65,25 +65,25 @@
 - Add operator/dev documentation for key sources, fallback order, and rotation workflow in
   `doc/dev/environment_encryption_at_rest.md` — completed in STEP 7.
 - Implement bulk re-encryption / migration tooling when encryption settings change.
-  Jira: [PYPOST-487](https://pypost.atlassian.net/browse/PYPOST-487)
+- Implement bulk re-encryption / migration tooling when encryption settings change. — [PYPOST-487](https://pypost.atlassian.net/browse/PYPOST-487)
 - Add vault and env-indirection secret-store backends beyond file v1.
-  Jira: [PYPOST-500](https://pypost.atlassian.net/browse/PYPOST-500)
+- Add vault and env-indirection secret-store backends beyond file v1. — [PYPOST-500](https://pypost.atlassian.net/browse/PYPOST-500)
 - Add end-to-end test: Settings dialog → `StorageManager.apply_encryption_settings()` →
   encrypt/decrypt with multi-source chain.
-  Jira: [PYPOST-501](https://pypost.atlassian.net/browse/PYPOST-501)
+- encrypt/decrypt with multi-source chain. — [PYPOST-501](https://pypost.atlassian.net/browse/PYPOST-501)
 - Add unit tests for `parse_key_source_fallback()`, chain by-id fallback, and secret-store
   historical key resolution.
-  Jira: [PYPOST-502](https://pypost.atlassian.net/browse/PYPOST-502)
+- historical key resolution. — [PYPOST-502](https://pypost.atlassian.net/browse/PYPOST-502)
 - Consolidate `SUPPORTED_KEY_SOURCES` and secret-backend factory into a single module.
-  Jira: [PYPOST-503](https://pypost.atlassian.net/browse/PYPOST-503)
+- Consolidate `SUPPORTED_KEY_SOURCES` and secret-backend factory into a single module. — [PYPOST-503](https://pypost.atlassian.net/browse/PYPOST-503)
 - Consider registry caching with file-mtime invalidation for env/secret-store sources.
-  Jira: [PYPOST-504](https://pypost.atlassian.net/browse/PYPOST-504)
+- Consider registry caching with file-mtime invalidation for env/secret-store sources. — [PYPOST-504](https://pypost.atlassian.net/browse/PYPOST-504)
 - Warn in Settings UI when fallback text contains unsupported or duplicate entries.
-  Jira: [PYPOST-505](https://pypost.atlassian.net/browse/PYPOST-505)
+- Warn in Settings UI when fallback text contains unsupported or duplicate entries. — [PYPOST-505](https://pypost.atlassian.net/browse/PYPOST-505)
 - Validate Fernet key material at registry load time with clear, safe error messages.
-  Jira: [PYPOST-506](https://pypost.atlassian.net/browse/PYPOST-506)
+- Validate Fernet key material at registry load time with clear, safe error messages. — [PYPOST-506](https://pypost.atlassian.net/browse/PYPOST-506)
 - Evaluate extracting environment serialization/encryption from `StorageManager`.
-  Jira: [PYPOST-482](https://pypost.atlassian.net/browse/PYPOST-482)
+- Evaluate extracting environment serialization/encryption from `StorageManager`. — [PYPOST-482](https://pypost.atlassian.net/browse/PYPOST-482)
 - Clarify `keyring` packaging: optional extra vs required dependency, documented in install
   guidance.
-  Jira: [PYPOST-507](https://pypost.atlassian.net/browse/PYPOST-507)
+- guidance. — [PYPOST-507](https://pypost.atlassian.net/browse/PYPOST-507)

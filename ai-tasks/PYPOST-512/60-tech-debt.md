@@ -28,9 +28,9 @@
 ## Follow-up Tasks
 
 - Implement YAML and XML body validators when those formats are active via format selector.
-  Jira: [PYPOST-519](https://pypost.atlassian.net/browse/PYPOST-519) (non-blocker; depends on
+- Implement YAML and XML body validators when those formats are active via format selector. — [PYPOST-519](https://pypost.atlassian.net/browse/PYPOST-519)
   [PYPOST-513](https://pypost.atlassian.net/browse/PYPOST-513))
 - Add unit test for validation error line alignment with folded/hidden blocks.
-  Jira: [PYPOST-520](https://pypost.atlassian.net/browse/PYPOST-520) (non-blocker)
+- Add unit test for validation error line alignment with folded/hidden blocks. — [PYPOST-520](https://pypost.atlassian.net/browse/PYPOST-520)
 - Extend RequestWidget integration test to assert body validation banner on invalid JSON.
-  Jira: [PYPOST-521](https://pypost.atlassian.net/browse/PYPOST-521) (non-blocker)
+- Extend RequestWidget integration test to assert body validation banner on invalid JSON. — [PYPOST-521](https://pypost.atlassian.net/browse/PYPOST-521)

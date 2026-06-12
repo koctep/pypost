@@ -34,7 +34,7 @@ None. Per-test signal timeouts add negligible overhead; full suite completes in 
 | ---- | -------- | ----- |
 | Extend `make lint` to `tests/` with E402 noqa policy | Low | Optional consistency |
 | Per-test timeout overrides for slow outliers | Low | Only if CI reports timeouts |
-| Fix pre-existing E501/E203 in unrelated pypost files | Low | Out of PYPOST-548 scope |
+| Fix pre-existing E501/E203 in unrelated pypost files | Low | Out of PYPOST-548 scope | [PYPOST-651](https://pypost.atlassian.net/browse/PYPOST-651) |
 
 ## Blocker Review
 

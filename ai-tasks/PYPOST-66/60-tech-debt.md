@@ -14,8 +14,8 @@
 
 | Item | Priority | Follow-up |
 |------|----------|-----------|
-| `main_window.py` still 260 LOC vs PYPOST-43 ≤ 150 target | LOW | Future PYPOST-43 chunks: layout, menus/shortcuts, settings flow |
-| `MainWindow` class 222 LOC | LOW | Same — incremental extraction |
+| `main_window.py` still 260 LOC vs PYPOST-43 ≤ 150 target | LOW | Future PYPOST-43 chunks: layout, menus/shortcuts, settings flow | [PYPOST-672](https://pypost.atlassian.net/browse/PYPOST-672) |
+| `MainWindow` class 222 LOC | LOW | Same — incremental extraction | [PYPOST-673](https://pypost.atlassian.net/browse/PYPOST-673) |
 
 ## Follow-ups
 

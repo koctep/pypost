@@ -20,7 +20,7 @@ None.
 
 | Priority | Description | Jira |
 | --- | --- | --- |
-| Medium | CI allowlist for expected ERROR lines from error-path tests | PYPOST-571 |
+| Medium | CI allowlist for expected ERROR lines from error-path tests | [PYPOST-666](https://pypost.atlassian.net/browse/PYPOST-666) |
 | Low | Add optional `caplog` asserts to medium-risk retry exhaustion tests | (defer) |
 
 ## Verdict

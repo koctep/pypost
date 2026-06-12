@@ -17,7 +17,7 @@ None — verification-only task.
 
 | Item | Severity | Follow-up |
 | --- | --- | --- |
-| `start_server` may call `stop_server` while holding non-reentrant `Lock` | Low | Dead path in production; use `restart_server` or `RLock` if concurrent start is ever needed |
+| `start_server` may call `stop_server` while holding non-reentrant `Lock` | Low | Dead path in production; use `restart_server` or `RLock` if concurrent start is ever needed | [PYPOST-590](https://pypost.atlassian.net/browse/PYPOST-590) |
 | `restart_server` not atomic across stop+start | Low | Acceptable while only Qt main thread restarts metrics |
 
 ## Follow-up Tasks

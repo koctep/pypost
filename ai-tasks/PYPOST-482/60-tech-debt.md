@@ -24,8 +24,8 @@ None introduced. Same per-value encrypt/decrypt loop; PYPOST-485 tracks optimiza
 ## Follow-up Tasks
 
 - Reduce per-value encryption overhead on save/load paths.
-  Jira: [PYPOST-485](https://pypost.atlassian.net/browse/PYPOST-485)
+- Reduce per-value encryption overhead on save/load paths. — [PYPOST-485](https://pypost.atlassian.net/browse/PYPOST-485)
 - Represent encrypted envelope via typed model for centralized validation.
-  Jira: [PYPOST-484](https://pypost.atlassian.net/browse/PYPOST-484)
+- Represent encrypted envelope via typed model for centralized validation. — [PYPOST-484](https://pypost.atlassian.net/browse/PYPOST-484)
 - Add graceful shutdown wait for `EnvironmentStorageGateway` when encryption is enabled.
-  Jira: [PYPOST-508](https://pypost.atlassian.net/browse/PYPOST-508)
+- Add graceful shutdown wait for `EnvironmentStorageGateway` when encryption is enabled. — [PYPOST-508](https://pypost.atlassian.net/browse/PYPOST-508)

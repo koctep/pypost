@@ -44,8 +44,8 @@ and tab-layer isolation. Residual debt is optional polish, not blockers.
 
 | Priority | Description |
 | --- | --- |
-| Low | Optional: `track_gui_new_tab_action("collections_click")` on left-click for metric parity |
-| Low | Optional: merge `open_request_in_tab` / `open_request_in_isolated_tab` if product wants one signal |
-| Low | Optional: integration test via `MainWindow` for full open path |
+| Low | Optional: `track_gui_new_tab_action("collections_click")` on left-click for metric parity | [PYPOST-605](https://pypost.atlassian.net/browse/PYPOST-605) |
+| Low | Optional: merge `open_request_in_tab` / `open_request_in_isolated_tab` if product wants one signal | [PYPOST-606](https://pypost.atlassian.net/browse/PYPOST-606) |
+| Low | Optional: integration test via `MainWindow` for full open path | [PYPOST-607](https://pypost.atlassian.net/browse/PYPOST-607) |
 
 No new Jira tickets required to close PYPOST-406.

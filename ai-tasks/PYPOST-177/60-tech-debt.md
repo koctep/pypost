@@ -13,7 +13,7 @@
 | Item | Severity | Notes |
 | --- | --- | --- |
 | Live metrics-server MCP SSE round-trip | Low | Pre-existing; out of scope |
-| Facade-only coverage in `test_metrics_manager.py` | Low | Complements new component tests |
+| Facade-only coverage in `test_metrics_manager.py` | Low | Complements new component tests | [PYPOST-591](https://pypost.atlassian.net/browse/PYPOST-591) |
 
 ## Follow-up Tasks
 

@@ -20,9 +20,10 @@ None. `set_colors` rebuilds five `QTextCharFormat` objects — negligible on set
 
 ## Follow-up Tasks
 
-- Add `AppSettings.theme` and settings UI for explicit light/dark/system choice (no Jira
-  issue yet).
-- Optional user-configurable JSON syntax colors in settings (no Jira issue yet).
+- Add `AppSettings.theme` and settings UI for explicit light/dark/system choice.
+- Add `AppSettings.theme` and settings UI for explicit light/dark/system choice. — [PYPOST-603](https://pypost.atlassian.net/browse/PYPOST-603)
+- Optional user-configurable JSON syntax colors in settings.
+- Optional user-configurable JSON syntax colors in settings. — [PYPOST-604](https://pypost.atlassian.net/browse/PYPOST-604)
 
 ## Verdict
 

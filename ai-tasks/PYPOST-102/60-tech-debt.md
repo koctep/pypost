@@ -19,7 +19,7 @@ None.
 ## Code Quality Issues
 
 None for this closure. User-configurable JSON syntax colors in settings remain out of
-scope (no Jira issue).
+- None for this closure. User-configurable JSON syntax colors in settings remain out of — [PYPOST-586](https://pypost.atlassian.net/browse/PYPOST-586)
 
 ## Missing Tests
 

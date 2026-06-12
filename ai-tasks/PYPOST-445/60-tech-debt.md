@@ -15,7 +15,7 @@
   this task's deliverable.
 - **Optional (non-blocker):** MainWindow-level test that `open_settings()` save + new
   `StateManager` load reflects timeout — low value given ConfigManager + dialog coverage.
-  - Jira: _none_
+- `StateManager` load reflects timeout — low value given ConfigManager + dialog coverage. — [PYPOST-626](https://pypost.atlassian.net/browse/PYPOST-626)
 
 ## Performance Concerns
 

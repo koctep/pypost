@@ -27,7 +27,7 @@ None introduced. No production code changes.
 
 - **Compiled template LRU (optional):** If Prometheus shows sustained high
   `template_expression_render_attempts` or hover lag is reported, implement Strategy A from
-  `20-architecture.md` (`lru_cache` on compile, `maxsize=256`). No Jira ticket created —
+- `20-architecture.md` (`lru_cache` on compile, `maxsize=256`). — [PYPOST-628](https://pypost.atlassian.net/browse/PYPOST-628)
   criteria documented above; create ticket when signal appears.
 - **Render duration histogram (optional):** Add only if volume counters are insufficient to
   diagnose lag.

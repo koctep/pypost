@@ -9,7 +9,7 @@
   - Jira: _none_ (accepted by design)
 - No INFO log was added when the user toggles `log_hidden_key_names` in Settings. Policy
   change is silent in logs; only the checkbox state in `settings.json` records the preference.
-  - Jira: _none_ (low impact)
+- change is silent in logs; only the checkbox state in `settings.json` records the preference. — [PYPOST-627](https://pypost.atlassian.net/browse/PYPOST-627)
 
 ## Code Quality Issues
 
@@ -17,11 +17,11 @@
   `pypost/ui/widgets/mixins.py`, creating a core → UI layer dependency. For a one-field
   policy this is acceptable short-term, but the mask constant belongs in a shared module
   (e.g. `pypost/core/constants.py` or next to `SensitiveDataMaskingPolicy`).
-  - Jira: [PYPOST-491](https://pypost.atlassian.net/browse/PYPOST-491) (Medium, Debt)
+- (e.g. `pypost/core/constants.py` or next to `SensitiveDataMaskingPolicy`). — [PYPOST-491](https://pypost.atlassian.net/browse/PYPOST-491)
 - `SettingsDialog` places the new checkbox with `addRow("", checkbox)` — label text lives on
   the `QCheckBox` itself. Consistent with some existing rows but differs from labeled spinbox
   rows; a dedicated "Security / Logging" section header would improve discoverability.
-  - Jira: [PYPOST-492](https://pypost.atlassian.net/browse/PYPOST-492) (Low, Debt)
+- rows; a dedicated "Security / Logging" section header would improve discoverability. — [PYPOST-492](https://pypost.atlassian.net/browse/PYPOST-492)
 
 ## Missing Tests
 
@@ -29,11 +29,11 @@
   `EnvPresenter._open_env_manager` → masked toggle log. Coverage is split across
   `test_settings_dialog`, `test_env_presenter.apply_settings`, and `test_env_dialog` caplog
   tests but not wired in one flow.
-  - Jira: [PYPOST-490](https://pypost.atlassian.net/browse/PYPOST-490) (High, Debt)
+- tests but not wired in one flow. — [PYPOST-490](https://pypost.atlassian.net/browse/PYPOST-490)
 - `tests/test_env_persistence_e2e.py` constructs `EnvironmentDialog` without
   `log_hidden_key_names`; it does not assert default masked logging after persistence round-
   trip.
-  - Jira: [PYPOST-489](https://pypost.atlassian.net/browse/PYPOST-489) (Low, Debt)
+- trip. — [PYPOST-489](https://pypost.atlassian.net/browse/PYPOST-489)
 - No test verifies `env_name` is still logged when key is redacted (only full message string
   asserted in caplog tests).
   - Jira: _none_ (covered implicitly by existing caplog assertions)
@@ -55,7 +55,7 @@
 
 - ~~`doc/dev/hidden_variables.md` outdated (PYPOST-437 text).~~ **Resolved in STEP 7**
   (PYPOST-448 `70-dev-docs.md`, `doc/dev/hidden_variables.md` updated).
-  - Jira: [PYPOST-488](https://pypost.atlassian.net/browse/PYPOST-488) (High, Debt) — close
+- (PYPOST-448 `70-dev-docs.md`, `doc/dev/hidden_variables.md` updated). — [PYPOST-488](https://pypost.atlassian.net/browse/PYPOST-488)
     when verified
 
 ## Follow-up Tasks

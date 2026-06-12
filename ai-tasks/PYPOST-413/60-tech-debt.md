@@ -4,7 +4,7 @@
 
 | ID | Item | Resolution |
 |----|------|------------|
-| TD-5 | `_on_request_error` cancellation check on `ExecutionError.detail` imprecise | `ErrorCategory.CANCELLED` + category check |
+| TD-5 | `_on_request_error` cancellation check on `ExecutionError.detail` imprecise | `ErrorCategory.CANCELLED` + category check | [PYPOST-612](https://pypost.atlassian.net/browse/PYPOST-612) |
 
 ## Follow-ups
 

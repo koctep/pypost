@@ -38,14 +38,14 @@
 ## Follow-up Tasks
 
 - Add integration test covering hidden-value masking through execution -> history save -> reload ->
-  history panel display. Jira: [PYPOST-462](https://pypost.atlassian.net/browse/PYPOST-462)
+- history panel display. — [PYPOST-462](https://pypost.atlassian.net/browse/PYPOST-462)
   (Priority: High, Type: Debt).
 - Refactor `RequestService.execute` history-recording block into dedicated helpers to reduce method
-  complexity. Jira: [PYPOST-463](https://pypost.atlassian.net/browse/PYPOST-463) (Priority:
+- Refactor `RequestService.execute` history-recording block into dedicated helpers to reduce method — [PYPOST-463](https://pypost.atlassian.net/browse/PYPOST-463)
   Normal/Medium, Type: Debt).
 - Add explicit tests for masking metric behavior with empty vs non-empty `hidden_keys`. Jira:
   [PYPOST-464](https://pypost.atlassian.net/browse/PYPOST-464) (Priority: Normal/Medium, Type:
   Debt). **Done** — see `tests/test_history_masking_metrics.py`.
 - Provision CI/local test environment with required dependencies and run full regression for this
-  task before merge. Jira: [PYPOST-465](https://pypost.atlassian.net/browse/PYPOST-465) (Priority:
+- task before merge. — [PYPOST-465](https://pypost.atlassian.net/browse/PYPOST-465)
   Low, Type: Debt).

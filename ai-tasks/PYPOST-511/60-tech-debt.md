@@ -18,7 +18,7 @@
 
 - No test that collapsed region IDs survive debounced re-scan after edits elsewhere in the
   document (only boundary-unchanged regions are kept).
-  Jira: [PYPOST-517](https://pypost.atlassian.net/browse/PYPOST-517)
+- document (only boundary-unchanged regions are kept). — [PYPOST-517](https://pypost.atlassian.net/browse/PYPOST-517)
 - No automated test that `RequestWidget` Body tab shows fold chevrons in an integrated hierarchy
   (covered indirectly via `CodeEditor` unit tests).
   Jira: extend [PYPOST-516](https://pypost.atlassian.net/browse/PYPOST-516) (non-blocker)
@@ -28,14 +28,14 @@
 
 - `JsonStructureScanner` runs `json.loads()` on the full document plus a character scan on every
   debounced re-scan. Fine for typical payloads; very large bodies may benefit from a single-pass
-  scanner later. No ticket filed (low priority).
+- debounced re-scan. Fine for typical payloads; very large bodies may benefit from a single-pass — [PYPOST-637](https://pypost.atlassian.net/browse/PYPOST-637)
 
 ## Follow-up Tasks
 
 - Implement YAML and XML structure scanners and enable folding when those formats are active.
-  Jira: [PYPOST-518](https://pypost.atlassian.net/browse/PYPOST-518) (non-blocker; depends on
+- Implement YAML and XML structure scanners and enable folding when those formats are active. — [PYPOST-518](https://pypost.atlassian.net/browse/PYPOST-518)
   [PYPOST-513](https://pypost.atlassian.net/browse/PYPOST-513))
 - Add unit tests for fold remapping after document edits while sections are collapsed.
-  Jira: [PYPOST-517](https://pypost.atlassian.net/browse/PYPOST-517) (non-blocker)
+- Add unit tests for fold remapping after document edits while sections are collapsed. — [PYPOST-517](https://pypost.atlassian.net/browse/PYPOST-517)
 - Extend RequestWidget integration test to assert body gutter chevrons and fold toggle.
-  Jira: [PYPOST-516](https://pypost.atlassian.net/browse/PYPOST-516) (non-blocker; existing ticket)
+- Extend RequestWidget integration test to assert body gutter chevrons and fold toggle. — [PYPOST-516](https://pypost.atlassian.net/browse/PYPOST-516)

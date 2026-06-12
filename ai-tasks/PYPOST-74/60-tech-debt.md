@@ -15,7 +15,7 @@
 | Priority | Jira | Item |
 | --- | --- | --- |
 | Low | [PYPOST-75](https://pypost.atlassian.net/browse/PYPOST-75) | Duplicate scope (NullMetrics) — close or narrow to counter split only |
-| Low | — | Gradually type consumer params as `MetricsTrackerProtocol` without `\| None` |
+| Low | [PYPOST-675](https://pypost.atlassian.net/browse/PYPOST-675) | Gradually type consumer params as `MetricsTrackerProtocol` without `\| None` |
 
 ## Notes
 

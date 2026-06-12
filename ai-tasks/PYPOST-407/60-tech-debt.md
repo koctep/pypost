@@ -39,7 +39,7 @@ contract stated, tests added. Behavior unchanged; no blockers.
 
 | Priority | Description |
 | --- | --- |
-| Low | Optional: profile tab-open with multi-MB bodies if users store huge drafts |
-| Low | Optional: field hashing in `persisted_fields_equal` if sibling sync becomes hot |
+| Low | Optional: profile tab-open with multi-MB bodies if users store huge drafts | [PYPOST-608](https://pypost.atlassian.net/browse/PYPOST-608) |
+| Low | Optional: field hashing in `persisted_fields_equal` if sibling sync becomes hot | [PYPOST-609](https://pypost.atlassian.net/browse/PYPOST-609) |
 
 No new Jira tickets required to close PYPOST-407.

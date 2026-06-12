@@ -12,8 +12,8 @@
 
 | Item | Severity | Status |
 | ---- | -------- | ------ |
-| Remove deprecated alias after sunset | Low | Follow-up — see below |
-| `doc/dev/testing.md` metric table omits retry exhaustion series | Low | Non-blocker; covered in migration doc |
+| Remove deprecated alias after sunset | Low | Follow-up — see below | [PYPOST-623](https://pypost.atlassian.net/browse/PYPOST-623) |
+| `doc/dev/testing.md` metric table omits retry exhaustion series | Low | Non-blocker; covered in migration doc | [PYPOST-624](https://pypost.atlassian.net/browse/PYPOST-624) |
 
 **Blockers:** None. **Verdict: SAFE TO CLOSE.**
 

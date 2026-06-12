@@ -17,8 +17,8 @@
 
 | ID | Priority | Item |
 | --- | --- | --- |
-| TD-1 | Low | Auto-populate MCP params table from template scan when URL/body changes |
-| TD-2 | Low | Support `array` / `object` types in UI type combo (model already allows) |
-| TD-3 | Low | Operator contract preview panel (PYPOST-555) |
+| TD-1 | Low | Auto-populate MCP params table from template scan when URL/body changes | [PYPOST-657](https://pypost.atlassian.net/browse/PYPOST-657) |
+| TD-2 | Low | Support `array` / `object` types in UI type combo (model already allows) | [PYPOST-658](https://pypost.atlassian.net/browse/PYPOST-658) |
+| TD-3 | Low | Operator contract preview panel (PYPOST-555) | [PYPOST-659](https://pypost.atlassian.net/browse/PYPOST-659) |
 
-No Jira issues created — items tracked in PYPOST-555 epic child or future polish.
+Follow-ups ticketed above (PYPOST-657–659); operator preview tracked under PYPOST-555.

@@ -25,7 +25,7 @@ None.
 
 | Item | Severity | Jira | Notes |
 | --- | --- | --- | --- |
-| Migrate `TestOnRequestError` to pytest + `qapp` | Low | — | Reduces QApplication lifecycle footguns; not required for this closure |
+| Migrate `TestOnRequestError` to pytest + `qapp` | Low | — | Reduces QApplication lifecycle footguns; not required for this closure | [PYPOST-615](https://pypost.atlassian.net/browse/PYPOST-615) |
 
 No new Jira issues created — optional refactor is low priority and does not block release.
 

@@ -18,6 +18,6 @@
 ## Follow-up Tasks
 
 - Add benchmark or profiling harness for environments with 100+ hidden keys to guard regressions.
-  Jira: [PYPOST-534](https://pypost.atlassian.net/browse/PYPOST-534)
+- Add benchmark or profiling harness for environments with 100+ hidden keys to guard regressions. — [PYPOST-534](https://pypost.atlassian.net/browse/PYPOST-534)
 - Consider persisted `kid` rotation batch job integration with reuse stats in migration CLI output.
-  Jira: [PYPOST-535](https://pypost.atlassian.net/browse/PYPOST-535)
+- Consider persisted `kid` rotation batch job integration with reuse stats in migration CLI output. — [PYPOST-535](https://pypost.atlassian.net/browse/PYPOST-535)

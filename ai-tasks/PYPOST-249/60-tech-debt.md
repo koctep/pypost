@@ -24,7 +24,7 @@ None new. Debounce behavior documented in `doc/dev/state_manager.md`.
 | --- | --- | --- |
 | Split AppSettings into preference vs session models | Low | Only if settings surface grows or ownership bugs recur |
 | Partial JSON field updates on disk | Low | Profile first; current file is small |
-| Timer-fired persistence without flush in tests | Low | Already noted in PYPOST-386/252 debt |
+| Timer-fired persistence without flush in tests | Low | Already noted in PYPOST-386/252 debt | [PYPOST-594](https://pypost.atlassian.net/browse/PYPOST-594) |
 
 ## Blocker Review Verdict
 

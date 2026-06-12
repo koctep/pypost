@@ -36,9 +36,9 @@
 
 | ID | Priority | Task | Rationale |
 | --- | --- | --- | --- |
-| TD-1 | Low | Add Settings action for encrypt-plaintext | Parity with CLI M4 scenario |
-| TD-2 | Low | Extract shared migration report text formatter | DRY with CLI |
-| TD-3 | Low | Background worker for bulk re-encrypt from UI | Avoid UI freeze on large files |
+| TD-1 | Low | Add Settings action for encrypt-plaintext | Parity with CLI M4 scenario | [PYPOST-640](https://pypost.atlassian.net/browse/PYPOST-640) |
+| TD-2 | Low | Extract shared migration report text formatter | DRY with CLI | [PYPOST-641](https://pypost.atlassian.net/browse/PYPOST-641) |
+| TD-3 | Low | Background worker for bulk re-encrypt from UI | Avoid UI freeze on large files | [PYPOST-642](https://pypost.atlassian.net/browse/PYPOST-642) |
 
 ## Review
 

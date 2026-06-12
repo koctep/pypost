@@ -41,7 +41,35 @@ See [`tech-debt-diff.md`](../../tech-debt-diff.md) for conventions:
 
 - Complete sentences before em-dash Jira links
 - Readable Jira summaries (not mid-sentence fragments)
-- Consistent linking style (prefer PYPOST-53 table format for dense items)
+- Consistent linking style (prefer table format for dense items)
+
+### Follow-up table format (PYPOST-582)
+
+Use a three-column table for follow-ups — **no** `Jira:` prefix column, **no** stray
+`PYPOST-N` text column:
+
+```markdown
+## Follow-up Tasks
+
+| Priority | Description | Jira |
+| --- | --- | --- |
+| Medium | Refine expected/suspicious tags after worker/presenter audit | [PYPOST-665](https://pypost.atlassian.net/browse/PYPOST-665) |
+```
+
+Alternate layout (`Priority | Jira | Item`) is fine when the Jira key is the second column.
+
+Normalize legacy files:
+
+```bash
+python3 scripts/standardize_debt_markdown.py
+python3 scripts/consolidate_tech_debt.py
+```
+
+Export inventory JSON for tooling:
+
+```bash
+python3 scripts/consolidate_tech_debt.py --json scripts/debt_inventory.json
+```
 
 ## Related
 

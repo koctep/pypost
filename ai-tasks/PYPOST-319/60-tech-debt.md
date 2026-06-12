@@ -37,7 +37,7 @@ insert path is tested and documented. Definition of Done met.
 
 | Priority | Description |
 | --- | --- |
-| Low | Consider incremental tree update for regular save when only one request changes |
-| Low | GUI save-as tests (PYPOST-320) |
+| Low | Consider incremental tree update for regular save when only one request changes | [PYPOST-596](https://pypost.atlassian.net/browse/PYPOST-596) |
+| Low | GUI save-as tests (PYPOST-320) | [PYPOST-597](https://pypost.atlassian.net/browse/PYPOST-597) |
 
 No new Jira tickets required to close PYPOST-319.

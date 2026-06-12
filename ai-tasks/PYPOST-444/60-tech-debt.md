@@ -15,7 +15,7 @@
   codes path — this task's deliverable.
 - **Optional (non-blocker):** Parametrized Qt test for `empty_segment` and `out_of_range`
   reasons — low value given parser unit tests.
-  - Jira: _none_
+- reasons — low value given parser unit tests. — [PYPOST-625](https://pypost.atlassian.net/browse/PYPOST-625)
 
 ## Performance Concerns
 

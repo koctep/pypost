@@ -10,8 +10,8 @@
 
 | ID | Priority | Item | Notes |
 | --- | --- | --- | --- |
-| TD-1 | Low | Duplicate live-server harness | Extract shared `tests/helpers/mcp_live_server.py` from integration modules |
-| TD-2 | Low | No `conftest.py` fixture | Session-scoped collection server if more collection tests are added |
+| TD-1 | Low | Duplicate live-server harness | Extract shared `tests/helpers/mcp_live_server.py` from integration modules | [PYPOST-592](https://pypost.atlassian.net/browse/PYPOST-592) |
+| TD-2 | Low | No `conftest.py` fixture | Session-scoped collection server if more collection tests are added | [PYPOST-593](https://pypost.atlassian.net/browse/PYPOST-593) |
 | TD-3 | Medium | Real outbound HTTP to SSE probes | Requires local stub or running app on 1080/9080; deferred |
 
 ## Blocker review

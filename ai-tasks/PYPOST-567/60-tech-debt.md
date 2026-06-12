@@ -21,7 +21,7 @@ None.
 
 | Priority | Description | Jira |
 | --- | --- | --- |
-| Medium | Refine expected/suspicious tags after worker/presenter audit | PYPOST-568 |
+| Medium | Refine expected/suspicious tags after worker/presenter audit | [PYPOST-665](https://pypost.atlassian.net/browse/PYPOST-665) |
 | Low | Add unit tests for log inventory parser | (create if needed) |
 
 ## Verdict

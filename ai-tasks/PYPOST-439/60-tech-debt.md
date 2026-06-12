@@ -13,8 +13,8 @@ None introduced.
 
 | Item | Priority | Notes |
 | --- | --- | --- |
-| E2E: Settings save → `settings.json` round-trip for alert fields | Low | Covered indirectly by dialog accept tests |
-| Main window reload of `AlertManager` after settings save | Medium | Pre-existing gap |
+| E2E: Settings save → `settings.json` round-trip for alert fields | Low | Covered indirectly by dialog accept tests | [PYPOST-620](https://pypost.atlassian.net/browse/PYPOST-620) |
+| Main window reload of `AlertManager` after settings save | Medium | Pre-existing gap | [PYPOST-621](https://pypost.atlassian.net/browse/PYPOST-621) |
 
 ## Performance Concerns
 
@@ -24,7 +24,7 @@ None.
 
 | Item | Priority | Notes |
 | --- | --- | --- |
-| Rebuild or reconfigure `AlertManager` when alert settings change | Medium | `MainWindow.apply_settings` does not touch `_alert_manager` today |
+| Rebuild or reconfigure `AlertManager` when alert settings change | Medium | `MainWindow.apply_settings` does not touch `_alert_manager` today | [PYPOST-622](https://pypost.atlassian.net/browse/PYPOST-622) |
 
 ## Blocker Review Verdict
 

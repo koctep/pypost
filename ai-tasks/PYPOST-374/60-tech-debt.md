@@ -11,11 +11,11 @@ Documented in [30-dialogs-audit-report.md](30-dialogs-audit-report.md):
 
 | ID | Issue | Severity |
 | --- | --- | --- |
-| D1 | `SettingsDialog` multi-domain SRP violation (423 LOC) | High |
-| D2 | `HotkeysDialog` hardcoded shortcuts vs app actions | Medium |
-| D3 | Duplicated encryption mode parsing in `SettingsDialog` | Medium |
-| D4 | Hardcoded About version | Low |
-| D5 | `EncryptionMigrationService` constructed inside dialog | Low |
+| D1 | `SettingsDialog` multi-domain SRP violation (423 LOC) | High | [PYPOST-598](https://pypost.atlassian.net/browse/PYPOST-598) |
+| D2 | `HotkeysDialog` hardcoded shortcuts vs app actions | Medium | [PYPOST-599](https://pypost.atlassian.net/browse/PYPOST-599) |
+| D3 | Duplicated encryption mode parsing in `SettingsDialog` | Medium | [PYPOST-600](https://pypost.atlassian.net/browse/PYPOST-600) |
+| D4 | Hardcoded About version | Low | [PYPOST-601](https://pypost.atlassian.net/browse/PYPOST-601) |
+| D5 | `EncryptionMigrationService` constructed inside dialog | Low | [PYPOST-602](https://pypost.atlassian.net/browse/PYPOST-602) |
 
 ## Missing Tests
 

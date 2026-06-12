@@ -14,9 +14,9 @@ None introduced. Duplicate/copy logic remains in `EnvironmentListWidget`; tests 
 
 | Item | Priority | Notes |
 | --- | --- | --- |
-| Inline rename delegate validation via F2 | Low | Rename validation covered via `_apply_environment_rename`; delegate UI path not duplicated |
-| Full QMenu integration without mocking `QMenu` class | Low | Context-menu copy smoke test mocks menu; duplicate logic covered directly |
-| `add_environment` whitespace-only name | Low | Add path treats falsy `name` as no-op; copy empty-name loop is covered |
+| Inline rename delegate validation via F2 | Low | Rename validation covered via `_apply_environment_rename`; delegate UI path not duplicated | [PYPOST-617](https://pypost.atlassian.net/browse/PYPOST-617) |
+| Full QMenu integration without mocking `QMenu` class | Low | Context-menu copy smoke test mocks menu; duplicate logic covered directly | [PYPOST-618](https://pypost.atlassian.net/browse/PYPOST-618) |
+| `add_environment` whitespace-only name | Low | Add path treats falsy `name` as no-op; copy empty-name loop is covered | [PYPOST-619](https://pypost.atlassian.net/browse/PYPOST-619) |
 
 ## Performance Concerns
 

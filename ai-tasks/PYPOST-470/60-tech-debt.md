@@ -62,11 +62,11 @@ None. Added tests are synchronous parametrized unit tests with bounded inputs (l
 
 | Priority | Ticket / step | Description |
 | --- | --- | --- |
-| High | STEP 7 | Update `doc/dev/variable_validation.md` — Unicode acceptance policy, valid/invalid examples, whitespace trim vs core behavior |
-| Medium | New (if product wants Jinja2 parity) | Evaluate switching `validate_variable_name` from `isalnum()` to `isidentifier()`; add regression tests for known divergences (`x²`, NFD combining marks) |
+| High | STEP 7 | Update `doc/dev/variable_validation.md` — Unicode acceptance policy, valid/invalid examples, whitespace trim vs core behavior | [PYPOST-631](https://pypost.atlassian.net/browse/PYPOST-631) |
+| Medium | New (if product wants Jinja2 parity) | Evaluate switching `validate_variable_name` from `isalnum()` to `isidentifier()`; add regression tests for known divergences (`x²`, NFD combining marks) | [PYPOST-632](https://pypost.atlassian.net/browse/PYPOST-632) |
 | Low | [PYPOST-472](https://pypost.atlassian.net/browse/PYPOST-472) | Deduplicate error message strings between validation and UI layers |
 | Low | [PYPOST-479](https://pypost.atlassian.net/browse/PYPOST-479) | Review validation debug logging verbosity |
-| Low | Test hygiene | Unify error-message constants and add `validation_failure_reason` to baseline Unicode test |
+| Low | Test hygiene | Unify error-message constants and add `validation_failure_reason` to baseline Unicode test | [PYPOST-633](https://pypost.atlassian.net/browse/PYPOST-633) |
 
 Closes PYPOST-163 item 163-1 (edge-case unit test gaps). No new Jira tickets filed for
 PYPOST-470 scope.

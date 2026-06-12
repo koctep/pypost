@@ -34,6 +34,6 @@
 
 | Priority | Description |
 | --- | --- |
-| Low | If a third tree item type is added, register it in `DEFAULT_COLLECTION_ITEM_STRATEGIES` |
+| Low | If a third tree item type is added, register it in `DEFAULT_COLLECTION_ITEM_STRATEGIES` | [PYPOST-634](https://pypost.atlassian.net/browse/PYPOST-634) |
 
 No new Jira tickets required to close PYPOST-48.

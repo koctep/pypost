@@ -40,7 +40,7 @@ None. All requirements implemented as designed.
 | Issue | Severity | File | Notes |
 |-------|----------|------|-------|
 | No `.flake8` config | Low | project root | E501 pre-existing; affects whole codebase |
-| `QT_QPA_PLATFORM` not in Makefile `test` | Low | `Makefile` | UI tests fail in CI without it |
+| `QT_QPA_PLATFORM` not in Makefile `test` | Low | `Makefile` | UI tests fail in CI without it | [PYPOST-614](https://pypost.atlassian.net/browse/PYPOST-614) |
 | HTTP method strings not constants | Low | multiple | Pre-existing; see PYPOST-40 audit |
 
 ## Missing Tests

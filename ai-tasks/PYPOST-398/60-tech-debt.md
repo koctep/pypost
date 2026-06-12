@@ -22,4 +22,5 @@ None introduced. Same number of `QColor` constructions as before.
 
 - Dark-theme JSON syntax palette and runtime theme switching —
   [PYPOST-395](https://pypost.atlassian.net/browse/PYPOST-395).
-- Optional user-configurable colors in settings (no Jira issue yet).
+- Optional user-configurable colors in settings —
+- Optional user-configurable colors in settings — [PYPOST-604](https://pypost.atlassian.net/browse/PYPOST-604)

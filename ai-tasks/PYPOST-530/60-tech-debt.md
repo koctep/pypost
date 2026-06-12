@@ -8,9 +8,9 @@ None. Acceptance criteria met.
 
 | ID | Priority | Task | Rationale |
 | --- | --- | --- | --- |
-| TD-6 | Low | Flag non-string/non-envelope hidden values in inventory | PYPOST-529 |
-| TD-8 | Low | Integration tests with keyring and secret_store fixtures | PYPOST-531 |
-| TD-9 | Low | CLI test for `encrypt-plaintext --dry-run` | PYPOST-532 |
+| TD-6 | Low | Flag non-string/non-envelope hidden values in inventory | [PYPOST-643](https://pypost.atlassian.net/browse/PYPOST-643) |
+| TD-8 | Low | Integration tests with keyring and secret_store fixtures | [PYPOST-644](https://pypost.atlassian.net/browse/PYPOST-644) |
+| TD-9 | Low | CLI test for `encrypt-plaintext --dry-run` | [PYPOST-645](https://pypost.atlassian.net/browse/PYPOST-645) |
 | TD-10 | Low | Optional `--config-dir` for settings alongside `--data-dir` | Restore workflows that copy only data. Jira: [PYPOST-540](https://pypost.atlassian.net/browse/PYPOST-540) |
 
 ## Verdict

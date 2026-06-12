@@ -13,8 +13,8 @@ None.
 
 | Priority | Description | Jira / action |
 | --- | --- | --- |
-| High | CI allowlist / fail on unexpected ERROR | PYPOST-571 |
-| Medium | Add `-o log_cli=false` to `test.yml` | Optional small PR or part of PYPOST-571 |
+| High | CI allowlist / fail on unexpected ERROR | [PYPOST-670](https://pypost.atlassian.net/browse/PYPOST-670) |
+| Medium | Add `-o log_cli=false` to `test.yml` | Optional small PR or part of PYPOST-571 | [PYPOST-671](https://pypost.atlassian.net/browse/PYPOST-671) |
 | Low | `caplog` on medium-risk presenter test | Defer |
 | Low | Review 21 suspicious + 26 unknown inventory lines | Epic follow-up |
 

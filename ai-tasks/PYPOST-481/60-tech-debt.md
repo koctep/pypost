@@ -17,7 +17,7 @@ variables per security requirements.
 
 - No automated UI test for `MainWindow.open_settings()` applying encryption policy to
   `StorageManager` end-to-end (covered indirectly via storage + dialog unit tests).
-  Jira: [PYPOST-499](https://pypost.atlassian.net/browse/PYPOST-499)
+- `StorageManager` end-to-end (covered indirectly via storage + dialog unit tests). — [PYPOST-499](https://pypost.atlassian.net/browse/PYPOST-499)
 - No test for unsupported key source combo entries in UI (only one source enabled today).
   Low priority; deferred until additional key sources ship (PYPOST-483).
 
@@ -28,10 +28,10 @@ None introduced. Encryption work remains on environment save/load paths as in PY
 ## Follow-up Tasks
 
 - Add additional key provider strategies (keyring, external secret store) and enable UI options.
-  Jira: [PYPOST-483](https://pypost.atlassian.net/browse/PYPOST-483) (blocker: provider
+- Add additional key provider strategies (keyring, external secret store) and enable UI options. — [PYPOST-483](https://pypost.atlassian.net/browse/PYPOST-483)
   implementations)
 - Evaluate migration tooling when togg encryption settings togg existing plain-text hidden values.
-  Jira: [PYPOST-487](https://pypost.atlassian.net/browse/PYPOST-487) (blocker: key provider
+- Evaluate migration tooling when togg encryption settings togg existing plain-text hidden values. — [PYPOST-487](https://pypost.atlassian.net/browse/PYPOST-487)
   strategy work)
 - Extract environment serialization/encryption from `StorageManager` into dedicated adapter.
-  Jira: [PYPOST-482](https://pypost.atlassian.net/browse/PYPOST-482) (non-blocker)
+- Extract environment serialization/encryption from `StorageManager` into dedicated adapter. — [PYPOST-482](https://pypost.atlassian.net/browse/PYPOST-482)

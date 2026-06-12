@@ -8,6 +8,6 @@ None. Audit complete; no tests exceed 80% timeout utilization.
 
 | Item | Priority | Jira |
 | --- | --- | --- |
-| Optional CI job: `--durations=10 --durations-min=5` on verbose runs | Low | — |
-| Monitor `test_makefile.py` (~4.6s peak); consider 45s marker after stable week | Low | — |
-| Re-run `scripts/parse_timeout_audit.py` when adding e2e/integration tests | Low | — |
+| Optional CI job: `--durations=10 --durations-min=5` on verbose runs | Low | — | [PYPOST-667](https://pypost.atlassian.net/browse/PYPOST-667) |
+| Monitor `test_makefile.py` (~4.6s peak); consider 45s marker after stable week | Low | — | [PYPOST-668](https://pypost.atlassian.net/browse/PYPOST-668) |
+| Re-run `scripts/parse_timeout_audit.py` when adding e2e/integration tests | Low | — | [PYPOST-669](https://pypost.atlassian.net/browse/PYPOST-669) |

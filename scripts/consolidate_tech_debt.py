@@ -171,7 +171,28 @@ def render_markdown(
 
 
 def main() -> None:
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--json",
+        type=Path,
+        metavar="PATH",
+        help="Write unique Jira entries as JSON (key PYPOST-N -> title)",
+    )
+    args = parser.parse_args()
+
     entries, files_scanned, link_count, no_link_files = collect_entries()
+    if args.json:
+        payload = {
+            f"PYPOST-{jira}": entry["title"]
+            for jira, entry in sorted(entries.items())
+        }
+        args.json.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        print(f"Wrote {args.json.relative_to(ROOT)} ({len(payload)} issues)")
+        return
+
     OUTPUT.write_text(
         render_markdown(entries, files_scanned, link_count, no_link_files),
         encoding="utf-8",

@@ -13,8 +13,8 @@ None blocking close.
 | Priority | Item | Notes |
 |----------|------|-------|
 | Low | [PYPOST-412](https://pypost.atlassian.net/browse/PYPOST-412) | Worker `except ExecutionError` branch was only exercised by removed guard; add test when guard path is fully migrated to `ExecutionResult` |
-| Low | History masking re-renders URL | `SensitiveDataMaskingPolicy` renders templates again for history — acceptable, not on retry hot path |
-| Low | `TemplateService` silent fallback | Render errors return original content; strict template failure surfacing is separate work |
+| Low | History masking re-renders URL | `SensitiveDataMaskingPolicy` renders templates again for history — acceptable, not on retry hot path | [PYPOST-610](https://pypost.atlassian.net/browse/PYPOST-610) |
+| Low | `TemplateService` silent fallback | Render errors return original content; strict template failure surfacing is separate work | [PYPOST-611](https://pypost.atlassian.net/browse/PYPOST-611) |
 
 ## Missing Tests
 

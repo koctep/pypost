@@ -10,7 +10,7 @@ None. TD-9 from PYPOST-487 is resolved by this test.
 | --- | --- | --- | --- |
 | TD-6 | Low | Flag non-string/non-envelope hidden values in inventory | PYPOST-529 |
 | TD-8 | Low | Integration tests with keyring and secret_store fixtures | PYPOST-531 |
-| TD-10 | Low | Optional `--config-dir` for settings alongside `--data-dir` | PYPOST-540 |
+| TD-10 | Low | Optional `--config-dir` for settings alongside `--data-dir` | [PYPOST-646](https://pypost.atlassian.net/browse/PYPOST-646) |
 
 ## Verdict
 

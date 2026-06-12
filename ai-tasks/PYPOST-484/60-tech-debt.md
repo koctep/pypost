@@ -21,4 +21,4 @@ None. `from_payload` performs the same checks as the removed `_validate_payload`
 ## Follow-up Tasks
 
 - Add envelope v2 design when a new algorithm or metadata fields are required.
-  Jira: [PYPOST-533](https://pypost.atlassian.net/browse/PYPOST-533)
+- Add envelope v2 design when a new algorithm or metadata fields are required. — [PYPOST-533](https://pypost.atlassian.net/browse/PYPOST-533)

@@ -29,8 +29,8 @@ None. Single shared `Environment` per production instance unchanged.
 | Item | Severity | Jira |
 | --- | --- | --- |
 | `TemplateServiceProtocol` for mock without Jinja2 | Low | Future — PYPOST-378 TD-1 |
-| Remove leaf fallbacks; require explicit injection | Low | Future hardening |
-| Inject hover `TemplateService` from presenter | Low | Future UI DI |
+| Remove leaf fallbacks; require explicit injection | Low | Future hardening | [PYPOST-588](https://pypost.atlassian.net/browse/PYPOST-588) |
+| Inject hover `TemplateService` from presenter | Low | Future UI DI | [PYPOST-589](https://pypost.atlassian.net/browse/PYPOST-589) |
 
 No new Jira issues created — items are pre-existing accepted trade-offs, now documented.
 

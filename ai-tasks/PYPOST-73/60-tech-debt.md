@@ -11,7 +11,7 @@
 | Item | Severity | Notes |
 | --- | --- | --- |
 | `None` guards still verbose | Low | PYPOST-44 TD-2 — needs `NullMetrics` |
-| Facade still bundles server + counters at root | Low | Addressed by PYPOST-75 split; root still uses facade |
+| Facade still bundles server + counters at root | Low | Addressed by PYPOST-75 split; root still uses facade | [PYPOST-674](https://pypost.atlassian.net/browse/PYPOST-674) |
 | No OpenTelemetry adapter | Low | Future work once protocol exists |
 
 ## Resolved Debt

@@ -39,7 +39,7 @@ of Done met.
 
 | Priority | Description |
 | --- | --- |
-| Low | Optional: user-facing “Reload collections from disk” menu action calling `load_collections()` |
-| Low | Optional: unify `FakeRequestManager` with `tests.helpers.FakeStorageManager` |
+| Low | Optional: user-facing “Reload collections from disk” menu action calling `load_collections()` | [PYPOST-629](https://pypost.atlassian.net/browse/PYPOST-629) |
+| Low | Optional: unify `FakeRequestManager` with `tests.helpers.FakeStorageManager` | [PYPOST-630](https://pypost.atlassian.net/browse/PYPOST-630) |
 
 No new Jira tickets required to close PYPOST-47.

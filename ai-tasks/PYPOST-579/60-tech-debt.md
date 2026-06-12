@@ -9,8 +9,8 @@
 
 | ID | Priority | Item | Notes |
 | --- | --- | --- | --- |
-| TD-1 | Low | Wire OTel adapter in production composition root | Requires operator OTLP config; desktop default stays Prometheus |
-| TD-2 | Low | Shared instrument definition table | `MetricsRegistry` and `OtelMetricsTracker` duplicate instrument metadata |
+| TD-1 | Low | Wire OTel adapter in production composition root | Requires operator OTLP config; desktop default stays Prometheus | [PYPOST-583](https://pypost.atlassian.net/browse/PYPOST-583) |
+| TD-2 | Low | Shared instrument definition table | `MetricsRegistry` and `OtelMetricsTracker` duplicate instrument metadata | [PYPOST-584](https://pypost.atlassian.net/browse/PYPOST-584) |
 
 ## Blocker review
 

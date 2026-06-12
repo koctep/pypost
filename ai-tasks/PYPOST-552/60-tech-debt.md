@@ -13,8 +13,8 @@
 | --- | --- | --- | --- |
 | TD-1 | Low | Manual Cursor sign-off not in CI | Operator completes checklist; cannot automate desktop agent |
 | TD-2 | Low | SSE probe tools still use `/sse` URLs | By design — HTTPClient SSE-probe heuristic (PYPOST-430) |
-| TD-3 | Low | `doc/dev/architecture.md` metrics MCP line still mentions `/sse` | Minor; update in follow-up doc sweep |
-| TD-4 | Low | PYPOST-578 duplicate scope | Close or link as duplicate of PYPOST-552 |
+| TD-3 | Low | `doc/dev/architecture.md` metrics MCP line still mentions `/sse` | Minor; update in follow-up doc sweep | [PYPOST-655](https://pypost.atlassian.net/browse/PYPOST-655) |
+| TD-4 | Low | PYPOST-578 duplicate scope | Close or link as duplicate of PYPOST-552 | [PYPOST-656](https://pypost.atlassian.net/browse/PYPOST-656) |
 
 ## Worklog
 

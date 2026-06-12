@@ -25,8 +25,8 @@ None. Format change triggers existing debounced fold/validation rescans on the e
 ## Follow-up Tasks
 
 - Implement YAML and XML structure scanners for folding when those formats are selected.
-  Jira: [PYPOST-518](https://pypost.atlassian.net/browse/PYPOST-518) (non-blocker)
+- Implement YAML and XML structure scanners for folding when those formats are selected. — [PYPOST-518](https://pypost.atlassian.net/browse/PYPOST-518)
 - Implement YAML and XML body validators when those formats are active.
-  Jira: [PYPOST-519](https://pypost.atlassian.net/browse/PYPOST-519) (non-blocker)
-- Add YAML/XML syntax highlighting when format-specific highlighters are available.
-  (non-blocker; no Jira yet)
+- Implement YAML and XML body validators when those formats are active. — [PYPOST-519](https://pypost.atlassian.net/browse/PYPOST-519)
+- - Add YAML/XML syntax highlighting when format-specific highlighters are available. — [PYPOST-585](https://pypost.atlassian.net/browse/PYPOST-585)
+- Add YAML/XML syntax highlighting when format-specific highlighters are available. — Jira: [PYPOST-585](https://pypost.atlassian.net/browse/PYPOST-585) — [PYPOST-585](https://pypost.atlassian.net/browse/PYPOST-585)

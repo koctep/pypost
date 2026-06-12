@@ -16,7 +16,7 @@ No significant shortcuts. The implementation follows the official Qt Code Editor
 - No automated UI test that opens `RequestWidget` and visually confirms the Body tab gutter in an
   integrated widget hierarchy (covered indirectly: `RequestWidget` uses `CodeEditor`, and gutter
   tests target `CodeEditor` directly).
-  Jira: [PYPOST-516](https://pypost.atlassian.net/browse/PYPOST-516)
+- tests target `CodeEditor` directly). — [PYPOST-516](https://pypost.atlassian.net/browse/PYPOST-516)
 - No undo/redo-specific line-number test (block count updates are covered via typing, paste, and
   delete; undo/redo reuse the same `blockCountChanged` path).
 
@@ -27,7 +27,7 @@ None for typical payload sizes. Painting is O(visible lines) per paint event, ma
 ## Follow-up Tasks
 
 - Reuse the line-number gutter on the Script tab editor (tracked in existing tech debt).
-  Jira: [PYPOST-10](https://pypost.atlassian.net/browse/PYPOST-10) (non-blocker; separate scope)
+- Reuse the line-number gutter on the Script tab editor (tracked in existing tech debt). — [PYPOST-10](https://pypost.atlassian.net/browse/PYPOST-10)
 - Add an integration test that loads `RequestWidget` and asserts the Body tab shows a gutter with
   correct width (non-blocker).
-  Jira: [PYPOST-516](https://pypost.atlassian.net/browse/PYPOST-516)
+- correct width (non-blocker). — [PYPOST-516](https://pypost.atlassian.net/browse/PYPOST-516)

@@ -27,4 +27,5 @@ None introduced by theme extraction.
 
 - Duplicate debt item closed:
   [PYPOST-102](https://pypost.atlassian.net/browse/PYPOST-102) (duplicate of PYPOST-99).
-- Optional user-configurable JSON syntax colors in settings (no Jira issue).
+- Optional user-configurable JSON syntax colors in settings —
+- Optional user-configurable JSON syntax colors in settings — [PYPOST-604](https://pypost.atlassian.net/browse/PYPOST-604)

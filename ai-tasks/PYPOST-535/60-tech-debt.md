@@ -8,8 +8,8 @@ None. Acceptance criteria met.
 
 | ID | Priority | Task | Rationale |
 | --- | --- | --- | --- |
-| TD-1 | Low | Surface `reencrypt_stats` in Settings re-encrypt dialog | Jira: [PYPOST-544](https://pypost.atlassian.net/browse/PYPOST-544) |
-| TD-2 | Low | Dry-run projected reuse counts | Jira: [PYPOST-545](https://pypost.atlassian.net/browse/PYPOST-545) |
+| TD-1 | Low | Surface `reencrypt_stats` in Settings re-encrypt dialog | [PYPOST-544](https://pypost.atlassian.net/browse/PYPOST-544) |
+| TD-2 | Low | Dry-run projected reuse counts | [PYPOST-545](https://pypost.atlassian.net/browse/PYPOST-545) |
 
 ## Verdict
 

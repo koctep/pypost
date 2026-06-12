@@ -46,7 +46,7 @@ mark that PYPOST-448 follow-up as done when this task ships.
   helper would reduce drift if more integration tests adopt this pattern. No existing Jira ticket.
 - `HiddenToggleLogPolicy` still imports `HIDDEN_MASK` from the UI layer (core → UI dependency).
   Pre-existing from PYPOST-448; not introduced by this task.
-  - Jira: [PYPOST-491](https://pypost.atlassian.net/browse/PYPOST-491) (Medium, Debt)
+- Pre-existing from PYPOST-448; not introduced by this task. — [PYPOST-491](https://pypost.atlassian.net/browse/PYPOST-491)
 
 ## Missing Tests
 
@@ -57,9 +57,9 @@ mark that PYPOST-448 follow-up as done when this task ships.
 - **Policy change while environment manager is open** — explicitly out of scope (PYPOST-448
   accepted UX limitation).
 - **Persistence round-trip with default masked toggle logging** — separate scope.
-  - Jira: [PYPOST-489](https://pypost.atlassian.net/browse/PYPOST-489) (Low, Debt)
+- **Persistence round-trip with default masked toggle logging** — separate scope. — [PYPOST-489](https://pypost.atlassian.net/browse/PYPOST-489)
 - **Settings UI discoverability** (security/logging section grouping) — separate scope.
-  - Jira: [PYPOST-492](https://pypost.atlassian.net/browse/PYPOST-492) (Low, Debt)
+- **Settings UI discoverability** (security/logging section grouping) — separate scope. — [PYPOST-492](https://pypost.atlassian.net/browse/PYPOST-492)
 
 No new missing-test gaps introduced by PYPOST-490 beyond the optional guard above.
 

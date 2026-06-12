@@ -8,12 +8,12 @@
 
 - Section header uses inline `setStyleSheet` rather than a shared theme helper. Acceptable
   for a single dialog row; `hotkeys_dialog.py` uses a similar pattern.
-  - Jira: _none_ (consistent with existing UI)
+- for a single dialog row; `hotkeys_dialog.py` uses a similar pattern. — [PYPOST-635](https://pypost.atlassian.net/browse/PYPOST-635)
 
 ## Missing Tests
 
 - No visual/regression screenshot test for Settings dialog layout.
-  - Jira: _none_ (form index tests sufficient for this scope)
+- No visual/regression screenshot test for Settings dialog layout. — [PYPOST-636](https://pypost.atlassian.net/browse/PYPOST-636)
 
 ## Performance Concerns
 

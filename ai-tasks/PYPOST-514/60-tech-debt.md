@@ -43,15 +43,15 @@ payload sizes make this negligible on the send path.
 - **Copy cURL / history parity** — Apply `yaml_as_json` in `CurlGenerator.generate` so
   exported cURL matches the JSON wire body when conversion is enabled. History entries
   intentionally keep editor YAML; document or offer opt-in wire-form export if users need
-  it. Jira: [PYPOST-522](https://pypost.atlassian.net/browse/PYPOST-522) (non-blocker)
+- intentionally keep editor YAML; document or offer opt-in wire-form export if users need — [PYPOST-522](https://pypost.atlassian.net/browse/PYPOST-522)
 - **Paste-time JSON→YAML** — PYPOST-515 shares the `yaml_as_json` flag for editor paste
   behavior; no PYPOST-514 changes required until that task ships.
-  Jira: [PYPOST-515](https://pypost.atlassian.net/browse/PYPOST-515) (non-blocker)
+- behavior; no PYPOST-514 changes required until that task ships. — [PYPOST-515](https://pypost.atlassian.net/browse/PYPOST-515)
 - **BODY error dialog test** — Add `test_tabs_presenter` coverage for
   `ErrorCategory.BODY` message formatting.
-  Jira: [PYPOST-523](https://pypost.atlassian.net/browse/PYPOST-523) (non-blocker)
+- `ErrorCategory.BODY` message formatting. — [PYPOST-523](https://pypost.atlassian.net/browse/PYPOST-523)
 - **Conversion analytics** — Optional `track_yaml_to_json_conversion_failed` counter (no
   body content) if failure rates become useful for support.
-  Jira: [PYPOST-524](https://pypost.atlassian.net/browse/PYPOST-524) (non-blocker)
+- body content) if failure rates become useful for support. — [PYPOST-524](https://pypost.atlassian.net/browse/PYPOST-524)
 - **User documentation** — YAML 1.1 boolean/tag semantics covered in STEP 7 dev docs
   (`doc/dev/yaml_as_json.md`); cURL/history vs wire body behavior documented.

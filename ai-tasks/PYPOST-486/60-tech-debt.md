@@ -40,7 +40,7 @@
 
 - **Encryption CPU cost unchanged** — work moved off the UI thread; total encrypt/decrypt time
   for large datasets is the same. Per-value overhead remains tracked separately.
-  Jira: [PYPOST-485](https://pypost.atlassian.net/browse/PYPOST-485)
+- for large datasets is the same. Per-value overhead remains tracked separately. — [PYPOST-485](https://pypost.atlassian.net/browse/PYPOST-485)
 - **Save snapshots** — `model_copy(deep=True)` duplicates secret values in memory until the
   worker finishes; acceptable for typical env sizes, worth revisiting if env dictionaries grow
   very large.
@@ -50,11 +50,11 @@
 ## Follow-up Tasks
 
 - Reduce per-value encryption overhead on save/load paths.
-  Jira: [PYPOST-485](https://pypost.atlassian.net/browse/PYPOST-485) (non-blocker; orthogonal)
+- Reduce per-value encryption overhead on save/load paths. — [PYPOST-485](https://pypost.atlassian.net/browse/PYPOST-485)
 - Extract environment serialization/encryption from `StorageManager` into a dedicated adapter.
-  Jira: [PYPOST-482](https://pypost.atlassian.net/browse/PYPOST-482) (non-blocker)
+- Extract environment serialization/encryption from `StorageManager` into a dedicated adapter. — [PYPOST-482](https://pypost.atlassian.net/browse/PYPOST-482)
 - Add graceful shutdown: wait for `EnvironmentStorageGateway` to finish or cancel before quit
   when encryption is enabled.
-  Jira: [PYPOST-508](https://pypost.atlassian.net/browse/PYPOST-508)
+- when encryption is enabled. — [PYPOST-508](https://pypost.atlassian.net/browse/PYPOST-508)
 - Add `MainWindow` integration test for encrypted async startup gating.
-  Jira: [PYPOST-509](https://pypost.atlassian.net/browse/PYPOST-509)
+- Add `MainWindow` integration test for encrypted async startup gating. — [PYPOST-509](https://pypost.atlassian.net/browse/PYPOST-509)
