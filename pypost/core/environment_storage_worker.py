@@ -3,7 +3,7 @@ from typing import Literal
 
 from PySide6.QtCore import QThread, Signal
 
-from pypost.core.storage import StorageManager
+from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Environment
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class EnvironmentStorageWorker(QThread):
 
     def __init__(
         self,
-        storage: StorageManager,
+        storage: StorageInterface,
         *,
         operation: Literal["load", "save"],
         environments: list[Environment] | None = None,

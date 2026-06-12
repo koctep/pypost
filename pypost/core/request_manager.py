@@ -5,7 +5,7 @@ from pypost.core.collection_item_strategies import (
     DEFAULT_COLLECTION_ITEM_STRATEGIES,
     CollectionItemStrategy,
 )
-from pypost.core.storage import StorageManager
+from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Collection, RequestData
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class RequestManager:
 
     def __init__(
         self,
-        storage_manager: StorageManager,
+        storage_manager: StorageInterface,
         *,
         item_strategies: dict[str, CollectionItemStrategy] | None = None,
     ):

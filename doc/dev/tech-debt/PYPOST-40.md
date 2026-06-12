@@ -28,13 +28,18 @@ See audit R5.
 injection facade. See [mcp_integration.md](../mcp_integration.md) and
 [testability.md](../testability.md). See audit R7.
 
-## 5. Request Execution Protocol
+## 5. Storage Abstraction
+
+**Resolved in PYPOST-50.** Persistence consumers depend on `StorageInterface`; `StorageManager`
+remains the composition-root implementation. See [testability.md](../testability.md). See audit R8.
+
+## 6. Request Execution Protocol
 
 RequestService accepts optional `http_client` and `mcp_client` constructor injection (PYPOST-382).
 RequestWorker and MCPServerImpl still create RequestService internally. Introduce protocols for
 full testability. See [testability.md](../testability.md) and audit R4, R9.
 
-## 6. Collection Item Type Dispatch
+## 7. Collection Item Type Dispatch
 
 **Resolved in PYPOST-48.** `RequestManager` routes `delete_collection_item` and
 `rename_collection_item` through `DEFAULT_COLLECTION_ITEM_STRATEGIES` instead of inline
@@ -46,5 +51,5 @@ full testability. See [testability.md](../testability.md) and audit R4, R9.
 - **P1:** PYPOST-43 (MainWindow), PYPOST-44 (MetricsManager), PYPOST-45 (template_service)
 - **P2:** PYPOST-46 (HTTPClient protocol), ~~PYPOST-47 (collection loading)~~,
   ~~PYPOST-48 (item_type strategy)~~, ~~PYPOST-49 (MetricsManager split)~~
-- **P3:** PYPOST-50 (StorageInterface), PYPOST-51 (ExecuteRequestProtocol)
+- **P3:** ~~PYPOST-50 (StorageInterface)~~, PYPOST-51 (ExecuteRequestProtocol)
 - Consider automated audit tooling (radon, pylint) in CI.

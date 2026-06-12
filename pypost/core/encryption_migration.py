@@ -12,7 +12,7 @@ from typing import Any
 
 from pypost.core.encryption_config import build_key_provider, resolve_encryption_enabled
 from pypost.core.key_provider import EnvironmentEncryptionError
-from pypost.core.storage import StorageManager
+from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 
@@ -101,7 +101,7 @@ def _invalid_hidden_message(env_label: str, key: str, value: Any) -> str:
 class EncryptionMigrationService:
     """Verify decrypt access, inventory kid/plaintext mix, and bulk re-encrypt."""
 
-    def __init__(self, storage: StorageManager) -> None:
+    def __init__(self, storage: StorageInterface) -> None:
         self._storage = storage
 
     def build_inventory(self, settings: AppSettings | None) -> EnvironmentInventory:

@@ -4,7 +4,7 @@ from typing import Literal
 from PySide6.QtCore import QObject, Signal
 
 from pypost.core.environment_storage_worker import EnvironmentStorageWorker
-from pypost.core.storage import StorageManager
+from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Environment
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ class EnvironmentStorageGateway(QObject):
     save_completed = Signal()
     save_failed = Signal(object)
 
-    def __init__(self, storage: StorageManager, parent: QObject | None = None) -> None:
+    def __init__(self, storage: StorageInterface, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._storage = storage
         self._worker: EnvironmentStorageWorker | None = None

@@ -10,6 +10,10 @@ collections from overwriting each other's files.
 
 ## API
 
+Consumers type-hint against `StorageInterface` (`pypost/core/storage_interface.py`).
+`StorageManager` is the production implementation; tests use `FakeStorageManager` or
+`MagicMock(spec=StorageInterface)`.
+
 ### `StorageManager.save_collection(collection)`
 
 Writes `collection` to `{id}.json`. If a legacy name-based file exists for the same

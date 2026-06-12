@@ -18,7 +18,7 @@ from pypost.core.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
 from pypost.core.mcp_server import MCPServerManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
-from pypost.core.storage import StorageManager
+from pypost.core.storage_interface import StorageInterface
 from pypost.core.variable_name_validation import (
     validate_variable_name,
     validation_failure_reason,
@@ -48,7 +48,7 @@ class EnvPresenter(QObject):
 
     def __init__(
         self,
-        storage: StorageManager,
+        storage: StorageInterface,
         config_manager: ConfigManager,
         mcp_manager: MCPServerManager,
         settings: AppSettings,

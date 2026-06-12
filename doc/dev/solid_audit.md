@@ -28,7 +28,7 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 |----------|----------------|
 | P1 | ~~Decompose MainWindow~~ (PYPOST-43); ~~MetricsManager/template_service injection~~ (PYPOST-44/45/167) |
 | P2 | HTTPClient protocol; ~~unified collection loading~~ (PYPOST-47); item_type strategy; ~~split MetricsManager~~ (PYPOST-49) |
-| P3 | StorageInterface; ExecuteRequestProtocol |
+| P3 | ~~StorageInterface~~ (PYPOST-50); ExecuteRequestProtocol |
 
 ## Regression baseline metrics (PYPOST-376)
 

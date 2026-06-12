@@ -7,8 +7,10 @@ test because dependencies were created internally. PYPOST-382 adds **constructor
 seams** where practical and documents established mocking patterns. Metrics consumers now
 depend on `MetricsTrackerProtocol` ([PYPOST-73](https://pypost.atlassian.net/browse/PYPOST-73));
 HTTP transport consumers depend on `HTTPClientProtocol`
-([PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46)); collection item dispatch uses a
-strategy registry ([PYPOST-48](https://pypost.atlassian.net/browse/PYPOST-48)).
+([PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46)); persistence consumers depend on
+`StorageInterface` ([PYPOST-50](https://pypost.atlassian.net/browse/PYPOST-50)); collection
+item dispatch uses a strategy registry
+([PYPOST-48](https://pypost.atlassian.net/browse/PYPOST-48)).
 
 ## Composition root
 
@@ -277,6 +279,33 @@ mock_http = MagicMock(spec=HTTPClientProtocol)
 ```
 
 **Coverage:** `tests/test_http_client_protocol.py`, `TestRequestServiceInjection`.
+
+## StorageInterface
+
+`RequestManager`, environment presenters, migration services, and async storage workers depend
+on `StorageInterface` instead of the concrete `StorageManager`. Production still constructs
+`StorageManager` in `MainWindow`.
+
+```python
+from pypost.core.storage_interface import StorageInterface
+
+class RequestManager:
+    def __init__(self, storage_manager: StorageInterface, ...):
+        self.storage = storage_manager
+```
+
+```python
+from unittest.mock import MagicMock
+
+from pypost.core.storage_interface import StorageInterface
+from tests.helpers import FakeStorageManager
+
+mock_storage = MagicMock(spec=StorageInterface)
+# or
+storage = FakeStorageManager([collection])
+```
+
+**Coverage:** `tests/test_storage_interface.py`, `tests/test_request_manager.py`.
 
 ## Out of scope (future tickets)
 

@@ -30,7 +30,7 @@ from pypost.core.key_source_constants import (
     find_fallback_parse_issues,
     parse_key_source_fallback,
 )
-from pypost.core.storage import StorageManager
+from pypost.core.storage_interface import StorageInterface
 from pypost.models.retry import (
     RetryableCodesValidationFailure,
     RetryPolicy,
@@ -135,7 +135,7 @@ class SettingsDialog(QDialog):
         current_settings: AppSettings,
         parent=None,
         *,
-        storage: StorageManager | None = None,
+        storage: StorageInterface | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
