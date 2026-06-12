@@ -50,6 +50,15 @@ ENCRYPTION_MODE_DEFAULT = "default"
 ENCRYPTION_MODE_ENABLED = "enabled"
 ENCRYPTION_MODE_DISABLED = "disabled"
 
+
+def parse_env_encryption_enabled_from_mode(encryption_mode: str) -> bool | None:
+    """Map Settings encryption mode combo value to tri-state env_encryption_enabled."""
+    if encryption_mode == ENCRYPTION_MODE_ENABLED:
+        return True
+    if encryption_mode == ENCRYPTION_MODE_DISABLED:
+        return False
+    return None
+
 SECTION_HEADER_STYLE = "font-weight: bold; margin-top: 8px;"
 ALERT_LOG_FILENAME = "pypost-alerts.log"
 WEBHOOK_AUTH_KEEP_PLACEHOLDER = "Leave blank to keep configured value"
@@ -357,13 +366,9 @@ class SettingsDialog(QDialog):
         self.env_encryption_help_label.setText(help_text)
 
     def _encryption_settings_from_form(self) -> AppSettings:
-        encryption_mode = self.env_encryption_mode_combo.currentData()
-        if encryption_mode == ENCRYPTION_MODE_ENABLED:
-            env_encryption_enabled = True
-        elif encryption_mode == ENCRYPTION_MODE_DISABLED:
-            env_encryption_enabled = False
-        else:
-            env_encryption_enabled = None
+        env_encryption_enabled = parse_env_encryption_enabled_from_mode(
+            self.env_encryption_mode_combo.currentData(),
+        )
         return self.current_settings.model_copy(
             update={
                 "env_encryption_enabled": env_encryption_enabled,
@@ -489,13 +494,9 @@ class SettingsDialog(QDialog):
             stored_auth=self.current_settings.alert_webhook_auth_header,
             clear_requested=self.alert_webhook_auth_clear_check.isChecked(),
         )
-        encryption_mode = self.env_encryption_mode_combo.currentData()
-        if encryption_mode == ENCRYPTION_MODE_ENABLED:
-            env_encryption_enabled = True
-        elif encryption_mode == ENCRYPTION_MODE_DISABLED:
-            env_encryption_enabled = False
-        else:
-            env_encryption_enabled = None
+        env_encryption_enabled = parse_env_encryption_enabled_from_mode(
+            self.env_encryption_mode_combo.currentData(),
+        )
 
         self.new_settings = AppSettings(
             font_size=self.font_size_spin.value(),

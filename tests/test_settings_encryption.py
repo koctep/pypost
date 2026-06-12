@@ -10,12 +10,14 @@ from PySide6.QtWidgets import QApplication
 from pypost.core.config_manager import ConfigManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import (
+    ENCRYPTION_MODE_DEFAULT,
     ENCRYPTION_MODE_DISABLED,
     ENCRYPTION_MODE_ENABLED,
     KEY_SOURCE_ENVIRONMENT,
     KEY_SOURCE_KEYRING,
     KEY_SOURCE_SECRET_STORE,
     SettingsDialog,
+    parse_env_encryption_enabled_from_mode,
 )
 
 
@@ -165,3 +167,15 @@ class TestConfigManagerEncryptionPersistence:
         assert reloaded.env_encryption_enabled is True
         assert reloaded.env_encryption_key_source == KEY_SOURCE_ENVIRONMENT
         assert reloaded.env_encryption_key_source_fallback == ["secret_store"]
+
+
+@pytest.mark.parametrize(
+    "mode,expected",
+    [
+        (ENCRYPTION_MODE_ENABLED, True),
+        (ENCRYPTION_MODE_DISABLED, False),
+        (ENCRYPTION_MODE_DEFAULT, None),
+    ],
+)
+def test_parse_env_encryption_enabled_from_mode(mode, expected):
+    assert parse_env_encryption_enabled_from_mode(mode) is expected
