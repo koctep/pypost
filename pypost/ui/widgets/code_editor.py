@@ -1,4 +1,5 @@
 import json
+import logging
 
 from PySide6.QtCore import QEvent, QMimeData, Qt, QRect
 from PySide6.QtGui import (
@@ -15,7 +16,10 @@ from pypost.core.yaml_json_converter import convert_json_object_to_yaml
 from pypost.ui.widgets.fold import BodyFormat, FoldController
 from pypost.ui.widgets.line_number_area import LineNumberArea
 from pypost.ui.widgets.validate import ValidationController
+from pypost.ui.widgets.paste_json_worker import PasteJsonFormatWorker
 from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
+
+logger = logging.getLogger(__name__)
 
 _CHEVRON_WIDTH = 14
 _CHEVRON_PADDING = 2
@@ -25,6 +29,12 @@ _PASTE_JSON_FORMAT_CHAR_THRESHOLD = 100 * 1024
 def _should_format_pasted_json(text: str) -> bool:
     """Return False when paste-time JSON parse/format would risk UI lag."""
     return len(text) <= _PASTE_JSON_FORMAT_CHAR_THRESHOLD
+
+
+def _looks_like_json(text: str) -> bool:
+    """Heuristic to avoid background work on obviously non-JSON large pastes."""
+    stripped = text.lstrip()
+    return stripped.startswith("{") or stripped.startswith("[")
 
 
 class CodeEditor(VariableAwarePlainTextEdit):
@@ -44,6 +54,12 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self._update_line_number_area_width(0)
 
         self.update_indent_size(indent_size)
+
+        self._paste_json_generation = 0
+        self._paste_json_worker: PasteJsonFormatWorker | None = None
+        self._async_paste_start = 0
+        self._async_paste_length = 0
+        self._async_paste_original = ""
 
     def fold_controller(self) -> FoldController:
         return self._fold_controller
@@ -276,7 +292,10 @@ class CodeEditor(VariableAwarePlainTextEdit):
         if source.hasText():
             text = source.text()
             if not _should_format_pasted_json(text):
-                super().insertFromMimeData(source)
+                if _looks_like_json(text):
+                    self._start_async_json_paste(text)
+                else:
+                    super().insertFromMimeData(source)
                 return
             try:
                 parsed = json.loads(text)
@@ -290,3 +309,65 @@ class CodeEditor(VariableAwarePlainTextEdit):
                 super().insertFromMimeData(source)
         else:
             super().insertFromMimeData(source)
+
+    def _start_async_json_paste(self, text: str) -> None:
+        self._paste_json_generation += 1
+        generation = self._paste_json_generation
+
+        if self._paste_json_worker is not None and self._paste_json_worker.isRunning():
+            self._paste_json_worker.requestInterruption()
+
+        cursor = self.textCursor()
+        self._async_paste_start = cursor.position()
+        self._async_paste_original = text
+        self.insertPlainText(text)
+        self._async_paste_length = len(text)
+
+        logger.debug(
+            "code_editor_async_paste_started generation=%d chars=%d",
+            generation,
+            len(text),
+        )
+
+        worker = PasteJsonFormatWorker(
+            generation,
+            text,
+            indent_size=self.indent_size,
+            body_format=self._body_format,
+            yaml_as_json=self._yaml_as_json,
+        )
+        worker.finished_with_result.connect(self._on_async_paste_formatted)
+        worker.finished.connect(worker.deleteLater)
+        self._paste_json_worker = worker
+        worker.start()
+
+    def _on_async_paste_formatted(self, generation: int, formatted: object) -> None:
+        if generation != self._paste_json_generation:
+            logger.debug(
+                "code_editor_async_paste_skipped generation=%d reason=stale",
+                generation,
+            )
+            return
+        if not isinstance(formatted, str):
+            logger.debug(
+                "code_editor_async_paste_skipped generation=%d reason=not_json",
+                generation,
+            )
+            return
+
+        cursor = QTextCursor(self.document())
+        cursor.setPosition(self._async_paste_start)
+        cursor.setPosition(
+            self._async_paste_start + self._async_paste_length,
+            QTextCursor.MoveMode.KeepAnchor,
+        )
+        selected = cursor.selectedText().replace("\u2029", "\n")
+        if selected != self._async_paste_original:
+            logger.debug(
+                "code_editor_async_paste_skipped generation=%d reason=edited",
+                generation,
+            )
+            return
+
+        cursor.insertText(formatted)
+        logger.debug("code_editor_async_paste_applied generation=%d", generation)

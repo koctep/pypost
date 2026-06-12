@@ -20,8 +20,13 @@ Behaviour:
 - When format is not YAML, the flag has no effect on send or paste (even if still checked in the
   model).
 - Pasted non-JSON text is unchanged; invalid JSON paste falls back to default insert.
-- Pasted text larger than **100KB** (102 400 characters) skips JSON parse and formatting; raw
-  clipboard text is inserted to avoid UI lag on the main thread.
+- Pasted text larger than **100KB** (102 400 characters):
+  - If it does not look like JSON (after leading whitespace, does not start with `{` or `[`),
+    raw clipboard text is inserted with no background work.
+  - If it looks like JSON, raw text is inserted immediately on the UI thread, then
+    `PasteJsonFormatWorker` parses and formats off-thread. On success, the inserted region is
+    replaced with pretty-printed JSON (or YAML when **YAML as JSON** is on). If parse fails or
+    the user edits the region before completion, raw text is kept.
 
 See also [Body Format Selector](body_format_selector.md) for format persistence and
 [Copy cURL](copy_curl.md) for cURL generation (cURL uses editor text, not converted JSON).
@@ -65,7 +70,10 @@ flowchart LR
   `setEnabled` when format is YAML; `_sync_yaml_as_json_to_editor` pushes flag to `CodeEditor`.
 - **`CodeEditor` (`pypost/ui/widgets/code_editor.py`)** — `set_yaml_as_json`; paste hook converts
   JSON→YAML when format is YAML and flag is on, otherwise pretty-prints JSON. Paste at or below
-  100KB only; larger clipboard text uses default insert (`_PASTE_JSON_FORMAT_CHAR_THRESHOLD`).
+  100KB is synchronous; larger JSON-like pastes use async format via `PasteJsonFormatWorker`
+  (`_PASTE_JSON_FORMAT_CHAR_THRESHOLD`, `_looks_like_json`).
+- **`PasteJsonFormatWorker` (`pypost/ui/widgets/paste_json_worker.py`)** — background
+  `json.loads` + format for large pastes; signals formatted text back to `CodeEditor`.
 - **`RequestData` (`pypost/models/models.py`)** — `yaml_as_json: bool = False`; serializes with
   existing collection storage (no migration).
 - **`yaml_json_converter` (`pypost/core/yaml_json_converter.py`)** — `convert_yaml_body_to_object`
@@ -253,4 +261,5 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 - **PYPOST-513** — Body format selector (`body_type`).
 - **PYPOST-514** — YAML-as-JSON send conversion (this feature).
 - **PYPOST-515** — Paste-time JSON→YAML in editor when checkbox is on (shares `yaml_as_json` flag).
-- **PYPOST-109** — Skip paste-time JSON parse/format above 100KB to avoid UI lag.
+- **PYPOST-109** — Bound synchronous paste-time JSON handling to ≤100KB.
+- **PYPOST-111** — Async JSON parse/format for large JSON-like pastes above 100KB.

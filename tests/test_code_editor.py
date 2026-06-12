@@ -166,14 +166,39 @@ class TestCodeEditorPaste(unittest.TestCase):
         ed.insertFromMimeData(mime)
         self.assertEqual(json.loads(ed.toPlainText()), {"x": 1})
 
-    def test_insert_from_mime_data_large_text_skips_json_format(self):
+    def test_insert_from_mime_data_large_json_formats_async(self):
         ed = CodeEditor(indent_size=2)
         ed.setPlainText("")
-        raw = '{"x":1,"pad":"' + ("a" * (100 * 1024)) + '"}'
+        pad = "a" * (100 * 1024)
+        raw = '{"x":1,"pad":"' + pad + '"}'
         mime = QMimeData()
         mime.setText(raw)
         ed.insertFromMimeData(mime)
         self.assertEqual(ed.toPlainText(), raw)
+        for _ in range(200):
+            QApplication.processEvents()
+            if ed.toPlainText() != raw:
+                break
+        self.assertEqual(json.loads(ed.toPlainText()), {"x": 1, "pad": pad})
+
+    def test_insert_from_mime_data_large_json_to_yaml_async(self):
+        ed = CodeEditor()
+        ed.set_body_format(BodyFormat.YAML)
+        ed.set_yaml_as_json(True)
+        ed.setPlainText("")
+        pad = "b" * (100 * 1024)
+        raw = '{"x":1,"pad":"' + pad + '"}'
+        mime = QMimeData()
+        mime.setText(raw)
+        ed.insertFromMimeData(mime)
+        for _ in range(200):
+            QApplication.processEvents()
+            if ed.toPlainText() != raw:
+                break
+        self.assertEqual(
+            convert_yaml_body_to_object(ed.toPlainText()),
+            {"x": 1, "pad": pad},
+        )
 
     def test_insert_from_mime_data_large_non_json_passthrough(self):
         ed = CodeEditor()
