@@ -268,16 +268,27 @@ class TestSettingsDialogBindAddressValidation:
 
 
 class TestSettingsDialogRetryableCodesValidation:
+    @pytest.mark.parametrize(
+        "codes,expected_reason,message_fragment",
+        [
+            ("500,abc", "invalid_token", "whole number"),
+            ("500,", "empty_segment", "empty entries"),
+            ("99", "out_of_range", "100 and 599"),
+        ],
+    )
     @patch("pypost.ui.dialogs.settings_dialog.show_invalid_retryable_status_codes")
     def test_accept_blocks_save_and_shows_warning_on_invalid_codes(
         self,
         mock_show_invalid,
+        codes,
+        expected_reason,
+        message_fragment,
         qapp,
         caplog,
     ):
         dlg = SettingsDialog(AppSettings())
         try:
-            dlg.retryable_codes_edit.setText("500,abc")
+            dlg.retryable_codes_edit.setText(codes)
             with caplog.at_level(
                 logging.WARNING,
                 logger="pypost.ui.dialogs.settings_dialog",
@@ -287,10 +298,10 @@ class TestSettingsDialogRetryableCodesValidation:
             mock_show_invalid.assert_called_once()
             assert mock_show_invalid.call_args.args[0] is dlg
             message = mock_show_invalid.call_args.args[1]
-            assert "whole number" in message
+            assert message_fragment in message
             assert any(
                 "retryable_codes_settings_validation_failed" in record.message
-                and "reason=invalid_token" in record.message
+                and f"reason={expected_reason}" in record.message
                 for record in caplog.records
             )
         finally:
