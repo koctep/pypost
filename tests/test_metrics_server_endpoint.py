@@ -5,6 +5,8 @@ import pytest
 pytestmark = pytest.mark.timeout(30)
 
 import asyncio
+import socket
+import time
 import unittest
 from unittest.mock import patch
 
@@ -17,6 +19,23 @@ from pypost.core.metrics_server import MetricsServer
 
 def _scrape(registry: MetricsRegistry) -> str:
     return generate_latest(registry.registry).decode("utf-8")
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def _wait_listening(host: str, port: int, timeout: float = 10.0) -> None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return
+        except OSError:
+            time.sleep(0.05)
+    raise TimeoutError(f"server did not listen on {host}:{port}")
 
 
 class TestMetricsServerHttpEndpoint(unittest.TestCase):
@@ -50,6 +69,22 @@ class TestMetricsServerHttpEndpoint(unittest.TestCase):
             'mcp_responses_sent_total{method="read_resource:metrics",status="success"} 1.0',
             response.text,
         )
+
+
+class TestMetricsServerLifecycle(unittest.TestCase):
+    def test_start_server_restarts_when_thread_alive(self):
+        """RLock allows stop_server while start_server holds the lock (PYPOST-590)."""
+        registry = MetricsRegistry()
+        server = MetricsServer(registry)
+        port1 = _free_port()
+        port2 = _free_port()
+        server.start_server("127.0.0.1", port1)
+        try:
+            _wait_listening("127.0.0.1", port1)
+            server.start_server("127.0.0.1", port2)
+            _wait_listening("127.0.0.1", port2)
+        finally:
+            server.stop_server()
 
 
 class TestMetricsServerMcpResourceCounters(unittest.TestCase):
