@@ -24,6 +24,20 @@ SSE_PROBE_MAX_EVENTS = 5
 DEFAULT_REQUEST_TIMEOUT = 30.0
 
 
+def _is_sse_content_type(content_type: str) -> bool:
+    """Return True when Content-Type indicates an SSE response body."""
+    if not content_type:
+        return False
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    return media_type == "text/event-stream"
+
+
+def _headers_accept_event_stream(headers: Dict[str, str]) -> bool:
+    """Return True when the request Accept header asks for event-stream."""
+    accept = headers.get("Accept", "")
+    return "text/event-stream" in accept.lower()
+
+
 @dataclass(frozen=True)
 class ResolvedRequestFields:
     """Template-resolved URL, headers, and body sent on the wire."""
@@ -209,15 +223,14 @@ class HTTPClient:
         self._metrics.track_request_sent(request_data.method)
 
         url = self._template_service.render_string(request_data.url, variables)
-        is_sse_endpoint = request_data.method == "GET" and "/sse" in url.rstrip("/")
-        if is_sse_endpoint:
-            logger.debug("sse_probe_detected method=%s url=%s", request_data.method, url)
 
         try:
             kwargs, resolved = self._prepare_request_kwargs(
                 request_data, variables, rendered_url=url
             )
-            if is_sse_endpoint:
+            if request_data.method == "GET" and _headers_accept_event_stream(
+                kwargs.get("headers", {})
+            ):
                 kwargs["timeout"] = (SSE_PROBE_CONNECT_TIMEOUT, SSE_PROBE_TIMEOUT)
                 headers = dict(kwargs.get("headers", {}))
                 headers.setdefault("Accept", "text/event-stream")
@@ -249,9 +262,13 @@ class HTTPClient:
             headers_callback(response.status_code, dict(response.headers))
 
         content_type = response.headers.get("Content-Type", "")
-        if request_data.method == "GET" and (
-            "text/event-stream" in content_type or is_sse_endpoint
-        ):
+        if request_data.method == "GET" and _is_sse_content_type(content_type):
+            logger.debug(
+                "sse_stream_detected method=%s url=%s content_type=%s",
+                request_data.method,
+                url,
+                content_type,
+            )
             return HTTPRequestResult(
                 response=self._handle_sse_response(response, request_data, start_time),
                 resolved=resolved,

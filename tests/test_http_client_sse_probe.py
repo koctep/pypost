@@ -1,4 +1,4 @@
-"""Tests for HTTPClient SSE probe (PYPOST-39)."""
+"""Tests for HTTPClient SSE probe (PYPOST-39, PYPOST-430)."""
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
@@ -29,18 +29,13 @@ def _make_sse_response(events_data):
 
 class HTTPClientSSEProbeTests(unittest.TestCase):
     def setUp(self):
-        self.metrics_patcher = patch(
-            "pypost.core.http_client.MetricsManager",
-            return_value=MagicMock(),
+        self.client = HTTPClient(
+            metrics=MagicMock(),
+            template_service=TemplateService(),
         )
-        self.metrics_patcher.start()
-        self.client = HTTPClient(template_service=TemplateService())
 
-    def tearDown(self):
-        self.metrics_patcher.stop()
-
-    def test_auto_detects_sse_and_handles_read_timeout(self):
-        """When server sends 200 but no events (waits for client), return success."""
+    def test_handles_sse_read_timeout_by_content_type(self):
+        """When server sends 200 SSE but no events, return success."""
         import requests
 
         class TimeoutIterator:
@@ -65,21 +60,61 @@ class HTTPClientSSEProbeTests(unittest.TestCase):
         self.assertIn("Connection established", result.response.body)
         self.assertIn("InitializeRequest", result.response.body)
 
-    def test_auto_detects_sse_by_url_and_content_type(self):
-        """When GET to /sse URL, use SSE handling (URL or Content-Type)."""
+    def test_handles_sse_response_by_content_type(self):
+        """When GET response is text/event-stream, use SSE handling."""
         client = self.client
         req = RequestData(method="GET", url="http://localhost:9080/sse")
         mock_response = _make_sse_response([("endpoint", "http://localhost:9080")])
 
-        with patch.object(client.session, "request", return_value=mock_response) as m:
+        with patch.object(client.session, "request", return_value=mock_response):
             result = client.send_request(req)
-            call_kw = m.call_args[1]
-            self.assertEqual(call_kw["timeout"], (3.0, 10.0))
-            self.assertIn("text/event-stream", call_kw["headers"]["Accept"])
 
         self.assertEqual(result.response.status_code, 200)
         self.assertIn("SSE stream opened", result.response.body)
         self.assertIn("1 event(s)", result.response.body)
+
+    def test_detects_sse_without_sse_substring_in_url(self):
+        """Content-Type detection works for non-/sse URLs (e.g. legacy paths)."""
+        client = self.client
+        req = RequestData(method="GET", url="http://localhost:1080/mcp")
+        mock_response = _make_sse_response([("message", "ok")])
+
+        with patch.object(client.session, "request", return_value=mock_response):
+            result = client.send_request(req)
+
+        self.assertIn("SSE stream opened", result.response.body)
+
+    def test_no_false_positive_when_url_contains_sse_substring(self):
+        """URL containing /sse without SSE content-type uses normal response path."""
+        client = self.client
+        req = RequestData(method="GET", url="http://example.com/api/sse-metrics")
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = {"Content-Type": "application/json"}
+        mock_response.iter_content = MagicMock(
+            return_value=[b'{"ok":true}'],
+        )
+
+        with patch.object(client.session, "request", return_value=mock_response):
+            result = client.send_request(req)
+
+        self.assertEqual('{"ok":true}', result.response.body)
+
+    def test_applies_sse_probe_timeout_when_accept_header_set(self):
+        """Explicit Accept: text/event-stream uses SSE probe timeouts before send."""
+        client = self.client
+        req = RequestData(
+            method="GET",
+            url="http://localhost:9080/stream",
+            headers={"Accept": "text/event-stream"},
+        )
+        mock_response = _make_sse_response([("endpoint", "http://localhost:9080")])
+
+        with patch.object(client.session, "request", return_value=mock_response) as m:
+            client.send_request(req)
+            call_kw = m.call_args[1]
+            self.assertEqual(call_kw["timeout"], (3.0, 10.0))
+            self.assertIn("text/event-stream", call_kw["headers"]["Accept"])
 
     def test_handles_non_200_sse_response(self):
         """When SSE endpoint returns non-200, return that status."""

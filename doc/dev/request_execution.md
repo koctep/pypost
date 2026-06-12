@@ -9,8 +9,14 @@ which coordinates transport, post-scripts, and history recording.
 
 URL templates are rendered **once per HTTP request** inside `HTTPClient.send_request()`:
 
-1. `render_string(request.url, variables)` resolves the URL (also used for SSE endpoint detection).
+1. `render_string(request.url, variables)` resolves the URL once per send.
 2. `_prepare_request_kwargs(..., rendered_url=url)` reuses that value for the actual request.
+
+**SSE stream handling (PYPOST-430):** After the response arrives, GET requests with
+`Content-Type: text/event-stream` are routed to SSE probe parsing (`_handle_sse_response`).
+URL path is not used for detection. When the request already includes
+`Accept: text/event-stream`, `HTTPClient` applies shorter SSE probe connect/read timeouts
+before dispatch.
 
 `RequestService.execute()` does **not** pre-render the URL. The former template render guard
 was removed because it duplicated work without adding behavior beyond what the HTTP/MCP paths
