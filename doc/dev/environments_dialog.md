@@ -20,6 +20,16 @@ import constants and small formatter helpers from that module.
 `EnvPresenter._open_env_manager` passes presenter-owned environments, opens the dialog, then
 assigns `self._environments = dialog.environments` before saving — the presenter owns state.
 
+### EnvPresenter public API (PYPOST-68)
+
+`EnvPresenter` exposes `widget` for top-bar layout only. Internal combo/button/label widgets
+are not public properties. Callers use:
+
+- `apply_font(font)` / `apply_settings(settings)` — font on env bar widgets
+- `select_environment_index(index)` — user intent to change active environment
+- `environment_at(index)`, `current_environment_index()`, `environment_count()` — query API
+- `mcp_status_text()`, `mcp_tools_button_text()`, `mcp_activity_button_text()` — MCP bar labels
+
 Legacy attributes on `EnvironmentDialog` (`env_list`, `vars_table`, `mcp_check`) delegate to
 the child widgets for tests and gradual migration.
 

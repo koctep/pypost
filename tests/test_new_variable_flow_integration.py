@@ -31,10 +31,10 @@ def _make_presenter_with_env(env: Environment) -> EnvPresenter:
         metrics=MagicMock(),
     )
     presenter._environments = [env]
-    presenter.env_selector.blockSignals(True)
-    presenter.env_selector.addItem(env.name, env)
-    presenter.env_selector.setCurrentIndex(1)
-    presenter.env_selector.blockSignals(False)
+    presenter._env_selector.blockSignals(True)
+    presenter._env_selector.addItem(env.name, env)
+    presenter._env_selector.setCurrentIndex(1)
+    presenter._env_selector.blockSignals(False)
     return presenter
 
 

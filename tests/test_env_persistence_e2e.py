@@ -76,7 +76,7 @@ def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa
                     metrics=MagicMock(),
                 )
                 presenter.load_environments()
-                presenter.env_selector.setCurrentIndex(1)
+                presenter.select_environment_index(1)
                 presenter.handle_variable_set_request("NEW_KEY", "new-value")
 
                 reloaded = storage.load_environments()
@@ -97,7 +97,7 @@ def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa
                     metrics=MagicMock(),
                 )
                 presenter_after_restart.load_environments()
-                loaded_env = presenter_after_restart.env_selector.itemData(1)
+                loaded_env = presenter_after_restart.environment_at(1)
                 assert isinstance(loaded_env, Environment)
                 assert loaded_env.hidden_keys == {"API_KEY"}
 
@@ -211,5 +211,5 @@ def test_presenter_load_shows_no_env_when_key_missing_for_encrypted_data(qapp): 
                     )
                     presenter.load_environments()
 
-                    assert presenter.env_selector.count() == 1
-                    assert presenter.env_selector.currentIndex() == 0
+                    assert presenter.environment_count() == 1
+                    assert presenter.current_environment_index() == 0

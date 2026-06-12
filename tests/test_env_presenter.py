@@ -114,9 +114,9 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter(envs)
         p.load_environments()
         # "No Environment" + 2 envs = 3 items
-        self.assertEqual(p.env_selector.count(), 3)
-        self.assertEqual(p.env_selector.itemText(1), "Production")
-        self.assertEqual(p.env_selector.itemText(2), "Staging")
+        self.assertEqual(p.environment_count(), 3)
+        self.assertEqual(p.environment_display_name_at(1), "Production")
+        self.assertEqual(p.environment_display_name_at(2), "Staging")
 
     def test_load_environments_selects_last_used(self):
         envs = [_make_env("e1", "Dev"), _make_env("e2", "Prod")]
@@ -124,12 +124,12 @@ class TestEnvPresenter(unittest.TestCase):
         p._settings.last_environment_id = "e2"
         p.load_environments()
         # index 0 = No Env, index 1 = Dev, index 2 = Prod
-        self.assertEqual(p.env_selector.currentIndex(), 2)
+        self.assertEqual(p.current_environment_index(), 2)
 
     def test_load_environments_defaults_to_no_environment(self):
         p = self._make_presenter([])
         p.load_environments()
-        self.assertEqual(p.env_selector.currentIndex(), 0)
+        self.assertEqual(p.current_environment_index(), 0)
 
     def test_env_variables_changed_emitted_on_selection(self):
         env = _make_env("e1", "Dev", {"KEY": "VALUE"})
@@ -147,10 +147,10 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {"KEY": "VALUE"})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
         received = []
         p.env_variables_changed.connect(received.append)
         p.reload_current_env()
@@ -162,7 +162,7 @@ class TestEnvPresenter(unittest.TestCase):
         received = []
         p.env_keys_changed.connect(received.append)
         p._environments = [env]
-        p.env_selector.addItem(env.name, env)
+        p._env_selector.addItem(env.name, env)
         p._on_env_changed(1)
         self.assertIn(sorted(received[-1]), [["A", "B"]])
 
@@ -177,9 +177,9 @@ class TestEnvPresenter(unittest.TestCase):
         received = []
         p.env_hidden_keys_changed.connect(received.append)
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(1)
         self.assertEqual(received[-1], {"TOKEN"})
 
@@ -192,9 +192,9 @@ class TestEnvPresenter(unittest.TestCase):
         )
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(1)
         self.assertEqual(p._mcp_manager.hidden_keys_supplier(), {"TOKEN"})
 
@@ -218,10 +218,10 @@ class TestEnvPresenter(unittest.TestCase):
         env_prod = _make_env("e2", "Prod", {"B": "2"}, enable_mcp=True)
         p = self._make_presenter([env_dev, env_prod])
         p._environments = [env_dev, env_prod]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env_dev.name, env_dev)
-        p.env_selector.addItem(env_prod.name, env_prod)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env_dev.name, env_dev)
+        p._env_selector.addItem(env_prod.name, env_prod)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(1)
         p._on_env_changed(2)
         p._metrics.track_mcp_active_env_changed.assert_called_once()
@@ -230,9 +230,9 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {"A": "1"}, enable_mcp=True)
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(1)
         env.variables["A"] = "2"
         p._on_env_changed(1)
@@ -242,9 +242,9 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", enable_mcp=True)
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(1)
         with self.assertLogs("pypost.ui.presenters.env_presenter", level=logging.INFO) as caplog:
             p._on_env_changed(0)
@@ -262,9 +262,9 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", enable_mcp=True)
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(0)
         self.assertEqual(p._mcp_manager.stopped, 1)
 
@@ -274,9 +274,9 @@ class TestEnvPresenter(unittest.TestCase):
         p._settings.mcp_port = 1080
         p._settings.mcp_host = "127.0.0.1"
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(1)
         self.assertEqual(len(p._mcp_manager.started), 1)
         self.assertEqual(p._mcp_manager.started[0][0], 1080)
@@ -298,20 +298,20 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {"TOKEN": "abc"})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
         self.assertEqual(p.current_variables, {"TOKEN": "abc"})
 
     def test_on_env_update_merges_variables(self):
         env = _make_env("e1", "Dev", {"A": "1"})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
         p.on_env_update({"B": "2"})
         self.assertEqual(env.variables, {"A": "1", "B": "2"})
 
@@ -319,29 +319,29 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {"EXISTING": "val"})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
         p.handle_variable_set_request("NEW_KEY", "new_value")
         self.assertEqual(env.variables["NEW_KEY"], "new_value")
 
     def test_mcp_status_label_updated_on_running(self):
         p = self._make_presenter([])
         p._on_mcp_status_changed(True)
-        self.assertIn("ON", p.mcp_status_label.text())
+        self.assertIn("ON", p.mcp_status_text())
 
     def test_mcp_status_label_updated_on_stopped(self):
         p = self._make_presenter([])
         p._on_mcp_status_changed(False)
-        self.assertEqual(p.mcp_status_label.text(), "MCP: OFF")
+        self.assertEqual(p.mcp_status_text(), "MCP: OFF")
 
     def test_mcp_tools_button_shows_count(self):
         req = RequestData(id="r1", name="Tool", expose_as_mcp=True)
         col = Collection(id="c1", name="API", requests=[req])
         p = self._make_presenter(collections=[col])
         p._refresh_mcp_tools_button()
-        self.assertEqual(p.mcp_tools_btn.text(), "MCP Tools (1)")
+        self.assertEqual(p.mcp_tools_button_text(), "MCP Tools (1)")
 
     def test_refresh_mcp_tools_restarts_when_running(self):
         env = _make_env("e1", "MCP-Env", enable_mcp=True)
@@ -349,10 +349,10 @@ class TestEnvPresenter(unittest.TestCase):
         col = Collection(id="c1", name="API", requests=[req])
         p = self._make_presenter([env], collections=[col])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(1)
         self.assertEqual(len(p._mcp_manager.started), 1)
 
@@ -361,7 +361,7 @@ class TestEnvPresenter(unittest.TestCase):
 
         p.refresh_mcp_tools()
         self.assertEqual(len(p._mcp_manager.started), 2)
-        self.assertEqual(p.mcp_tools_btn.text(), "MCP Tools (2)")
+        self.assertEqual(p.mcp_tools_button_text(), "MCP Tools (2)")
 
     def test_refresh_mcp_tools_noop_when_mcp_disabled(self):
         req = RequestData(id="r1", name="Tool", expose_as_mcp=True)
@@ -369,19 +369,19 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter(collections=[col])
         p.refresh_mcp_tools()
         self.assertEqual(len(p._mcp_manager.started), 0)
-        self.assertEqual(p.mcp_tools_btn.text(), "MCP Tools (1)")
+        self.assertEqual(p.mcp_tools_button_text(), "MCP Tools (1)")
 
     def test_mcp_activity_button_shows_count(self):
         p = self._make_presenter([])
         p._mcp_manager.activity_log.append(McpActivityEntry.new_list_tools(2))
         p._refresh_mcp_activity_button()
-        self.assertEqual(p.mcp_activity_btn.text(), "MCP Activity (1)")
+        self.assertEqual(p.mcp_activity_button_text(), "MCP Activity (1)")
 
     def test_mcp_activity_recorded_updates_button(self):
         p = self._make_presenter([])
         p._mcp_manager.activity_log.append(McpActivityEntry.new_list_tools(1))
         p._on_mcp_activity_recorded(McpActivityEntry.new_list_tools(99))
-        self.assertEqual(p.mcp_activity_btn.text(), "MCP Activity (1)")
+        self.assertEqual(p.mcp_activity_button_text(), "MCP Activity (1)")
 
     def test_on_env_changed_shows_starting_when_mcp_enabled(self):
         env = _make_env("e1", "MCP-Env", enable_mcp=True)
@@ -389,11 +389,11 @@ class TestEnvPresenter(unittest.TestCase):
         p._settings.mcp_port = 1080
         p._settings.mcp_host = "127.0.0.1"
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.blockSignals(False)
         p._on_env_changed(1)
-        self.assertIn("Starting", p.mcp_status_label.text())
+        self.assertIn("Starting", p.mcp_status_text())
 
     def test_mcp_start_failed_shows_warning(self):
         p = self._make_presenter([])
@@ -407,7 +407,7 @@ class TestEnvPresenter(unittest.TestCase):
             side_effect=capture_warning,
         ):
             p._on_mcp_start_failed("Port is busy")
-        self.assertEqual(p.mcp_status_label.text(), "MCP: OFF")
+        self.assertEqual(p.mcp_status_text(), "MCP: OFF")
         self.assertEqual(len(shown), 1)
         self.assertIn("Port is busy", shown[0][1])
 
@@ -431,10 +431,10 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
 
         # Mock QInputDialog to return a valid name
         original_getText = QInputDialog.getText
@@ -452,10 +452,10 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
 
         # Mock QInputDialog to return empty string after stripping
         original_getText = QInputDialog.getText
@@ -484,10 +484,10 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
 
         # Mock QInputDialog to return name starting with digit
         original_getText = QInputDialog.getText
@@ -516,10 +516,10 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
 
         # Mock QInputDialog to return name with invalid chars
         original_getText = QInputDialog.getText
@@ -551,10 +551,10 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
 
         # Mock QInputDialog to return cancelled
         original_getText = QInputDialog.getText
@@ -582,6 +582,29 @@ class TestEnvPresenter(unittest.TestCase):
         self.assertIs(p._settings, new_settings)
         self.assertTrue(p._settings.log_hidden_key_names)
 
+    def test_apply_font_sets_font_on_env_bar_widgets(self):
+        from PySide6.QtGui import QFont
+
+        p = self._make_presenter([])
+        font = QFont()
+        font.setPointSize(16)
+        p.apply_font(font)
+        self.assertEqual(p._env_label.font().pointSize(), 16)
+        self.assertEqual(p._env_selector.font().pointSize(), 16)
+        self.assertEqual(p._manage_btn.font().pointSize(), 16)
+
+    def test_widget_properties_removed(self):
+        p = self._make_presenter([])
+        for name in (
+            "env_selector",
+            "manage_btn",
+            "mcp_activity_btn",
+            "mcp_tools_btn",
+            "mcp_status_label",
+            "env_label",
+        ):
+            self.assertFalse(hasattr(type(p), name), f"property {name} should be removed")
+
     def test_async_load_refreshes_combo_when_encryption_enabled(self):
         envs = [_make_env("e1", "Production")]
         p = self._make_presenter(envs)
@@ -604,8 +627,8 @@ class TestEnvPresenter(unittest.TestCase):
         timer.stop()
 
         self.assertEqual(len(loaded), 1)
-        self.assertEqual(p.env_selector.count(), 2)
-        self.assertEqual(p.env_selector.itemText(1), "Production")
+        self.assertEqual(p.environment_count(), 2)
+        self.assertEqual(p.environment_display_name_at(1), "Production")
 
     def test_save_failure_shows_warning_dialog(self):
         p = self._make_presenter([])
@@ -629,10 +652,10 @@ class TestEnvPresenter(unittest.TestCase):
         env = _make_env("e1", "Dev", {"K": "V"})
         p = self._make_presenter([env])
         p._environments = [env]
-        p.env_selector.blockSignals(True)
-        p.env_selector.addItem(env.name, env)
-        p.env_selector.setCurrentIndex(1)
-        p.env_selector.blockSignals(False)
+        p._env_selector.blockSignals(True)
+        p._env_selector.addItem(env.name, env)
+        p._env_selector.setCurrentIndex(1)
+        p._env_selector.blockSignals(False)
         with patch.object(p._storage_gateway, "save_async") as save_async:
             p._save_environments()
             save_async.assert_not_called()

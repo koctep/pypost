@@ -2,7 +2,9 @@ import logging
 from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QHBoxLayout,
     QInputDialog,
@@ -121,33 +123,49 @@ class EnvPresenter(QObject):
             return dict(selected.variables)
         return {}
 
-    @property
-    def env_selector(self) -> QComboBox:
-        """Exposes the combo box for MainWindow layout integration."""
-        return self._env_selector
-
-    @property
-    def manage_btn(self) -> QPushButton:
-        return self._manage_btn
-
-    @property
-    def mcp_activity_btn(self) -> QPushButton:
-        return self._mcp_activity_btn
-
-    @property
-    def mcp_tools_btn(self) -> QPushButton:
-        return self._mcp_tools_btn
-
-    @property
-    def mcp_status_label(self) -> QLabel:
-        return self._mcp_status_label
-
-    @property
-    def env_label(self) -> QLabel:
-        return self._env_label
+    def apply_font(self, font: QFont) -> None:
+        """Apply font to all env bar widgets."""
+        for widget in (
+            self._env_label,
+            self._env_selector,
+            self._manage_btn,
+            self._mcp_tools_btn,
+            self._mcp_activity_btn,
+            self._mcp_status_label,
+        ):
+            widget.setFont(font)
 
     def apply_settings(self, settings: AppSettings) -> None:
         self._settings = settings
+        app = QApplication.instance()
+        if app:
+            self.apply_font(app.font())
+
+    def select_environment_index(self, index: int) -> None:
+        """Select environment by combo index (0 = No Environment)."""
+        self._env_selector.setCurrentIndex(index)
+
+    def current_environment_index(self) -> int:
+        return self._env_selector.currentIndex()
+
+    def environment_count(self) -> int:
+        return self._env_selector.count()
+
+    def environment_display_name_at(self, index: int) -> str:
+        return self._env_selector.itemText(index)
+
+    def environment_at(self, index: int) -> Environment | None:
+        data = self._env_selector.itemData(index)
+        return data if isinstance(data, Environment) else None
+
+    def mcp_status_text(self) -> str:
+        return self._mcp_status_label.text()
+
+    def mcp_tools_button_text(self) -> str:
+        return self._mcp_tools_btn.text()
+
+    def mcp_activity_button_text(self) -> str:
+        return self._mcp_activity_btn.text()
 
     def reload_current_env(self) -> None:
         """Re-resolves variables and MCP state for the current combo selection."""

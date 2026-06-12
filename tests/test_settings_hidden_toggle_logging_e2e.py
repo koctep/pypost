@@ -56,7 +56,7 @@ def _make_env_presenter() -> EnvPresenter:
         MagicMock(),
     )
     presenter.load_environments()
-    presenter.env_selector.setCurrentIndex(1)
+    presenter.select_environment_index(1)
     return presenter
 
 
