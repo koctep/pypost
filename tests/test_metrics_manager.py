@@ -65,6 +65,15 @@ class TestMetricsManagerGuiTracking(unittest.TestCase):
         self.assertIn('gui_new_tab_actions_total{source="plus_button"} 1.0', out)
         self.assertIn('gui_new_tab_actions_total{source="shortcut"} 1.0', out)
 
+    def test_track_gui_new_tab_action_collections_context(self):
+        mm = MetricsManager()
+        mm.track_gui_new_tab_action("collections_context")
+        out = _scrape(mm)
+        self.assertIn(
+            'gui_new_tab_actions_total{source="collections_context"} 1.0',
+            out,
+        )
+
     def test_track_gui_new_tab_action_invalid_source_maps_to_unknown(self):
         mm = MetricsManager()
         mm.track_gui_new_tab_action("test_source")

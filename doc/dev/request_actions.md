@@ -33,7 +33,7 @@ This design reduces UI clutter and allows adding more actions in the same menu l
   - Collects GUI action metrics:
     - `gui_send_clicks_total`
     - `gui_save_actions_total{source=<menu|shortcut>}`
-    - `gui_new_tab_actions_total{source=<plus_button|shortcut|unknown>}`
+    - `gui_new_tab_actions_total{source=<plus_button|shortcut|collections_context|unknown>}`
 
 High-level flow:
 1. User clicks `Actions -> Save` or presses `Ctrl+S`.
@@ -106,7 +106,7 @@ Records a labeled counter increment for save action source.
 
 Centralized new-tab entry point used by both keyboard and plus-tab flows.
 
-- **source**: trigger origin (`plus_button`, `shortcut`, fallback `unknown`).
+- **source**: trigger origin (`plus_button`, `shortcut`, `collections_context`, fallback `unknown`).
 - **Behavior**:
   1. Writes INFO log `new_tab_action_triggered source=<source> tabs_before=<count>`.
   1. Increments metric `gui_new_tab_actions_total{source=<source>}`.
@@ -133,7 +133,9 @@ MainWindow delegate — forwards to `TabsPresenter.handle_new_tab()`.
 
 ### `MetricsManager.track_gui_new_tab_action(source: str)`
 
-Records a labeled counter increment for new-tab trigger source.
+Records a labeled counter increment for new-tab trigger source. The metrics registry
+normalizes `source` via `_normalize_new_tab_source`: allowed labels are `plus_button`,
+`shortcut`, `collections_context`, and `unknown`; any other string is recorded as `unknown`.
 
 ### `MetricsManager.track_gui_save_as_action(source: str)`
 
