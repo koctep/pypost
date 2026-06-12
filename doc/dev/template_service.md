@@ -66,6 +66,57 @@ expression policy and test matrix.
 accept `template_service: TemplateService | None = None` and fall back to a local instance when
 omitted (see [testability.md](testability.md)).
 
+## Lifecycle and test seams (PYPOST-143)
+
+PYPOST-18 originally used a module-level `template_service = TemplateService()` singleton.
+That global was **removed** in PYPOST-45. The accepted pattern today:
+
+| Context | Pattern | Notes |
+| --- | --- | --- |
+| Production | One instance in `main.py` | Shared Jinja2 `Environment`; metrics wired at root |
+| Core unit tests | Constructor injection | Pass `TemplateService()` or `MagicMock()` |
+| Isolated leaf tests | Optional fallback | `HTTPClient()` creates a local instance when omitted |
+| Hover UI | Module `_hover_template_service` | Exception — see below |
+
+### Production chain
+
+```
+main.py → MainWindow → MCPServerManager / TabsPresenter
+         → RequestService → HTTPClient   (same id() throughout)
+```
+
+Enable `DEBUG` logging to confirm identical `id()` values on startup and per request.
+
+### Testing without globals
+
+```python
+# Core — inject at constructor
+client = HTTPClient(template_service=mock_ts)
+
+# Hover — assign class property (restored in finally)
+original = VariableHoverHelper._template_service
+try:
+    VariableHoverHelper._template_service = mock_ts
+    ...
+finally:
+    VariableHoverHelper._template_service = original
+```
+
+See [testability.md](testability.md) for full patterns and test class references.
+
+### Hover exception
+
+`VariableHoverResolver` uses a module-level `TemplateService` because mixins lack a presenter-
+owned handle. `VariableHoverHelper._template_service` is a class property (metaclass) so tests
+patch one shared instance. This is **not** a second runtime singleton in the request pipeline —
+only the hover preview path.
+
+### Why no DI container
+
+At current project size, explicit constructor injection from `main.py` is sufficient. A framework
+DI container would add indirection without measurable benefit. Revisit if call-site count grows
+significantly or a second `TemplateService` implementation appears ([PYPOST-378](../../ai-tasks/PYPOST-378/60-review.md) TD-1).
+
 ## Hover exception (not duplication)
 
 `VariableHoverResolver` keeps **plain** `{{name}}` chain resolution in the UI layer:

@@ -14,8 +14,10 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
   Acts as a composition root after PYPOST-43 presenter split. Regression caps in
   [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
 - **Singletons/globals**: ~~MetricsManager~~ resolved (PYPOST-44, [PYPOST-167](../../ai-tasks/PYPOST-167/70-dev-docs.md));
-  `template_service` global resolved (PYPOST-45). Remaining direct instantiation in
-  RequestService/RequestWorker — see [testability.md](testability.md) (PYPOST-382).
+  ~~`template_service` module global~~ resolved (PYPOST-45); lifecycle and test seams documented
+  ([PYPOST-143](../../ai-tasks/PYPOST-143/70-dev-docs.md), [template_service.md](template_service.md)).
+  Remaining direct instantiation in RequestService/RequestWorker — see [testability.md](testability.md)
+  (PYPOST-382).
 - **Direct instantiation**: RequestService still creates default HTTP/MCP clients when not
   injected; RequestWorker creates RequestService internally. Constructor seams and test patterns
   documented in [testability.md](testability.md) (PYPOST-382). Full protocol refactor: PYPOST-46.

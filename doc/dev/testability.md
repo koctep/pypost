@@ -21,7 +21,25 @@ broader protocol work continues in [PYPOST-46](https://pypost.atlassian.net/brow
 | `TemplateService` | `main.py` | `MainWindow`, `MCPServerManager`, `TabsPresenter` → workers |
 
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
-`TemplateService` chain.
+`TemplateService` chain and [template_service.md](template_service.md) for lifecycle design
+(PYPOST-143).
+
+## TemplateService lifecycle
+
+The module-level `template_service` global was removed in PYPOST-45. Production uses a **composition-
+root singleton**: one `TemplateService(metrics=...)` in `main.py`, propagated by constructors.
+
+| Layer | Injection | Test substitute |
+| --- | --- | --- |
+| `HTTPClient`, `RequestService`, `MCPServerImpl` | Optional `template_service` param | `TemplateService()` or `MagicMock()` |
+| `MainWindow` | Required `template_service` | `MagicMock()` in patched constructor tests |
+| Hover (`mixins.py`) | Module `_hover_template_service` | Assign `VariableHoverHelper._template_service` |
+
+Leaf classes may create a local `TemplateService()` when the parameter is omitted — intentional for
+isolated unit tests. Production always injects from `main.py`.
+
+**Coverage:** `TestHTTPClientInjection`, `TestRequestServiceInjection`,
+`test_variable_hover.py` (hover property patching).
 
 ## MetricsTrackerProtocol and NullMetrics
 

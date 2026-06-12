@@ -3,9 +3,9 @@
 
 ## Shortcuts Taken
 
-- **Global TemplateService** ([PYPOST-143](https://pypost.atlassian.net/browse/PYPOST-143)):
-  Global `template_service` is idiomatic for this codebase size; larger systems might prefer a DI
-  container for lifecycle control.
+- ~~**Global TemplateService** ([PYPOST-143](https://pypost.atlassian.net/browse/PYPOST-143))~~:
+  **Resolved.** Module global removed (PYPOST-45); composition-root injection documented
+  (PYPOST-378, PYPOST-143). See [template_service.md](../../doc/dev/template_service.md).
 
 ## Code Quality Issues
 
