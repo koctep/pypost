@@ -12,6 +12,7 @@ set up your development environment, and contribute to the project.
 1. [Security and Secrets Handling Audit (PYPOST-685)](security_audit.md)
 1. [Test Coverage and Quality Audit (PYPOST-686)](test_audit.md)
 1. [Code Quality and Maintainability Audit (PYPOST-687)](maintainability_audit.md)
+1. [Observability and Logging Audit (PYPOST-688)](observability_audit.md)
 1. [Unit Testability Patterns (PYPOST-382)](testability.md)
 1. [MCP Integration](mcp_integration.md)
 1. [Testing via MCP and Prometheus](testing.md)
