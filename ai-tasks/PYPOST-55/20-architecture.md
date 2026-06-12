@@ -1,53 +1,29 @@
 # PYPOST-55: Architecture
 
-## Research
+## Constants module
 
-Hardcoded strings were found in:
+New module: `pypost/core/environment_messages.py`
 
-- `pypost/ui/dialogs/env_dialog.py` — window title
-- `pypost/ui/widgets/environments/environment_list_widget.py` — dialogs, menus, copy default
-- `pypost/ui/widgets/environments/environment_variables_widget.py` — headers, MCP, menus
-- `pypost/ui/collection_item_dialogs.py` — delete/copy QMessageBox text
-- `pypost/core/environment_ops.py` — rename validation errors (duplicated wording)
+- String constants for titles, labels, menu actions, table columns, MCP checkbox text.
+- Message templates with small `format_*` helpers for `{name}` interpolation.
+- Shared by UI widgets, `collection_item_dialogs` environment helpers, and
+  `environment_ops.validate_environment_rename`.
 
-## Design
+## Call sites updated
 
-### Module: `pypost/core/environment_messages.py`
-
-| Category | Examples |
+| Component | Strings moved |
 | --- | --- |
-| Dialog titles | `DIALOG_TITLE_MANAGE_ENVIRONMENTS`, `DIALOG_TITLE_COPY_ENVIRONMENT` |
-| Labels / buttons | `INPUT_LABEL_NAME`, `BUTTON_ADD`, `MCP_ENABLE_LABEL` |
-| Actions | `ACTION_RENAME`, `ACTION_COPY`, `ACTION_DELETE`, move up/down |
-| Table columns | `COLUMN_VARIABLE`, `COLUMN_VALUE`, `COLUMN_HIDDEN` |
-| Messages | `MSG_EMPTY_NAME`, duplicate/delete confirm templates |
-| Formatters | `format_delete_environment_confirm`, `format_copy_of_name`, etc. |
+| `env_dialog.py` | Window title |
+| `environment_list_widget.py` | Add button, new/copy dialogs, context menu actions, default copy name |
+| `environment_variables_widget.py` | Table headers, MCP label, variable context menu |
+| `collection_item_dialogs.py` | Delete confirm, copy validation QMessageBox titles/bodies |
+| `environment_ops.py` | Rename validation error messages |
 
-Placed under `core/` so `validate_environment_rename` can import validation text without
-depending on UI packages.
+## Testing
 
-### Data flow
+- `tests/test_environment_messages.py` — format helper unit tests.
+- Existing `tests/test_env_dialog.py` — regression for dialog behavior.
 
-```mermaid
-flowchart LR
-    EM[environment_messages.py]
-    EO[environment_ops.py]
-    ELW[EnvironmentListWidget]
-    EVW[EnvironmentVariablesWidget]
-    CID[collection_item_dialogs]
-    ED[EnvironmentDialog]
-    EM --> EO
-    EM --> ELW
-    EM --> EVW
-    EM --> CID
-    EM --> ED
-```
+## Observability
 
-## Patterns
-
-- **Constants + formatters** for strings with `{name}` placeholders.
-- **Import constants at call site** — no string re-export through widgets.
-
-## Worklog
-
-role: execution, step: 2, step_name: Architecture, tokens_used: 1800
+No new log events. Log message keys remain English identifiers (unchanged).

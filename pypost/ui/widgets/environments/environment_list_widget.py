@@ -24,16 +24,6 @@ from pypost.core.environment_messages import (
     INPUT_LABEL_NAME,
     format_copy_of_name,
 )
-from pypost.core.environment_messages import (
-    ACTION_COPY,
-    ACTION_DELETE,
-    ACTION_RENAME,
-    BUTTON_ADD,
-    DIALOG_TITLE_COPY_ENVIRONMENT,
-    DIALOG_TITLE_NEW_ENVIRONMENT,
-    INPUT_LABEL_NAME,
-    format_copy_of_name,
-)
 from pypost.core.environment_ops import clone_environment, validate_environment_rename
 from pypost.models.models import Environment
 from pypost.ui.collection_item_dialogs import (

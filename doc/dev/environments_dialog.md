@@ -23,6 +23,14 @@ assigns `self._environments = dialog.environments` before saving — the present
 Legacy attributes on `EnvironmentDialog` (`env_list`, `vars_table`, `mcp_check`) delegate to
 the child widgets for tests and gradual migration.
 
+## User-visible strings
+
+All Manage Environments copy (window title, button labels, context-menu actions, table
+headers, MCP checkbox, validation and confirmation messages) lives in
+`pypost/core/environment_messages.py`. Widgets and `collection_item_dialogs` environment
+helpers import from that module; rename validation in `environment_ops` uses the same
+messages for consistency.
+
 ## API / Usage
 
 ### `EnvironmentDialog(environments, parent, current_env_name, log_hidden_key_names)`

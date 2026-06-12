@@ -1,19 +1,12 @@
-# PYPOST-55: Dev Docs (Step 7)
+# PYPOST-55: Dev Docs
 
-## Updates
+## Updated
 
-| Document | Change |
-| --- | --- |
-| [doc/dev/environments_dialog.md](../../doc/dev/environments_dialog.md) | Document `environment_messages` module |
-| [pypost/core/environment_messages.py](../../pypost/core/environment_messages.py) | New constants module (inline docstring) |
+- `doc/dev/environments_dialog.md` — documents `environment_messages` module and string
+  ownership.
 
-## Developer notes
+## Key points for developers
 
-- Import user-visible environment strings from `pypost.core.environment_messages`.
-- Use formatter helpers for messages with dynamic names (`format_copy_of_name`, etc.).
-- Tests: `tests/test_environment_messages.py`, rename cases in `tests/test_environment_ops.py`.
-- Qt coverage unchanged: `tests/test_env_dialog.py`.
-
-## Worklog
-
-role: execution, step: 7, step_name: Dev Docs, tokens_used: 500
+1. Add or change user-visible environment manager text in `pypost/core/environment_messages.py`.
+2. Use `format_*` helpers when messages include dynamic names.
+3. Do not reintroduce literals in widgets; import constants from the module above.

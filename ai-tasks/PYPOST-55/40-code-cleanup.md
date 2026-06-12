@@ -1,20 +1,12 @@
-# PYPOST-55: Code Cleanup (Step 4)
+# PYPOST-55: Code Cleanup
 
-## Checks
+## Actions
 
-| Check | Result |
-| --- | --- |
-| Line length ≤ 100 | Pass |
-| Trailing whitespace | Pass |
-| Final newline | Pass |
-| Duplicate `environment_ui_strings.py` | Removed — single module `environment_messages.py` |
-| English only | Pass |
+- [x] Removed duplicate import block in `environment_list_widget.py`.
+- [x] Dropped unused duplicate `environment_ui_strings.py` draft module.
+- [x] Reused `MSG_EMPTY_NAME` in `show_rename_empty_name_error` where text matches.
+- [x] Line length within 100 characters.
 
-## Notes
+## Verification
 
-- Import blocks grouped: stdlib → third-party → pypost (existing style).
-- Formatter functions kept minimal (one-line `str.format` wrappers).
-
-## Worklog
-
-role: execution, step: 4, step_name: Code Cleanup, tokens_used: 600
+- Targeted pytest modules pass (see development step).

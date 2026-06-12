@@ -1,18 +1,10 @@
-# PYPOST-55: Observability (Step 5)
+# PYPOST-55: Observability
 
-## Scope
+## Assessment
 
-No new metrics or log statements. Existing environment lifecycle logs unchanged:
+String extraction only. No new user flows or log events.
 
-| Event | Logger | Example |
-| --- | --- | --- |
-| Environment deleted | `environment_list_widget` | `environment_deleted env_name=...` |
-| Environment renamed | `environment_list_widget` | `environment_renamed old_name=...` |
-| Environment copied | `environment_list_widget` | `environment_copied source_name=...` |
-| Variable moved/deleted | `environment_variables_widget` | `env_variable_moved ...` |
+## Changes
 
-User-visible strings are not logged; no observability impact.
-
-## Worklog
-
-role: execution, step: 5, step_name: Observability, tokens_used: 400
+None required. Existing structured logs (`environment_copied`, `env_variable_deleted`, etc.)
+use stable English field names, not UI copy.
