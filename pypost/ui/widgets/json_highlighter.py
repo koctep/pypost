@@ -4,6 +4,10 @@ from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 from pypost.core.template_expression_tokenizer import TEMPLATE_PLACEHOLDER_PATTERN
 from pypost.ui.theme.json_syntax_theme import JsonSyntaxColors, resolve_json_syntax_colors
 
+# Minified JSON can occupy a single QTextBlock; skip regex highlighting above this size
+# to avoid UI stalls on megabyte-scale lines.
+MAX_HIGHLIGHT_BLOCK_CHARS = 32_768
+
 
 class JsonHighlighter(QSyntaxHighlighter):
     """Highlighter for JSON syntax and template placeholders.
@@ -21,6 +25,8 @@ class JsonHighlighter(QSyntaxHighlighter):
     - Object keys are detected by ``"..."\\s*:`` on the same line.
     - The number rule targets common literals; spec edge cases such as leading zeros
       or non-finite values may not match exactly.
+    - Blocks longer than ``MAX_HIGHLIGHT_BLOCK_CHARS`` skip highlighting entirely so
+      minified megabyte JSON on one line does not block the UI thread.
 
     Structural JSON validation is handled by ``ValidationController`` in the body editor;
     see ``doc/dev/body_editor_validation.md``. Coloring-only scope is documented in
@@ -70,6 +76,9 @@ class JsonHighlighter(QSyntaxHighlighter):
 
     def highlightBlock(self, text):
         """Apply syntax highlighting to the given block of text."""
+        if len(text) > MAX_HIGHLIGHT_BLOCK_CHARS:
+            return
+
         for pattern, fmt in self.rules:
             iterator = pattern.globalMatch(text)
             while iterator.hasNext():

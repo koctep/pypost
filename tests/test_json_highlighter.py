@@ -1,4 +1,4 @@
-"""JsonHighlighter tests (PYPOST-103, PYPOST-124, PYPOST-399, PYPOST-398, PYPOST-395).
+"""JsonHighlighter tests (PYPOST-103, PYPOST-124, PYPOST-399, PYPOST-398, PYPOST-395, PYPOST-101).
 
 RequestEditor/ResponseView attach JsonHighlighter to JSON body documents. Rules cover
 keywords, numbers, strings, object keys, and template placeholders. Assertions use
@@ -20,7 +20,10 @@ from pypost.ui.theme.json_syntax_theme import (
     JsonSyntaxColors,
     resolve_json_syntax_colors,
 )
-from pypost.ui.widgets.json_highlighter import JsonHighlighter
+from pypost.ui.widgets.json_highlighter import (
+    MAX_HIGHLIGHT_BLOCK_CHARS,
+    JsonHighlighter,
+)
 
 
 def _hex_color_at(doc: QTextDocument, position: int) -> str:
@@ -212,6 +215,21 @@ class TestJsonHighlighter(unittest.TestCase):
     def test_resolve_json_syntax_colors_returns_light_by_default(self):
         self.assertEqual(resolve_json_syntax_colors(dark=False), DEFAULT_JSON_SYNTAX_COLORS)
         self.assertEqual(resolve_json_syntax_colors(dark=True), DARK_JSON_SYNTAX_COLORS)
+
+    def test_skips_highlighting_for_oversized_block(self):
+        text = "true" + (" " * MAX_HIGHLIGHT_BLOCK_CHARS)
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("true")
+        default_color = QColor("#000000").name()
+        self.assertEqual(_hex_color_at(edit.document(), pos), default_color)
+
+    def test_highlights_at_block_size_threshold(self):
+        padding = MAX_HIGHLIGHT_BLOCK_CHARS - len("true")
+        text = "true" + (" " * padding)
+        self.assertEqual(len(text), MAX_HIGHLIGHT_BLOCK_CHARS)
+        edit = self._edit_with_highlighted(text)
+        pos = text.index("true")
+        self.assertEqual(_hex_color_at(edit.document(), pos), QColor("darkblue").name())
 
     def test_set_colors_rebinds_highlighting(self):
         text = '{"k": true}'

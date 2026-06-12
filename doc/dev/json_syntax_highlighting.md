@@ -45,6 +45,16 @@ Upgrading to an incremental JSON lexer would improve edge-case accuracy but add 
 and per-keystroke cost. Structural validation belongs in `ValidationController` (see
 `doc/dev/body_editor_validation.md`).
 
+### Large blocks (PYPOST-101)
+
+Minified JSON may place an entire payload in one `QTextBlock`. String and key regexes scan
+the full block on the UI thread, which can stall the app on megabyte-scale lines.
+
+`JsonHighlighter` defines `MAX_HIGHLIGHT_BLOCK_CHARS` (32_768) in
+`pypost/ui/widgets/json_highlighter.py`. When `len(text)` exceeds this limit,
+`highlightBlock` returns without applying rules. Text remains readable; only syntax colors
+are omitted for that block. Pretty-printed JSON (many short lines) is unaffected.
+
 ## Highlighted elements
 
 Colors are defined in `pypost/ui/theme/json_syntax_theme.py` as `JsonSyntaxColors` and
