@@ -3,10 +3,11 @@ import pytest
 
 pytestmark = pytest.mark.timeout(60)
 
+import errno
 import socket
 import time
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
@@ -63,9 +64,9 @@ class TestMCPServerManagerStartup(unittest.TestCase):
         finally:
             manager.stop_server()
 
-    def test_port_busy_emits_start_failed(self):
+    @patch("uvicorn.Server.serve", side_effect=OSError(errno.EADDRINUSE, "Address already in use"))
+    def test_port_busy_emits_start_failed(self, mock_serve):
         port = _free_port()
-        blocker = _occupy_port(port)
         failures: list[str] = []
         statuses: list[bool] = []
         manager = MCPServerManager()
@@ -82,7 +83,6 @@ class TestMCPServerManagerStartup(unittest.TestCase):
             self.assertTrue(statuses)
             self.assertFalse(statuses[-1])
         finally:
-            blocker.close()
             manager.stop_server()
 
     def test_stop_emits_false(self):

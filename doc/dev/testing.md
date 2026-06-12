@@ -248,6 +248,13 @@ PYPOST-154 verified end-to-end port-in-use handling for both MCP and metrics (cl
 PYPOST-20 bind-error debt). Implementation is in PYPOST-556 and PYPOST-153; 154 adds shared
 helper tests and documentation.
 
+To prevent native thread-termination crashes and segmentation faults on macOS under Python 3.11+
+(tracked in PYPOST-429), the port-busy test cases in `test_metrics_server_startup.py` and
+`test_mcp_server_manager.py` are stabilized (PYPOST-716) by using `unittest.mock.patch` to mock
+`uvicorn.Server.serve` raising `OSError(errno.EADDRINUSE, ...)`. This avoids uvicorn's complex socket
+bind and background thread exit cleanup, while still fully exercising the manager's custom
+error signaling and status transition logic.
+
 Not covered by the above (follow-up debt): integration tests with real outbound HTTP via a
 local stub server for request execution paths.
 

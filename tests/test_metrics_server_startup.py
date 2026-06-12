@@ -3,9 +3,11 @@ import pytest
 
 pytestmark = pytest.mark.timeout(60)
 
+import errno
 import socket
 import time
 import unittest
+from unittest.mock import patch
 
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
@@ -59,9 +61,9 @@ class TestMetricsServerStartup(unittest.TestCase):
         finally:
             manager.stop_server()
 
-    def test_port_busy_emits_start_failed(self):
+    @patch("uvicorn.Server.serve", side_effect=OSError(errno.EADDRINUSE, "Address already in use"))
+    def test_port_busy_emits_start_failed(self, mock_serve):
         port = _free_port()
-        blocker = _occupy_port(port)
         failures: list[str] = []
         manager = MetricsManager()
         manager.connect_start_failed(failures.append)
@@ -74,12 +76,11 @@ class TestMetricsServerStartup(unittest.TestCase):
             self.assertEqual(len(failures), 1)
             self.assertIn(str(port), failures[0])
         finally:
-            blocker.close()
             manager.stop_server()
 
-    def test_pending_failure_delivered_when_handler_connected_late(self):
+    @patch("uvicorn.Server.serve", side_effect=OSError(errno.EADDRINUSE, "Address already in use"))
+    def test_pending_failure_delivered_when_handler_connected_late(self, mock_serve):
         port = _free_port()
-        blocker = _occupy_port(port)
         manager = MetricsManager()
         try:
             manager.start_server("127.0.0.1", port)
@@ -93,7 +94,6 @@ class TestMetricsServerStartup(unittest.TestCase):
             self.assertEqual(len(failures), 1)
             self.assertIn(str(port), failures[0])
         finally:
-            blocker.close()
             manager.stop_server()
 
 
