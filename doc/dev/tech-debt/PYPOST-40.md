@@ -10,8 +10,10 @@ TabsPresenter, EnvironmentPresenter. See [30-audit-report.md](../../../ai-tasks/
 
 ## 2. Dependency Injection
 
-Replace MetricsManager singleton and template_service global with constructor injection. Pass
-from main.py. See audit R2, R3.
+**MetricsManager singleton resolved in PYPOST-44** ([PYPOST-167](../../ai-tasks/PYPOST-167/70-dev-docs.md)):
+`main.py` creates one instance and injects it; tracking consumers use `MetricsTrackerProtocol`.
+**TemplateService global resolved in PYPOST-45.** See audit R2, R3 and
+[testability.md](../testability.md).
 
 ## 3. Collection Loading
 

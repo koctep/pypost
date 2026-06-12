@@ -13,8 +13,9 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 - **MainWindow** (282 file / 246 class LOC as of 2026-06-11 baseline; 1040 at audit time):
   Acts as a composition root after PYPOST-43 presenter split. Regression caps in
   [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
-- **Singletons/globals**: MetricsManager and template_service hinder testability and DIP.
-  Replace with constructor injection.
+- **Singletons/globals**: ~~MetricsManager~~ resolved (PYPOST-44, [PYPOST-167](../../ai-tasks/PYPOST-167/70-dev-docs.md));
+  `template_service` global resolved (PYPOST-45). Remaining direct instantiation in
+  RequestService/RequestWorker — see [testability.md](testability.md) (PYPOST-382).
 - **Direct instantiation**: RequestService still creates default HTTP/MCP clients when not
   injected; RequestWorker creates RequestService internally. Constructor seams and test patterns
   documented in [testability.md](testability.md) (PYPOST-382). Full protocol refactor: PYPOST-46.
@@ -23,7 +24,7 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 
 | Priority | Recommendation |
 |----------|----------------|
-| P1 | Decompose MainWindow; replace MetricsManager/template_service with injection |
+| P1 | ~~Decompose MainWindow~~ (PYPOST-43); ~~MetricsManager/template_service injection~~ (PYPOST-44/45/167) |
 | P2 | HTTPClient protocol; ~~unified collection loading~~ (PYPOST-47); item_type strategy; ~~split MetricsManager~~ (PYPOST-49) |
 | P3 | StorageInterface; ExecuteRequestProtocol |
 
