@@ -216,6 +216,17 @@ class TestTemplateServiceVariableTypes(unittest.TestCase):
         self.assertEqual("localhost:443/True", result)
 
 
+class TestTemplateServiceSingleEnvironment(unittest.TestCase):
+    """PYPOST-146: one jinja2.Environment per TemplateService instance."""
+
+    def test_single_environment_shared_by_render_and_parse(self):
+        svc = TemplateService()
+        env = svc.env
+        svc.render_string("{{ x }}", {"x": "value"})
+        svc.parse("{{ x }}")
+        self.assertIs(svc.env, env)
+
+
 class TestTemplateServiceParse(unittest.TestCase):
     def setUp(self):
         self.svc = TemplateService()

@@ -163,3 +163,36 @@ Exposes resolver validation without rendering. Used by tests and future authorin
 Audit date: 2026-06. **No migration required.** The PYPOST-15 debt item "move substitution to
 `TemplateEngine`" is satisfied by `TemplateService` (PYPOST-18). Do not reintroduce
 `template_engine.py` or ad-hoc `jinja2.Template` construction outside `TemplateService`.
+
+## Single Jinja2 Environment (PYPOST-146)
+
+Audit date: 2026-06. **Already satisfied.** Each `TemplateService` constructs one
+`jinja2.Environment` in `__init__` and stores it on `self.env`. Both runtime paths use that
+instance:
+
+| Method | Jinja2 API | Env used |
+| --- | --- | --- |
+| `render_string` | `self.env.from_string(...).render(...)` | `self.env` |
+| `parse` | `self.env.parse(...)` | `self.env` |
+
+Production grep: the only `jinja2.Environment()` in `pypost/` is `template_service.py`.
+`FunctionRegistry.register_into_env` binds allow-listed callables on the same env.
+
+### Performance impact
+
+- **Versus old `TemplateEngine`:** avoids creating a new `Environment` or ad-hoc `Template` on
+  every render call.
+- **`from_string` compile cache:** not enabled by default. Repeated identical templates still
+  recompile unless a custom cache is added ([PYPOST-148](https://pypost.atlassian.net/browse/PYPOST-148)).
+- **Measured cost (PYPOST-455):** render work is sub-millisecond; network I/O dominates request
+  latency. Compile caching remains deferred.
+
+### Regression test
+
+`TestTemplateServiceSingleEnvironment` in `tests/test_template_service.py` asserts
+`render_string` and `parse` keep the same `self.env` object on one service instance.
+
+### When to revisit caching
+
+See [template_expression_functions.md](template_expression_functions.md) (Caching evaluation,
+PYPOST-455) and PYPOST-148 for criteria (hover lag, high render rates, large templates).
