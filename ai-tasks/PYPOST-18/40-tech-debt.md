@@ -15,9 +15,9 @@
 
 ## Missing Tests
 
-- **TemplateService unit tests** ([PYPOST-145](https://pypost.atlassian.net/browse/PYPOST-145)):
-  Behavior is verified at integration level only; no isolated tests for `render_string`, variable
-  types, or template error handling.
+- ~~**TemplateService unit tests** ([PYPOST-145](https://pypost.atlassian.net/browse/PYPOST-145))~~:
+  **Resolved.** PYPOST-147 broad suite + PYPOST-145 variable-type tests. See
+  [template_expression_functions.md](../../doc/dev/template_expression_functions.md).
 
 ## Performance Concerns
 

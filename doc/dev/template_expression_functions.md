@@ -278,20 +278,25 @@ satisfies table-cell equivalence (PYPOST-453 precedent).
 - `test_malformed_nested_expressions` — M1–M4 matrix
 - `test_nested_spacing_variants` — S1–S5 matrix
 
-**Unit tests — `TemplateService`** (`tests/test_template_service.py`, PYPOST-147):
+**Unit tests — `TemplateService`** (`tests/test_template_service.py`, PYPOST-147,
+PYPOST-145):
 
 Isolated coverage for `pypost/core/template_service.py` (closes PYPOST-18 missing-test debt):
 
 | Class | Public API / behavior |
 | --- | --- |
 | `TestTemplateServiceRenderString` | `render_string` — variables, catalog, nesting, fallback |
+| `TestTemplateServiceVariableTypes` | `render_string` — int/float/bool/None variable values (PYPOST-145) |
 | `TestTemplateServiceParse` | `parse` → Jinja AST |
 | `TestTemplateServiceValidationOutcomes` | `validate_function_expressions` — codes, plain identifiers |
 | `TestTemplateServiceObservability` | Metrics + `render_path` labels |
 | `TestTemplateServiceRenderStages` | Staged render outcomes (incl. mocked render error) |
 | `TestTemplateServiceHelperStages` | Fallback helper metrics branching |
 
-Scoped run: 49 tests + subtests (2026-06-11).
+Syntax/structure error fallback is covered by `TestTemplateServiceRenderString` and
+`TestTemplateServiceValidationOutcomes` (PYPOST-147); PYPOST-145 adds variable-type gaps only.
+
+Scoped run: 55 tests + subtests (2026-06-12).
 
 **Render, parity, security, observability** (highlights within the file above):
 

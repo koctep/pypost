@@ -180,6 +180,42 @@ class TestTemplateServiceRenderString(unittest.TestCase):
         self.assertEqual(content, result)
 
 
+class TestTemplateServiceVariableTypes(unittest.TestCase):
+    """PYPOST-145: render_string with non-string variable values."""
+
+    def setUp(self):
+        self.svc = TemplateService()
+
+    def test_render_integer_variable(self):
+        result = self.svc.render_string("port={{port}}/api", {"port": 8080})
+        self.assertEqual("port=8080/api", result)
+
+    def test_render_float_variable(self):
+        result = self.svc.render_string("v={{ratio}}", {"ratio": 3.14})
+        self.assertEqual("v=3.14", result)
+
+    def test_render_boolean_variables(self):
+        for value, expected in [(True, "True"), (False, "False")]:
+            with self.subTest(value=value):
+                result = self.svc.render_string("{{flag}}", {"flag": value})
+                self.assertEqual(expected, result)
+
+    def test_render_none_variable_value(self):
+        result = self.svc.render_string("x={{value}}y", {"value": None})
+        self.assertEqual("x=Noney", result)
+
+    def test_render_catalog_function_with_integer_argument(self):
+        result = self.svc.render_string("{{urlencode(port)}}", {"port": 8080})
+        self.assertEqual("8080", result)
+
+    def test_render_mixed_type_variables_in_one_template(self):
+        result = self.svc.render_string(
+            "{{host}}:{{port}}/{{enabled}}",
+            {"host": "localhost", "port": 443, "enabled": True},
+        )
+        self.assertEqual("localhost:443/True", result)
+
+
 class TestTemplateServiceParse(unittest.TestCase):
     def setUp(self):
         self.svc = TemplateService()
