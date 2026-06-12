@@ -33,6 +33,18 @@ Checkers infer `TWidget` as `QLineEdit` from the MRO.
 - Initialize the mixin after the QWidget base: `QLineEdit.__init__(self)` then
   `VariableHoverMixin.__init__(self)`.
 
+### Line-scoped scan (PYPOST-122)
+
+For multiline editors, `VariableHoverMixin` can limit expression lookup to the line under
+the cursor instead of scanning the full document on every `mouseMoveEvent`:
+
+- `_hover_line_scoped_scan` — when `True`, `_prepare_hover_scan_context` uses
+  `_slice_line_at_index` before `_find_hover_expression`.
+- `VariableAwarePlainTextEdit` sets this flag in `__init__` (JSON body / `CodeEditor`).
+- `VariableAwareLineEdit` keeps the default (`False`) because the buffer is a single line.
+
+This preserves tooltip behaviour while avoiding O(document) regex iteration on large bodies.
+
 ### Variable value resolution (PYPOST-115)
 
 `VariableHoverHelper.get_variable_value` resolves plain `{{name}}` placeholders:

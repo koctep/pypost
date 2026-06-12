@@ -28,6 +28,7 @@ class VariableAwarePlainTextEdit(VariableHoverMixin, QPlainTextEdit):
     def __init__(self, parent=None):
         QPlainTextEdit.__init__(self, parent)
         VariableHoverMixin.__init__(self)
+        self._hover_line_scoped_scan = True
 
     def _get_text_at_cursor(self, event) -> Tuple[str, int]:
         cursor = self.cursorForPosition(event.position().toPoint())

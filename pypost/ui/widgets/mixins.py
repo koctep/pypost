@@ -148,6 +148,7 @@ class VariableHoverMixin(Generic[TWidget]):
     def __init__(self: TWidget) -> None:
         self._variables: Dict[str, str] = {}
         self._hidden_keys: Set[str] = set()
+        self._hover_line_scoped_scan = False
         self.setMouseTracking(True)
 
     def set_variables(self, variables: Dict[str, str]) -> None:
@@ -170,6 +171,28 @@ class VariableHoverMixin(Generic[TWidget]):
         """
         raise NotImplementedError("Subclasses must implement _get_text_at_cursor")
 
+    @staticmethod
+    def _slice_line_at_index(text: str, index: int) -> Tuple[str, int]:
+        """Return line text and index within line for a document-global cursor index."""
+        if not text:
+            return text, index
+        index = min(max(index, 0), len(text))
+        line_start = text.rfind("\n", 0, index) + 1
+        line_end = text.find("\n", index)
+        if line_end == -1:
+            line_end = len(text)
+        return text[line_start:line_end], index - line_start
+
+    def _prepare_hover_scan_context(
+        self: TWidget,
+        text: str,
+        index: int,
+    ) -> Tuple[str, int]:
+        """Narrow scan scope before expression lookup (line-only for multiline editors)."""
+        if self._hover_line_scoped_scan:
+            return self._slice_line_at_index(text, index)
+        return text, index
+
     def mouseMoveEvent(self: TWidget, event: QMouseEvent) -> None:
         super().mouseMoveEvent(event)
 
@@ -181,7 +204,8 @@ class VariableHoverMixin(Generic[TWidget]):
         if not text:
             return
 
-        expression = self._find_hover_expression(text, index)
+        scan_text, scan_index = self._prepare_hover_scan_context(text, index)
+        expression = self._find_hover_expression(scan_text, scan_index)
         self._show_or_hide_tooltip(event, expression)
 
     def _find_hover_expression(self, text: str, index: int) -> Optional[str]:

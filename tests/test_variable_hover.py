@@ -57,6 +57,7 @@ class _FixedCursorHoverPlainText(VariableHoverMixin, QPlainTextEdit):
     def __init__(self) -> None:
         QPlainTextEdit.__init__(self)
         VariableHoverMixin.__init__(self)
+        self._hover_line_scoped_scan = True
         self.fixed_document_position = 0
 
     def cursorForPosition(self, pos):  # noqa: ARG002
@@ -251,6 +252,20 @@ class TestVariableHoverHelper(unittest.TestCase):
         )
         self.assertEqual(out, "x={{not_allowed(db)}}")
 
+    def test_slice_line_at_index_middle_of_line(self):
+        text = "line0\n  {{var}} here\nline2"
+        idx = text.index("var")
+        line_text, line_idx = VariableHoverMixin._slice_line_at_index(text, idx)
+        self.assertEqual(line_text, "  {{var}} here")
+        self.assertEqual(line_idx, line_text.index("var"))
+
+    def test_slice_line_at_index_first_line(self):
+        text = "{{top}}\nsecond"
+        idx = text.index("top")
+        line_text, line_idx = VariableHoverMixin._slice_line_at_index(text, idx)
+        self.assertEqual(line_text, "{{top}}")
+        self.assertEqual(line_idx, 2)
+
     def test_resolve_text_variant_b_function_marks_hover_render_path(self):
         original_service = VariableHoverHelper._template_service
         try:
@@ -350,6 +365,21 @@ class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
         w.mouseMoveEvent(_mouse_move_event(w, QPoint(5, 10)))
         show_mock.assert_not_called()
         hide_mock.assert_called()
+
+    @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
+    @patch("pypost.ui.widgets.mixins.QToolTip.showText")
+    def test_line_scoped_scan_finds_variable_on_deep_line(self, show_mock, _hide):
+        w = _FixedCursorHoverPlainText()
+        w.resize(480, 400)
+        filler = "\n".join(f'{{"k{i}": "plain{i}"}}' for i in range(200))
+        target_line = '  "url": "{{deep}}"'
+        body = f"{filler}\n{target_line}\n{filler}"
+        w.setPlainText(body)
+        w.set_variables({"deep": "found"})
+        w.fixed_document_position = body.index("{{deep}}") + 2
+        w.mouseMoveEvent(_mouse_move_event(w, QPoint(20, 200)))
+        show_mock.assert_called_once()
+        self.assertEqual(show_mock.call_args[0][1], "found")
 
     @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
     @patch("pypost.ui.widgets.mixins.QToolTip.showText")
