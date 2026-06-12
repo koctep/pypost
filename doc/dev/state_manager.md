@@ -5,7 +5,9 @@
 `StateManager` persists high-frequency UI session state (expanded tree nodes, open tabs, last
 environment) to the user settings file. It sits between UI presenters and `ConfigManager`,
 providing typed getters/setters and debounced saves so rapid UI interactions do not trigger
-redundant disk I/O.
+redundant disk I/O. Debounced persistence closed debt
+[PYPOST-90](https://pypost.atlassian.net/browse/PYPOST-90) (implemented in
+[PYPOST-386](https://pypost.atlassian.net/browse/PYPOST-386)).
 
 User preferences (font size, metrics ports, encryption options, etc.) are **not** routed through
 `StateManager`; the Settings dialog saves them immediately via `ConfigManager`.

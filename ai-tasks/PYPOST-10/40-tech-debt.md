@@ -9,9 +9,9 @@ Addressed in PYPOST-14 by implementing `StateManager`.
 - **[FIXED] Direct Settings Manipulation from UI**: Tree state logic
   (`expanded_collections`) is now managed via `StateManager`. `MainWindow` no longer depends
   directly on the settings structure for this functionality.
-- **Synchronous tree-state saves** ([PYPOST-90](https://pypost.atlassian.net/browse/PYPOST-90)):
-  Each expand/collapse persists settings immediately; very frequent clicks add I/O but are fine at
-  current scale.
+- **[FIXED] Synchronous tree-state saves** ([PYPOST-90](https://pypost.atlassian.net/browse/PYPOST-90)):
+  Addressed in [PYPOST-386](https://pypost.atlassian.net/browse/PYPOST-386) via debounced
+  `StateManager` saves (300 ms); expand/collapse no longer writes on every click.
 
 ## Code Quality Issues
 
