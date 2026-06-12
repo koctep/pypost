@@ -20,7 +20,7 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
   (PYPOST-382).
 - **Direct instantiation**: RequestService still creates default HTTP/MCP clients when not
   injected; RequestWorker creates RequestService internally. Constructor seams and test patterns
-  documented in [testability.md](testability.md) (PYPOST-382). Full protocol refactor: PYPOST-46.
+  documented in [testability.md](testability.md) (PYPOST-382, PYPOST-46).
 
 ## Prioritized Recommendations
 

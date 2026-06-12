@@ -6,7 +6,8 @@ The PYPOST-40 audit flagged `RequestService`, `HTTPClient`, and `MainWindow` as 
 test because dependencies were created internally. PYPOST-382 adds **constructor injection
 seams** where practical and documents established mocking patterns. Metrics consumers now
 depend on `MetricsTrackerProtocol` ([PYPOST-73](https://pypost.atlassian.net/browse/PYPOST-73));
-broader protocol work continues in [PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46).
+HTTP transport consumers depend on `HTTPClientProtocol`
+([PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46)).
 
 ## Composition root
 
@@ -96,7 +97,7 @@ See [PYPOST-73](../../ai-tasks/PYPOST-73/70-dev-docs.md) and
 | `template_service` | `None` | `TemplateService()` for render paths |
 | `history_manager` | `None` | `MagicMock(spec=HistoryManager)` |
 | `alert_manager` | `None` | `MagicMock(spec=AlertManager)` |
-| `http_client` | new `HTTPClient(...)` | `MagicMock()` — avoids network I/O |
+| `http_client` | new `HTTPClient(...)` | `MagicMock(spec=HTTPClientProtocol)` — avoids network I/O |
 | `mcp_client` | new `MCPClientService()` | `MagicMock()` — avoids MCP transport |
 
 ### Recommended pattern
@@ -109,7 +110,9 @@ from unittest.mock import MagicMock
 from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
 
-mock_http = MagicMock()
+from pypost.core.http_client_protocol import HTTPClientProtocol
+
+mock_http = MagicMock(spec=HTTPClientProtocol)
 svc = RequestService(
     metrics=MagicMock(),
     template_service=TemplateService(),
@@ -216,11 +219,34 @@ For signal/slot tests, mock presenters with real Qt widgets where needed — see
 | `tests/test_main_window.py` | `test_main_window_curl_copied_status_bar` | Signal wiring (integration) |
 | `tests/test_main_window_signals.py` | `test_wire_presenter_signals_*` | `wire_presenter_signals` unit tests |
 
+## HTTPClientProtocol
+
+`RequestService` depends on `HTTPClientProtocol` (structural typing) instead of the
+concrete `HTTPClient` class. Production still constructs `HTTPClient` when no client is
+injected.
+
+```python
+from pypost.core.http_client_protocol import HTTPClientProtocol
+
+class RequestService:
+    def __init__(self, http_client: HTTPClientProtocol | None = None):
+        ...
+```
+
+```python
+from unittest.mock import MagicMock
+
+from pypost.core.http_client_protocol import HTTPClientProtocol
+
+mock_http = MagicMock(spec=HTTPClientProtocol)
+```
+
+**Coverage:** `tests/test_http_client_protocol.py`, `TestRequestServiceInjection`.
+
 ## Out of scope (future tickets)
 
 | Gap | Follow-up |
 | --- | --- |
-| `HTTPClient` protocol / interface | [PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46) |
 | `RequestWorker` accepts `RequestService` injection | [PYPOST-379](https://pypost.atlassian.net/browse/PYPOST-379) |
 | MainWindow presenter decomposition | [PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43) |
 | Full composition-root DI container | Backlog — not planned |

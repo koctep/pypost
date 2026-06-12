@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional
 from pypost.core.alert_manager import AlertManager, AlertPayload
 from pypost.core.history_manager import HistoryManager
 from pypost.core.http_client import HTTPClient, ResolvedRequestFields
+from pypost.core.http_client_protocol import HTTPClientProtocol
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.script_executor import ScriptExecutor
@@ -49,7 +50,7 @@ class RequestService:
         history_manager: HistoryManager | None = None,
         alert_manager: AlertManager | None = None,
         default_retry_policy: RetryPolicy | None = None,
-        http_client: HTTPClient | None = None,
+        http_client: HTTPClientProtocol | None = None,
         mcp_client: MCPClientService | None = None,
     ) -> None:
         self._metrics = resolve_metrics(metrics)
@@ -71,7 +72,9 @@ class RequestService:
         )
         if http_client is not None:
             self.http_client = http_client
-            logger.debug("RequestService: using injected HTTPClient id=%d", id(http_client))
+            logger.debug(
+                "RequestService: using injected HTTP client id=%d", id(http_client)
+            )
         else:
             self.http_client = HTTPClient(
                 metrics=self._metrics, template_service=self._template_service
