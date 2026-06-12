@@ -48,7 +48,7 @@ def _make_encrypted_startup_window(qapp, mock_env):  # noqa: ARG001
         patch("pypost.ui.main_window.EnvPresenter", return_value=mock_env),
         patch("pypost.ui.main_window.HistoryPanel"),
         patch("pypost.ui.main_window.MainWindow._build_layout"),
-        patch("pypost.ui.main_window.MainWindow._wire_signals"),
+        patch("pypost.ui.main_window.wire_presenter_signals"),
         patch("pypost.ui.main_window.MainWindow._create_menu_bar"),
         patch("pypost.ui.main_window.MainWindow._setup_shortcuts"),
         patch("pypost.ui.main_window.MainWindow.apply_settings"),

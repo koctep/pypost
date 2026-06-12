@@ -154,11 +154,17 @@ with (
     patch("pypost.ui.main_window.StorageManager"),
     patch("pypost.ui.main_window.CollectionsPresenter") as mock_collections,
     patch("pypost.ui.main_window.MainWindow._build_layout"),
+    patch("pypost.ui.main_window.wire_presenter_signals"),
     ...
 ):
     window = MainWindow(metrics=MagicMock(), template_service=MagicMock())
     mock_collections.return_value.refresh_tree.assert_called_once()
 ```
+
+Cross-presenter signal wiring lives in `pypost/ui/main_window_signals.py` as
+`wire_presenter_signals(window)`. Unit-test it directly with a `MagicMock` window — see
+`tests/test_main_window_signals.py`. Integration tests that construct a real `MainWindow` still
+exercise the full wiring path.
 
 For signal/slot tests, mock presenters with real Qt widgets where needed — see
 [gui_testing.md](gui_testing.md).
@@ -169,7 +175,8 @@ For signal/slot tests, mock presenters with real Qt widgets where needed — see
 | --- | --- | --- |
 | `tests/test_main_window.py` | `test_constructor_stores_injected_dependencies` | DI retention |
 | `tests/test_main_window.py` | `test_startup_refreshes_tree_from_request_manager` | Startup orchestration |
-| `tests/test_main_window.py` | `test_main_window_curl_copied_status_bar` | Signal wiring |
+| `tests/test_main_window.py` | `test_main_window_curl_copied_status_bar` | Signal wiring (integration) |
+| `tests/test_main_window_signals.py` | `test_wire_presenter_signals_*` | `wire_presenter_signals` unit tests |
 
 ## Out of scope (future tickets)
 

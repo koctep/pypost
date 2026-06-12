@@ -29,6 +29,7 @@ from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
+from pypost.ui.main_window_signals import wire_presenter_signals
 from pypost.ui.presenters import CollectionsPresenter, EnvPresenter, TabsPresenter
 from pypost.ui.widgets.history_panel import HistoryPanel
 
@@ -92,7 +93,7 @@ class MainWindow(QMainWindow):
             self.metrics,
         )
         self._build_layout()
-        self._wire_signals()
+        wire_presenter_signals(self)
         self._create_menu_bar()
         self._setup_shortcuts()
         self.collections.refresh_tree()
@@ -142,32 +143,6 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.tabs.widget)
         splitter.setSizes([300, 900])
         main_layout.addWidget(splitter)
-
-    def _wire_signals(self) -> None:
-        self.collections.open_request_in_tab.connect(self.tabs.add_new_tab)
-        self.collections.open_request_in_isolated_tab.connect(self.tabs.add_new_tab)
-        self.collections.collections_changed.connect(self.env.load_environments)
-        self.collections.collections_changed.connect(self.env.refresh_mcp_tools)
-        self.collections.request_renamed.connect(self.tabs.rename_request_tabs)
-        self.collections.requests_deleted.connect(self.tabs.close_tabs_for_request_ids)
-        self.collections.requests_deleted.connect(self.env.refresh_mcp_tools)
-        self.env.env_variables_changed.connect(self.tabs.on_env_variables_changed)
-        self.env.env_keys_changed.connect(self.tabs.on_env_keys_changed)
-        self.env.env_hidden_keys_changed.connect(
-            self.tabs.on_env_hidden_keys_changed,
-        )
-        self.tabs.variable_set_requested.connect(self.env.handle_variable_set_request)
-        self.tabs.env_update_requested.connect(self.env.on_env_update)
-        self.tabs.request_saved.connect(self.collections.refresh_tree)
-        self.tabs.request_saved.connect(self.collections.restore_tree_state)
-        self.tabs.request_saved.connect(self.env.refresh_mcp_tools)
-        self.tabs.request_save_as_completed.connect(self.collections.add_saved_request_to_tree)
-        self.tabs.request_executed.connect(self.history_panel.refresh)
-        self.history_panel.load_into_editor.connect(self.tabs.load_request_from_history)
-        self.history_panel.curl_copied.connect(self._on_curl_copied)
-
-    def _on_curl_copied(self) -> None:
-        self.statusBar().showMessage("Copied to clipboard", 3000)
 
     def _create_menu_bar(self) -> None:
         menubar = self.menuBar()
