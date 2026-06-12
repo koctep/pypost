@@ -1,0 +1,105 @@
+# StateManager
+
+## Overview
+
+`StateManager` persists high-frequency UI session state (expanded tree nodes, open tabs, last
+environment) to the user settings file. It sits between UI presenters and `ConfigManager`,
+providing typed getters/setters and debounced saves so rapid UI interactions do not trigger
+redundant disk I/O.
+
+User preferences (font size, metrics ports, encryption options, etc.) are **not** routed through
+`StateManager`; the Settings dialog saves them immediately via `ConfigManager`.
+
+## Architecture
+
+```text
+ConfigManager.load_config() → AppSettings (single in-memory object)
+         ↑                              ↑
+         │                              │
+  save_config (immediate)         StateManager.set_* (debounced)
+         │                              │
+  MainWindow.open_settings()      CollectionsPresenter, TabsPresenter, …
+```
+
+### Shared `AppSettings` object
+
+`MainWindow` sets `self.settings = self.state_manager.settings`. Presenters and dialogs read
+preference fields from that same object. This is intentional: one JSON file, one loaded model.
+
+`StateManager` does **not** duplicate or subset the model on disk. It restricts **which fields
+it mutates through its public API** (`_UI_STATE_FIELDS` in `state_manager.py`).
+
+### Save paths
+
+| Trigger | Path | Timing |
+| --- | --- | --- |
+| Tree expand/collapse, tab open/close, env switch | `StateManager.set_*` | Debounced (300 ms) |
+| Settings dialog OK | `config_manager.save_config` | Immediate |
+| Application exit | `state_manager.flush_pending_save()` | Immediate flush of pending UI state |
+| Tests / forced persist | `StateManager.save()` or `flush_pending_save()` | Immediate |
+
+Full settings JSON is written on every save. Partial field updates on disk are out of scope
+until file size or write latency becomes a measured problem.
+
+## API / Usage
+
+### Managed fields
+
+- `expanded_collections` — collection tree expansion ids
+- `open_tabs` — open request tab ids
+- `last_environment_id` — last selected environment
+
+### Public methods
+
+| Method | Purpose |
+| --- | --- |
+| `get_expanded_collections()` / `set_expanded_collections(ids)` | Tree expansion state |
+| `get_open_tabs()` / `set_open_tabs(ids)` | Tab bar state |
+| `get_last_environment_id()` / `set_last_environment_id(env_id)` | Environment selection |
+| `save()` | Persist immediately (stops debounce timer) |
+| `flush_pending_save()` | Write pending debounced changes before shutdown |
+
+All `set_*` methods no-op when the value is unchanged (no save scheduled).
+
+### Example (presenter)
+
+```python
+if self.state_manager.get_open_tabs() != tab_ids:
+    self.state_manager.set_open_tabs(tab_ids)
+```
+
+### Example (test)
+
+```python
+sm.set_expanded_collections(["c1"])
+sm.flush_pending_save()  # required before asserting on disk
+```
+
+## Configuration
+
+Debounce interval: `_UI_STATE_SAVE_DEBOUNCE_MS = 300` in `pypost/core/state_manager.py`
+(not user-configurable).
+
+## Related documentation
+
+- [architecture.md](architecture.md) — core module overview
+- [collection_tree_actions.md](collection_tree_actions.md) — tree expand persistence
+- [testing.md](testing.md) — `TestStateManagerPersistence` run commands
+
+## Troubleshooting
+
+| Symptom | Likely cause | Action |
+| --- | --- | --- |
+| Test expects immediate disk write after `set_*` | Debounce defers write | Call `flush_pending_save()` or process Qt event loop until timer fires |
+| Preference change not visible in UI | Wrong object reference | Ensure code uses `MainWindow.settings`, not a copied `AppSettings` |
+| UI state lost on normal quit | Flush not called | Verify `MainWindow.handle_exit()` calls `flush_pending_save()` |
+| Settings dialog change overwritten | Saving UI state after dialog | Settings path uses immediate save; UI fields should not reset preferences |
+
+## Future work (non-blocking)
+
+- Split `AppSettings` into preference vs session models if the settings surface grows
+  significantly.
+- Partial JSON writes only if profiling shows settings save latency matters.
+
+See Jira [PYPOST-249](https://pypost.atlassian.net/browse/PYPOST-249) for the documented
+decision to defer these refactors.

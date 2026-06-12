@@ -1,5 +1,22 @@
+"""UI session state persistence for PyPost.
+
+Design contract (see doc/dev/state_manager.md):
+
+- ``StateManager`` owns persistence for high-churn UI fields only
+  (``expanded_collections``, ``open_tabs``, ``last_environment_id``).
+- It holds a reference to the same ``AppSettings`` instance loaded by
+  ``ConfigManager``; ``MainWindow.settings`` points at that object. Shared
+  mutability is intentional so preference fields edited in the Settings dialog
+  remain visible everywhere without a reload.
+- Granular updates: each ``set_*`` method compares values and skips scheduling
+  when unchanged; disk writes still serialize the full settings file via
+  ``ConfigManager.save_config`` (acceptable for current file size).
+- User preference changes bypass debounce and save immediately through
+  ``ConfigManager`` in ``MainWindow.open_settings()``.
+"""
+
 import logging
-from typing import List, Optional
+from typing import Final, List, Optional, Tuple
 
 from PySide6.QtCore import QObject, QTimer
 
@@ -9,14 +26,19 @@ from pypost.models.settings import AppSettings
 logger = logging.getLogger(__name__)
 
 _UI_STATE_SAVE_DEBOUNCE_MS = 300
+_UI_STATE_FIELDS: Final[Tuple[str, ...]] = (
+    "expanded_collections",
+    "open_tabs",
+    "last_environment_id",
+)
 
 
 class StateManager(QObject):
     """
-    Manages the persistent state of the UI, abstracting the AppSettings structure.
+    Persists UI session state with debounced disk writes.
 
-    UI-driven mutations are debounced to reduce redundant disk writes; call
-    flush_pending_save() before application shutdown.
+    Call ``flush_pending_save()`` before application shutdown so pending UI
+    changes are not lost inside the debounce window.
     """
 
     def __init__(self, config_manager: ConfigManager, parent: QObject | None = None):
