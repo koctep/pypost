@@ -202,6 +202,19 @@ def confirm_re_encrypt_environments(parent: QWidget) -> bool:
     return reply == QMessageBox.StandardButton.Yes
 
 
+def confirm_encrypt_plaintext_hidden(parent: QWidget) -> bool:
+    reply = QMessageBox.question(
+        parent,
+        "Encrypt plaintext hidden values",
+        "This encrypts hidden environment variables that are still stored as "
+        "plaintext strings. A timestamped backup of environments.json is created "
+        "before writing.\n\nContinue?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No,
+    )
+    return reply == QMessageBox.StandardButton.Yes
+
+
 def show_invalid_retryable_status_codes(parent: QWidget, message: str) -> None:
     QMessageBox.warning(parent, "Invalid retryable status codes", message)
 

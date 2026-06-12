@@ -27,6 +27,7 @@ from pypost.core.encryption_migration import (
     MigrationReport,
     format_migration_report,
 )
+from pypost.core.encryption_migration_worker import EncryptionMigrationWorker
 from pypost.core.key_source_constants import (
     KEY_SOURCE_ENVIRONMENT,
     KEY_SOURCE_KEYRING,
@@ -42,6 +43,7 @@ from pypost.models.retry import (
 )
 from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import (
+    confirm_encrypt_plaintext_hidden,
     confirm_re_encrypt_environments,
     show_invalid_bind_address,
     show_invalid_retryable_status_codes,
@@ -133,6 +135,7 @@ class SettingsDialog(QDialog):
             self._migration_service = EncryptionMigrationService(storage)
         else:
             self._migration_service = None
+        self._migration_worker: EncryptionMigrationWorker | None = None
 
         self.layout = QVBoxLayout(self)
 
@@ -237,9 +240,12 @@ class SettingsDialog(QDialog):
         self.verify_encryption_btn.clicked.connect(self._on_verify_encryption)
         self.reencrypt_environments_btn = QPushButton("Re-encrypt all environments")
         self.reencrypt_environments_btn.clicked.connect(self._on_re_encrypt_environments)
+        self.encrypt_plaintext_btn = QPushButton("Encrypt plaintext hidden values")
+        self.encrypt_plaintext_btn.clicked.connect(self._on_encrypt_plaintext_hidden)
         migration_enabled = self._migration_service is not None
         self.verify_encryption_btn.setEnabled(migration_enabled)
         self.reencrypt_environments_btn.setEnabled(migration_enabled)
+        self.encrypt_plaintext_btn.setEnabled(migration_enabled)
 
         # Retry policy defaults
         default_policy = RetryPolicy()
@@ -318,6 +324,7 @@ class SettingsDialog(QDialog):
         self.form_layout.addRow(self.encryption_migration_section_label)
         self.form_layout.addRow("", self.verify_encryption_btn)
         self.form_layout.addRow("", self.reencrypt_environments_btn)
+        self.form_layout.addRow("", self.encrypt_plaintext_btn)
         self.form_layout.addRow("Max Retries (0 = disabled):", self.max_retries_spin)
         self.form_layout.addRow("Retry Delay (seconds):", self.retry_delay_spin)
         self.form_layout.addRow("Retry Backoff Multiplier:", self.retry_backoff_spin)
@@ -374,22 +381,83 @@ class SettingsDialog(QDialog):
         )
         self._show_migration_result("Verify encryption", report)
 
-    def _on_re_encrypt_environments(self) -> None:
-        if self._migration_service is None:
+    def _set_migration_buttons_enabled(self, enabled: bool) -> None:
+        has_service = self._migration_service is not None
+        for button in (
+            self.verify_encryption_btn,
+            self.reencrypt_environments_btn,
+            self.encrypt_plaintext_btn,
+        ):
+            button.setEnabled(enabled and has_service)
+
+    def _start_migration_worker(
+        self,
+        operation: str,
+        *,
+        title: str,
+        confirm,
+    ) -> None:
+        if self._migration_service is None or self._migration_worker is not None:
             return
-        if not confirm_re_encrypt_environments(self):
-            logger.info("settings_encryption_reencrypt_cancelled")
+        if not confirm(self):
+            logger.info("settings_encryption_%s_cancelled", operation)
             return
         settings = self._encryption_settings_from_form()
-        logger.info("settings_encryption_reencrypt_started")
-        report = self._migration_service.bulk_re_encrypt(settings, backup=True)
+        logger.info("settings_encryption_%s_started", operation)
+        worker = EncryptionMigrationWorker(self._migration_service, operation, settings)
+        worker.finished.connect(
+            lambda report, op=operation, result_title=title: self._on_migration_worker_finished(
+                op,
+                result_title,
+                report,
+            )
+        )
+        worker.failed.connect(self._on_migration_worker_failed)
+        self._migration_worker = worker
+        self._set_migration_buttons_enabled(False)
+        worker.start()
+
+    def _on_migration_worker_finished(
+        self,
+        operation: str,
+        title: str,
+        report: MigrationReport,
+    ) -> None:
+        self._migration_worker = None
+        self._set_migration_buttons_enabled(True)
         logger.info(
-            "settings_encryption_reencrypt_completed success=%s backup=%s error_count=%d",
+            "settings_encryption_%s_completed success=%s backup=%s error_count=%d",
+            operation,
             report.success,
             report.backup_path,
             len(report.errors),
         )
-        self._show_migration_result("Re-encrypt all environments", report)
+        self._show_migration_result(title, report)
+
+    def _on_migration_worker_failed(self, message: str) -> None:
+        self._migration_worker = None
+        self._set_migration_buttons_enabled(True)
+        logger.error("settings_encryption_migration_worker_failed error=%s", message)
+        show_migration_result(
+            self,
+            "Encryption migration",
+            f"Migration failed: {message}",
+            success=False,
+        )
+
+    def _on_re_encrypt_environments(self) -> None:
+        self._start_migration_worker(
+            "re_encrypt",
+            title="Re-encrypt all environments",
+            confirm=confirm_re_encrypt_environments,
+        )
+
+    def _on_encrypt_plaintext_hidden(self) -> None:
+        self._start_migration_worker(
+            "encrypt_plaintext",
+            title="Encrypt plaintext hidden values",
+            confirm=confirm_encrypt_plaintext_hidden,
+        )
 
     def _update_fallback_warning(self) -> None:
         issues = find_fallback_parse_issues(

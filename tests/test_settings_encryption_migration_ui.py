@@ -6,8 +6,11 @@ import pytest
 pytestmark = pytest.mark.timeout(120)
 
 from dataclasses import replace
+import time
 from unittest.mock import MagicMock, patch
 
+from PySide6.QtCore import QCoreApplication
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.encryption_migration import MigrationReport, ReencryptStats
@@ -20,6 +23,13 @@ from pypost.ui.dialogs.settings_dialog import SettingsDialog
 def qapp():
     app = QApplication.instance() or QApplication([])
     yield app
+
+
+def _wait_for_migration_worker(dlg, timeout_s: float = 5.0) -> None:
+    deadline = time.time() + timeout_s
+    while dlg._migration_worker is not None and time.time() < deadline:
+        QCoreApplication.processEvents()
+        QTest.qWait(10)
 
 
 def _empty_report(*, success: bool = True) -> MigrationReport:
@@ -54,8 +64,10 @@ class TestSettingsDialogEncryptionMigration:
             assert dlg.form_layout.indexOf(dlg.encryption_migration_section_label) >= 0
             assert dlg.form_layout.indexOf(dlg.verify_encryption_btn) >= 0
             assert dlg.form_layout.indexOf(dlg.reencrypt_environments_btn) >= 0
+            assert dlg.form_layout.indexOf(dlg.encrypt_plaintext_btn) >= 0
             assert dlg.verify_encryption_btn.isEnabled()
             assert dlg.reencrypt_environments_btn.isEnabled()
+            assert dlg.encrypt_plaintext_btn.isEnabled()
         finally:
             dlg.close()
 
@@ -64,6 +76,7 @@ class TestSettingsDialogEncryptionMigration:
         try:
             assert not dlg.verify_encryption_btn.isEnabled()
             assert not dlg.reencrypt_environments_btn.isEnabled()
+            assert not dlg.encrypt_plaintext_btn.isEnabled()
         finally:
             dlg.close()
 
@@ -114,11 +127,33 @@ class TestSettingsDialogEncryptionMigration:
         service.bulk_re_encrypt = MagicMock(return_value=_empty_report())
         try:
             dlg._on_re_encrypt_environments()
+            _wait_for_migration_worker(dlg)
         finally:
             dlg.close()
 
         service.bulk_re_encrypt.assert_called_once()
         call_kwargs = service.bulk_re_encrypt.call_args.kwargs
+        assert call_kwargs["backup"] is True
+        mock_show.assert_called_once()
+
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    @patch(
+        "pypost.ui.dialogs.settings_dialog.confirm_encrypt_plaintext_hidden",
+        return_value=True,
+    )
+    def test_encrypt_plaintext_runs_when_confirmed(self, mock_confirm, mock_show, qapp):
+        storage = MagicMock(spec=StorageManager)
+        dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
+        service = dlg._migration_service
+        service.encrypt_plaintext_hidden = MagicMock(return_value=_empty_report())
+        try:
+            dlg._on_encrypt_plaintext_hidden()
+            _wait_for_migration_worker(dlg)
+        finally:
+            dlg.close()
+
+        service.encrypt_plaintext_hidden.assert_called_once()
+        call_kwargs = service.encrypt_plaintext_hidden.call_args.kwargs
         assert call_kwargs["backup"] is True
         mock_show.assert_called_once()
 
@@ -138,6 +173,7 @@ class TestSettingsDialogEncryptionMigration:
         service.bulk_re_encrypt = MagicMock(return_value=report)
         try:
             dlg._on_re_encrypt_environments()
+            _wait_for_migration_worker(dlg)
         finally:
             dlg.close()
 
