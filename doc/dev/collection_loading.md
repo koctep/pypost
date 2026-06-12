@@ -75,8 +75,15 @@ No configuration flags. Collection files live under the user data `collections/`
 | Tree wrong after save | Bug in RequestManager CRUD | Check `save_request` / index rebuild |
 | Double disk read on startup | Calling `load_collections()` at startup | Use `refresh_tree()` instead |
 
+## Performance
+
+For a full vs incremental tree refresh inventory (audit closure
+[PYPOST-383](https://pypost.atlassian.net/browse/PYPOST-383)), see
+[collection_tree_performance.md](collection_tree_performance.md).
+
 ## Related
 
+- [Collection Tree Performance](collection_tree_performance.md)
 - [Collection Storage](collection_storage.md)
 - [Architecture Overview](architecture.md)
 - [Technical Debt: PYPOST-40](tech-debt/PYPOST-40.md)

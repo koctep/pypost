@@ -93,9 +93,21 @@ pytest tests/test_dialogs_audit.py -v
 When adding a new dialog, extend `30-dialogs-audit-report.md` so `--check` and
 `test_dialogs_audit.py` keep passing.
 
+## Collection tree performance (PYPOST-383)
+
+The audit did not identify new performance-specific findings. Known collection-tree scale
+behavior (full vs incremental model refresh) was already filed under
+[PYPOST-35](https://pypost.atlassian.net/browse/PYPOST-35); follow-up work added incremental
+delete ([PYPOST-334](https://pypost.atlassian.net/browse/PYPOST-334)), rename
+([PYPOST-347](https://pypost.atlassian.net/browse/PYPOST-347)), and save-as insert
+([PYPOST-319](https://pypost.atlassian.net/browse/PYPOST-319)).
+
+Full inventory: [collection_tree_performance.md](collection_tree_performance.md)
+
 ## Related
 
 - [Architecture Overview](architecture.md)
 - [Technical Debt: PYPOST-40](tech-debt/PYPOST-40.md)
+- [Collection Tree Performance](collection_tree_performance.md)
 - [Testing: SOLID audit baseline](testing.md#solid-audit-baseline-pypost-376)
 - [Testing: Dialog audit inventory](testing.md#dialog-audit-inventory-pypost-374)

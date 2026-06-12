@@ -45,6 +45,13 @@ full testability. See [testability.md](../testability.md) and audit R4, R9.
 `rename_collection_item` through `DEFAULT_COLLECTION_ITEM_STRATEGIES` instead of inline
 `item_type` branching. See [testability.md](../testability.md). See audit R6.
 
+## 8. Performance Concerns
+
+**Closed in PYPOST-383.** The audit did not surface new performance-specific findings. Known
+collection-tree refresh behavior (including historical full-reload-on-delete notes) is documented
+in [collection_tree_performance.md](../collection_tree_performance.md) with links to PYPOST-35 and
+follow-up tickets (PYPOST-334, PYPOST-347, PYPOST-319, PYPOST-340).
+
 ## Follow-up Tasks
 
 - **Prerequisite:** PYPOST-52 — Add test coverage for refactoring safety (blocks P1)

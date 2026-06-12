@@ -55,9 +55,11 @@ As documented in `30-audit-report.md`:
 
 ## Performance Concerns
 
-- **Prior reports cover perf** ([PYPOST-383](https://pypost.atlassian.net/browse/PYPOST-383)):
-  No new audit-specific concerns; known issues (e.g. full tree reload on delete) appear in earlier
-  tech-debt notes (e.g. PYPOST-35).
+- **Prior reports cover perf** — **resolved** in
+  [PYPOST-383](https://pypost.atlassian.net/browse/PYPOST-383):
+  No new audit-specific concerns; inventory in
+  `doc/dev/collection_tree_performance.md` cross-links PYPOST-35 follow-ups (PYPOST-334,
+  PYPOST-347, PYPOST-319, PYPOST-340).
 
 ## Follow-up Tasks
 
