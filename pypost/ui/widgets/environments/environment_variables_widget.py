@@ -26,6 +26,7 @@ from pypost.core.environment_messages import (
 from pypost.core.environment_ops import validate_environment_variable_name
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.models.models import Environment
+from pypost.ui.collection_item_dialogs import show_invalid_variable_name_error
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +224,7 @@ class EnvironmentVariablesWidget(QWidget):
 
             if k_item and k_item.text():
                 key = k_item.text().strip()
-                is_valid, _error = validate_environment_variable_name(key)
+                is_valid, error = validate_environment_variable_name(key)
                 if not is_valid:
                     if (
                         edited_item is not None
@@ -233,6 +234,7 @@ class EnvironmentVariablesWidget(QWidget):
                         old_keys = list(env.variables.keys())
                         revert = old_keys[i] if i < len(old_keys) else ""
                         k_item.setText(revert)
+                        show_invalid_variable_name_error(self, error)
                     continue
                 is_hidden = cb.isChecked() if cb else False
                 if is_hidden:

@@ -63,6 +63,10 @@ Instead of main UI buttons, actions on existing environments are handled via a r
 
 ### Variable Editing
 - **`on_var_changed(item)`**: Updates the underlying `Environment` object when a user modifies the table. Automatically adds an empty row at the bottom for new variables.
+- **Variable name validation**: Keys are trimmed and validated via
+  `validate_environment_variable_name` (shared Jinja2-compatible rules). Invalid names are not
+  saved; the Variable cell reverts to the previous value (or empty for a new row) and
+  `show_invalid_variable_name_error` displays the validator message.
 - **`_on_hidden_toggled(checked)`**: Manages the masking and unmasking of hidden variable values in the UI, ensuring the real value is preserved in the item's `UserRole` data.
 
 ## Configuration

@@ -456,7 +456,11 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
-    def test_invalid_variable_name_rejected_in_table(self, qapp):
+    @patch(
+        "pypost.ui.widgets.environments.environment_variables_widget"
+        ".show_invalid_variable_name_error",
+    )
+    def test_invalid_variable_name_rejected_in_table(self, mock_invalid_error, qapp):
         env = Environment(name="Dev", variables={"valid_key": "1"})
         dlg = EnvironmentDialog([env])
         try:
@@ -467,6 +471,10 @@ class TestEnvironmentDialog:
             dlg.on_var_changed(item)
             assert "123bad" not in dlg.environments[0].variables
             assert dlg.vars_table.item(row, 0).text() == ""
+            mock_invalid_error.assert_called_once_with(
+                dlg._vars_widget,
+                "Variable name cannot start with a digit.",
+            )
         finally:
             dlg.close()
 
@@ -618,7 +626,11 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
-    def test_edit_existing_key_to_invalid_name_reverts(self, qapp):
+    @patch(
+        "pypost.ui.widgets.environments.environment_variables_widget"
+        ".show_invalid_variable_name_error",
+    )
+    def test_edit_existing_key_to_invalid_name_reverts(self, mock_invalid_error, qapp):
         env = Environment(name="Dev", variables={"valid_key": "1"})
         dlg = EnvironmentDialog([env])
         try:
@@ -628,6 +640,10 @@ class TestEnvironmentDialog:
             dlg.on_var_changed(item)
             assert list(dlg.environments[0].variables.keys()) == ["valid_key"]
             assert dlg.vars_table.item(0, 0).text() == "valid_key"
+            mock_invalid_error.assert_called_once_with(
+                dlg._vars_widget,
+                "Variable name cannot start with a digit.",
+            )
         finally:
             dlg.close()
 

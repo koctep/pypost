@@ -14,6 +14,7 @@ from pypost.core.environment_ops import (
     clone_environment,
     clone_environments,
     validate_environment_rename,
+    validate_environment_variable_name,
 )
 from pypost.models.models import Environment
 
@@ -115,6 +116,31 @@ class TestValidateEnvironmentRename(unittest.TestCase):
         self.assertTrue(accepted)
         self.assertEqual(normalized, "Prod")
         self.assertEqual(error, "")
+
+
+class TestValidateEnvironmentVariableName(unittest.TestCase):
+    def test_accepts_valid_name(self) -> None:
+        is_valid, error = validate_environment_variable_name("api_key")
+        self.assertTrue(is_valid)
+        self.assertEqual(error, "")
+
+    def test_rejects_empty_name(self) -> None:
+        is_valid, error = validate_environment_variable_name("")
+        self.assertFalse(is_valid)
+        self.assertEqual(error, "Variable name cannot be empty.")
+
+    def test_rejects_name_starting_with_digit(self) -> None:
+        is_valid, error = validate_environment_variable_name("1bad")
+        self.assertFalse(is_valid)
+        self.assertEqual(error, "Variable name cannot start with a digit.")
+
+    def test_rejects_invalid_characters(self) -> None:
+        is_valid, error = validate_environment_variable_name("api-key")
+        self.assertFalse(is_valid)
+        self.assertEqual(
+            error,
+            "Variable name can only contain letters, numbers, and underscores.",
+        )
 
 
 class TestCloneEnvironments(unittest.TestCase):
