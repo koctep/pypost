@@ -33,6 +33,18 @@ Checkers infer `TWidget` as `QLineEdit` from the MRO.
 - Initialize the mixin after the QWidget base: `QLineEdit.__init__(self)` then
   `VariableHoverMixin.__init__(self)`.
 
+### Variable value resolution (PYPOST-115)
+
+`VariableHoverHelper.get_variable_value` resolves plain `{{name}}` placeholders:
+
+- **Direct lookup:** `host` → value from the variables dict, or `<not defined>`.
+- **One-level chain:** when a variable's value is exactly another plain token (e.g.
+  `VAR_A = {{VAR_B}}`), the tooltip follows that reference once and shows `VAR_B`'s value.
+  Deeper chains are not expanded (second hop stops at the inner token text).
+- **Hidden keys:** masking applies to both the outer and inner variable name.
+- **Function expressions** (`{{urlencode(db)}}`, nested calls, etc.) use
+  `TemplateService.render_string` with `render_path="hover"` — unchanged.
+
 ### Related
 
 - Variable-aware widgets: `pypost/ui/widgets/variable_aware_widgets.py`

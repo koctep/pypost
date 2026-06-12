@@ -64,7 +64,30 @@ class VariableHoverHelper:
         """Returns the value of the variable or a default message."""
         if hidden_keys and variable_name in hidden_keys:
             return HIDDEN_MASK
-        return variables.get(variable_name, "<not defined>")
+        raw = variables.get(variable_name, "<not defined>")
+        if raw == "<not defined>":
+            return raw
+        return VariableHoverHelper._resolve_single_level_reference(
+            raw,
+            variables,
+            hidden_keys,
+        )
+
+    @staticmethod
+    def _resolve_single_level_reference(
+        raw: str,
+        variables: Dict[str, str],
+        hidden_keys: Optional[Set[str]] = None,
+    ) -> str:
+        """Follow one plain ``{{name}}`` reference in a variable value (PYPOST-115)."""
+        if not is_plain_variable_token(raw):
+            return raw
+        inner_name = extract_plain_variable_name(raw)
+        if inner_name is None:
+            return raw
+        if hidden_keys and inner_name in hidden_keys:
+            return HIDDEN_MASK
+        return variables.get(inner_name, "<not defined>")
 
     @staticmethod
     def resolve_text(

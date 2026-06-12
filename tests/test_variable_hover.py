@@ -162,6 +162,41 @@ class TestVariableHoverHelper(unittest.TestCase):
             HIDDEN_MASK,
         )
 
+    def test_get_variable_value_one_level_chain(self):
+        self.assertEqual(
+            VariableHoverHelper.get_variable_value(
+                "a",
+                {"a": "{{b}}", "b": "resolved"},
+            ),
+            "resolved",
+        )
+
+    def test_get_variable_value_chain_stops_after_one_level(self):
+        self.assertEqual(
+            VariableHoverHelper.get_variable_value(
+                "a",
+                {"a": "{{b}}", "b": "{{c}}", "c": "deep"},
+            ),
+            "{{c}}",
+        )
+
+    def test_get_variable_value_chain_hidden_inner_returns_mask(self):
+        self.assertEqual(
+            VariableHoverHelper.get_variable_value(
+                "a",
+                {"a": "{{secret}}", "secret": "value"},
+                {"secret"},
+            ),
+            HIDDEN_MASK,
+        )
+
+    def test_resolve_text_one_level_chain(self):
+        out = VariableHoverHelper.resolve_text(
+            "{{a}}",
+            {"a": "{{b}}", "b": "ok"},
+        )
+        self.assertEqual(out, "ok")
+
     def test_resolve_text_replaces_all(self):
         out = VariableHoverHelper.resolve_text(
             "{{a}} and {{b}}",
