@@ -561,6 +561,40 @@ def test_bulk_re_encrypt_skips_when_already_on_active_kid(tmp_path, monkeypatch,
     )
 
 
+def test_bulk_re_encrypt_skips_when_no_ciphertext_to_rotate(tmp_path, monkeypatch, caplog):
+    storage = _make_storage(tmp_path, monkeypatch)
+    settings = AppSettings(env_encryption_enabled=True)
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", "not-used-for-plaintext-only")
+    plain_payload = [
+        {
+            "id": "e1",
+            "name": "Plain",
+            "variables": {"SECRET": "plain"},
+            "hidden_keys": ["SECRET"],
+            "enable_mcp": False,
+        }
+    ]
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump(plain_payload, handle, indent=2)
+
+    before_mtime = storage.environments_file.stat().st_mtime
+    service = EncryptionMigrationService(storage)
+
+    with caplog.at_level("INFO"):
+        report = service.bulk_re_encrypt(settings, dry_run=False, backup=True)
+
+    assert report.success is True
+    assert report.backup_path is None
+    assert report.reencrypt_stats is not None
+    assert report.reencrypt_stats.encrypted_count == 0
+    assert storage.environments_file.stat().st_mtime == before_mtime
+    assert any(
+        "encryption_migration_operation_skipped operation=re_encrypt "
+        "reason=no_ciphertext_to_rotate" in record.message
+        for record in caplog.records
+    )
+
+
 def test_bulk_re_encrypt_does_not_skip_with_plaintext_hidden(tmp_path, monkeypatch):
     fernet = pytest.importorskip("cryptography.fernet")
     storage = _make_storage(tmp_path, monkeypatch)

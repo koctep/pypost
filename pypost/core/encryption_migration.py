@@ -68,6 +68,69 @@ def _log_inventory(event: str, inventory: EnvironmentInventory) -> None:
     )
 
 
+def format_migration_report(report: MigrationReport, *, cli_style: bool = False) -> str:
+    """Human-readable migration report for CLI stdout or Settings dialog."""
+    inv = report.inventory
+    if cli_style:
+        lines = [
+            f"environments: {inv.environment_count}",
+            f"hidden_values: {inv.hidden_value_count}",
+            f"encrypted_envelopes: {inv.encrypted_envelope_count}",
+            f"v1_envelopes: {inv.v1_envelope_count}",
+            f"v2_envelopes: {inv.v2_envelope_count}",
+            f"plaintext_hidden: {inv.plaintext_hidden_count}",
+            f"invalid_hidden: {inv.invalid_hidden_count}",
+        ]
+        kid_label = "kid_histogram:"
+        missing_label = "missing_kids:"
+        backup_prefix = "backup:"
+        reencrypt_prefix = "reencrypt_stats:"
+        encrypted_label = "  encrypted:"
+        reused_label = "  reused:"
+    else:
+        lines = [
+            f"Environments: {inv.environment_count}",
+            f"Hidden values: {inv.hidden_value_count}",
+            f"Encrypted envelopes: {inv.encrypted_envelope_count}",
+            f"Plaintext hidden: {inv.plaintext_hidden_count}",
+            f"Invalid hidden: {inv.invalid_hidden_count}",
+        ]
+        kid_label = "Key IDs:"
+        missing_label = "Missing key IDs:"
+        backup_prefix = "Backup:"
+        reencrypt_prefix = None
+        encrypted_label = "Re-encrypted:"
+        reused_label = "Reused:"
+        error_prefix = None
+
+    if inv.kid_histogram:
+        lines.append(kid_label)
+        for kid, count in sorted(inv.kid_histogram.items()):
+            lines.append(f"  {kid}: {count}")
+    if inv.missing_kids:
+        lines.append(missing_label)
+        for kid in sorted(inv.missing_kids):
+            lines.append(f"  {kid}")
+    if report.dry_run and cli_style:
+        lines.append("dry_run: true")
+    if report.backup_path is not None:
+        lines.append(f"{backup_prefix} {report.backup_path}")
+    if report.reencrypt_stats is not None:
+        stats = report.reencrypt_stats
+        if reencrypt_prefix is not None:
+            lines.append(reencrypt_prefix)
+            lines.append(f"{encrypted_label} {stats.encrypted_count}")
+            lines.append(f"{reused_label} {stats.reused_count}")
+        else:
+            lines.append(f"{encrypted_label} {stats.encrypted_count}")
+            lines.append(f"{reused_label} {stats.reused_count}")
+    if report.errors and not cli_style:
+        lines.append("")
+        lines.append("Errors:")
+        lines.extend(f"  {error}" for error in report.errors)
+    return "\n".join(lines)
+
+
 def backup_environments_file(path: Path) -> Path:
     """Copy environments.json to a timestamped sibling file."""
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -248,6 +311,28 @@ class EncryptionMigrationService:
                 backup_path=None,
                 errors=(),
                 success=True,
+            )
+
+        if (
+            not require_plaintext
+            and target_envelope_version != 2
+            and inventory.encrypted_envelope_count == 0
+        ):
+            logger.info(
+                "encryption_migration_operation_skipped operation=%s "
+                "reason=no_ciphertext_to_rotate",
+                operation,
+            )
+            return MigrationReport(
+                inventory=inventory,
+                dry_run=dry_run,
+                backup_path=None,
+                errors=(),
+                success=True,
+                reencrypt_stats=ReencryptStats(
+                    encrypted_count=0,
+                    reused_count=inventory.hidden_value_count,
+                ),
             )
 
         if target_envelope_version == 2 and self._inventory_all_v2(inventory):

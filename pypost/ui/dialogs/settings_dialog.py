@@ -22,7 +22,11 @@ from pypost.core.bind_address_validation import (
     validate_bind_host,
     validate_bind_port,
 )
-from pypost.core.encryption_migration import EncryptionMigrationService, MigrationReport
+from pypost.core.encryption_migration import (
+    EncryptionMigrationService,
+    MigrationReport,
+    format_migration_report,
+)
 from pypost.core.key_source_constants import (
     KEY_SOURCE_ENVIRONMENT,
     KEY_SOURCE_KEYRING,
@@ -92,36 +96,6 @@ def _make_section_header(title: str) -> QLabel:
     return label
 
 
-def _format_migration_report(report: MigrationReport) -> str:
-    inv = report.inventory
-    lines = [
-        f"Environments: {inv.environment_count}",
-        f"Hidden values: {inv.hidden_value_count}",
-        f"Encrypted envelopes: {inv.encrypted_envelope_count}",
-        f"Plaintext hidden: {inv.plaintext_hidden_count}",
-        f"Invalid hidden: {inv.invalid_hidden_count}",
-    ]
-    if inv.kid_histogram:
-        lines.append("Key IDs:")
-        for kid, count in sorted(inv.kid_histogram.items()):
-            lines.append(f"  {kid}: {count}")
-    if inv.missing_kids:
-        lines.append("Missing key IDs:")
-        for kid in sorted(inv.missing_kids):
-            lines.append(f"  {kid}")
-    if report.backup_path is not None:
-        lines.append(f"Backup: {report.backup_path}")
-    if report.reencrypt_stats is not None:
-        stats = report.reencrypt_stats
-        lines.append(f"Re-encrypted: {stats.encrypted_count}")
-        lines.append(f"Reused: {stats.reused_count}")
-    if report.errors:
-        lines.append("")
-        lines.append("Errors:")
-        lines.extend(f"  {error}" for error in report.errors)
-    return "\n".join(lines)
-
-
 KEY_SOURCE_HELP = {
     KEY_SOURCE_ENVIRONMENT: (
         "Store the Fernet key in PYPOST_ENV_ENCRYPTION_KEY (shell or service env). "
@@ -145,6 +119,7 @@ class SettingsDialog(QDialog):
         parent=None,
         *,
         storage: StorageInterface | None = None,
+        migration_service: EncryptionMigrationService | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
@@ -152,9 +127,12 @@ class SettingsDialog(QDialog):
         self.current_settings = current_settings
         self.new_settings = None
         self._storage = storage
-        self._migration_service = (
-            EncryptionMigrationService(storage) if storage is not None else None
-        )
+        if migration_service is not None:
+            self._migration_service = migration_service
+        elif storage is not None:
+            self._migration_service = EncryptionMigrationService(storage)
+        else:
+            self._migration_service = None
 
         self.layout = QVBoxLayout(self)
 
@@ -380,7 +358,7 @@ class SettingsDialog(QDialog):
         )
 
     def _show_migration_result(self, title: str, report: MigrationReport) -> None:
-        body = _format_migration_report(report)
+        body = format_migration_report(report)
         show_migration_result(self, title, body, success=report.success)
 
     def _on_verify_encryption(self) -> None:

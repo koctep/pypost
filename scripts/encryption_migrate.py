@@ -74,42 +74,13 @@ def _report_to_dict(report: MigrationReport, *, command: str) -> dict[str, Any]:
     return payload
 
 
-def _format_inventory(report: MigrationReport) -> str:
-    inv = report.inventory
-    lines = [
-        f"environments: {inv.environment_count}",
-        f"hidden_values: {inv.hidden_value_count}",
-        f"encrypted_envelopes: {inv.encrypted_envelope_count}",
-        f"v1_envelopes: {inv.v1_envelope_count}",
-        f"v2_envelopes: {inv.v2_envelope_count}",
-        f"plaintext_hidden: {inv.plaintext_hidden_count}",
-        f"invalid_hidden: {inv.invalid_hidden_count}",
-    ]
-    if inv.kid_histogram:
-        lines.append("kid_histogram:")
-        for kid, count in sorted(inv.kid_histogram.items()):
-            lines.append(f"  {kid}: {count}")
-    if inv.missing_kids:
-        lines.append("missing_kids:")
-        for kid in sorted(inv.missing_kids):
-            lines.append(f"  {kid}")
-    if report.dry_run:
-        lines.append("dry_run: true")
-    if report.backup_path is not None:
-        lines.append(f"backup: {report.backup_path}")
-    if report.reencrypt_stats is not None:
-        stats = report.reencrypt_stats
-        lines.append("reencrypt_stats:")
-        lines.append(f"  encrypted: {stats.encrypted_count}")
-        lines.append(f"  reused: {stats.reused_count}")
-    return "\n".join(lines)
-
-
 def _emit_report(report: MigrationReport, *, command: str, as_json: bool) -> int:
     if as_json:
         print(json.dumps(_report_to_dict(report, command=command), indent=2))
     else:
-        print(_format_inventory(report))
+        from pypost.core.encryption_migration import format_migration_report
+
+        print(format_migration_report(report, cli_style=True))
         for error in report.errors:
             print(f"error: {error}", file=sys.stderr)
     return 0 if report.success else 1
