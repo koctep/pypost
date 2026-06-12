@@ -78,7 +78,7 @@ class RequestTab(QWidget):
         self.request_data = request_data
         self.persisted_baseline: RequestData | None = None
         self.stale_persisted = False
-        self.layout = QVBoxLayout(self)
+        self._content_layout = QVBoxLayout(self)
         self.splitter = QSplitter(Qt.Vertical)
 
         self.request_editor = RequestWidget(request_data, metrics=metrics)
@@ -86,7 +86,7 @@ class RequestTab(QWidget):
 
         self.splitter.addWidget(self.request_editor)
         self.splitter.addWidget(self.response_view)
-        self.layout.addWidget(self.splitter)
+        self._content_layout.addWidget(self.splitter)
 
         self.worker: RequestWorker | None = None
 

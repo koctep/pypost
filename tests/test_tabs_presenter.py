@@ -571,6 +571,11 @@ class TestRequestSync(unittest.TestCase):
         tab.request_editor.url_input.setText("https://edited.example.com")
         self.assertTrue(is_tab_dirty(tab))
 
+    def test_request_tab_layout_method_not_shadowed(self):
+        tab = RequestTab()
+        self.assertNotIn("layout", tab.__dict__)
+        self.assertIsNotNone(tab.layout())
+
 
 class TestOnRequestError(unittest.TestCase):
     @classmethod
