@@ -1,4 +1,6 @@
-"""PYPOST-106: StyleManager injects application font size into global QSS."""
+"""PYPOST-106: StyleManager injects application font size into global QSS.
+PYPOST-114: bundled main.qss includes QToolTip styling hook.
+"""
 
 import pytest
 
@@ -27,3 +29,11 @@ def test_apply_styles_without_font_size_omits_rule(qapp):
     manager = StyleManager()
     manager.apply_styles(widget)
     assert "Application font size" not in widget.styleSheet()
+
+
+def test_load_styles_includes_tooltip_qss():
+    manager = StyleManager()
+    styles = manager.load_styles()
+    assert "QToolTip" in styles
+    assert "palette(tooltip-text)" in styles
+    assert "palette(tooltip-base)" in styles

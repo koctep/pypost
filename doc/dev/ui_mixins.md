@@ -37,3 +37,15 @@ Checkers infer `TWidget` as `QLineEdit` from the MRO.
 
 - Variable-aware widgets: `pypost/ui/widgets/variable_aware_widgets.py`
 - Tests: `tests/test_variable_hover.py`
+
+### Tooltip styling (PYPOST-114)
+
+Variable hover tooltips use `QToolTip.showText`, which renders Qt's shared tooltip widget.
+Appearance is controlled by the global application stylesheet from `StyleManager`:
+
+- Default rules live in `pypost/ui/styles/main.qss` under the `QToolTip { ... }` selector.
+- Customize colors there (prefer `palette(tooltip-text)` / `palette(tooltip-base)` over hex
+  literals) so tooltips follow the active theme.
+- The same rules apply to static `setToolTip` strings elsewhere in the UI.
+
+See also `doc/dev/ui_font_and_styles.md` for how stylesheets are loaded and applied.

@@ -51,3 +51,12 @@ QMenu::item:selected {
     background-color: palette(highlight);
     color: palette(highlighted-text);
 }
+
+/* Variable hover tooltips (QToolTip.showText) and widget setToolTip hooks.
+   Customize colors here; palette roles follow the active Qt theme. */
+QToolTip {
+    color: palette(tooltip-text);
+    background-color: palette(tooltip-base);
+    border: 1px solid palette(mid);
+    padding: 4px;
+}
