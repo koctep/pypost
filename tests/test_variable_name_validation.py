@@ -1,6 +1,6 @@
 """Unit tests for Jinja2-compatible environment variable name validation."""
 
-
+import unicodedata
 
 import pytest
 
@@ -188,3 +188,22 @@ class TestValidateVariableNameBoundaries:
         assert is_valid is False
         assert error == expected_error
         assert validation_failure_reason(name) == expected_reason
+
+
+class TestIsidentifierDivergencePYPOST632:
+    """PYPOST-632: document isalnum() vs str.isidentifier() divergences — keep isalnum policy."""
+
+    def test_superscript_digit_accepted_by_isalnum_rejected_by_isidentifier(self) -> None:
+        name = "x²"
+        assert name.isidentifier() is False
+        is_valid, error = validate_variable_name(name)
+        assert is_valid is True
+        assert error == ""
+
+    def test_nfd_combining_marks_rejected_by_isalnum_not_by_isidentifier(self) -> None:
+        nfd = unicodedata.normalize("NFD", "naïve")
+        assert nfd != "naïve"
+        assert nfd.isidentifier() is True
+        is_valid, error = validate_variable_name(nfd)
+        assert is_valid is False
+        assert error == _INVALID_CHARS_MSG
