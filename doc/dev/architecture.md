@@ -55,7 +55,8 @@ The application uses classes (often Pydantic models or dataclasses) to define st
   for network calls and `ScriptExecutor` for post-request scripts.
 - **HTTPClient**: Handles the actual network communication using `requests`. Responsible for rendering templates and preparing request parameters.
 - **ScriptExecutor**: Runs user-defined Python scripts in a sandboxed environment to manipulate variables.
-- **TemplateService**: A service that manages the Jinja2 Environment and processes strings like `{{base_url}}/api`.
+- **TemplateService**: Central Jinja2 service for all runtime `{{...}}` substitution (replaced
+  the removed `TemplateEngine` in PYPOST-18). See [template_service.md](template_service.md).
 - **MetricsManager**: Composition-root facade (constructed in `main.py`) composing
   `MetricsRegistry` (Prometheus counters) and `MetricsServer` (observability HTTP/MCP). Runs an
   isolated `uvicorn` server providing Prometheus metrics (`/metrics`), Streamable HTTP MCP

@@ -1,0 +1,114 @@
+# TemplateService — central variable substitution
+
+## Overview
+
+`TemplateService` (`pypost/core/template_service.py`) is the **single runtime entry point** for
+`{{...}}` placeholder substitution in PyPost. It replaced the removed `TemplateEngine` module
+(PYPOST-18). PYPOST-134 verified that no duplicate Jinja2 render paths exist outside this
+service.
+
+Use `TemplateService` for:
+
+- Rendering request URL, headers, params, and body before HTTP/MCP execution
+- Generating copy-as-cURL strings with resolved values
+- Masking sensitive values in history via re-render
+- Parsing templates into AST for MCP secrets policy
+- Hover preview of **function expressions** (`render_path="hover"`)
+
+## Architecture
+
+```mermaid
+flowchart LR
+  main[main.py composition root]
+  TS[TemplateService]
+  FR[FunctionRegistry]
+  FER[FunctionExpressionResolver]
+
+  main --> TS
+  TS --> FR
+  TS --> FER
+  TS --> env[jinja2.Environment]
+
+  HC[HTTPClient] --> TS
+  RS[RequestService] --> TS
+  CG[CurlGenerator] --> TS
+  SDP[SensitiveDataMaskingPolicy] --> TS
+  MSP[McpSecretsPolicy] -->|parse| TS
+  VHR[VariableHoverResolver] -->|expressions| TS
+```
+
+### Related modules
+
+| Module | Role |
+| --- | --- |
+| `function_registry.py` | Allow-listed callable names (`urlencode`, `md5`, `base64`) |
+| `function_expression_resolver.py` | Validates `{{func(...)}}` before render |
+| `template_expression_tokenizer.py` | Shared `{{...}}` token patterns |
+
+See also [template_expression_functions.md](template_expression_functions.md) for function
+expression policy and test matrix.
+
+## Consumer matrix
+
+| Consumer | File | Method | Notes |
+| --- | --- | --- | --- |
+| HTTP transport | `http_client.py` | `render_string` | URL, header/param keys and values, body |
+| Request orchestration | `request_service.py` | `render_string` | MCP/history URL and body |
+| Copy as cURL | `curl_generator.py` | `render_string` | Injected service from caller |
+| History masking | `sensitive_data_masking_policy.py` | `render_string` | Masked and raw render paths |
+| MCP secrets | `mcp_secrets_policy.py` | `parse` | AST variable discovery |
+| Hover tooltips | `ui/widgets/mixins.py` | `render_string(..., render_path="hover")` | Function expressions only |
+
+### Injection
+
+`main.py` constructs one `TemplateService(metrics=metrics_manager)` and passes it through
+`MainWindow` → `TabsPresenter` → `RequestService` / `HTTPClient` / MCP stack. Components
+accept `template_service: TemplateService | None = None` and fall back to a local instance when
+omitted (see [testability.md](testability.md)).
+
+## Hover exception (not duplication)
+
+`VariableHoverResolver` keeps **plain** `{{name}}` chain resolution in the UI layer:
+
+- Cycle and depth limits for tooltip preview (PYPOST-123)
+- Hidden-key masking (`HIDDEN_MASK`)
+- No request-time side effects
+
+Function-style placeholders (`{{urlencode(db)}}`, nested calls) delegate to
+`TemplateService.render_string` so hover matches runtime behavior. This split is intentional
+(PYPOST-129); it is not a missing centralization step.
+
+## API
+
+### `render_string(content, variables, render_path="runtime") -> str`
+
+Validation-first render:
+
+1. Tokenize `{{...}}` placeholders
+2. Validate function expressions via `FunctionExpressionResolver`
+3. Render with shared `jinja2.Environment`
+4. On validation or render failure: log, emit metrics, return **original content**
+
+### `parse(content) -> AST`
+
+Parses template source for variable discovery (MCP secrets filtering). Uses the same
+`Environment` instance as `render_string`.
+
+### `validate_function_expressions(content) -> ValidationResult`
+
+Exposes resolver validation without rendering. Used by tests and future authoring checks.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Placeholder not substituted at send time | Confirm caller uses `TemplateService.render_string`, not manual string replace |
+| Hover differs from sent request for plain vars | Expected when chain depth/cycle limits apply in hover only |
+| Function hover matches send but send fails | Compare `render_path` metrics; validation runs on both paths |
+| Multiple `Environment` instances | Each fallback `TemplateService()` owns its own env — prefer injection from `main.py` |
+
+## PYPOST-134 verdict
+
+Audit date: 2026-06. **No migration required.** The PYPOST-15 debt item "move substitution to
+`TemplateEngine`" is satisfied by `TemplateService` (PYPOST-18). Do not reintroduce
+`template_engine.py` or ad-hoc `jinja2.Template` construction outside `TemplateService`.
