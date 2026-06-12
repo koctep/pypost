@@ -22,7 +22,9 @@ class JsonHighlighter(QSyntaxHighlighter):
     - The number rule targets common literals; spec edge cases such as leading zeros
       or non-finite values may not match exactly.
 
-    See ``doc/dev/json_syntax_highlighting.md`` for patterns, rule order, and tests.
+    Structural JSON validation is handled by ``ValidationController`` in the body editor;
+    see ``doc/dev/body_editor_validation.md``. Coloring-only scope is documented in
+    ``doc/dev/json_syntax_highlighting.md``.
     """
 
     def __init__(self, document, colors: JsonSyntaxColors | None = None):
