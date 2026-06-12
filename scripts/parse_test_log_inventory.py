@@ -48,13 +48,16 @@ def classify_group(logger: str, message_prefix: str) -> str:
         "pypost.core.request_service",
         "pypost.core.worker",
         "pypost.ui.presenters.tabs_presenter",
+        "pypost.ui.presenters.collection_tree_actions",
     )
     if logger in expected_loggers:
         return "expected"
     expected_patterns = (
         "RequestWorker unexpected error",
         "request_error category=",
+        "request_error error_msg=",
         "collection_item_delete_failed",
+        "collection_item_delete_not_found",
         "collection_item_rename_rejected",
         "retryable_",
         "retry_exhausted",
