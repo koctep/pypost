@@ -192,6 +192,12 @@ class RequestWidget(QWidget):
         self._wire_mcp_preview_refresh()
 
     def set_variables(self, variables: dict):
+        """Push environment variables to all variable-aware child editors.
+
+        Part of the presenter-driven propagation chain documented in
+        doc/dev/variable_propagation.md. Forwards the dict snapshot; children do not
+        connect to env signals directly.
+        """
         self.url_input.set_variables(variables)
         self.params_table.set_variables(variables)
         self.headers_table.set_variables(variables)

@@ -215,9 +215,11 @@ class TestTabsPresenter(unittest.TestCase):
     def test_on_env_variables_changed_updates_tabs(self):
         p = self._make_presenter()
         p.add_new_tab()
+        tab = p.widget.widget(0)
         variables = {"BASE_URL": "https://example.com"}
         p.on_env_variables_changed(variables)
         self.assertEqual(p._current_variables, variables)
+        self.assertEqual(tab.request_editor.url_input._variables, variables)
 
     def test_on_env_keys_changed_pushes_keys(self):
         p = self._make_presenter()
@@ -326,8 +328,7 @@ class TestTabsPresenter(unittest.TestCase):
         p._current_variables = variables
         p.add_new_tab()
         tab = p.widget.widget(0)
-        if hasattr(tab.request_editor, 'set_variables'):
-            pass  # verified by side effects; no crash = pass
+        self.assertEqual(tab.request_editor.url_input._variables, variables)
 
     def test_save_as_emits_request_save_as_completed_not_request_saved(self):
         from pypost.models.models import Collection

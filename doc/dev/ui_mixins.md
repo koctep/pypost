@@ -45,8 +45,16 @@ Checkers infer `TWidget` as `QLineEdit` from the MRO.
 - **Function expressions** (`{{urlencode(db)}}`, nested calls, etc.) use
   `TemplateService.render_string` with `render_path="hover"` — unchanged.
 
+### Variable snapshot (`set_variables`)
+
+Hover resolution reads `self._variables` set by `set_variables`. Values are pushed from
+`TabsPresenter` through `RequestWidget.set_variables` — not via per-widget signals. See
+`doc/dev/variable_propagation.md` for the full presenter → widget flow and extension
+checklist.
+
 ### Related
 
+- Variable propagation: `doc/dev/variable_propagation.md`
 - Variable-aware widgets: `pypost/ui/widgets/variable_aware_widgets.py`
 - Tests: `tests/test_variable_hover.py`
 

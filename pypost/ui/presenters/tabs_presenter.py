@@ -204,7 +204,12 @@ class TabsPresenter(QObject):
         self._state_manager.set_open_tabs(open_ids)
 
     def on_env_variables_changed(self, variables: dict) -> None:
-        """Pushes new env vars to all open tabs."""
+        """React to env variable changes and push snapshots into open request tabs.
+
+        Connected from EnvPresenter.env_variables_changed in main_window_signals.
+        Caches variables for new tabs and calls set_variables on each RequestWidget.
+        See doc/dev/variable_propagation.md.
+        """
         self._current_variables = variables
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)

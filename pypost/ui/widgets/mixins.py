@@ -151,6 +151,12 @@ class VariableHoverMixin(Generic[TWidget]):
         self.setMouseTracking(True)
 
     def set_variables(self, variables: Dict[str, str]) -> None:
+        """Store the latest environment variable snapshot for hover resolution.
+
+        Called by parent composites (e.g. RequestWidget) when the active environment
+        changes. Widgets read this dict on demand during mouseMoveEvent; they do not
+        subscribe to EnvPresenter signals directly. See doc/dev/variable_propagation.md.
+        """
         self._variables = variables
 
     def set_hidden_keys(self, hidden_keys: Set[str]) -> None:
