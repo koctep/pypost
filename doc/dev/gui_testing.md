@@ -100,6 +100,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | Segfault in CI | Ensure offscreen is set before any `PySide6` import |
 | Test hangs | Add explicit timeout marker; bound internal waits with `QTimer` |
 | Missing timeout marker | `conftest.py` fails setup — add `pytestmark` or per-function marker |
+| ELF `core` file in repo root | Native crash (SIGSEGV), not a Python exception. Delete the file; do not commit. Repo-root `/core` is gitignored. Run tests via `make test` or set `QT_QPA_PLATFORM=offscreen`. If it recurs, capture `lldb -c core --batch -o bt` and file a ticket with Python/PySide6 versions. See [PYPOST-429 investigation](../../ai-tasks/PYPOST-429/investigation-report.md). |
 
 ## References
 

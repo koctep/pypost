@@ -73,7 +73,7 @@ fixture (`tests/conftest.py`). The project does not use the `pytest-qt` package;
 widget methods and assert on labels, models, and mocked dialogs.
 
 See [gui_testing.md](gui_testing.md) for patterns, representative modules, focused commands,
-and troubleshooting.
+and troubleshooting (including ELF core dumps from native Qt crashes — [PYPOST-429](../../ai-tasks/PYPOST-429/investigation-report.md)).
 
 Unit testability seams for `RequestService`, `HTTPClient`, and `MainWindow` are documented in
 [testability.md](testability.md) (PYPOST-382).
