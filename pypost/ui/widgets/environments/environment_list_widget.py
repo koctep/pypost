@@ -14,6 +14,26 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.environment_messages import (
+    ACTION_COPY,
+    ACTION_DELETE,
+    ACTION_RENAME,
+    BUTTON_ADD,
+    DIALOG_TITLE_COPY_ENVIRONMENT,
+    DIALOG_TITLE_NEW_ENVIRONMENT,
+    INPUT_LABEL_NAME,
+    format_copy_of_name,
+)
+from pypost.core.environment_messages import (
+    ACTION_COPY,
+    ACTION_DELETE,
+    ACTION_RENAME,
+    BUTTON_ADD,
+    DIALOG_TITLE_COPY_ENVIRONMENT,
+    DIALOG_TITLE_NEW_ENVIRONMENT,
+    INPUT_LABEL_NAME,
+    format_copy_of_name,
+)
 from pypost.core.environment_ops import clone_environment, validate_environment_rename
 from pypost.models.models import Environment
 from pypost.ui.collection_item_dialogs import (
@@ -67,7 +87,7 @@ class EnvironmentListWidget(QWidget):
         rename_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
         rename_shortcut.activated.connect(self._rename_current_environment)
 
-        add_btn = QPushButton("Add")
+        add_btn = QPushButton(BUTTON_ADD)
         add_btn.clicked.connect(self.add_environment)
 
         layout.addWidget(self.env_list)
@@ -92,7 +112,11 @@ class EnvironmentListWidget(QWidget):
         self.env_list.blockSignals(False)
 
     def add_environment(self) -> None:
-        name, ok = QInputDialog.getText(self, "New Environment", "Name:")
+        name, ok = QInputDialog.getText(
+            self,
+            DIALOG_TITLE_NEW_ENVIRONMENT,
+            INPUT_LABEL_NAME,
+        )
         if ok and name:
             env = Environment(name=name)
             self.environments.append(env)
@@ -123,9 +147,9 @@ class EnvironmentListWidget(QWidget):
             return
         row = self.env_list.row(item)
         menu = QMenu(self)
-        rename_action = menu.addAction("Rename")
-        copy_action = menu.addAction("Copy")
-        delete_action = menu.addAction("Delete")
+        rename_action = menu.addAction(ACTION_RENAME)
+        copy_action = menu.addAction(ACTION_COPY)
+        delete_action = menu.addAction(ACTION_DELETE)
         chosen = menu.exec(self.env_list.mapToGlobal(pos))
         if chosen == rename_action:
             self._rename_environment_at_row(row)
@@ -198,9 +222,14 @@ class EnvironmentListWidget(QWidget):
         if row < 0 or row >= len(self.environments):
             return
         source = self.environments[row]
-        default_name = f"Copy of {source.name}"
+        default_name = format_copy_of_name(source.name)
         while True:
-            name, ok = QInputDialog.getText(self, "Copy Environment", "Name:", text=default_name)
+            name, ok = QInputDialog.getText(
+                self,
+                DIALOG_TITLE_COPY_ENVIRONMENT,
+                INPUT_LABEL_NAME,
+                text=default_name,
+            )
             if not ok:
                 return
             stripped = name.strip()

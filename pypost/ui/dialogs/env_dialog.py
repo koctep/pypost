@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QDialog, QHBoxLayout
 
 from pypost.core.environment_ops import clone_environments
 from pypost.models.models import Environment
+from pypost.core.environment_messages import DIALOG_TITLE_MANAGE_ENVIRONMENTS
 from pypost.ui.widgets.environments import (
     EnvironmentListWidget,
     EnvironmentVariablesWidget,
@@ -19,7 +20,7 @@ class EnvironmentDialog(QDialog):
         log_hidden_key_names: bool = False,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Manage Environments")
+        self.setWindowTitle(DIALOG_TITLE_MANAGE_ENVIRONMENTS)
         self.resize(800, 600)
         self._environments = clone_environments(environments)
         self.current_env_name = current_env_name

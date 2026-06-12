@@ -14,6 +14,15 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.core.constants import HIDDEN_MASK
+from pypost.core.environment_messages import (
+    ACTION_DELETE,
+    ACTION_MOVE_DOWN,
+    ACTION_MOVE_UP,
+    COLUMN_HIDDEN,
+    COLUMN_VALUE,
+    COLUMN_VARIABLE,
+    MCP_ENABLE_LABEL,
+)
 from pypost.core.environment_ops import validate_environment_variable_name
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.models.models import Environment
@@ -44,7 +53,9 @@ class EnvironmentVariablesWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.vars_table = QTableWidget(0, 3)
-        self.vars_table.setHorizontalHeaderLabels(["Variable", "Value", "Hidden"])
+        self.vars_table.setHorizontalHeaderLabels(
+            [COLUMN_VARIABLE, COLUMN_VALUE, COLUMN_HIDDEN],
+        )
         header = self.vars_table.horizontalHeader()
         header.setSectionResizeMode(COL_VAR, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_VAL, QHeaderView.Stretch)
@@ -53,7 +64,7 @@ class EnvironmentVariablesWidget(QWidget):
         self.vars_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.vars_table.customContextMenuRequested.connect(self._on_vars_table_context_menu)
 
-        self.mcp_check = QCheckBox("Enable MCP (Model Context Protocol)")
+        self.mcp_check = QCheckBox(MCP_ENABLE_LABEL)
         self.mcp_check.toggled.connect(self._on_mcp_toggled)
         self.mcp_check.setEnabled(False)
 
@@ -278,15 +289,15 @@ class EnvironmentVariablesWidget(QWidget):
 
         menu = QMenu(self)
 
-        move_up_action = menu.addAction("Move Up")
+        move_up_action = menu.addAction(ACTION_MOVE_UP)
         move_up_action.setEnabled(0 < row < var_count)
 
-        move_down_action = menu.addAction("Move Down")
+        move_down_action = menu.addAction(ACTION_MOVE_DOWN)
         move_down_action.setEnabled(0 <= row < var_count - 1)
 
         menu.addSeparator()
 
-        delete_action = menu.addAction("Delete")
+        delete_action = menu.addAction(ACTION_DELETE)
         chosen = menu.exec(self.vars_table.mapToGlobal(pos))
         if chosen == delete_action:
             self.delete_variable_at_row(row)

@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 
+from pypost.core.environment_messages import (
+    DIALOG_TITLE_COPY_ENVIRONMENT,
+    DIALOG_TITLE_DELETE_ENVIRONMENT,
+    MSG_EMPTY_NAME,
+    format_delete_environment_confirm,
+    format_duplicate_environment_name,
+)
+
 _RENAME_TITLE = "Rename Error"
 _DELETE_TITLE = "Delete Error"
 _SAVED_REQUEST_CHANGED_TITLE = "Saved Request Changed"
-_COPY_ENVIRONMENT_TITLE = "Copy Environment"
 
 
 def confirm_delete(parent: QWidget, item_label: str) -> bool:
@@ -23,7 +30,7 @@ def confirm_delete(parent: QWidget, item_label: str) -> bool:
 
 
 def show_rename_empty_name_error(parent: QWidget) -> None:
-    QMessageBox.warning(parent, _RENAME_TITLE, "Name cannot be empty.")
+    QMessageBox.warning(parent, _RENAME_TITLE, MSG_EMPTY_NAME)
 
 
 def show_rename_failure(parent: QWidget, item_label: str, error: BaseException) -> None:
@@ -87,8 +94,8 @@ def prompt_clean_sibling_tab_reload(parent: QWidget, name: str) -> bool:
 def confirm_delete_environment(parent: QWidget, env_name: str) -> bool:
     reply = QMessageBox.question(
         parent,
-        "Delete Environment",
-        f'Are you sure you want to delete "{env_name}"?',
+        DIALOG_TITLE_DELETE_ENVIRONMENT,
+        format_delete_environment_confirm(env_name),
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         QMessageBox.StandardButton.No,
     )
@@ -96,14 +103,14 @@ def confirm_delete_environment(parent: QWidget, env_name: str) -> bool:
 
 
 def show_copy_environment_empty_name_error(parent: QWidget) -> None:
-    QMessageBox.warning(parent, _COPY_ENVIRONMENT_TITLE, "Name cannot be empty.")
+    QMessageBox.warning(parent, DIALOG_TITLE_COPY_ENVIRONMENT, MSG_EMPTY_NAME)
 
 
 def show_copy_environment_duplicate_name_error(parent: QWidget, name: str) -> None:
     QMessageBox.warning(
         parent,
-        _COPY_ENVIRONMENT_TITLE,
-        f'An environment named "{name}" already exists.',
+        DIALOG_TITLE_COPY_ENVIRONMENT,
+        format_duplicate_environment_name(name),
     )
 
 

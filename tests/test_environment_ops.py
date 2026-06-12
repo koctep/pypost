@@ -6,7 +6,15 @@ pytestmark = pytest.mark.timeout(60)
 
 import unittest
 
-from pypost.core.environment_ops import clone_environment, clone_environments
+from pypost.core.environment_messages import (
+    MSG_EMPTY_NAME,
+    format_duplicate_environment_name,
+)
+from pypost.core.environment_ops import (
+    clone_environment,
+    clone_environments,
+    validate_environment_rename,
+)
 from pypost.models.models import Environment
 
 
@@ -61,6 +69,52 @@ class TestCloneEnvironment(unittest.TestCase):
         )
         restored = Environment(**source.model_dump())
         self.assertEqual(restored.hidden_keys, {"TOKEN"})
+
+
+class TestValidateEnvironmentRename(unittest.TestCase):
+    def test_rejects_empty_name(self) -> None:
+        accepted, normalized, error = validate_environment_rename(
+            "   ",
+            "Dev",
+            ["Dev"],
+            0,
+        )
+        self.assertFalse(accepted)
+        self.assertEqual(normalized, "")
+        self.assertEqual(error, MSG_EMPTY_NAME)
+
+    def test_accepts_same_name_no_op(self) -> None:
+        accepted, normalized, error = validate_environment_rename(
+            "Dev",
+            "Dev",
+            ["Dev"],
+            0,
+        )
+        self.assertTrue(accepted)
+        self.assertEqual(normalized, "Dev")
+        self.assertEqual(error, "")
+
+    def test_rejects_duplicate_name(self) -> None:
+        accepted, normalized, error = validate_environment_rename(
+            "Staging",
+            "Dev",
+            ["Dev", "Staging"],
+            0,
+        )
+        self.assertFalse(accepted)
+        self.assertEqual(normalized, "")
+        self.assertEqual(error, format_duplicate_environment_name("Staging"))
+
+    def test_accepts_unique_rename(self) -> None:
+        accepted, normalized, error = validate_environment_rename(
+            "  Prod  ",
+            "Dev",
+            ["Dev"],
+            0,
+        )
+        self.assertTrue(accepted)
+        self.assertEqual(normalized, "Prod")
+        self.assertEqual(error, "")
 
 
 class TestCloneEnvironments(unittest.TestCase):

@@ -2,6 +2,10 @@
 
 from pypost.core.variable_name_validation import validate_variable_name
 from pypost.models.models import Environment
+from pypost.core.environment_messages import (
+    MSG_EMPTY_NAME,
+    format_duplicate_environment_name,
+)
 
 
 def validate_environment_variable_name(name: str) -> tuple[bool, str]:
@@ -25,11 +29,11 @@ def validate_environment_rename(
     """
     stripped = new_name.strip()
     if not stripped:
-        return False, "", "Name cannot be empty."
+        return False, "", MSG_EMPTY_NAME
     if stripped == old_name:
         return True, old_name, ""
     if any(name == stripped for i, name in enumerate(existing_names) if i != row):
-        return False, "", f'An environment named "{stripped}" already exists.'
+        return False, "", format_duplicate_environment_name(stripped)
     return True, stripped, ""
 
 

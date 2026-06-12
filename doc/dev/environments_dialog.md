@@ -5,6 +5,10 @@ The `EnvironmentDialog` class provides the UI for managing environments in PyPos
 
 ## Architecture
 
+User-visible strings (dialog titles, labels, menu actions, validation messages) live in
+`pypost/core/environment_messages.py`. UI widgets and `environment_ops.validate_environment_rename`
+import constants and small formatter helpers from that module.
+
 `EnvironmentDialog` composes two widgets under `pypost/ui/widgets/environments/`:
 
 - **`EnvironmentListWidget`**: Left pane — `QListWidget`, Add button, F2/context-menu
