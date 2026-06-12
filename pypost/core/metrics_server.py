@@ -30,7 +30,7 @@ class MetricsServer:
         self._registry = registry
         self.server_instance = None
         self.thread = None
-        self.server_lock = threading.Lock()
+        self.server_lock = threading.RLock()
         self._current_host = "127.0.0.1"
         self._current_port = 9080
         self._stop_event = threading.Event()
