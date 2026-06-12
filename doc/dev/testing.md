@@ -112,6 +112,11 @@ Legacy SSE module tests in `tests/test_mcp_legacy_sse.py` (PYPOST-156, PYPOST-15
 teardown), and 405 guards for wrong methods on the inner stream (`GET /`) and messages
 (`POST /messages`) paths, including the mounted `/sse` prefix.
 
+ASGI compatibility tests in `tests/test_mcp_asgi_compatibility.py` (PYPOST-161) assert
+Starlette registers legacy SSE `MessagesEndpoint`, Streamable HTTP `/mcp`, and metrics
+`/metrics` mount as direct ASGI (not `request_response` wrappers), and that POST
+`/messages` completes without `TypeError` when the transport is mocked.
+
 | Class | Scope |
 | --- | --- |
 | `TestMCPServerImpl` | Tool registration, schemas, `call_tool`, metrics, script output |
@@ -119,11 +124,16 @@ teardown), and 405 guards for wrong methods on the inner stream (`GET /`) and me
 | `TestMCPServerImplInjection` | Constructor `TemplateService` injection |
 | `TestMcpLegacySseModule` | Module-level endpoint imports and route structure |
 | `TestMcpLegacySseHttpGuards` | SSE close contract and 405 method guards (PYPOST-158) |
+| `TestLegacySseAsgiCompatibility` | Direct ASGI on `/messages`; POST without TypeError (PYPOST-161) |
+| `TestStreamableHttpAsgiCompatibility` | Direct ASGI on `/mcp` for MCP and metrics apps (PYPOST-161) |
+| `TestMetricsServerAsgiCompatibility` | `/metrics`, `/mcp`, `/sse` mount structure and scrape (PYPOST-161) |
+| `TestMcpServerAsgiCompatibility` | MCP app Streamable HTTP + legacy SSE ASGI routes (PYPOST-161) |
 
 Focused run:
 
 ```bash
-.venv/bin/python -m pytest tests/test_mcp_server_impl.py tests/test_mcp_legacy_sse.py -v
+.venv/bin/python -m pytest tests/test_mcp_server_impl.py tests/test_mcp_legacy_sse.py \
+  tests/test_mcp_asgi_compatibility.py -v
 ```
 
 ## MCP server integration tests
