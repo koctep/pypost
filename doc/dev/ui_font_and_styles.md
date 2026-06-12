@@ -43,10 +43,22 @@ Delegates font work to `style_manager.apply_styles(app, font_size=settings.font_
 | One widget ignores size | Widget has local `setStyleSheet` with fixed `font-size` |
 | Font resets after show | `showEvent` re-applies settings via `QTimer.singleShot(0, ...)` — intentional |
 
+## Body editor (`CodeEditor`)
+
+Request body tabs use `CodeEditor`, which inherits application font size from global QSS and
+`QApplication.setFont`. The editor does **not** receive manual `setFont` from
+`TabsPresenter`.
+
+When font metrics change (`QEvent.FontChange`), `CodeEditor._refresh_font_metrics` recalculates
+tab-stop distance and the line-number gutter width from `document().defaultFont()` and the
+current `indent_size`. Indent width alone is still updated via
+`TabsPresenter.apply_settings` → `update_indent_size`.
+
 ## Related
 
 - PYPOST-404 — startup font size bug (call-order fix)
 - PYPOST-106 — removed manual per-widget `setFont` loop in `MainWindow`
+- PYPOST-107 — body editor font metrics refresh on global theme change
 - PYPOST-425 — removed redundant `EnvPresenter.apply_font` widget loop
 - PYPOST-114 — `QToolTip` QSS hook for variable hover and widget tooltips
 - `doc/dev/ui_mixins.md` — variable hover tooltip styling

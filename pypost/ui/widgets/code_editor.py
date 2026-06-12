@@ -1,6 +1,6 @@
 import json
 
-from PySide6.QtCore import QMimeData, Qt, QRect
+from PySide6.QtCore import QEvent, QMimeData, Qt, QRect
 from PySide6.QtGui import (
     QFontMetrics,
     QKeyEvent,
@@ -59,11 +59,20 @@ class CodeEditor(VariableAwarePlainTextEdit):
         super().setPlainText(text)
         self._validation_controller.clear()
 
+    def _refresh_font_metrics(self) -> None:
+        """Recalculate tab stops and gutter from the current document font."""
+        font_metrics = QFontMetrics(self.document().defaultFont())
+        self.setTabStopDistance(self.indent_size * font_metrics.horizontalAdvance(" "))
+        self._update_line_number_area_width(0)
+
     def update_indent_size(self, new_size: int):
         self.indent_size = new_size
-        font = self.document().defaultFont()
-        font_metrics = QFontMetrics(font)
-        self.setTabStopDistance(self.indent_size * font_metrics.horizontalAdvance(" "))
+        self._refresh_font_metrics()
+
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.FontChange:
+            self._refresh_font_metrics()
 
     def line_number_area_width(self) -> int:
         digits = max(1, len(str(self.blockCount())))

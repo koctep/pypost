@@ -65,6 +65,15 @@ class TestCodeEditorBasics(unittest.TestCase):
         self.assertEqual(ed.indent_size, 4)
         self.assertGreater(ed.tabStopDistance(), d2)
 
+    def test_font_change_refreshes_tab_stop_distance(self):
+        ed = CodeEditor(indent_size=2)
+        ed.show()
+        base = ed.tabStopDistance()
+        font = ed.font()
+        font.setPointSize(font.pointSize() + 6)
+        ed.setFont(font)
+        self.assertGreater(ed.tabStopDistance(), base)
+
 
 class TestCodeEditorReformat(unittest.TestCase):
     @classmethod
