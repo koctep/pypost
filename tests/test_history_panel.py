@@ -80,5 +80,43 @@ class TestHistoryPanel(unittest.TestCase):
                 panel._on_context_menu(QPoint(0, 0))
                 mock_copy_method.assert_called_once()
 
+    def test_selected_entry_lookup_by_id_index(self):
+        history_manager = MagicMock()
+        entries = [
+            HistoryEntry(
+                id="a",
+                method="GET",
+                url="https://example.com/a",
+                headers={},
+                body="",
+                status_code=200,
+                response_time_ms=10,
+                timestamp="2023-01-01T12:00:00Z",
+            ),
+            HistoryEntry(
+                id="b",
+                method="POST",
+                url="https://example.com/b",
+                headers={},
+                body="payload",
+                status_code=201,
+                response_time_ms=20,
+                timestamp="2023-01-01T13:00:00Z",
+            ),
+        ]
+        history_manager.get_entries.return_value = entries
+
+        panel = HistoryPanel(history_manager=history_manager)
+        self.assertEqual(panel._list_widget.count(), 2)
+
+        panel._list_widget.setCurrentRow(1)
+        self.assertIs(panel._selected_entry(), entries[1])
+
+        history_manager.get_entries.return_value = [entries[0]]
+        panel.refresh()
+        panel._list_widget.setCurrentRow(0)
+        self.assertIs(panel._selected_entry(), entries[0])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Dict, List
 
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -40,6 +40,7 @@ class HistoryPanel(QWidget):
         self._history_manager = history_manager
         self._icons = icons or {}
         self._entries: List[HistoryEntry] = []
+        self._entries_by_id: Dict[str, HistoryEntry] = {}
 
         self._build_ui()
         self.refresh()
@@ -47,6 +48,7 @@ class HistoryPanel(QWidget):
     def refresh(self) -> None:
         """Reloads entries from HistoryManager and re-applies filter."""
         self._entries = self._history_manager.get_entries()
+        self._entries_by_id = {entry.id: entry for entry in self._entries}
         logger.debug("history_panel_refreshed entry_count=%d", len(self._entries))
         self._apply_filter(self._filter_input.text())
 
@@ -220,10 +222,7 @@ class HistoryPanel(QWidget):
         if item is None:
             return None
         entry_id = item.data(Qt.UserRole)
-        for entry in self._entries:
-            if entry.id == entry_id:
-                return entry
-        return None
+        return self._entries_by_id.get(entry_id)
 
     def _clear_detail(self) -> None:
         self._detail_method.clear()
