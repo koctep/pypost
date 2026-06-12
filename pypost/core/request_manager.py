@@ -1,6 +1,10 @@
 import logging
 from typing import Dict, List, Optional, Tuple
 
+from pypost.core.collection_item_strategies import (
+    DEFAULT_COLLECTION_ITEM_STRATEGIES,
+    CollectionItemStrategy,
+)
 from pypost.core.storage import StorageManager
 from pypost.models.models import Collection, RequestData
 
@@ -12,10 +16,20 @@ class RequestManager:
     Manages the lifecycle of requests and collections, abstracting storage operations.
     """
 
-    def __init__(self, storage_manager: StorageManager):
+    def __init__(
+        self,
+        storage_manager: StorageManager,
+        *,
+        item_strategies: dict[str, CollectionItemStrategy] | None = None,
+    ):
         self.storage = storage_manager
         self.collections: List[Collection] = []
         self._request_index: Dict[str, Tuple[RequestData, Collection]] = {}
+        self._item_strategies = (
+            item_strategies
+            if item_strategies is not None
+            else DEFAULT_COLLECTION_ITEM_STRATEGIES
+        )
         self.reload_collections()
 
     def reload_collections(self):
@@ -151,16 +165,15 @@ class RequestManager:
             item_id,
             item_type,
         )
-        if item_type == "collection":
-            return self.delete_collection(item_id)
-        if item_type == "request":
-            return self.delete_request(item_id)
-        logger.warning(
-            "delete_collection_item_unsupported_type item_id=%s item_type=%s",
-            item_id,
-            item_type,
-        )
-        return False
+        strategy = self._item_strategies.get(item_type)
+        if strategy is None:
+            logger.warning(
+                "delete_collection_item_unsupported_type item_id=%s item_type=%s",
+                item_id,
+                item_type,
+            )
+            return False
+        return strategy.delete(self, item_id)
 
     def rename_request(self, request_id: str, new_name: str) -> bool:
         """Renames a request by ID and persists the parent collection."""
@@ -224,13 +237,12 @@ class RequestManager:
             item_id,
             item_type,
         )
-        if item_type == "collection":
-            return self.rename_collection(item_id, new_name)
-        if item_type == "request":
-            return self.rename_request(item_id, new_name)
-        logger.warning(
-            "rename_collection_item_unsupported_type item_id=%s item_type=%s",
-            item_id,
-            item_type,
-        )
-        return False
+        strategy = self._item_strategies.get(item_type)
+        if strategy is None:
+            logger.warning(
+                "rename_collection_item_unsupported_type item_id=%s item_type=%s",
+                item_id,
+                item_type,
+            )
+            return False
+        return strategy.rename(self, item_id, new_name)

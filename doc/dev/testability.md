@@ -7,7 +7,8 @@ test because dependencies were created internally. PYPOST-382 adds **constructor
 seams** where practical and documents established mocking patterns. Metrics consumers now
 depend on `MetricsTrackerProtocol` ([PYPOST-73](https://pypost.atlassian.net/browse/PYPOST-73));
 HTTP transport consumers depend on `HTTPClientProtocol`
-([PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46)).
+([PYPOST-46](https://pypost.atlassian.net/browse/PYPOST-46)); collection item dispatch uses a
+strategy registry ([PYPOST-48](https://pypost.atlassian.net/browse/PYPOST-48)).
 
 ## Composition root
 
@@ -218,6 +219,24 @@ For signal/slot tests, mock presenters with real Qt widgets where needed — see
 | `tests/test_main_window.py` | `test_startup_refreshes_tree_from_request_manager` | Startup orchestration |
 | `tests/test_main_window.py` | `test_main_window_curl_copied_status_bar` | Signal wiring (integration) |
 | `tests/test_main_window_signals.py` | `test_wire_presenter_signals_*` | `wire_presenter_signals` unit tests |
+
+## RequestManager collection item strategies
+
+`RequestManager.delete_collection_item` and `rename_collection_item` dispatch through
+`DEFAULT_COLLECTION_ITEM_STRATEGIES` ([PYPOST-48](https://pypost.atlassian.net/browse/PYPOST-48)).
+New tree item types register in the map without editing dispatch methods.
+
+```python
+from pypost.core.collection_item_strategies import CollectionItemStrategy
+from pypost.core.request_manager import RequestManager
+
+strategies = {
+    "folder": CollectionItemStrategy(delete=..., rename=...),
+}
+manager = RequestManager(storage, item_strategies=strategies)
+```
+
+**Coverage:** `tests/test_collection_item_strategies.py`, `tests/test_request_manager_delete.py`.
 
 ## HTTPClientProtocol
 
