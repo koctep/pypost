@@ -333,12 +333,14 @@ Shared fixtures for presenter and `CollectionTreeActions` tests live in
 `patch_view_context_menu`, `build_isolated_tree_actions`, etc.). See
 [collection_tree_actions.md](collection_tree_actions.md) for the isolated harness.
 
-## Core manager unit tests (PYPOST-252)
+## Core manager unit tests (PYPOST-252, PYPOST-251)
 
 Automated unit coverage for `RequestManager` and `StateManager` (debt follow-up from
-[PYPOST-29](https://pypost.atlassian.net/browse/PYPOST-29)). Pytest infrastructure
-(`pytest.ini`, `Makefile`, `tests/conftest.py` timeout gate) was already in place; this section
-indexes the manager test modules.
+[PYPOST-29](https://pypost.atlassian.net/browse/PYPOST-29)).
+[PYPOST-251](https://pypost.atlassian.net/browse/PYPOST-251) closed the original blocker
+(missing pytest setup); [PYPOST-252](https://pypost.atlassian.net/browse/PYPOST-252) added
+manager tests and this section. Pytest infrastructure (`pytest.ini`, `Makefile`,
+`tests/conftest.py` timeout gate) is the standard entry point for local and CI runs.
 
 | Module | Test file | Scope |
 | --- | --- | --- |

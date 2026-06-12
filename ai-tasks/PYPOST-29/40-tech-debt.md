@@ -12,7 +12,7 @@
 
 ## Missing Tests
 
-- **Automated Tests**: No new automated tests were added because the project currently lacks a setup for running tests (pytest missing, empty tests folder). The refactoring was verified manually. — [PYPOST-251](https://pypost.atlassian.net/browse/PYPOST-251)
+- **Automated Tests**: [RESOLVED in PYPOST-251/PYPOST-252] Pytest infrastructure (`pytest.ini`, `Makefile`, `tests/conftest.py`) and a broad `tests/` suite are in place; manager unit tests documented in `doc/dev/testing.md`.
 
 ## Performance Concerns
 
@@ -20,6 +20,6 @@
 
 ## Follow-up Tasks
 
-- Implement `pytest` infrastructure and add tests for `RequestManager` and `StateManager`. — [PYPOST-252](https://pypost.atlassian.net/browse/PYPOST-252)
+- [x] Implement `pytest` infrastructure and add tests for `RequestManager` and `StateManager`. [DONE in PYPOST-251/PYPOST-252]
 - [x] Add internal index to `RequestManager` for O(1) lookups. [DONE in PYPOST-8]
 
