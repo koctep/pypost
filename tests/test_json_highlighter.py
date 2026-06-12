@@ -216,6 +216,16 @@ class TestJsonHighlighter(unittest.TestCase):
         self.assertEqual(resolve_json_syntax_colors(dark=False), DEFAULT_JSON_SYNTAX_COLORS)
         self.assertEqual(resolve_json_syntax_colors(dark=True), DARK_JSON_SYNTAX_COLORS)
 
+    def test_resolve_json_syntax_colors_respects_explicit_theme(self):
+        self.assertEqual(
+            resolve_json_syntax_colors(theme="light"),
+            DEFAULT_JSON_SYNTAX_COLORS,
+        )
+        self.assertEqual(
+            resolve_json_syntax_colors(theme="dark"),
+            DARK_JSON_SYNTAX_COLORS,
+        )
+
     def test_skips_highlighting_for_oversized_block(self):
         text = "true" + (" " * MAX_HIGHLIGHT_BLOCK_CHARS)
         edit = self._edit_with_highlighted(text)

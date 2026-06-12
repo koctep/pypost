@@ -35,8 +35,19 @@ def is_dark_palette(palette: QPalette | None = None) -> bool:
     return palette.color(QPalette.ColorRole.Window).lightness() < 128
 
 
-def resolve_json_syntax_colors(*, dark: bool | None = None) -> JsonSyntaxColors:
+def resolve_json_syntax_colors(
+    *,
+    dark: bool | None = None,
+    theme: str | None = None,
+) -> JsonSyntaxColors:
     """Return JSON syntax colors for the active or requested theme."""
-    if dark is None:
+    if theme is not None:
+        if theme == "dark":
+            dark = True
+        elif theme == "light":
+            dark = False
+        else:
+            dark = is_dark_palette()
+    elif dark is None:
         dark = is_dark_palette()
     return DARK_JSON_SYNTAX_COLORS if dark else DEFAULT_JSON_SYNTAX_COLORS

@@ -85,6 +85,12 @@ class TestApplySettingsFont:
             window.apply_settings(AppSettings(font_size=18))
         apply_styles.assert_called_once_with(qapp, font_size=18)
 
+    def test_apply_theme_receives_theme_setting(self, qapp):
+        window = _make_window(qapp)
+        with patch.object(window.style_manager, "apply_theme") as apply_theme:
+            window.apply_settings(AppSettings(theme="dark"))
+        apply_theme.assert_called_once_with(qapp, "dark")
+
     def test_show_event_reapplies_settings_once(self, qapp):
         window = _make_window(qapp)
         with patch("pypost.ui.main_window.QTimer.singleShot") as single_shot:

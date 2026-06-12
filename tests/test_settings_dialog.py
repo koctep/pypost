@@ -54,6 +54,32 @@ class TestSettingsDialogRequestTimeout:
             dlg.close()
 
 
+class TestSettingsDialogTheme:
+    def test_theme_combo_is_on_form_layout(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            assert dlg.theme_combo.parent() is dlg
+            assert dlg.form_layout.indexOf(dlg.theme_combo) >= 0
+        finally:
+            dlg.close()
+
+    def test_theme_loads_from_settings(self, qapp):
+        dlg = SettingsDialog(AppSettings(theme="dark"))
+        try:
+            assert dlg.theme_combo.currentData() == "dark"
+        finally:
+            dlg.close()
+
+    def test_accept_includes_theme_in_result(self, qapp):
+        dlg = SettingsDialog(AppSettings(theme="system"))
+        try:
+            dlg.theme_combo.setCurrentIndex(dlg.theme_combo.findData("light"))
+            dlg.accept()
+            assert dlg.get_settings().theme == "light"
+        finally:
+            dlg.close()
+
+
 class TestSettingsDialogLogHiddenKeyNames:
     def test_log_hidden_key_names_checkbox_on_form(self, qapp):
         dlg = SettingsDialog(AppSettings())

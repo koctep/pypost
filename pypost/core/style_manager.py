@@ -1,5 +1,39 @@
 from pathlib import Path
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QStyleFactory
+
+from pypost.ui.styles.custom_style import PyPostStyle
+
+_THEME_SYSTEM = "system"
+_THEME_LIGHT = "light"
+_THEME_DARK = "dark"
+_VALID_THEMES = {_THEME_SYSTEM, _THEME_LIGHT, _THEME_DARK}
+
+
+def _fusion_dark_palette() -> QPalette:
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.Base, QColor(35, 35, 35))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(25, 25, 25))
+    palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+    palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
+    return palette
+
+
+def _fusion_light_palette() -> QPalette:
+    fusion = QStyleFactory.create("Fusion")
+    return fusion.standardPalette()
+
 
 class StyleManager:
     def __init__(self):
@@ -39,6 +73,25 @@ class StyleManager:
 
     def _font_size_rule(self, font_size: int) -> str:
         return f"\n/* Application font size */\nQWidget {{ font-size: {font_size}pt; }}\n"
+
+    def apply_theme(self, app, theme: str = _THEME_SYSTEM) -> None:
+        """Apply Qt Fusion palette for light/dark, or system default style."""
+        if theme not in _VALID_THEMES:
+            theme = _THEME_SYSTEM
+
+        if theme == _THEME_SYSTEM:
+            custom_style = PyPostStyle()
+            custom_style.set_close_button_size(48)
+            app.setStyle(custom_style)
+            app.setPalette(custom_style.standardPalette())
+            return
+
+        fusion = QStyleFactory.create("Fusion")
+        app.setStyle(fusion)
+        if theme == _THEME_DARK:
+            app.setPalette(_fusion_dark_palette())
+        else:
+            app.setPalette(_fusion_light_palette())
 
     def apply_styles(self, app_or_widget, font_size: int | None = None):
         """Applies the loaded styles to the given application or widget."""

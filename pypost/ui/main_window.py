@@ -303,6 +303,7 @@ class MainWindow(QMainWindow):
         logger.debug("apply_settings_start font_size=%d", settings.font_size)
         app = QApplication.instance()
         if app:
+            self.style_manager.apply_theme(app, settings.theme)
             self.style_manager.apply_styles(app, font_size=settings.font_size)
             font = app.font()
             font.setPointSize(settings.font_size)

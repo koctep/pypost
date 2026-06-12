@@ -1,13 +1,16 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
 from pypost.models.retry import RetryPolicy
 
+ThemeSetting = Literal["system", "light", "dark"]
+
 
 class AppSettings(BaseModel):
     font_size: int = 12
     indent_size: int = 2
+    theme: ThemeSetting = "system"
     request_timeout: int = 60
     config_version: int = 1
     revision: int = 0

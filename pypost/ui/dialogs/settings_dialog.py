@@ -91,6 +91,7 @@ class SettingsDialog(QDialog):
 
         self.font_size_spin = editor.font_size_spin
         self.indent_size_spin = editor.indent_size_spin
+        self.theme_combo = editor.theme_combo
         self.timeout_spin = request.timeout_spin
         self.confirm_overwrite_check = request.confirm_overwrite_check
         self.mcp_port_spin = server_bind.mcp_port_spin

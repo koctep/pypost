@@ -287,7 +287,7 @@ class TabsPresenter(QObject):
     def apply_settings(self, settings: AppSettings) -> None:
         """Updates indent, JSON syntax colors, and body reformat in all tabs."""
         self._settings = settings
-        json_colors = resolve_json_syntax_colors()
+        json_colors = resolve_json_syntax_colors(theme=settings.theme)
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
