@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QSplitter,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -123,8 +124,6 @@ class MainWindow(QMainWindow):
         }
 
     def _build_layout(self) -> None:
-        from PySide6.QtWidgets import QTabWidget
-
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)

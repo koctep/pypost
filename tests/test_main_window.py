@@ -4,7 +4,7 @@ pytestmark = pytest.mark.timeout(60)
 
 import unittest
 from unittest.mock import MagicMock, patch
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QTabWidget, QWidget
 
 from pypost.models.settings import AppSettings
 from pypost.ui.main_window import MainWindow
@@ -97,6 +97,49 @@ class TestMainWindow(unittest.TestCase):
         self.assertIs(template_service, window.template_service)
         self.assertIs(config_manager, window.config_manager)
         self.assertIs(alert_manager, window._alert_manager)
+
+    def test_build_layout_sidebar_is_qtabwidget(self):
+        """PYPOST-61: left sidebar uses QTabWidget with Collections and History tabs."""
+        metrics = MagicMock()
+        template_service = MagicMock()
+        mock_collections = MagicMock()
+        mock_tabs = MagicMock()
+        with (
+            patch("pypost.ui.main_window.StorageManager"),
+            patch("pypost.ui.main_window.ConfigManager"),
+            patch("pypost.ui.main_window.RequestManager"),
+            patch("pypost.ui.main_window.StateManager") as mock_sm,
+            patch("pypost.ui.main_window.MCPServerManager"),
+            patch("pypost.ui.main_window.HistoryManager"),
+            patch(
+                "pypost.ui.main_window.CollectionsPresenter",
+                return_value=mock_collections,
+            ),
+            patch("pypost.ui.main_window.TabsPresenter", return_value=mock_tabs),
+            patch("pypost.ui.main_window.EnvPresenter") as mock_env_cls,
+            patch("pypost.ui.main_window.HistoryPanel", return_value=QWidget()),
+            patch("pypost.ui.main_window.MainWindow._wire_signals"),
+            patch("pypost.ui.main_window.MainWindow._create_menu_bar"),
+            patch("pypost.ui.main_window.MainWindow._setup_shortcuts"),
+            patch("pypost.ui.main_window.MainWindow.apply_settings"),
+            patch(
+                "pypost.ui.main_window.resolve_encryption_enabled",
+                return_value=False,
+            ),
+        ):
+            mock_sm.return_value.settings = AppSettings()
+            mock_collections.widget = QWidget()
+            mock_tabs.widget = QWidget()
+            mock_env_cls.return_value.widget = QWidget()
+            window = MainWindow(
+                metrics=metrics,
+                template_service=template_service,
+            )
+            splitter = window.centralWidget().layout().itemAt(1).widget()
+            sidebar = splitter.widget(0)
+            self.assertIsInstance(sidebar, QTabWidget)
+            self.assertEqual(sidebar.tabText(0), "Collections")
+            self.assertEqual(sidebar.tabText(1), "History")
 
     def test_main_window_curl_copied_status_bar(self):
         metrics = MagicMock()
