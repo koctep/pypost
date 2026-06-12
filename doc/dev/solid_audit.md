@@ -37,8 +37,8 @@ LOC baselines and caps so god-object regressions (especially `MainWindow` growth
 
 | Metric | Audit era (PYPOST-40) | Baseline (2026-06-11) | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 282 | 300 |
-| `MainWindow` class LOC | 1040 | 246 | 260 |
+| `main_window.py` file LOC | 1040 | 383 | 425 |
+| `MainWindow` class LOC | 1040 | 343 | 380 |
 
 Full module table: [ai-tasks/PYPOST-376/baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
 

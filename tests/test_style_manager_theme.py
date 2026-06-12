@@ -14,7 +14,26 @@ from pypost.ui.styles.custom_style import PyPostStyle
 @pytest.fixture(scope="module")
 def qapp():
     app = QApplication.instance() or QApplication([])
+    
+    # Save original style, palette, and stylesheet for isolation
+    orig_style = app.style()
+    orig_palette = app.palette()
+    orig_stylesheet = app.styleSheet()
+    
+    # Reset/clear stylesheet to avoid style wrapping (QStyleSheetStyle)
+    app.setStyleSheet("")
+    
     yield app
+    
+    # Restore original state
+    try:
+        if orig_style:
+            app.setStyle(orig_style)
+    except RuntimeError:
+        # If original style object was deleted/garbage-collected by Qt, fall back to PyPostStyle
+        app.setStyle(PyPostStyle())
+    app.setPalette(orig_palette)
+    app.setStyleSheet(orig_stylesheet)
 
 
 def test_apply_theme_dark_uses_fusion_and_dark_window(qapp):
