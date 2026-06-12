@@ -37,14 +37,7 @@ _DEFAULT_CATALOG: dict[str, Callable[..., Any]] = {
 
 
 class FunctionRegistry:
-    """
-    Single source of truth for allowed template function names and callables.
-
-    Under normal use, TemplateService.__init__ constructs a registry and calls
-    register_into_env once. register_into_env sets or replaces only the catalog
-    keys on env.globals (urlencode, md5, base64); other globals are unchanged.
-    Repeat calls re-bind those keys only to the registry's implementations.
-    """
+    """Single source of truth for allowed template function names and callables."""
 
     def __init__(self) -> None:
         self._functions: dict[str, Callable[..., Any]] = dict(_DEFAULT_CATALOG)
@@ -62,8 +55,10 @@ class FunctionRegistry:
         """
         Bind catalog names to callables on env.globals.
 
-        Prefer one call from TemplateService.__init__. Repeat calls set or replace
-        only catalog keys; unrelated env.globals entries are left untouched.
+        Under normal use, TemplateService.__init__ constructs a registry and calls
+        this once. Sets or replaces only catalog keys (urlencode, md5, base64);
+        other globals are unchanged. Repeat calls re-bind those keys only to the
+        registry's implementations.
         """
         for name, fn in self._functions.items():
             env.globals[name] = fn
