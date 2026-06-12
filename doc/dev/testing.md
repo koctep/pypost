@@ -162,6 +162,20 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_server_integration.py -v
 ```
 
+## MCP test fixture generator (PYPOST-179)
+
+Committed MCP test artifacts are defined in code and written by
+`scripts/generate_mcp_test_fixtures.py` (builders in `pypost/fixtures/mcp_test_fixtures.py`).
+Regenerate after changing fixture definitions; use `--check` to fail when committed JSON drifts
+from the canonical models.
+
+```bash
+.venv/bin/python scripts/generate_mcp_test_fixtures.py
+.venv/bin/python scripts/generate_mcp_test_fixtures.py --check
+```
+
+Focused tests: `tests/test_generate_mcp_test_fixtures.py`.
+
 ## MCP test collection groundwork (PYPOST-180)
 
 Committed manual-test artifacts under `examples/collections/mcp.json` and

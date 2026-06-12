@@ -1,5 +1,11 @@
 # Test Config for PyPost MCP
 
+Regenerate committed fixtures from the repo root when changing MCP test data definitions:
+
+```bash
+.venv/bin/python scripts/generate_mcp_test_fixtures.py
+```
+
 Copy these files to your PyPost data directory to enable MCP testing.
 
 ## Setup

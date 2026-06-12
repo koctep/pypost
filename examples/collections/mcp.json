@@ -11,8 +11,12 @@
       "params": {},
       "body": "",
       "body_type": "json",
+      "yaml_as_json": false,
       "post_script": "",
-      "expose_as_mcp": true
+      "expose_as_mcp": true,
+      "mcp_description": "",
+      "mcp_params": {},
+      "retry_policy": null
     },
     {
       "id": "sse-probe-main",
@@ -23,8 +27,12 @@
       "params": {},
       "body": "",
       "body_type": "json",
+      "yaml_as_json": false,
       "post_script": "",
-      "expose_as_mcp": true
+      "expose_as_mcp": true,
+      "mcp_description": "",
+      "mcp_params": {},
+      "retry_policy": null
     },
     {
       "id": "mcp-list-tools",
@@ -35,8 +43,12 @@
       "params": {},
       "body": "",
       "body_type": "json",
+      "yaml_as_json": false,
       "post_script": "",
-      "expose_as_mcp": false
+      "expose_as_mcp": false,
+      "mcp_description": "",
+      "mcp_params": {},
+      "retry_policy": null
     }
   ]
 }

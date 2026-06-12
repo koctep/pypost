@@ -3,6 +3,7 @@
     "id": "test-env-mcp",
     "name": "MCP Test",
     "variables": {},
+    "hidden_keys": [],
     "enable_mcp": true
   }
 ]
