@@ -8,6 +8,8 @@ mcp
 starlette
 uvicorn
 prometheus_client
+opentelemetry-api
+opentelemetry-sdk
 sseclient-py
 cryptography
 keyring

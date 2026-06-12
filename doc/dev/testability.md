@@ -88,6 +88,22 @@ metrics = MagicMock(spec=MetricsTrackerProtocol)
 See [PYPOST-73](../../ai-tasks/PYPOST-73/70-dev-docs.md) and
 [PYPOST-74](../../ai-tasks/PYPOST-74/70-dev-docs.md) dev notes.
 
+### OpenTelemetry adapter (PYPOST-579)
+
+Production can inject `OtelMetricsTracker` instead of Prometheus counters without changing
+consumer call sites. Configure exporters on a `MeterProvider`, then:
+
+```python
+from opentelemetry.sdk.metrics import MeterProvider
+
+from pypost.core.metrics_otel import create_otel_metrics_tracker
+
+metrics = create_otel_metrics_tracker(meter_provider=provider)
+```
+
+Metric names and labels mirror `MetricsRegistry`. The desktop app default remains
+`MetricsManager` (embedded Prometheus scrape). See `pypost/core/metrics_otel.py`.
+
 ## RequestService
 
 ### Injectable dependencies
