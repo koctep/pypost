@@ -16,8 +16,9 @@ Addressed in PYPOST-14 by implementing `RequestManager`.
 
 ## Missing Tests
 
-- No unit tests were added for the save logic or the settings persistence. Manual testing is relied — [PYPOST-125](https://pypost.atlassian.net/browse/PYPOST-125)
-  upon.
+- No unit tests were added for the save logic or the settings persistence; manual testing
+  is relied upon.
+  — [PYPOST-125](https://pypost.atlassian.net/browse/PYPOST-125)
 
 ## Performance Concerns
 

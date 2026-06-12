@@ -131,7 +131,7 @@ as a follow-up ticket. This is out of scope for PYPOST-52 but should be tracked.
 
 ---
 
-### INFO — `helpers.py` lacks module-level docstring
+### INFO — `helpers.py` lacks module-level docstring — [PYPOST-580](https://pypost.atlassian.net/browse/PYPOST-580)
 
 `tests/helpers.py` has no module docstring explaining its purpose. Acceptable
 for now given the small team, but worth adding when the file grows.
