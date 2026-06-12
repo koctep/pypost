@@ -54,6 +54,17 @@ This class contains the actual business logic of the MCP server.
     pure ASGI delegate to `handle_post_message` — no `starlette.responses` usage and no manual
     `_send_response` / raw ASGI status bodies. Module-level `Response` is used only by the GET
     SSE wrapper (`handle_sse_get`) after the stream completes.
+*   **Legacy SSE ASGI efficiency (PYPOST-159)**: Performance is not a concern for this transport.
+    Starlette `Mount` on `MCP_LEGACY_SSE_MOUNT_PATH` forwards `scope` / `receive` / `send` to the
+    inner `Starlette` sub-app without a `request_response` adapter — the same pattern as
+    Prometheus on `/metrics`. Inside the sub-app, `MessagesEndpoint` is registered on `Route` as a
+    direct ASGI callable (`route.app` remains the endpoint instance; see
+    `tests/test_mcp_asgi_compatibility.py`). That path is at least as efficient as a
+    `request_response` wrapper. GET `/` alone uses `handle_sse_get`, an async function returning
+    `Response` after `connect_sse` teardown — Starlette wraps it once in `request_response`. The
+    overhead is negligible for long-lived SSE connections and avoids `TypeError` on `await None`
+    from the original PYPOST-21 bug. Do not replace outer `Mount` with `Route` expecting a perf
+    win; `Mount` is already the efficient ASGI delegation pattern.
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
 *   **Tool metadata (PYPOST-553)**: `RequestData.mcp_description` is the agent-visible
     description (falls back to `name`). `RequestData.mcp_params` holds per-parameter

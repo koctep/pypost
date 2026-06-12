@@ -2,6 +2,11 @@
 
 Module-level ASGI endpoints support isolated unit tests and reuse by
 ``MCPServerImpl`` and ``MetricsServer``.
+
+Routing efficiency (PYPOST-159): the outer app mounts this module via ``Mount`` (no
+``request_response`` wrapper). ``MessagesEndpoint`` is a direct ASGI callable on ``Route``;
+only GET ``/`` uses ``handle_sse_get`` (``request_response``) to return an empty ``Response``
+after ``connect_sse`` completes. See ``doc/dev/mcp_integration.md``.
 """
 
 from mcp.server import Server
