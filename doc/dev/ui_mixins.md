@@ -13,7 +13,9 @@ Hover support is split into two classes in `pypost/ui/widgets/mixins.py`:
 - **Line / plain-text editors** (`VariableHoverMixin`): locator on `mouseMoveEvent`, resolver
   for the matched token only.
 - **Table cells** (`VariableAwareTableWidget`): locator pattern for detection, resolver on full
-  cell text (no cursor index).
+  cell text (no cursor index). Per-cell resolution cache avoids redundant `resolve_text` on
+  repeated `mouseMoveEvent` over the same cell (PYPOST-132). This path is separate from
+  line-scoped scan (PYPOST-122), which applies only to multiline editors.
 - **Metrics:** `VariableHoverResolver.set_metrics` (also exposed on the facade).
 
 ## VariableHoverMixin
@@ -60,6 +62,13 @@ the cursor instead of scanning the full document on every `mouseMoveEvent`:
 - `VariableAwareLineEdit` keeps the default (`False`) because the buffer is a single line.
 
 This preserves tooltip behaviour while avoiding O(document) regex iteration on large bodies.
+
+### Table cell hover cache (PYPOST-132)
+
+`VariableAwareTableWidget` caches the last resolved tooltip keyed by `(row, column, cell_text)`.
+Cache is cleared when variables or hidden keys change, or when the pointer leaves table cells.
+Table cells are short single-line strings, so line-scoped scan does not apply; caching addresses
+high-frequency `mouseMoveEvent` while the pointer remains in one cell.
 
 ### Variable value resolution (PYPOST-115, PYPOST-123)
 

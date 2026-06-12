@@ -510,6 +510,23 @@ class TestVariableAwareTableWidgetTooltips(unittest.TestCase):
         show_mock.assert_not_called()
         hide_mock.assert_called()
 
+    @patch("pypost.ui.widgets.variable_aware_widgets.VariableHoverResolver.resolve_text")
+    @patch("pypost.ui.widgets.variable_aware_widgets.QToolTip.hideText")
+    @patch("pypost.ui.widgets.variable_aware_widgets.QToolTip.showText")
+    def test_repeated_mouse_move_reuses_hover_cache(
+        self, show_mock, _hide, resolve_mock,
+    ):
+        resolve_mock.return_value = "resolved"
+        w = _FixedHoverTableWidget()
+        w.resize(300, 100)
+        w.set_hover_text("{{host}}")
+        w.set_variables({"host": "example.com"})
+        event = _mouse_move_event(w, QPoint(10, 10))
+        w.mouseMoveEvent(event)
+        w.mouseMoveEvent(event)
+        resolve_mock.assert_called_once()
+        self.assertEqual(show_mock.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
