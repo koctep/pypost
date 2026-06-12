@@ -16,6 +16,21 @@ from pypost.core.template_service import TemplateService
 # Maximum plain {{name}} follow hops in hover tooltips (cycle-safe bound).
 TOOLTIP_REFERENCE_MAX_DEPTH = 32
 
+_hover_template_service = TemplateService()
+
+
+class _HoverHelperMeta(type):
+    """Metaclass so tests can patch ``VariableHoverHelper._template_service`` on the class."""
+
+    @property
+    def _template_service(cls) -> TemplateService:
+        return _hover_template_service
+
+    @_template_service.setter
+    def _template_service(cls, value: TemplateService) -> None:
+        global _hover_template_service
+        _hover_template_service = value
+
 
 def push_snapshot_to_widgets(
     widgets: Iterable[Any],
@@ -33,21 +48,13 @@ def push_snapshot_to_widgets(
             method(value)
 
 
-class VariableHoverHelper:
-    """Helper class to find variables in text and manage tooltip display."""
+class VariableHoverLocator:
+    """Locate ``{{...}}`` tokens under a text cursor index (PYPOST-129)."""
 
     # Plain {{name}} fast path — shared with core template_expression_tokenizer (PYPOST-113).
     VARIABLE_PATTERN = PLAIN_VARIABLE_PATTERN
     # Full-token scan shared with core template_expression_tokenizer (PYPOST-536).
     EXPRESSION_PATTERN = TEMPLATE_PLACEHOLDER_PATTERN
-    _template_service = TemplateService()
-
-    @classmethod
-    def set_metrics(cls, metrics: MetricsTrackerProtocol | None) -> None:
-        """
-        Rebuild helper TemplateService so hover path exports observability metrics.
-        """
-        cls._template_service = TemplateService(metrics=resolve_metrics(metrics))
 
     @staticmethod
     def find_variable_at_index(
@@ -58,7 +65,7 @@ class VariableHoverHelper:
         Finds a variable name under the given index in text.
         Returns the variable name (without braces) or None.
         """
-        for match in VariableHoverHelper.VARIABLE_PATTERN.finditer(text):
+        for match in VariableHoverLocator.VARIABLE_PATTERN.finditer(text):
             if match.start() <= index < match.end():
                 return match.group(1)
         return None
@@ -69,10 +76,26 @@ class VariableHoverHelper:
         Finds full `{{...}}` function placeholder token (e.g. {{urlencode(db)}}) under index.
         Returns full token with braces or None.
         """
-        for match in VariableHoverHelper.EXPRESSION_PATTERN.finditer(text):
+        for match in VariableHoverLocator.EXPRESSION_PATTERN.finditer(text):
             if match.start() <= index < match.end():
                 return match.group(0)
         return None
+
+
+class VariableHoverResolver:
+    """Resolve ``{{...}}`` tokens to hover preview values (PYPOST-129)."""
+
+    @classmethod
+    def set_metrics(cls, metrics: MetricsTrackerProtocol | None) -> None:
+        """
+        Rebuild helper TemplateService so hover path exports observability metrics.
+        """
+        global _hover_template_service
+        _hover_template_service = TemplateService(metrics=resolve_metrics(metrics))
+
+    @classmethod
+    def _template_service(cls) -> TemplateService:
+        return _hover_template_service
 
     @staticmethod
     def get_variable_value(
@@ -83,7 +106,7 @@ class VariableHoverHelper:
         """Returns the value of the variable or a default message."""
         if hidden_keys and variable_name in hidden_keys:
             return HIDDEN_MASK
-        return VariableHoverHelper._resolve_plain_reference_chain(
+        return VariableHoverResolver._resolve_plain_reference_chain(
             variable_name,
             variables,
             hidden_keys,
@@ -120,7 +143,7 @@ class VariableHoverHelper:
         if depth >= TOOLTIP_REFERENCE_MAX_DEPTH:
             return raw
 
-        return VariableHoverHelper._resolve_plain_reference_chain(
+        return VariableHoverResolver._resolve_plain_reference_chain(
             inner_name,
             variables,
             hidden_keys,
@@ -139,17 +162,17 @@ class VariableHoverHelper:
         def replace(match):
             expression = match.group(0)
             if is_plain_variable_token(expression):
-                return VariableHoverHelper._resolve_plain_variable(
+                return VariableHoverResolver._resolve_plain_variable(
                     expression,
                     variables,
                     hidden_keys,
                 )
-            return VariableHoverHelper._resolve_expression_token(
+            return VariableHoverResolver._resolve_expression_token(
                 expression,
                 variables,
             )
 
-        return VariableHoverHelper.EXPRESSION_PATTERN.sub(replace, text)
+        return VariableHoverLocator.EXPRESSION_PATTERN.sub(replace, text)
 
     @staticmethod
     def _resolve_plain_variable(
@@ -160,7 +183,7 @@ class VariableHoverHelper:
         name = extract_plain_variable_name(expression)
         if name is None:
             return expression
-        return VariableHoverHelper.get_variable_value(
+        return VariableHoverResolver.get_variable_value(
             name,
             variables,
             hidden_keys,
@@ -168,11 +191,50 @@ class VariableHoverHelper:
 
     @staticmethod
     def _resolve_expression_token(expression: str, variables: Dict[str, str]) -> str:
-        return VariableHoverHelper._template_service.render_string(
+        return VariableHoverResolver._template_service().render_string(
             expression,
             variables,
             render_path="hover",
         )
+
+
+class VariableHoverHelper(metaclass=_HoverHelperMeta):
+    """Backward-compatible facade over locator and resolver (PYPOST-129)."""
+
+    VARIABLE_PATTERN = VariableHoverLocator.VARIABLE_PATTERN
+    EXPRESSION_PATTERN = VariableHoverLocator.EXPRESSION_PATTERN
+
+    @classmethod
+    def set_metrics(cls, metrics: MetricsTrackerProtocol | None) -> None:
+        VariableHoverResolver.set_metrics(metrics)
+
+    @staticmethod
+    def find_variable_at_index(text: str, index: int) -> Optional[str]:
+        return VariableHoverLocator.find_variable_at_index(text, index)
+
+    @staticmethod
+    def find_expression_at_index(text: str, index: int) -> Optional[str]:
+        return VariableHoverLocator.find_expression_at_index(text, index)
+
+    @staticmethod
+    def get_variable_value(
+        variable_name: str,
+        variables: Dict[str, str],
+        hidden_keys: Optional[Set[str]] = None,
+    ) -> str:
+        return VariableHoverResolver.get_variable_value(
+            variable_name,
+            variables,
+            hidden_keys,
+        )
+
+    @staticmethod
+    def resolve_text(
+        text: str,
+        variables: Dict[str, str],
+        hidden_keys: Optional[Set[str]] = None,
+    ) -> str:
+        return VariableHoverResolver.resolve_text(text, variables, hidden_keys)
 
 
 TWidget = TypeVar("TWidget", bound=QWidget)
@@ -248,10 +310,10 @@ class VariableHoverMixin(Generic[TWidget]):
         self._show_or_hide_tooltip(event, expression)
 
     def _find_hover_expression(self, text: str, index: int) -> Optional[str]:
-        expression = VariableHoverHelper.find_expression_at_index(text, index)
+        expression = VariableHoverLocator.find_expression_at_index(text, index)
         if expression or index <= 0:
             return expression
-        return VariableHoverHelper.find_expression_at_index(text, index - 1)
+        return VariableHoverLocator.find_expression_at_index(text, index - 1)
 
     def _show_or_hide_tooltip(
         self: TWidget,
@@ -262,7 +324,7 @@ class VariableHoverMixin(Generic[TWidget]):
             QToolTip.hideText()
             return
 
-        value = VariableHoverHelper.resolve_text(
+        value = VariableHoverResolver.resolve_text(
             expression,
             self._variables,
             self._hidden_keys,
@@ -272,3 +334,4 @@ class VariableHoverMixin(Generic[TWidget]):
             value,
             self,
         )
+

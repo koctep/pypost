@@ -2,7 +2,11 @@ from typing import Dict, Set, Tuple
 
 from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QTableWidget, QToolTip
 
-from pypost.ui.widgets.mixins import VariableHoverHelper, VariableHoverMixin
+from pypost.ui.widgets.mixins import (
+    VariableHoverLocator,
+    VariableHoverMixin,
+    VariableHoverResolver,
+)
 
 
 class VariableAwareLineEdit(VariableHoverMixin, QLineEdit):
@@ -56,8 +60,8 @@ class VariableAwareTableWidget(QTableWidget):
         item = self.itemAt(event.position().toPoint())
         if item:
             text = item.text()
-            if VariableHoverHelper.EXPRESSION_PATTERN.search(text):
-                resolved = VariableHoverHelper.resolve_text(
+            if VariableHoverLocator.EXPRESSION_PATTERN.search(text):
+                resolved = VariableHoverResolver.resolve_text(
                     text,
                     self._variables,
                     self._hidden_keys,

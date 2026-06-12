@@ -31,7 +31,7 @@ from pypost.models.models import McpToolParam, RequestData
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
-from pypost.ui.widgets.mixins import VariableHoverHelper, push_snapshot_to_widgets
+from pypost.ui.widgets.mixins import VariableHoverResolver, push_snapshot_to_widgets
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwareTableWidget
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class RequestWidget(QWidget):
         self._metrics = resolve_metrics(metrics)
         self._template_service: TemplateService | None = None
         self._hidden_keys: set[str] = set()
-        VariableHoverHelper.set_metrics(metrics)
+        VariableHoverResolver.set_metrics(metrics)
         self.request_data = request_data or RequestData()
         self.init_ui()
 

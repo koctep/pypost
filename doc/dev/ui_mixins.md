@@ -1,5 +1,21 @@
 # UI widget mixins
 
+## Variable hover components (PYPOST-129)
+
+Hover support is split into two classes in `pypost/ui/widgets/mixins.py`:
+
+| Class | Use when |
+| --- | --- |
+| `VariableHoverLocator` | Finding which `{{...}}` token is under a cursor index |
+| `VariableHoverResolver` | Resolving token(s) to tooltip preview values |
+| `VariableHoverHelper` | Backward-compatible facade; delegates to both |
+
+- **Line / plain-text editors** (`VariableHoverMixin`): locator on `mouseMoveEvent`, resolver
+  for the matched token only.
+- **Table cells** (`VariableAwareTableWidget`): locator pattern for detection, resolver on full
+  cell text (no cursor index).
+- **Metrics:** `VariableHoverResolver.set_metrics` (also exposed on the facade).
+
 ## VariableHoverMixin
 
 `pypost/ui/widgets/mixins.py` defines `VariableHoverMixin`, shared tooltip logic for
@@ -47,7 +63,8 @@ This preserves tooltip behaviour while avoiding O(document) regex iteration on l
 
 ### Variable value resolution (PYPOST-115, PYPOST-123)
 
-`VariableHoverHelper.get_variable_value` resolves plain `{{name}}` placeholders:
+`VariableHoverResolver.get_variable_value` (and the `VariableHoverHelper` facade) resolves plain
+`{{name}}` placeholders:
 
 - **Direct lookup:** `host` → value from the variables dict, or `<not defined>`.
 - **Multi-hop chain:** when variables reference each other via plain tokens (e.g.

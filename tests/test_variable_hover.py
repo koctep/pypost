@@ -27,7 +27,12 @@ from pypost.core.template_expression_tokenizer import (
     TEMPLATE_PLACEHOLDER_PATTERN,
     tokenize_template_expressions,
 )
-from pypost.ui.widgets.mixins import VariableHoverHelper, VariableHoverMixin
+from pypost.ui.widgets.mixins import (
+    VariableHoverHelper,
+    VariableHoverLocator,
+    VariableHoverMixin,
+    VariableHoverResolver,
+)
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareTableWidget
 
 
@@ -313,6 +318,51 @@ class TestVariableHoverHelper(unittest.TestCase):
             )
         finally:
             VariableHoverHelper._template_service = original_service
+
+
+class TestVariableHoverSplit(unittest.TestCase):
+    """PYPOST-129: locator vs resolver responsibilities."""
+
+    def test_locator_finds_plain_variable(self):
+        text = "x{{foo}}y"
+        idx = text.index("f")
+        self.assertEqual(
+            VariableHoverLocator.find_variable_at_index(text, idx),
+            "foo",
+        )
+
+    def test_locator_finds_expression_token(self):
+        text = "x{{urlencode(db)}}y"
+        idx = text.index("urlencode")
+        self.assertEqual(
+            VariableHoverLocator.find_expression_at_index(text, idx),
+            "{{urlencode(db)}}",
+        )
+
+    def test_resolver_resolve_text_plain(self):
+        out = VariableHoverResolver.resolve_text("{{a}}", {"a": "v"})
+        self.assertEqual(out, "v")
+
+    def test_helper_facade_matches_split_classes(self):
+        text = "{{x}}"
+        variables = {"x": "ok"}
+        self.assertEqual(
+            VariableHoverHelper.find_expression_at_index(text, 1),
+            VariableHoverLocator.find_expression_at_index(text, 1),
+        )
+        self.assertEqual(
+            VariableHoverHelper.resolve_text(text, variables),
+            VariableHoverResolver.resolve_text(text, variables),
+        )
+
+    def test_template_service_alias_shared(self):
+        original = VariableHoverHelper._template_service
+        try:
+            fake = MagicMock()
+            VariableHoverHelper._template_service = fake
+            self.assertIs(VariableHoverResolver._template_service(), fake)
+        finally:
+            VariableHoverHelper._template_service = original
 
 
 def _mouse_move_event(widget, local_point: QPoint) -> QMouseEvent:
