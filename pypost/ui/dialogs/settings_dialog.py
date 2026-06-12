@@ -1,117 +1,46 @@
 import logging
 
-from pathlib import Path
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QVBoxLayout
 
-from platformdirs import user_data_dir
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QDoubleSpinBox,
-    QFormLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QSpinBox,
-    QVBoxLayout,
-)
-
-from pypost.core.bind_address_validation import (
-    BindAddressValidationFailure,
-    validate_bind_host,
-    validate_bind_port,
-)
-from pypost.core.encryption_migration import (
-    EncryptionMigrationService,
-    MigrationReport,
-    format_migration_report,
-)
-from pypost.core.encryption_migration_worker import EncryptionMigrationWorker
-from pypost.core.key_source_constants import (
+from pypost.core.encryption_migration import EncryptionMigrationService
+from pypost.core.key_source_constants import (  # noqa: F401
     KEY_SOURCE_ENVIRONMENT,
     KEY_SOURCE_KEYRING,
     KEY_SOURCE_SECRET_STORE,
-    find_fallback_parse_issues,
-    parse_key_source_fallback,
 )
 from pypost.core.storage_interface import StorageInterface
-from pypost.models.retry import (
-    RetryableCodesValidationFailure,
-    RetryPolicy,
-    parse_retryable_status_codes,
-)
 from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import (
     confirm_encrypt_plaintext_hidden,
     confirm_re_encrypt_environments,
+    show_migration_result,
+)
+from pypost.ui.collection_item_dialogs import (  # noqa: F401
     show_invalid_bind_address,
     show_invalid_retryable_status_codes,
-    show_migration_result,
+)
+from pypost.ui.widgets.settings import (
+    EditorSettingsSection,
+    EncryptionConfigSection,
+    EncryptionMigrationSection,
+    RequestSettingsSection,
+    RetryPolicySection,
+    SecurityAlertSection,
+    ServerBindSettingsSection,
+)
+from pypost.ui.widgets.settings.encryption_config_section import (  # noqa: F401
+    ENCRYPTION_MODE_DEFAULT,
+    ENCRYPTION_MODE_DISABLED,
+    ENCRYPTION_MODE_ENABLED,
+    parse_env_encryption_enabled_from_mode,
+)
+from pypost.ui.widgets.settings.security_alert_section import (  # noqa: F401
+    WEBHOOK_AUTH_KEEP_PLACEHOLDER,
+    WEBHOOK_AUTH_NEW_PLACEHOLDER,
+    _resolve_webhook_auth_header,
 )
 
 logger = logging.getLogger(__name__)
-
-ENCRYPTION_MODE_DEFAULT = "default"
-ENCRYPTION_MODE_ENABLED = "enabled"
-ENCRYPTION_MODE_DISABLED = "disabled"
-
-
-def parse_env_encryption_enabled_from_mode(encryption_mode: str) -> bool | None:
-    """Map Settings encryption mode combo value to tri-state env_encryption_enabled."""
-    if encryption_mode == ENCRYPTION_MODE_ENABLED:
-        return True
-    if encryption_mode == ENCRYPTION_MODE_DISABLED:
-        return False
-    return None
-
-SECTION_HEADER_STYLE = "font-weight: bold; margin-top: 8px;"
-ALERT_LOG_FILENAME = "pypost-alerts.log"
-WEBHOOK_AUTH_KEEP_PLACEHOLDER = "Leave blank to keep configured value"
-WEBHOOK_AUTH_NEW_PLACEHOLDER = "Bearer <token>"
-
-
-def _default_alert_log_path() -> str:
-    return str(Path(user_data_dir("pypost")) / ALERT_LOG_FILENAME)
-
-
-def _resolve_webhook_auth_header(
-    entered: str,
-    *,
-    had_stored_auth: bool,
-    stored_auth: str | None,
-    clear_requested: bool,
-) -> str | None:
-    if clear_requested:
-        return None
-    stripped = entered.strip()
-    if stripped:
-        return stripped
-    if had_stored_auth:
-        return stored_auth
-    return None
-
-
-def _make_section_header(title: str) -> QLabel:
-    label = QLabel(title)
-    label.setStyleSheet(SECTION_HEADER_STYLE)
-    return label
-
-
-KEY_SOURCE_HELP = {
-    KEY_SOURCE_ENVIRONMENT: (
-        "Store the Fernet key in PYPOST_ENV_ENCRYPTION_KEY (shell or service env). "
-        "Do not put key material in settings.json."
-    ),
-    KEY_SOURCE_KEYRING: (
-        "Store keys in the OS credential store (keyring service pypost/env-encryption, "
-        "entry active for current key). Requires the keyring package."
-    ),
-    KEY_SOURCE_SECRET_STORE: (
-        "Load keys from an operator-managed JSON spec via "
-        "PYPOST_ENV_ENCRYPTION_SECRETS_FILE. Do not put key material in settings.json."
-    ),
-}
 
 
 class SettingsDialog(QDialog):
@@ -129,445 +58,128 @@ class SettingsDialog(QDialog):
         self.current_settings = current_settings
         self.new_settings = None
         self._storage = storage
-        if migration_service is not None:
-            self._migration_service = migration_service
-        elif storage is not None:
-            self._migration_service = EncryptionMigrationService(storage)
-        else:
-            self._migration_service = None
-        self._migration_worker: EncryptionMigrationWorker | None = None
+        self._migration_worker = None
 
         self.layout = QVBoxLayout(self)
-
-        # Form
         self.form_layout = QFormLayout()
 
-        self.font_size_spin = QSpinBox()
-        self.font_size_spin.setRange(8, 48)
-        self.font_size_spin.setValue(current_settings.font_size)
-
-        self.indent_size_spin = QSpinBox()
-        self.indent_size_spin.setRange(2, 8)
-        self.indent_size_spin.setValue(current_settings.indent_size)
-
-        self.timeout_spin = QSpinBox()
-        self.timeout_spin.setRange(1, 300)
-        self.timeout_spin.setValue(current_settings.request_timeout)
-
-        self.mcp_port_spin = QSpinBox()
-        self.mcp_port_spin.setRange(1024, 65535)
-        self.mcp_port_spin.setValue(current_settings.mcp_port)
-
-        self.mcp_host_edit = QLineEdit()
-        self.mcp_host_edit.setText(current_settings.mcp_host)
-
-        self.metrics_port_spin = QSpinBox()
-        self.metrics_port_spin.setRange(1024, 65535)
-        self.metrics_port_spin.setValue(current_settings.metrics_port)
-
-        self.metrics_host_edit = QLineEdit()
-        self.metrics_host_edit.setText(current_settings.metrics_host)
-
-        self.confirm_overwrite_check = QCheckBox()
-        self.confirm_overwrite_check.setChecked(current_settings.confirm_overwrite_request)
-
-        self.log_hidden_key_names_check = QCheckBox(
-            "Log variable key names when hidden flag is toggled",
+        editor = EditorSettingsSection(current_settings, self)
+        request = RequestSettingsSection(current_settings, self)
+        server_bind = ServerBindSettingsSection(current_settings, self)
+        encryption_config = EncryptionConfigSection(current_settings, self)
+        encryption_migration = EncryptionMigrationSection(
+            self,
+            storage=storage,
+            migration_service=migration_service,
+            encryption_config=encryption_config,
+            current_settings=current_settings,
+            show_migration_result=show_migration_result,
+            confirm_re_encrypt_environments=confirm_re_encrypt_environments,
+            confirm_encrypt_plaintext_hidden=confirm_encrypt_plaintext_hidden,
+            host_dialog=self,
         )
-        self.log_hidden_key_names_check.setChecked(
-            current_settings.log_hidden_key_names,
-        )
+        retry_policy = RetryPolicySection(current_settings, self)
+        security_alert = SecurityAlertSection(current_settings, self)
 
-        self.env_encryption_mode_combo = QComboBox()
-        self.env_encryption_mode_combo.addItem(
-            "Use environment variable default",
-            ENCRYPTION_MODE_DEFAULT,
-        )
-        self.env_encryption_mode_combo.addItem("Enabled", ENCRYPTION_MODE_ENABLED)
-        self.env_encryption_mode_combo.addItem("Disabled", ENCRYPTION_MODE_DISABLED)
-        if current_settings.env_encryption_enabled is True:
-            self.env_encryption_mode_combo.setCurrentIndex(1)
-        elif current_settings.env_encryption_enabled is False:
-            self.env_encryption_mode_combo.setCurrentIndex(2)
-        else:
-            self.env_encryption_mode_combo.setCurrentIndex(0)
+        self._editor_section = editor
+        self._request_section = request
+        self._server_bind_section = server_bind
+        self._encryption_config_section = encryption_config
+        self._encryption_migration_section = encryption_migration
+        self._retry_policy_section = retry_policy
+        self._security_alert_section = security_alert
 
-        self.env_encryption_key_source_combo = QComboBox()
-        self.env_encryption_key_source_combo.addItem(
-            "Environment variable (PYPOST_ENV_ENCRYPTION_KEY)",
-            KEY_SOURCE_ENVIRONMENT,
+        self.font_size_spin = editor.font_size_spin
+        self.indent_size_spin = editor.indent_size_spin
+        self.timeout_spin = request.timeout_spin
+        self.confirm_overwrite_check = request.confirm_overwrite_check
+        self.mcp_port_spin = server_bind.mcp_port_spin
+        self.mcp_host_edit = server_bind.mcp_host_edit
+        self.metrics_port_spin = server_bind.metrics_port_spin
+        self.metrics_host_edit = server_bind.metrics_host_edit
+        self.env_encryption_mode_combo = encryption_config.env_encryption_mode_combo
+        self.env_encryption_key_source_combo = encryption_config.env_encryption_key_source_combo
+        self.env_encryption_key_source_fallback_edit = (
+            encryption_config.env_encryption_key_source_fallback_edit
         )
-        self.env_encryption_key_source_combo.addItem(
-            "OS keyring (pypost/env-encryption)",
-            KEY_SOURCE_KEYRING,
+        self.env_encryption_fallback_warning_label = (
+            encryption_config.env_encryption_fallback_warning_label
         )
-        self.env_encryption_key_source_combo.addItem(
-            "Secret store spec file (PYPOST_ENV_ENCRYPTION_SECRETS_FILE)",
-            KEY_SOURCE_SECRET_STORE,
+        self.env_encryption_help_label = encryption_config.env_encryption_help_label
+        self.encryption_migration_section_label = (
+            encryption_migration.encryption_migration_section_label
         )
-        key_source = current_settings.env_encryption_key_source or KEY_SOURCE_ENVIRONMENT
-        source_index = self.env_encryption_key_source_combo.findData(key_source)
-        self.env_encryption_key_source_combo.setCurrentIndex(
-            source_index if source_index >= 0 else 0,
-        )
+        self.verify_encryption_btn = encryption_migration.verify_encryption_btn
+        self.reencrypt_environments_btn = encryption_migration.reencrypt_environments_btn
+        self.encrypt_plaintext_btn = encryption_migration.encrypt_plaintext_btn
+        self.max_retries_spin = retry_policy.max_retries_spin
+        self.retry_delay_spin = retry_policy.retry_delay_spin
+        self.retry_backoff_spin = retry_policy.retry_backoff_spin
+        self.retryable_codes_edit = retry_policy.retryable_codes_edit
+        self.security_logging_section_label = security_alert.security_logging_section_label
+        self.log_hidden_key_names_check = security_alert.log_hidden_key_names_check
+        self.alert_log_path_edit = security_alert.alert_log_path_edit
+        self.alert_webhook_url_edit = security_alert.alert_webhook_url_edit
+        self.alert_webhook_auth_edit = security_alert.alert_webhook_auth_edit
+        self.alert_webhook_auth_clear_check = security_alert.alert_webhook_auth_clear_check
+        self._had_webhook_auth = security_alert._had_webhook_auth
 
-        self.env_encryption_key_source_fallback_edit = QLineEdit()
-        self.env_encryption_key_source_fallback_edit.setPlaceholderText(
-            "e.g. environment, secret_store",
-        )
-        fallback = current_settings.env_encryption_key_source_fallback
-        if fallback:
-            self.env_encryption_key_source_fallback_edit.setText(",".join(fallback))
+        self._migration_service = encryption_migration._migration_service
 
-        self.env_encryption_fallback_warning_label = QLabel()
-        self.env_encryption_fallback_warning_label.setWordWrap(True)
-        self.env_encryption_key_source_fallback_edit.textChanged.connect(
-            self._update_fallback_warning,
-        )
-        self._update_fallback_warning()
+        editor.add_to_form(self.form_layout)
+        request.add_timeout_to_form(self.form_layout)
+        server_bind.add_to_form(self.form_layout)
+        request.add_confirm_overwrite_to_form(self.form_layout)
+        encryption_config.add_to_form(self.form_layout)
+        encryption_migration.add_to_form(self.form_layout)
+        retry_policy.add_to_form(self.form_layout)
+        security_alert.add_to_form(self.form_layout)
 
-        self.env_encryption_help_label = QLabel()
-        self.env_encryption_help_label.setWordWrap(True)
-        self.env_encryption_key_source_combo.currentIndexChanged.connect(
-            self._update_encryption_key_source_help,
-        )
-        self._update_encryption_key_source_help()
-
-        self.encryption_migration_section_label = _make_section_header(
-            "Encryption migration",
-        )
-        self.verify_encryption_btn = QPushButton("Verify encryption")
-        self.verify_encryption_btn.clicked.connect(self._on_verify_encryption)
-        self.reencrypt_environments_btn = QPushButton("Re-encrypt all environments")
-        self.reencrypt_environments_btn.clicked.connect(self._on_re_encrypt_environments)
-        self.encrypt_plaintext_btn = QPushButton("Encrypt plaintext hidden values")
-        self.encrypt_plaintext_btn.clicked.connect(self._on_encrypt_plaintext_hidden)
-        migration_enabled = self._migration_service is not None
-        self.verify_encryption_btn.setEnabled(migration_enabled)
-        self.reencrypt_environments_btn.setEnabled(migration_enabled)
-        self.encrypt_plaintext_btn.setEnabled(migration_enabled)
-
-        # Retry policy defaults
-        default_policy = RetryPolicy()
-        current_policy = current_settings.default_retry_policy or default_policy
-
-        self.max_retries_spin = QSpinBox()
-        self.max_retries_spin.setRange(0, 10)
-        self.max_retries_spin.setValue(current_policy.max_retries)
-
-        self.retry_delay_spin = QDoubleSpinBox()
-        self.retry_delay_spin.setRange(0.1, 30.0)
-        self.retry_delay_spin.setSingleStep(0.1)
-        self.retry_delay_spin.setDecimals(1)
-        self.retry_delay_spin.setValue(current_policy.retry_delay_seconds)
-
-        self.retry_backoff_spin = QDoubleSpinBox()
-        self.retry_backoff_spin.setRange(1.0, 5.0)
-        self.retry_backoff_spin.setSingleStep(0.1)
-        self.retry_backoff_spin.setDecimals(1)
-        self.retry_backoff_spin.setValue(current_policy.retry_backoff_multiplier)
-
-        self.retryable_codes_edit = QLineEdit()
-        self.retryable_codes_edit.setPlaceholderText("e.g. 429,500,502,503,504")
-        self.retryable_codes_edit.setText(
-            ",".join(str(c) for c in current_policy.retryable_status_codes)
-        )
-
-        self._had_webhook_auth = bool(current_settings.alert_webhook_auth_header)
-
-        self.alert_log_path_edit = QLineEdit()
-        self.alert_log_path_edit.setPlaceholderText(
-            f"Empty for default ({_default_alert_log_path()})",
-        )
-        self.alert_log_path_edit.setText(current_settings.alert_log_path or "")
-
-        self.alert_webhook_url_edit = QLineEdit()
-        self.alert_webhook_url_edit.setPlaceholderText("https://hooks.example.com/alert")
-        self.alert_webhook_url_edit.setText(current_settings.alert_webhook_url or "")
-
-        self.alert_webhook_auth_edit = QLineEdit()
-        self.alert_webhook_auth_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        auth_placeholder = (
-            WEBHOOK_AUTH_KEEP_PLACEHOLDER
-            if self._had_webhook_auth
-            else WEBHOOK_AUTH_NEW_PLACEHOLDER
-        )
-        self.alert_webhook_auth_edit.setPlaceholderText(auth_placeholder)
-
-        self.alert_webhook_auth_clear_check = QCheckBox("Remove stored authorization header")
-        self.alert_webhook_auth_clear_check.setVisible(self._had_webhook_auth)
-
-        self.form_layout.addRow("Application Font Size:", self.font_size_spin)
-        self.form_layout.addRow("JSON Indent Size:", self.indent_size_spin)
-        self.form_layout.addRow("Request Timeout (seconds):", self.timeout_spin)
-        self.form_layout.addRow("MCP Server Port:", self.mcp_port_spin)
-        self.form_layout.addRow("MCP Server Host:", self.mcp_host_edit)
-        self.form_layout.addRow("Metrics Server Port:", self.metrics_port_spin)
-        self.form_layout.addRow("Metrics Server Host:", self.metrics_host_edit)
-        self.form_layout.addRow(
-            "Confirm before overwriting requests:", self.confirm_overwrite_check
-        )
-        self.form_layout.addRow(
-            "Environment encryption at rest:",
-            self.env_encryption_mode_combo,
-        )
-        self.form_layout.addRow(
-            "Encryption key source:",
-            self.env_encryption_key_source_combo,
-        )
-        self.form_layout.addRow(
-            "Encryption key source fallback:",
-            self.env_encryption_key_source_fallback_edit,
-        )
-        self.form_layout.addRow("", self.env_encryption_fallback_warning_label)
-        self.form_layout.addRow("", self.env_encryption_help_label)
-        self.form_layout.addRow(self.encryption_migration_section_label)
-        self.form_layout.addRow("", self.verify_encryption_btn)
-        self.form_layout.addRow("", self.reencrypt_environments_btn)
-        self.form_layout.addRow("", self.encrypt_plaintext_btn)
-        self.form_layout.addRow("Max Retries (0 = disabled):", self.max_retries_spin)
-        self.form_layout.addRow("Retry Delay (seconds):", self.retry_delay_spin)
-        self.form_layout.addRow("Retry Backoff Multiplier:", self.retry_backoff_spin)
-        self.form_layout.addRow("Retryable Status Codes:", self.retryable_codes_edit)
-        self.security_logging_section_label = _make_section_header("Security / Logging")
-        self.form_layout.addRow(self.security_logging_section_label)
-        self.form_layout.addRow("", self.log_hidden_key_names_check)
-        self.form_layout.addRow("Alert Log Path:", self.alert_log_path_edit)
-        self.form_layout.addRow("Alert Webhook URL:", self.alert_webhook_url_edit)
-        self.form_layout.addRow("Alert Webhook Auth Header:", self.alert_webhook_auth_edit)
-        if self._had_webhook_auth:
-            self.form_layout.addRow("", self.alert_webhook_auth_clear_check)
         self.layout.addLayout(self.form_layout)
 
-        # Buttons
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         self.layout.addWidget(self.buttons)
 
-    def _update_encryption_key_source_help(self) -> None:
-        source = self.env_encryption_key_source_combo.currentData()
-        help_text = KEY_SOURCE_HELP.get(source, KEY_SOURCE_HELP[KEY_SOURCE_ENVIRONMENT])
-        self.env_encryption_help_label.setText(help_text)
-
     def _encryption_settings_from_form(self) -> AppSettings:
-        env_encryption_enabled = parse_env_encryption_enabled_from_mode(
-            self.env_encryption_mode_combo.currentData(),
+        return self._encryption_config_section.encryption_settings_from_form(
+            self.current_settings,
         )
-        return self.current_settings.model_copy(
-            update={
-                "env_encryption_enabled": env_encryption_enabled,
-                "env_encryption_key_source": self.env_encryption_key_source_combo.currentData(),
-                "env_encryption_key_source_fallback": parse_key_source_fallback(
-                    self.env_encryption_key_source_fallback_edit.text(),
-                ),
-            },
-        )
-
-    def _show_migration_result(self, title: str, report: MigrationReport) -> None:
-        body = format_migration_report(report)
-        show_migration_result(self, title, body, success=report.success)
 
     def _on_verify_encryption(self) -> None:
-        if self._migration_service is None:
-            return
-        settings = self._encryption_settings_from_form()
-        logger.info("settings_encryption_verify_started")
-        report = self._migration_service.verify_decrypt_access(settings)
-        logger.info(
-            "settings_encryption_verify_completed success=%s error_count=%d",
-            report.success,
-            len(report.errors),
-        )
-        self._show_migration_result("Verify encryption", report)
-
-    def _set_migration_buttons_enabled(self, enabled: bool) -> None:
-        has_service = self._migration_service is not None
-        for button in (
-            self.verify_encryption_btn,
-            self.reencrypt_environments_btn,
-            self.encrypt_plaintext_btn,
-        ):
-            button.setEnabled(enabled and has_service)
-
-    def _start_migration_worker(
-        self,
-        operation: str,
-        *,
-        title: str,
-        confirm,
-    ) -> None:
-        if self._migration_service is None or self._migration_worker is not None:
-            return
-        if not confirm(self):
-            logger.info("settings_encryption_%s_cancelled", operation)
-            return
-        settings = self._encryption_settings_from_form()
-        logger.info("settings_encryption_%s_started", operation)
-        worker = EncryptionMigrationWorker(self._migration_service, operation, settings)
-        worker.finished.connect(
-            lambda report, op=operation, result_title=title: self._on_migration_worker_finished(
-                op,
-                result_title,
-                report,
-            )
-        )
-        worker.failed.connect(self._on_migration_worker_failed)
-        self._migration_worker = worker
-        self._set_migration_buttons_enabled(False)
-        worker.start()
-
-    def _on_migration_worker_finished(
-        self,
-        operation: str,
-        title: str,
-        report: MigrationReport,
-    ) -> None:
-        self._migration_worker = None
-        self._set_migration_buttons_enabled(True)
-        logger.info(
-            "settings_encryption_%s_completed success=%s backup=%s error_count=%d",
-            operation,
-            report.success,
-            report.backup_path,
-            len(report.errors),
-        )
-        self._show_migration_result(title, report)
-
-    def _on_migration_worker_failed(self, message: str) -> None:
-        self._migration_worker = None
-        self._set_migration_buttons_enabled(True)
-        logger.error("settings_encryption_migration_worker_failed error=%s", message)
-        show_migration_result(
-            self,
-            "Encryption migration",
-            f"Migration failed: {message}",
-            success=False,
-        )
+        self._encryption_migration_section.on_verify_encryption()
 
     def _on_re_encrypt_environments(self) -> None:
-        self._start_migration_worker(
-            "re_encrypt",
-            title="Re-encrypt all environments",
-            confirm=confirm_re_encrypt_environments,
-        )
+        self._encryption_migration_section.on_re_encrypt_environments()
 
     def _on_encrypt_plaintext_hidden(self) -> None:
-        self._start_migration_worker(
-            "encrypt_plaintext",
-            title="Encrypt plaintext hidden values",
-            confirm=confirm_encrypt_plaintext_hidden,
-        )
-
-    def _update_fallback_warning(self) -> None:
-        issues = find_fallback_parse_issues(
-            self.env_encryption_key_source_fallback_edit.text(),
-        )
-        if not issues:
-            self.env_encryption_fallback_warning_label.clear()
-            return
-        self.env_encryption_fallback_warning_label.setText(
-            "Ignored fallback entries: " + ", ".join(issues),
-        )
-
-    def _validate_bind_addresses(self) -> tuple[str, str, int, int] | None:
-        mcp_host = validate_bind_host(
-            self.mcp_host_edit.text(),
-            field_label="MCP Server Host",
-        )
-        if isinstance(mcp_host, BindAddressValidationFailure):
-            self._show_bind_address_validation_failure(mcp_host)
-            return None
-        mcp_port = validate_bind_port(
-            self.mcp_port_spin.value(),
-            field_label="MCP Server Port",
-        )
-        if isinstance(mcp_port, BindAddressValidationFailure):
-            self._show_bind_address_validation_failure(mcp_port)
-            return None
-        metrics_host = validate_bind_host(
-            self.metrics_host_edit.text(),
-            field_label="Metrics Server Host",
-        )
-        if isinstance(metrics_host, BindAddressValidationFailure):
-            self._show_bind_address_validation_failure(metrics_host)
-            return None
-        metrics_port = validate_bind_port(
-            self.metrics_port_spin.value(),
-            field_label="Metrics Server Port",
-        )
-        if isinstance(metrics_port, BindAddressValidationFailure):
-            self._show_bind_address_validation_failure(metrics_port)
-            return None
-        return mcp_host, mcp_port, metrics_host, metrics_port
-
-    def _show_bind_address_validation_failure(
-        self,
-        failure: BindAddressValidationFailure,
-    ) -> None:
-        logger.warning(
-            "bind_address_settings_validation_failed field=%s reason=%s",
-            failure.field,
-            failure.reason,
-        )
-        show_invalid_bind_address(self, failure.message)
+        self._encryption_migration_section.on_encrypt_plaintext_hidden()
 
     def accept(self):
-        bind_values = self._validate_bind_addresses()
+        bind_values = self._server_bind_section.validate(self)
         if bind_values is None:
             return
-        mcp_host, mcp_port, metrics_host, metrics_port = bind_values
 
-        parsed_codes = parse_retryable_status_codes(self.retryable_codes_edit.text())
-        if isinstance(parsed_codes, RetryableCodesValidationFailure):
-            logger.warning(
-                "retryable_codes_settings_validation_failed reason=%s",
-                parsed_codes.reason,
-            )
-            show_invalid_retryable_status_codes(self, parsed_codes.message)
+        retry_policy = self._retry_policy_section.validate(self)
+        if retry_policy is None:
             return
-        retry_policy = RetryPolicy(
-            max_retries=self.max_retries_spin.value(),
-            retry_delay_seconds=self.retry_delay_spin.value(),
-            retry_backoff_multiplier=self.retry_backoff_spin.value(),
-            retryable_status_codes=parsed_codes,
-        )
-        alert_log_path = self.alert_log_path_edit.text().strip() or None
-        webhook_url = self.alert_webhook_url_edit.text().strip() or None
-        webhook_auth = _resolve_webhook_auth_header(
-            self.alert_webhook_auth_edit.text(),
-            had_stored_auth=self._had_webhook_auth,
-            stored_auth=self.current_settings.alert_webhook_auth_header,
-            clear_requested=self.alert_webhook_auth_clear_check.isChecked(),
-        )
-        env_encryption_enabled = parse_env_encryption_enabled_from_mode(
-            self.env_encryption_mode_combo.currentData(),
-        )
+
+        fields: dict = {}
+        fields.update(self._editor_section.collect_fields())
+        fields.update(self._request_section.collect_fields())
+        fields.update(self._server_bind_section.collect_validated_fields(bind_values))
+        fields.update(self._encryption_config_section.collect_fields())
+        fields.update(self._retry_policy_section.collect_fields(retry_policy))
+        fields.update(self._security_alert_section.collect_fields())
 
         self.new_settings = AppSettings(
-            font_size=self.font_size_spin.value(),
-            indent_size=self.indent_size_spin.value(),
-            request_timeout=self.timeout_spin.value(),
             config_version=self.current_settings.config_version,
             revision=self.current_settings.revision,
             last_environment_id=self.current_settings.last_environment_id,
             open_tabs=self.current_settings.open_tabs,
             expanded_collections=self.current_settings.expanded_collections,
-            confirm_overwrite_request=self.confirm_overwrite_check.isChecked(),
-            log_hidden_key_names=self.log_hidden_key_names_check.isChecked(),
-            mcp_port=mcp_port,
-            mcp_host=mcp_host,
-            metrics_port=metrics_port,
-            metrics_host=metrics_host,
-            default_retry_policy=retry_policy,
-            alert_webhook_url=webhook_url,
-            alert_webhook_auth_header=webhook_auth,
-            alert_log_path=alert_log_path,
-            env_encryption_enabled=env_encryption_enabled,
-            env_encryption_key_source=self.env_encryption_key_source_combo.currentData(),
-            env_encryption_key_source_fallback=parse_key_source_fallback(
-                self.env_encryption_key_source_fallback_edit.text(),
-            ),
+            **fields,
         )
         super().accept()
 

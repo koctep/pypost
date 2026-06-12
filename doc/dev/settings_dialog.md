@@ -1,10 +1,40 @@
-# Settings Dialog — Alert Configuration (PYPOST-439)
+# Settings Dialog
 
 ## Overview
 
 The Settings dialog (`pypost/ui/dialogs/settings_dialog.py`) persists application
-preferences to `settings.json` via `ConfigManager`. Under **Security / Logging**, operators
-can configure retry-exhaustion alert delivery.
+preferences to `settings.json` via `ConfigManager`.
+
+Since PYPOST-598, the dialog is a **thin coordinator** that composes domain section builders
+under `pypost/ui/widgets/settings/`. Callers and tests still import `SettingsDialog` from
+`settings_dialog.py`; widget attributes remain on the dialog instance for backward-compatible
+test access.
+
+### Architecture (PYPOST-598)
+
+| Module | Domain |
+| --- | --- |
+| `editor_section.py` | Application font size, JSON indent |
+| `request_section.py` | Request timeout, confirm-before-overwrite |
+| `server_bind_section.py` | MCP/metrics host and port, bind validation |
+| `encryption_config_section.py` | Environment encryption mode, key source, fallback |
+| `encryption_migration_section.py` | Verify / re-encrypt / encrypt-plaintext actions |
+| `retry_policy_section.py` | Default retry policy, retryable status codes |
+| `security_alert_section.py` | Security/logging header, hidden-key logging, alerts |
+
+Form rows are assembled in legacy order. Request and server-bind rows are **interleaved**:
+timeout before MCP/metrics, confirm-overwrite after (see `SettingsDialog.__init__`).
+
+`accept()` orchestrates validation (`server_bind`, `retry_policy`) then merges
+`collect_fields()` from each section into one `AppSettings`.
+
+Public helpers (`parse_env_encryption_enabled_from_mode`, `ENCRYPTION_MODE_*`,
+`KEY_SOURCE_*`, `_resolve_webhook_auth_header`, validation/migration UI functions) are
+re-exported from `settings_dialog.py` for tests and patch targets.
+
+## Alert Configuration (PYPOST-439)
+
+Under **Security / Logging**, operators can configure retry-exhaustion alert delivery.
 
 ## Alert Fields
 
@@ -44,8 +74,9 @@ application restarts.
 
 ## MCP and metrics bind address validation
 
-On Save, `SettingsDialog.accept()` validates MCP and metrics host/port fields via
-`pypost/core/bind_address_validation.py` before other checks:
+On Save, `ServerBindSettingsSection.validate()` (called from `SettingsDialog.accept()`)
+validates MCP and metrics host/port fields via `pypost/core/bind_address_validation.py`
+before other checks:
 
 - **Hosts** — non-empty after trim; valid IPv4/IPv6 literal or hostname (label rules).
 - **Ports** — integer in 1024–65535 (defense in depth; spinboxes use the same range).
@@ -60,7 +91,7 @@ Reasons: `empty`, `invalid_format`, `out_of_range`.
 
 ## Retryable status codes validation
 
-On Save, `SettingsDialog.accept()` parses the retryable status codes line edit via
+On Save, `RetryPolicySection.validate()` parses the retryable status codes line edit via
 `parse_retryable_status_codes`. Invalid input blocks persistence:
 
 - `new_settings` is not set; dialog stays open.
