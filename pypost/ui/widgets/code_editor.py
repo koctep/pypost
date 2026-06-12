@@ -216,22 +216,44 @@ class CodeEditor(VariableAwarePlainTextEdit):
 
         self.insertPlainText("\n" + indent)
 
+    def _should_outdent_for_closing_bracket(self, line_text: str, column: int) -> bool:
+        """True when only whitespace surrounds the cursor on this line."""
+        prefix = line_text[:column]
+        suffix = line_text[column:]
+        if prefix.strip() or suffix.strip():
+            return False
+        leading_spaces = len(line_text) - len(line_text.lstrip(" "))
+        return leading_spaces >= self.indent_size
+
+    def _outdent_line_start(self, cursor: QTextCursor) -> None:
+        cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
+        cursor.movePosition(
+            QTextCursor.MoveOperation.Right,
+            QTextCursor.MoveMode.KeepAnchor,
+            self.indent_size,
+        )
+        if cursor.selectedText() != " " * self.indent_size:
+            return
+
+        cursor.removeSelectedText()
+        line_text = cursor.block().text()
+        if not line_text.strip():
+            cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
+            cursor.movePosition(
+                QTextCursor.MoveOperation.Right,
+                QTextCursor.MoveMode.MoveAnchor,
+                len(line_text),
+            )
+        self.setTextCursor(cursor)
+
     def _handle_closing_bracket(self, event: QKeyEvent):
         cursor = self.textCursor()
-        current_line_text = cursor.block().text()
+        block = cursor.block()
+        line_text = block.text()
+        column = cursor.positionInBlock()
 
-        if current_line_text.strip() == "":
-            indent_level = len(current_line_text) - len(current_line_text.lstrip())
-
-            if indent_level >= self.indent_size:
-                cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
-                cursor.movePosition(
-                    QTextCursor.MoveOperation.Right,
-                    QTextCursor.MoveMode.KeepAnchor,
-                    self.indent_size,
-                )
-                if cursor.selectedText() == " " * self.indent_size:
-                    cursor.removeSelectedText()
+        if self._should_outdent_for_closing_bracket(line_text, column):
+            self._outdent_line_start(cursor)
 
         super().keyPressEvent(event)
 

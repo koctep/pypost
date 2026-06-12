@@ -2,7 +2,7 @@
 
 PYPOST-104: CodeEditor extends VariableAwarePlainTextEdit; used in RequestEditor for JSON body.
 Coverage: indent/tab stops, JSON reformat, paste-as-JSON-format, Enter auto-indent, closing-bracket
-dedent when line is whitespace-only.
+dedent when only whitespace surrounds the cursor (PYPOST-105).
 PYPOST-510: line-number gutter width, viewport margin, read-only gutter clicks.
 """
 
@@ -189,6 +189,34 @@ class TestCodeEditorKeyHandling(unittest.TestCase):
         ed.setTextCursor(cur)
         QTest.keyClick(ed, Qt.Key.Key_BraceRight)
         self.assertEqual(ed.toPlainText(), "{\n}")
+
+    def test_closing_bracket_dedents_with_cursor_mid_whitespace(self):
+        ed = CodeEditor(indent_size=2)
+        ed.setPlainText("{\n    ")
+        cur = ed.textCursor()
+        cur.movePosition(cur.MoveOperation.End)
+        cur.movePosition(cur.MoveOperation.Left, cur.MoveMode.MoveAnchor, 2)
+        ed.setTextCursor(cur)
+        QTest.keyClick(ed, Qt.Key.Key_BraceRight)
+        self.assertEqual(ed.toPlainText(), "{\n  }")
+
+    def test_closing_bracket_dedents_square_bracket(self):
+        ed = CodeEditor(indent_size=2)
+        ed.setPlainText("[\n  ")
+        cur = ed.textCursor()
+        cur.movePosition(cur.MoveOperation.End)
+        ed.setTextCursor(cur)
+        QTest.keyClick(ed, Qt.Key.Key_BracketRight)
+        self.assertEqual(ed.toPlainText(), "[\n]")
+
+    def test_closing_bracket_no_dedent_when_line_has_content(self):
+        ed = CodeEditor(indent_size=2)
+        ed.setPlainText('{\n  "a": 1')
+        cur = ed.textCursor()
+        cur.movePosition(cur.MoveOperation.End)
+        ed.setTextCursor(cur)
+        QTest.keyClick(ed, Qt.Key.Key_BraceRight)
+        self.assertEqual(ed.toPlainText(), '{\n  "a": 1}')
 
 
 class TestCodeEditorLineNumbers(unittest.TestCase):
