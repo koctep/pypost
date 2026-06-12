@@ -182,17 +182,38 @@ Production grep: the only `jinja2.Environment()` in `pypost/` is `template_servi
 
 - **Versus old `TemplateEngine`:** avoids creating a new `Environment` or ad-hoc `Template` on
   every render call.
-- **`from_string` compile cache:** not enabled by default. Repeated identical templates still
-  recompile unless a custom cache is added ([PYPOST-148](https://pypost.atlassian.net/browse/PYPOST-148)).
+- **`from_string` compile cache:** not present on `TemplateService` (audit PYPOST-148, 2026-06).
+  Repeated identical templates recompile each call unless a future cache is added.
 - **Measured cost (PYPOST-455):** render work is sub-millisecond; network I/O dominates request
-  latency. Compile caching remains deferred.
+  latency.
+
+### Compile cache decision (PYPOST-148)
+
+**Outcome: defer implementation.** No bounded compile cache was added.
+
+| Audit item | Result |
+| --- | --- |
+| `lru_cache` / Jinja2 `BytecodeCache` on `TemplateService` | Not present |
+| `_render_with_jinja` | `self.env.from_string(content)` per call |
+| Guard tests for future cache | `tests/test_template_service_caching_eval.py` |
+
+**Benchmark reference (PYPOST-455, local 2026-06-11):**
+
+| Scenario | µs/render |
+| --- | ---: |
+| Plain two-placeholder template | ~130 |
+| Single function expression | ~152 |
+| Nested `base64(md5(...))` | ~182 |
+| Simulated HTTP request | ~708 |
+
+**Revisit when:** hover lag with function templates; sustained high
+`template_expression_render_attempts`; templates routinely with 20+ placeholders. Prefer
+`functools.lru_cache` on compile with `maxsize=256` (PYPOST-455 Strategy A).
+
+Full analysis: [template_expression_functions.md](template_expression_functions.md) (Caching
+evaluation) and `ai-tasks/PYPOST-455/20-architecture.md`.
 
 ### Regression test
 
 `TestTemplateServiceSingleEnvironment` in `tests/test_template_service.py` asserts
 `render_string` and `parse` keep the same `self.env` object on one service instance.
-
-### When to revisit caching
-
-See [template_expression_functions.md](template_expression_functions.md) (Caching evaluation,
-PYPOST-455) and PYPOST-148 for criteria (hover lag, high render rates, large templates).

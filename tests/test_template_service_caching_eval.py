@@ -1,7 +1,7 @@
-"""PYPOST-455: Properties required if template caching is added later.
+"""PYPOST-455 / PYPOST-148: Properties required if template caching is added later.
 
-Caching is not implemented. Evaluation concluded deferral — see
-doc/dev/template_expression_functions.md (Caching evaluation).
+Caching is not implemented. PYPOST-455 evaluated cost; PYPOST-148 closed the debt item with
+documented deferral — see doc/dev/template_service.md (Compile cache decision).
 """
 
 import pytest

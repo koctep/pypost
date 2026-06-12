@@ -30,5 +30,6 @@
 
 - Create unit tests for `pypost/core/template_service.py`.
   — [PYPOST-147](https://pypost.atlassian.net/browse/PYPOST-147)
-- **Jinja2 `from_string` caching** ([PYPOST-148](https://pypost.atlassian.net/browse/PYPOST-148)):
-  Consider `lru_cache` or Jinja2 cache for repeated identical templates if profiling shows need.
+- ~~**Jinja2 `from_string` caching** ([PYPOST-148](https://pypost.atlassian.net/browse/PYPOST-148))~~:
+  **Resolved (deferral).** Audit confirmed no bounded compile cache; PYPOST-455 benchmark shows
+  sub-ms render cost. Deferral documented in [template_service.md](../../doc/dev/template_service.md).
