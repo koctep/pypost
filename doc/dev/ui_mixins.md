@@ -15,7 +15,7 @@ Hover support is split into two classes in `pypost/ui/widgets/mixins.py`:
 - **Table cells** (`VariableAwareTableWidget`): locator pattern for detection, resolver on full
   cell text (no cursor index). Per-cell resolution cache avoids redundant `resolve_text` on
   repeated `mouseMoveEvent` over the same cell (PYPOST-132). This path is separate from
-  line-scoped scan (PYPOST-122), which applies only to multiline editors.
+  line-scoped scan (PYPOST-120 / PYPOST-122), which applies only to multiline editors.
 - **Metrics:** `VariableHoverResolver.set_metrics` (also exposed on the facade).
 
 ## VariableHoverMixin
@@ -51,10 +51,11 @@ Checkers infer `TWidget` as `QLineEdit` from the MRO.
 - Initialize the mixin after the QWidget base: `QLineEdit.__init__(self)` then
   `VariableHoverMixin.__init__(self)`.
 
-### Line-scoped scan (PYPOST-122)
+### Line-scoped scan (PYPOST-120, PYPOST-122)
 
-For multiline editors, `VariableHoverMixin` can limit expression lookup to the line under
-the cursor instead of scanning the full document on every `mouseMoveEvent`:
+For multiline editors, `VariableHoverMixin` limits expression lookup to the line under
+the cursor instead of scanning the full document on every `mouseMoveEvent` (PYPOST-120
+mitigation from PYPOST-13 tech debt; implemented in PYPOST-122):
 
 - `_hover_line_scoped_scan` — when `True`, `_prepare_hover_scan_context` uses
   `_slice_line_at_index` before `_find_hover_expression`.
