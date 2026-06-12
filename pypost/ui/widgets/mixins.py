@@ -13,6 +13,9 @@ from pypost.core.template_expression_tokenizer import (
 )
 from pypost.core.template_service import TemplateService
 
+# Maximum plain {{name}} follow hops in hover tooltips (cycle-safe bound).
+TOOLTIP_REFERENCE_MAX_DEPTH = 32
+
 
 class VariableHoverHelper:
     """Helper class to find variables in text and manage tooltip display."""
@@ -64,30 +67,50 @@ class VariableHoverHelper:
         """Returns the value of the variable or a default message."""
         if hidden_keys and variable_name in hidden_keys:
             return HIDDEN_MASK
-        raw = variables.get(variable_name, "<not defined>")
-        if raw == "<not defined>":
-            return raw
-        return VariableHoverHelper._resolve_single_level_reference(
-            raw,
+        return VariableHoverHelper._resolve_plain_reference_chain(
+            variable_name,
             variables,
             hidden_keys,
         )
 
     @staticmethod
-    def _resolve_single_level_reference(
-        raw: str,
+    def _resolve_plain_reference_chain(
+        name: str,
         variables: Dict[str, str],
         hidden_keys: Optional[Set[str]] = None,
+        *,
+        visited: Optional[Set[str]] = None,
+        depth: int = 0,
     ) -> str:
-        """Follow one plain ``{{name}}`` reference in a variable value (PYPOST-115)."""
+        """Follow plain ``{{name}}`` references with cycle and depth bounds (PYPOST-123)."""
+        if hidden_keys and name in hidden_keys:
+            return HIDDEN_MASK
+
+        raw = variables.get(name, "<not defined>")
+        if raw == "<not defined>":
+            return raw
+
         if not is_plain_variable_token(raw):
             return raw
+
         inner_name = extract_plain_variable_name(raw)
         if inner_name is None:
             return raw
-        if hidden_keys and inner_name in hidden_keys:
-            return HIDDEN_MASK
-        return variables.get(inner_name, "<not defined>")
+
+        seen = visited if visited is not None else set()
+        if inner_name in seen:
+            return raw
+
+        if depth >= TOOLTIP_REFERENCE_MAX_DEPTH:
+            return raw
+
+        return VariableHoverHelper._resolve_plain_reference_chain(
+            inner_name,
+            variables,
+            hidden_keys,
+            visited=seen | {name},
+            depth=depth + 1,
+        )
 
     @staticmethod
     def resolve_text(

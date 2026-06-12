@@ -172,14 +172,48 @@ class TestVariableHoverHelper(unittest.TestCase):
             "resolved",
         )
 
-    def test_get_variable_value_chain_stops_after_one_level(self):
+    def test_get_variable_value_multi_level_chain(self):
         self.assertEqual(
             VariableHoverHelper.get_variable_value(
                 "a",
                 {"a": "{{b}}", "b": "{{c}}", "c": "deep"},
             ),
-            "{{c}}",
+            "deep",
         )
+
+    def test_get_variable_value_cycle_returns_unresolved_reference(self):
+        self.assertEqual(
+            VariableHoverHelper.get_variable_value(
+                "a",
+                {"a": "{{b}}", "b": "{{a}}"},
+            ),
+            "{{a}}",
+        )
+
+    def test_get_variable_value_self_cycle_returns_reference(self):
+        self.assertEqual(
+            VariableHoverHelper.get_variable_value(
+                "loop",
+                {"loop": "{{loop}}"},
+            ),
+            "{{loop}}",
+        )
+
+    def test_get_variable_value_chain_stops_at_max_depth(self):
+        variables = {
+            "v0": "{{v1}}",
+            "v1": "{{v2}}",
+            "v2": "{{v3}}",
+            "v3": "leaf",
+        }
+        with patch(
+            "pypost.ui.widgets.mixins.TOOLTIP_REFERENCE_MAX_DEPTH",
+            2,
+        ):
+            self.assertEqual(
+                VariableHoverHelper.get_variable_value("v0", variables),
+                "{{v3}}",
+            )
 
     def test_get_variable_value_chain_hidden_inner_returns_mask(self):
         self.assertEqual(

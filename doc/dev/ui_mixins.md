@@ -45,15 +45,16 @@ the cursor instead of scanning the full document on every `mouseMoveEvent`:
 
 This preserves tooltip behaviour while avoiding O(document) regex iteration on large bodies.
 
-### Variable value resolution (PYPOST-115)
+### Variable value resolution (PYPOST-115, PYPOST-123)
 
 `VariableHoverHelper.get_variable_value` resolves plain `{{name}}` placeholders:
 
 - **Direct lookup:** `host` → value from the variables dict, or `<not defined>`.
-- **One-level chain:** when a variable's value is exactly another plain token (e.g.
-  `VAR_A = {{VAR_B}}`), the tooltip follows that reference once and shows `VAR_B`'s value.
-  Deeper chains are not expanded (second hop stops at the inner token text).
-- **Hidden keys:** masking applies to both the outer and inner variable name.
+- **Multi-hop chain:** when variables reference each other via plain tokens (e.g.
+  `A = {{B}}`, `B = {{C}}`, `C = value`), the tooltip follows the chain until a literal
+  value, a missing variable, a cycle, or the depth bound (`TOOLTIP_REFERENCE_MAX_DEPTH`).
+  On cycle or depth limit, the tooltip shows the unresolved `{{name}}` token at that hop.
+- **Hidden keys:** masking applies at every hop in the chain.
 - **Function expressions** (`{{urlencode(db)}}`, nested calls, etc.) use
   `TemplateService.render_string` with `render_path="hover"` — unchanged.
 
