@@ -39,8 +39,6 @@ def _make_window(qapp):
         mock_sm.return_value.settings = AppSettings()
         from pypost.ui.main_window import MainWindow
         window = MainWindow(metrics=metrics, template_service=template_service)
-    # Supply widget stubs that apply_settings references via the explicit loop.
-    window.settings_btn = MagicMock()
     return window
 
 

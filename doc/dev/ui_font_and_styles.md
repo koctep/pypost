@@ -46,7 +46,8 @@ Delegates font work to `style_manager.apply_styles(app, font_size=settings.font_
 ## Related
 
 - PYPOST-404 — startup font size bug (call-order fix)
-- PYPOST-106 — removed manual per-widget `setFont` loop
+- PYPOST-106 — removed manual per-widget `setFont` loop in `MainWindow`
+- PYPOST-425 — removed redundant `EnvPresenter.apply_font` widget loop
 - PYPOST-114 — `QToolTip` QSS hook for variable hover and widget tooltips
 - `doc/dev/ui_mixins.md` — variable hover tooltip styling
 - `doc/dev/tech-debt/PYPOST-11.md` — menu padding QSS for large fonts

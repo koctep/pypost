@@ -582,17 +582,6 @@ class TestEnvPresenter(unittest.TestCase):
         self.assertIs(p._settings, new_settings)
         self.assertTrue(p._settings.log_hidden_key_names)
 
-    def test_apply_font_sets_font_on_env_bar_widgets(self):
-        from PySide6.QtGui import QFont
-
-        p = self._make_presenter([])
-        font = QFont()
-        font.setPointSize(16)
-        p.apply_font(font)
-        self.assertEqual(p._env_label.font().pointSize(), 16)
-        self.assertEqual(p._env_selector.font().pointSize(), 16)
-        self.assertEqual(p._manage_btn.font().pointSize(), 16)
-
     def test_widget_properties_removed(self):
         p = self._make_presenter([])
         for name in (

@@ -25,7 +25,7 @@ assigns `self._environments = dialog.environments` before saving — the present
 `EnvPresenter` exposes `widget` for top-bar layout only. Internal combo/button/label widgets
 are not public properties. Callers use:
 
-- `apply_font(font)` / `apply_settings(settings)` — font on env bar widgets
+- `apply_settings(settings)` — stores presenter settings (font via global QSS + app font)
 - `select_environment_index(index)` — user intent to change active environment
 - `environment_at(index)`, `current_environment_index()`, `environment_count()` — query API
 - `mcp_status_text()`, `mcp_tools_button_text()`, `mcp_activity_button_text()` — MCP bar labels

@@ -2,9 +2,7 @@ import logging
 from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QApplication,
     QComboBox,
     QHBoxLayout,
     QInputDialog,
@@ -123,23 +121,8 @@ class EnvPresenter(QObject):
             return dict(selected.variables)
         return {}
 
-    def apply_font(self, font: QFont) -> None:
-        """Apply font to all env bar widgets."""
-        for widget in (
-            self._env_label,
-            self._env_selector,
-            self._manage_btn,
-            self._mcp_tools_btn,
-            self._mcp_activity_btn,
-            self._mcp_status_label,
-        ):
-            widget.setFont(font)
-
     def apply_settings(self, settings: AppSettings) -> None:
         self._settings = settings
-        app = QApplication.instance()
-        if app:
-            self.apply_font(app.font())
 
     def select_environment_index(self, index: int) -> None:
         """Select environment by combo index (0 = No Environment)."""
