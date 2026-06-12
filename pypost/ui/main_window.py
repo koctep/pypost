@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -29,6 +29,7 @@ from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
+from pypost.ui.hotkeys import register_hotkey, register_hotkey_group, tag_action
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.main_window_signals import wire_presenter_signals
 from pypost.ui.presenters import CollectionsPresenter, EnvPresenter, TabsPresenter
@@ -151,30 +152,124 @@ class MainWindow(QMainWindow):
         quit_action = file_menu.addAction("Quit")
         quit_action.setShortcut("Ctrl+Q")
         quit_action.triggered.connect(self.handle_exit)
+        tag_action(
+            quit_action,
+            section="General",
+            order=1,
+            keys=("Ctrl+Q",),
+            label="Quit Application",
+        )
         help_menu = menubar.addMenu("Help")
         help_menu.addAction("Hotkeys").triggered.connect(self.handle_show_hotkeys)
         help_menu.addAction("About").triggered.connect(self.handle_show_about)
 
     def _setup_shortcuts(self) -> None:
-        def sc(key, slot):
-            QShortcut(QKeySequence(key), self).activated.connect(slot)
-
-        sc("Ctrl+N", lambda: self.tabs.handle_new_tab("shortcut"))
-        sc("Ctrl+W", self.tabs.handle_close_tab)
-        sc("Ctrl+Tab", self.tabs.handle_next_tab)
-        sc("Ctrl+Shift+Tab", self.tabs.handle_previous_tab)
-        for i in range(1, 10):
-            sc(f"Alt+{i}", lambda idx=i - 1: self.tabs.handle_switch_to_tab(idx))
-        sc("Ctrl+,", self.open_settings)
-        sc("F12", self.open_settings)
-        sc("Ctrl+E", self.env.handle_open_environments)
-        sc("Ctrl+L", self.tabs.handle_focus_url)
-        sc("Alt+D", self.tabs.handle_focus_url)
-        sc("F5", self.tabs.handle_send_request_global)
-        sc("Ctrl+P", self.tabs.handle_switch_to_params_global)
-        sc("Ctrl+H", self.tabs.handle_switch_to_headers_global)
-        sc("Ctrl+B", self.tabs.handle_switch_to_body_global)
-        sc("Ctrl+T", self.tabs.handle_switch_to_script_global)
+        register_hotkey(
+            self,
+            section="General",
+            label="Settings",
+            keys=("Ctrl+,", "F12"),
+            slot=self.open_settings,
+            order=2,
+        )
+        register_hotkey(
+            self,
+            section="General",
+            label="Environment Manager",
+            keys=("Ctrl+E",),
+            slot=self.env.handle_open_environments,
+            order=3,
+        )
+        register_hotkey(
+            self,
+            section="Tabs",
+            label="New Tab",
+            keys=("Ctrl+N",),
+            slot=lambda: self.tabs.handle_new_tab("shortcut"),
+            order=1,
+        )
+        register_hotkey(
+            self,
+            section="Tabs",
+            label="Close Tab",
+            keys=("Ctrl+W",),
+            slot=self.tabs.handle_close_tab,
+            order=2,
+        )
+        register_hotkey(
+            self,
+            section="Tabs",
+            label="Next Tab",
+            keys=("Ctrl+Tab",),
+            slot=self.tabs.handle_next_tab,
+            order=3,
+        )
+        register_hotkey(
+            self,
+            section="Tabs",
+            label="Previous Tab",
+            keys=("Ctrl+Shift+Tab",),
+            slot=self.tabs.handle_previous_tab,
+            order=4,
+        )
+        register_hotkey_group(
+            self,
+            section="Tabs",
+            label="Switch to Tab 1-9",
+            bindings=tuple(
+                (f"Alt+{index}", lambda idx=index - 1: self.tabs.handle_switch_to_tab(idx))
+                for index in range(1, 10)
+            ),
+            order=5,
+        )
+        register_hotkey(
+            self,
+            section="Request Editor",
+            label="Send Request",
+            keys=("F5", "Ctrl+Return"),
+            slot=self.tabs.handle_send_request_global,
+            order=1,
+        )
+        register_hotkey(
+            self,
+            section="Request Editor",
+            label="Focus URL Bar",
+            keys=("Ctrl+L", "Alt+D"),
+            slot=self.tabs.handle_focus_url,
+            order=4,
+        )
+        register_hotkey(
+            self,
+            section="Request Editor",
+            label="Switch to Params",
+            keys=("Ctrl+P",),
+            slot=self.tabs.handle_switch_to_params_global,
+            order=5,
+        )
+        register_hotkey(
+            self,
+            section="Request Editor",
+            label="Switch to Headers",
+            keys=("Ctrl+H",),
+            slot=self.tabs.handle_switch_to_headers_global,
+            order=6,
+        )
+        register_hotkey(
+            self,
+            section="Request Editor",
+            label="Switch to Body",
+            keys=("Ctrl+B",),
+            slot=self.tabs.handle_switch_to_body_global,
+            order=7,
+        )
+        register_hotkey(
+            self,
+            section="Request Editor",
+            label="Switch to Script",
+            keys=("Ctrl+T",),
+            slot=self.tabs.handle_switch_to_script_global,
+            order=8,
+        )
 
     def apply_settings(self, settings: AppSettings) -> None:
         self.settings = settings
@@ -244,13 +339,6 @@ class MainWindow(QMainWindow):
 
     def handle_show_about(self) -> None:
         AboutDialog(self).exec()
-
-    def keyPressEvent(self, event) -> None:
-        if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_Return:
-            self.tabs.handle_send_request_global()
-            event.accept()
-            return
-        super().keyPressEvent(event)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)

@@ -2,7 +2,7 @@ import logging
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -28,6 +28,7 @@ from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_sync import copy_request_for_isolated_tab
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
+from pypost.ui.hotkeys import tag_action
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
@@ -369,10 +370,24 @@ class RequestWidget(QWidget):
         self.save_requested.emit(current_request)
 
     def _setup_shortcuts(self):
-        save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
-        save_shortcut.activated.connect(self.handle_save_request_shortcut)
-        save_as_shortcut = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
-        save_as_shortcut.activated.connect(self.handle_save_as_shortcut)
+        self.save_action.setShortcut(QKeySequence("Ctrl+S"))
+        self.save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.addAction(self.save_action)
+        self.addAction(self.save_as_action)
+        tag_action(
+            self.save_action,
+            section="Request Editor",
+            order=2,
+            keys=("Ctrl+S",),
+            label="Save Request",
+        )
+        tag_action(
+            self.save_as_action,
+            section="Request Editor",
+            order=3,
+            keys=("Ctrl+Shift+S",),
+            label="Save As Request",
+        )
 
     def handle_save_request_shortcut(self):
         self.on_save("shortcut")
