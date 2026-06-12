@@ -5,43 +5,27 @@ pytestmark = pytest.mark.timeout(120)
 
 import asyncio
 import json
-import socket
 import threading
-import time
 import unittest
-from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import MagicMock
 
 import anyio
-import uvicorn
 from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.mcp_server import MCPServerManager
-from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.request_service import ExecutionResult
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
-
-
-def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
-
-
-def _wait_for_port(host: str, port: int, timeout: float = 10.0) -> None:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=0.2):
-                return
-        except OSError:
-            time.sleep(0.05)
-    raise TimeoutError(f"MCP server did not listen on {host}:{port} within {timeout}s")
+from tests.helpers.mcp_live_server import (
+    LiveMCPServer,
+    free_port,
+    live_mcp_server,
+    wait_for_port,
+)
 
 
 def _exec_result(body: str = "ok") -> ExecutionResult:
@@ -83,59 +67,6 @@ async def _mcp_call_tool(mcp_url: str, name: str, arguments: dict | None = None)
                 await session.initialize()
                 result = await session.call_tool(name, arguments or {})
                 return json.loads(result.content[0].text)
-
-
-class _LiveMCPServer:
-    """Minimal uvicorn harness mirroring MCPServerManager._run_uvicorn."""
-
-    def __init__(self, tools, execute_result: ExecutionResult | None = None):
-        self.host = "127.0.0.1"
-        self.port = _free_port()
-        self.impl = MCPServerImpl()
-        self.impl.register_tools(tools)
-        if execute_result is not None:
-            mock_svc = MagicMock()
-            mock_svc.execute.return_value = execute_result
-            self.impl._create_request_service = lambda: mock_svc
-            self._mock_request_service = mock_svc
-        self._thread: threading.Thread | None = None
-        self._server: uvicorn.Server | None = None
-
-    @property
-    def mcp_url(self) -> str:
-        return f"http://{self.host}:{self.port}/mcp"
-
-    def start(self) -> None:
-        self._thread = threading.Thread(target=self._run_uvicorn, daemon=True)
-        self._thread.start()
-        _wait_for_port(self.host, self.port)
-
-    def stop(self) -> None:
-        if self._server is not None:
-            self._server.should_exit = True
-        if self._thread is not None:
-            self._thread.join(timeout=3.0)
-
-    def _run_uvicorn(self) -> None:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        app = self.impl.create_app()
-        config = uvicorn.Config(
-            app=app, host=self.host, port=self.port, loop="asyncio", log_level="warning"
-        )
-        self._server = uvicorn.Server(config)
-        self._server.install_signal_handlers = lambda: None
-        loop.run_until_complete(self._server.serve())
-
-
-@contextmanager
-def live_mcp_server(tools, execute_result: ExecutionResult | None = None):
-    server = _LiveMCPServer(tools, execute_result=execute_result)
-    server.start()
-    try:
-        yield server
-    finally:
-        server.stop()
 
 
 class TestMCPServerIntegration(unittest.TestCase):
@@ -199,7 +130,7 @@ class TestMCPServerIntegration(unittest.TestCase):
             method="GET",
             url="{{ base_url }}/{{ mcp.request.id }}",
         )
-        server = _LiveMCPServer([tool], execute_result=_exec_result("ok"))
+        server = LiveMCPServer([tool], execute_result=_exec_result("ok"))
         server.impl.set_variable_supplier(lambda: {"base_url": "http://api"})
         server.start()
         try:
@@ -217,7 +148,7 @@ class TestMCPServerIntegration(unittest.TestCase):
 
     def test_call_tool_executes_real_outbound_http_via_stub(self):
         """MCP tool call hits a local HTTP stub (PYPOST-564), not mocked execute."""
-        stub_port = _free_port()
+        stub_port = free_port()
         stub_body = "stub-response"
 
         class _StubHandler(BaseHTTPRequestHandler):
@@ -256,7 +187,7 @@ class TestMCPServerManagerIntegration(unittest.TestCase):
     """Exercise production MCPServerManager thread + uvicorn lifecycle."""
 
     def test_manager_starts_server_and_invokes_tool(self):
-        port = _free_port()
+        port = free_port()
         tool = RequestData(
             name="Mgr Tool",
             expose_as_mcp=True,
@@ -269,7 +200,7 @@ class TestMCPServerManagerIntegration(unittest.TestCase):
         manager._impl._create_request_service = lambda: mock_svc
         manager.start_server(port, [tool], host="127.0.0.1")
         try:
-            _wait_for_port("127.0.0.1", port)
+            wait_for_port("127.0.0.1", port)
             mcp_url = f"http://127.0.0.1:{port}/mcp"
             payload = anyio.run(_mcp_call_tool, mcp_url, "mgr_tool", {})
             self.assertEqual(payload["body"], "from-manager")
