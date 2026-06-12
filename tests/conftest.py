@@ -16,6 +16,18 @@ def qapp():
     yield app
 
 
+@pytest.fixture(scope="session")
+def mcp_collection_live_server():
+    """Session-scoped MCP server for the committed test collection (PYPOST-593)."""
+    from tests.helpers.mcp_live_server import LiveMCPServer
+    from tests.helpers.mcp_test_collection import mcp_exposed_requests
+
+    server = LiveMCPServer(mcp_exposed_requests())
+    server.start()
+    yield server
+    server.stop()
+
+
 def pytest_runtest_setup(item):
     if item.get_closest_marker("timeout") is None:
         pytest.fail(
