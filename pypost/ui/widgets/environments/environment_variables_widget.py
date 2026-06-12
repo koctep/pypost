@@ -147,6 +147,67 @@ class EnvironmentVariablesWidget(QWidget):
             return stored
         return fallback
 
+    def _is_edited_cell(
+        self,
+        edited_item: QTableWidgetItem | None,
+        row: int,
+        column: int,
+    ) -> bool:
+        return (
+            edited_item is not None
+            and edited_item.column() == column
+            and edited_item.row() == row
+        )
+
+    def _revert_invalid_variable_key(
+        self,
+        row: int,
+        env: Environment,
+        k_item: QTableWidgetItem,
+        edited_item: QTableWidgetItem | None,
+        error: str,
+    ) -> bool:
+        """Revert the key cell when the edited row has an invalid name."""
+        if not self._is_edited_cell(edited_item, row, COL_VAR):
+            return False
+        old_keys = list(env.variables.keys())
+        revert = old_keys[row] if row < len(old_keys) else ""
+        k_item.setText(revert)
+        show_invalid_variable_name_error(self, error)
+        return True
+
+    def _resolve_hidden_value_on_edit(
+        self,
+        row: int,
+        key: str,
+        env: Environment,
+        edited_item: QTableWidgetItem | None,
+        v_item: QTableWidgetItem | None,
+    ) -> str:
+        val = self._extract_real_value(v_item, env.variables.get(key, ""))
+        if not self._is_edited_cell(edited_item, row, COL_VAL):
+            return val
+        typed = v_item.text() if v_item else ""
+        if typed != HIDDEN_MASK:
+            val = typed
+        self.vars_table.setItem(row, COL_VAL, self._make_value_item(val, True))
+        return val
+
+    def _refresh_value_cell_for_hidden_toggle(
+        self,
+        row: int,
+        key: str,
+        hidden: bool,
+        env: Environment,
+    ) -> None:
+        val_item = self.vars_table.item(row, COL_VAL)
+        real_val = self._extract_real_value(val_item, env.variables.get(key, ""))
+        self.vars_table.setItem(
+            row,
+            COL_VAL,
+            self._make_value_item(real_val, hidden),
+        )
+
     def _on_hidden_toggled(self, checked: bool) -> None:
         env = self._get_selected_env()
         if env is None:
@@ -163,24 +224,9 @@ class EnvironmentVariablesWidget(QWidget):
                 self.vars_table.blockSignals(True)
                 if checked:
                     env.hidden_keys.add(key)
-                    val_item = self.vars_table.item(i, COL_VAL)
-                    real_val = self._extract_real_value(
-                        val_item,
-                        env.variables.get(key, ""),
-                    )
-                    self.vars_table.setItem(i, COL_VAL, self._make_value_item(real_val, True))
                 else:
                     env.hidden_keys.discard(key)
-                    val_item = self.vars_table.item(i, COL_VAL)
-                    real_val = self._extract_real_value(
-                        val_item,
-                        env.variables.get(key, ""),
-                    )
-                    self.vars_table.setItem(
-                        i,
-                        COL_VAL,
-                        self._make_value_item(real_val, False),
-                    )
+                self._refresh_value_cell_for_hidden_toggle(i, key, checked, env)
                 self.vars_table.blockSignals(False)
                 logger.info(
                     "env_hidden_flag_changed env_name=%s key=%s hidden=%s",
@@ -226,34 +272,25 @@ class EnvironmentVariablesWidget(QWidget):
                 key = k_item.text().strip()
                 is_valid, error = validate_environment_variable_name(key)
                 if not is_valid:
-                    if (
-                        edited_item is not None
-                        and edited_item.column() == COL_VAR
-                        and edited_item.row() == i
+                    if self._revert_invalid_variable_key(
+                        i,
+                        env,
+                        k_item,
+                        edited_item,
+                        error,
                     ):
-                        old_keys = list(env.variables.keys())
-                        revert = old_keys[i] if i < len(old_keys) else ""
-                        k_item.setText(revert)
-                        show_invalid_variable_name_error(self, error)
+                        continue
                     continue
                 is_hidden = cb.isChecked() if cb else False
                 if is_hidden:
                     new_hidden.add(key)
-                    val = self._extract_real_value(v_item, env.variables.get(key, ""))
-                    if (
-                        edited_item is not None
-                        and edited_item.column() == COL_VAL
-                        and edited_item.row() == i
-                    ):
-                        typed = v_item.text() if v_item else ""
-                        if typed != HIDDEN_MASK:
-                            val = typed
-                        self.vars_table.setItem(
-                            i,
-                            COL_VAL,
-                            self._make_value_item(val, True),
-                        )
-                    new_vars[key] = val
+                    new_vars[key] = self._resolve_hidden_value_on_edit(
+                        i,
+                        key,
+                        env,
+                        edited_item,
+                        v_item,
+                    )
                 else:
                     new_vars[key] = self._extract_real_value(v_item, "")
 

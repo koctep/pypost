@@ -69,6 +69,24 @@ Instead of main UI buttons, actions on existing environments are handled via a r
   `show_invalid_variable_name_error` displays the validator message.
 - **`_on_hidden_toggled(checked)`**: Manages the masking and unmasking of hidden variable values in the UI, ensuring the real value is preserved in the item's `UserRole` data.
 
+#### Row-update helpers (`EnvironmentVariablesWidget`, PYPOST-449)
+
+Row-level transitions are decomposed into private helpers so `on_var_changed` and hidden-toggle
+paths stay readable:
+
+| Helper | Role |
+| --- | --- |
+| `_is_edited_cell` | True when the `itemChanged` callback targets a given row/column |
+| `_revert_invalid_variable_key` | Revert Variable cell and show validation error |
+| `_resolve_hidden_value_on_edit` | Persist typed value for hidden rows and re-apply `HIDDEN_MASK` |
+| `_refresh_value_cell_for_hidden_toggle` | Swap mask/plaintext when the Hidden checkbox toggles |
+
+Value storage still uses `_make_value_item` / `_extract_real_value` (PYPOST-437). Model sync runs
+through `_sync_env_variables_from_table`.
+
+Widget-focused tests: `tests/test_environment_variables_widget.py`. Full dialog regression:
+`tests/test_env_dialog.py`.
+
 ## Configuration
 N/A
 
