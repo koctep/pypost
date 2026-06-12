@@ -21,11 +21,11 @@ Addressed in PYPOST-14 by implementing `RequestManager`.
 
 ## Performance Concerns
 
-- As mentioned, linear search for request ID might be slow if the user has thousands of requests. A — [PYPOST-126](https://pypost.atlassian.net/browse/PYPOST-126)
-  hash map index (ID -> Request) would be O(1). This can now be optimized inside `RequestManager`
-  without changing the rest of the app.
+- **[FIXED] Linear request ID search**: Replaced with `_request_index` hash map for O(1) lookup
+  in `RequestManager.find_request` ([PYPOST-127](https://pypost.atlassian.net/browse/PYPOST-127),
+  [PYPOST-126](https://pypost.atlassian.net/browse/PYPOST-126)).
 
 ## Follow-up Tasks
 
 - **[COMPLETED] Refactor Request Management**: Create a `RequestManager` service.
-- **Optimize Lookup**: Implement an index for request IDs inside `RequestManager`. — [PYPOST-127](https://pypost.atlassian.net/browse/PYPOST-127)
+- **[COMPLETED] Optimize Lookup**: Index for request IDs inside `RequestManager`. — [PYPOST-127](https://pypost.atlassian.net/browse/PYPOST-127)

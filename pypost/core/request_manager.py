@@ -182,21 +182,20 @@ class RequestManager:
             logger.warning("rename_request_rejected_empty_name request_id=%s", request_id)
             return False
 
-        for col in self.collections:
-            for req in col.requests:
-                if req.id == request_id:
-                    req.name = normalized_name
-                    self.storage.save_collection(col)
-                    self._rebuild_index()
-                    logger.info(
-                        "rename_request_succeeded request_id=%s collection_id=%s",
-                        request_id,
-                        col.id,
-                    )
-                    return True
+        indexed = self._request_index.get(request_id)
+        if not indexed:
+            logger.warning("rename_request_not_found request_id=%s", request_id)
+            return False
 
-        logger.warning("rename_request_not_found request_id=%s", request_id)
-        return False
+        req, col = indexed
+        req.name = normalized_name
+        self.storage.save_collection(col)
+        logger.info(
+            "rename_request_succeeded request_id=%s collection_id=%s",
+            request_id,
+            col.id,
+        )
+        return True
 
     def rename_collection(self, collection_id: str, new_name: str) -> bool:
         """Renames a collection by ID and updates stored collection file name."""

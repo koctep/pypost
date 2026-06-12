@@ -16,8 +16,12 @@ RequestManager.collections  +  _request_index
 CollectionsPresenter.refresh_tree()  →  QTreeView model
 ```
 
-- **RequestManager** owns the in-memory collection list and request index. It is the only
-  component that calls `StorageManager.load_collections()` for normal operation.
+- **RequestManager** owns the in-memory collection list and request index
+  (`_request_index: dict[str, tuple[RequestData, Collection]]`). `find_request` and
+  `rename_request` use the index for O(1) lookup; `reload_collections` and `save_request`
+  rebuild it; delete paths drop keys incrementally ([PYPOST-127](https://pypost.atlassian.net/browse/PYPOST-127)).
+- **RequestManager** is the only component that calls `StorageManager.load_collections()`
+  for normal operation.
 - **CollectionsPresenter** renders the sidebar tree. It reads via `get_collections()` and
   rebuilds the Qt model in `refresh_tree()`.
 

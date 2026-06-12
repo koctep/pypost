@@ -90,6 +90,33 @@ class TestRequestManagerFind(unittest.TestCase):
         result = self.manager.find_request("missing")
         self.assertIsNone(result)
 
+    def test_find_request_uses_index_not_collection_scan(self):
+        class SentinelCollections(list):
+            def __iter__(self):
+                raise AssertionError("find_request must not scan collections")
+
+        self.manager.collections = SentinelCollections(self.manager.collections)
+        result = self.manager.find_request("r1")
+        self.assertIsNotNone(result)
+        self.assertEqual(self.req, result[0])
+
+
+class TestRequestManagerRenameIndex(unittest.TestCase):
+    def test_rename_request_uses_index_without_rebuild(self):
+        req = RequestData(id="r1", name="Get users")
+        col = Collection(id="c1", name="Team API", requests=[req])
+        storage = FakeStorageManager([col])
+        manager = RequestManager(storage)
+
+        with patch.object(manager, "_rebuild_index") as rebuild_mock:
+            renamed = manager.rename_request("r1", "Get active users")
+
+        rebuild_mock.assert_not_called()
+        self.assertTrue(renamed)
+        result = manager.find_request("r1")
+        self.assertIsNotNone(result)
+        self.assertEqual("Get active users", result[0].name)
+
 
 class TestRequestManagerReload(unittest.TestCase):
     def setUp(self):
