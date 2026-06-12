@@ -108,6 +108,10 @@ former monolithic `MetricsManager` into focused modules:
 *   **Framework**: Same stack as the main server (`Starlette` + `mcp` SDK + `uvicorn`).
 *   **Hybrid Server**: Hosts Prometheus (`/metrics`), Streamable HTTP MCP (`/mcp`), and
     legacy SSE (`/sse`, `/messages`) on the same port (default 9080).
+*   **Declarative routing (PYPOST-166)**: `MetricsServer._create_app()` registers routes via
+    Starlette `Mount` / `Route` — not manual `PATH_INFO` checks. Prometheus uses
+    `Mount("/metrics", app=make_asgi_app(...))`; the `MetricsManager` facade has no HTTP
+    routing logic.
 *   **Resources**:
     *   `metrics://all`: Returns the full Prometheus metrics dump as `text/plain`.
 
