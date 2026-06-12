@@ -76,8 +76,8 @@ The application uses classes (often Pydantic models or dataclasses) to define st
   the removed `TemplateEngine` in PYPOST-18). See [template_service.md](template_service.md).
 - **MetricsManager**: Composition-root facade (constructed in `main.py`) composing
   `MetricsRegistry` (Prometheus counters) and `MetricsServer` (observability HTTP/MCP). Runs an
-  isolated `uvicorn` server providing Prometheus metrics (`/metrics`), Streamable HTTP MCP
-  (`/mcp`), and legacy SSE for accessing metrics as resources. See
+  isolated `uvicorn` server providing Prometheus metrics (`/metrics`) and Streamable HTTP MCP
+  (`/mcp`) for accessing metrics as resources. See
   [mcp_integration.md](mcp_integration.md).
 - **Storage**: Manages saving and loading collections and environments to/from the filesystem (JSON
   format). When environment encryption is enabled, `EnvironmentStorageGateway` delegates encrypted

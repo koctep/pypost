@@ -24,9 +24,9 @@ ones, merge the "MCP Test" entry into your current file instead of overwriting.
 ## Contents
 
 - **MCP** collection (`examples/collections/mcp.json`) with three requests:
-  - `SSE Probe Metrics` — GET `http://127.0.0.1:9080/sse` (legacy SSE stream on metrics
-    server; used by HTTPClient SSE-probe mode)
-  - `SSE Probe Main` — GET `http://127.0.0.1:1080/sse` (legacy SSE stream on main MCP
+  - `SSE Probe Metrics` — GET `http://127.0.0.1:9080/mcp` (Streamable HTTP on metrics
+    server)
+  - `SSE Probe Main` — GET `http://127.0.0.1:1080/mcp` (Streamable HTTP on main MCP
     server)
   - `List Tools` — MCP `http://127.0.0.1:1080/mcp` (`list_tools` via Streamable HTTP)
 
@@ -54,7 +54,7 @@ See [Cursor verification checklist](../../ai-tasks/PYPOST-552/cursor-verificatio
   1. MCP is enabled (select environment with `enable_mcp: true`).
   2. No firewall blocks localhost/127.0.0.1.
   3. Ports 1080 and 9080 are not used by other apps.
-  4. **List Tools** uses `/mcp` — ensure Cursor and in-app MCP requests use Streamable HTTP,
-     not legacy `/sse` URLs.
+  4. **List Tools** and probe requests use `/mcp` — ensure Cursor and in-app MCP requests
+     use Streamable HTTP.
 - **Connection refused**: MCP server is not running. Select the MCP Test environment
   and restart PyPost.

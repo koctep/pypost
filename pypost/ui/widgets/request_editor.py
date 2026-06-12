@@ -20,9 +20,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.mcp_secrets_policy import McpSecretsPolicy
 from pypost.core.mcp_tool_contract import (
     build_mcp_tool_contract_preview,
     format_mcp_tool_contract_preview,
+    resolve_mcp_param_specs,
 )
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_sync import copy_request_for_isolated_tab
@@ -298,9 +300,33 @@ class RequestWidget(QWidget):
         self.headers_table.itemChanged.connect(self._on_mcp_preview_source_changed)
         self.body_edit.textChanged.connect(self._on_mcp_preview_source_changed)
 
+    def _request_fields_for_mcp_scan(self) -> RequestData:
+        return RequestData(
+            url=self.url_input.text(),
+            headers=self.headers_table.get_data(),
+            params=self.params_table.get_data(),
+            body=self.body_edit.toPlainText(),
+            mcp_params=self.mcp_params_table.get_data(),
+        )
+
+    def _sync_mcp_params_from_template(self) -> None:
+        req = self._request_fields_for_mcp_scan()
+        discovered = McpSecretsPolicy.extract_mcp_request_variables(req)
+        merged = resolve_mcp_param_specs(req, discovered)
+        if merged != req.mcp_params:
+            self.mcp_params_table.set_data(merged)
+
     def _on_mcp_preview_source_changed(self, *_args) -> None:
         if self._loading:
             return
+        sender = self.sender()
+        if sender in (
+            self.url_input,
+            self.params_table,
+            self.headers_table,
+            self.body_edit,
+        ):
+            self._sync_mcp_params_from_template()
         self._refresh_mcp_preview()
 
     def _refresh_mcp_preview(self) -> None:
@@ -415,7 +441,14 @@ class RequestWidget(QWidget):
 
 
 class McpParamsTable(QTableWidget):
-    _TYPE_OPTIONS = ("string", "integer", "number", "boolean")
+    _TYPE_OPTIONS = (
+        "string",
+        "integer",
+        "number",
+        "boolean",
+        "array",
+        "object",
+    )
 
     def __init__(self):
         super().__init__(0, 4)
@@ -426,6 +459,11 @@ class McpParamsTable(QTableWidget):
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
         if item.row() == self.rowCount() - 1 and item.column() == 0 and item.text():
             self.setRowCount(self.rowCount() + 1)
+
+    def _on_param_type_changed(self, row: int) -> None:
+        item = self.item(row, 2)
+        if item is not None:
+            self.itemChanged.emit(item)
 
     def set_data(self, params: dict[str, McpToolParam]) -> None:
         self.blockSignals(True)
@@ -444,6 +482,9 @@ class McpParamsTable(QTableWidget):
         idx = type_combo.findText(spec.type)
         if idx >= 0:
             type_combo.setCurrentIndex(idx)
+        type_combo.currentTextChanged.connect(
+            lambda _text, r=row: self._on_param_type_changed(r)
+        )
         self.setCellWidget(row, 1, type_combo)
         self.setItem(row, 2, QTableWidgetItem(spec.description))
         required_item = QTableWidgetItem()
