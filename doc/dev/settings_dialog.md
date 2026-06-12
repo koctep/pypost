@@ -42,6 +42,22 @@ Saved through `SettingsDialog.accept()` → `MainWindow.open_settings()` →
 dialog updates persistence but does not reconfigure the live instance until the
 application restarts.
 
+## MCP and metrics bind address validation
+
+On Save, `SettingsDialog.accept()` validates MCP and metrics host/port fields via
+`pypost/core/bind_address_validation.py` before other checks:
+
+- **Hosts** — non-empty after trim; valid IPv4/IPv6 literal or hostname (label rules).
+- **Ports** — integer in 1024–65535 (defense in depth; spinboxes use the same range).
+
+Invalid input blocks persistence:
+
+- `new_settings` is not set; dialog stays open.
+- `show_invalid_bind_address` shows a warning (`QMessageBox.warning`).
+- WARNING log: `bind_address_settings_validation_failed field=<label> reason=<reason>`.
+
+Reasons: `empty`, `invalid_format`, `out_of_range`.
+
 ## Retryable status codes validation
 
 On Save, `SettingsDialog.accept()` parses the retryable status codes line edit via
@@ -73,6 +89,8 @@ Direct ConfigManager round-trip (without dialog): `TestConfigManagerPersistence.
 
 - `TestSettingsDialogRequestTimeout` — spinbox layout, load, accept output
 - `TestSettingsDialogAlertSettings` — load/save, echo mode, keep/clear auth
+- `TestSettingsDialogBindAddressValidation` — blocked save on invalid host, valid save path
+  (PYPOST-151)
 - `TestSettingsDialogRetryableCodesValidation` — blocked save + warning on invalid codes
   (PYPOST-444)
 - `TestResolveWebhookAuthHeader` — pure helper unit tests
@@ -82,6 +100,7 @@ Direct ConfigManager round-trip (without dialog): `TestConfigManagerPersistence.
 - `test_request_timeout_survives_settings_dialog_save_and_restart` — dialog save + restart
   (PYPOST-445)
 
-Parser unit tests: `tests/test_retryable_status_codes_parse.py`.
+Parser unit tests: `tests/test_retryable_status_codes_parse.py`,
+`tests/test_bind_address_validation.py` (PYPOST-151).
 
 See also `doc/dev/gui_testing.md`.

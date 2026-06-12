@@ -204,3 +204,7 @@ def confirm_re_encrypt_environments(parent: QWidget) -> bool:
 
 def show_invalid_retryable_status_codes(parent: QWidget, message: str) -> None:
     QMessageBox.warning(parent, "Invalid retryable status codes", message)
+
+
+def show_invalid_bind_address(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, "Invalid server address", message)

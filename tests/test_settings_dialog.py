@@ -206,6 +206,67 @@ class TestSettingsDialogAlertSettings:
             dlg.close()
 
 
+class TestSettingsDialogBindAddressValidation:
+    @patch("pypost.ui.dialogs.settings_dialog.show_invalid_bind_address")
+    def test_accept_blocks_save_on_invalid_mcp_host(
+        self,
+        mock_show_invalid,
+        qapp,
+        caplog,
+    ):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            dlg.mcp_host_edit.setText("not a host!")
+            with caplog.at_level(
+                logging.WARNING,
+                logger="pypost.ui.dialogs.settings_dialog",
+            ):
+                dlg.accept()
+            assert dlg.new_settings is None
+            mock_show_invalid.assert_called_once()
+            assert mock_show_invalid.call_args.args[0] is dlg
+            assert "valid IP address" in mock_show_invalid.call_args.args[1]
+            assert any(
+                "bind_address_settings_validation_failed" in record.message
+                and "reason=invalid_format" in record.message
+                for record in caplog.records
+            )
+        finally:
+            dlg.close()
+
+    @patch("pypost.ui.dialogs.settings_dialog.show_invalid_bind_address")
+    def test_accept_blocks_save_on_empty_metrics_host(
+        self,
+        mock_show_invalid,
+        qapp,
+    ):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            dlg.metrics_host_edit.setText("   ")
+            dlg.accept()
+            assert dlg.new_settings is None
+            mock_show_invalid.assert_called_once()
+            assert "cannot be empty" in mock_show_invalid.call_args.args[1]
+        finally:
+            dlg.close()
+
+    def test_accept_persists_valid_bind_addresses(self, qapp):
+        dlg = SettingsDialog(AppSettings())
+        try:
+            dlg.mcp_host_edit.setText("0.0.0.0")
+            dlg.mcp_port_spin.setValue(2080)
+            dlg.metrics_host_edit.setText("127.0.0.1")
+            dlg.metrics_port_spin.setValue(9081)
+            dlg.accept()
+            settings = dlg.get_settings()
+            assert settings.mcp_host == "0.0.0.0"
+            assert settings.mcp_port == 2080
+            assert settings.metrics_host == "127.0.0.1"
+            assert settings.metrics_port == 9081
+        finally:
+            dlg.close()
+
+
 class TestSettingsDialogRetryableCodesValidation:
     @patch("pypost.ui.dialogs.settings_dialog.show_invalid_retryable_status_codes")
     def test_accept_blocks_save_and_shows_warning_on_invalid_codes(

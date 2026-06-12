@@ -17,6 +17,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from pypost.core.bind_address_validation import (
+    BindAddressValidationFailure,
+    validate_bind_host,
+    validate_bind_port,
+)
 from pypost.core.encryption_migration import EncryptionMigrationService, MigrationReport
 from pypost.core.key_source_constants import (
     KEY_SOURCE_ENVIRONMENT,
@@ -34,6 +39,7 @@ from pypost.models.retry import (
 from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import (
     confirm_re_encrypt_environments,
+    show_invalid_bind_address,
     show_invalid_retryable_status_codes,
     show_migration_result,
 )
@@ -413,7 +419,54 @@ class SettingsDialog(QDialog):
             "Ignored fallback entries: " + ", ".join(issues),
         )
 
+    def _validate_bind_addresses(self) -> tuple[str, str, int, int] | None:
+        mcp_host = validate_bind_host(
+            self.mcp_host_edit.text(),
+            field_label="MCP Server Host",
+        )
+        if isinstance(mcp_host, BindAddressValidationFailure):
+            self._show_bind_address_validation_failure(mcp_host)
+            return None
+        mcp_port = validate_bind_port(
+            self.mcp_port_spin.value(),
+            field_label="MCP Server Port",
+        )
+        if isinstance(mcp_port, BindAddressValidationFailure):
+            self._show_bind_address_validation_failure(mcp_port)
+            return None
+        metrics_host = validate_bind_host(
+            self.metrics_host_edit.text(),
+            field_label="Metrics Server Host",
+        )
+        if isinstance(metrics_host, BindAddressValidationFailure):
+            self._show_bind_address_validation_failure(metrics_host)
+            return None
+        metrics_port = validate_bind_port(
+            self.metrics_port_spin.value(),
+            field_label="Metrics Server Port",
+        )
+        if isinstance(metrics_port, BindAddressValidationFailure):
+            self._show_bind_address_validation_failure(metrics_port)
+            return None
+        return mcp_host, mcp_port, metrics_host, metrics_port
+
+    def _show_bind_address_validation_failure(
+        self,
+        failure: BindAddressValidationFailure,
+    ) -> None:
+        logger.warning(
+            "bind_address_settings_validation_failed field=%s reason=%s",
+            failure.field,
+            failure.reason,
+        )
+        show_invalid_bind_address(self, failure.message)
+
     def accept(self):
+        bind_values = self._validate_bind_addresses()
+        if bind_values is None:
+            return
+        mcp_host, mcp_port, metrics_host, metrics_port = bind_values
+
         parsed_codes = parse_retryable_status_codes(self.retryable_codes_edit.text())
         if isinstance(parsed_codes, RetryableCodesValidationFailure):
             logger.warning(
@@ -455,10 +508,10 @@ class SettingsDialog(QDialog):
             expanded_collections=self.current_settings.expanded_collections,
             confirm_overwrite_request=self.confirm_overwrite_check.isChecked(),
             log_hidden_key_names=self.log_hidden_key_names_check.isChecked(),
-            mcp_port=self.mcp_port_spin.value(),
-            mcp_host=self.mcp_host_edit.text(),
-            metrics_port=self.metrics_port_spin.value(),
-            metrics_host=self.metrics_host_edit.text(),
+            mcp_port=mcp_port,
+            mcp_host=mcp_host,
+            metrics_port=metrics_port,
+            metrics_host=metrics_host,
             default_retry_policy=retry_policy,
             alert_webhook_url=webhook_url,
             alert_webhook_auth_header=webhook_auth,
