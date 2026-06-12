@@ -156,9 +156,9 @@ def test_hidden_toggle_persists_and_reveal_keeps_original_value(qapp):  # noqa: 
                 assert hidden_cb is not None
                 hidden_cb.setChecked(False)
                 assert dialog.vars_table.item(0, 1).text() == "secret"
-                assert environments[0].hidden_keys == set()
+                assert dialog.environments[0].hidden_keys == set()
 
-                storage.save_environments(environments)
+                storage.save_environments(dialog.environments)
             finally:
                 dialog.close()
 

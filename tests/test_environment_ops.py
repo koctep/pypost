@@ -6,7 +6,7 @@ pytestmark = pytest.mark.timeout(60)
 
 import unittest
 
-from pypost.core.environment_ops import clone_environment
+from pypost.core.environment_ops import clone_environment, clone_environments
 from pypost.models.models import Environment
 
 
@@ -61,6 +61,30 @@ class TestCloneEnvironment(unittest.TestCase):
         )
         restored = Environment(**source.model_dump())
         self.assertEqual(restored.hidden_keys, {"TOKEN"})
+
+
+class TestCloneEnvironments(unittest.TestCase):
+    def test_returns_independent_deep_copies(self) -> None:
+        source = Environment(
+            name="Dev",
+            variables={"API_KEY": "secret"},
+            hidden_keys={"API_KEY"},
+            enable_mcp=True,
+        )
+        copies = clone_environments([source])
+        self.assertEqual(len(copies), 1)
+        self.assertEqual(copies[0].id, source.id)
+        copies[0].variables["API_KEY"] = "changed"
+        copies[0].hidden_keys.add("OTHER")
+        copies[0].enable_mcp = False
+        copies[0].name = "Staging"
+        self.assertEqual(source.variables["API_KEY"], "secret")
+        self.assertEqual(source.hidden_keys, {"API_KEY"})
+        self.assertTrue(source.enable_mcp)
+        self.assertEqual(source.name, "Dev")
+
+    def test_empty_list(self) -> None:
+        self.assertEqual(clone_environments([]), [])
 
 
 if __name__ == "__main__":

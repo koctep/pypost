@@ -2,6 +2,7 @@ from typing import List
 
 from PySide6.QtWidgets import QDialog, QHBoxLayout
 
+from pypost.core.environment_ops import clone_environments
 from pypost.models.models import Environment
 from pypost.ui.widgets.environments import (
     EnvironmentListWidget,
@@ -20,11 +21,11 @@ class EnvironmentDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Manage Environments")
         self.resize(800, 600)
-        self.environments = environments
+        self._environments = clone_environments(environments)
         self.current_env_name = current_env_name
 
         self._env_list_widget = EnvironmentListWidget(
-            self.environments,
+            self._environments,
             current_env_name=current_env_name,
             get_current_env_name=lambda: self.current_env_name,
             set_current_env_name=lambda name: setattr(self, "current_env_name", name),
@@ -41,6 +42,11 @@ class EnvironmentDialog(QDialog):
         self._env_list_widget.environment_selected.connect(self.on_env_selected)
 
     @property
+    def environments(self) -> List[Environment]:
+        """Working copy edited in the dialog; presenter applies on close."""
+        return self._environments
+
+    @property
     def env_list(self):
         return self._env_list_widget.env_list
 
@@ -54,15 +60,15 @@ class EnvironmentDialog(QDialog):
 
     def _selected_environment(self) -> Environment | None:
         row = self.env_list.currentRow()
-        if row < 0 or row >= len(self.environments):
+        if row < 0 or row >= len(self._environments):
             return None
-        return self.environments[row]
+        return self._environments[row]
 
     def on_env_selected(self, row: int) -> None:
-        if row < 0 or row >= len(self.environments):
+        if row < 0 or row >= len(self._environments):
             self._vars_widget.load_environment(None)
             return
-        self._vars_widget.load_environment(self.environments[row])
+        self._vars_widget.load_environment(self._environments[row])
 
     def add_environment(self) -> None:
         self._env_list_widget.add_environment()

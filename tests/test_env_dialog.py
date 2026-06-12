@@ -22,6 +22,21 @@ def qapp():
 
 
 class TestEnvironmentDialog:
+    def test_dialog_does_not_mutate_input_environments(self, qapp):
+        env = Environment(name="Dev", variables={"k": "v"}, enable_mcp=False)
+        input_envs = [env]
+        dlg = EnvironmentDialog(input_envs)
+        try:
+            dlg.on_env_selected(0)
+            dlg.mcp_check.setChecked(True)
+            dlg.vars_table.setItem(0, 1, QTableWidgetItem("changed"))
+            assert env.enable_mcp is False
+            assert env.variables == {"k": "v"}
+            assert dlg.environments[0].enable_mcp is True
+            assert dlg.environments[0].variables["k"] == "changed"
+        finally:
+            dlg.close()
+
     def test_load_list_selects_current_env_by_name(self, qapp):
         envs = [
             Environment(name="First", variables={}),
@@ -65,9 +80,9 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg.mcp_check.setChecked(True)
-            assert env.enable_mcp is True
+            assert dlg.environments[0].enable_mcp is True
             dlg.mcp_check.setChecked(False)
-            assert env.enable_mcp is False
+            assert dlg.environments[0].enable_mcp is False
         finally:
             dlg.close()
 
@@ -84,8 +99,8 @@ class TestEnvironmentDialog:
         try:
             dlg.env_list.setCurrentRow(0)
             dlg.delete_environment()
-            assert len(envs) == 1
-            assert envs[0].name == "B"
+            assert len(dlg.environments) == 1
+            assert dlg.environments[0].name == "B"
             mock_question.assert_called_once()
         finally:
             dlg.close()
@@ -114,8 +129,8 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog(envs)
         try:
             dlg.add_environment()
-            assert len(envs) == 2
-            assert envs[1].name == "Staging"
+            assert len(dlg.environments) == 2
+            assert dlg.environments[1].name == "Staging"
         finally:
             dlg.close()
 
@@ -144,10 +159,10 @@ class TestEnvironmentDialog:
             hidden_cb = dlg._get_hidden_checkbox(0)
             assert hidden_cb is not None
             hidden_cb.setChecked(True)
-            assert "API_KEY" in env.hidden_keys
+            assert "API_KEY" in dlg.environments[0].hidden_keys
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
             hidden_cb.setChecked(False)
-            assert "API_KEY" not in env.hidden_keys
+            assert "API_KEY" not in dlg.environments[0].hidden_keys
             assert dlg.vars_table.item(0, 1).text() == "secret"
         finally:
             dlg.close()
@@ -162,13 +177,13 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg.vars_table.setItem(0, 1, QTableWidgetItem("new"))
-            assert env.variables["API_KEY"] == "new"
+            assert dlg.environments[0].variables["API_KEY"] == "new"
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
             hidden_cb = dlg._get_hidden_checkbox(0)
             assert hidden_cb is not None
             hidden_cb.setChecked(False)
             assert dlg.vars_table.item(0, 1).text() == "new"
-            assert env.hidden_keys == set()
+            assert dlg.environments[0].hidden_keys == set()
         finally:
             dlg.close()
 
@@ -182,8 +197,8 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg.vars_table.setItem(0, 0, QTableWidgetItem("NEW_KEY"))
-            assert env.variables == {"NEW_KEY": "secret"}
-            assert env.hidden_keys == {"NEW_KEY"}
+            assert dlg.environments[0].variables == {"NEW_KEY": "secret"}
+            assert dlg.environments[0].hidden_keys == {"NEW_KEY"}
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
         finally:
             dlg.close()
@@ -229,8 +244,8 @@ class TestEnvironmentDialog:
             # Find row for "a"
             row = 0 if dlg.vars_table.item(0, 0).text() == "a" else 1
             dlg._delete_variable_at_row(row)
-            assert "a" not in env.variables
-            assert "b" in env.variables
+            assert "a" not in dlg.environments[0].variables
+            assert "b" in dlg.environments[0].variables
             assert dlg.vars_table.rowCount() == 2  # 1 var + 1 empty trailing row
         finally:
             dlg.close()
@@ -241,8 +256,8 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg._delete_variable_at_row(0)
-            assert "secret" not in env.variables
-            assert "secret" not in env.hidden_keys
+            assert "secret" not in dlg.environments[0].variables
+            assert "secret" not in dlg.environments[0].hidden_keys
         finally:
             dlg.close()
 
@@ -309,7 +324,7 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg.vars_table.item(0, 0).setText("")
-            assert "k" not in env.variables
+            assert "k" not in dlg.environments[0].variables
         finally:
             dlg.close()
 
@@ -319,7 +334,7 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg._move_variable_at_row(1, "up")
-            assert list(env.variables.keys()) == ["b", "a", "c"]
+            assert list(dlg.environments[0].variables.keys()) == ["b", "a", "c"]
         finally:
             dlg.close()
 
@@ -329,7 +344,7 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg._move_variable_at_row(1, "down")
-            assert list(env.variables.keys()) == ["a", "c", "b"]
+            assert list(dlg.environments[0].variables.keys()) == ["a", "c", "b"]
         finally:
             dlg.close()
 
@@ -339,7 +354,7 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg._move_variable_at_row(0, "up")
-            assert list(env.variables.keys()) == ["a", "b"]
+            assert list(dlg.environments[0].variables.keys()) == ["a", "b"]
         finally:
             dlg.close()
 
@@ -349,7 +364,7 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg._move_variable_at_row(1, "down")
-            assert list(env.variables.keys()) == ["a", "b"]
+            assert list(dlg.environments[0].variables.keys()) == ["a", "b"]
         finally:
             dlg.close()
 
@@ -359,8 +374,8 @@ class TestEnvironmentDialog:
         try:
             dlg.on_env_selected(0)
             dlg._move_variable_at_row(0, "down")
-            assert list(env.variables.keys()) == ["b", "a"]
-            assert env.hidden_keys == {"a"}
+            assert list(dlg.environments[0].variables.keys()) == ["b", "a"]
+            assert dlg.environments[0].hidden_keys == {"a"}
             assert dlg.vars_table.item(1, 1).text() == HIDDEN_MASK
         finally:
             dlg.close()
@@ -386,7 +401,7 @@ class TestEnvironmentDialog:
             dlg._move_variable_at_row(0, "down")
             dlg.on_env_selected(1)
             dlg.on_env_selected(0)
-            assert list(envs[0].variables.keys()) == ["b", "a"]
+            assert list(dlg.environments[0].variables.keys()) == ["b", "a"]
         finally:
             dlg.close()
 
@@ -409,7 +424,7 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog(envs)
         try:
             assert dlg._apply_environment_rename(0, "Staging")
-            assert envs[0].name == "Staging"
+            assert dlg.environments[0].name == "Staging"
             assert dlg.env_list.item(0).text() == "Staging"
         finally:
             dlg.close()
@@ -419,7 +434,7 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog(envs)
         try:
             assert not dlg._apply_environment_rename(0, "")
-            assert envs[0].name == "Dev"
+            assert dlg.environments[0].name == "Dev"
         finally:
             dlg.close()
 
@@ -428,7 +443,7 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog(envs)
         try:
             assert not dlg._apply_environment_rename(0, "Prod")
-            assert envs[0].name == "Dev"
+            assert dlg.environments[0].name == "Dev"
         finally:
             dlg.close()
 
@@ -437,7 +452,7 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog(envs)
         try:
             assert dlg._apply_environment_rename(0, "Dev")
-            assert envs[0].name == "Dev"
+            assert dlg.environments[0].name == "Dev"
         finally:
             dlg.close()
 
@@ -446,11 +461,11 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
-            row = len(env.variables)
+            row = len(dlg.environments[0].variables)
             dlg.vars_table.setItem(row, 0, QTableWidgetItem("123bad"))
             item = dlg.vars_table.item(row, 0)
             dlg.on_var_changed(item)
-            assert "123bad" not in env.variables
+            assert "123bad" not in dlg.environments[0].variables
             assert dlg.vars_table.item(row, 0).text() == ""
         finally:
             dlg.close()
@@ -472,9 +487,9 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog(envs)
         try:
             dlg._env_list_widget._duplicate_environment_at_row(1)
-            assert len(envs) == 3
-            assert envs[1].name == "Staging"
-            copy_env = envs[2]
+            assert len(dlg.environments) == 3
+            assert dlg.environments[1].name == "Staging"
+            copy_env = dlg.environments[2]
             assert copy_env.name == "Staging Copy"
             assert copy_env.variables == source.variables
             assert copy_env.hidden_keys == source.hidden_keys
@@ -516,8 +531,8 @@ class TestEnvironmentDialog:
         try:
             dlg._env_list_widget._duplicate_environment_at_row(0)
             assert mock_empty_error.call_count == 1
-            assert len(envs) == 2
-            assert envs[1].name == "Valid Copy"
+            assert len(dlg.environments) == 2
+            assert dlg.environments[1].name == "Valid Copy"
             assert mock_get_text.call_count == 2
         finally:
             dlg.close()
@@ -538,8 +553,8 @@ class TestEnvironmentDialog:
             dlg._env_list_widget._duplicate_environment_at_row(0)
             assert mock_dup_error.call_count == 1
             mock_dup_error.assert_called_with(dlg._env_list_widget, "Dev")
-            assert len(envs) == 2
-            assert envs[1].name == "Dev Copy"
+            assert len(dlg.environments) == 2
+            assert dlg.environments[1].name == "Dev Copy"
             assert mock_get_text.call_count == 2
         finally:
             dlg.close()
@@ -593,12 +608,12 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
-            trailing_row = len(env.variables)
+            trailing_row = len(dlg.environments[0].variables)
             dlg.vars_table.setItem(trailing_row, 0, QTableWidgetItem("new_key"))
             dlg.vars_table.setItem(trailing_row, 1, QTableWidgetItem("new_val"))
             item = dlg.vars_table.item(trailing_row, 0)
             dlg.on_var_changed(item)
-            assert env.variables == {"existing": "1", "new_key": "new_val"}
+            assert dlg.environments[0].variables == {"existing": "1", "new_key": "new_val"}
             assert dlg.vars_table.rowCount() == 3
         finally:
             dlg.close()
@@ -611,7 +626,7 @@ class TestEnvironmentDialog:
             dlg.vars_table.item(0, 0).setText("123bad")
             item = dlg.vars_table.item(0, 0)
             dlg.on_var_changed(item)
-            assert list(env.variables.keys()) == ["valid_key"]
+            assert list(dlg.environments[0].variables.keys()) == ["valid_key"]
             assert dlg.vars_table.item(0, 0).text() == "valid_key"
         finally:
             dlg.close()
@@ -660,9 +675,9 @@ class TestEnvironmentDialog:
 
                     list_widget._on_env_list_context_menu(QPoint(0, 0))
 
-            assert len(envs) == 2
-            assert envs[1].name == "Dev Copy"
-            assert envs[1].variables == {"x": "1"}
+            assert len(dlg.environments) == 2
+            assert dlg.environments[1].name == "Dev Copy"
+            assert dlg.environments[1].variables == {"x": "1"}
         finally:
             dlg.close()
 

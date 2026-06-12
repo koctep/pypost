@@ -33,6 +33,11 @@ def validate_environment_rename(
     return True, stripped, ""
 
 
+def clone_environments(environments: list[Environment]) -> list[Environment]:
+    """Return a deep copy of an environment list for dialog editing."""
+    return [env.model_copy(deep=True) for env in environments]
+
+
 def clone_environment(source: Environment, new_name: str) -> Environment:
     """Build a new Environment copied from source with a new name and id.
 

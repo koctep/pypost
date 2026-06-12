@@ -13,6 +13,9 @@ The `EnvironmentDialog` class provides the UI for managing environments in PyPos
   Hidden columns) and the MCP checkbox. Loads via `load_environment(Environment | None)` when
   the selection changes.
 
+`EnvPresenter._open_env_manager` passes presenter-owned environments, opens the dialog, then
+assigns `self._environments = dialog.environments` before saving — the presenter owns state.
+
 Legacy attributes on `EnvironmentDialog` (`env_list`, `vars_table`, `mcp_check`) delegate to
 the child widgets for tests and gradual migration.
 
@@ -20,7 +23,8 @@ the child widgets for tests and gradual migration.
 
 ### `EnvironmentDialog(environments, parent, current_env_name, log_hidden_key_names)`
 Initializes the dialog.
-- **environments**: List of `Environment` objects to manage.
+- **environments**: List of `Environment` objects to edit. The dialog deep-copies this list
+  internally; callers read results via the `environments` property after `exec()`.
 - **parent**: The parent widget.
 - **current_env_name**: The name of the environment currently active in the application.
 - **log_hidden_key_names**: Configuration for logging hidden key names.

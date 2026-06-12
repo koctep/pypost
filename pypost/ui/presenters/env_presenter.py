@@ -429,6 +429,7 @@ class EnvPresenter(QObject):
         )
         dialog.exec()
         logger.info("env_manager_dialog_closed")
+        self._environments = dialog.environments
         self._save_environments()
         if self._encryption_enabled():
             self._pending_env_manager_refresh = True
