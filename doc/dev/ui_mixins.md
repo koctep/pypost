@@ -63,6 +63,15 @@ the cursor instead of scanning the full document on every `mouseMoveEvent`:
 
 This preserves tooltip behaviour while avoiding O(document) regex iteration on large bodies.
 
+### Scan-position cache (PYPOST-119)
+
+`VariableHoverMixin` caches the last expression lookup and resolved tooltip keyed by
+`(scan_text, scan_index)` — the scoped text slice and index passed to
+`find_expression_at_index`. Repeated `mouseMoveEvent` calls while the pointer jitters over the
+same token reuse the cache instead of re-running regex and `resolve_text`. Cache is cleared on
+`set_variables` and `set_hidden_keys`. Complements line-scoped scan (PYPOST-122); table widgets
+use a separate per-cell cache (PYPOST-132).
+
 ### Table cell hover cache (PYPOST-132)
 
 `VariableAwareTableWidget` caches the last resolved tooltip keyed by `(row, column, cell_text)`.

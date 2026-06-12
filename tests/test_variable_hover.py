@@ -419,6 +419,27 @@ class TestVariableAwareLineEditTooltips(unittest.TestCase):
         show_mock.assert_called_once()
         self.assertEqual(show_mock.call_args[0][1], "a%20b%2Fc")
 
+    @patch("pypost.ui.widgets.mixins.VariableHoverLocator.find_expression_at_index")
+    @patch("pypost.ui.widgets.mixins.VariableHoverResolver.resolve_text")
+    @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
+    @patch("pypost.ui.widgets.mixins.QToolTip.showText")
+    def test_repeated_mouse_move_reuses_mixin_scan_cache_line_edit(
+        self, show_mock, _hide, resolve_mock, find_mock,
+    ):
+        find_mock.return_value = "{{host}}"
+        resolve_mock.return_value = "example.com"
+        w = _FixedCursorHoverLineEdit()
+        w.resize(400, 32)
+        w.setText("https://{{host}}/api")
+        w.set_variables({"host": "example.com"})
+        w.fixed_cursor_index = w.text().index("{{host}}") + 2
+        event = _mouse_move_event(w, QPoint(10, 16))
+        w.mouseMoveEvent(event)
+        w.mouseMoveEvent(event)
+        find_mock.assert_called_once()
+        resolve_mock.assert_called_once()
+        self.assertEqual(show_mock.call_count, 2)
+
 
 class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
     @classmethod
@@ -479,6 +500,28 @@ class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
         w.mouseMoveEvent(_mouse_move_event(w, QPoint(20, 40)))
         show_mock.assert_called_once()
         self.assertEqual(show_mock.call_args[0][1], "aGVsbG8=")
+
+    @patch("pypost.ui.widgets.mixins.VariableHoverLocator.find_expression_at_index")
+    @patch("pypost.ui.widgets.mixins.VariableHoverResolver.resolve_text")
+    @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
+    @patch("pypost.ui.widgets.mixins.QToolTip.showText")
+    def test_repeated_mouse_move_reuses_mixin_scan_cache_plain_text(
+        self, show_mock, _hide, resolve_mock, find_mock,
+    ):
+        find_mock.return_value = "{{base}}"
+        resolve_mock.return_value = "https://api.example"
+        w = _FixedCursorHoverPlainText()
+        w.resize(480, 120)
+        body = '{\n  "u": "{{base}}/p"\n}'
+        w.setPlainText(body)
+        w.set_variables({"base": "https://api.example"})
+        w.fixed_document_position = body.index("{{base}}") + 2
+        event = _mouse_move_event(w, QPoint(20, 40))
+        w.mouseMoveEvent(event)
+        w.mouseMoveEvent(event)
+        find_mock.assert_called_once()
+        resolve_mock.assert_called_once()
+        self.assertEqual(show_mock.call_count, 2)
 
 
 class TestVariableAwareTableWidgetTooltips(unittest.TestCase):

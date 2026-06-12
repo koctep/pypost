@@ -250,6 +250,9 @@ class VariableHoverMixin(Generic[TWidget]):
         self._variables: Dict[str, str] = {}
         self._hidden_keys: Set[str] = set()
         self._hover_line_scoped_scan = False
+        self._hover_scan_cache_key: Optional[Tuple[str, int]] = None
+        self._hover_scan_cache_expression: Optional[str] = None
+        self._hover_scan_cache_resolved: Optional[str] = None
         self.setMouseTracking(True)
 
     def set_variables(self, variables: Dict[str, str]) -> None:
@@ -260,9 +263,16 @@ class VariableHoverMixin(Generic[TWidget]):
         subscribe to EnvPresenter signals directly. See doc/dev/variable_propagation.md.
         """
         self._variables = variables
+        self._clear_hover_scan_cache()
 
     def set_hidden_keys(self, hidden_keys: Set[str]) -> None:
         self._hidden_keys = hidden_keys
+        self._clear_hover_scan_cache()
+
+    def _clear_hover_scan_cache(self: TWidget) -> None:
+        self._hover_scan_cache_key = None
+        self._hover_scan_cache_expression = None
+        self._hover_scan_cache_resolved = None
 
     def _get_text_at_cursor(self: TWidget, event: QMouseEvent) -> Tuple[str, int]:
         """
@@ -306,8 +316,8 @@ class VariableHoverMixin(Generic[TWidget]):
             return
 
         scan_text, scan_index = self._prepare_hover_scan_context(text, index)
-        expression = self._find_hover_expression(scan_text, scan_index)
-        self._show_or_hide_tooltip(event, expression)
+        expression, resolved = self._resolve_hover_at_scan_index(scan_text, scan_index)
+        self._show_or_hide_tooltip(event, expression, resolved)
 
     def _find_hover_expression(self, text: str, index: int) -> Optional[str]:
         expression = VariableHoverLocator.find_expression_at_index(text, index)
@@ -315,20 +325,47 @@ class VariableHoverMixin(Generic[TWidget]):
             return expression
         return VariableHoverLocator.find_expression_at_index(text, index - 1)
 
+    def _resolve_hover_at_scan_index(
+        self: TWidget,
+        scan_text: str,
+        scan_index: int,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Return (expression, resolved tooltip) for scan scope; reuse cache on repeat moves."""
+        cache_key = (scan_text, scan_index)
+        if cache_key == self._hover_scan_cache_key:
+            return self._hover_scan_cache_expression, self._hover_scan_cache_resolved
+
+        expression = self._find_hover_expression(scan_text, scan_index)
+        resolved: Optional[str] = None
+        if expression:
+            resolved = VariableHoverResolver.resolve_text(
+                expression,
+                self._variables,
+                self._hidden_keys,
+            )
+
+        self._hover_scan_cache_key = cache_key
+        self._hover_scan_cache_expression = expression
+        self._hover_scan_cache_resolved = resolved
+        return expression, resolved
+
     def _show_or_hide_tooltip(
         self: TWidget,
         event: QMouseEvent,
         expression: Optional[str],
+        resolved: Optional[str] = None,
     ) -> None:
         if not expression:
             QToolTip.hideText()
             return
 
-        value = VariableHoverResolver.resolve_text(
-            expression,
-            self._variables,
-            self._hidden_keys,
-        )
+        value = resolved
+        if value is None:
+            value = VariableHoverResolver.resolve_text(
+                expression,
+                self._variables,
+                self._hidden_keys,
+            )
         QToolTip.showText(
             event.globalPosition().toPoint(),
             value,
