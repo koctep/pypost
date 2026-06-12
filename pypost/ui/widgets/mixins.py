@@ -1,6 +1,7 @@
 import re
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, Generic, Optional, Set, Tuple, TypeVar
 
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QToolTip, QWidget
 
 from pypost.core.constants import HIDDEN_MASK
@@ -108,25 +109,27 @@ class VariableHoverHelper:
         )
 
 
-class VariableHoverMixin:
+TWidget = TypeVar("TWidget", bound=QWidget)
+
+
+class VariableHoverMixin(Generic[TWidget]):
     """
     Mixin for QWidgets to support hovering over {{variables}}.
     Requires the host class to be a QWidget subclass.
     """
 
-    def __init__(self):
+    def __init__(self: TWidget) -> None:
         self._variables: Dict[str, str] = {}
         self._hidden_keys: Set[str] = set()
-        if isinstance(self, QWidget):
-            self.setMouseTracking(True)
+        self.setMouseTracking(True)
 
-    def set_variables(self, variables: Dict[str, str]):
+    def set_variables(self, variables: Dict[str, str]) -> None:
         self._variables = variables
 
-    def set_hidden_keys(self, hidden_keys: Set[str]):
+    def set_hidden_keys(self, hidden_keys: Set[str]) -> None:
         self._hidden_keys = hidden_keys
 
-    def _get_text_at_cursor(self, event) -> Tuple[str, int]:
+    def _get_text_at_cursor(self: TWidget, event: QMouseEvent) -> Tuple[str, int]:
         """
         Abstract method to get text and index at cursor position.
         Must be implemented by subclasses.
@@ -134,8 +137,8 @@ class VariableHoverMixin:
         """
         raise NotImplementedError("Subclasses must implement _get_text_at_cursor")
 
-    def mouseMoveEvent(self, event):
-        super().mouseMoveEvent(event)  # type: ignore
+    def mouseMoveEvent(self: TWidget, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
 
         try:
             text, index = self._get_text_at_cursor(event)
@@ -154,7 +157,11 @@ class VariableHoverMixin:
             return expression
         return VariableHoverHelper.find_expression_at_index(text, index - 1)
 
-    def _show_or_hide_tooltip(self, event, expression: Optional[str]) -> None:
+    def _show_or_hide_tooltip(
+        self: TWidget,
+        event: QMouseEvent,
+        expression: Optional[str],
+    ) -> None:
         if not expression:
             QToolTip.hideText()
             return
@@ -167,5 +174,5 @@ class VariableHoverMixin:
         QToolTip.showText(
             event.globalPosition().toPoint(),
             value,
-            self,  # type: ignore
+            self,
         )

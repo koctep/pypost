@@ -74,7 +74,8 @@ Built with **PySide6** (Qt for Python).
 - **Widgets**: Specialized components like `RequestEditor` for composing requests and `ResponseView`
   for displaying results. `ResponseView` includes a status bar, search bar (plain-text search with
   Previous/Next, match case, counter), and read-only body. `VariableAware` widgets use
-  `VariableHoverMixin` for shared tooltip logic.
+  `VariableHoverMixin` for shared tooltip logic (generic `QWidget` mixin; see
+  [ui_mixins.md](ui_mixins.md)).
 - **Dialogs**: Separate windows for specific tasks like editing environment variables
   (`env_dialog.py`).
 
