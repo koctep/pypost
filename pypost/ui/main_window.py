@@ -25,6 +25,7 @@ from pypost.core.state_manager import StateManager
 from pypost.core.storage import StorageManager
 from pypost.core.style_manager import StyleManager
 from pypost.core.template_service import TemplateService
+from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
@@ -175,7 +176,7 @@ class MainWindow(QMainWindow):
         sc("Ctrl+B", self.tabs.handle_switch_to_body_global)
         sc("Ctrl+T", self.tabs.handle_switch_to_script_global)
 
-    def apply_settings(self, settings) -> None:
+    def apply_settings(self, settings: AppSettings) -> None:
         self.settings = settings
         logger.debug("apply_settings_start font_size=%d", settings.font_size)
         app = QApplication.instance()

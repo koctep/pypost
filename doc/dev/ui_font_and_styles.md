@@ -25,7 +25,7 @@ Call order matters: **stylesheet first, then `setFont`** (see PYPOST-404). Qt's
 Loads `pypost/ui/styles/*.qss`, optionally appends the global font-size rule, and applies the
 combined sheet to the given `QApplication` or widget.
 
-### `MainWindow.apply_settings(settings)`
+### `MainWindow.apply_settings(settings: AppSettings)`
 
 Delegates font work to `style_manager.apply_styles(app, font_size=settings.font_size)` and
 `app.setFont`. Does **not** call `setFont` on individual child widgets.
