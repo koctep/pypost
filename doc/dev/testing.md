@@ -215,14 +215,22 @@ duplicate scope: prior tickets already cover the intent.
 | `MetricsServer` MCP resource counters | `tests/test_metrics_server_endpoint.py` | Unit | PYPOST-177; success, unknown URI, scrape error paths |
 | Shared bind error messages | `tests/test_server_bind.py` | Unit | PYPOST-154; `format_bind_error` / MCP wrapper |
 | Metrics server bind / startup signaling | `tests/test_metrics_server_startup.py` | Integration | PYPOST-153; port busy, deferred failure |
+| Live HTTP `/metrics` scrape after uvicorn start | `tests/test_metrics_server_integration.py` | Integration | PYPOST-169; real socket bind + urllib GET |
+| Live metrics MCP resource round-trip | `tests/test_metrics_server_integration.py` | Integration | PYPOST-563; Streamable HTTP and SSE |
 | MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556; port busy, listen readiness |
 
 PYPOST-154 verified end-to-end port-in-use handling for both MCP and metrics (closes
 PYPOST-20 bind-error debt). Implementation is in PYPOST-556 and PYPOST-153; 154 adds shared
 helper tests and documentation.
 
-Not covered by the above (follow-up debt): live metrics-server MCP SSE round-trip and
-integration tests with real outbound HTTP via a local stub server.
+Not covered by the above (follow-up debt): integration tests with real outbound HTTP via a
+local stub server for request execution paths.
+
+Focused metrics HTTP integration run:
+
+```bash
+.venv/bin/python -m pytest tests/test_metrics_server_integration.py::TestMetricsServerHttpIntegration -v
+```
 
 Focused metrics MCP resource run:
 

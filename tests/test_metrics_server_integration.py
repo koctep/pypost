@@ -1,4 +1,4 @@
-"""Integration tests: live MetricsManager uvicorn + MCP resource round-trip (PYPOST-563)."""
+"""Integration tests: live MetricsManager uvicorn HTTP and MCP (PYPOST-169, PYPOST-563)."""
 
 import pytest
 
@@ -7,6 +7,8 @@ pytestmark = pytest.mark.timeout(120)
 import socket
 import time
 import unittest
+import urllib.error
+import urllib.request
 
 import anyio
 from mcp.client.session import ClientSession
@@ -34,6 +36,17 @@ def _wait_for_port(host: str, port: int, timeout: float = 10.0) -> None:
     raise TimeoutError(f"Metrics server did not listen on {host}:{port} within {timeout}s")
 
 
+def _fetch_metrics_http(
+    host: str, port: int, path: str = "/metrics"
+) -> tuple[int, dict[str, str], str]:
+    url = f"http://{host}:{port}{path}"
+    request = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(request, timeout=5.0) as response:
+        body = response.read().decode("utf-8")
+        headers = {key.lower(): value for key, value in response.headers.items()}
+        return response.status, headers, body
+
+
 async def _read_metrics_over_streamable_http(mcp_url: str) -> str:
     async with create_mcp_http_client() as http_client:
         async with streamable_http_client(mcp_url, http_client=http_client) as (
@@ -53,6 +66,33 @@ async def _read_metrics_over_sse(sse_url: str) -> str:
             await session.initialize()
             result = await session.read_resource("metrics://all")
             return result.contents[0].text
+
+
+class TestMetricsServerHttpIntegration(unittest.TestCase):
+    def setUp(self) -> None:
+        self._host = "127.0.0.1"
+        self._port = _free_port()
+        self._metrics = MetricsManager()
+        self._metrics.start_server(self._host, self._port)
+        _wait_for_port(self._host, self._port)
+
+    def tearDown(self) -> None:
+        self._metrics.stop_server()
+
+    def test_metrics_http_serves_prometheus_text_after_start(self):
+        status, headers, body = _fetch_metrics_http(self._host, self._port)
+
+        self.assertEqual(status, 200)
+        self.assertIn("text/plain", headers.get("content-type", ""))
+        self.assertIn("requests_sent_total", body)
+
+    def test_metrics_http_reflects_tracked_counters(self):
+        self._metrics.track_gui_send_click()
+
+        status, _, body = _fetch_metrics_http(self._host, self._port)
+
+        self.assertEqual(status, 200)
+        self.assertIn("gui_send_clicks_total 1.0", body)
 
 
 class TestMetricsServerMcpIntegration(unittest.TestCase):
