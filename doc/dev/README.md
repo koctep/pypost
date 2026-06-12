@@ -7,6 +7,7 @@ set up your development environment, and contribute to the project.
 
 1. [Setup and Installation](setup.md)
 1. [Architecture Overview](architecture.md)
+1. [Architecture and Package Boundary Audit (PYPOST-684)](architecture_audit.md)
 1. [SOLID and Maintainability Audit](solid_audit.md)
 1. [Unit Testability Patterns (PYPOST-382)](testability.md)
 1. [MCP Integration](mcp_integration.md)

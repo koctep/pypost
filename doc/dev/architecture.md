@@ -1,37 +1,87 @@
 # Architecture Overview
 
 PyPost follows a modular architecture, separating business logic (Core), data definitions (Models),
-and the user interface (UI).
+and the user interface (UI). Package boundaries and layer rules are audited in
+[architecture_audit.md](architecture_audit.md) (PYPOST-684).
 
 ## Directory Structure
 
+As of 2026-06-12 (141 Python modules). Grouped by subsystem; see the live tree under `pypost/`.
+
 ```text
 pypost/
-├── main.py                 # Application entry point
-├── core/                   # Business logic
-│   ├── request_manager.py  # Request & Collection lifecycle management
-│   ├── state_manager.py    # UI State persistence
-│   ├── request_service.py  # Unified request execution service
-│   ├── http_client.py      # HTTP request handling (wrapping `requests`)
-│   ├── script_executor.py  # Python script execution environment
-│   ├── template_service.py # Variable interpolation (Jinja2) Service
-│   ├── storage.py          # Persistence (JSON)
-│   ├── environment_storage_worker.py  # Background env load/save (encrypted)
-│   ├── environment_storage_gateway.py # Single-flight async env storage queue
+├── main.py                 # Application entry point (composition root)
+├── version.py
+├── core/                   # Business logic (68 modules)
+│   ├── request_manager.py  # Request & collection lifecycle
+│   ├── request_service.py  # Unified request execution
+│   ├── request_sync.py     # RequestData copy/compare and dirty-check helpers
+│   ├── worker.py           # Background request execution (QThread)
+│   ├── http_client.py      # HTTP handling (wraps `requests`)
+│   ├── http_client_protocol.py
+│   ├── execute_request_protocol.py
+│   ├── script_executor.py  # Post-request Python script sandbox
+│   ├── template_service.py # Jinja2 variable interpolation
+│   ├── function_registry.py, function_expression_resolver.py
+│   ├── template_expression_tokenizer.py, template_expression_types.py
+│   ├── storage.py          # JSON persistence (collections, environments)
+│   ├── storage_interface.py, collection_item_strategies.py
 │   ├── config_manager.py   # Configuration management
-│   └── worker.py           # Background task execution
-├── models/                 # Data structures
-│   ├── models.py           # Core data models
-│   ├── response.py         # HTTP Response structure
-│   └── settings.py         # Application settings
-├── ui/                     # User Interface (PySide6)
+│   ├── state_manager.py    # Debounced UI session state persistence
+│   ├── history_manager.py  # Execution history read/write
+│   ├── sensitive_data_masking_policy.py, curl_generator.py
+│   ├── environment_ops.py, environment_messages.py
+│   ├── environment_variables_adapter.py, env_variable_snapshot.py
+│   ├── environment_storage_worker.py   # Background env load/save (encrypted)
+│   ├── environment_storage_gateway.py  # Single-flight async env storage queue
+│   ├── environment_secrets_codec.py
+│   ├── encryption_config.py, encryption_key.py
+│   ├── encryption_migration.py, encryption_migration_worker.py
+│   ├── key_provider.py, key_source_constants.py
+│   ├── key_sources/        # Keyring, env, file, chain, factory, registry
+│   ├── mcp_server.py       # MCP lifecycle (thread + uvicorn + Qt signals)
+│   ├── mcp_server_impl.py  # Starlette routes, tool list/call
+│   ├── mcp_client_service.py   # Outbound MCP protocol client
+│   ├── mcp_secrets_policy.py, mcp_activity_log.py, mcp_tool_contract.py
+│   ├── mcp_tools_overview.py, mcp_transport_routes.py
+│   ├── mcp_legacy_sse.py, mcp_streamable_http.py
+│   ├── metrics.py          # MetricsManager facade (composition root)
+│   ├── metrics_registry.py, metrics_server.py, metrics_otel.py
+│   ├── metrics_protocol.py, alert_manager.py
+│   ├── style_manager.py    # Theme/QSS application (see architecture_audit.md)
+│   ├── bind_address_validation.py, server_bind.py
+│   ├── variable_name_validation.py, hidden_toggle_log_policy.py
+│   ├── yaml_json_converter.py, constants.py
+│   └── ...
+├── models/                 # Data structures (6 modules)
+│   ├── models.py           # Core data models (requests, collections, environments)
+│   ├── response.py         # HTTP response structure
+│   ├── settings.py         # Application settings
+│   ├── errors.py, retry.py
+├── ui/                     # User Interface — PySide6 (61 modules)
 │   ├── main_window.py      # Main application window
-│   ├── dialogs/            # Modal dialogs (Settings, Save, Env)
-│   ├── widgets/            # Reusable UI components
-│   │   ├── mixins.py       # UI Mixins (e.g. VariableHoverMixin)
-│   └── styles/             # Qt Stylesheets (.qss) and custom styles
-└── utils/                  # Helper utilities
+│   ├── main_window_signals.py
+│   ├── presenters/         # CollectionsPresenter, TabsPresenter, EnvPresenter
+│   ├── dialogs/            # Settings, Save, Env, MCP activity, hotkeys, about
+│   ├── widgets/            # RequestEditor, ResponseView, HistoryPanel, body editor
+│   │   ├── mixins.py       # VariableHoverMixin and shared tooltip logic
+│   │   ├── environments/   # Environment list and variables widgets
+│   │   ├── fold/           # Body editor code folding
+│   │   ├── settings/       # Settings dialog sections
+│   │   └── validate/       # Body format validators (JSON, YAML, XML)
+│   ├── delegates/          # Collection rename, environment name delegates
+│   ├── styles/             # Qt stylesheets (.qss) and custom styles
+│   ├── theme/              # JSON syntax highlighting theme
+│   ├── hotkeys.py, collection_item_dialogs.py
+│   └── request_save_orchestrator.py
+├── fixtures/               # Test fixtures only (not imported by production)
+│   └── mcp_test_fixtures.py
+└── utils/                  # Empty package (unused; see architecture_audit.md)
 ```
+
+**Layer rules:** `models/` → stdlib only; `core/` → `models/`; `ui/` → `core/`, `models/`.
+Known exception: `core/style_manager.py` imports from `ui/` at runtime — see
+[architecture_audit.md](architecture_audit.md#dependency-direction).
 
 ## Composition root (`main.py`)
 
@@ -49,6 +99,11 @@ The same `ConfigManager` instance is injected into `MainWindow` so `settings.jso
 (PYPOST-404). Do not lazy-create `ConfigManager` inside `MainWindow` in production. See
 [testability.md](testability.md#composition-root) and
 [PYPOST-404 dev notes](../ai-tasks/PYPOST-404/70-dev-docs.md).
+
+`MainWindow` still constructs several services not wired in `main.py`: `StorageManager`,
+`RequestManager`, `HistoryManager`, `MCPServerManager`, and `StyleManager`. This partial
+composition root increases test-setup cost — see
+[architecture_audit.md](architecture_audit.md#executive-summary) (PYPOST-684).
 
 ## Core Components
 
@@ -83,12 +138,28 @@ The application uses classes (often Pydantic models or dataclasses) to define st
   format). When environment encryption is enabled, `EnvironmentStorageGateway` delegates encrypted
   load/save to `EnvironmentStorageWorker` on a background thread (see
   [environment_storage_async.md](environment_storage_async.md)).
+- **HistoryManager**: Persists execution history entries written by `RequestService` after each
+  request. Masking uses `SensitiveDataMaskingPolicy`. The UI `HistoryPanel` reads and filters;
+  see [request_execution.md](request_execution.md) and
+  [sensitive_data_masking_policy.md](sensitive_data_masking_policy.md).
+- **MCP stack**: `MCPServerManager` owns lifecycle (thread, uvicorn, Qt signals);
+  `MCPServerImpl` exposes Starlette routes and tool list/call. Inbound MCP tools execute via
+  per-call `RequestService` instances; outbound MCP-as-HTTP uses `MCPClientService` from
+  `RequestService._execute_mcp()`. See [mcp_integration.md](mcp_integration.md) and
+  [mcp_secrets_policy.md](mcp_secrets_policy.md).
+- **Encryption**: `key_sources/` resolves encryption keys (keyring, env, file, chain);
+  `encryption_migration_worker.py` migrates encrypted environments on a background thread.
+  See [environment_encryption_at_rest.md](environment_encryption_at_rest.md).
 
 ### User Interface (`pypost/ui/`)
 
 Built with **PySide6** (Qt for Python).
 
-- **MainWindow**: The central hub, managing the layout. Delegates logic to `RequestManager` and `StateManager`.
+- **MainWindow**: The central hub, managing the layout. Delegates orchestration to presenters
+  (`CollectionsPresenter`, `TabsPresenter`, `EnvPresenter`) introduced in PYPOST-43.
+- **Presenters**: Keep collection, tab, and environment/MCP wiring out of widgets. Collection
+  reads go through `RequestManager.get_collections()` only — see
+  [collection_loading.md](collection_loading.md).
 - **Widgets**: Specialized components like `RequestEditor` for composing requests and `ResponseView`
   for displaying results. `ResponseView` includes a status bar, search bar (plain-text search with
   Previous/Next, match case, counter), and read-only body. `VariableAware` widgets use
