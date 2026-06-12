@@ -112,6 +112,7 @@ Search is cleared automatically when:
 | Module | Scope |
 | --- | --- |
 | `tests/test_response_view_search.py` | ResponseView unit tests: counter, navigation, debounce, metrics |
+| `tests/test_response_view_context_menu.py` | ResponseView context menu: Set Variable submenu, Copy, Select All, signals |
 | `tests/test_response_search_flow_integration.py` | RequestTab wiring: `display_response` → type → Next/Enter → counter |
 
 Focused run:
