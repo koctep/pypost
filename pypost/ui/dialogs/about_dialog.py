@@ -1,6 +1,8 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout
 
+from pypost.version import __version__
+
 
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
@@ -18,8 +20,7 @@ class AboutDialog(QDialog):
         name_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(name_label)
 
-        # Version (Placeholder for now)
-        version_label = QLabel("Version 0.1.0")
+        version_label = QLabel(f"Version {__version__}")
         version_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(version_label)
 
