@@ -5,11 +5,11 @@
 
 - **No Tests**: Creation of automated tests was skipped by user request. Auto-indentation and paste logic is not covered by tests. — [PYPOST-104](https://pypost.atlassian.net/browse/PYPOST-104)
 - **Simplified Unindent Logic**: Unindentation works only if the line contains *only* the closing bracket and spaces before it. In more complex cases (e.g., code on the same line), unindentation might not work or work unexpectedly. — [PYPOST-105](https://pypost.atlassian.net/browse/PYPOST-105)
-- **Manual Font Propagation**: In `MainWindow.apply_settings`, the font is manually applied to individual widgets (`collections_view`, `tabs`, `menuBar`, etc.) because automatic inheritance from `QApplication` did not work for all elements. This creates a risk of missing new elements when expanding UI. — [PYPOST-106](https://pypost.atlassian.net/browse/PYPOST-106)
+- **Manual Font Propagation**: ~~In `MainWindow.apply_settings`, the font is manually applied to individual widgets~~ **Resolved** — global QSS + `app.setFont` (PYPOST-106); inheritance causes documented (PYPOST-112). — [PYPOST-106](https://pypost.atlassian.net/browse/PYPOST-106), [PYPOST-112](https://pypost.atlassian.net/browse/PYPOST-112)
 
 ## Code Quality Issues
 
-- **Manual Font Propagation**: (See above). This violates DRY principle and complicates UI maintenance. — [PYPOST-107](https://pypost.atlassian.net/browse/PYPOST-107)
+- **Manual Font Propagation**: ~~(See above)~~ **Resolved** — see PYPOST-106 and PYPOST-112. — [PYPOST-107](https://pypost.atlassian.net/browse/PYPOST-107), [PYPOST-112](https://pypost.atlassian.net/browse/PYPOST-112)
 
 ## Missing Tests
 
@@ -24,4 +24,4 @@
 
 - Create tests for `CodeEditor`. — [PYPOST-110](https://pypost.atlassian.net/browse/PYPOST-110)
 - Implement asynchronous JSON check on paste for large data volumes (optional). — [PYPOST-111](https://pypost.atlassian.net/browse/PYPOST-111)
-- Investigate reasons for font inheritance issues and refactor `apply_settings` for a cleaner solution (possibly via global QSS). — [PYPOST-112](https://pypost.atlassian.net/browse/PYPOST-112)
+- ~~Investigate reasons for font inheritance issues and refactor `apply_settings`~~ **Done** — [PYPOST-112](https://pypost.atlassian.net/browse/PYPOST-112)

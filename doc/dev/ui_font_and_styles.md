@@ -1,4 +1,4 @@
-# UI Font Size and Global Styles (PYPOST-106)
+# UI Font Size and Global Styles (PYPOST-106, PYPOST-112)
 
 ## Overview
 
@@ -17,6 +17,22 @@ Two mechanisms work together:
 
 Call order matters: **stylesheet first, then `setFont`** (see PYPOST-404). Qt's
 `setStyleSheet()` re-polish resets the application font if `setFont` ran earlier.
+
+## Font inheritance investigation (PYPOST-112)
+
+PYPOST-12 added manual `setFont` calls in `apply_settings` because inheritance appeared broken
+after global stylesheet application. Investigation (PYPOST-112) identified these causes:
+
+| Cause | Mitigation |
+| --- | --- |
+| `setStyleSheet()` re-polish resets `QApplication` font | Apply stylesheet before `app.setFont` (PYPOST-404) |
+| Global QSS without explicit `font-size` | `StyleManager` appends `QWidget { font-size: Npt; }` (PYPOST-106) |
+| Widget-local QSS with fixed `font-size` | Local rules win; optional per-widget audit |
+| `CodeEditor` tab/gutter metrics | `_refresh_font_metrics` on `QEvent.FontChange` (PYPOST-107) |
+
+`MainWindow.apply_settings` no longer loops over child widgets. Presenter `apply_settings`
+methods handle indent and syntax colours only. No further refactor is required for main-window
+font propagation.
 
 ## API / Usage
 
@@ -59,6 +75,7 @@ current `indent_size`. Indent width alone is still updated via
 - PYPOST-404 — startup font size bug (call-order fix)
 - PYPOST-106 — removed manual per-widget `setFont` loop in `MainWindow`
 - PYPOST-107 — body editor font metrics refresh on global theme change
+- PYPOST-112 — font inheritance investigation; confirms PYPOST-106/107 close PYPOST-12 debt
 - PYPOST-425 — removed redundant `EnvPresenter.apply_font` widget loop
 - PYPOST-114 — `QToolTip` QSS hook for variable hover and widget tooltips
 - `doc/dev/ui_mixins.md` — variable hover tooltip styling
