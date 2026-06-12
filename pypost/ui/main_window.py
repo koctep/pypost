@@ -271,6 +271,33 @@ class MainWindow(QMainWindow):
             order=8,
         )
 
+    def _alert_settings_changed(
+        self, previous: AppSettings, updated: AppSettings
+    ) -> bool:
+        return (
+            previous.alert_log_path != updated.alert_log_path
+            or previous.alert_webhook_url != updated.alert_webhook_url
+            or previous.alert_webhook_auth_header != updated.alert_webhook_auth_header
+        )
+
+    def _reload_alert_manager(self) -> None:
+        if self._alert_manager is not None:
+            self._alert_manager.close()
+        log_path = (
+            Path(self.settings.alert_log_path) if self.settings.alert_log_path else None
+        )
+        self._alert_manager = AlertManager(
+            log_path=log_path,
+            webhook_url=self.settings.alert_webhook_url,
+            webhook_auth_header=self.settings.alert_webhook_auth_header,
+        )
+        self.tabs.set_alert_manager(self._alert_manager)
+        logger.info(
+            "alert_manager_reloaded log_path=%s webhook_url_set=%s",
+            log_path,
+            bool(self.settings.alert_webhook_url),
+        )
+
     def apply_settings(self, settings: AppSettings) -> None:
         self.settings = settings
         logger.debug("apply_settings_start font_size=%d", settings.font_size)
@@ -293,15 +320,21 @@ class MainWindow(QMainWindow):
         new_settings = dialog.get_settings()
         if not new_settings:
             return
+        previous_settings = self.settings
         metrics_changed = (
-            self.settings.metrics_host != new_settings.metrics_host
-            or self.settings.metrics_port != new_settings.metrics_port
+            previous_settings.metrics_host != new_settings.metrics_host
+            or previous_settings.metrics_port != new_settings.metrics_port
+        )
+        alert_settings_changed = self._alert_settings_changed(
+            previous_settings, new_settings
         )
         self.settings = new_settings
         self.config_manager.save_config(self.settings)
         self.env.wait_storage_idle()
         self.storage.apply_encryption_settings(self.settings)
         self.apply_settings(self.settings)
+        if alert_settings_changed:
+            self._reload_alert_manager()
         if metrics_changed:
             logger.info(
                 "metrics_server_restarting host=%s port=%d",

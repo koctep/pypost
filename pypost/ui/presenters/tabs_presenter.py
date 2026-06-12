@@ -278,6 +278,12 @@ class TabsPresenter(QObject):
             sorted(ids_to_close),
         )
 
+    def set_alert_manager(self, alert_manager: AlertManager | None) -> None:
+        self._alert_manager = alert_manager
+        logger.debug(
+            "TabsPresenter: alert_manager_updated=%s", alert_manager is not None
+        )
+
     def apply_settings(self, settings: AppSettings) -> None:
         """Updates indent, JSON syntax colors, and body reformat in all tabs."""
         self._settings = settings

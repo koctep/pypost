@@ -40,7 +40,7 @@ Under **Security / Logging**, operators can configure retry-exhaustion alert del
 
 | UI label | `AppSettings` field | Default | Runtime consumer |
 | --- | --- | --- | --- |
-| Alert Log Path | `alert_log_path` | `None` | `AlertManager` in `main.py` |
+| Alert Log Path | `alert_log_path` | `None` | `AlertManager` (startup + settings save) |
 | Alert Webhook URL | `alert_webhook_url` | `None` | `AlertManager` |
 | Alert Webhook Auth Header | `alert_webhook_auth_header` | `None` | `AlertManager` |
 
@@ -66,11 +66,12 @@ When `alert_log_path` is `None`, `AlertManager` uses
 Saved through `SettingsDialog.accept()` → `MainWindow.open_settings()` →
 `ConfigManager.save_config()`. Fields are optional; empty strings become `None`.
 
-## Limitation
+## Runtime reload (PYPOST-621)
 
-`AlertManager` is created once at startup in `main.py`. Changing alert settings in the
-dialog updates persistence but does not reconfigure the live instance until the
-application restarts.
+`AlertManager` is created at startup in `main.py`. When the operator saves alert field
+changes in Settings, `MainWindow.open_settings()` closes the previous instance, builds a
+new `AlertManager` from the saved `AppSettings`, and propagates it to `TabsPresenter` so
+subsequent requests use the updated log path and webhook configuration.
 
 ## MCP and metrics bind address validation
 
