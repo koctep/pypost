@@ -13,6 +13,16 @@ logger = logging.getLogger(__name__)
 
 
 class TemplateService:
+    """Central ``{{...}}`` substitution entry point (PYPOST-18).
+
+    Autonomous-default (PYPOST-45): ``HTTPClient``, ``RequestService``, and
+    ``MCPServerImpl`` accept optional ``template_service``. When omitted or
+    ``None``, each creates ``TemplateService()`` locally — no module singleton.
+    ``main.py`` injects one instance through the UI/MCP chain for a shared
+    Jinja2 ``Environment``; isolated callers get separate envs (cheap, intentional).
+    See ``doc/dev/template_service.md`` for consumers and test seams.
+    """
+
     _VALIDATION_MESSAGES = {
         "unknown_function": "Unknown function: {function_name}",
         "invalid_arity": "Invalid function arity",

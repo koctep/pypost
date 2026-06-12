@@ -61,6 +61,10 @@ expression policy and test matrix.
 
 ### Injection
 
+The **autonomous-default pattern** is documented on the `TemplateService` class itself
+(`pypost/core/template_service.py`) — read that docstring first for when consumers create
+their own instance vs. receive an injected one.
+
 `main.py` constructs one `TemplateService(metrics=metrics_manager)` and passes it through
 `MainWindow` → `TabsPresenter` → `RequestService` / `HTTPClient` / MCP stack. Components
 accept `template_service: TemplateService | None = None` and fall back to a local instance when
