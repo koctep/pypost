@@ -65,6 +65,7 @@ Key metrics for MCP testing:
 | `mcp_responses_sent_total` | `method`, `status` | MCP responses (success/error) |
 | `requests_sent_total` | `method` | HTTP requests sent |
 | `responses_received_total` | `method`, `status_code` | HTTP responses received |
+| `request_retry_exhaustions_total` | `endpoint` | Outbound HTTP retries exhausted (PYPOST-443) |
 
 ## GUI / Qt widget tests
 
@@ -698,11 +699,11 @@ When adding an intentional error-path test that emits a new ERROR pattern, add a
 
 ### Phase 2 — duration budget audit (PYPOST-573)
 
-The main CI pytest run includes `--durations=0 --durations-min=1` (output in `pytest.log`).
-After the log verifier:
+The main CI pytest run includes `--durations=0 --durations-min=1` (captured in
+`pytest-output.txt` after PYPOST-671). After the log verifier:
 
 ```bash
-python scripts/audit_test_durations.py pytest.log
+python scripts/audit_test_durations.py pytest-output.txt
 ```
 
 | Utilization | Action |
@@ -716,6 +717,15 @@ Local reproduction:
 make test 2>&1 | tee tests.txt
 python scripts/audit_test_durations.py tests.txt
 ```
+
+**Operational notes (PYPOST-569 follow-ups):**
+
+- Re-run `scripts/parse_timeout_audit.py` when adding e2e/integration tests that may shift
+  duration baselines (PYPOST-669).
+- Monitor `tests/test_makefile.py` peak duration (~4.6s); consider a 45s timeout marker
+  after a stable week if CI annotations persist (PYPOST-668).
+- Optional verbose CI job: `--durations=10 --durations-min=5` on manual/workflow_dispatch runs
+  (PYPOST-667).
 
 Phase 2 caplog contract: [PYPOST-574](https://pypost.atlassian.net/browse/PYPOST-574).
 
