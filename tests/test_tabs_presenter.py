@@ -338,6 +338,7 @@ class TestTabsPresenter(unittest.TestCase):
         rm.collections = [col]
         p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
         p.add_new_tab(req, save_state=False)
+        tab = p.widget.widget(0)
 
         save_as_received = []
         saved_received = []
@@ -356,7 +357,7 @@ class TestTabsPresenter(unittest.TestCase):
             "pypost.ui.request_save_orchestrator.SaveRequestDialog",
             return_value=mock_dialog,
         ):
-            p._handle_save_as_request(req)
+            p._handle_save_as_request(tab, req)
 
         self.assertEqual(len(save_as_received), 1)
         self.assertNotEqual(save_as_received[0][0], "r1")
@@ -388,7 +389,7 @@ class TestTabsPresenter(unittest.TestCase):
             "pypost.ui.request_save_orchestrator.SaveRequestDialog",
             return_value=mock_dialog,
         ):
-            p._handle_save_as_request(save_as_input)
+            p._handle_save_as_request(tab, save_as_input)
 
         original_lookup = rm.find_request("r1")
         self.assertIsNotNone(original_lookup)
@@ -415,10 +416,11 @@ class TestTabsPresenter(unittest.TestCase):
         sm = FakeStateManager()
         p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
         p.add_new_tab(req)
+        tab = p.widget.widget(0)
 
         received = []
         p.request_saved.connect(lambda: received.append(True))
-        p._handle_save_request(req)
+        p._handle_save_request(tab, req)
         self.assertEqual(len(received), 1)
 
     def test_persisted_baseline_initialized_on_add_new_tab(self):
@@ -815,8 +817,7 @@ class TestTabsPresenterSaveTabBinding(unittest.TestCase):
             "pypost.ui.request_save_orchestrator.SaveRequestDialog",
             return_value=mock_dialog,
         ):
-            with patch.object(p, "_find_tab_for_sender", return_value=source_tab):
-                p._handle_save_request(unsaved)
+            p._handle_save_request(source_tab, unsaved)
 
         self.assertEqual(source_tab.request_data.name, "Saved Name")
         self.assertEqual(other_tab.request_data.name, "Other")
@@ -850,12 +851,33 @@ class TestTabsPresenterSaveTabBinding(unittest.TestCase):
             "pypost.ui.request_save_orchestrator.SaveRequestDialog",
             return_value=mock_dialog,
         ):
-            with patch.object(p, "_find_tab_for_sender", return_value=source_tab):
-                p._handle_save_as_request(source)
+            p._handle_save_as_request(source_tab, source)
 
         self.assertNotEqual(source_tab.request_data.id, "r1")
         self.assertEqual(source_tab.request_data.name, "Copy")
         self.assertEqual(other_tab.request_data.name, "Other")
+
+    def test_handle_save_request_accepts_explicit_tab_without_sender(self):
+        """PYPOST-162: save handler must not rely on QObject.sender()."""
+        from pypost.models.models import Collection
+
+        unsaved = _make_request("new-r", "Unsaved")
+        col = Collection(id="c1", name="API", requests=[])
+        rm = FakeRequestManager()
+        rm.collections = [col]
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(unsaved, save_state=False)
+        source_tab = p.widget.widget(0)
+
+        mock_dialog = self._mock_save_dialog(request_name="Saved Name")
+        with patch(
+            "pypost.ui.request_save_orchestrator.SaveRequestDialog",
+            return_value=mock_dialog,
+        ):
+            p._handle_save_request(source_tab, unsaved)
+
+        self.assertEqual(source_tab.request_data.name, "Saved Name")
+        self.assertIsNotNone(source_tab.persisted_baseline)
 
 
 class TestTabsPresenterHiddenKeysForwarding(unittest.TestCase):

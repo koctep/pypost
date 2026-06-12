@@ -146,31 +146,7 @@ class TabsPresenter(QObject):
     def add_new_tab(self, request_data: RequestData | None = None, save_state: bool = True) -> None:
         if request_data is not None:
             request_data = copy_request_for_isolated_tab(request_data)
-        tab = RequestTab(request_data, metrics=self._metrics)
-
-        if hasattr(tab.request_editor, "body_edit"):
-            tab.request_editor.body_edit.update_indent_size(self._settings.indent_size)
-        if hasattr(tab.response_view, "set_indent_size"):
-            tab.response_view.set_indent_size(self._settings.indent_size)
-
-        if self._current_variables:
-            if hasattr(tab.request_editor, "set_variables"):
-                tab.request_editor.set_variables(self._current_variables)
-            if hasattr(tab.response_view, "set_env_keys"):
-                tab.response_view.set_env_keys(
-                    list(self._current_variables.keys()),
-                )
-        if self._current_hidden_keys:
-            if hasattr(tab.request_editor, "set_hidden_keys"):
-                tab.request_editor.set_hidden_keys(
-                    self._current_hidden_keys,
-                )
-        if self._template_service and hasattr(
-            tab.request_editor, "set_template_service"
-        ):
-            tab.request_editor.set_template_service(self._template_service)
-
-        self._wire_tab_signals(tab)
+        tab = self._create_request_tab(request_data)
 
         if request_data:
             tab.persisted_baseline = snapshot_persisted_fields(request_data)
@@ -386,13 +362,46 @@ class TabsPresenter(QObject):
         tab = self._tabs.currentWidget()
         return tab if isinstance(tab, RequestTab) else None
 
+    def _create_request_tab(self, request_data: RequestData | None) -> RequestTab:
+        """Creates a RequestTab and wires all per-tab signals."""
+        tab = RequestTab(request_data, metrics=self._metrics)
+
+        if hasattr(tab.request_editor, "body_edit"):
+            tab.request_editor.body_edit.update_indent_size(self._settings.indent_size)
+        if hasattr(tab.response_view, "set_indent_size"):
+            tab.response_view.set_indent_size(self._settings.indent_size)
+
+        if self._current_variables:
+            if hasattr(tab.request_editor, "set_variables"):
+                tab.request_editor.set_variables(self._current_variables)
+            if hasattr(tab.response_view, "set_env_keys"):
+                tab.response_view.set_env_keys(
+                    list(self._current_variables.keys()),
+                )
+        if self._current_hidden_keys:
+            if hasattr(tab.request_editor, "set_hidden_keys"):
+                tab.request_editor.set_hidden_keys(
+                    self._current_hidden_keys,
+                )
+        if self._template_service and hasattr(
+            tab.request_editor, "set_template_service"
+        ):
+            tab.request_editor.set_template_service(self._template_service)
+
+        self._wire_tab_signals(tab)
+        return tab
+
     def _wire_tab_signals(self, tab: RequestTab) -> None:
         """Connects tab's internal signals to self."""
         tab.request_editor.send_requested.connect(
             lambda data, t=tab: self._handle_send_request(t, data)
         )
-        tab.request_editor.save_requested.connect(self._handle_save_request)
-        tab.request_editor.save_as_requested.connect(self._handle_save_as_request)
+        tab.request_editor.save_requested.connect(
+            lambda data, t=tab: self._handle_save_request(t, data)
+        )
+        tab.request_editor.save_as_requested.connect(
+            lambda data, t=tab: self._handle_save_as_request(t, data)
+        )
         tab.request_editor.copy_curl_requested.connect(self._handle_copy_curl_request)
         tab.response_view.variable_set_requested.connect(self.variable_set_requested)
 
@@ -567,27 +576,11 @@ class TabsPresenter(QObject):
             if isinstance(self._tabs.widget(i), RequestTab)
         )
 
-    def _find_tab_for_sender(self) -> RequestTab | None:
-        sender = self.sender()
-        for i in range(self._tabs.count()):
-            tab = self._tabs.widget(i)
-            if isinstance(tab, RequestTab) and tab.request_editor == sender:
-                return tab
-        return None
-
     def _index_of_tab(self, tab: RequestTab) -> int | None:
         for i in range(self._tabs.count()):
             if self._tabs.widget(i) is tab:
                 return i
         return None
-
-    def _request_tab_before_dialog(self, source_tab: RequestTab | None, tab_index: int) -> RequestTab | None:
-        if source_tab is not None:
-            return source_tab
-        if tab_index < 0:
-            return None
-        widget = self._tabs.widget(tab_index)
-        return widget if isinstance(widget, RequestTab) else None
 
     def _sync_tab_labels_for_request(self, request_id: str, new_name: str) -> None:
         """Updates tab labels and in-memory names for all tabs sharing a request id."""
@@ -654,9 +647,7 @@ class TabsPresenter(QObject):
         tab.persisted_baseline = snapshot_persisted_fields(request)
         tab.stale_persisted = False
 
-    def _handle_save_request(self, request_data: RequestData) -> None:
-        source_tab = self._find_tab_for_sender()
-        tab_index_before = self._tabs.currentIndex()
+    def _handle_save_request(self, source_tab: RequestTab, request_data: RequestData) -> None:
         result = self._save_orchestrator.save_request(
             request_data,
             self._tabs,
@@ -667,7 +658,7 @@ class TabsPresenter(QObject):
 
         if result.action == SaveAction.OVERWRITE:
             snapshot = result.request
-            if source_tab is not None and snapshot is not None:
+            if snapshot is not None:
                 source_tab.request_data = snapshot
                 source_tab.persisted_baseline = snapshot_persisted_fields(snapshot)
                 source_tab.stale_persisted = False
@@ -677,31 +668,25 @@ class TabsPresenter(QObject):
             return
 
         if result.action == SaveAction.CREATED_NEW and result.request is not None:
-            target_tab = self._request_tab_before_dialog(source_tab, tab_index_before)
-            if target_tab is not None:
-                tab_index = self._index_of_tab(target_tab)
-                if tab_index is not None:
-                    self._header.set_tab_label(tab_index, result.request.name)
-                self._apply_save_result_to_tab(target_tab, result.request)
+            tab_index = self._index_of_tab(source_tab)
+            if tab_index is not None:
+                self._header.set_tab_label(tab_index, result.request.name)
+            self._apply_save_result_to_tab(source_tab, result.request)
             self.save_tabs_state()
             self.request_saved.emit()
 
-    def _handle_save_as_request(self, request_data: RequestData) -> None:
-        source_tab = self._find_tab_for_sender()
-        tab_index_before = self._tabs.currentIndex()
+    def _handle_save_as_request(self, source_tab: RequestTab, request_data: RequestData) -> None:
         result = self._save_orchestrator.save_as_request(request_data, self._tabs)
         if result.action != SaveAction.SAVE_AS or result.request is None:
             return
 
         new_request = result.request
-        target_tab = self._request_tab_before_dialog(source_tab, tab_index_before)
-        if target_tab is not None:
-            tab_index = self._index_of_tab(target_tab)
-            if tab_index is not None:
-                self._header.set_tab_label(tab_index, new_request.name)
-            target_tab.request_data = new_request
-            target_tab.request_editor.request_data = new_request
-            self._apply_save_result_to_tab(target_tab, new_request)
+        tab_index = self._index_of_tab(source_tab)
+        if tab_index is not None:
+            self._header.set_tab_label(tab_index, new_request.name)
+        source_tab.request_data = new_request
+        source_tab.request_editor.request_data = new_request
+        self._apply_save_result_to_tab(source_tab, new_request)
 
         self.save_tabs_state()
         self.request_save_as_completed.emit(new_request, result.collection_id or "")

@@ -112,6 +112,26 @@ tab.request_editor.send_requested.connect(
 
 See `tests/test_worker_race.py::test_worker_not_reusable_after_stop`.
 
+### Save handler tab binding (PYPOST-162)
+
+`_create_request_tab` is the single production path for new request tabs. It applies indent,
+environment, and template setup, then calls `_wire_tab_signals`.
+
+Save and save-as use the same closure pattern as send:
+
+```python
+tab.request_editor.save_requested.connect(
+    lambda data, t=tab: self._handle_save_request(t, data)
+)
+tab.request_editor.save_as_requested.connect(
+    lambda data, t=tab: self._handle_save_as_request(t, data)
+)
+```
+
+`_handle_save_request(source_tab, request_data)` and `_handle_save_as_request(source_tab,
+request_data)` use the captured tab directly. `_find_tab_for_sender` was removed; post-dialog
+`currentIndex()` fallbacks are no longer needed.
+
 ### MCP transport exceptions (PYPOST-411)
 
 `MCPClientService.run()` maps httpx exceptions from the MCP SSE client to `ExecutionError`:
