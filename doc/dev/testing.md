@@ -227,6 +227,7 @@ duplicate scope: prior tickets already cover the intent.
 | Live metrics MCP resource round-trip | `tests/test_metrics_server_integration.py` | Integration | PYPOST-563; Streamable HTTP and SSE |
 | RequestWidget GUI action counters | `tests/test_request_editor_gui_metrics.py` | Integration | PYPOST-170; Send click + Save/Copy cURL scrape |
 | MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556; port busy, listen readiness |
+| MCP and metrics bind host fidelity | `tests/test_server_bind_host_integration.py` | Integration | PYPOST-150; `127.0.0.1`, `0.0.0.0`, `localhost`, `::1` |
 
 PYPOST-154 verified end-to-end port-in-use handling for both MCP and metrics (closes
 PYPOST-20 bind-error debt). Implementation is in PYPOST-556 and PYPOST-153; 154 adds shared
