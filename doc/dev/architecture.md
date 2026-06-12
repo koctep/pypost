@@ -33,6 +33,23 @@ pypost/
 └── utils/                  # Helper utilities
 ```
 
+## Composition root (`main.py`)
+
+`main.py` wires shared services before `MainWindow` is shown. `ConfigManager` is created first
+because several startup components need `AppSettings` from disk before the UI exists:
+
+```text
+ConfigManager.load_config() → AppSettings
+    ├─ MetricsManager.start_server(host, port)
+    ├─ AlertManager(log_path, webhook, …)
+    └─ MainWindow(config_manager=…) → StateManager (same AppSettings object)
+```
+
+The same `ConfigManager` instance is injected into `MainWindow` so `settings.json` is read once
+(PYPOST-404). Do not lazy-create `ConfigManager` inside `MainWindow` in production. See
+[testability.md](testability.md#composition-root) and
+[PYPOST-404 dev notes](../ai-tasks/PYPOST-404/70-dev-docs.md).
+
 ## Core Components
 
 ### Data Models (`pypost/models/`)

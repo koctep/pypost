@@ -23,7 +23,8 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("PyPost")
 
-    # Initialize Config and Metrics
+    # Composition root: load settings once for MetricsManager, AlertManager, and
+    # MainWindow. The same ConfigManager instance is injected into MainWindow.
     config_manager = ConfigManager()
     settings = config_manager.load_config()
 

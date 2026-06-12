@@ -14,15 +14,35 @@ broader protocol work continues in [PYPOST-46](https://pypost.atlassian.net/brow
 
 | Service | Created in | Injected into |
 | --- | --- | --- |
+| `ConfigManager` | `main.py` (before other services) | `MainWindow` → `StateManager` |
+| `AppSettings` | `config_manager.load_config()` in `main.py` | `MetricsManager.start_server`, `AlertManager`, shared in UI |
 | `MetricsManager` (facade) | `main.py` | `MainWindow`, presenters, workers |
 | `MetricsTrackerProtocol` | type hint at consumers | `MagicMock(spec=MetricsTrackerProtocol)` in tests |
 | `MetricsRegistry` (counters) | inside `MetricsManager` | use directly in counter-only unit tests |
 | `MetricsServer` (uvicorn/MCP) | inside `MetricsManager` | started via `metrics.start_server()` in `main.py` |
 | `TemplateService` | `main.py` | `MainWindow`, `MCPServerManager`, `TabsPresenter` → workers |
+| `AlertManager` | `main.py` (from `AppSettings`) | `MainWindow` |
 
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
 `TemplateService` chain and [template_service.md](template_service.md) for lifecycle design
 (PYPOST-143).
+
+## ConfigManager lifecycle
+
+`main.py` is the composition root for settings: it constructs one `ConfigManager`, calls
+`load_config()` once, and passes the same instance to `MainWindow`. Startup services that need
+`AppSettings` before the UI exists (`MetricsManager.start_server`, `AlertManager`) read from that
+single load — they are not a reason to defer or duplicate `ConfigManager` creation.
+
+| Layer | Injection | Test substitute |
+| --- | --- | --- |
+| `MainWindow` | Optional `config_manager` (required in production from `main.py`) | `FakeConfigManager` or patched constructor |
+| `StateManager` | Required `ConfigManager` | In-memory / temp-dir `ConfigManager` |
+
+Production must inject from `main.py` so `settings.json` is read exactly once and
+`StateManager` shares the same in-memory `AppSettings` object. See
+[PYPOST-404 dev notes](../../ai-tasks/PYPOST-404/70-dev-docs.md) and
+[architecture.md](architecture.md#composition-root-mainpy).
 
 ## TemplateService lifecycle
 
