@@ -61,3 +61,7 @@
 - Prior audit: [PYPOST-40](../PYPOST-40/00-roadmap.md) (SOLID and maintainability)
 - Documented architecture: `doc/dev/architecture.md`, `doc/dev/mcp_integration.md`,
   `doc/dev/testability.md`
+
+## Recommended Branch
+
+`documentation/PYPOST-684-audit-tech-debt-jira-links`

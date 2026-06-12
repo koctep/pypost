@@ -71,7 +71,7 @@ Full report:
 | --- | ---: | --- |
 | `settings_dialog.py` | 423 | P1 — multi-domain SRP violation |
 | `mcp_activity_dialog.py` | 117 | OK — data-injected read-only viewer |
-| `hotkeys_dialog.py` | 91 | P2 — hardcoded shortcut list |
+| `hotkeys_dialog.py` | ~70 | OK — derives shortcuts from tagged QActions ([PYPOST-599](hotkeys.md)) |
 | `save_dialog.py` | 91 | OK — thin save-as form |
 | `env_dialog.py` | 89 | OK — widget composition facade |
 | `mcp_tools_overview_dialog.py` | 72 | OK — data-injected read-only viewer |

@@ -212,5 +212,5 @@ Twelve remediation items ticketed in Jira; R-P2-008 resolved in PYPOST-685 Step 
 ## Blocker Review
 
 **SAFE TO CLOSE** — audit deliverables complete; no application code changes required.
-Documented policies largely align with implementation for their stated scope. Thirteen follow-up
-remediation items (3 P1, 8 P2, 3 P3) documented for future Jira ticketing and implementation.
+Documented policies largely align with implementation for their stated scope. Twelve follow-up
+remediation items ticketed in Jira (PYPOST-703–715); R-P2-008 resolved in Step 7.

@@ -113,23 +113,24 @@ Findings use **P1** (critical/high exposure), **P2** (policy gap or secondary su
 
 ## Prioritized Recommendations
 
-| Priority | ID | Finding | Remediation direction |
+| Priority | ID | Finding | Jira |
 | --- | --- | --- | --- |
-| **P1** | M-002 / P-001 | Full response body in MCP tool results | Response redaction policy for agent results; size limits; document current behavior |
-| **P1** | T-002 | Metrics bind `0.0.0.0` default | Default to localhost; warn on wide bind |
-| **P1** | T-004 | No inbound MCP authentication | Document network trust model; consider token/auth for non-localhost bind |
-| **P2** | E-001 | History stores non-hidden credentials | Expand masking heuristics or stronger operator UX for hidden flag |
-| **P2** | S-002 | Encryption scope is hidden keys only | Settings UX copy; optional encrypt-all mode |
-| **P2** | S-003 | Webhook auth in plaintext settings | Encrypt or externalize secret storage |
-| **P2** | E-003 | Resolved URLs in ERROR logs | Log template URL or redact query params |
-| **P2** | M-003 | Script logs in MCP results | Sanitize or omit `logs` field for agent responses |
-| **P2** | C-001 | All collections contribute MCP tools | Collection-level exposure control or active-collection filter |
-| **P2** | M-007 | Unauthenticated metrics MCP | Bind default + optional auth |
-| **P3** | S-005 | Plaintext collections | Operator documentation |
-| **P3** | M-005 | MCP path omits `hidden_keys` | Forward `hidden_keys` if MCP history added |
-| **P3** | T-005 | Starlette debug=True | Set `debug=False` for production MCP app |
+| **P1** | M-002 / P-001 | Full response body in MCP tool results | [PYPOST-703](https://pypost.atlassian.net/browse/PYPOST-703) |
+| **P1** | T-002 | Metrics bind `0.0.0.0` default | [PYPOST-704](https://pypost.atlassian.net/browse/PYPOST-704) |
+| **P1** | T-004 | No inbound MCP authentication | [PYPOST-705](https://pypost.atlassian.net/browse/PYPOST-705) |
+| **P2** | E-001 | History stores non-hidden credentials | [PYPOST-706](https://pypost.atlassian.net/browse/PYPOST-706) |
+| **P2** | S-002 | Encryption scope is hidden keys only | [PYPOST-707](https://pypost.atlassian.net/browse/PYPOST-707) |
+| **P2** | S-003 | Webhook auth in plaintext settings | [PYPOST-708](https://pypost.atlassian.net/browse/PYPOST-708) |
+| **P2** | E-003 | Resolved URLs in ERROR logs | [PYPOST-709](https://pypost.atlassian.net/browse/PYPOST-709) |
+| **P2** | M-003 | Script logs in MCP results | [PYPOST-710](https://pypost.atlassian.net/browse/PYPOST-710) |
+| **P2** | C-001 | All collections contribute MCP tools | [PYPOST-711](https://pypost.atlassian.net/browse/PYPOST-711) |
+| **P2** | M-007 | Unauthenticated metrics MCP | [PYPOST-712](https://pypost.atlassian.net/browse/PYPOST-712) |
+| **P2** | R-P2-008 | Security documentation gaps | Resolved in PYPOST-685 Step 7 |
+| **P3** | S-005 | Plaintext collections | [PYPOST-713](https://pypost.atlassian.net/browse/PYPOST-713) |
+| **P3** | M-005 | MCP path omits `hidden_keys` | [PYPOST-714](https://pypost.atlassian.net/browse/PYPOST-714) |
+| **P3** | T-005 | Starlette debug=True | [PYPOST-715](https://pypost.atlassian.net/browse/PYPOST-715) |
 
-Follow-up Jira issues: [60-tech-debt.md](../../ai-tasks/PYPOST-685/60-tech-debt.md)
+Full remediation directions: [60-tech-debt.md](../../ai-tasks/PYPOST-685/60-tech-debt.md)
 
 ## Documentation Alignment
 

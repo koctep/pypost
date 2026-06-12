@@ -92,22 +92,22 @@ models/  →  (stdlib only)
 
 ## Prioritized Recommendations
 
-| Priority | ID | Finding | Remediation direction |
+| Priority | ID | Finding | Jira |
 | --- | --- | --- | --- |
-| **P1** | R-P1-001 | `style_manager.py` core → ui import | Move `StyleManager` to `ui/` or neutral module |
-| **P1** | R-P1-002 | Qt throughout `core/` | Document compromise or split `core/qt/` subpackage |
-| **P2** | R-P2-001 | `HistoryManager` outside composition root | Construct in `main.py`; extend `testability.md` |
-| **P2** | R-P2-002 | Partial composition root in `MainWindow` | Elevate storage/request/MCP wiring to `main.py` |
-| **P2** | R-P2-003 | `request_sync.is_tab_dirty` in core | Relocate tab-aware helper to `ui/` |
-| **P2** | R-P2-004 | Dual `TemplateService` for hover | Inject composition-root instance into mixin |
-| **P2** | R-P2-005 | Stale `architecture.md` tree | Refreshed in Step 7 (this task) |
-| **P2** | R-P2-006 | Worker always builds `RequestService` | Inject `ExecuteRequestProtocol` factory |
-| **P3** | R-P3-001 | Empty `utils/` package | Remove from docs or populate when needed |
-| **P3** | R-P3-002 | `template_service.py` LOC cap exceeded | Split expression helpers if growth continues |
-| **P3** | R-P3-003 | MCP inbound skips history | Accept as documented product choice |
-| **P3** | R-P3-004 | `main.py` duplicates `PyPostStyle` setup | Consolidate once style code moves to ui |
+| **P1** | R-P1-001 | `style_manager.py` core → ui import | [PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692) |
+| **P1** | R-P1-002 | Qt throughout `core/` | [PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693) |
+| **P2** | R-P2-001 | `HistoryManager` outside composition root | [PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694) |
+| **P2** | R-P2-002 | Partial composition root in `MainWindow` | [PYPOST-695](https://pypost.atlassian.net/browse/PYPOST-695) |
+| **P2** | R-P2-003 | `request_sync.is_tab_dirty` in core | [PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696) |
+| **P2** | R-P2-004 | Dual `TemplateService` for hover | [PYPOST-697](https://pypost.atlassian.net/browse/PYPOST-697) |
+| **P2** | R-P2-005 | Stale `architecture.md` tree | Resolved in PYPOST-684 Step 7 |
+| **P2** | R-P2-006 | Worker always builds `RequestService` | [PYPOST-698](https://pypost.atlassian.net/browse/PYPOST-698) |
+| **P3** | R-P3-001 | Empty `utils/` package | [PYPOST-699](https://pypost.atlassian.net/browse/PYPOST-699) |
+| **P3** | R-P3-002 | `template_service.py` LOC cap exceeded | [PYPOST-700](https://pypost.atlassian.net/browse/PYPOST-700) |
+| **P3** | R-P3-003 | MCP inbound skips history | [PYPOST-701](https://pypost.atlassian.net/browse/PYPOST-701) |
+| **P3** | R-P3-004 | `main.py` duplicates `PyPostStyle` setup | [PYPOST-702](https://pypost.atlassian.net/browse/PYPOST-702) |
 
-Follow-up Jira issues: [60-tech-debt.md](../../ai-tasks/PYPOST-684/60-tech-debt.md)
+Full remediation directions: [60-tech-debt.md](../../ai-tasks/PYPOST-684/60-tech-debt.md)
 
 ## Documentation Alignment
 

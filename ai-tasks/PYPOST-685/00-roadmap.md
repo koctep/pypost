@@ -63,3 +63,7 @@
 - Documented policies: `doc/dev/sensitive_data_masking_policy.md`,
   `doc/dev/mcp_secrets_policy.md`, `doc/dev/environment_encryption_at_rest.md`,
   `doc/dev/hidden_variables.md`
+
+## Recommended Branch
+
+`documentation/PYPOST-685-security-tech-debt-jira-links`

@@ -12,7 +12,7 @@ None introduced.
 
 | Item | Priority | Notes |
 | --- | --- | --- |
-| E2E: emit alert after settings save uses new log path | Low | Unit tests cover reload wiring; full emit path is `AlertManager` scope |
+| E2E: emit alert after settings save uses new log path | Low | Unit tests cover reload wiring; full emit path is `AlertManager` scope | Jira: [PYPOST-682](https://pypost.atlassian.net/browse/PYPOST-682) |
 
 ## Performance Concerns
 

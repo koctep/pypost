@@ -216,30 +216,30 @@ Compared observed structure against `doc/dev/` references from `20-architecture.
 
 ### P1 — High (remediate before major boundary refactors)
 
-| ID | Finding | Remediation direction |
-| --- | --- | --- |
-| R-P1-001 | D-001 / L-004: `style_manager.py` core → ui import | Move `StyleManager` and theme application to `pypost/ui/` (e.g. `ui/styles/style_manager.py`) or extract `PyPostStyle` to a neutral module both layers can import. Remove `ui/` import from `core/`. |
-| R-P1-002 | D-004: Qt throughout `core/` | Document as accepted boundary compromise **or** split `core/qt/` / `core/integration/` subpackages with explicit "requires PySide6" boundary; keep HTTP/templating/history in Qt-free modules. |
+| ID | Finding | Remediation direction | Jira |
+| --- | --- | --- | --- |
+| R-P1-001 | D-001 / L-004: `style_manager.py` core → ui import | Move `StyleManager` and theme application to `pypost/ui/` (e.g. `ui/styles/style_manager.py`) or extract `PyPostStyle` to a neutral module both layers can import. Remove `ui/` import from `core/`. | [PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692) |
+| R-P1-002 | D-004: Qt throughout `core/` | Document as accepted boundary compromise **or** split `core/qt/` / `core/integration/` subpackages with explicit "requires PySide6" boundary; keep HTTP/templating/history in Qt-free modules. | [PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693) |
 
 ### P2 — Medium (schedule as tech debt)
 
-| ID | Finding | Remediation direction |
-| --- | --- | --- |
-| R-P2-001 | S-HIST-003: `HistoryManager` outside composition root | Construct in `main.py` and inject into `MainWindow` / `TabsPresenter`; extend `testability.md` table. |
-| R-P2-002 | Partial composition root in `MainWindow` | Optionally elevate `StorageManager`, `RequestManager`, `MCPServerManager` wiring to `main.py` for parity with `TemplateService` / `ConfigManager`. |
-| R-P2-003 | L-003: `request_sync.is_tab_dirty` in core | Relocate tab-aware helper to `ui/`; keep `RequestData` copy/compare helpers in core or `models/`. |
-| R-P2-004 | S-TMPL-003: dual `TemplateService` for hover | Inject composition-root `TemplateService` into hover mixin via `MainWindow` setup instead of module singleton (or document explicit acceptance). |
-| R-P2-005 | `architecture.md` stale tree | Refresh directory structure and MCP/encryption/metrics sections in Step 7 dev docs. |
-| R-P2-006 | S-HTTP-003: worker always builds `RequestService` | Allow injecting `ExecuteRequestProtocol` factory or service into `RequestWorker` for narrower integration tests. |
+| ID | Finding | Remediation direction | Jira |
+| --- | --- | --- | --- |
+| R-P2-001 | S-HIST-003: `HistoryManager` outside composition root | Construct in `main.py` and inject into `MainWindow` / `TabsPresenter`; extend `testability.md` table. | [PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694) |
+| R-P2-002 | Partial composition root in `MainWindow` | Optionally elevate `StorageManager`, `RequestManager`, `MCPServerManager` wiring to `main.py` for parity with `TemplateService` / `ConfigManager`. | [PYPOST-695](https://pypost.atlassian.net/browse/PYPOST-695) |
+| R-P2-003 | L-003: `request_sync.is_tab_dirty` in core | Relocate tab-aware helper to `ui/`; keep `RequestData` copy/compare helpers in core or `models/`. | [PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696) |
+| R-P2-004 | S-TMPL-003: dual `TemplateService` for hover | Inject composition-root `TemplateService` into hover mixin via `MainWindow` setup instead of module singleton (or document explicit acceptance). | [PYPOST-697](https://pypost.atlassian.net/browse/PYPOST-697) |
+| R-P2-005 | `architecture.md` stale tree | Refresh directory structure and MCP/encryption/metrics sections in Step 7 dev docs. | Resolved in PYPOST-684 Step 7 |
+| R-P2-006 | S-HTTP-003: worker always builds `RequestService` | Allow injecting `ExecuteRequestProtocol` factory or service into `RequestWorker` for narrower integration tests. | [PYPOST-698](https://pypost.atlassian.net/browse/PYPOST-698) |
 
 ### P3 — Low (track or accept)
 
-| ID | Finding | Remediation direction |
-| --- | --- | --- |
-| R-P3-001 | L-006: empty `utils/` package | Remove from docs or add shared helpers when needed. |
-| R-P3-002 | S-TMPL-004: `template_service.py` LOC cap | Split expression helpers if growth continues. |
-| R-P3-003 | S-HIST-004: MCP inbound no history | Accept as documented product choice; revisit only if agents need audit trail parity with GUI. |
-| R-P3-004 | `main.py` duplicates `PyPostStyle` setup | Consolidate with `StyleManager.apply_theme` once style code moves to ui. |
+| ID | Finding | Remediation direction | Jira |
+| --- | --- | --- | --- |
+| R-P3-001 | L-006: empty `utils/` package | Remove from docs or add shared helpers when needed. | [PYPOST-699](https://pypost.atlassian.net/browse/PYPOST-699) |
+| R-P3-002 | S-TMPL-004: `template_service.py` LOC cap | Split expression helpers if growth continues. | [PYPOST-700](https://pypost.atlassian.net/browse/PYPOST-700) |
+| R-P3-003 | S-HIST-004: MCP inbound no history | Accept as documented product choice; revisit only if agents need audit trail parity with GUI. | [PYPOST-701](https://pypost.atlassian.net/browse/PYPOST-701) |
+| R-P3-004 | `main.py` duplicates `PyPostStyle` setup | Consolidate with `StyleManager.apply_theme` once style code moves to ui. | [PYPOST-702](https://pypost.atlassian.net/browse/PYPOST-702) |
 
 ---
 
@@ -264,13 +264,12 @@ Per `10-requirements.md`:
 - Performance profiling, security penetration testing, UI/UX review
 - CI/build tooling or dependency version changes
 - Target future architecture definition (remediation tasks may define)
-- Follow-up Jira issues (Step 6 — `60-tech-debt.md`)
-
 ---
 
 ## Traceability
 
 - **Task:** PYPOST-684
+- **Follow-up Jira:** PYPOST-692–702 (11 Debt issues); see `60-tech-debt.md`
 - **Architecture plan:** `ai-tasks/PYPOST-684/20-architecture.md`
 - **Prior audit:** `ai-tasks/PYPOST-40/30-audit-report.md` (SOLID; boundary items cross-referenced, not duplicated)
 - **Metrics script:** `scripts/audit_baseline_metrics.py` (2026-06-11 baseline)

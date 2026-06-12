@@ -194,5 +194,5 @@ separate ticket).
 
 ## Blocker Review
 
-**SAFE TO CLOSE** — audit deliverables complete; no application code changes required. Twelve
-follow-up remediation items documented for Phase D Jira ticketing and future implementation.
+**SAFE TO CLOSE** — audit deliverables complete; no application code changes required. Eleven
+follow-up remediation items ticketed in Jira (PYPOST-692–702); R-P2-005 resolved in Step 7.
