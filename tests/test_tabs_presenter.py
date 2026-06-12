@@ -741,6 +741,39 @@ class TestTabsPresenterAlertManagerPropagation(unittest.TestCase):
             self.assertIsNone(kwargs.get("alert_manager"))
 
 
+class TestTabsPresenterSendRequestTabBinding(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_handle_send_request_accepts_explicit_tab_without_sender(self):
+        """PYPOST-71: send handler must not rely on QObject.sender()."""
+        rm = FakeRequestManager()
+        sm = FakeStateManager()
+        settings = AppSettings()
+        p = TabsPresenter(rm, sm, settings, metrics=MagicMock())
+
+        req1 = _make_request("r1", "Tab1", "GET")
+        req2 = _make_request("r2", "Tab2", "POST")
+        p.add_new_tab(req1)
+        p.add_new_tab(req2)
+        tab1 = p.widget.widget(0)
+        tab2 = p.widget.widget(1)
+        p.widget.setCurrentIndex(0)
+
+        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
+            mock_instance = MagicMock()
+            mock_instance.isRunning.return_value = False
+            MockWorker.return_value = mock_instance
+
+            p._handle_send_request(tab2, req2)
+
+            MockWorker.assert_called_once()
+            self.assertIs(tab2.worker, mock_instance)
+            self.assertIsNone(tab1.worker)
+            mock_instance.start.assert_called_once()
+
+
 class TestTabsPresenterHiddenKeysForwarding(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

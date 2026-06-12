@@ -388,23 +388,15 @@ class TabsPresenter(QObject):
 
     def _wire_tab_signals(self, tab: RequestTab) -> None:
         """Connects tab's internal signals to self."""
-        tab.request_editor.send_requested.connect(self._handle_send_request)
+        tab.request_editor.send_requested.connect(
+            lambda data, t=tab: self._handle_send_request(t, data)
+        )
         tab.request_editor.save_requested.connect(self._handle_save_request)
         tab.request_editor.save_as_requested.connect(self._handle_save_as_request)
         tab.request_editor.copy_curl_requested.connect(self._handle_copy_curl_request)
         tab.response_view.variable_set_requested.connect(self.variable_set_requested)
 
-    def _handle_send_request(self, request_data: RequestData) -> None:
-        sender_tab = None
-        for i in range(self._tabs.count()):
-            tab = self._tabs.widget(i)
-            if isinstance(tab, RequestTab) and tab.request_editor == self.sender():
-                sender_tab = tab
-                break
-
-        if not sender_tab:
-            return
-
+    def _handle_send_request(self, sender_tab: RequestTab, request_data: RequestData) -> None:
         if sender_tab.worker is not None and not sender_tab.worker.isRunning():
             self._clear_tab_worker(sender_tab, reason="stale", request_data=request_data)
 

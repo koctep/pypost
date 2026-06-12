@@ -97,6 +97,19 @@ true, silently cancelling the new request.
 **Contract:** one `RequestWorker` per send. `TabsPresenter._handle_send_request` always
 constructs a new worker; completion handlers clear `tab.worker` via `_clear_tab_worker()`.
 
+### Send handler tab binding (PYPOST-71)
+
+`_wire_tab_signals` connects `send_requested` with a closure that captures the `RequestTab`:
+
+```python
+tab.request_editor.send_requested.connect(
+    lambda data, t=tab: self._handle_send_request(t, data)
+)
+```
+
+`_handle_send_request(sender_tab, request_data)` uses that reference directly and does not call
+`QObject.sender()`, so the handler works outside a signal-slot context (e.g. unit tests).
+
 See `tests/test_worker_race.py::test_worker_not_reusable_after_stop`.
 
 ### MCP transport exceptions (PYPOST-411)
