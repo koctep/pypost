@@ -1,7 +1,6 @@
-"""PYPOST-455 / PYPOST-148: Properties required if template caching is added later.
+"""PYPOST-455 / PYPOST-628: Template compile cache properties and guards.
 
-Caching is not implemented. PYPOST-455 evaluated cost; PYPOST-148 closed the debt item with
-documented deferral — see doc/dev/template_service.md (Compile cache decision).
+Compiled templates are cached per TemplateService instance (LRU maxsize=256).
 """
 
 import pytest
@@ -46,6 +45,17 @@ class TestTemplateRenderCachingPrerequisites(unittest.TestCase):
     def test_empty_content_stays_empty(self) -> None:
         for _ in range(3):
             self.assertEqual(self.svc.render_string("", {"a": "1"}), "")
+
+    def test_compile_cache_reuses_template_for_identical_content(self) -> None:
+        content = "{{host}}/api"
+        variables = {"host": "example.com"}
+        self.svc.render_string(content, variables)
+        info_after_first = self.svc._compile_template.cache_info()
+        self.svc.render_string(content, variables)
+        info_after_second = self.svc._compile_template.cache_info()
+        self.assertEqual(info_after_first.misses, 1)
+        self.assertEqual(info_after_second.hits, 1)
+        self.assertEqual(info_after_second.misses, 1)
 
 
 if __name__ == "__main__":

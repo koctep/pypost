@@ -186,20 +186,21 @@ Production grep: the only `jinja2.Environment()` in `pypost/` is `template_servi
 
 - **Versus old `TemplateEngine`:** avoids creating a new `Environment` or ad-hoc `Template` on
   every render call.
-- **`from_string` compile cache:** not present on `TemplateService` (audit PYPOST-148, 2026-06).
-  Repeated identical templates recompile each call unless a future cache is added.
+- **`from_string` compile cache:** per-instance LRU (`maxsize=256`) on identical template
+  strings (PYPOST-628). DEBUG logs expose `cache_info()` hits/misses.
 - **Measured cost (PYPOST-455):** render work is sub-millisecond; network I/O dominates request
   latency.
 
-### Compile cache decision (PYPOST-148)
+### Compile cache (PYPOST-628)
 
-**Outcome: defer implementation.** No bounded compile cache was added.
+**Outcome: implemented.** Strategy A from PYPOST-455 — bounded LRU on compile keyed by
+template string content.
 
 | Audit item | Result |
 | --- | --- |
-| `lru_cache` / Jinja2 `BytecodeCache` on `TemplateService` | Not present |
-| `_render_with_jinja` | `self.env.from_string(content)` per call |
-| Guard tests for future cache | `tests/test_template_service_caching_eval.py` |
+| `lru_cache` on compile | Per `TemplateService` instance, `maxsize=256` |
+| `_render_with_jinja` | Uses `_compile_template(content)` |
+| Guard tests | `tests/test_template_service_caching_eval.py` |
 
 **Benchmark reference (PYPOST-455, local 2026-06-11):**
 

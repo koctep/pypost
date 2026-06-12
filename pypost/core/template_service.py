@@ -1,4 +1,5 @@
 import logging
+from functools import lru_cache
 from typing import Any
 
 from jinja2 import Environment
@@ -38,6 +39,12 @@ class TemplateService:
         self._function_expression_resolver = FunctionExpressionResolver(
             self._function_registry,
         )
+
+        @lru_cache(maxsize=256)
+        def _compile_template(content: str):
+            return self.env.from_string(content)
+
+        self._compile_template = _compile_template
 
     def validate_function_expressions(self, content: str) -> ValidationResult:
         """
@@ -144,7 +151,15 @@ class TemplateService:
         )
 
     def _render_with_jinja(self, content: str, variables: dict[str, Any]) -> str:
-        template = self.env.from_string(content)
+        template = self._compile_template(content)
+        if logger.isEnabledFor(logging.DEBUG):
+            info = self._compile_template.cache_info()
+            logger.debug(
+                "template_compile_cache hits=%d misses=%d size=%d",
+                info.hits,
+                info.misses,
+                info.currsize,
+            )
         return template.render(**variables)
 
     def _emit_render_success_observability(
