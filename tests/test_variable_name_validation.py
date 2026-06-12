@@ -7,6 +7,9 @@ import pytest
 pytestmark = pytest.mark.timeout(30)
 
 from pypost.core.variable_name_validation import (
+    MSG_EMPTY,
+    MSG_INVALID_CHARS,
+    MSG_STARTS_WITH_DIGIT,
     validate_variable_name,
     validation_failure_reason,
 )
@@ -36,29 +39,13 @@ class TestValidateVariableName:
     @pytest.mark.parametrize(
         ("name", "expected_error", "expected_reason"),
         [
-            ("", "Variable name cannot be empty.", "empty"),
-            ("123api", "Variable name cannot start with a digit.", "starts_with_digit"),
-            ("0_", "Variable name cannot start with a digit.", "starts_with_digit"),
-            (
-                "api-key",
-                "Variable name can only contain letters, numbers, and underscores.",
-                "invalid_chars",
-            ),
-            (
-                "user name",
-                "Variable name can only contain letters, numbers, and underscores.",
-                "invalid_chars",
-            ),
-            (
-                "user.name",
-                "Variable name can only contain letters, numbers, and underscores.",
-                "invalid_chars",
-            ),
-            (
-                "api key!",
-                "Variable name can only contain letters, numbers, and underscores.",
-                "invalid_chars",
-            ),
+            ("", MSG_EMPTY, "empty"),
+            ("123api", MSG_STARTS_WITH_DIGIT, "starts_with_digit"),
+            ("0_", MSG_STARTS_WITH_DIGIT, "starts_with_digit"),
+            ("api-key", MSG_INVALID_CHARS, "invalid_chars"),
+            ("user name", MSG_INVALID_CHARS, "invalid_chars"),
+            ("user.name", MSG_INVALID_CHARS, "invalid_chars"),
+            ("api key!", MSG_INVALID_CHARS, "invalid_chars"),
         ],
     )
     def test_invalid_names(
@@ -80,10 +67,8 @@ class TestValidateVariableName:
         assert error == ""
 
 
-_INVALID_CHARS_MSG = (
-    "Variable name can only contain letters, numbers, and underscores."
-)
-_STARTS_WITH_DIGIT_MSG = "Variable name cannot start with a digit."
+_INVALID_CHARS_MSG = MSG_INVALID_CHARS
+_STARTS_WITH_DIGIT_MSG = MSG_STARTS_WITH_DIGIT
 
 
 class TestValidateVariableNameUnicode:

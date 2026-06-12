@@ -4,6 +4,12 @@ from typing import Literal
 
 ValidationFailureReason = Literal["empty", "starts_with_digit", "invalid_chars"]
 
+MSG_EMPTY = "Variable name cannot be empty."
+MSG_STARTS_WITH_DIGIT = "Variable name cannot start with a digit."
+MSG_INVALID_CHARS = (
+    "Variable name can only contain letters, numbers, and underscores."
+)
+
 
 def validate_variable_name(name: str) -> tuple[bool, str]:
     """Validate a variable name for Jinja2 template compatibility.
@@ -17,16 +23,13 @@ def validate_variable_name(name: str) -> tuple[bool, str]:
         Tuple of (is_valid, error_message). error_message is empty when valid.
     """
     if not name:
-        return False, "Variable name cannot be empty."
+        return False, MSG_EMPTY
 
     if name[0].isdigit():
-        return False, "Variable name cannot start with a digit."
+        return False, MSG_STARTS_WITH_DIGIT
 
     if not all(c.isalnum() or c == "_" for c in name):
-        return (
-            False,
-            "Variable name can only contain letters, numbers, and underscores.",
-        )
+        return False, MSG_INVALID_CHARS
 
     return True, ""
 

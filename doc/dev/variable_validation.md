@@ -69,10 +69,16 @@ alphanumeric. This is documented and tested in `tests/test_variable_name_validat
 | Emoji / symbols | `api🔑`, `key❤`, `café!` | Reject | `invalid_chars` |
 | Invisible / format chars | `api\u200bkey`, `soft\u00adhyphen` | Reject | `invalid_chars` |
 
-**Jinja2 divergence (known, not fixed in PYPOST-470):** `isalnum()` and `isidentifier()` differ
-on some edge cases. For example, `x²` may pass PyPost validation but fail Jinja2 tokenization,
-while NFD forms with combining marks may fail PyPost but be valid identifiers. Aligning rules
-to `isidentifier()` is a separate product decision; see PYPOST-470 tech-debt follow-ups.
+**Jinja2 divergence (PYPOST-632):** PyPost **keeps** the `isalnum()` policy — do not switch to
+`str.isidentifier()` without a product decision.
+
+| Case | PyPost (`isalnum`) | `isidentifier()` |
+| --- | --- | --- |
+| `x²` | Accept | Reject |
+| NFD `naïve` (decomposed) | Reject (combining mark) | Accept |
+
+Regression tests: `TestIsidentifierDivergencePYPOST632` in
+`tests/test_variable_name_validation.py`.
 
 ## UI vs Core Behavior
 
