@@ -166,6 +166,24 @@ class TestCodeEditorPaste(unittest.TestCase):
         ed.insertFromMimeData(mime)
         self.assertEqual(json.loads(ed.toPlainText()), {"x": 1})
 
+    def test_insert_from_mime_data_large_text_skips_json_format(self):
+        ed = CodeEditor(indent_size=2)
+        ed.setPlainText("")
+        raw = '{"x":1,"pad":"' + ("a" * (100 * 1024)) + '"}'
+        mime = QMimeData()
+        mime.setText(raw)
+        ed.insertFromMimeData(mime)
+        self.assertEqual(ed.toPlainText(), raw)
+
+    def test_insert_from_mime_data_large_non_json_passthrough(self):
+        ed = CodeEditor()
+        ed.setPlainText("")
+        raw = "x" * (100 * 1024 + 1)
+        mime = QMimeData()
+        mime.setText(raw)
+        ed.insertFromMimeData(mime)
+        self.assertEqual(ed.toPlainText(), raw)
+
 
 class TestCodeEditorKeyHandling(unittest.TestCase):
     @classmethod

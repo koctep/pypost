@@ -19,6 +19,12 @@ from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
 
 _CHEVRON_WIDTH = 14
 _CHEVRON_PADDING = 2
+_PASTE_JSON_FORMAT_CHAR_THRESHOLD = 100 * 1024
+
+
+def _should_format_pasted_json(text: str) -> bool:
+    """Return False when paste-time JSON parse/format would risk UI lag."""
+    return len(text) <= _PASTE_JSON_FORMAT_CHAR_THRESHOLD
 
 
 class CodeEditor(VariableAwarePlainTextEdit):
@@ -269,6 +275,9 @@ class CodeEditor(VariableAwarePlainTextEdit):
     def insertFromMimeData(self, source: QMimeData):
         if source.hasText():
             text = source.text()
+            if not _should_format_pasted_json(text):
+                super().insertFromMimeData(source)
+                return
             try:
                 parsed = json.loads(text)
                 if self._body_format == BodyFormat.YAML and self._yaml_as_json:

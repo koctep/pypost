@@ -20,6 +20,8 @@ Behaviour:
 - When format is not YAML, the flag has no effect on send or paste (even if still checked in the
   model).
 - Pasted non-JSON text is unchanged; invalid JSON paste falls back to default insert.
+- Pasted text larger than **100KB** (102 400 characters) skips JSON parse and formatting; raw
+  clipboard text is inserted to avoid UI lag on the main thread.
 
 See also [Body Format Selector](body_format_selector.md) for format persistence and
 [Copy cURL](copy_curl.md) for cURL generation (cURL uses editor text, not converted JSON).
@@ -62,7 +64,8 @@ flowchart LR
   tab format row; load/save via `load_data`, `update_request_data`, `get_request_data_from_ui`;
   `setEnabled` when format is YAML; `_sync_yaml_as_json_to_editor` pushes flag to `CodeEditor`.
 - **`CodeEditor` (`pypost/ui/widgets/code_editor.py`)** — `set_yaml_as_json`; paste hook converts
-  JSON→YAML when format is YAML and flag is on, otherwise pretty-prints JSON (existing behavior).
+  JSON→YAML when format is YAML and flag is on, otherwise pretty-prints JSON. Paste at or below
+  100KB only; larger clipboard text uses default insert (`_PASTE_JSON_FORMAT_CHAR_THRESHOLD`).
 - **`RequestData` (`pypost/models/models.py`)** — `yaml_as_json: bool = False`; serializes with
   existing collection storage (no migration).
 - **`yaml_json_converter` (`pypost/core/yaml_json_converter.py`)** — `convert_yaml_body_to_object`
@@ -232,7 +235,7 @@ BODY errors before the retry loop. See `tests/test_retry.py`.
 | --- | --- |
 | `tests/test_yaml_json_converter.py` | YAML parse + `convert_json_object_to_yaml` round-trip |
 | `tests/test_http_client.py` | Send with flag on/off, ignored for JSON/XML, BODY error path |
-| `tests/test_code_editor.py` | JSON→YAML paste when flag on; JSON format unchanged |
+| `tests/test_code_editor.py` | JSON→YAML paste when flag on; JSON format unchanged; large paste skip |
 | `tests/test_request_editor_body_format.py` | Checkbox persistence, enabled-state, editor sync |
 | `tests/test_retry.py` | BODY errors do not retry |
 
@@ -250,3 +253,4 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 - **PYPOST-513** — Body format selector (`body_type`).
 - **PYPOST-514** — YAML-as-JSON send conversion (this feature).
 - **PYPOST-515** — Paste-time JSON→YAML in editor when checkbox is on (shares `yaml_as_json` flag).
+- **PYPOST-109** — Skip paste-time JSON parse/format above 100KB to avoid UI lag.
