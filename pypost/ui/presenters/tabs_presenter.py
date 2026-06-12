@@ -575,6 +575,20 @@ class TabsPresenter(QObject):
                 return tab
         return None
 
+    def _index_of_tab(self, tab: RequestTab) -> int | None:
+        for i in range(self._tabs.count()):
+            if self._tabs.widget(i) is tab:
+                return i
+        return None
+
+    def _request_tab_before_dialog(self, source_tab: RequestTab | None, tab_index: int) -> RequestTab | None:
+        if source_tab is not None:
+            return source_tab
+        if tab_index < 0:
+            return None
+        widget = self._tabs.widget(tab_index)
+        return widget if isinstance(widget, RequestTab) else None
+
     def _sync_tab_labels_for_request(self, request_id: str, new_name: str) -> None:
         """Updates tab labels and in-memory names for all tabs sharing a request id."""
         for i in range(self._tabs.count()):
@@ -642,6 +656,7 @@ class TabsPresenter(QObject):
 
     def _handle_save_request(self, request_data: RequestData) -> None:
         source_tab = self._find_tab_for_sender()
+        tab_index_before = self._tabs.currentIndex()
         result = self._save_orchestrator.save_request(
             request_data,
             self._tabs,
@@ -662,27 +677,31 @@ class TabsPresenter(QObject):
             return
 
         if result.action == SaveAction.CREATED_NEW and result.request is not None:
-            current_index = self._tabs.currentIndex()
-            self._header.set_tab_label(current_index, result.request.name)
-            tab = self._tabs.widget(current_index)
-            if isinstance(tab, RequestTab):
-                self._apply_save_result_to_tab(tab, result.request)
+            target_tab = self._request_tab_before_dialog(source_tab, tab_index_before)
+            if target_tab is not None:
+                tab_index = self._index_of_tab(target_tab)
+                if tab_index is not None:
+                    self._header.set_tab_label(tab_index, result.request.name)
+                self._apply_save_result_to_tab(target_tab, result.request)
             self.save_tabs_state()
             self.request_saved.emit()
 
     def _handle_save_as_request(self, request_data: RequestData) -> None:
+        source_tab = self._find_tab_for_sender()
+        tab_index_before = self._tabs.currentIndex()
         result = self._save_orchestrator.save_as_request(request_data, self._tabs)
         if result.action != SaveAction.SAVE_AS or result.request is None:
             return
 
         new_request = result.request
-        current_index = self._tabs.currentIndex()
-        self._header.set_tab_label(current_index, new_request.name)
-        tab = self._tabs.widget(current_index)
-        if isinstance(tab, RequestTab):
-            tab.request_data = new_request
-            tab.request_editor.request_data = new_request
-            self._apply_save_result_to_tab(tab, new_request)
+        target_tab = self._request_tab_before_dialog(source_tab, tab_index_before)
+        if target_tab is not None:
+            tab_index = self._index_of_tab(target_tab)
+            if tab_index is not None:
+                self._header.set_tab_label(tab_index, new_request.name)
+            target_tab.request_data = new_request
+            target_tab.request_editor.request_data = new_request
+            self._apply_save_result_to_tab(target_tab, new_request)
 
         self.save_tabs_state()
         self.request_save_as_completed.emit(new_request, result.collection_id or "")

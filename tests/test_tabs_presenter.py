@@ -774,6 +774,90 @@ class TestTabsPresenterSendRequestTabBinding(unittest.TestCase):
             mock_instance.start.assert_called_once()
 
 
+class TestTabsPresenterSaveTabBinding(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _mock_save_dialog(self, *, request_name: str = "Saved Copy"):
+        mock_dialog = MagicMock()
+        mock_dialog.exec.return_value = True
+        mock_dialog.selected_collection_id = "c1"
+        mock_dialog.new_collection_name = ""
+        mock_dialog.request_name = request_name
+        return mock_dialog
+
+    def test_save_new_applies_to_source_tab_when_index_changes_during_dialog(self):
+        """PYPOST-72: save-new must not rely on currentIndex() after modal dialog."""
+        from pypost.models.models import Collection
+
+        unsaved = _make_request("new-r", "Unsaved")
+        other = _make_request("r2", "Other")
+        col = Collection(id="c1", name="API", requests=[])
+        rm = FakeRequestManager()
+        rm.collections = [col]
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(unsaved, save_state=False)
+        p.add_new_tab(other, save_state=False)
+        source_tab = p.widget.widget(0)
+        other_tab = p.widget.widget(1)
+        p.widget.setCurrentIndex(0)
+
+        mock_dialog = self._mock_save_dialog(request_name="Saved Name")
+
+        def exec_switch_tab():
+            p.widget.setCurrentIndex(1)
+            return True
+
+        mock_dialog.exec.side_effect = exec_switch_tab
+
+        with patch(
+            "pypost.ui.request_save_orchestrator.SaveRequestDialog",
+            return_value=mock_dialog,
+        ):
+            with patch.object(p, "_find_tab_for_sender", return_value=source_tab):
+                p._handle_save_request(unsaved)
+
+        self.assertEqual(source_tab.request_data.name, "Saved Name")
+        self.assertEqual(other_tab.request_data.name, "Other")
+        self.assertIsNotNone(source_tab.persisted_baseline)
+
+    def test_save_as_applies_to_source_tab_when_index_changes_during_dialog(self):
+        """PYPOST-72: save-as must not rely on currentIndex() after modal dialog."""
+        from pypost.models.models import Collection
+
+        source = _make_request("r1", "Source")
+        other = _make_request("r2", "Other")
+        col = Collection(id="c1", name="API", requests=[source])
+        rm = FakeRequestManager([source])
+        rm.collections = [col]
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(source, save_state=False)
+        p.add_new_tab(other, save_state=False)
+        source_tab = p.widget.widget(0)
+        other_tab = p.widget.widget(1)
+        p.widget.setCurrentIndex(0)
+
+        mock_dialog = self._mock_save_dialog(request_name="Copy")
+
+        def exec_switch_tab():
+            p.widget.setCurrentIndex(1)
+            return True
+
+        mock_dialog.exec.side_effect = exec_switch_tab
+
+        with patch(
+            "pypost.ui.request_save_orchestrator.SaveRequestDialog",
+            return_value=mock_dialog,
+        ):
+            with patch.object(p, "_find_tab_for_sender", return_value=source_tab):
+                p._handle_save_as_request(source)
+
+        self.assertNotEqual(source_tab.request_data.id, "r1")
+        self.assertEqual(source_tab.request_data.name, "Copy")
+        self.assertEqual(other_tab.request_data.name, "Other")
+
+
 class TestTabsPresenterHiddenKeysForwarding(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

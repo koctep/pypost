@@ -227,6 +227,8 @@ QT_QPA_PLATFORM=offscreen python -m pytest \
 ### Save action works but data is not persisted
 
 - Inspect `RequestSaveOrchestrator.save_request` and `TabsPresenter._handle_save_request`.
+- Save handlers capture the originating tab **before** modal dialogs; post-save UI updates must
+  not rely on `currentIndex()` after the dialog closes (see PYPOST-72).
 - Check collection and storage files for write permissions.
 
 ### `+` button is not visible or overlaps tabs
