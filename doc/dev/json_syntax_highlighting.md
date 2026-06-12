@@ -126,5 +126,9 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_json_highlighter
 
 ## Related
 
+- [PYPOST-99](https://pypost.atlassian.net/browse/PYPOST-99) — closed PYPOST-11 hardcoded-colors
+  debt; theme module and resolver verified
+- [PYPOST-102](https://pypost.atlassian.net/browse/PYPOST-102) — duplicate closure confirming
+  PYPOST-99 already satisfied "move colors to theme or config"
 - Variable hover tooltips: `VariableHoverMixin` in `pypost/ui/widgets/mixins.py`
 - Template expressions: `doc/dev/template_expression_functions.md`

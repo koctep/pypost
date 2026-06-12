@@ -25,6 +25,6 @@ None introduced by theme extraction.
 
 ## Follow-up Tasks
 
-- Duplicate debt item — close or merge with PYPOST-99:
-  [PYPOST-102](https://pypost.atlassian.net/browse/PYPOST-102).
+- Duplicate debt item closed:
+  [PYPOST-102](https://pypost.atlassian.net/browse/PYPOST-102) (duplicate of PYPOST-99).
 - Optional user-configurable JSON syntax colors in settings (no Jira issue).

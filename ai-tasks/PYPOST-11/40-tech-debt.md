@@ -20,5 +20,7 @@
 
 ## Follow-up Tasks
 
-- Move color settings to application theme or config. — [PYPOST-102](https://pypost.atlassian.net/browse/PYPOST-102)
+- Move color settings to application theme or config — closed as duplicate of
+  [PYPOST-99](https://pypost.atlassian.net/browse/PYPOST-99) via
+  [PYPOST-102](https://pypost.atlassian.net/browse/PYPOST-102).
 - Add tests for `JsonHighlighter`. — [PYPOST-103](https://pypost.atlassian.net/browse/PYPOST-103)
