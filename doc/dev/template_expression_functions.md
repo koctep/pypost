@@ -105,6 +105,14 @@ Primary API entry points:
     scan).
 - `TEMPLATE_PLACEHOLDER_PATTERN` (`template_expression_tokenizer`)
   - Compiled regex `\{\{\s*(.*?)\s*\}\}` shared by render, validation, and hover scans.
+- `PLAIN_VARIABLE_PATTERN` (`template_expression_tokenizer`)
+  - Compiled regex `\{\{([a-zA-Z0-9_]+)\}\}` for plain `{{name}}` tokens without inner
+    whitespace. Used by hover fast-path (`VariableHoverHelper.VARIABLE_PATTERN`) and
+    `is_plain_variable_token` / `extract_plain_variable_name` helpers (PYPOST-113).
+- `is_plain_variable_token(token) -> bool` (`template_expression_tokenizer`)
+  - True when the full token is a plain variable placeholder (not a function call).
+- `extract_plain_variable_name(token) -> str | None` (`template_expression_tokenizer`)
+  - Returns the captured name from a plain token, or `None`.
 - `tokenize_template_expressions(content) -> list[str]` (`template_expression_tokenizer`)
   - Canonical extraction of inner text for each `{{ ... }}` placeholder.
 
@@ -444,7 +452,8 @@ hardening — not release blockers.
 | Registry vs `env.globals` parity test | — | Done in PYPOST-457 (`test_function_registry`, `test_template_service`) |
 | Shared tokenization dedup | — | Done in PYPOST-460 (`template_expression_tokenizer`) |
 | Empty-arg / multi-placeholder / closing-paren edge cases | — | Done in PYPOST-461 (see PYPOST-461 section) |
-| Hover regex vs resolver identifier rules | — | Hover `VARIABLE_PATTERN` vs resolver `_IDENTIFIER_RE` mismatch for digit-leading names |
+| Hover regex vs resolver identifier rules | — | `PLAIN_VARIABLE_PATTERN` allows digit-leading names; resolver `_IDENTIFIER_RE` does not |
+| Plain variable pattern centralization | — | Done in PYPOST-113 (`PLAIN_VARIABLE_PATTERN` + helpers in tokenizer) |
 | Hover expression pattern vs tokenizer | — | Done in PYPOST-536 (`EXPRESSION_PATTERN` aliases `TEMPLATE_PLACEHOLDER_PATTERN`) |
 | HTTPClient body / header-name integration | — | Optional; shared `render_string` path already proven |
 | Table tooltip malformed/spacing variants | — | Hover pipeline proven at `TemplateService`; table tests cover valid function cells only |

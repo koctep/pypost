@@ -1,4 +1,3 @@
-import re
 from typing import Dict, Generic, Optional, Set, Tuple, TypeVar
 
 from PySide6.QtGui import QMouseEvent
@@ -6,15 +5,20 @@ from PySide6.QtWidgets import QToolTip, QWidget
 
 from pypost.core.constants import HIDDEN_MASK
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
-from pypost.core.template_expression_tokenizer import TEMPLATE_PLACEHOLDER_PATTERN
+from pypost.core.template_expression_tokenizer import (
+    PLAIN_VARIABLE_PATTERN,
+    TEMPLATE_PLACEHOLDER_PATTERN,
+    extract_plain_variable_name,
+    is_plain_variable_token,
+)
 from pypost.core.template_service import TemplateService
 
 
 class VariableHoverHelper:
     """Helper class to find variables in text and manage tooltip display."""
 
-    # Regex to find {{variable}} pattern
-    VARIABLE_PATTERN = re.compile(r"\{\{([a-zA-Z0-9_]+)\}\}")
+    # Plain {{name}} fast path — shared with core template_expression_tokenizer (PYPOST-113).
+    VARIABLE_PATTERN = PLAIN_VARIABLE_PATTERN
     # Full-token scan shared with core template_expression_tokenizer (PYPOST-536).
     EXPRESSION_PATTERN = TEMPLATE_PLACEHOLDER_PATTERN
     _template_service = TemplateService()
@@ -72,7 +76,7 @@ class VariableHoverHelper:
 
         def replace(match):
             expression = match.group(0)
-            if VariableHoverHelper.VARIABLE_PATTERN.fullmatch(expression):
+            if is_plain_variable_token(expression):
                 return VariableHoverHelper._resolve_plain_variable(
                     expression,
                     variables,
@@ -91,11 +95,11 @@ class VariableHoverHelper:
         variables: Dict[str, str],
         hidden_keys: Optional[Set[str]] = None,
     ) -> str:
-        match = VariableHoverHelper.VARIABLE_PATTERN.fullmatch(expression)
-        if not match:
+        name = extract_plain_variable_name(expression)
+        if name is None:
             return expression
         return VariableHoverHelper.get_variable_value(
-            match.group(1),
+            name,
             variables,
             hidden_keys,
         )
