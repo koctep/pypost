@@ -477,22 +477,22 @@ def test_verify_decrypt_access_detects_corrupt_ciphertext(tmp_path, monkeypatch,
     )
 
 
-def test_verify_decrypt_access_uses_build_inventory(tmp_path, monkeypatch):
+def test_verify_decrypt_access_uses_single_raw_read(tmp_path, monkeypatch):
     storage = _make_storage(tmp_path, monkeypatch)
     service = EncryptionMigrationService(storage)
     settings = AppSettings(env_encryption_enabled=True)
-    inventory_called = False
-    original_build = service.build_inventory
+    read_count = 0
+    original_read = service._read_raw_environments
 
-    def spy_build(s):
-        nonlocal inventory_called
-        inventory_called = True
-        return original_build(s)
+    def spy_read():
+        nonlocal read_count
+        read_count += 1
+        return original_read()
 
-    monkeypatch.setattr(service, "build_inventory", spy_build)
+    monkeypatch.setattr(service, "_read_raw_environments", spy_read)
     report = service.verify_decrypt_access(settings)
 
-    assert inventory_called
+    assert read_count == 1
     assert report.inventory.environment_count == 0
 
 
@@ -502,28 +502,18 @@ def test_deserialize_all_uses_public_storage_api(tmp_path, monkeypatch):
     settings = AppSettings(env_encryption_enabled=True)
     env = Environment(name="Dev", variables={"A": "1"})
 
-    load_called = False
-    deserialize_called = False
+    records_called = False
 
-    def spy_load():
-        nonlocal load_called
-        load_called = True
+    def spy_records(records):
+        nonlocal records_called
+        records_called = True
         return [env], ()
 
-    original_deserialize = storage._env_adapter.deserialize_environment
-
-    def spy_deserialize(item):
-        nonlocal deserialize_called
-        deserialize_called = True
-        return original_deserialize(item)
-
-    monkeypatch.setattr(storage, "load_environments_with_errors", spy_load)
-    monkeypatch.setattr(storage._env_adapter, "deserialize_environment", spy_deserialize)
+    monkeypatch.setattr(storage, "deserialize_environment_records", spy_records)
 
     environments, errors = service._deserialize_all(settings)
 
-    assert load_called
-    assert not deserialize_called
+    assert records_called
     assert environments == [env]
     assert errors == ()
 

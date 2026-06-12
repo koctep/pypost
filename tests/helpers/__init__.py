@@ -51,3 +51,6 @@ class FakeStorageManager:
 
     def load_environments_with_errors(self):
         return [], ()
+
+    def deserialize_environment_records(self, records):
+        return [], ()

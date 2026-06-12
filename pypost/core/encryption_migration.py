@@ -170,6 +170,13 @@ class EncryptionMigrationService:
     def build_inventory(self, settings: AppSettings | None) -> EnvironmentInventory:
         self._storage.apply_encryption_settings(settings)
         raw = self._read_raw_environments()
+        return self._inventory_from_raw(raw, settings)
+
+    def _inventory_from_raw(
+        self,
+        raw: list[dict[str, Any]],
+        settings: AppSettings | None,
+    ) -> EnvironmentInventory:
         inventory = self._scan_raw_environments(raw)
         missing = self._check_missing_kids(inventory.kid_histogram, settings)
         inventory = replace(inventory, missing_kids=missing)
@@ -178,7 +185,9 @@ class EncryptionMigrationService:
 
     def verify_decrypt_access(self, settings: AppSettings | None) -> MigrationReport:
         logger.info("encryption_migration_verify_started")
-        inventory = self.build_inventory(settings)
+        self._storage.apply_encryption_settings(settings)
+        raw = self._read_raw_environments()
+        inventory = self._inventory_from_raw(raw, settings)
         errors: list[str] = []
         if inventory.data_quality_errors:
             logger.error(
@@ -196,7 +205,7 @@ class EncryptionMigrationService:
                 for kid in sorted(inventory.missing_kids)
             )
         else:
-            _, decrypt_errors = self._deserialize_all(settings)
+            _, decrypt_errors = self._deserialize_records(raw)
             if decrypt_errors:
                 logger.error(
                     "encryption_migration_decrypt_failed error_count=%d",
@@ -299,7 +308,9 @@ class EncryptionMigrationService:
                 success=False,
             )
 
-        inventory = self.build_inventory(settings)
+        self._storage.apply_encryption_settings(settings)
+        raw = self._read_raw_environments()
+        inventory = self._inventory_from_raw(raw, settings)
         if require_plaintext and inventory.plaintext_hidden_count == 0:
             logger.info(
                 "encryption_migration_operation_skipped operation=%s reason=no_plaintext_hidden",
@@ -402,7 +413,7 @@ class EncryptionMigrationService:
                 success=False,
             )
 
-        environments, decrypt_errors = self._deserialize_all(settings)
+        environments, decrypt_errors = self._deserialize_records(raw)
         if decrypt_errors:
             logger.error(
                 "encryption_migration_decrypt_failed error_count=%d",
@@ -564,14 +575,21 @@ class EncryptionMigrationService:
                 missing.add(kid)
         return frozenset(missing)
 
+    def _deserialize_records(
+        self,
+        raw: list[dict[str, Any]],
+    ) -> tuple[list[Environment], tuple[str, ...]]:
+        environments, failures = self._storage.deserialize_environment_records(raw)
+        errors = tuple(failure.format_operator_message() for failure in failures)
+        return environments, errors
+
     def _deserialize_all(
         self,
         settings: AppSettings | None,
     ) -> tuple[list[Environment], tuple[str, ...]]:
         self._storage.apply_encryption_settings(settings)
-        environments, failures = self._storage.load_environments_with_errors()
-        errors = tuple(failure.format_operator_message() for failure in failures)
-        return environments, errors
+        raw = self._read_raw_environments()
+        return self._deserialize_records(raw)
 
     @staticmethod
     def _inventory_all_v2(inventory: EnvironmentInventory) -> bool:

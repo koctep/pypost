@@ -216,82 +216,37 @@ class StorageManager:
             stats += env_stats
         return stats
 
-    def load_environments(self) -> List[Environment]:
+    def _read_environment_records(self) -> list[dict] | None:
         if not self.environments_file.exists():
             return []
         try:
-            with open(self.environments_file, "r") as f:
-                data = json.load(f)
-                environments = []
-                for item in data:
-                    env = self._env_adapter.deserialize_environment(item)
-                    environments.append(env)
-                    self._env_adapter.remember_environment_state(
-                        env.id,
-                        item.get("variables", {}),
-                        dict(env.variables),
-                    )
-                logger.info(
-                    "load_environments_completed count=%d file=%s",
-                    len(environments),
-                    self.environments_file,
-                )
-                return environments
-        except Exception as e:
+            with open(self.environments_file, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except Exception as exc:
             logger.error(
                 "load_environments_failed file=%s error=%s",
                 self.environments_file,
-                e,
+                exc,
             )
-            return []
-
-    def load_environments_with_errors(
-        self,
-    ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]:
-        """Load all stored environments, collecting per-record failures.
-
-        Unlike load_environments(), continues after individual decrypt or
-        deserialize failures and returns both successful environments and
-        structured failure details.
-
-        Caller must invoke apply_encryption_settings() before this method when
-        encryption policy matters (same as load_environments).
-
-        Returns:
-            A pair (environments, failures). environments preserves on-disk order
-            for successfully loaded records only. failures lists every record that
-            could not be deserialized.
-
-        File-level behavior (missing file, invalid JSON, non-list root):
-            Returns ([], ()) and logs an error — same effective outcome as an empty
-            store. Per-environment reporting applies only to valid list entries.
-        """
-        if not self.environments_file.exists():
-            return [], ()
-
-        try:
-            with open(self.environments_file, "r") as f:
-                data = json.load(f)
-        except Exception as e:
-            logger.error(
-                "load_environments_with_errors_failed file=%s error=%s",
-                self.environments_file,
-                e,
-            )
-            return [], ()
-
+            return None
         if not isinstance(data, list):
             logger.error(
-                "load_environments_with_errors_failed file=%s error=%s",
+                "load_environments_failed file=%s error=%s",
                 self.environments_file,
                 "root is not a list",
             )
-            return [], ()
+            return None
+        return data
 
+    def deserialize_environment_records(
+        self,
+        records: list[dict],
+    ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]:
+        """Deserialize in-memory environment JSON records (PYPOST-678)."""
         environments: list[Environment] = []
         failures: list[EnvironmentLoadFailure] = []
 
-        for item in data:
+        for item in records:
             env_name = str(item.get("name", "unknown"))
             raw_id = item.get("id")
             environment_id = raw_id if isinstance(raw_id, str) else None
@@ -322,7 +277,7 @@ class StorageManager:
                 )
             except Exception as exc:
                 logger.error(
-                    "load_environments_with_errors_item_failed name=%s error=%s",
+                    "deserialize_environment_records_item_failed name=%s error=%s",
                     env_name,
                     exc,
                 )
@@ -334,6 +289,54 @@ class StorageManager:
                     )
                 )
 
+        return environments, tuple(failures)
+
+    def load_environments(self) -> List[Environment]:
+        records = self._read_environment_records()
+        if records is None:
+            return []
+        environments, failures = self.deserialize_environment_records(records)
+        if failures:
+            logger.error(
+                "load_environments_partial_failure count=%d error_count=%d file=%s",
+                len(environments),
+                len(failures),
+                self.environments_file,
+            )
+            return []
+        logger.info(
+            "load_environments_completed count=%d file=%s",
+            len(environments),
+            self.environments_file,
+        )
+        return environments
+
+    def load_environments_with_errors(
+        self,
+    ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]:
+        """Load all stored environments, collecting per-record failures.
+
+        Unlike load_environments(), continues after individual decrypt or
+        deserialize failures and returns both successful environments and
+        structured failure details.
+
+        Caller must invoke apply_encryption_settings() before this method when
+        encryption policy matters (same as load_environments).
+
+        Returns:
+            A pair (environments, failures). environments preserves on-disk order
+            for successfully loaded records only. failures lists every record that
+            could not be deserialized.
+
+        File-level behavior (missing file, invalid JSON, non-list root):
+            Returns ([], ()) and logs an error — same effective outcome as an empty
+            store. Per-environment reporting applies only to valid list entries.
+        """
+        records = self._read_environment_records()
+        if records is None:
+            return [], ()
+
+        environments, failures = self.deserialize_environment_records(records)
         logger.info(
             "load_environments_with_errors_completed count=%d error_count=%d file=%s",
             len(environments),

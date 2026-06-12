@@ -48,3 +48,8 @@ class StorageInterface(Protocol):
     def load_environments_with_errors(
         self,
     ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]: ...
+
+    def deserialize_environment_records(
+        self,
+        records: list[dict],
+    ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]: ...
