@@ -7,6 +7,44 @@ JSON text in the request body editor (`RequestEditor`) and response viewer (`Res
 It extends `QSyntaxHighlighter` and runs on each `QTextDocument` block during edit and
 `rehighlight()`.
 
+## Regex-based highlighting
+
+`JsonHighlighter` colors tokens with `QRegularExpression` rules. It does not parse JSON
+into an AST. Approximate boundaries are sufficient for request/response editing where
+invalid JSON is still useful to read.
+
+### Patterns
+
+| Token | Pattern (summary) |
+| ----- | ----------------- |
+| Keywords | `\b(true|false|null)\b` |
+| Numbers | `\b-?(?:0\|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?\b` |
+| Strings | `"[^"\\]*(\\.[^"\\]*)*"` |
+| Object keys | `("[^"\\]*(\\.[^"\\]*)*")\s*:` (group 1 colored) |
+| Placeholders | `TEMPLATE_PLACEHOLDER_PATTERN` (`{{...}}`) |
+
+### Known limitations
+
+Accepted by design (PYPOST-97):
+
+1. **Per-block scope** — `highlightBlock` receives one line at a time. A string or key
+   that spans multiple lines is highlighted independently per line; an opening `"` on one
+   line and a closing `"` on the next may not color as a single string.
+2. **String escapes** — The string pattern handles common `\"` and `\\` sequences but is
+   not a full JSON string lexer. Rare escape forms may leave suffix characters uncolored
+   or misclassified.
+3. **Object keys** — Keys are matched only when the quoted name and trailing `:` appear
+   on the same block. Indented keys on continuation lines may appear as green strings
+   instead of purple keys.
+4. **Numeric literals** — The number rule targets typical API values (integers, decimals,
+   scientific notation). Spec edge cases such as `01` or non-finite literals are not goals.
+5. **Nesting depth** — Regex rules do not track `{`/`[` nesting; deeply nested structures
+   still color per-token and remain readable for normal payloads.
+
+Upgrading to an incremental JSON lexer would improve edge-case accuracy but add complexity
+and per-keystroke cost. Structural validation belongs in `ValidationController` (see
+`doc/dev/body_editor_validation.md`).
+
 ## Highlighted elements
 
 Colors are defined in `pypost/ui/theme/json_syntax_theme.py` as `JsonSyntaxColors` and

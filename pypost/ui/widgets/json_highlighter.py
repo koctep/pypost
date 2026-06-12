@@ -6,7 +6,24 @@ from pypost.ui.theme.json_syntax_theme import JsonSyntaxColors, resolve_json_syn
 
 
 class JsonHighlighter(QSyntaxHighlighter):
-    """Highlighter for JSON syntax and template placeholders."""
+    """Highlighter for JSON syntax and template placeholders.
+
+    Uses ``QRegularExpression`` rules (not a JSON parser) for approximate token coloring
+    on each ``QTextDocument`` block. This is intentional: ``QSyntaxHighlighter`` runs
+    per block without AST context, and regex rules are fast enough for typical API
+    payloads.
+
+    Known limitations (accepted for coloring-only use):
+
+    - Strings or keys split across line boundaries are not merged across blocks.
+    - Escape sequences inside strings use a simple pattern; unusual escapes may
+      miscolor trailing characters.
+    - Object keys are detected by ``"..."\\s*:`` on the same line.
+    - The number rule targets common literals; spec edge cases such as leading zeros
+      or non-finite values may not match exactly.
+
+    See ``doc/dev/json_syntax_highlighting.md`` for patterns, rule order, and tests.
+    """
 
     def __init__(self, document, colors: JsonSyntaxColors | None = None):
         super().__init__(document)
