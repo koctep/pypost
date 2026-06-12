@@ -5,7 +5,7 @@ pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtCore import QPoint
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSizePolicy
 
 from pypost.ui.widgets.history_panel import HistoryPanel
 from pypost.models.models import HistoryEntry
@@ -116,6 +116,20 @@ class TestHistoryPanel(unittest.TestCase):
         panel.refresh()
         panel._list_widget.setCurrentRow(0)
         self.assertIs(panel._selected_entry(), entries[0])
+
+    def test_detail_fields_use_expanding_layout(self):
+        history_manager = MagicMock()
+        history_manager.get_entries.return_value = []
+
+        panel = HistoryPanel(history_manager=history_manager)
+
+        for field in (panel._detail_headers, panel._detail_body):
+            policy = field.sizePolicy()
+            self.assertEqual(
+                policy.verticalPolicy(), QSizePolicy.Policy.Expanding
+            )
+            self.assertGreater(field.minimumHeight(), 0)
+            self.assertEqual(field.maximumHeight(), 16777215)
 
 
 if __name__ == "__main__":

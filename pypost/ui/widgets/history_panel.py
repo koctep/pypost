@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMenu,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QTextEdit,
     QVBoxLayout,
@@ -79,18 +80,25 @@ class HistoryPanel(QWidget):
         detail_container = QWidget()
         detail_layout = QFormLayout(detail_container)
         detail_layout.setContentsMargins(4, 4, 4, 4)
+        detail_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
 
         self._detail_method = QLabel()
         self._detail_url = QLabel()
         self._detail_url.setWordWrap(True)
         self._detail_status = QLabel()
         self._detail_time = QLabel()
+        line_height = self.fontMetrics().lineSpacing()
+        expanding = QSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
         self._detail_headers = QTextEdit()
         self._detail_headers.setReadOnly(True)
-        self._detail_headers.setFixedHeight(60)
+        self._detail_headers.setSizePolicy(expanding)
+        self._detail_headers.setMinimumHeight(line_height * 3)
         self._detail_body = QTextEdit()
         self._detail_body.setReadOnly(True)
-        self._detail_body.setFixedHeight(80)
+        self._detail_body.setSizePolicy(expanding)
+        self._detail_body.setMinimumHeight(line_height * 4)
 
         detail_layout.addRow("Method:", self._detail_method)
         detail_layout.addRow("URL:", self._detail_url)
@@ -100,6 +108,8 @@ class HistoryPanel(QWidget):
         detail_layout.addRow("Body:", self._detail_body)
 
         splitter.addWidget(detail_container)
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 1)
         layout.addWidget(splitter)
 
         btn_row = QHBoxLayout()
