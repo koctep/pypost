@@ -1,4 +1,4 @@
-from typing import Dict, Generic, Optional, Set, Tuple, TypeVar
+from typing import Any, Dict, Generic, Iterable, Optional, Set, Tuple, TypeVar
 
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QToolTip, QWidget
@@ -15,6 +15,22 @@ from pypost.core.template_service import TemplateService
 
 # Maximum plain {{name}} follow hops in hover tooltips (cycle-safe bound).
 TOOLTIP_REFERENCE_MAX_DEPTH = 32
+
+
+def push_snapshot_to_widgets(
+    widgets: Iterable[Any],
+    method_name: str,
+    value: Any,
+) -> None:
+    """Call ``method_name(value)`` on widgets that implement the method.
+
+    Composite request-editor widgets use this to fan out environment variable and
+    hidden-key snapshots. See doc/dev/variable_propagation.md.
+    """
+    for widget in widgets:
+        method = getattr(widget, method_name, None)
+        if callable(method):
+            method(value)
 
 
 class VariableHoverHelper:

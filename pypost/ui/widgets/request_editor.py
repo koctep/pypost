@@ -31,7 +31,7 @@ from pypost.models.models import McpToolParam, RequestData
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
-from pypost.ui.widgets.mixins import VariableHoverHelper
+from pypost.ui.widgets.mixins import VariableHoverHelper, push_snapshot_to_widgets
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwareTableWidget
 
 logger = logging.getLogger(__name__)
@@ -191,6 +191,16 @@ class RequestWidget(QWidget):
         self._setup_shortcuts()
         self._wire_mcp_preview_refresh()
 
+    @property
+    def _variable_snapshot_targets(self) -> tuple:
+        """Variable-aware children that receive env snapshots via push."""
+        return (
+            self.url_input,
+            self.params_table,
+            self.headers_table,
+            self.body_edit,
+        )
+
     def set_variables(self, variables: dict):
         """Push environment variables to all variable-aware child editors.
 
@@ -198,11 +208,11 @@ class RequestWidget(QWidget):
         doc/dev/variable_propagation.md. Forwards the dict snapshot; children do not
         connect to env signals directly.
         """
-        self.url_input.set_variables(variables)
-        self.params_table.set_variables(variables)
-        self.headers_table.set_variables(variables)
-        if hasattr(self.body_edit, "set_variables"):
-            self.body_edit.set_variables(variables)
+        push_snapshot_to_widgets(
+            self._variable_snapshot_targets,
+            "set_variables",
+            variables,
+        )
 
     def set_template_service(self, template_service: TemplateService | None) -> None:
         self._template_service = template_service
@@ -210,11 +220,11 @@ class RequestWidget(QWidget):
 
     def set_hidden_keys(self, hidden_keys: set):
         self._hidden_keys = set(hidden_keys)
-        self.url_input.set_hidden_keys(hidden_keys)
-        self.params_table.set_hidden_keys(hidden_keys)
-        self.headers_table.set_hidden_keys(hidden_keys)
-        if hasattr(self.body_edit, "set_hidden_keys"):
-            self.body_edit.set_hidden_keys(hidden_keys)
+        push_snapshot_to_widgets(
+            self._variable_snapshot_targets,
+            "set_hidden_keys",
+            hidden_keys,
+        )
         self._refresh_mcp_preview()
 
     def _on_method_changed(self, method: str):
