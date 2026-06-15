@@ -101,7 +101,6 @@ def format_migration_report(report: MigrationReport, *, cli_style: bool = False)
         reencrypt_prefix = None
         encrypted_label = "Re-encrypted:"
         reused_label = "Reused:"
-        error_prefix = None
 
     if inv.kid_histogram:
         lines.append(kid_label)

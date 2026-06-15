@@ -371,4 +371,3 @@ class VariableHoverMixin(Generic[TWidget]):
             value,
             self,
         )
-

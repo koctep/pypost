@@ -62,7 +62,11 @@ class RequestWidget(QWidget):
     save_as_requested = Signal(RequestData)
     copy_curl_requested = Signal(RequestData)
 
-    def __init__(self, request_data: RequestData = None, metrics: MetricsTrackerProtocol | None = None):
+    def __init__(
+        self,
+        request_data: RequestData = None,
+        metrics: MetricsTrackerProtocol | None = None,
+    ):
         super().__init__()
         self._loading = False
         self._metrics = resolve_metrics(metrics)

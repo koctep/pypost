@@ -7,7 +7,7 @@ from typing import Literal
 
 from PySide6.QtCore import QThread, Signal
 
-from pypost.core.encryption_migration import EncryptionMigrationService, MigrationReport
+from pypost.core.encryption_migration import EncryptionMigrationService
 from pypost.models.settings import AppSettings
 
 logger = logging.getLogger(__name__)
