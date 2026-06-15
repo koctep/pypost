@@ -44,7 +44,7 @@ def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path
     tests_dir.mkdir()
 
     install = subprocess.run(
-        ["make", "install"],
+        ["make", f"PYTHON={sys.executable}", "install"],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -54,7 +54,7 @@ def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path
     assert install.returncode == 0, install.stderr
 
     test_result = subprocess.run(
-        ["make", "test"],
+        ["make", f"PYTHON={sys.executable}", "test"],
         cwd=tmp_path,
         capture_output=True,
         text=True,

@@ -26,7 +26,7 @@ def _run_make(
     timeout: int = 110,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["make", *targets],
+        ["make", f"PYTHON={sys.executable}", *targets],
         cwd=workspace,
         capture_output=True,
         text=True,
@@ -37,7 +37,15 @@ def _run_make(
 
 def _prerequisites(workspace: Path, target: str) -> list[str]:
     proc = subprocess.run(
-        ["make", "-p", "-f", "Makefile", "-C", str(workspace)],
+        [
+            "make",
+            f"PYTHON={sys.executable}",
+            "-p",
+            "-f",
+            "Makefile",
+            "-C",
+            str(workspace),
+        ],
         capture_output=True,
         text=True,
         timeout=60,

@@ -447,6 +447,15 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
 | Slow install smoke | `make install` with real requirements succeeds; marked `@pytest.mark.slow` |
 
+### Python interpreter decoupling (PYPOST-718)
+
+To ensure Makefile integration tests are robust and decoupled from system-level environment
+differences, all test-spawns of `make` explicitly override the `PYTHON` variable with the active
+interpreter executing the tests (i.e., `PYTHON=sys.executable`). This forces `make` to create
+the virtual environment and markers with the exact matching Python version, preventing version
+mismatch failures in environments where the system-default `python3` differs from the `pytest`
+runner's interpreter.
+
 Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, minimal
 `tests/test_noop.py`, and `pypost/__init__.py`. Focused run:
 
