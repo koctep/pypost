@@ -1,4 +1,4 @@
-"""Tests for MCPServerManager startup signaling (PYPOST-556)."""
+"""Tests for MCPServerManager startup signaling (PYPOST-556, PYPOST-719)."""
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
@@ -7,12 +7,14 @@ import errno
 import socket
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
+from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.core.mcp_server import MCPServerManager, format_mcp_bind_error
+from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 
 
@@ -160,6 +162,90 @@ class TestMCPServerManagerUpdateTools(unittest.TestCase):
         )
         manager = MCPServerManager()
         self.assertFalse(manager.update_tools([tool]))
+
+
+class TestMCPServerManagerUnit(unittest.TestCase):
+    """Pure unit tests — no real server, no ports, no threads blocked (PYPOST-719)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_activity_log_property_returns_same_instance(self):
+        manager = MCPServerManager()
+        log = manager.activity_log
+        self.assertIs(manager.activity_log, log)
+
+    def test_emit_activity_emits_activity_recorded_signal(self):
+        manager = MCPServerManager()
+        received = []
+        manager.activity_recorded.connect(received.append)
+        entry = McpActivityEntry.new_list_tools(tool_count=2)
+        manager._emit_activity(entry)
+        self.assertEqual(received, [entry])
+
+    def test_set_hidden_keys_supplier_forwards_to_impl(self):
+        manager = MCPServerManager()
+        supplier = lambda: {"secret", "token"}
+        manager.set_hidden_keys_supplier(supplier)
+        self.assertIs(manager._impl._hidden_keys_supplier, supplier)
+
+    def test_init_with_template_service_logs_debug(self):
+        ts = MagicMock(spec=TemplateService)
+        with self.assertLogs("pypost.core.mcp_server", level="DEBUG") as cm:
+            MCPServerManager(template_service=ts)
+        self.assertTrue(any("propagating TemplateService" in m for m in cm.output))
+
+    def test_generic_exception_in_run_uvicorn_emits_start_failed(self):
+        manager = MCPServerManager()
+        failures: list[str] = []
+        statuses: list[bool] = []
+        manager.start_failed.connect(failures.append)
+        manager.status_changed.connect(statuses.append)
+
+        with patch.object(manager._impl, "create_app", side_effect=RuntimeError("kaboom")):
+            manager._current_port = 0
+            manager._current_host = "127.0.0.1"
+            manager._startup_notified = False
+            manager._stop_event.clear()
+            manager._run_uvicorn()
+
+        self.assertEqual(len(failures), 1)
+        self.assertIn("kaboom", failures[0])
+        self.assertFalse(statuses[-1])
+
+    def test_start_server_stops_existing_server_when_already_running(self):
+        manager = MCPServerManager()
+        with (
+            patch.object(manager, "is_running", return_value=True),
+            patch.object(manager, "stop_server") as mock_stop,
+            patch.object(manager, "_server_thread", create=True, new=None),
+            patch("threading.Thread"),
+        ):
+            manager.start_server(9999, [], host="127.0.0.1")
+        mock_stop.assert_called_once()
+
+    def test_unexpected_server_exit_emits_false_and_warns(self):
+        manager = MCPServerManager()
+        statuses: list[bool] = []
+        manager.status_changed.connect(statuses.append)
+
+        async def serve_noop(self_server):
+            return  # server exits without stop_event being set
+
+        with (
+            patch.object(manager._impl, "create_app", return_value=MagicMock()),
+            patch("uvicorn.Server.serve", serve_noop),
+        ):
+            manager._current_port = 0
+            manager._current_host = "127.0.0.1"
+            manager._startup_notified = True  # startup already signalled
+            manager._stop_event.clear()
+            with self.assertLogs("pypost.core.mcp_server", level="WARNING") as cm:
+                manager._run_uvicorn()
+
+        self.assertTrue(any("unexpected_exit" in m for m in cm.output))
+        self.assertFalse(statuses[-1])
 
 
 if __name__ == "__main__":
