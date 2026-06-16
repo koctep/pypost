@@ -100,7 +100,7 @@ Findings use **P1** (critical/high exposure), **P2** (policy gap or secondary su
 | T-001 | Outbound HTTP uses requests defaults; TLS verification not disabled | PASS |
 | T-002 | Metrics server defaults to all-interfaces bind | P1 |
 | T-003 | Collection MCP server defaults to localhost | PASS |
-| T-004 | Inbound MCP has no authentication | P1 (when network-exposed) |
+| T-004 | Inbound MCP has no authentication — documented trust model; token auth deferred | P1 (when network-exposed) |
 | T-005 | Starlette debug mode enabled on collection MCP app | P3 |
 
 ### Collection Exposure
