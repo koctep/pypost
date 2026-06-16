@@ -14,6 +14,7 @@ from prometheus_client import generate_latest, make_asgi_app
 from starlette.applications import Starlette
 from starlette.routing import Mount
 
+from pypost.core.bind_address_validation import is_localhost_bind_host
 from pypost.core.mcp_legacy_sse import build_legacy_sse_app
 from pypost.core.mcp_streamable_http import build_streamable_http_route
 from pypost.core.mcp_transport_routes import MCP_LEGACY_SSE_MOUNT_PATH
@@ -116,6 +117,13 @@ class MetricsServer:
             self.thread = threading.Thread(target=self._run_uvicorn, daemon=True)
             self.thread.start()
             logger.info("Metrics server starting on %s:%d", host, port)
+            if not is_localhost_bind_host(host):
+                logger.warning(
+                    "metrics_server_non_localhost_bind host=%s port=%d — "
+                    "metrics and MCP resources are exposed without authentication",
+                    host,
+                    port,
+                )
 
     def _notify_started(self) -> None:
         if self._startup_notified or self._stop_event.is_set():

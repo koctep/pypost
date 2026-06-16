@@ -177,5 +177,27 @@ class TestMetricsServerRestartServer(unittest.TestCase):
         self.assertEqual(calls, ["stop", "start"])
 
 
+class TestMetricsServerBindWarning(unittest.TestCase):
+    @patch.object(MetricsServer, "stop_server")
+    @patch("pypost.core.metrics_server.threading.Thread")
+    def test_start_server_warns_on_non_localhost_bind(self, mock_thread, mock_stop):
+        server = _make_server()
+        with self.assertLogs("pypost.core.metrics_server", level="WARNING") as logs:
+            server.start_server("0.0.0.0", 9080)
+        self.assertTrue(
+            any("metrics_server_non_localhost_bind" in record.message for record in logs.records)
+        )
+
+    @patch.object(MetricsServer, "stop_server")
+    @patch("pypost.core.metrics_server.threading.Thread")
+    def test_start_server_no_warning_for_loopback(self, mock_thread, mock_stop):
+        server = _make_server()
+        with self.assertLogs("pypost.core.metrics_server", level="INFO") as logs:
+            server.start_server("127.0.0.1", 9080)
+        self.assertFalse(
+            any("metrics_server_non_localhost_bind" in record.message for record in logs.records)
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -54,6 +54,17 @@ def validate_bind_host(raw: str, *, field_label: str) -> Union[str, BindAddressV
     )
 
 
+def is_localhost_bind_host(host: str) -> bool:
+    """True when the bind address is loopback-only (safe default for metrics/MCP)."""
+    stripped = host.strip().lower()
+    if stripped in ("localhost", "127.0.0.1", "::1"):
+        return True
+    try:
+        return ipaddress.ip_address(stripped).is_loopback
+    except ValueError:
+        return False
+
+
 def validate_bind_port(port: int, *, field_label: str) -> Union[int, BindAddressValidationFailure]:
     """Return port or a validation failure."""
     if port < _BIND_PORT_MIN or port > _BIND_PORT_MAX:

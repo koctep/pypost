@@ -4,6 +4,7 @@ import pytest
 
 from pypost.core.bind_address_validation import (
     BindAddressValidationFailure,
+    is_localhost_bind_host,
     validate_bind_host,
     validate_bind_port,
 )
@@ -57,3 +58,15 @@ class TestValidateBindPort:
         result = validate_bind_port(70000, field_label="MCP Server Port")
         assert isinstance(result, BindAddressValidationFailure)
         assert result.reason == "out_of_range"
+
+
+class TestIsLocalhostBindHost:
+    def test_loopback_addresses(self):
+        assert is_localhost_bind_host("127.0.0.1")
+        assert is_localhost_bind_host("localhost")
+        assert is_localhost_bind_host("::1")
+
+    def test_non_loopback_addresses(self):
+        assert not is_localhost_bind_host("0.0.0.0")
+        assert not is_localhost_bind_host("192.168.1.1")
+        assert not is_localhost_bind_host("api.example.com")

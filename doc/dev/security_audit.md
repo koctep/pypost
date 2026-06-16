@@ -30,8 +30,8 @@ chain.
 
 1. **Agent-visible MCP tool results** — full upstream HTTP response bodies (and post-script logs)
    are returned to external MCP clients without sanitization.
-2. **Inbound network exposure** — metrics MCP defaults to `0.0.0.0`; neither MCP server surface
-   authenticates clients.
+2. **Inbound network exposure** — metrics server now defaults to `127.0.0.1` and logs a warning
+   when bound to a non-loopback address; neither MCP server surface authenticates clients.
 3. **History and log scope** — masking applies only to `Environment.hidden_keys`; non-hidden env
    values and hardcoded credentials persist resolved in `history.json`; several DEBUG/ERROR log
    lines emit fully resolved URLs.
