@@ -18,7 +18,7 @@ from pypost.core.mcp_legacy_sse import build_legacy_sse_app
 from pypost.core.mcp_streamable_http import build_streamable_http_route
 from pypost.core.mcp_transport_routes import MCP_LEGACY_SSE_MOUNT_PATH
 from pypost.core.metrics_registry import MetricsRegistry
-from pypost.core.server_bind import format_bind_error
+from pypost.core.server_bind import drain_pending_tasks, format_bind_error
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +186,7 @@ class MetricsServer:
             self._notify_start_failed(f"Metrics server failed to start: {exc}")
         finally:
             sys.exit = original_exit
+            drain_pending_tasks(loop)
             loop.close()
             if not self._stop_event.is_set() and self._startup_notified:
                 logger.warning("metrics_server_unexpected_exit")

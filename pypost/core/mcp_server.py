@@ -12,7 +12,7 @@ from PySide6.QtCore import QObject, Signal
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
-from pypost.core.server_bind import format_bind_error
+from pypost.core.server_bind import drain_pending_tasks, format_bind_error
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 
@@ -191,6 +191,7 @@ class MCPServerManager(QObject):
             self._notify_start_failed(f"MCP server failed to start: {exc}")
         finally:
             sys.exit = original_exit
+            drain_pending_tasks(loop)
             loop.close()
             if not self._stop_event.is_set() and not self._startup_notified:
                 self.status_changed.emit(False)

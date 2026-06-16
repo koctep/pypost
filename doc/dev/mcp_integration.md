@@ -114,7 +114,7 @@ former monolithic `MetricsManager` into focused modules:
 | `pypost/core/metrics_otel.py` | `OtelMetricsTracker` | OTel-backed `MetricsTrackerProtocol` adapter (PYPOST-579) |
 | `pypost/core/metrics_server.py` | `MetricsServer` | MCP resources, Starlette app, uvicorn thread lifecycle |
 | `pypost/core/metrics.py` | `MetricsManager` | Facade composed at `main.py`; same injection API as before |
-| `pypost/core/server_bind.py` | `format_bind_error` | Shared operator-facing bind failure messages |
+| `pypost/core/server_bind.py` | `format_bind_error`, `drain_pending_tasks` | Shared bind-failure messages and asyncio loop teardown before `loop.close()` (PYPOST-726) |
 
 *   **Role**: Provides application metrics via MCP Resources.
 *   **Framework**: Same stack as the main server (`Starlette` + `mcp` SDK + `uvicorn`).
@@ -139,6 +139,14 @@ former monolithic `MetricsManager` into focused modules:
 6.  `uvicorn.Server.serve()` is called to start listening on the specified host and port.
 7.  After `startup()` completes, `MCPServerManager` emits `status_changed(True)`.
 8.  On bind failure, `start_failed` carries a user-visible message; UI stays OFF.
+
+### Server shutdown (PYPOST-726)
+
+When uvicorn's `serve()` returns, SSE transports may still have a pending
+`_shutdown_watcher` task on the loop. Before `loop.close()`, each `_run_uvicorn`
+implementation calls `drain_pending_tasks(loop)` from `server_bind.py` to cancel and
+await outstanding tasks, preventing spurious `Task was destroyed but it is pending!`
+asyncio warnings in logs and test output.
 
 ### Metrics server startup (PYPOST-153 / PYPOST-154)
 

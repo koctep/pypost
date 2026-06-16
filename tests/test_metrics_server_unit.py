@@ -1,7 +1,8 @@
-"""Pure unit tests for MetricsServer lifecycle (PYPOST-720)."""
+"""Pure unit tests for MetricsServer lifecycle (PYPOST-720, PYPOST-726)."""
 import asyncio
 import pytest
 import unittest
+import warnings
 from unittest.mock import MagicMock, patch
 
 pytestmark = pytest.mark.timeout(30)
@@ -123,6 +124,44 @@ class TestMetricsServerRunUvicornUnit(unittest.TestCase):
                 server._run_uvicorn()
 
         self.assertTrue(any("unexpected_exit" in m for m in cm.output))
+
+    def test_run_uvicorn_drains_pending_task_without_destroyed_warning(self):
+        """Regression test for PYPOST-726.
+
+        Mirrors an sse_starlette-style watcher task still pending on the loop
+        when uvicorn's serve() returns. Without draining, asyncio would log
+        "Task was destroyed but it is pending!" once the orphaned Task is
+        garbage-collected after loop.close().
+        """
+        server = _make_server()
+        leftover_tasks: list[asyncio.Task] = []
+
+        async def serve_leaves_pending_task(self_server):
+            task = asyncio.get_event_loop().create_task(asyncio.sleep(100))
+            leftover_tasks.append(task)
+            await asyncio.sleep(0)
+
+        with (
+            patch.object(server, "_create_app", return_value=MagicMock()),
+            patch("uvicorn.Server.serve", serve_leaves_pending_task),
+        ):
+            server._current_port = 0
+            server._current_host = "127.0.0.1"
+            server._startup_notified = True
+            server._stop_event.set()
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                server._run_uvicorn()
+                leftover_tasks.clear()
+                import gc
+
+                gc.collect()
+
+        messages = [str(w.message) for w in caught]
+        self.assertFalse(
+            any("was destroyed but it is pending" in m for m in messages),
+            f"unexpected destroyed-task warning(s): {messages}",
+        )
 
 
 class TestMetricsServerRestartServer(unittest.TestCase):

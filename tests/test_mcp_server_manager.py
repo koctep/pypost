@@ -1,12 +1,14 @@
-"""Tests for MCPServerManager startup signaling (PYPOST-556, PYPOST-719)."""
+"""Tests for MCPServerManager startup signaling (PYPOST-556, PYPOST-719, PYPOST-726)."""
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
 
+import asyncio
 import errno
 import socket
 import time
 import unittest
+import warnings
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QCoreApplication
@@ -246,6 +248,46 @@ class TestMCPServerManagerUnit(unittest.TestCase):
 
         self.assertTrue(any("unexpected_exit" in m for m in cm.output))
         self.assertFalse(statuses[-1])
+
+    def test_run_uvicorn_drains_pending_task_without_destroyed_warning(self):
+        """Regression test for PYPOST-726.
+
+        Mirrors an sse_starlette-style watcher task still pending on the loop
+        when uvicorn's serve() returns. Without draining, asyncio would log
+        "Task was destroyed but it is pending!" once the orphaned Task is
+        garbage-collected after loop.close().
+        """
+        manager = MCPServerManager()
+        leftover_tasks: list[asyncio.Task] = []
+
+        async def serve_leaves_pending_task(self_server):
+            # Schedule a never-completing task on the current loop, the same
+            # shape as sse_starlette's `_shutdown_watcher`.
+            task = asyncio.get_event_loop().create_task(asyncio.sleep(100))
+            leftover_tasks.append(task)
+            await asyncio.sleep(0)  # let it get scheduled before serve() returns
+
+        with (
+            patch.object(manager._impl, "create_app", return_value=MagicMock()),
+            patch("uvicorn.Server.serve", serve_leaves_pending_task),
+        ):
+            manager._current_port = 0
+            manager._current_host = "127.0.0.1"
+            manager._startup_notified = True
+            manager._stop_event.set()
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                manager._run_uvicorn()
+                leftover_tasks.clear()  # drop our reference; only GC can warn now
+                import gc
+
+                gc.collect()
+
+        messages = [str(w.message) for w in caught]
+        self.assertFalse(
+            any("was destroyed but it is pending" in m for m in messages),
+            f"unexpected destroyed-task warning(s): {messages}",
+        )
 
 
 if __name__ == "__main__":

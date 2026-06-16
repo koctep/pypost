@@ -13,6 +13,7 @@ import uvicorn
 
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.request_service import ExecutionResult
+from pypost.core.server_bind import drain_pending_tasks
 
 
 def free_port() -> int:
@@ -72,7 +73,11 @@ class LiveMCPServer:
         )
         self._server = uvicorn.Server(config)
         self._server.install_signal_handlers = lambda: None
-        loop.run_until_complete(self._server.serve())
+        try:
+            loop.run_until_complete(self._server.serve())
+        finally:
+            drain_pending_tasks(loop)
+            loop.close()
 
 
 @contextmanager
