@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.routing import Mount
 
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
+from pypost.core.mcp_response_sanitizer import McpResponseSanitizer
 from pypost.core.mcp_secrets_policy import McpSecretsPolicy
 from pypost.core.mcp_tool_contract import (
     build_tool_input_schema,
@@ -45,15 +46,27 @@ def _tool_result_has_error(result: ExecutionResult) -> bool:
     return result.response.status_code == 0
 
 
-def format_structured_tool_result(result: ExecutionResult) -> str:
+def format_structured_tool_result(
+    result: ExecutionResult,
+    *,
+    env_vars: dict[str, str] | None = None,
+    hidden_keys: set[str] | None = None,
+) -> str:
     """Serialize ExecutionResult as agent-facing JSON (status, error, body, optional logs)."""
+    env = env_vars or {}
+    hidden = hidden_keys or set()
+    body = McpResponseSanitizer.sanitize_body(
+        result.response.body, env_vars=env, hidden_keys=hidden
+    )
     payload: dict[str, Any] = {
         "status": result.response.status_code,
         "error": _tool_result_has_error(result),
-        "body": result.response.body,
+        "body": body,
     }
     if result.script_logs:
-        payload["logs"] = result.script_logs
+        payload["logs"] = McpResponseSanitizer.sanitize_logs(
+            result.script_logs, env_vars=env, hidden_keys=hidden
+        )
     if result.execution_error is not None:
         payload["error_category"] = result.execution_error.category.value
         payload["error_message"] = result.execution_error.message
@@ -114,10 +127,18 @@ class MCPServerImpl:
 
         # Execute request in threadpool since RequestService is synchronous
         try:
+            env_vars = self._variable_supplier()
+            hidden_keys = self._hidden_keys_supplier()
             result = await run_in_threadpool(
-                self._execute_request_sync, request_data, arguments
+                self._execute_request_sync,
+                request_data,
+                arguments,
+                env_vars,
+                hidden_keys,
             )
-            output_text = format_structured_tool_result(result)
+            output_text = format_structured_tool_result(
+                result, env_vars=env_vars, hidden_keys=hidden_keys
+            )
             duration_ms = (time.perf_counter() - started) * 1000.0
             has_error = _tool_result_has_error(result)
             outcome = "error" if has_error else "success"
@@ -172,9 +193,12 @@ class MCPServerImpl:
     ) -> None:
         self._hidden_keys_supplier = supplier or (lambda: set())
 
-    def _build_execution_variables(self, mcp_args: dict[str, Any]) -> dict[str, Any]:
-        env_vars = self._variable_supplier()
-        hidden_keys = self._hidden_keys_supplier()
+    def _build_execution_variables(
+        self,
+        mcp_args: dict[str, Any],
+        env_vars: dict[str, str],
+        hidden_keys: set[str],
+    ) -> dict[str, Any]:
         counts = McpSecretsPolicy.safe_execution_log_fields(
             len(env_vars),
             len(hidden_keys),
@@ -198,8 +222,14 @@ class MCPServerImpl:
             template_service=self._template_service,
         )
 
-    def _execute_request_sync(self, request_data: RequestData, args: dict):
-        variables = self._build_execution_variables(args)
+    def _execute_request_sync(
+        self,
+        request_data: RequestData,
+        args: dict,
+        env_vars: dict[str, str],
+        hidden_keys: set[str],
+    ):
+        variables = self._build_execution_variables(args, env_vars, hidden_keys)
         return self._create_request_service().execute(request_data, variables)
 
     def register_tools(self, requests: List[RequestData]):

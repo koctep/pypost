@@ -236,14 +236,18 @@ opens `McpActivityDialog` from **MCP Activity (N)** in the top bar.
 
 ### Structured tool results (PYPOST-557)
 
-Every execution-path `call_tool` response is JSON text with a fixed envelope:
+Every execution-path `call_tool` response is JSON text with a fixed envelope. Upstream
+response bodies and post-script `logs` are passed through
+`McpResponseSanitizer` (PYPOST-703) before agents see them: hidden environment values,
+common JSON credential fields, `Bearer` tokens, and sensitive query parameters are
+redacted to `***`.
 
 | Field | Type | Description |
 | --- | --- | --- |
 | `status` | `int` | HTTP status from upstream; `0` when PyPost could not complete the request |
 | `error` | `bool` | `true` when PyPost execution failed; `false` for completed HTTP calls (including 4xx/5xx) |
-| `body` | `str` | Response body from upstream or synthetic error body |
-| `logs` | `string[]` | Optional post-request script log lines |
+| `body` | `str` | Sanitized upstream response body (`***` redactions for secrets) |
+| `logs` | `string[]` | Optional post-request script log lines (sanitized like `body`) |
 | `error_category` | `string` | Optional `ErrorCategory` value when `execution_error` is set |
 | `error_message` | `string` | Optional human-readable execution error message |
 

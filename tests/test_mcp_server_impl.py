@@ -356,7 +356,7 @@ class TestMCPServerImpl(unittest.TestCase):
             return svc
 
         impl._create_request_service = tracking_create
-        via_mcp = impl._execute_request_sync(req, mcp_args)
+        via_mcp = impl._execute_request_sync(req, mcp_args, env_vars, set())
 
         direct_url = direct_svc.http_client.send_request.call_args.kwargs.get(
             "variables"
@@ -382,8 +382,8 @@ class TestMCPServerImpl(unittest.TestCase):
 
         impl._create_request_service = tracking_create
         req = RequestData(name="Tool", expose_as_mcp=True, method="GET", url="http://u")
-        impl._execute_request_sync(req, {})
-        impl._execute_request_sync(req, {})
+        impl._execute_request_sync(req, {}, {}, set())
+        impl._execute_request_sync(req, {}, {}, set())
         self.assertEqual(len(created), 2)
         self.assertIsNot(created[0], created[1])
         self.assertIsNot(created[0].http_client, created[1].http_client)
@@ -418,6 +418,21 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertEqual(payload["status"], 404)
         self.assertFalse(payload["error"])
         self.assertEqual(payload["body"], "not found")
+
+    def test_call_tool_redacts_hidden_env_values_in_response_body(self):
+        impl = MCPServerImpl()
+        impl.set_variable_supplier(lambda: {"api_key": "secret-echo-123"})
+        impl.set_hidden_keys_supplier(lambda: {"api_key"})
+        req = RequestData(name="T", expose_as_mcp=True, method="GET", url="http://u")
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result(
+            '{"token":"secret-echo-123","id":1}'
+        )
+        out = asyncio.run(impl.call_tool("t", {}))
+        payload = _parse_tool_result(out[0].text)
+        self.assertNotIn("secret-echo-123", payload["body"])
+        self.assertIn("***", payload["body"])
 
     def test_call_tool_on_execute_exception_returns_error_content_and_metrics(self):
         metrics = MagicMock()
