@@ -96,6 +96,10 @@ PyPost runs Qt tests headlessly with `QT_QPA_PLATFORM=offscreen` and a module-sc
 fixture (`tests/conftest.py`). The project does not use the `pytest-qt` package; tests call
 widget methods and assert on labels, models, and mocked dialogs.
 
+For bounded event-loop polling (e.g. waiting for Qt signals while a background server starts),
+use `wait_until` from `tests/helpers/qt_wait.py` (PYPOST-727). For TCP listen readiness, use
+`wait_for_port` from `tests/helpers/mcp_live_server.py`.
+
 See [gui_testing.md](gui_testing.md) for patterns, representative modules, focused commands,
 and troubleshooting (including ELF core dumps from native Qt crashes — [PYPOST-429](../../ai-tasks/PYPOST-429/investigation-report.md)).
 
