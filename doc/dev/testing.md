@@ -16,6 +16,16 @@ make test-cov      # with coverage report
 make test-slow     # network-heavy Makefile smoke
 ```
 
+Pass extra pytest arguments via `PYTEST_ARGS` (PYPOST-791). When set, `PYTEST_ARGS`
+**replaces** the default path/marker arguments for that target; when unset, behavior is
+unchanged.
+
+```bash
+make test PYTEST_ARGS="tests/test_mcp_server_manager.py -q"
+make test PYTEST_ARGS="-k test_format_mcp_bind_error"
+make test-cov PYTEST_ARGS="--cov=pypost.core.mcp_server tests/test_mcp_server_manager.py"
+```
+
 See § Reproducible test environment, § Per-test timeouts, § CI guardrails, and § Makefile
 automation tests below.
 

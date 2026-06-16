@@ -5,6 +5,7 @@ PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_
 VENV := .venv
 BIN := $(VENV)/bin
 VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
+PYTEST_ARGS ?=
 
 # Create virtual environment
 venv: $(VENV_MARKER)
@@ -29,16 +30,19 @@ run: $(VENV_MARKER)
 
 # Run tests (excludes slow network-heavy Makefile install smoke; see test-slow)
 test: $(VENV_MARKER)
-	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/ -m "not slow"
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
+		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m "not slow")
 
 # Run slow integration tests only (PYPOST-559 Makefile install smoke)
 test-slow: $(VENV_MARKER)
-	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/ -m slow
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
+		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m slow)
 
 # Run tests with coverage report (requires pytest-cov)
 test-cov: $(VENV_MARKER) venv-test
-	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/ \
-		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
+		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
+		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov)
 
 # Linting
 lint: $(VENV_MARKER)

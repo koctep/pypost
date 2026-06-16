@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 import pytest
@@ -24,14 +25,22 @@ def _run_make(
     *targets: str,
     check: bool = False,
     timeout: int = 110,
+    pytest_args: str | None = "",
 ) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env.pop("PYTEST_ARGS", None)
+    cmd = ["make", f"PYTHON={sys.executable}"]
+    if pytest_args is not None:
+        cmd.append(f"PYTEST_ARGS={pytest_args}")
+    cmd.extend(targets)
     return subprocess.run(
-        ["make", f"PYTHON={sys.executable}", *targets],
+        cmd,
         cwd=workspace,
         capture_output=True,
         text=True,
         check=check,
         timeout=timeout,
+        env=env,
     )
 
 
@@ -212,6 +221,24 @@ class TestTargetExecution:
         assert install_result.returncode == 0, install_result.stderr
         test_result = _run_make(make_workspace, "test")
         assert test_result.returncode == 0, test_result.stderr
+
+    def test_pytest_args_narrows_test_run(self, make_workspace: Path) -> None:
+        """PYPOST-791: PYTEST_ARGS must be forwarded to pytest (not silently ignored)."""
+        failing = make_workspace / "tests" / "test_failing.py"
+        failing.write_text(
+            "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n"
+            "def test_always_fails() -> None:\n"
+            "    assert False\n",
+            encoding="utf-8",
+        )
+        install_result = _run_make(make_workspace, "install")
+        assert install_result.returncode == 0, install_result.stderr
+        narrow = _run_make(
+            make_workspace,
+            "test",
+            pytest_args="tests/test_noop.py -q",
+        )
+        assert narrow.returncode == 0, narrow.stderr + narrow.stdout
 
     def test_lint_succeeds_after_install(self, make_workspace: Path) -> None:
         install_result = _run_make(make_workspace, "install")
