@@ -35,6 +35,29 @@ Use this checklist on a **clean checkout** to match CI regression coverage local
 `run`, `test`, and `lint` do not auto-install dependencies — run `make install` first after
 clone or Python version change. See [setup.md](setup.md).
 
+### Local vs CI test parity troubleshooting (PYPOST-723)
+
+CI (`.github/workflows/test.yml`) runs on **Ubuntu** with a **Python 3.11 / 3.13 matrix**.
+Local development on **macOS** commonly uses a newer system Python (e.g. 3.14.x via Homebrew),
+which can surface differences that don't reproduce in CI or vice versa.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `test_makefile.py` fails locally but passes in CI (or vice versa) | `make` subprocess spawns with the system `python3`/`PYTHON` default, which may differ from the interpreter running pytest | Tests pass `PYTHON={sys.executable}` explicitly to `make` invocations (PYPOST-718) — if you add a new Makefile integration test, do the same |
+| Qt/PySide6 import errors or segfaults on Linux only | CI runner image lacks EGL/XCB/fontconfig shared libraries that are preinstalled on macOS | `.github/workflows/test.yml` installs `libegl1`, `libxcb-cursor0`, `libxkbcommon0`, etc. before running tests — see the "Install Qt / EGL runtime" step |
+| A test passes locally on Python 3.14 but fails on CI's 3.11/3.13 | Newer Python stdlib/typing behavior not yet exercised by the CI matrix | Install a matching interpreter locally with `pyenv install 3.11` / `3.13` and re-run `make test` under that version before assuming a CI-only bug |
+| Coverage differs slightly between local and CI runs | `--cov-fail-under` threshold (70%) is enforced identically, but conditional imports (e.g. platform-specific branches like `sys.platform == "win32"` in `curl_generator.py`) only execute on the OS where the branch is true | Don't chase 100% parity on OS-gated branches; rely on the CI matrix as the source of truth for the threshold gate |
+| macOS-only Qt segfault during a specific GUI test | Rare; not reproducible on Linux CI | Run the failing module in isolation (`pytest tests/test_x.py -v`) to confirm it's environment-specific before filing a bug — see `doc/dev/test_audit.md` § Local vs CI |
+
+**Quick parity check before debugging a "works locally, fails in CI" report:**
+
+1. Confirm Python version: `python3 --version` locally vs the matrix entries in
+   `.github/workflows/test.yml` (`strategy.matrix.python-version`).
+2. Re-run with `QT_QPA_PLATFORM=offscreen` set explicitly (CI always sets this; local shells
+   may not).
+3. Run `make test` (not a bare `pytest` invocation) so Makefile-driven env setup matches CI's
+   `python -m pytest tests/ ...` invocation.
+
 ### AI-assisted verification (supplementary)
 
 PyPost can also be exercised by the AI assistant in Cursor using the embedded MCP server and

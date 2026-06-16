@@ -69,7 +69,10 @@ CI matrix: Python **3.11** and **3.13** on Ubuntu; separate slow job for `make i
 - Use `make install` then `make test` for fast regression.
 - macOS may hit Qt segfaults not seen on Linux CI — run problematic modules in isolation if needed.
 - Ensure `python3` for Makefile subprocess tests matches your `.venv` interpreter when debugging
-  `test_makefile.py`.
+  `test_makefile.py` (fixed for the test suite itself in PYPOST-718).
+- Full troubleshooting table (symptom → cause → fix) for macOS/Python version drift vs the
+  Ubuntu CI matrix: see
+  [testing.md § Local vs CI test parity troubleshooting](testing.md#local-vs-ci-test-parity-troubleshooting-pypost-723).
 
 ## Follow-up Work
 
