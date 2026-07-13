@@ -30,3 +30,4 @@ class AppSettings(BaseModel):
     env_encryption_enabled: Optional[bool] = None
     env_encryption_key_source: Optional[str] = None
     env_encryption_key_source_fallback: Optional[List[str]] = None
+    max_response_bytes: int = 52_428_800

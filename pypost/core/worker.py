@@ -44,6 +44,7 @@ class RequestWorker(QThread):
         template_service: TemplateService | None = None,
         alert_manager: AlertManager | None = None,
         default_retry_policy: RetryPolicy | None = None,
+        max_response_bytes: int | None = None,
     ):
         super().__init__()
         self.request_data = request_data
@@ -68,6 +69,7 @@ class RequestWorker(QThread):
             template_service=template_service,
             alert_manager=alert_manager,
             default_retry_policy=default_retry_policy,
+            max_response_bytes=max_response_bytes,
         )
         self._stop_event = threading.Event()
 

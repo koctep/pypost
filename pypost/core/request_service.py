@@ -52,6 +52,7 @@ class RequestService:
         default_retry_policy: RetryPolicy | None = None,
         http_client: HTTPClientProtocol | None = None,
         mcp_client: MCPClientService | None = None,
+        max_response_bytes: int | None = None,
     ) -> None:
         self._metrics = resolve_metrics(metrics)
         self._history_manager = history_manager
@@ -76,8 +77,17 @@ class RequestService:
                 "RequestService: using injected HTTP client id=%d", id(http_client)
             )
         else:
+            from pypost.core.http_client import DEFAULT_MAX_RESPONSE_BYTES
+
+            cap = (
+                max_response_bytes
+                if max_response_bytes is not None
+                else DEFAULT_MAX_RESPONSE_BYTES
+            )
             self.http_client = HTTPClient(
-                metrics=self._metrics, template_service=self._template_service
+                metrics=self._metrics,
+                template_service=self._template_service,
+                max_response_bytes=cap,
             )
         if mcp_client is not None:
             self.mcp_client = mcp_client

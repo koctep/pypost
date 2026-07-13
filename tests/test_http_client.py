@@ -508,5 +508,38 @@ class TestHTTPClientErrorLogging(unittest.TestCase):
         self.assertNotIn("abc", joined)
 
 
+class TestHTTPClientResponseBodyCap(unittest.TestCase):
+    def setUp(self):
+        self.metrics = MagicMock()
+        self.client = HTTPClient(
+            metrics=self.metrics,
+            template_service=TemplateService(),
+            max_response_bytes=10,
+        )
+        self.mock_session = MagicMock()
+        self.client.session = self.mock_session
+
+    def test_truncates_oversized_stream_and_emits_metric(self):
+        self.mock_session.request.return_value = _make_response(
+            status=200,
+            chunks=[b"0123456789", b"extra-bytes"],
+        )
+        req = RequestData(method="GET", url="http://x")
+        result = self.client.send_request(req)
+        self.assertEqual("0123456789", result.response.body[:10])
+        self.assertIn("truncated", result.response.body)
+        self.metrics.track_response_body_truncated.assert_called_once_with("GET")
+
+    def test_small_body_not_truncated(self):
+        self.mock_session.request.return_value = _make_response(
+            status=200,
+            chunks=[b"small"],
+        )
+        req = RequestData(method="GET", url="http://x")
+        result = self.client.send_request(req)
+        self.assertEqual("small", result.response.body)
+        self.metrics.track_response_body_truncated.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

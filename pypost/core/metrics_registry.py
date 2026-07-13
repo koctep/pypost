@@ -108,6 +108,13 @@ class MetricsRegistry:
             registry=self.registry,
         )
 
+        self.response_body_truncated = Counter(
+            "response_body_truncated_total",
+            "Number of HTTP responses truncated due to max_response_bytes",
+            ["method"],
+            registry=self.registry,
+        )
+
         self.mcp_requests_received = Counter(
             "mcp_requests_received_total",
             "Number of requests received by MCP server",
@@ -254,6 +261,9 @@ class MetricsRegistry:
 
     def track_response_received(self, method: str, status_code: str) -> None:
         self.responses_received.labels(method=method, status_code=status_code).inc()
+
+    def track_response_body_truncated(self, method: str) -> None:
+        self.response_body_truncated.labels(method=method).inc()
 
     def track_mcp_request_received(self, method: str) -> None:
         self.mcp_requests_received.labels(method=method).inc()

@@ -87,6 +87,9 @@ class MetricsManager(QObject):
     def track_response_received(self, method: str, status_code: str) -> None:
         self._registry.track_response_received(method, status_code)
 
+    def track_response_body_truncated(self, method: str) -> None:
+        self._registry.track_response_body_truncated(method)
+
     def track_mcp_request_received(self, method: str) -> None:
         self._registry.track_mcp_request_received(method)
 

@@ -31,6 +31,8 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_response_received(self, method: str, status_code: str) -> None: ...
 
+    def track_response_body_truncated(self, method: str) -> None: ...
+
     def track_mcp_request_received(self, method: str) -> None: ...
 
     def track_mcp_response_sent(self, method: str, status: str) -> None: ...
@@ -117,6 +119,9 @@ class NullMetrics:
         return None
 
     def track_response_received(self, method: str, status_code: str) -> None:
+        return None
+
+    def track_response_body_truncated(self, method: str) -> None:
         return None
 
     def track_mcp_request_received(self, method: str) -> None:

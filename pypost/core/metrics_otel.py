@@ -91,6 +91,10 @@ class OtelMetricsTracker:
             "responses_received_total",
             description="Number of HTTP responses received",
         )
+        self._response_body_truncated = meter.create_counter(
+            "response_body_truncated_total",
+            description="Number of HTTP responses truncated due to max_response_bytes",
+        )
         self._mcp_requests_received = meter.create_counter(
             "mcp_requests_received_total",
             description="Number of requests received by MCP server",
@@ -209,6 +213,9 @@ class OtelMetricsTracker:
         self._responses_received.add(
             1, {"method": method, "status_code": status_code}
         )
+
+    def track_response_body_truncated(self, method: str) -> None:
+        self._response_body_truncated.add(1, {"method": method})
 
     def track_mcp_request_received(self, method: str) -> None:
         self._mcp_requests_received.add(1, {"method": method})

@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List
 
 import requests
 
+from pypost.core.http_response_body_reader import read_streamed_body
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_service import TemplateService
 from pypost.core.yaml_json_converter import (
@@ -22,6 +23,8 @@ SSE_PROBE_TIMEOUT = 10.0
 SSE_PROBE_CONNECT_TIMEOUT = 3.0
 SSE_PROBE_MAX_EVENTS = 5
 DEFAULT_REQUEST_TIMEOUT = 30.0
+DEFAULT_MAX_RESPONSE_BYTES = 52_428_800  # 50 MiB
+TRUNCATION_NOTICE = "\n\n[Response body truncated: exceeded max_response_bytes limit]"
 
 
 def _is_sse_content_type(content_type: str) -> bool:
@@ -61,9 +64,11 @@ class HTTPClient:
         metrics: MetricsTrackerProtocol | None = None,
         template_service: TemplateService | None = None,
         session: requests.Session | None = None,
+        max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
     ):
         self.session = session if session is not None else requests.Session()
         self._metrics = resolve_metrics(metrics)
+        self._max_response_bytes = max_response_bytes
         self._template_service = (
             template_service if template_service is not None else TemplateService()
         )
@@ -283,30 +288,21 @@ class HTTPClient:
                 resolved=resolved,
             )
 
-        content_parts = []
-        # iter_content with None uses optimal chunk size from server (or fallback).
-        # Default yields bytes; decode here so mocks and real responses stay aligned.
-        for chunk in response.iter_content(chunk_size=None):
-            if stop_flag and stop_flag():
-                # If cancelled, we break the loop.
-                # Note: This stops reading, but doesn't necessarily close socket immediately
-                # unless we close response.
-                response.close()
-                break
-
-            if chunk:
-                if isinstance(chunk, bytes):
-                    chunk = chunk.decode("utf-8", errors="replace")
-                content_parts.append(chunk)
-                if stream_callback:
-                    stream_callback(chunk)
-
-            # Check stop flag again after processing chunk to be responsive
-            if stop_flag and stop_flag():
-                response.close()
-                break
-
-        content = "".join(content_parts)
+        content, truncated = read_streamed_body(
+            response,
+            max_response_bytes=self._max_response_bytes,
+            stream_callback=stream_callback,
+            stop_flag=stop_flag,
+        )
+        if truncated:
+            self._metrics.track_response_body_truncated(request_data.method)
+            logger.warning(
+                "response_body_truncated method=%s url=%s max_bytes=%d",
+                request_data.method,
+                url,
+                self._max_response_bytes,
+            )
+            content = f"{content}{TRUNCATION_NOTICE}"
 
         end_time = time.time()
 
