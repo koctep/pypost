@@ -1,6 +1,7 @@
 import logging
+from functools import partial
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QSplitter,
@@ -129,6 +130,9 @@ class TabsPresenter(QObject):
         )
         self._current_variables: dict = {}
         self._current_hidden_keys: set = set()
+        self._chunk_buffers: dict[int, list[str]] = {}
+        self._chunk_flush_timers: dict[int, QTimer] = {}
+        self._chunk_flush_ms = 33
 
         self._tabs = QTabWidget()
         self._header = RequestTabHeader(self)
@@ -548,7 +552,23 @@ class TabsPresenter(QObject):
         tab.response_view.status_label.setText(f"Status: {status}")
 
     def _on_chunk_received(self, tab: RequestTab, chunk: str) -> None:
-        tab.response_view.append_body(chunk)
+        tab_key = id(tab)
+        self._chunk_buffers.setdefault(tab_key, []).append(chunk)
+        timer = self._chunk_flush_timers.get(tab_key)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(self._chunk_flush_ms)
+            timer.timeout.connect(partial(self._flush_chunk_buffer, tab))
+            self._chunk_flush_timers[tab_key] = timer
+        timer.start()
+
+    def _flush_chunk_buffer(self, tab: RequestTab) -> None:
+        tab_key = id(tab)
+        chunks = self._chunk_buffers.pop(tab_key, [])
+        if not chunks:
+            return
+        tab.response_view.append_body("".join(chunks))
         current_text = tab.response_view.body_view.toPlainText()
         size_bytes = len(current_text.encode("utf-8"))
         tab.response_view.size_label.setText(f"Size: {size_bytes} bytes")
