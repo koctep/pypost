@@ -176,6 +176,16 @@ class TestResponseViewSearch:
         finally:
             view.close()
 
+    def test_set_indent_size_skips_large_document(self, qapp):
+        view = ResponseView(indent_size=2)
+        try:
+            body = '{"data":"' + ("x" * (100 * 1024 + 1)) + '"}'
+            view.body_view.setPlainText(body)
+            view.set_indent_size(4)
+            assert view.body_view.toPlainText() == body
+        finally:
+            view.close()
+
     def test_small_document_searches_immediately(self, qapp):
         view = ResponseView()
         try:

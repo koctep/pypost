@@ -265,14 +265,15 @@ class ResponseView(QWidget):
     def set_indent_size(self, size: int):
         self.indent_size = size
         # Refresh current view if it contains JSON
-        if self.body_view.toPlainText():
-            try:
-                text = self.body_view.toPlainText()
-                parsed = json.loads(text)
-                pretty_json = json.dumps(parsed, indent=self.indent_size)
-                self.body_view.setText(pretty_json)
-            except Exception:
-                pass
+        text = self.body_view.toPlainText()
+        if not text or len(text) > LARGE_DOC_CHAR_THRESHOLD:
+            return
+        try:
+            parsed = json.loads(text)
+            pretty_json = json.dumps(parsed, indent=self.indent_size)
+            self.body_view.setText(pretty_json)
+        except Exception:
+            pass
 
     def clear_body(self):
         """Clears the response body and status labels."""
