@@ -38,6 +38,9 @@ class FakeRequestManager:
     def reload_collections(self):
         self.collections = self.storage.load_collections()
 
+    def apply_loaded_collections(self, collections):
+        self.collections = list(collections)
+
     def get_collections(self):
         return self.collections
 

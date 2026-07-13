@@ -11,6 +11,10 @@ from pypost.core.state_manager import StateManager
 from pypost.models.models import Collection, RequestData
 from pypost.ui.delegates import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
+from pypost.ui.presenters.collection_tree_incremental import (
+    log_tree_refresh,
+    try_incremental_tree_refresh,
+)
 from pypost.ui.presenters.collections_async_loader import CollectionsAsyncLoader
 
 logger = logging.getLogger(__name__)
@@ -122,23 +126,20 @@ class CollectionsPresenter(QObject):
 
     def refresh_tree(self) -> None:
         """Rebuilds tree model from RequestManager in-memory collections."""
+        collections = self._request_manager.get_collections()
+        req_count = sum(len(col.requests) for col in collections)
+        if try_incremental_tree_refresh(self._collection_items_by_id, collections):
+            log_tree_refresh(len(collections), req_count, incremental=True)
+            return
         self._model.clear()
         self._collection_items_by_id.clear()
-
-        collections = self._request_manager.get_collections()
-        total_requests = sum(len(col.requests) for col in collections)
-        logger.info(
-            "refresh_tree_completed collection_count=%d request_count=%d",
-            len(collections),
-            total_requests,
-        )
-
         for col in collections:
             col_item = self._make_collection_item(col)
             for req in col.requests:
                 col_item.appendRow(self._make_request_item(req))
             self._model.appendRow(col_item)
             self._collection_items_by_id[col.id] = col_item
+        log_tree_refresh(len(collections), req_count, incremental=False)
 
     def add_saved_request_to_tree(self, request: RequestData, collection_id: str) -> bool:
         """Insert a newly saved request without rebuilding the full tree model."""

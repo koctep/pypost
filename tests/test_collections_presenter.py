@@ -256,7 +256,8 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter.load_collections()
         model = presenter.widget.model()
         index = model.item(0).index()
-        self.assertFalse(presenter.widget.isExpanded(index))
+        # Incremental reload preserves expansion when structure is unchanged (PYPOST-758).
+        self.assertTrue(presenter.widget.isExpanded(index))
 
         presenter.restore_tree_state()
         self.assertTrue(presenter.widget.isExpanded(index))
