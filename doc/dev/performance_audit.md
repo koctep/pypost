@@ -31,22 +31,28 @@ thread** for large bodies.
 
 ## Thread Model
 
+PyPost uses **Qt main thread** for all widgets and **QThread** / **daemon threads** for I/O and
+network work. See the full inventory and remediation status in
+[performance_audit.md](performance_audit.md#thread-model).
+
 ```text
 Main thread (Qt)
-├── Startup: load_collections, history load, refresh_tree  [blocking — P1/P2]
-├── ResponseView.display_response, streaming append_body   [P2 for large payloads]
-└── StateManager debounced config save                     [P3]
+├── CollectionsPresenter / ResponseView / TabsPresenter
+├── Startup: async collection load (CollectionStorageWorker) + env load gate
+├── Streaming: chunk buffer flushed every ~33 ms (TabsPresenter)
+└── StateManager debounced config save
 
 QThread workers
-├── RequestWorker        → RequestService.execute (HTTP/MCP, script, history)
-├── EnvironmentStorageWorker → encrypted env load/save (PYPOST-486)
+├── RequestWorker              → RequestService.execute
+├── CollectionStorageWorker    → startup / reload collection JSON (PYPOST-754/757)
+├── EnvironmentStorageWorker   → encrypted env load/save (PYPOST-486)
 ├── EncryptionMigrationWorker
-└── PasteJsonFormatWorker → large JSON paste (>100 KB)
+└── PasteJsonFormatWorker
 
-Daemon threads
-├── MCPServerManager     → uvicorn; call_tool → run_in_threadpool → RequestService
-├── MetricsServer        → /metrics scrape
-└── HistoryManager       → debounced history.json save
+Daemon / pool threads
+├── MCPServerManager → uvicorn; call_tool limited by asyncio.Semaphore (PYPOST-759)
+├── MetricsServer    → /metrics scrape
+└── HistoryManager   → debounced history.json save
 ```
 
 ## Request Hot Path

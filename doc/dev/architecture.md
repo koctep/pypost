@@ -17,6 +17,7 @@ pypost/
 │   ├── request_service.py  # Unified request execution
 │   ├── request_sync.py     # RequestData copy/compare and dirty-check helpers
 │   ├── worker.py           # Background request execution (QThread)
+│   │                       # Thread model: see performance_audit.md#thread-model
 │   ├── http_client.py      # HTTP handling (wraps `requests`)
 │   ├── http_client_protocol.py
 │   ├── execute_request_protocol.py
