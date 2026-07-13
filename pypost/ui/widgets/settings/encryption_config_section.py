@@ -17,6 +17,11 @@ ENCRYPTION_MODE_DEFAULT = "default"
 ENCRYPTION_MODE_ENABLED = "enabled"
 ENCRYPTION_MODE_DISABLED = "disabled"
 
+ENCRYPTION_SCOPE_HELP = (
+    "Encrypts values for variables marked Hidden in each environment only. "
+    "Non-hidden variables stay plaintext on disk even when encryption is enabled."
+)
+
 
 def parse_env_encryption_enabled_from_mode(encryption_mode: str) -> bool | None:
     """Map Settings encryption mode combo value to tri-state env_encryption_enabled."""
@@ -95,6 +100,8 @@ class EncryptionConfigSection:
 
         self.env_encryption_help_label = QLabel(parent)
         self.env_encryption_help_label.setWordWrap(True)
+        self.env_encryption_scope_label = QLabel(ENCRYPTION_SCOPE_HELP, parent)
+        self.env_encryption_scope_label.setWordWrap(True)
         self.env_encryption_key_source_combo.currentIndexChanged.connect(
             self._update_encryption_key_source_help,
         )
@@ -113,6 +120,7 @@ class EncryptionConfigSection:
             "Encryption key source fallback:",
             self.env_encryption_key_source_fallback_edit,
         )
+        form.addRow("", self.env_encryption_scope_label)
         form.addRow("", self.env_encryption_fallback_warning_label)
         form.addRow("", self.env_encryption_help_label)
 

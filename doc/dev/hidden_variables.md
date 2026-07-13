@@ -11,6 +11,9 @@ The feature is display-level only: request execution still uses real values from
 PYPOST-446 masks hidden-derived values in request history. PYPOST-448 adds a configurable
 logging policy for hidden-flag toggle events (variable key names in diagnostic logs).
 
+When **environment encryption at rest** is enabled (Settings), only variables marked **Hidden**
+are encrypted in `environments.json`; other variables remain plaintext on disk.
+
 ## Architecture
 
 - **Model**: `pypost.models.models.Environment`

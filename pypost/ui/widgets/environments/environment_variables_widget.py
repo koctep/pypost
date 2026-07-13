@@ -23,6 +23,11 @@ from pypost.core.environment_messages import (
     COLUMN_VARIABLE,
     MCP_ENABLE_LABEL,
 )
+
+HIDDEN_COLUMN_TOOLTIP = (
+    "Hidden variables are masked in the UI and encrypted at rest when encryption is enabled. "
+    "Non-hidden variables are stored as plaintext."
+)
 from pypost.core.environment_ops import validate_environment_variable_name
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.models.models import Environment
@@ -61,6 +66,9 @@ class EnvironmentVariablesWidget(QWidget):
         header.setSectionResizeMode(COL_VAR, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_VAL, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_HIDDEN, QHeaderView.ResizeToContents)
+        hidden_header = self.vars_table.horizontalHeaderItem(COL_HIDDEN)
+        if hidden_header is not None:
+            hidden_header.setToolTip(HIDDEN_COLUMN_TOOLTIP)
         self.vars_table.itemChanged.connect(self.on_var_changed)
         self.vars_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.vars_table.customContextMenuRequested.connect(self._on_vars_table_context_menu)

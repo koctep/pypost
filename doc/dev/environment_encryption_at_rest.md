@@ -23,7 +23,10 @@ PYPOST-525 adds `StorageManager.load_environments_with_errors()` so migration to
 per-environment decrypt failures through a supported public API without changing desktop load
 behavior.
 
-This feature protects hidden-key values in persisted environment storage (`environments.json`).
+This feature protects **hidden-key values only** in persisted environment storage
+(`environments.json`). Variables not marked Hidden remain **plaintext on disk** even when
+encryption is enabled. Settings shows this scope under **Environment encryption at rest**.
+
 Runtime request execution is unchanged: components still consume plain
 `Environment.variables: Dict[str, str]` after load-time decryption.
 
