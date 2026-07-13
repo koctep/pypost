@@ -80,7 +80,8 @@ This class contains the actual business logic of the MCP server.
 *   **Execution**: Delegates request execution to a fresh `RequestService` per `call_tool`
     invocation so each MCP tool call owns an isolated `HTTPClient` / `requests.Session`
     (PYPOST-138). Synchronous work runs in Starlette's threadpool via
-    `run_in_threadpool`.
+    `run_in_threadpool`, capped at **4** concurrent `call_tool` executions per server
+    instance (`asyncio.Semaphore` in `MCPServerImpl`, PYPOST-759).
 *   **Environment variables (PYPOST-550)**: At `call_tool` time, snapshots active
     environment variables via an injected `variable_supplier`, merges them with MCP tool
     arguments, and passes the combined dict to `RequestService.execute()` (GUI parity).

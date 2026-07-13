@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+import asyncio
 from collections.abc import Callable
 from typing import Any, Dict, List
 
@@ -30,6 +31,8 @@ from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_MAX_CONCURRENT_MCP_CALLS = 4
 
 
 def _merge_execution_variables(
@@ -90,6 +93,7 @@ class MCPServerImpl:
         self._template_service = template_service
         self._variable_supplier = variable_supplier or (lambda: {})
         self._hidden_keys_supplier = hidden_keys_supplier or (lambda: set())
+        self._call_tool_semaphore = asyncio.Semaphore(DEFAULT_MAX_CONCURRENT_MCP_CALLS)
         if template_service is not None:
             logger.debug(
                 "MCPServerImpl: using injected TemplateService id=%d", id(template_service)
@@ -115,6 +119,10 @@ class MCPServerImpl:
         return tools
 
     async def call_tool(self, name: str, arguments: dict) -> List[Any]:
+        async with self._call_tool_semaphore:
+            return await self._call_tool_inner(name, arguments)
+
+    async def _call_tool_inner(self, name: str, arguments: dict) -> List[Any]:
         if name not in self.tools_map:
             raise ValueError(f"Tool {name} not found")
 
