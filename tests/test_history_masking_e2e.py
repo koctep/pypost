@@ -9,6 +9,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import json
+
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
@@ -96,7 +98,10 @@ def test_hidden_values_stay_masked_after_history_reload_in_panel(qapp):  # noqa:
         entry = entries[0]
         assert entry.url == "http://myserver.com/api?token=***"
         assert entry.headers["Authorization"] == "Bearer ***"
-        assert entry.body == '{"token":"***","host":"myserver.com"}'
+        assert json.loads(entry.body) == {
+            "token": "***",
+            "host": "myserver.com",
+        }
 
         # Journey step 6: History panel displays reloaded entry.
         panel = _reloaded_panel(history_path)
@@ -117,5 +122,8 @@ def test_hidden_values_stay_masked_after_history_reload_in_panel(qapp):  # noqa:
         assert url_text == "http://myserver.com/api?token=***"
         assert VISIBLE_VALUE in url_text
         assert "Bearer ***" in headers_text
-        assert body_text == '{"token":"***","host":"myserver.com"}'
+        assert json.loads(body_text) == {
+            "token": "***",
+            "host": "myserver.com",
+        }
         assert VISIBLE_VALUE in body_text

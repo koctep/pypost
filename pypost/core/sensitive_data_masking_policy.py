@@ -33,20 +33,31 @@ class SensitiveDataMaskingPolicy:
         env_vars = {k: str(v) for k, v in variables.items()}
 
         if hidden:
-            masked_variables = dict(variables)
-            for key in hidden:
-                if key in masked_variables:
-                    masked_variables[key] = HIDDEN_PLACEHOLDER
-            rendered = MaskedRequestData(
-                url=self._template_service.render_string(request.url, masked_variables),
-                headers={
-                    self._template_service.render_string(
-                        k, masked_variables
-                    ): self._template_service.render_string(v, masked_variables)
-                    for k, v in request.headers.items()
-                },
-                body=self._template_service.render_string(request.body, masked_variables),
-            )
+            if resolved is not None:
+                rendered = MaskedRequestData(
+                    url=resolved.url,
+                    headers=dict(resolved.headers),
+                    body=resolved.body,
+                )
+            else:
+                masked_variables = dict(variables)
+                for key in hidden:
+                    if key in masked_variables:
+                        masked_variables[key] = HIDDEN_PLACEHOLDER
+                rendered = MaskedRequestData(
+                    url=self._template_service.render_string(
+                        request.url, masked_variables
+                    ),
+                    headers={
+                        self._template_service.render_string(
+                            k, masked_variables
+                        ): self._template_service.render_string(v, masked_variables)
+                        for k, v in request.headers.items()
+                    },
+                    body=self._template_service.render_string(
+                        request.body, masked_variables
+                    ),
+                )
         elif resolved is not None:
             rendered = MaskedRequestData(
                 url=resolved.url,
@@ -65,10 +76,18 @@ class SensitiveDataMaskingPolicy:
                 body=self._template_service.render_string(request.body, variables),
             )
 
+        if hidden:
+            safe_headers = {
+                key: sanitize_text(value, env_vars=env_vars, hidden_keys=hidden)
+                for key, value in rendered.headers.items()
+            }
+        else:
+            safe_headers = sanitize_headers(
+                rendered.headers, env_vars=env_vars, hidden_keys=hidden
+            )
+
         return MaskedRequestData(
             url=sanitize_text(rendered.url, env_vars=env_vars, hidden_keys=hidden),
-            headers=sanitize_headers(
-                rendered.headers, env_vars=env_vars, hidden_keys=hidden
-            ),
+            headers=safe_headers,
             body=sanitize_text(rendered.body, env_vars=env_vars, hidden_keys=hidden),
         )
