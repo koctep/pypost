@@ -182,6 +182,9 @@ class CollectionsPresenter(QObject):
 
     def load_collections(self) -> None:
         """Reloads collections from storage and rebuilds the tree model."""
+        if self._async_loader is not None:
+            self._async_loader.try_load_async()
+            return
         self._request_manager.reload_collections()
         self.refresh_tree()
 
@@ -192,7 +195,7 @@ class CollectionsPresenter(QObject):
             self.load_collections()
             self.collections_loaded.emit()
             return
-        self._async_loader.load_async()
+        self.load_collections()
 
     def restore_tree_state(self) -> None:
         """Re-expands nodes from StateManager state."""

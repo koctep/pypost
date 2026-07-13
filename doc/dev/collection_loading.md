@@ -49,7 +49,9 @@ in-app CRUD or tab save when RequestManager memory is already up to date.
 
 ### `CollectionsPresenter.load_collections()`
 
-Calls `reload_collections()` then `refresh_tree()`. Full resync from disk plus UI rebuild.
+When a `CollectionStorageGateway` is configured (production `MainWindow`), dispatches an
+async disk reload and skips if a load is already in progress. Otherwise falls back to
+synchronous `reload_collections()` + `refresh_tree()` (unit tests).
 
 ### `CollectionsPresenter.add_saved_request_to_tree(request, collection_id)`
 
@@ -79,8 +81,7 @@ CollectionStorageGateway.load_completed
   → collections_loaded signal
 ```
 
-Mirrors `EnvironmentStorageWorker` / `EnvironmentStorageGateway` (PYPOST-486). User-triggered
-full reload off the main thread is deferred to PYPOST-757.
+User-triggered reload uses the same `CollectionStorageGateway` as startup (PYPOST-757).
 
 ## Configuration
 

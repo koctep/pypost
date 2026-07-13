@@ -32,6 +32,17 @@ class CollectionsAsyncLoader(QObject):
         self._gateway.load_completed.connect(self._on_load_completed)
         self._gateway.load_failed.connect(self._on_load_failed)
 
+    def is_busy(self) -> bool:
+        return self._gateway.has_pending_work()
+
+    def try_load_async(self) -> bool:
+        """Dispatch load if idle. Returns False when skipped because busy."""
+        if self.is_busy():
+            logger.info("load_collections_skipped reason=busy")
+            return False
+        self.load_async()
+        return True
+
     def load_async(self) -> None:
         logger.info("collection_storage_async_load_dispatched")
         self._gateway.load_async()

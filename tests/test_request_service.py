@@ -231,6 +231,14 @@ class TestRequestServiceHistory(unittest.TestCase):
             body='{"token":"{{token}}","host":"{{host}}"}',
             post_script="",
         )
+        self.svc.http_client.send_request.return_value = HTTPRequestResult(
+            response=_make_response(200),
+            resolved=ResolvedRequestFields(
+                url="http://myserver.com/api?token=supersecret",
+                headers={"Authorization": "Bearer supersecret"},
+                body='{"token":"supersecret","host":"myserver.com"}',
+            ),
+        )
         self.svc.execute(
             req,
             variables={"host": "myserver.com", "token": "supersecret"},
@@ -238,7 +246,7 @@ class TestRequestServiceHistory(unittest.TestCase):
         )
         entry = self.history_manager.append.call_args[0][0]
         self.assertEqual("http://myserver.com/api?token=***", entry.url)
-        self.assertEqual("***", entry.headers["Authorization"])
+        self.assertEqual("Bearer ***", entry.headers["Authorization"])
         self.assertIn('"token": "***"', entry.body)
         self.assertIn('"host": "myserver.com"', entry.body)
 
