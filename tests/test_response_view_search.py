@@ -143,6 +143,39 @@ class TestResponseViewSearch:
         finally:
             view.close()
 
+    def test_display_response_pretty_prints_small_json(self, qapp):
+        view = ResponseView(indent_size=2)
+        try:
+            response = ResponseData(
+                status_code=200,
+                headers={},
+                body='{"ok":true}',
+                elapsed_time=0.1,
+                size=11,
+            )
+            view.display_response(response)
+            text = view.body_view.toPlainText()
+            assert "\n" in text
+            assert '"ok"' in text
+        finally:
+            view.close()
+
+    def test_display_response_skips_pretty_print_for_large_body(self, qapp):
+        view = ResponseView(indent_size=2)
+        try:
+            body = '{"data":"' + ("x" * (100 * 1024 + 1)) + '"}'
+            response = ResponseData(
+                status_code=200,
+                headers={},
+                body=body,
+                elapsed_time=0.1,
+                size=len(body.encode("utf-8")),
+            )
+            view.display_response(response)
+            assert view.body_view.toPlainText() == body
+        finally:
+            view.close()
+
     def test_small_document_searches_immediately(self, qapp):
         view = ResponseView()
         try:

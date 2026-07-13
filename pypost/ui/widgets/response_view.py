@@ -305,6 +305,14 @@ class ResponseView(QWidget):
             if isinstance(response.body, str)
             else response.body.decode("utf-8", errors="replace")
         )
+        if len(body_str) > LARGE_DOC_CHAR_THRESHOLD:
+            logger.info(
+                "display_response_skip_pretty_print body_chars=%d threshold=%d",
+                len(body_str),
+                LARGE_DOC_CHAR_THRESHOLD,
+            )
+            self.body_view.setText(body_str)
+            return
         try:
             parsed = json.loads(body_str)
             pretty_json = json.dumps(parsed, indent=self.indent_size)
