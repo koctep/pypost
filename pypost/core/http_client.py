@@ -119,7 +119,7 @@ class HTTPClient:
                 logger.error(
                     "yaml_to_json_conversion_failed method=%s url=%r detail=%s",
                     request_data.method,
-                    url,
+                    request_data.url,
                     exc,
                 )
                 self._metrics.track_yaml_to_json_conversion_failed()
@@ -237,21 +237,30 @@ class HTTPClient:
                 kwargs["headers"] = headers
             response = self.session.request(**kwargs)
         except requests.Timeout as exc:
-            logger.error("Request timed out: %s %s", request_data.method, url)
+            logger.error(
+                "Request timed out: %s %s", request_data.method, request_data.url
+            )
             raise ExecutionError(
                 category=ErrorCategory.TIMEOUT,
                 message=f"Request to {url} timed out.",
                 detail=str(exc),
             ) from exc
         except requests.ConnectionError as exc:
-            logger.error("Connection failed: %s %s", request_data.method, url)
+            logger.error(
+                "Connection failed: %s %s", request_data.method, request_data.url
+            )
             raise ExecutionError(
                 category=ErrorCategory.NETWORK,
                 message=f"Could not connect to {url}.",
                 detail=str(exc),
             ) from exc
         except requests.RequestException as exc:
-            logger.error("Request failed: %s %s — %s", request_data.method, url, exc)
+            logger.error(
+                "Request failed: %s %s — %s",
+                request_data.method,
+                request_data.url,
+                exc,
+            )
             raise ExecutionError(
                 category=ErrorCategory.UNKNOWN,
                 message="An unexpected request error occurred.",

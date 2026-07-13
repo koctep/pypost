@@ -493,5 +493,20 @@ class TestHTTPClientInjection(unittest.TestCase):
         self.assertIs(mock_session, client.session)
 
 
+class TestHTTPClientErrorLogging(unittest.TestCase):
+    def test_connection_error_logs_template_url_not_resolved(self):
+        client = HTTPClient(metrics=MagicMock(), template_service=TemplateService())
+        client.session = MagicMock()
+        client.session.request.side_effect = requests_lib.ConnectionError("refused")
+        req = RequestData(method="GET", url="http://{{host}}/api?token={{token}}")
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError):
+                client.send_request(req, variables={"host": "secret.example.com", "token": "abc"})
+        joined = "\n".join(logs.output)
+        self.assertIn("http://{{host}}/api?token={{token}}", joined)
+        self.assertNotIn("secret.example.com", joined)
+        self.assertNotIn("abc", joined)
+
+
 if __name__ == "__main__":
     unittest.main()
