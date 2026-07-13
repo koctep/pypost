@@ -21,6 +21,7 @@ class RequestManager:
         storage_manager: StorageInterface,
         *,
         item_strategies: dict[str, CollectionItemStrategy] | None = None,
+        defer_initial_load: bool = False,
     ):
         self.storage = storage_manager
         self.collections: List[Collection] = []
@@ -30,12 +31,23 @@ class RequestManager:
             if item_strategies is not None
             else DEFAULT_COLLECTION_ITEM_STRATEGIES
         )
-        self.reload_collections()
+        if not defer_initial_load:
+            self.reload_collections()
 
     def reload_collections(self):
         """Reloads collections from storage."""
         self.collections = self.storage.load_collections()
         self._rebuild_index()
+
+    def apply_loaded_collections(self, collections: List[Collection]) -> None:
+        """Applies collections loaded off the main thread and rebuilds the index."""
+        self.collections = collections
+        self._rebuild_index()
+        logger.info(
+            "apply_loaded_collections_completed collection_count=%d request_count=%d",
+            len(self.collections),
+            len(self._request_index),
+        )
 
     def _rebuild_index(self):
         """Rebuilds the internal index of requests for O(1) access."""

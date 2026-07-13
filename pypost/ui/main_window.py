@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
             self.config_manager = ConfigManager()
         self._alert_manager = alert_manager
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
-        self.request_manager = RequestManager(self.storage)
+        self.request_manager = RequestManager(self.storage, defer_initial_load=True)
         self.state_manager = StateManager(self.config_manager, parent=self)
         self.storage.apply_encryption_settings(self.state_manager.settings)
         self.style_manager = StyleManager()
@@ -76,6 +76,7 @@ class MainWindow(QMainWindow):
             self.state_manager,
             self.metrics,
             self.icons,
+            storage=self.storage,
         )
         self.tabs = TabsPresenter(
             self.request_manager,
@@ -98,20 +99,29 @@ class MainWindow(QMainWindow):
         wire_presenter_signals(self)
         self._create_menu_bar()
         self._setup_shortcuts()
-        self.collections.refresh_tree()
-        if resolve_encryption_enabled(self.settings):
-            self.env.environments_loaded.connect(self._on_startup_environments_loaded)
-            self.env.load_environments()
-        else:
-            self.env.load_environments()
-            self.tabs.restore_tabs()
-            self.collections.restore_tree_state()
+        self._startup_collections_ready = False
+        self._startup_env_ready = False
+        self.collections.collections_loaded.connect(self._on_startup_collections_loaded)
+        self.env.environments_loaded.connect(self._on_startup_environments_loaded)
+        self.collections.load_collections_async()
+        self.env.load_environments()
         self._startup_settings_reapplied = False
         self.apply_settings(self.settings)
         logger.info("main_window_initialized")
 
+    def _on_startup_collections_loaded(self) -> None:
+        self.collections.collections_loaded.disconnect(self._on_startup_collections_loaded)
+        self._startup_collections_ready = True
+        self._maybe_complete_startup_restore()
+
     def _on_startup_environments_loaded(self) -> None:
         self.env.environments_loaded.disconnect(self._on_startup_environments_loaded)
+        self._startup_env_ready = True
+        self._maybe_complete_startup_restore()
+
+    def _maybe_complete_startup_restore(self) -> None:
+        if not (self._startup_collections_ready and self._startup_env_ready):
+            return
         self.tabs.restore_tabs()
         self.collections.restore_tree_state()
 

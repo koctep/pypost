@@ -132,6 +132,21 @@ class TestRequestManagerReload(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(req, result[0])
 
+    def test_defer_initial_load_starts_empty(self):
+        storage = FakeStorageManager([Collection(id="c1", name="Col", requests=[])])
+        manager = RequestManager(storage, defer_initial_load=True)
+        self.assertEqual([], manager.get_collections())
+
+    def test_apply_loaded_collections_rebuilds_index(self):
+        storage = FakeStorageManager()
+        manager = RequestManager(storage, defer_initial_load=True)
+        req = RequestData(id="r1", name="Get users")
+        col = Collection(id="c1", name="Team API", requests=[req])
+        manager.apply_loaded_collections([col])
+        result = manager.find_request("r1")
+        self.assertIsNotNone(result)
+        self.assertEqual(req, result[0])
+
 
 class TestRequestManagerGetCollections(unittest.TestCase):
     def test_get_collections_returns_current_list(self):

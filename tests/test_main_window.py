@@ -30,7 +30,7 @@ class TestMainWindow(unittest.TestCase):
                 f"MainWindow should not define {name}",
             )
 
-    def test_startup_refreshes_tree_from_request_manager(self):
+    def test_startup_dispatches_async_collection_load(self):
         metrics = MagicMock()
         template_service = MagicMock()
         mock_collections = MagicMock()
@@ -50,7 +50,6 @@ class TestMainWindow(unittest.TestCase):
             patch("pypost.ui.main_window.MainWindow._create_menu_bar"),
             patch("pypost.ui.main_window.MainWindow._setup_shortcuts"),
             patch("pypost.ui.main_window.MainWindow.apply_settings"),
-            patch("pypost.ui.main_window.resolve_encryption_enabled", return_value=False),
         ):
             mock_sm.return_value.settings = AppSettings()
             window = MainWindow(
@@ -59,7 +58,8 @@ class TestMainWindow(unittest.TestCase):
             )
             window.settings_btn = MagicMock()
 
-        mock_collections.refresh_tree.assert_called_once()
+        mock_collections.load_collections_async.assert_called_once()
+        mock_collections.refresh_tree.assert_not_called()
         mock_collections.load_collections.assert_not_called()
 
     def test_constructor_stores_injected_dependencies(self):

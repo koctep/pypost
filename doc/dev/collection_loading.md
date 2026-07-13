@@ -30,8 +30,12 @@ CollectionsPresenter.refresh_tree()  →  QTreeView model
 ### `RequestManager.reload_collections()`
 
 Re-reads all collection JSON from disk and rebuilds the request index. Called automatically in
-`RequestManager.__init__`. Use when disk content may have changed outside the manager (e.g.
-future manual refresh action).
+`RequestManager.__init__` unless `defer_initial_load=True` (MainWindow startup path).
+
+### `RequestManager.apply_loaded_collections(collections)`
+
+Sets in-memory collections and rebuilds the request index from a list loaded on a background
+thread. Used by `CollectionStorageGateway` at startup; does not touch disk.
 
 ### `RequestManager.get_collections() -> list[Collection]`
 
@@ -55,12 +59,28 @@ already current ([PYPOST-319](https://pypost.atlassian.net/browse/PYPOST-319)).
 
 ## MainWindow wiring
 
-- **Startup:** `RequestManager` loads in `__init__`; MainWindow calls
-  `collections.refresh_tree()` once (no double reload).
+- **Startup:** `RequestManager(defer_initial_load=True)`; `CollectionsPresenter.load_collections_async()`
+  loads JSON on a background thread via `CollectionStorageGateway`. MainWindow waits for both
+  `collections_loaded` and `environments_loaded` before `restore_tabs()` and
+  `restore_tree_state()`.
 - **After tab save:** `TabsPresenter.request_saved` → `collections.refresh_tree()` (save already
   updated RequestManager memory).
 - **After save-as:** `TabsPresenter.request_save_as_completed` →
   `collections.add_saved_request_to_tree()` (incremental insert; no full tree rebuild).
+
+## Async startup (PYPOST-754)
+
+```text
+CollectionStorageWorker (QThread)
+  → storage.load_collections()
+CollectionStorageGateway.load_completed
+  → RequestManager.apply_loaded_collections()
+  → CollectionsPresenter.refresh_tree()
+  → collections_loaded signal
+```
+
+Mirrors `EnvironmentStorageWorker` / `EnvironmentStorageGateway` (PYPOST-486). User-triggered
+full reload off the main thread is deferred to PYPOST-757.
 
 ## Configuration
 

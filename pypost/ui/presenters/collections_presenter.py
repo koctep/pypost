@@ -11,6 +11,7 @@ from pypost.core.state_manager import StateManager
 from pypost.models.models import Collection, RequestData
 from pypost.ui.delegates import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
+from pypost.ui.presenters.collections_async_loader import CollectionsAsyncLoader
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class CollectionsPresenter(QObject):
     open_request_in_tab = Signal(object)  # payload: RequestData (deep copy for new tab)
     open_request_in_isolated_tab = Signal(object)  # payload: RequestData (deep copy)
     collections_changed = Signal()  # after create / delete / rename
+    collections_loaded = Signal()  # after async startup load completes
     request_renamed = Signal(str, str)  # (request_id, new_name)
     requests_deleted = Signal(list)  # request IDs whose tabs should close
 
@@ -30,6 +32,7 @@ class CollectionsPresenter(QObject):
         state_manager: StateManager,
         metrics: MetricsTrackerProtocol,
         icons: dict,
+        storage=None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -37,6 +40,18 @@ class CollectionsPresenter(QObject):
         self._state_manager = state_manager
         self._metrics = metrics
         self._icons = icons
+        self._async_loader = (
+            CollectionsAsyncLoader(
+                request_manager,
+                storage,
+                self.refresh_tree,
+                parent=self,
+            )
+            if storage is not None
+            else None
+        )
+        if self._async_loader is not None:
+            self._async_loader.collections_loaded.connect(self.collections_loaded.emit)
 
         self._model = QStandardItemModel()
         self._collection_items_by_id: dict[str, QStandardItem] = {}
@@ -169,6 +184,15 @@ class CollectionsPresenter(QObject):
         """Reloads collections from storage and rebuilds the tree model."""
         self._request_manager.reload_collections()
         self.refresh_tree()
+
+    def load_collections_async(self) -> None:
+        """Loads collections from storage on a background thread (startup path)."""
+        if self._async_loader is None:
+            logger.warning("load_collections_async_fallback reason=no_loader")
+            self.load_collections()
+            self.collections_loaded.emit()
+            return
+        self._async_loader.load_async()
 
     def restore_tree_state(self) -> None:
         """Re-expands nodes from StateManager state."""
