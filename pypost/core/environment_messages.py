@@ -20,6 +20,10 @@ COLUMN_VALUE = "Value"
 COLUMN_HIDDEN = "Hidden"
 
 MCP_ENABLE_LABEL = "Enable MCP (Model Context Protocol)"
+MCP_ENABLE_TOOLTIP = (
+    "When enabled, every request marked Expose as MCP in any loaded collection "
+    "is registered as a tool for this environment. There is no per-collection gate."
+)
 
 MSG_EMPTY_NAME = "Name cannot be empty."
 MSG_DELETE_ENVIRONMENT_CONFIRM = 'Are you sure you want to delete "{name}"?'

@@ -418,6 +418,19 @@ Internal. Returns `true` when `execution_error` is set or `response.status_code 
 No new settings. MCP tools use variables from the **currently selected environment** when
 `enable_mcp=True`. Port and host remain in `AppSettings` (`mcp_port`, `mcp_host`).
 
+### Collection exposure model (PYPOST-711)
+
+MCP tool registration is **global across all loaded collections** when the active environment
+has `enable_mcp=True`. Each request with `expose_as_mcp=True` becomes a tool — there is no
+per-collection ACL. Operators control exposure by:
+
+- Unchecking **Enable MCP** on the environment (disables the server for that env).
+- Unchecking **Expose as MCP** on individual requests they do not want agents to call.
+- Using separate PyPost instances or environments for untrusted tool sets.
+
+The **MCP Tools (N)** overview dialog lists every exposed tool with its source collection for
+review before enabling MCP on a shared workstation.
+
 ### Agent connection URL
 
 Configure local MCP clients (Cursor, Claude Desktop, etc.) with Streamable HTTP:

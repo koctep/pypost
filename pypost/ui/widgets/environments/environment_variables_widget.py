@@ -22,6 +22,7 @@ from pypost.core.environment_messages import (
     COLUMN_VALUE,
     COLUMN_VARIABLE,
     MCP_ENABLE_LABEL,
+    MCP_ENABLE_TOOLTIP,
 )
 
 HIDDEN_COLUMN_TOOLTIP = (
@@ -74,6 +75,7 @@ class EnvironmentVariablesWidget(QWidget):
         self.vars_table.customContextMenuRequested.connect(self._on_vars_table_context_menu)
 
         self.mcp_check = QCheckBox(MCP_ENABLE_LABEL)
+        self.mcp_check.setToolTip(MCP_ENABLE_TOOLTIP)
         self.mcp_check.toggled.connect(self._on_mcp_toggled)
         self.mcp_check.setEnabled(False)
 
