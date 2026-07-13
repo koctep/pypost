@@ -93,8 +93,11 @@ def _open_settings_with_alert_fields(
     return window.settings
 
 
-def test_open_settings_alert_fields_round_trip_via_settings_json(qapp, tmp_path):
+def test_open_settings_alert_fields_round_trip_via_settings_json(qapp, tmp_path, monkeypatch):
     """Settings save through MainWindow persists alert fields to disk."""
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", Fernet.generate_key().decode("utf-8"))
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     with patch("pypost.core.config_manager.user_config_dir", return_value=str(config_dir)):
@@ -121,7 +124,8 @@ def test_open_settings_alert_fields_round_trip_via_settings_json(qapp, tmp_path)
         on_disk = json.loads(cfg_path.read_text(encoding="utf-8"))
         assert on_disk["alert_log_path"] == log_path
         assert on_disk["alert_webhook_url"] == webhook_url
-        assert on_disk["alert_webhook_auth_header"] == webhook_auth
+        assert "alert_webhook_auth_header" not in on_disk
+        assert "alert_webhook_auth_header_encrypted" in on_disk
 
         reloaded = ConfigManager().load_config()
         assert reloaded.alert_log_path == log_path

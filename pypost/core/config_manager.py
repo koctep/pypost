@@ -3,6 +3,7 @@ from pathlib import Path
 
 from platformdirs import user_config_dir
 
+from pypost.core.settings_secrets import parse_settings_from_disk, serialize_settings_for_disk
 from pypost.models.settings import AppSettings
 
 
@@ -35,7 +36,7 @@ class ConfigManager:
         try:
             with open(self.config_path, "r") as f:
                 data = json.load(f)
-                return AppSettings(**data)
+                return parse_settings_from_disk(data)
         except Exception as e:
             print(f"Error loading config: {e}")
             return AppSettings()
@@ -46,6 +47,6 @@ class ConfigManager:
             settings.revision += 1
 
             with open(self.config_path, "w") as f:
-                json.dump(settings.model_dump(), f, indent=4)
+                json.dump(serialize_settings_for_disk(settings), f, indent=4)
         except Exception as e:
             print(f"Error saving config: {e}")
