@@ -91,7 +91,7 @@ Findings use **P1** (critical/high exposure), **P2** (policy gap or secondary su
 | M-004 | MCP activity log excludes argument values | PASS |
 | M-005 | MCP execution does not pass `hidden_keys` (latent) | P3 |
 | M-006 | Tool descriptions are operator-controlled static text | PASS |
-| M-007 | Metrics MCP surface exposes Prometheus scrape data | P2 |
+| M-007 | Metrics MCP surface exposes Prometheus scrape data — localhost default + WARNING on non-loopback bind | P2 (mitigated on loopback) |
 
 ### Transport
 

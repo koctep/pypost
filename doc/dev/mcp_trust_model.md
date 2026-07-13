@@ -22,6 +22,24 @@ Operators are expected to treat network MCP like a **local privilege boundary**:
 When metrics bind outside loopback, PyPost logs `metrics_server_non_localhost_bind` (WARNING).
 Request MCP has no equivalent runtime warning — use Settings → Server bind fields deliberately.
 
+## Metrics MCP surface (PYPOST-712)
+
+`MetricsServer` exposes **two unauthenticated endpoints** on the metrics bind address:
+
+| Path | Protocol | Data exposed |
+| --- | --- | --- |
+| `/metrics` | HTTP GET | Full Prometheus text exposition (request counts, MCP activity, etc.) |
+| `/mcp` | MCP Streamable HTTP | `metrics://all` resource — same scrape payload to MCP clients |
+
+**Hardening shipped:**
+
+- `AppSettings.metrics_host` defaults to `127.0.0.1` (PYPOST-704).
+- Non-loopback bind emits `metrics_server_non_localhost_bind` WARNING at startup.
+- Trust model documented here and in [security_audit.md](security_audit.md).
+
+**Not implemented:** bearer-token or mTLS on metrics HTTP/MCP. Keep metrics on loopback or
+front with an authenticated reverse proxy when remote scrape is required.
+
 ## What agents can do
 
 With network access to the MCP endpoint, a client can:
