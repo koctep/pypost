@@ -434,6 +434,21 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertNotIn("secret-echo-123", payload["body"])
         self.assertIn("***", payload["body"])
 
+    def test_call_tool_redacts_secrets_in_script_logs(self):
+        impl = MCPServerImpl()
+        impl.set_variable_supplier(lambda: {"token": "leaked-token"})
+        impl.set_hidden_keys_supplier(lambda: {"token"})
+        req = RequestData(name="T", expose_as_mcp=True, method="GET", url="http://u")
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result(
+            "ok", logs=["debug token=leaked-token"]
+        )
+        out = asyncio.run(impl.call_tool("t", {}))
+        payload = _parse_tool_result(out[0].text)
+        self.assertNotIn("leaked-token", payload["logs"][0])
+        self.assertIn("***", payload["logs"][0])
+
     def test_call_tool_on_execute_exception_returns_error_content_and_metrics(self):
         metrics = MagicMock()
         impl = MCPServerImpl(metrics=metrics)
