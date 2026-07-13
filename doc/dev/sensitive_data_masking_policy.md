@@ -40,9 +40,11 @@ TabsPresenter (hidden_keys)
 
 - A copy of the variables map is made; each hidden key's value is replaced with `***`.
 - Rendering happens on the masked copy, so the secret never appears in the rendered output.
-- Keys not present in the active variables are left unchanged (no-op, no error).
-- The `***` placeholder is a module-level constant (`HIDDEN_PLACEHOLDER`) in
-  `sensitive_data_masking_policy.py`.
+- **Heuristic pass (PYPOST-706):** After rendering, URL/body text and all headers are sanitized:
+  - Sensitive header names (`Authorization`, `Cookie`, `X-Api-Key`, …) → `***`
+  - `Bearer …` tokens, `?token=` / `&api_key=` query params
+  - JSON body fields matching credential-like key names
+- Shared implementation: `pypost.core.sensitive_text_sanitizer` (also used by MCP responses).
 
 ## Invariants
 

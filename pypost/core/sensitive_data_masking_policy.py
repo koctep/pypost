@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Set
 
 from pypost.core.http_client import ResolvedRequestFields
+from pypost.core.sensitive_text_sanitizer import HIDDEN_PLACEHOLDER, sanitize_headers, sanitize_text
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
-
-HIDDEN_PLACEHOLDER = "***"
 
 
 @dataclass(frozen=True)
@@ -18,7 +17,7 @@ class MaskedRequestData:
 
 
 class SensitiveDataMaskingPolicy:
-    """Builds history-safe request fields when hidden env values are involved."""
+    """Builds history-safe request fields with hidden-key and heuristic redaction."""
 
     def __init__(self, template_service: TemplateService) -> None:
         self._template_service = template_service
@@ -31,12 +30,14 @@ class SensitiveDataMaskingPolicy:
         resolved: ResolvedRequestFields | None = None,
     ) -> MaskedRequestData:
         hidden = hidden_keys or set()
+        env_vars = {k: str(v) for k, v in variables.items()}
+
         if hidden:
             masked_variables = dict(variables)
             for key in hidden:
                 if key in masked_variables:
                     masked_variables[key] = HIDDEN_PLACEHOLDER
-            return MaskedRequestData(
+            rendered = MaskedRequestData(
                 url=self._template_service.render_string(request.url, masked_variables),
                 headers={
                     self._template_service.render_string(
@@ -46,19 +47,28 @@ class SensitiveDataMaskingPolicy:
                 },
                 body=self._template_service.render_string(request.body, masked_variables),
             )
-        if resolved is not None:
-            return MaskedRequestData(
+        elif resolved is not None:
+            rendered = MaskedRequestData(
                 url=resolved.url,
                 headers=dict(resolved.headers),
                 body=resolved.body,
             )
+        else:
+            rendered = MaskedRequestData(
+                url=self._template_service.render_string(request.url, variables),
+                headers={
+                    self._template_service.render_string(k, variables): (
+                        self._template_service.render_string(v, variables)
+                    )
+                    for k, v in request.headers.items()
+                },
+                body=self._template_service.render_string(request.body, variables),
+            )
+
         return MaskedRequestData(
-            url=self._template_service.render_string(request.url, variables),
-            headers={
-                self._template_service.render_string(k, variables): (
-                    self._template_service.render_string(v, variables)
-                )
-                for k, v in request.headers.items()
-            },
-            body=self._template_service.render_string(request.body, variables),
+            url=sanitize_text(rendered.url, env_vars=env_vars, hidden_keys=hidden),
+            headers=sanitize_headers(
+                rendered.headers, env_vars=env_vars, hidden_keys=hidden
+            ),
+            body=sanitize_text(rendered.body, env_vars=env_vars, hidden_keys=hidden),
         )

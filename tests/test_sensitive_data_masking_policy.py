@@ -36,7 +36,7 @@ class TestSensitiveDataMaskingPolicyBuildHistorySafeFields(unittest.TestCase):
             variables={"token": "supersecret"},
             hidden_keys={"token"},
         )
-        self.assertEqual("Bearer ***", result.headers["Authorization"])
+        self.assertEqual("***", result.headers["Authorization"])
 
     def test_masks_hidden_variable_in_body(self):
         req = RequestData(
@@ -49,7 +49,8 @@ class TestSensitiveDataMaskingPolicyBuildHistorySafeFields(unittest.TestCase):
             variables={"token": "supersecret", "user": "alice"},
             hidden_keys={"token"},
         )
-        self.assertEqual('{"token":"***","user":"alice"}', result.body)
+        self.assertIn('"token": "***"', result.body)
+        self.assertIn('"user": "alice"', result.body)
 
     def test_non_hidden_variables_remain_unmasked(self):
         req = RequestData(method="GET", url="http://{{host}}/api?token={{token}}")
@@ -65,7 +66,9 @@ class TestSensitiveDataMaskingPolicyBuildHistorySafeFields(unittest.TestCase):
     def test_reuses_resolved_fields_when_no_hidden_keys(self):
         req = RequestData(method="GET", url="http://{{host}}/api")
         resolved = ResolvedRequestFields(
-            url="http://myserver.com/api", headers={"X": "1"}, body="body"
+            url="http://myserver.com/api?token=leaked",
+            headers={"Authorization": "Bearer secret-token"},
+            body="plain",
         )
         result = self.policy.build_history_safe_fields(
             request=req,
@@ -73,28 +76,48 @@ class TestSensitiveDataMaskingPolicyBuildHistorySafeFields(unittest.TestCase):
             hidden_keys=set(),
             resolved=resolved,
         )
-        self.assertEqual(resolved.url, result.url)
-        self.assertEqual(resolved.headers, result.headers)
-        self.assertEqual(resolved.body, result.body)
+        self.assertNotIn("leaked", result.url)
+        self.assertEqual("***", result.headers["Authorization"])
 
-    def test_empty_hidden_keys_renders_but_does_not_mask(self):
-        req = RequestData(method="GET", url="http://{{host}}?token={{token}}")
+    def test_heuristic_masks_authorization_without_hidden_keys(self):
+        req = RequestData(
+            method="GET",
+            url="http://x",
+            headers={"Authorization": "Bearer hardcoded-secret"},
+        )
+        result = self.policy.build_history_safe_fields(
+            request=req,
+            variables={},
+            hidden_keys=set(),
+        )
+        self.assertEqual("***", result.headers["Authorization"])
+
+    def test_heuristic_masks_query_token_without_hidden_keys(self):
+        req = RequestData(method="GET", url="http://example.com?token=supersecret")
+        result = self.policy.build_history_safe_fields(
+            request=req,
+            variables={},
+            hidden_keys=set(),
+        )
+        self.assertNotIn("supersecret", result.url)
+        self.assertIn("token=***", result.url)
+
+    def test_empty_hidden_keys_renders_non_sensitive_fields(self):
+        req = RequestData(method="GET", url="http://{{host}}/api")
         result = self.policy.build_history_safe_fields(
             request=req,
             variables={"host": "myserver.com", "token": "supersecret"},
             hidden_keys=set(),
         )
-        self.assertIn("supersecret", result.url)
         self.assertIn("myserver.com", result.url)
 
-    def test_none_hidden_keys_renders_but_does_not_mask(self):
-        req = RequestData(method="GET", url="http://{{host}}?token={{token}}")
+    def test_none_hidden_keys_renders_non_sensitive_fields(self):
+        req = RequestData(method="GET", url="http://{{host}}/api")
         result = self.policy.build_history_safe_fields(
             request=req,
             variables={"host": "myserver.com", "token": "supersecret"},
             hidden_keys=None,
         )
-        self.assertIn("supersecret", result.url)
         self.assertIn("myserver.com", result.url)
 
     def test_hidden_key_not_in_variables_is_silently_skipped(self):

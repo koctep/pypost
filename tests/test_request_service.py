@@ -238,8 +238,9 @@ class TestRequestServiceHistory(unittest.TestCase):
         )
         entry = self.history_manager.append.call_args[0][0]
         self.assertEqual("http://myserver.com/api?token=***", entry.url)
-        self.assertEqual("Bearer ***", entry.headers["Authorization"])
-        self.assertEqual('{"token":"***","host":"myserver.com"}', entry.body)
+        self.assertEqual("***", entry.headers["Authorization"])
+        self.assertIn('"token": "***"', entry.body)
+        self.assertIn('"host": "myserver.com"', entry.body)
 
     def test_history_masking_metric_recorded_when_hidden_keys_present(self):
         req = RequestData(method="GET", url="http://{{host}}?token={{token}}", post_script="")
