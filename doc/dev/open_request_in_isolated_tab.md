@@ -99,9 +99,10 @@ post_script, expose_as_mcp, retry_policy).
 
 Returns `True` when two requests match on all persisted editor fields.
 
-### `request_sync.is_tab_dirty(tab)`
+### `tab_dirty.is_tab_dirty(tab)`
 
-Returns `True` when the tab editor differs from `tab.persisted_baseline`.
+Located in `pypost/ui/presenters/tab_dirty.py`. Returns `True` when the tab editor differs
+from `tab.persisted_baseline`. Uses `request_sync.persisted_fields_equal` for comparison.
 
 ### `TabsPresenter.request_persisted`
 

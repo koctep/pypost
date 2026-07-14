@@ -21,10 +21,10 @@ from pypost.core.alert_manager import AlertManager
 from pypost.core.curl_generator import CurlGenerator
 from pypost.core.request_sync import (
     copy_request_for_isolated_tab,
-    is_tab_dirty,
     persisted_fields_equal,
     snapshot_persisted_fields,
 )
+from pypost.ui.presenters.tab_dirty import is_tab_dirty
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_manager import RequestManager

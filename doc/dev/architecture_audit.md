@@ -62,7 +62,7 @@ models/  →  (stdlib only)
 | --- | --- | --- |
 | L-001 | Layer map matches intent; Qt glue isolated in `core/qt/` | PASS |
 | L-002 | Presenter pattern holds for collections, tabs, and env/MCP wiring | PASS |
-| L-003 | `request_sync.is_tab_dirty` ties core semantics to UI `RequestTab` | MEDIUM |
+| L-003 | `request_sync.is_tab_dirty` ties core semantics to UI `RequestTab` | **Remediated** ([PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696)) |
 | L-004 | `StyleManager` is a UI concern living in `core/` | **Remediated** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
 | L-005 | `fixtures/` not imported by production code | PASS |
 | L-006 | `utils/` package is empty and unused | LOW |
@@ -95,7 +95,7 @@ models/  →  (stdlib only)
 | **P1** | R-P1-002 | Qt throughout `core/` | **Done** ([PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693)) |
 | **P2** | R-P2-001 | `HistoryManager` outside composition root | [PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694) |
 | **P2** | R-P2-002 | Partial composition root in `MainWindow` | [PYPOST-695](https://pypost.atlassian.net/browse/PYPOST-695) |
-| **P2** | R-P2-003 | `request_sync.is_tab_dirty` in core | [PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696) |
+| **P2** | R-P2-003 | `request_sync.is_tab_dirty` in core | **Done** ([PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696)) |
 | **P2** | R-P2-004 | Dual `TemplateService` for hover | [PYPOST-697](https://pypost.atlassian.net/browse/PYPOST-697) |
 | **P2** | R-P2-005 | Stale `architecture.md` tree | Resolved in PYPOST-684 Step 7 |
 | **P2** | R-P2-006 | Worker always builds `RequestService` | [PYPOST-698](https://pypost.atlassian.net/browse/PYPOST-698) |

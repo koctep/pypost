@@ -8,7 +8,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QTabBar
 
-from pypost.core.request_sync import is_tab_dirty, persisted_fields_equal, snapshot_persisted_fields
+from pypost.core.request_sync import persisted_fields_equal, snapshot_persisted_fields
+from pypost.ui.presenters.tab_dirty import is_tab_dirty
 from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab, PLUS_TAB_MARKER
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
