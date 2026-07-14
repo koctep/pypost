@@ -90,7 +90,14 @@ set up your development environment, and contribute to the project.
 ### Tech debt
 
 1. [Tech Debt Inventory](tech_debt_inventory.md)
-1. [Per-task tech debt notes](tech-debt/) — `doc/dev/tech-debt/PYPOST-*.md`
+1. [Post-request Scripts Tech Debt (PYPOST-10)](tech-debt/PYPOST-10.md)
+1. [Settings and Hotkeys Tech Debt (PYPOST-11)](tech-debt/PYPOST-11.md)
+1. [Template Service Tech Debt (PYPOST-21)](tech-debt/PYPOST-21.md)
+1. [Variable Validation Tech Debt (PYPOST-25)](tech-debt/PYPOST-25.md)
+1. [SOLID Audit Tech Debt (PYPOST-40)](tech-debt/PYPOST-40.md)
+1. [Qt Mouse Event API Tech Debt (PYPOST-431)](tech-debt/PYPOST-431.md)
+1. [Pytest and CI Hygiene Tech Debt (PYPOST-434)](tech-debt/PYPOST-434.md)
+1. [History-recording Helper Tech Debt (PYPOST-463)](tech-debt/PYPOST-463.md)
 
 ## Quick Start
 
