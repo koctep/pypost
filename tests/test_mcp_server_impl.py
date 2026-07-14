@@ -389,6 +389,15 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertIsNot(created[0].http_client, created[1].http_client)
         self.assertIsNot(created[0].http_client.session, created[1].http_client.session)
 
+    def test_execute_request_sync_forwards_hidden_keys(self):
+        impl = MCPServerImpl()
+        req = RequestData(name="Tool", expose_as_mcp=True, method="GET", url="http://u")
+        mock_svc = MagicMock()
+        mock_svc.execute.return_value = _exec_result()
+        impl._create_request_service = lambda: mock_svc
+        impl._execute_request_sync(req, {"host": "x"}, {"host": "secret.example.com"}, {"token"})
+        self.assertEqual(mock_svc.execute.call_args.kwargs.get("hidden_keys"), {"token"})
+
     def test_call_tool_returns_structured_json_with_script_logs_and_error(self):
         impl = MCPServerImpl()
         req = RequestData(name="T", expose_as_mcp=True, method="GET", url="http://u")
@@ -514,6 +523,7 @@ class TestMCPServerImplRouting(unittest.TestCase):
     def test_create_app_returns_starlette_application(self):
         app = MCPServerImpl().create_app()
         self.assertIsInstance(app, Starlette)
+        self.assertFalse(app.debug)
 
     def test_create_app_exposes_streamable_http_route(self):
         app = MCPServerImpl().create_app()

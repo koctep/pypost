@@ -238,7 +238,9 @@ class MCPServerImpl:
         hidden_keys: set[str],
     ):
         variables = self._build_execution_variables(args, env_vars, hidden_keys)
-        return self._create_request_service().execute(request_data, variables)
+        return self._create_request_service().execute(
+            request_data, variables, hidden_keys=hidden_keys
+        )
 
     def register_tools(self, requests: List[RequestData]):
         self.tools_map.clear()
@@ -260,7 +262,7 @@ class MCPServerImpl:
     def create_app(self) -> Starlette:
         mcp_route, lifespan = build_streamable_http_route(self.server)
         return Starlette(
-            debug=True,
+            debug=False,
             routes=[
                 mcp_route,
                 Mount(MCP_LEGACY_SSE_MOUNT_PATH, app=self._create_sse_app()),
@@ -270,4 +272,4 @@ class MCPServerImpl:
 
     def _create_sse_app(self) -> Starlette:
         """Legacy HTTP+SSE transport for backward-compatible clients."""
-        return build_legacy_sse_app(self.server, debug=True)
+        return build_legacy_sse_app(self.server, debug=False)
