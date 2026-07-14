@@ -157,3 +157,34 @@ jobs:
       - name: Run slow Makefile install smoke
         run: |
           python -m pytest tests/test_makefile.py -m slow -v --tb=short
+
+  security-audit:
+    name: "pip-audit (dependency CVE scan)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install application dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Audit dependencies for known CVEs
+        run: |
+          python -m pip install pip-audit
+          pip-audit -r requirements.txt
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## Dependency CVE scan" >> "$GITHUB_STEP_SUMMARY"
+          echo "Scanned \`requirements.txt\` with \`pip-audit\` (PYPOST-778)." \
+            >> "$GITHUB_STEP_SUMMARY"

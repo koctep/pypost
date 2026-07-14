@@ -20,18 +20,33 @@ Full report:
 | Unpinned direct deps | 1 (`pydantic>=2.0` lower bound only) |
 | Lock / constraints file | None |
 | `pyproject.toml` | None |
-| CI vulnerability scanner | None |
-| Dependabot config | None |
+| CI vulnerability scanner | `pip-audit` job in `.github/workflows/test.yml` (PYPOST-778) |
+| Dependabot config | `.github/dependabot.yml` (pip + GitHub Actions, weekly) |
 
-**Three areas need attention:**
+**Remaining areas:**
 
 1. **Production pins adopted** — Direct deps pinned to CI-tested versions; `mcp>=1.27,<2` blocks
    accidental v2 installs ([PYPOST-777](https://pypost.atlassian.net/browse/PYPOST-777)).
-2. **No CVE gate in CI** — `cryptography`, HTTP, and ASGI packages are not scanned before merge.
-3. **Automation gaps** — No Dependabot; dev tool versions duplicated unpinned in Makefile and CI.
+2. **CVE gate in CI** — `security-audit` job runs `pip-audit -r requirements.txt` on every push/PR
+   ([PYPOST-778](https://pypost.atlassian.net/browse/PYPOST-778)).
+3. **Automation gaps** — Dev tool versions still duplicated unpinned in Makefile and CI.
 
 **Positive:** Test tooling is excluded from `requirements.txt`. CI pip cache invalidates when
-`requirements.txt` changes (PYPOST-311).
+`requirements.txt` changes (PYPOST-311). Dependabot opens weekly dependency PRs.
+
+## CVE Scanning (PYPOST-778)
+
+| Context | Command |
+| --- | --- |
+| CI | Job `security-audit` in `.github/workflows/test.yml` |
+| Local | `make security-audit` (requires `make install` first) |
+
+The scan installs production dependencies, then runs `pip-audit -r requirements.txt`. The job
+fails when known vulnerabilities are reported.
+
+**Temporary exceptions:** If a CVE has no fixed release, add `pip-audit --ignore-vuln <CVE-ID>`
+to the CI step and document the rationale here. Remove the ignore when a patched version is
+available.
 
 ## Production Dependencies
 
@@ -84,10 +99,10 @@ No transitive license inventory is checked into the repo.
 | Priority | ID | Title |
 | --- | --- | --- |
 | **P1** | R-P1-001 | Pin direct dependencies; add `mcp>=1.27,<2` upper bound |
-| **P1** | R-P1-002 | Add `pip-audit` (or OSV) CI job on requirements/lock |
+| **P1** | R-P1-002 | Add `pip-audit` (or OSV) CI job on requirements/lock — **Done (PYPOST-778)** |
 | P2 | R-P2-001 | Commit a lock file (`pip-compile` or `uv lock`) |
 | P2 | R-P2-002 | Consolidate dev deps in `requirements-dev.txt` with pins |
-| P2 | R-P2-003 | Add Dependabot for pip and GitHub Actions |
+| P2 | R-P2-003 | Add Dependabot for pip and GitHub Actions — **Done** |
 | P2 | R-P2-004 | Align `pydantic` constraint with MCP SDK (`>=2.11,<3`) |
 | P2 | R-P2-005 | Reconcile redundant `starlette`/`uvicorn` direct declarations |
 | P2 | R-P2-006 | Pin GitHub Actions to full commit SHAs |

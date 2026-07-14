@@ -148,6 +148,10 @@ class TestDependencyChain:
         prereqs = _prerequisites(make_workspace, "venv-test")
         assert MARKER_REL in prereqs
 
+    def test_security_audit_depends_on_install(self, make_workspace: Path) -> None:
+        prereqs = _prerequisites(make_workspace, "security-audit")
+        assert "install" in prereqs
+
     @pytest.mark.parametrize("target", ["run", "test", "lint"])
     def test_runtime_targets_depend_on_marker_only(
         self,

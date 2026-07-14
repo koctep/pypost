@@ -1,4 +1,4 @@
-.PHONY: venv venv-test install run clean test test-slow test-cov lint check
+.PHONY: venv venv-test install run clean test test-slow test-cov lint check security-audit
 
 PYTHON := python3
 PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])')
@@ -49,6 +49,11 @@ lint: $(VENV_MARKER)
 	$(BIN)/python -m flake8 --jobs=1 pypost/
 
 check: lint test ## Convenience quality gate: static analysis + full test suite
+
+# Scan production dependencies for known CVEs (PYPOST-778; mirrors CI security-audit job)
+security-audit: install
+	$(BIN)/python -m pip install pip-audit
+	$(BIN)/pip-audit -r requirements.txt
 
 # Clean
 clean:
