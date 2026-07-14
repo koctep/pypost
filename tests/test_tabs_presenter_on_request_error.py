@@ -30,7 +30,7 @@ def presenter_with_tab(qapp):
 def test_str_cancellation_message_no_dialog(presenter_with_tab) -> None:
     presenter, tab = presenter_with_tab
     with patch(
-        "pypost.ui.presenters.tabs_presenter.show_request_failed_error"
+        "pypost.ui.presenters.tabs_presenter_worker.show_request_failed_error"
     ) as mock_show:
         presenter._on_request_error(tab, "request cancelled")
         mock_show.assert_not_called()
@@ -40,7 +40,7 @@ def test_str_cancellation_message_no_dialog(presenter_with_tab) -> None:
 def test_str_error_shows_dialog(presenter_with_tab) -> None:
     presenter, tab = presenter_with_tab
     with patch(
-        "pypost.ui.presenters.tabs_presenter.show_request_failed_error"
+        "pypost.ui.presenters.tabs_presenter_worker.show_request_failed_error"
     ) as mock_show:
         presenter._on_request_error(tab, "connection refused")
         mock_show.assert_called_once()
@@ -56,7 +56,7 @@ def test_execution_error_network_shows_category_message(presenter_with_tab) -> N
         message="no conn",
         detail="connection refused",
     )
-    with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
+    with patch("pypost.ui.presenters.tabs_presenter_worker.show_request_error") as mock_show:
         presenter._on_request_error(tab, exc)
         mock_show.assert_called_once()
         assert "server is running" in mock_show.call_args[0][1]
@@ -72,7 +72,7 @@ def test_execution_error_body_shows_category_message(presenter_with_tab) -> None
         message="Could not convert YAML body to JSON.",
         detail="mapping values are not allowed here",
     )
-    with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
+    with patch("pypost.ui.presenters.tabs_presenter_worker.show_request_error") as mock_show:
         presenter._on_request_error(tab, exc)
         mock_show.assert_called_once()
         args = mock_show.call_args[0]
@@ -90,7 +90,7 @@ def test_execution_error_timeout_shows_timeout_message(presenter_with_tab) -> No
         message="timed out",
         detail="ReadTimeout",
     )
-    with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
+    with patch("pypost.ui.presenters.tabs_presenter_worker.show_request_error") as mock_show:
         presenter._on_request_error(tab, exc)
         assert "timed out" in mock_show.call_args[0][1]
 
@@ -107,7 +107,7 @@ def test_execution_error_detail_substring_not_treated_as_cancelled(
         message="connection failed",
         detail="operation cancelled by upstream proxy",
     )
-    with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
+    with patch("pypost.ui.presenters.tabs_presenter_worker.show_request_error") as mock_show:
         presenter._on_request_error(tab, exc)
         mock_show.assert_called_once()
 
@@ -122,7 +122,7 @@ def test_execution_error_cancelled_no_dialog(presenter_with_tab) -> None:
         message="Request cancelled",
         detail="Cancelled during retry delay",
     )
-    with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
+    with patch("pypost.ui.presenters.tabs_presenter_worker.show_request_error") as mock_show:
         presenter._on_request_error(tab, exc)
         mock_show.assert_not_called()
 
@@ -140,6 +140,6 @@ def test_execution_error_message_does_not_expose_raw_detail_for_network(
         message="no conn",
         detail=raw_detail,
     )
-    with patch("pypost.ui.presenters.tabs_presenter.show_request_error") as mock_show:
+    with patch("pypost.ui.presenters.tabs_presenter_worker.show_request_error") as mock_show:
         presenter._on_request_error(tab, exc)
         assert raw_detail not in mock_show.call_args[0][1]

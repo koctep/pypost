@@ -154,7 +154,7 @@ class TestWorkerRaceCondition(unittest.TestCase):
         tab.worker = stale_worker
 
         with self.assertLogs(
-            "pypost.ui.presenters.tabs_presenter", level=logging.DEBUG
+            "pypost.ui.presenters.tabs_presenter_worker", level=logging.DEBUG
         ) as caplog:
             with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
                 MockWorker.return_value = MagicMock()

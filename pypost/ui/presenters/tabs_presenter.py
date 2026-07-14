@@ -1,5 +1,4 @@
 import logging
-from functools import partial
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -13,8 +12,6 @@ from PySide6.QtWidgets import (
 from pypost.ui.collection_item_dialogs import (
     prompt_clean_sibling_tab_reload,
     prompt_dirty_sibling_tab_reload,
-    show_request_error,
-    show_request_failed_error,
 )
 
 from pypost.core.alert_manager import AlertManager
@@ -25,13 +22,13 @@ from pypost.core.request_sync import (
     snapshot_persisted_fields,
 )
 from pypost.ui.presenters.tab_dirty import is_tab_dirty
+from pypost.ui.presenters.tabs_presenter_worker import TabsPresenterWorkerHandlers
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.core.template_service import TemplateService
 from pypost.core.qt.worker import RequestWorker
-from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 from pypost.ui.request_save_orchestrator import (
@@ -47,24 +44,6 @@ from pypost.ui.widgets.tab_header import PLUS_TAB_MARKER, RequestTabHeader
 logger = logging.getLogger(__name__)
 
 __all__ = ["PLUS_TAB_MARKER", "RequestTab", "TabsPresenter"]
-
-_ERROR_MESSAGES = {
-    ErrorCategory.NETWORK: (
-        "Could not connect to {url}. Check that the server is running and reachable."
-    ),
-    ErrorCategory.TIMEOUT: (
-        "Request to {url} timed out. Try increasing the timeout or check server load."
-    ),
-    ErrorCategory.TEMPLATE: (
-        "Template rendering failed: {detail}. Check variable names and syntax."
-    ),
-    ErrorCategory.BODY: (
-        "Could not convert YAML body to JSON: {detail}. Check YAML syntax and structure."
-    ),
-    ErrorCategory.SCRIPT: ("Post-script execution failed: {detail}. Review the script for errors."),
-    ErrorCategory.HISTORY: ("History could not be recorded: {detail}."),
-    ErrorCategory.UNKNOWN: ("An unexpected error occurred: {detail}."),
-}
 
 
 class RequestTab(QWidget):
@@ -92,7 +71,7 @@ class RequestTab(QWidget):
         self.worker: RequestWorker | None = None
 
 
-class TabsPresenter(QObject):
+class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     """Owns the QTabWidget: opening, closing, restoring tabs and worker lifecycle."""
 
     variable_set_requested = Signal(object, str)  # (key: str | None, value: str)
@@ -491,115 +470,6 @@ class TabsPresenter(QObject):
         )
         self._metrics.track_history_load_into_editor()
         self.add_new_tab(request_data)
-
-    def _on_request_finished(self, tab: RequestTab, response) -> None:
-        self._clear_tab_worker(tab)
-        method = tab.request_data.method if tab.request_data else "UNKNOWN"
-        logger.info(
-            "request_finished method=%s status_code=%s elapsed_time=%.3fs size=%s",
-            method,
-            response.status_code,
-            response.elapsed_time,
-            response.size,
-        )
-        self._metrics.track_response_received(method, str(response.status_code))
-        tab.response_view.display_response(response)
-        self._reset_tab_ui_state(tab)
-        tab.response_view.status_label.setText(f"Status: {response.status_code}")
-        tab.response_view.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
-        tab.response_view.size_label.setText(f"Size: {response.size} bytes")
-        self.request_executed.emit()
-
-    def _on_request_error(self, tab: RequestTab, error) -> None:
-        self._clear_tab_worker(tab)
-        self._reset_tab_ui_state(tab)
-
-        # Cancellation path (still a plain string)
-        if isinstance(error, str):
-            if "cancelled" in error.lower() or "aborted" in error.lower():
-                logger.info("request_cancelled error_msg=%s", error)
-                return
-            logger.error("request_error error_msg=%s", error)
-            show_request_failed_error(self._tabs, error)
-            return
-
-        # Structured ExecutionError path
-        if isinstance(error, ExecutionError):
-            if error.category == ErrorCategory.CANCELLED:
-                logger.info("request_cancelled category=%s", error.category)
-                return
-
-            url = tab.request_data.url if tab.request_data else ""
-            template = _ERROR_MESSAGES.get(error.category, _ERROR_MESSAGES[ErrorCategory.UNKNOWN])
-            user_msg = template.format(url=url, detail=error.detail or error.message)
-
-            logger.error(
-                "request_error category=%s message=%s detail=%s",
-                error.category,
-                error.message,
-                error.detail,
-            )
-            show_request_error(self._tabs, user_msg)
-
-    def _on_script_output(self, tab: RequestTab, logs, err) -> None:
-        if logs:
-            for line in str(logs).splitlines():
-                logger.debug("script_output tab_id=%s line=%s", id(tab), line)
-        if err:
-            logger.warning("script_error tab_id=%s error=%s", id(tab), err)
-
-    def _on_headers_received(self, tab: RequestTab, status: int, headers: dict) -> None:
-        tab.response_view.status_label.setText(f"Status: {status}")
-
-    def _on_chunk_received(self, tab: RequestTab, chunk: str) -> None:
-        tab_key = id(tab)
-        self._chunk_buffers.setdefault(tab_key, []).append(chunk)
-        timer = self._chunk_flush_timers.get(tab_key)
-        if timer is None:
-            timer = QTimer(self)
-            timer.setSingleShot(True)
-            timer.setInterval(self._chunk_flush_ms)
-            timer.timeout.connect(partial(self._flush_chunk_buffer, tab))
-            self._chunk_flush_timers[tab_key] = timer
-        timer.start()
-
-    def _flush_chunk_buffer(self, tab: RequestTab) -> None:
-        tab_key = id(tab)
-        chunks = self._chunk_buffers.pop(tab_key, [])
-        if not chunks:
-            return
-        tab.response_view.append_body("".join(chunks))
-        current_text = tab.response_view.body_view.toPlainText()
-        size_bytes = len(current_text.encode("utf-8"))
-        tab.response_view.size_label.setText(f"Size: {size_bytes} bytes")
-
-    def _on_retry_attempt(self, tab: RequestTab, attempt: int, max_retries: int) -> None:
-        tab.request_editor.send_btn.setText(f"Retrying\u2026 ({attempt} of {max_retries})")
-
-    def _clear_tab_worker(
-        self,
-        tab: RequestTab,
-        *,
-        reason: str = "completed",
-        request_data: RequestData | None = None,
-    ) -> None:
-        """Release tab.worker when a request ends or a stale reference is detected.
-
-        Worker finished/error signals are queued on the Qt event loop, so
-        tab.worker may still reference a dead thread until this runs. The stale
-        guard in _handle_send_request covers the window before the handler fires.
-        """
-        if tab.worker is None:
-            return
-        if reason == "stale":
-            method = request_data.method if request_data else "UNKNOWN"
-            url = request_data.url if request_data else ""
-            logger.debug("stale_worker_cleared method=%s url=%s", method, url)
-        tab.worker = None
-
-    def _reset_tab_ui_state(self, tab: RequestTab) -> None:
-        tab.request_editor.send_btn.setEnabled(True)
-        tab.request_editor.send_btn.setText("Send")
 
     def _request_tab_count(self) -> int:
         return sum(
