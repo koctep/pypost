@@ -31,6 +31,7 @@ set up your development environment, and contribute to the project.
 1. [Performance and Scalability Audit (PYPOST-689)](performance_audit.md)
 1. [Documentation and ADR Alignment Audit (PYPOST-690)](documentation_audit.md)
 1. [Dependencies and Supply Chain Audit (PYPOST-691)](dependencies_audit.md)
+1. [Licensing and Distribution — PySide6 LGPL (PYPOST-786)](licensing.md)
 
 ### Collections and environments
 

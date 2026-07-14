@@ -90,10 +90,12 @@ See [mcp_integration.md](mcp_integration.md) for runtime architecture.
 ## License Notes
 
 - **PyPost:** MIT (`LICENSE`)
-- **PySide6:** LGPL-3.0 — relevant for binary distribution; see R-P3-002 in tech debt
+- **PySide6:** LGPL-3.0 — relevant for binary distribution; see
+  [licensing.md](licensing.md) (PYPOST-786)
 - **Most Python deps:** MIT / Apache / BSD (permissive)
 
-No transitive license inventory is checked into the repo.
+No transitive license inventory is checked into the repo. Distributor guidance for PySide6:
+[licensing.md](licensing.md).
 
 ## Prioritized Recommendations
 
@@ -108,7 +110,7 @@ No transitive license inventory is checked into the repo.
 | P2 | R-P2-005 | Reconcile redundant `starlette`/`uvicorn` direct declarations |
 | P2 | R-P2-006 | Pin GitHub Actions to full commit SHAs |
 | P3 | R-P3-001 | Introduce `pyproject.toml` for metadata and optional extras — **Done (PYPOST-785)** |
-| P3 | R-P3-002 | Document PySide6 LGPL distribution obligations |
+| P3 | R-P3-002 | Document PySide6 LGPL distribution obligations — **Done (PYPOST-786)** |
 | P3 | R-P3-003 | Split OpenTelemetry deps into optional extra |
 | P3 | R-P3-004 | Refresh `setup.md` dependency list |
 
