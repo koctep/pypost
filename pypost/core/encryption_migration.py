@@ -272,55 +272,65 @@ class EncryptionMigrationService:
             target_envelope_version=2,
         )
 
-    def _rewrite_environments(
+    def _rewrite_operation_name(
         self,
-        settings: AppSettings | None,
         *,
-        dry_run: bool,
-        backup: bool,
         require_plaintext: bool,
-        target_envelope_version: int | None = None,
-    ) -> MigrationReport:
+        target_envelope_version: int | None,
+    ) -> str:
         if target_envelope_version == 2:
-            operation = "upgrade_v2"
-        elif require_plaintext:
-            operation = "encrypt_plaintext"
-        else:
-            operation = "re_encrypt"
-        logger.info(
-            "encryption_migration_operation_started operation=%s dry_run=%s backup=%s",
-            operation,
-            dry_run,
-            backup,
-        )
-        if not resolve_encryption_enabled(settings):
-            inventory = self.build_inventory(settings)
-            logger.warning(
-                "encryption_migration_operation_skipped operation=%s reason=encryption_disabled",
-                operation,
-            )
-            return MigrationReport(
-                inventory=inventory,
-                dry_run=dry_run,
-                backup_path=None,
-                errors=("Encryption is not enabled.",),
-                success=False,
-            )
+            return "upgrade_v2"
+        if require_plaintext:
+            return "encrypt_plaintext"
+        return "re_encrypt"
 
-        self._storage.apply_encryption_settings(settings)
-        raw = self._read_raw_environments()
-        inventory = self._inventory_from_raw(raw, settings)
+    def _rewrite_noop_stats(self, inventory: EnvironmentInventory) -> ReencryptStats:
+        return ReencryptStats(
+            encrypted_count=0,
+            reused_count=inventory.hidden_value_count,
+        )
+
+    def _rewrite_skip_report(
+        self,
+        *,
+        inventory: EnvironmentInventory,
+        dry_run: bool,
+        operation: str,
+        reason: str,
+        reencrypt_stats: ReencryptStats | None = None,
+        log_extra: str = "",
+    ) -> MigrationReport:
+        logger.info(
+            "encryption_migration_operation_skipped operation=%s reason=%s%s",
+            operation,
+            reason,
+            log_extra,
+        )
+        return MigrationReport(
+            inventory=inventory,
+            dry_run=dry_run,
+            backup_path=None,
+            errors=(),
+            success=True,
+            reencrypt_stats=reencrypt_stats,
+        )
+
+    def _rewrite_early_skip(
+        self,
+        *,
+        settings: AppSettings | None,
+        inventory: EnvironmentInventory,
+        dry_run: bool,
+        operation: str,
+        require_plaintext: bool,
+        target_envelope_version: int | None,
+    ) -> MigrationReport | None:
         if require_plaintext and inventory.plaintext_hidden_count == 0:
-            logger.info(
-                "encryption_migration_operation_skipped operation=%s reason=no_plaintext_hidden",
-                operation,
-            )
-            return MigrationReport(
+            return self._rewrite_skip_report(
                 inventory=inventory,
                 dry_run=dry_run,
-                backup_path=None,
-                errors=(),
-                success=True,
+                operation=operation,
+                reason="no_plaintext_hidden",
             )
 
         if (
@@ -328,146 +338,151 @@ class EncryptionMigrationService:
             and target_envelope_version != 2
             and inventory.encrypted_envelope_count == 0
         ):
-            logger.info(
-                "encryption_migration_operation_skipped operation=%s "
-                "reason=no_ciphertext_to_rotate",
-                operation,
-            )
-            return MigrationReport(
+            return self._rewrite_skip_report(
                 inventory=inventory,
                 dry_run=dry_run,
-                backup_path=None,
-                errors=(),
-                success=True,
-                reencrypt_stats=ReencryptStats(
-                    encrypted_count=0,
-                    reused_count=inventory.hidden_value_count,
-                ),
+                operation=operation,
+                reason="no_ciphertext_to_rotate",
+                reencrypt_stats=self._rewrite_noop_stats(inventory),
             )
 
         if target_envelope_version == 2 and self._inventory_all_v2(inventory):
-            logger.info(
-                "encryption_migration_operation_skipped operation=%s reason=already_v2",
-                operation,
-            )
-            return MigrationReport(
+            return self._rewrite_skip_report(
                 inventory=inventory,
                 dry_run=dry_run,
-                backup_path=None,
-                errors=(),
-                success=True,
-                reencrypt_stats=ReencryptStats(
-                    encrypted_count=0,
-                    reused_count=inventory.hidden_value_count,
-                ),
+                operation=operation,
+                reason="already_v2",
+                reencrypt_stats=self._rewrite_noop_stats(inventory),
             )
 
         if not require_plaintext and target_envelope_version != 2:
             active_kid = build_key_provider(settings).get_current_key().key_id
             if self._inventory_matches_active_kid(inventory, active_kid):
-                logger.info(
-                    "encryption_migration_operation_skipped operation=%s "
-                    "reason=already_on_active_kid active_kid=%s",
-                    operation,
-                    active_kid,
-                )
-                return MigrationReport(
+                return self._rewrite_skip_report(
                     inventory=inventory,
                     dry_run=dry_run,
-                    backup_path=None,
-                    errors=(),
-                    success=True,
-                    reencrypt_stats=ReencryptStats(
-                        encrypted_count=0,
-                        reused_count=inventory.hidden_value_count,
-                    ),
+                    operation=operation,
+                    reason="already_on_active_kid",
+                    reencrypt_stats=self._rewrite_noop_stats(inventory),
+                    log_extra=f" active_kid={active_kid}",
                 )
+        return None
 
+    def _rewrite_inventory_failure(
+        self,
+        *,
+        inventory: EnvironmentInventory,
+        dry_run: bool,
+        operation: str,
+    ) -> MigrationReport | None:
         quality_errors = inventory.data_quality_errors
-        if quality_errors or inventory.missing_kids:
-            if quality_errors:
-                logger.error(
-                    "encryption_migration_data_quality_errors count=%d",
-                    len(quality_errors),
-                )
-            if inventory.missing_kids:
-                logger.error(
-                    "encryption_migration_missing_kids count=%d",
-                    len(inventory.missing_kids),
-                )
-            errors = quality_errors + tuple(
-                f"Missing key material for kid: {kid}" for kid in sorted(inventory.missing_kids)
-            )
-            logger.warning(
-                "encryption_migration_operation_completed operation=%s success=false "
-                "error_count=%d",
-                operation,
-                len(errors),
-            )
-            return MigrationReport(
-                inventory=inventory,
-                dry_run=dry_run,
-                backup_path=None,
-                errors=errors,
-                success=False,
-            )
-
-        environments, decrypt_errors = self._deserialize_records(raw)
-        if decrypt_errors:
+        if not quality_errors and not inventory.missing_kids:
+            return None
+        if quality_errors:
             logger.error(
-                "encryption_migration_decrypt_failed error_count=%d",
-                len(decrypt_errors),
+                "encryption_migration_data_quality_errors count=%d",
+                len(quality_errors),
             )
-            for detail in decrypt_errors:
-                logger.error("encryption_migration_decrypt_failed detail=%s", detail)
-            logger.warning(
-                "encryption_migration_operation_completed operation=%s success=false "
-                "error_count=%d",
-                operation,
-                len(decrypt_errors),
+        if inventory.missing_kids:
+            logger.error(
+                "encryption_migration_missing_kids count=%d",
+                len(inventory.missing_kids),
             )
-            return MigrationReport(
-                inventory=inventory,
-                dry_run=dry_run,
-                backup_path=None,
-                errors=decrypt_errors,
-                success=False,
-            )
+        errors = quality_errors + tuple(
+            f"Missing key material for kid: {kid}" for kid in sorted(inventory.missing_kids)
+        )
+        logger.warning(
+            "encryption_migration_operation_completed operation=%s success=false "
+            "error_count=%d",
+            operation,
+            len(errors),
+        )
+        return MigrationReport(
+            inventory=inventory,
+            dry_run=dry_run,
+            backup_path=None,
+            errors=errors,
+            success=False,
+        )
 
+    def _rewrite_decrypt_failure(
+        self,
+        *,
+        inventory: EnvironmentInventory,
+        decrypt_errors: tuple[str, ...],
+        dry_run: bool,
+        operation: str,
+    ) -> MigrationReport:
+        logger.error(
+            "encryption_migration_decrypt_failed error_count=%d",
+            len(decrypt_errors),
+        )
+        for detail in decrypt_errors:
+            logger.error("encryption_migration_decrypt_failed detail=%s", detail)
+        logger.warning(
+            "encryption_migration_operation_completed operation=%s success=false "
+            "error_count=%d",
+            operation,
+            len(decrypt_errors),
+        )
+        return MigrationReport(
+            inventory=inventory,
+            dry_run=dry_run,
+            backup_path=None,
+            errors=decrypt_errors,
+            success=False,
+        )
+
+    def _rewrite_dry_run(
+        self,
+        *,
+        settings: AppSettings | None,
+        inventory: EnvironmentInventory,
+        environments: list[Environment],
+        operation: str,
+        target_envelope_version: int | None,
+    ) -> MigrationReport:
+        active_kid = build_key_provider(settings).get_current_key().key_id
+        if target_envelope_version == 2:
+            projected = self._projected_inventory_after_v2_upgrade(inventory, active_kid)
+        else:
+            projected = self._projected_inventory_after_encrypt(inventory, active_kid)
+        projected_stats = self._storage.project_save_stats(
+            environments,
+            target_envelope_version=target_envelope_version,
+        )
+        logger.info(
+            "encryption_migration_dry_run_completed operation=%s "
+            "projected_encrypted_count=%d projected_reused_count=%d active_kid=%s",
+            operation,
+            projected_stats.encrypted_count,
+            projected_stats.reused_count,
+            active_kid,
+        )
+        return MigrationReport(
+            inventory=projected,
+            dry_run=True,
+            backup_path=None,
+            errors=(),
+            success=True,
+            reencrypt_stats=ReencryptStats(
+                encrypted_count=projected_stats.encrypted_count,
+                reused_count=projected_stats.reused_count,
+            ),
+        )
+
+    def _rewrite_save(
+        self,
+        *,
+        settings: AppSettings | None,
+        environments: list[Environment],
+        operation: str,
+        backup: bool,
+        target_envelope_version: int | None,
+    ) -> MigrationReport:
         backup_path = None
-        if backup and not dry_run:
+        if backup:
             backup_path = backup_environments_file(self._storage.environments_file)
-
-        if dry_run:
-            active_kid = build_key_provider(settings).get_current_key().key_id
-            if target_envelope_version == 2:
-                projected = self._projected_inventory_after_v2_upgrade(inventory, active_kid)
-            else:
-                projected = self._projected_inventory_after_encrypt(inventory, active_kid)
-            projected_stats = self._storage.project_save_stats(
-                environments,
-                target_envelope_version=target_envelope_version,
-            )
-            logger.info(
-                "encryption_migration_dry_run_completed operation=%s "
-                "projected_encrypted_count=%d projected_reused_count=%d active_kid=%s",
-                operation,
-                projected_stats.encrypted_count,
-                projected_stats.reused_count,
-                active_kid,
-            )
-            return MigrationReport(
-                inventory=projected,
-                dry_run=True,
-                backup_path=None,
-                errors=(),
-                success=True,
-                reencrypt_stats=ReencryptStats(
-                    encrypted_count=projected_stats.encrypted_count,
-                    reused_count=projected_stats.reused_count,
-                ),
-            )
-
         save_stats = self._storage.save_environments(
             environments,
             target_envelope_version=target_envelope_version,
@@ -496,6 +511,88 @@ class EncryptionMigrationService:
                 encrypted_count=save_stats.encrypted_count,
                 reused_count=save_stats.reused_count,
             ),
+        )
+
+    def _rewrite_environments(
+        self,
+        settings: AppSettings | None,
+        *,
+        dry_run: bool,
+        backup: bool,
+        require_plaintext: bool,
+        target_envelope_version: int | None = None,
+    ) -> MigrationReport:
+        operation = self._rewrite_operation_name(
+            require_plaintext=require_plaintext,
+            target_envelope_version=target_envelope_version,
+        )
+        logger.info(
+            "encryption_migration_operation_started operation=%s dry_run=%s backup=%s",
+            operation,
+            dry_run,
+            backup,
+        )
+        if not resolve_encryption_enabled(settings):
+            inventory = self.build_inventory(settings)
+            logger.warning(
+                "encryption_migration_operation_skipped operation=%s reason=encryption_disabled",
+                operation,
+            )
+            return MigrationReport(
+                inventory=inventory,
+                dry_run=dry_run,
+                backup_path=None,
+                errors=("Encryption is not enabled.",),
+                success=False,
+            )
+
+        self._storage.apply_encryption_settings(settings)
+        raw = self._read_raw_environments()
+        inventory = self._inventory_from_raw(raw, settings)
+
+        early = self._rewrite_early_skip(
+            settings=settings,
+            inventory=inventory,
+            dry_run=dry_run,
+            operation=operation,
+            require_plaintext=require_plaintext,
+            target_envelope_version=target_envelope_version,
+        )
+        if early is not None:
+            return early
+
+        inventory_failure = self._rewrite_inventory_failure(
+            inventory=inventory,
+            dry_run=dry_run,
+            operation=operation,
+        )
+        if inventory_failure is not None:
+            return inventory_failure
+
+        environments, decrypt_errors = self._deserialize_records(raw)
+        if decrypt_errors:
+            return self._rewrite_decrypt_failure(
+                inventory=inventory,
+                decrypt_errors=decrypt_errors,
+                dry_run=dry_run,
+                operation=operation,
+            )
+
+        if dry_run:
+            return self._rewrite_dry_run(
+                settings=settings,
+                inventory=inventory,
+                environments=environments,
+                operation=operation,
+                target_envelope_version=target_envelope_version,
+            )
+
+        return self._rewrite_save(
+            settings=settings,
+            environments=environments,
+            operation=operation,
+            backup=backup,
+            target_envelope_version=target_envelope_version,
         )
 
     def _read_raw_environments(self) -> list[dict[str, Any]]:
