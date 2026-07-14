@@ -5,7 +5,7 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QTreeView
 
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
-from pypost.core.request_sync import copy_request_for_isolated_tab
+from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.models import Collection, RequestData

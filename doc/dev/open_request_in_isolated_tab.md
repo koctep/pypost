@@ -20,7 +20,7 @@ latest on-disk version without silent data loss.
   `add_new_tab` deep-copies any non-`None` `request_data` before creating `RequestTab`.
 - **`RequestTab`**: holds per-tab `persisted_baseline` (last adopted on-disk snapshot) and
   `stale_persisted` (session flag when the user dismissed a stale notice or kept a draft).
-- **`pypost/core/request_sync.py`**: pure helpers to snapshot, compare, and detect dirty state
+- **`pypost/core/request_persisted_fields.py`**: pure helpers to snapshot, compare, and detect dirty state
   across persisted editor fields.
 
 ### Persisted baseline
@@ -89,20 +89,20 @@ Copy semantics are centralized in `copy_request_for_isolated_tab` (see
 
 ## API / Usage
 
-### `request_sync.snapshot_persisted_fields(data)`
+### `request_persisted_fields.snapshot_persisted_fields(data)`
 
 Returns a deep copy of `RequestData` used as a persisted-field snapshot. Comparison uses
 `_PERSISTED_FIELD_NAMES` (name, url, method, headers, params, body, body_type, yaml_as_json,
 post_script, expose_as_mcp, retry_policy).
 
-### `request_sync.persisted_fields_equal(a, b)`
+### `request_persisted_fields.persisted_fields_equal(a, b)`
 
 Returns `True` when two requests match on all persisted editor fields.
 
 ### `tab_dirty.is_tab_dirty(tab)`
 
 Located in `pypost/ui/presenters/tab_dirty.py`. Returns `True` when the tab editor differs
-from `tab.persisted_baseline`. Uses `request_sync.persisted_fields_equal` for comparison.
+from `tab.persisted_baseline`. Uses `request_persisted_fields.persisted_fields_equal` for comparison.
 
 ### `TabsPresenter.request_persisted`
 

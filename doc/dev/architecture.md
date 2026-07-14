@@ -15,7 +15,7 @@ pypost/
 ├── core/                   # Business logic (68 modules)
 │   ├── request_manager.py  # Request & collection lifecycle
 │   ├── request_service.py  # Unified request execution
-│   ├── request_sync.py     # RequestData copy/compare and dirty-check helpers
+│   ├── request_persisted_fields.py  # RequestData copy/compare for persisted fields
 │   ├── http_client.py      # HTTP handling (wraps `requests`)
 │   ├── http_client_protocol.py
 │   ├── execute_request_protocol.py

@@ -537,7 +537,7 @@ build_tool_input_schema(specs)  → Tool.inputSchema
 
 `RequestWidget` **MCP** tab: tool description (`QPlainTextEdit`) and `McpParamsTable`
 (name, type, description, required). Persisted via `_PERSISTED_FIELD_NAMES` in
-`request_sync.py`.
+`request_persisted_fields.py`.
 
 #### Agent contract preview (PYPOST-555)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pypost.core.request_sync import persisted_fields_equal
+from pypost.core.request_persisted_fields import persisted_fields_equal
 
 if TYPE_CHECKING:
     from pypost.ui.presenters.tabs_presenter import RequestTab

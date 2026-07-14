@@ -158,7 +158,7 @@ N/A for this audit. LOC/complexity proxies only; no runtime profiling.
 - **Finding refs:** Naming section, PYPOST-684 L-003
 - **Description:** `request_sync.py` implements tab dirty helpers, not HTTP sync.
 - **Remediation:** Rename to `tab_dirty_state.py` or move to `ui/presenters/`.
-- **Jira:** [PYPOST-740](https://pypost.atlassian.net/browse/PYPOST-740)
+- **Jira:** [PYPOST-740](https://pypost.atlassian.net/browse/PYPOST-740) — **Remediated** (renamed to `request_persisted_fields.py`)
 
 ## Blocker Review
 

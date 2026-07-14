@@ -16,7 +16,7 @@ from pypost.ui.collection_item_dialogs import (
 
 from pypost.core.alert_manager import AlertManager
 from pypost.core.curl_generator import CurlGenerator
-from pypost.core.request_sync import (
+from pypost.core.request_persisted_fields import (
     copy_request_for_isolated_tab,
     persisted_fields_equal,
     snapshot_persisted_fields,

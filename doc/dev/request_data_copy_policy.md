@@ -10,7 +10,7 @@ so future changes stay consistent and `RequestData` remains lean.
 
 - **`RequestData`** (`pypost/models/models.py`): editor and persistence fields only. Must not
   hold HTTP response bodies, history entries, or other large runtime buffers.
-- **`copy_request_for_isolated_tab`** (`pypost/core/request_sync.py`): canonical deep-copy
+- **`copy_request_for_isolated_tab`** (`pypost/core/request_persisted_fields.py`): canonical deep-copy
   helper for tab ownership.
 - **`snapshot_persisted_fields`**: baseline snapshots for dirty/stale detection; uses the same
   copy helper.
@@ -44,7 +44,7 @@ Returns a deep copy safe for isolated tab ownership. Prefer this over inline
 ### `snapshot_persisted_fields(data: RequestData) -> RequestData`
 
 Returns a deep copy for `persisted_baseline` and sibling-notification snapshots. Comparison
-uses `_PERSISTED_FIELD_NAMES` in `request_sync.py`.
+uses `_PERSISTED_FIELD_NAMES` in `request_persisted_fields.py`.
 
 ## Configuration
 
@@ -55,7 +55,7 @@ No settings or environment variables control copy behavior.
 | Symptom | Likely cause | What to check |
 | --- | --- | --- |
 | Edits leak across tabs | Caller bypassed copy helper or mutated tree `UserRole` data | Trace open path through `copy_request_for_isolated_tab` |
-| Memory spikes on tab open | `RequestData` gained heavy fields | Run `tests/test_request_sync.py::TestRequestDataLeanModel` |
+| Memory spikes on tab open | `RequestData` gained heavy fields | Run `tests/test_request_persisted_fields.py::TestRequestDataLeanModel` |
 | Slow sibling notifications | Large bodies compared field-by-field | Expected for typical sizes; see PYPOST-408 performance note |
 
 ## Limitations and Future Work

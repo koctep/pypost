@@ -1,4 +1,4 @@
-"""Tests for request_sync copy policy and comparison helpers."""
+"""Tests for request_persisted_fields copy policy and comparison helpers."""
 
 import pytest
 
@@ -6,7 +6,7 @@ pytestmark = pytest.mark.timeout(120)
 
 import unittest
 
-from pypost.core.request_sync import (
+from pypost.core.request_persisted_fields import (
     copy_request_for_isolated_tab,
     snapshot_persisted_fields,
 )

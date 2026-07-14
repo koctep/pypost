@@ -11,7 +11,10 @@ from PySide6.QtWidgets import QWidget
 
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_manager import RequestManager
-from pypost.core.request_sync import persisted_fields_equal, snapshot_persisted_fields
+from pypost.core.request_persisted_fields import (
+    persisted_fields_equal,
+    snapshot_persisted_fields,
+)
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings

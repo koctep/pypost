@@ -27,7 +27,7 @@ from pypost.core.mcp_tool_contract import (
     resolve_mcp_param_specs,
 )
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
-from pypost.core.request_sync import copy_request_for_isolated_tab
+from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
 from pypost.ui.hotkeys import tag_action

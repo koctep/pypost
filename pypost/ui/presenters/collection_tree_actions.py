@@ -18,7 +18,7 @@ from pypost.ui.collection_item_dialogs import (
     show_rename_failure,
     show_rename_not_found,
 )
-from pypost.core.request_sync import copy_request_for_isolated_tab
+from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import RequestData
 
