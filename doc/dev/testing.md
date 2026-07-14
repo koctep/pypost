@@ -468,6 +468,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-310] | Implementation slice: execution smoke for install/test/lint exit codes |
 | [PYPOST-559] | Optional slow `make install` with real requirements in isolated workspace |
 | [PYPOST-279] | Pytest exit code `5` (no tests collected) policy in `make test` and CI |
+| [PYPOST-800] | Smoke for `make help` non-empty output (PYPOST-794 follow-up) |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -475,6 +476,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-310]: https://pypost.atlassian.net/browse/PYPOST-310
 [PYPOST-559]: https://pypost.atlassian.net/browse/PYPOST-559
 [PYPOST-279]: https://pypost.atlassian.net/browse/PYPOST-279
+[PYPOST-800]: https://pypost.atlassian.net/browse/PYPOST-800
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -483,6 +485,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `test`/`lint` |
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
 | Slow install smoke | `make install` with real requirements succeeds; marked `@pytest.mark.slow` |
+| Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
 
 ### Python interpreter decoupling (PYPOST-718)
 

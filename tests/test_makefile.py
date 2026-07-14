@@ -172,6 +172,16 @@ class TestDependencyChain:
         assert "venv-test" not in prereqs
 
 
+class TestHelpTarget:
+    def test_help_prints_non_empty_output(self, make_workspace: Path) -> None:
+        """PYPOST-800: catch accidental removal of Makefile ## annotations."""
+        result = _run_make(make_workspace, "help")
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip(), (
+            "make help produced empty output; check ## target annotations"
+        )
+
+
 class TestExitBehavior:
     def test_clean_exits_zero_on_empty_tree(self, make_workspace: Path) -> None:
         result = _run_make(make_workspace, "clean")
