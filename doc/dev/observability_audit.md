@@ -28,8 +28,9 @@ PyPost uses stdlib logging with a **key=value event convention** in newer module
 only), and **AlertManager** JSON files plus optional webhooks. CI disables live `log_cli` but
 verifies captured logs against an allowlist.
 
-**Top gaps:** `print()` in config/style paths (P1), hardcoded INFO log level (P2). Resolved URLs
-in `http_client` ERROR logs remediated in [PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741).
+**Top gaps:** hardcoded INFO log level (P2). `print()` in config paths remediated in
+[PYPOST-742](https://pypost.atlassian.net/browse/PYPOST-742). Resolved URLs in `http_client`
+ERROR logs remediated in [PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741).
 
 ## Logging Configuration
 
@@ -115,7 +116,7 @@ for local vs CI rationale.
 | MCP activity | PASS | Counts only |
 | Key sources | PASS | key_id logged, not key material |
 | Alert endpoint in WARNING | P2 | Full URL in log line |
-| config/style errors | **P1** | `print()` only |
+| config/style errors | **Remediated** ([PYPOST-742](https://pypost.atlassian.net/browse/PYPOST-742)) | ConfigManager uses `logger.error` |
 
 Details and cross-reference to PYPOST-685: [30-audit-report.md](../../ai-tasks/PYPOST-688/30-audit-report.md).
 

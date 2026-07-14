@@ -1,10 +1,13 @@
 import json
+import logging
 from pathlib import Path
 
 from platformdirs import user_config_dir
 
 from pypost.core.settings_secrets import parse_settings_from_disk, serialize_settings_for_disk
 from pypost.models.settings import AppSettings
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -27,7 +30,7 @@ class ConfigManager:
             try:
                 self.config_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
-                print(f"Error creating config directory: {e}")
+                logger.error("config_directory_create_failed path=%s error=%s", self.config_dir, e)
 
     def load_config(self) -> AppSettings:
         if not self.config_path.exists():
@@ -38,7 +41,7 @@ class ConfigManager:
                 data = json.load(f)
                 return parse_settings_from_disk(data)
         except Exception as e:
-            print(f"Error loading config: {e}")
+            logger.error("config_load_failed path=%s error=%s", self.config_path, e)
             return AppSettings()
 
     def save_config(self, settings: AppSettings):
@@ -49,4 +52,4 @@ class ConfigManager:
             with open(self.config_path, "w") as f:
                 json.dump(serialize_settings_for_disk(settings), f, indent=4)
         except Exception as e:
-            print(f"Error saving config: {e}")
+            logger.error("config_save_failed path=%s error=%s", self.config_path, e)

@@ -233,5 +233,34 @@ def test_request_timeout_survives_settings_dialog_save_and_restart(qapp):  # noq
                 dlg_after_restart.close()
 
 
+class TestConfigManagerErrorLogging(unittest.TestCase):
+    def test_load_failure_logs_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            config_path = Path(td) / "settings.json"
+            config_path.write_text("{not valid json", encoding="utf-8")
+            with patch("pypost.core.config_manager.user_config_dir", return_value=td):
+                cm = ConfigManager()
+                with self.assertLogs("pypost.core.config_manager", level="ERROR") as logs:
+                    settings = cm.load_config()
+                self.assertIsInstance(settings, AppSettings)
+                self.assertTrue(
+                    any("config_load_failed" in line for line in logs.output)
+                )
+
+    def test_save_failure_logs_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            with patch("pypost.core.config_manager.user_config_dir", return_value=td):
+                cm = ConfigManager()
+                with patch(
+                    "pypost.core.config_manager.json.dump",
+                    side_effect=OSError("disk full"),
+                ):
+                    with self.assertLogs("pypost.core.config_manager", level="ERROR") as logs:
+                        cm.save_config(AppSettings())
+                self.assertTrue(
+                    any("config_save_failed" in line for line in logs.output)
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
