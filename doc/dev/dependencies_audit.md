@@ -41,11 +41,9 @@ Full report:
 | requests | `==2.34.2` | Outbound HTTP |
 | PyYAML | `==6.0.3` | YAML parsing |
 | jinja2 | `==3.1.6` | Request templating |
-| pydantic | `>=2.0` | Models / settings |
+| pydantic | `>=2.11,<3` | Models / settings |
 | platformdirs | `==4.10.0` | Config paths |
-| mcp | `>=1.27,<2` | MCP server SDK |
-| starlette | `==1.3.1` | ASGI routing |
-| uvicorn | `==0.49.0` | ASGI server |
+| mcp | `>=1.27,<2` | MCP server SDK (pulls starlette/uvicorn) |
 | prometheus_client | `==0.25.0` | Default metrics |
 | opentelemetry-api | `==1.42.1` | Alternate metrics API |
 | opentelemetry-sdk | `==1.42.1` | Alternate metrics SDK |
