@@ -345,8 +345,9 @@ pytestmark = pytest.mark.timeout(60)
 ### Enforcement
 
 [`tests/conftest.py`](../../tests/conftest.py) fails setup for any test without a closest
-`timeout` marker. [`pytest.ini`](../../pytest.ini) registers the marker; `pytest-timeout` is
-installed via `make venv-test`. There is no global default in `pytest.ini` — each test module,
+`timeout` marker. [`pyproject.toml`](../../pyproject.toml) `[tool.pytest.ini_options]` registers
+the marker; `pytest-timeout` is installed via `make venv-test`. There is no global default in
+`pyproject.toml` — each test module,
 class, or function must declare its own timeout.
 
 ```bash
@@ -384,7 +385,7 @@ Automated unit coverage for `RequestManager` and `StateManager` (debt follow-up 
 [PYPOST-29](https://pypost.atlassian.net/browse/PYPOST-29)).
 [PYPOST-251](https://pypost.atlassian.net/browse/PYPOST-251) closed the original blocker
 (missing pytest setup); [PYPOST-252](https://pypost.atlassian.net/browse/PYPOST-252) added
-manager tests and this section. Pytest infrastructure (`pytest.ini`, `Makefile`,
+manager tests and this section. Pytest infrastructure (`pyproject.toml`, `Makefile`,
 `tests/conftest.py` timeout gate) is the standard entry point for local and CI runs.
 
 | Module | Test file | Scope |
@@ -441,7 +442,7 @@ the 70% project target.
 
 | Setting | Value |
 | --- | --- |
-| Enforcement | `--cov-fail-under=70` in `pytest.ini` `addopts` |
+| Enforcement | `--cov-fail-under=70` in `pyproject.toml` `[tool.pytest.ini_options]` `addopts` |
 | CI summary display | `THRESHOLD=70` in `.github/workflows/test.yml` |
 | Project target | 70% (follow-up when ready) |
 
@@ -452,7 +453,8 @@ make test-cov
 ```
 
 Look for `TOTAL ... XX%` and `Required test coverage of 60% reached` in the output. To raise
-the threshold, update both `pytest.ini` and the `THRESHOLD` variable in `test.yml` together.
+the threshold, update both `pyproject.toml` `[tool.pytest.ini_options]` and the `THRESHOLD`
+variable in `test.yml` together.
 See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 
 ## Makefile automation tests
@@ -511,8 +513,9 @@ make test-slow
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -m slow -v
 ```
 
-CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest (`pytest.ini`
-`addopts`) and `make test` exclude `-m slow`. A separate `make-install-smoke` job in
+CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest
+(`pyproject.toml` `[tool.pytest.ini_options]` `addopts`) and `make test` exclude `-m slow`. A
+separate `make-install-smoke` job in
 `.github/workflows/test.yml` runs `-m slow` Makefile tests on Python 3.11.
 
 ## CI dependency caching (PYPOST-311)
@@ -577,7 +580,8 @@ propagation — no Makefile wrapper maps codes to success):
 
 To prevent false-positive CI/CD pipeline failures in empty-test repositories, templates, or newly
 initialized projects, PyPost supports configuring the policy for handling pytest exit code `5`
-(no tests collected) via the `empty_tests_policy` option in `pytest.ini` or `pyproject.toml`.
+(no tests collected) via the `empty_tests_policy` option in `pyproject.toml`
+`[tool.pytest.ini_options]`.
 
 #### Supported Policies
 
@@ -591,14 +595,7 @@ initialized projects, PyPost supports configuring the policy for handling pytest
 
 #### Configuration Example
 
-In `pytest.ini`:
-
-```ini
-[pytest]
-empty_tests_policy = warn
-```
-
-Or in `pyproject.toml`:
+In `pyproject.toml`:
 
 ```toml
 [tool.pytest.ini_options]
@@ -616,7 +613,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_pytest_exit_poli
 See [observability_audit.md — Test and CI Logging](observability_audit.md#test-and-ci-logging)
 for the audit summary table (local vs CI `log_cli`, guardrail baseline 72 + margin 5).
 
-`pytest.ini` enables live application logs during test runs:
+`pyproject.toml` `[tool.pytest.ini_options]` enables live application logs during test runs:
 
 | Setting | Value |
 | --- | --- |
@@ -631,7 +628,7 @@ error-path output, not test failures.
 
 **Recommendation** (see `ai-tasks/PYPOST-570/log-cli-review.md`):
 
-1. **Keep** `pytest.ini` defaults for local runs (helps correlate logs with failing tests).
+1. **Keep** `pyproject.toml` defaults for local runs (helps correlate logs with failing tests).
 2. **Disable in CI** with `-o log_cli=false` on the workflow pytest command (follow-up PR).
 3. **PYPOST-571** — allowlist guardrail so CI still fails on unexpected ERROR lines without
    printing known noise on every green run.
@@ -651,7 +648,7 @@ Inventory capture still requires live logging enabled (default `make test` or ex
 
 ## Test log inventory (PYPOST-567)
 
-A green `make test` run can still emit many ERROR/WARNING lines because `pytest.ini`
+A green `make test` run can still emit many ERROR/WARNING lines because `pyproject.toml`
 enables live CLI logging at WARNING level. To audit that noise:
 
 ```bash
@@ -788,7 +785,7 @@ augments verbose pytest output:
 - Each completed test line shows **call duration**: `PASSED [1.23s]` or `FAILED [450ms]`.
 - After the session, a **top 5 slowest tests** block is printed (sorted by call duration).
 
-This applies to `make test`, `pytest.ini` defaults, and CI. The existing `--durations=0`
+This applies to `make test`, `pyproject.toml` pytest defaults, and CI. The existing `--durations=0`
 section in `pytest-output.txt` is unchanged so `scripts/audit_test_durations.py` keeps working.
 
 ### Phase 2 — duration budget audit (PYPOST-573)

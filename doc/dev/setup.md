@@ -229,8 +229,9 @@ Common targets:
 ### Unit tests (pytest)
 
 `make install` installs the package in editable mode (`pip install -e ".[dev,otel]"`), so
-`import pypost` works from any working directory. Root `pytest.ini` still sets `pythonpath = .`
-for contributors who run pytest without a prior editable install (see PYPOST-434).
+`import pypost` works from any working directory. `[tool.pytest.ini_options]` in
+`pyproject.toml` still sets `pythonpath = "."` for contributors who run pytest without a prior
+editable install (see PYPOST-434).
 
 **Reproducible test environment** (PYPOST-465): on a clean checkout, run `make install` once —
 it provisions the editable package with `[dev,otel]` extras (`pytest`, `pytest-cov`,

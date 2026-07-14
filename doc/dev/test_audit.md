@@ -19,7 +19,7 @@ flaky patterns, maintainability
 | Test modules | 135 |
 | Fast suite tests collected | 1,423 |
 | Line coverage (audit measurement) | **~88%** |
-| CI coverage gate | **70%** (`pytest.ini`, `test.yml`) |
+| CI coverage gate | **70%** (`pyproject.toml`, `test.yml`) |
 | Timeout marker compliance | **100%** (enforced in `conftest.py`) |
 | Typical `make test` runtime | ~90s |
 

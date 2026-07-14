@@ -1,6 +1,7 @@
 # Technical Debt — PYPOST-434 (pytest / CI hygiene)
 
-This bugfix added `pythonpath = .` to `pytest.ini`.  No new code debt was introduced.
+This bugfix added `pythonpath = .` to pytest config (now in `pyproject.toml`
+`[tool.pytest.ini_options]`). No new code debt was introduced.
 Track optional follow-ups here.
 
 ## 1. CI lint gate

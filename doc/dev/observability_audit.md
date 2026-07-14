@@ -96,7 +96,7 @@ Reload on settings save via `MainWindow._reload_alert_manager`.
 
 ## Test and CI Logging
 
-| Setting | Local (`pytest.ini`) | CI (`test.yml`) |
+| Setting | Local (`pyproject.toml`) | CI (`test.yml`) |
 | --- | --- | --- |
 | `log_cli` | `true` | `false` |
 | Level | `WARNING` | file: `WARNING` |
