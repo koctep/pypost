@@ -1,4 +1,4 @@
-.PHONY: venv venv-test install run clean test test-slow test-cov lint check security-audit
+.PHONY: venv venv-test install run clean test test-slow test-cov lint check security-audit generate-mcp-fixtures check-mcp-fixtures
 
 PYTHON := python3
 PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])')
@@ -54,6 +54,12 @@ check: lint test ## Convenience quality gate: static analysis + full test suite
 security-audit: install
 	$(BIN)/python -m pip install pip-audit
 	$(BIN)/pip-audit -r requirements.txt
+
+generate-mcp-fixtures: $(VENV_MARKER) ## Regenerate MCP test collection and environment JSON fixtures
+	$(BIN)/python scripts/generate_mcp_test_fixtures.py
+
+check-mcp-fixtures: $(VENV_MARKER) ## Verify committed MCP test fixtures match canonical builders
+	$(BIN)/python scripts/generate_mcp_test_fixtures.py --check
 
 # Clean
 clean:

@@ -152,6 +152,14 @@ class TestDependencyChain:
         prereqs = _prerequisites(make_workspace, "security-audit")
         assert "install" in prereqs
 
+    def test_generate_mcp_fixtures_depends_on_marker(self, make_workspace: Path) -> None:
+        prereqs = _prerequisites(make_workspace, "generate-mcp-fixtures")
+        assert MARKER_REL in prereqs
+
+    def test_check_mcp_fixtures_depends_on_marker(self, make_workspace: Path) -> None:
+        prereqs = _prerequisites(make_workspace, "check-mcp-fixtures")
+        assert MARKER_REL in prereqs
+
     @pytest.mark.parametrize("target", ["run", "test", "lint"])
     def test_runtime_targets_depend_on_marker_only(
         self,
