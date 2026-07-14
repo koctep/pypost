@@ -84,7 +84,7 @@ Common targets:
   ```bash
   make test
   ```
-- **Lint code**:
+- **Lint code** (`flake8` on `pypost/`; T201 bans `print()` in application code):
   ```bash
   make lint
   ```
@@ -113,7 +113,7 @@ setting `PYTHONPATH` (see PYPOST-434).
 
 **Reproducible test environment** (PYPOST-465): on a clean checkout, run `make install` once —
 it provisions app deps (`requirements.txt`) and test tooling (`pytest`, `pytest-cov`,
-`pytest-timeout`, `flake8` via `venv-test`). Then run full regression with:
+`pytest-timeout`, `flake8`, `flake8-print` via `venv-test`). Then run full regression with:
 
 ```bash
 make test        # fast suite (-m "not slow")

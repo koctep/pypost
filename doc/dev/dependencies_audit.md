@@ -71,7 +71,7 @@ available.
 | Category | Install source | Packages |
 | --- | --- | --- |
 | Production | `requirements.txt` via `make install` | 15 runtime deps |
-| Development | `Makefile` `venv-test` + CI `pip install` | pytest, pytest-cov, pytest-timeout, flake8 |
+| Development | `Makefile` `venv-test` + CI `pip install` | pytest, pytest-cov, pytest-timeout, flake8, flake8-print |
 
 Dev packages are **not** in `requirements.txt` (good separation) but versions are **unpinned**
 and declared in two places (gap).

@@ -11,6 +11,9 @@ It complements [observability_audit.md](observability_audit.md) (audit inventory
 [security_audit.md](security_audit.md) (sensitive fields), and [testing.md](testing.md) (pytest
 `log_cli` and CI allowlists).
 
+**Do not use `print()` in `pypost/`** — `make lint` runs flake8 with the `flake8-print` plugin
+(T201) on application code. Use `logging.getLogger(__name__)` instead (PYPOST-752).
+
 ## Log Format
 
 Root configuration is applied at startup in `pypost/main.py`:

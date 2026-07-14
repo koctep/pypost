@@ -21,7 +21,7 @@ $(VENV_MARKER):
 	touch "$(VENV_MARKER)"
 
 venv-test: $(VENV_MARKER) ## Install pytest, flake8, and test tooling into the venv
-	$(BIN)/python -m pip install pytest flake8 pytest-cov pytest-timeout
+	$(BIN)/python -m pip install pytest flake8 flake8-print pytest-cov pytest-timeout
 
 install: $(VENV_MARKER) venv-test ## Install application and test dependencies
 	$(BIN)/python -m pip install -r requirements.txt

@@ -36,7 +36,7 @@ Use this checklist on a **clean checkout** to match CI regression coverage local
 | Step | Command / detail |
 | --- | --- |
 | **Python** | 3.11+ recommended ([README](../../README.md)); CI matrix runs **3.11** and **3.13** |
-| **Install** | `make install` — creates `.venv`, installs test tooling via `venv-test` (`pytest`, `pytest-cov`, `pytest-timeout`, `flake8`), then app deps from `requirements.txt` |
+| **Install** | `make install` — creates `.venv`, installs test tooling via `venv-test` (`pytest`, `pytest-cov`, `pytest-timeout`, `flake8`, `flake8-print`), then app deps from `requirements.txt` |
 | **Fast regression** | `make test` — full suite except `-m slow` |
 | **Slow smoke** | `make test-slow` — Makefile install smoke (`tests/test_makefile.py`) |
 | **Coverage** | `make test-cov` — fast suite with `--cov=pypost` |
