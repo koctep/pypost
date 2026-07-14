@@ -162,14 +162,21 @@ Tab action UI uses internal constants in `RequestTabHeader`:
 
 ## Testing
 
-Plus-tab click tests in `tests/test_tab_header.py` and `tests/test_tabs_presenter.py` use
-`QTest.mouseClick` on the real embedded `+` button (`tabButton(plus_idx, LeftSide)`), not
-synthetic `tabBarClicked.emit` — matching the user click path wired via `plus_btn.clicked`.
+Plus-tab click tests in `tests/test_tab_header.py` and `tests/test_tabs_presenter.py` cover
+both click paths:
+
+- **Primary**: `QTest.mouseClick` on the real embedded `+` button (`tabButton(plus_idx, LeftSide)`)
+  — matches user clicks on the visible widget wired via `plus_btn.clicked`.
+- **Fallback**: `tabBarClicked.emit(plus_idx)` — covers `_on_tab_bar_clicked` when the user
+  clicks plus-tab chrome outside the embedded button.
 
 | Test | Behavior verified |
 | ---- | ----------------- |
 | `test_plus_tab_click_emits_new_tab_requested` | `+` button click emits `new_tab_requested` |
+| `test_plus_tab_tab_bar_clicked_emits_new_tab_requested` | Fallback chrome click emits signal |
+| `test_non_plus_tab_bar_clicked_does_not_emit_new_tab` | Non-plus index does not emit signal |
 | `test_plus_tab_click_adds_request_tab` | Presenter adds tab; plus placeholder stays last |
+| `test_plus_tab_tab_bar_clicked_adds_request_tab` | Fallback path adds tab via presenter |
 | `test_plus_tab_is_last` | Plus placeholder remains trailing tab |
 | `test_plus_tab_close_is_ignored` | Close on plus tab is ignored |
 

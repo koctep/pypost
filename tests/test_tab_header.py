@@ -37,6 +37,24 @@ class TestRequestTabHeader(unittest.TestCase):
         QTest.mouseClick(plus_btn, Qt.MouseButton.LeftButton)
         self.assertEqual(received, [True])
 
+    def test_plus_tab_tab_bar_clicked_emits_new_tab_requested(self):
+        """Fallback path: chrome click outside embedded + button."""
+        header, _tabs = self._make_header()
+        received = []
+        header.new_tab_requested.connect(lambda: received.append(True))
+        plus_idx = header.plus_tab_index()
+        header.tab_bar.tabBarClicked.emit(plus_idx)
+        self.assertEqual(received, [True])
+
+    def test_non_plus_tab_bar_clicked_does_not_emit_new_tab(self):
+        header, tabs = self._make_header()
+        plus_idx = header.plus_tab_index()
+        tabs.insertTab(plus_idx, QWidget(), "Request")
+        received = []
+        header.new_tab_requested.connect(lambda: received.append(True))
+        header.tab_bar.tabBarClicked.emit(0)
+        self.assertEqual(received, [])
+
     def test_is_plus_tab_index(self):
         header, tabs = self._make_header()
         plus_idx = header.plus_tab_index()

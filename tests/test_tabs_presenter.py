@@ -263,6 +263,17 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(_request_tab_count(p), before + 1)
         self.assertEqual(_plus_tab_index(p), p.widget.count() - 1)
 
+    def test_plus_tab_tab_bar_clicked_adds_request_tab(self):
+        """Fallback path: tabBarClicked on plus index adds a request tab."""
+        p = self._make_presenter()
+        p.add_new_tab()
+        before = _request_tab_count(p)
+        plus_idx = _plus_tab_index(p)
+        tab_bar = p.widget.tabBar()
+        tab_bar.tabBarClicked.emit(plus_idx)
+        self.assertEqual(_request_tab_count(p), before + 1)
+        self.assertEqual(_plus_tab_index(p), p.widget.count() - 1)
+
     def test_plus_tab_close_is_ignored(self):
         p = self._make_presenter()
         p.add_new_tab()
