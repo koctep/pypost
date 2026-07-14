@@ -9,7 +9,6 @@ from pypost.core.config_manager import ConfigManager
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
 from pypost.ui.main_window import MainWindow
-from pypost.ui.styles.custom_style import PyPostStyle
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,9 +44,6 @@ def main():
         log_path,
         bool(settings.alert_webhook_url),
     )
-
-    # Apply custom style (native metrics by default; see PyPostStyle)
-    app.setStyle(PyPostStyle())
 
     window = MainWindow(
         metrics=metrics_manager,
