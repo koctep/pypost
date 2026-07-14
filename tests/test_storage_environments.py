@@ -468,3 +468,28 @@ def test_load_environments_unchanged_on_partial_failure(tmp_path, monkeypatch):
     _save_two_envs_one_corrupt(storage, monkeypatch)
 
     assert storage.load_environments() == []
+
+
+def test_load_environments_invalid_json_returns_empty(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    storage.environments_file.write_text("{not valid json", encoding="utf-8")
+
+    assert storage.load_environments() == []
+
+
+def test_load_environments_non_list_root_returns_empty(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    with open(storage.environments_file, "w", encoding="utf-8") as handle:
+        json.dump({"environments": []}, handle)
+
+    assert storage.load_environments() == []
+
+
+def test_load_environments_with_errors_invalid_json_returns_empty(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    storage.environments_file.write_text("[] trailing garbage", encoding="utf-8")
+
+    environments, failures = storage.load_environments_with_errors()
+
+    assert environments == []
+    assert failures == ()

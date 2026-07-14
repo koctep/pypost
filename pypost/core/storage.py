@@ -61,13 +61,13 @@ class StorageManager:
         if not self.data_dir.exists():
             try:
                 self.data_dir.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
+            except OSError as e:
                 logger.error("storage_data_dir_create_failed path=%s error=%s", self.data_dir, e)
 
         if not self.collections_path.exists():
             try:
                 self.collections_path.mkdir(exist_ok=True)
-            except Exception as e:
+            except OSError as e:
                 logger.error(
                     "storage_collections_dir_create_failed path=%s error=%s",
                     self.collections_path,
@@ -78,7 +78,7 @@ class StorageManager:
             try:
                 with open(self.environments_file, "w") as f:
                     json.dump([], f)
-            except Exception as e:
+            except OSError as e:
                 logger.error(
                     "storage_environments_file_create_failed path=%s error=%s",
                     self.environments_file,
@@ -148,7 +148,7 @@ class StorageManager:
                     collections.append(collection)
                     if self._is_legacy_name_file(filename, collection):
                         self._migrate_legacy_collection_file(filename, collection)
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, ValidationError) as e:
                 logger.warning(
                     "storage_collection_load_failed filename=%s error=%s",
                     filename,
@@ -181,7 +181,7 @@ class StorageManager:
             json.dump(data, f, indent=2)
         try:
             os.replace(tmp_file, self.environments_file)
-        except Exception as e:
+        except OSError as e:
             logger.error(
                 "save_environments_replace_failed src=%s dst=%s error=%s",
                 tmp_file,
@@ -222,7 +222,7 @@ class StorageManager:
         try:
             with open(self.environments_file, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError) as exc:
             logger.error(
                 "load_environments_failed file=%s error=%s",
                 self.environments_file,
@@ -275,8 +275,8 @@ class StorageManager:
                         reason=str(exc),
                     )
                 )
-            except Exception as exc:
-                logger.error(
+            except Exception as exc:  # noqa: BLE001
+                logger.exception(
                     "deserialize_environment_records_item_failed name=%s error=%s",
                     env_name,
                     exc,

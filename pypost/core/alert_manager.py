@@ -92,7 +92,7 @@ class AlertManager:
         for stale in stale_handlers:
             try:
                 stale.close()
-            except Exception:  # noqa: BLE001
+            except OSError:
                 pass
             self._logger.removeHandler(stale)
 
@@ -106,12 +106,9 @@ class AlertManager:
         """Release the log handler and remove it from the logger."""
         try:
             self._handler.close()
-        except Exception:  # noqa: BLE001
+        except OSError:
             pass
-        try:
-            self._logger.removeHandler(self._handler)
-        except Exception:  # noqa: BLE001
-            pass
+        self._logger.removeHandler(self._handler)
         logger.debug("alert_manager_close logger=%s", self._logger.name)
 
     def __enter__(self) -> "AlertManager":
@@ -150,7 +147,19 @@ class AlertManager:
                 _webhook_log_target(self._webhook_url),
                 resp.status_code,
             )
-        except Exception as exc:  # noqa: BLE001
+        except requests.Timeout as exc:
+            logger.warning(
+                "alert_webhook_failed target=%s error=%s",
+                _webhook_log_target(self._webhook_url),
+                exc,
+            )
+        except requests.ConnectionError as exc:
+            logger.warning(
+                "alert_webhook_failed target=%s error=%s",
+                _webhook_log_target(self._webhook_url),
+                exc,
+            )
+        except requests.RequestException as exc:
             logger.warning(
                 "alert_webhook_failed target=%s error=%s",
                 _webhook_log_target(self._webhook_url),

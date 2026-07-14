@@ -85,3 +85,29 @@ def test_delete_collection_removes_id_based_file(tmp_path, monkeypatch):
     storage.delete_collection("del-id-1", collection_name="To Delete")
 
     assert not (storage.collections_path / "del-id-1.json").exists()
+
+
+def test_load_collections_skips_corrupt_json_file(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    good = Collection(id="good-id", name="Good", requests=[])
+    storage.save_collection(good)
+    corrupt_path = storage.collections_path / "corrupt.json"
+    corrupt_path.write_text("{broken", encoding="utf-8")
+
+    loaded = storage.load_collections()
+
+    assert len(loaded) == 1
+    assert loaded[0].id == "good-id"
+
+
+def test_load_collections_skips_invalid_collection_schema(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    invalid_path = storage.collections_path / "invalid.json"
+    invalid_path.write_text(
+        json.dumps({"id": "bad", "name": "Broken", "requests": "not-a-list"}),
+        encoding="utf-8",
+    )
+
+    loaded = storage.load_collections()
+
+    assert loaded == []

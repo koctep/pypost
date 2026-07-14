@@ -11,6 +11,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from pypost.core.alert_manager import AlertManager, AlertPayload
 
 
@@ -129,7 +131,7 @@ class TestAlertManagerWebhook(unittest.TestCase):
         )
         with patch(
             "pypost.core.alert_manager.requests.post",
-            side_effect=ConnectionError("unreachable"),
+            side_effect=requests.ConnectionError("unreachable"),
         ):
             # Must NOT raise
             mgr.emit(_make_payload())
@@ -143,6 +145,19 @@ class TestAlertManagerWebhook(unittest.TestCase):
         with patch(
             "pypost.core.alert_manager.requests.post",
             side_effect=req_lib.Timeout("timed out"),
+        ):
+            mgr.emit(_make_payload())
+
+    def test_webhook_request_exception_does_not_propagate(self):
+        import requests as req_lib
+
+        mgr = AlertManager(
+            log_path=self.log_path,
+            webhook_url="http://hooks.example.com/alert",
+        )
+        with patch(
+            "pypost.core.alert_manager.requests.post",
+            side_effect=req_lib.RequestException("bad request"),
         ):
             mgr.emit(_make_payload())
 
@@ -238,7 +253,7 @@ class TestAlertManagerLogSanitization(unittest.TestCase):
         )
         with patch(
             "pypost.core.alert_manager.requests.post",
-            side_effect=ConnectionError("unreachable"),
+            side_effect=requests.ConnectionError("unreachable"),
         ):
             with self.assertLogs("pypost.core.alert_manager", level="WARNING") as logs:
                 mgr.emit(_make_payload())

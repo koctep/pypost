@@ -79,6 +79,8 @@ follow-up).
 - **No bare `except:`** in `pypost/` — good
 - **29 `except Exception`** — mostly storage, alerts, I/O; prefer typed catches +
   `logger.exception`
+- **PYPOST-733** narrowed persistence-layer handlers in `storage.py` and `alert_manager.py`;
+  one intentional last-resort `except Exception` remains in `deserialize_environment_records`
 - User dialogs centralized in `collection_item_dialogs.py`
 
 ## PYPOST-40 Alignment
