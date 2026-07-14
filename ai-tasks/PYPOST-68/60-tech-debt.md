@@ -7,11 +7,10 @@
 | Item | Status |
 |------|--------|
 | PYPOST-43 TD-3 widget property leak | **Resolved** |
+| PYPOST-43 TD-1 Collections/Tabs presenter `apply_font` | **Resolved** — [PYPOST-803](https://pypost.atlassian.net/browse/PYPOST-803) |
 
 ## Follow-ups
 
-| ID | Severity | Item | Notes |
-|----|----------|------|-------|
-| TD-1 | LOW | Collections/Tabs presenter `apply_font` | PYPOST-43 TD-1; separate task |
+None.
 
 No blockers. SAFE TO CLOSE.

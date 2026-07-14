@@ -134,6 +134,12 @@ after global stylesheet application. Investigation (PYPOST-112) identified these
 methods handle indent and syntax colours only. No further refactor is required for main-window
 font propagation.
 
+**PYPOST-803 closure:** `CollectionsPresenter` and `TabsPresenter` do **not** implement
+`apply_font`. PYPOST-43 TD-1 originally suggested per-presenter font methods; PYPOST-425
+removed the same pattern from `EnvPresenter` as redundant. The collections tree (`QTreeView`)
+and request tabs (`QTabWidget`) inherit font size from global QSS and `QApplication.setFont`.
+Regression coverage: `tests/test_presenter_font_inheritance.py`.
+
 ## API / Usage
 
 ### `StyleManager.apply_appearance(app, *, theme, font_size)`
@@ -260,6 +266,7 @@ current `indent_size`. Indent width alone is still updated via
 - PYPOST-107 — body editor font metrics refresh on global theme change
 - PYPOST-112 — font inheritance investigation; confirms PYPOST-106/107 close PYPOST-12 debt
 - PYPOST-425 — removed redundant `EnvPresenter.apply_font` widget loop
+- PYPOST-803 — closed PYPOST-43 TD-1 for Collections/Tabs presenters (global propagation only)
 - PYPOST-114 — `QToolTip` QSS hook for variable hover and widget tooltips
 - `doc/dev/ui_mixins.md` — variable hover tooltip styling
 - `doc/dev/tech-debt/PYPOST-11.md` — menu padding QSS for large fonts
