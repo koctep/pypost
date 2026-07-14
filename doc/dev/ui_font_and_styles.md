@@ -17,6 +17,10 @@ and `PyPostStyle` metrics must not override tab geometry; see [Tab bar styling p
 
 ## Architecture
 
+`StyleManager` lives in `pypost/ui/styles/style_manager.py` (moved from `core/` in
+[PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)). It colocates theme/QSS
+orchestration with `custom_style.py` and bundled `.qss` assets.
+
 ### Theme and stylesheet pipeline
 
 Startup and every settings save follow the same sequence in `MainWindow.apply_settings`:

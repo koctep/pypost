@@ -40,11 +40,8 @@ def _fusion_light_palette() -> QPalette:
 
 class StyleManager:
     def __init__(self):
-        # Path to pypost/ui/styles
-        # This file is in pypost/core/style_manager.py, so parent.parent is pypost/
-        self.root_dir = Path(__file__).parent.parent
-        self.styles_dir = self.root_dir / "ui" / "styles"
-        self.icons_dir = self.root_dir / "ui" / "resources" / "icons"
+        self.styles_dir = Path(__file__).parent
+        self.icons_dir = Path(__file__).parent.parent / "resources" / "icons"
 
     def load_styles(self) -> str:
         """Reads all .qss files from the styles directory and returns the combined stylesheet."""

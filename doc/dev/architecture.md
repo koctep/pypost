@@ -49,7 +49,6 @@ pypost/
 │   ├── metrics.py          # MetricsManager facade (composition root)
 │   ├── metrics_registry.py, metrics_server.py, metrics_otel.py
 │   ├── metrics_protocol.py, alert_manager.py
-│   ├── style_manager.py    # Theme/QSS application (see architecture_audit.md)
 │   ├── bind_address_validation.py, server_bind.py
 │   ├── variable_name_validation.py, hidden_toggle_log_policy.py
 │   ├── yaml_json_converter.py, constants.py
@@ -71,7 +70,7 @@ pypost/
 │   │   ├── settings/       # Settings dialog sections
 │   │   └── validate/       # Body format validators (JSON, YAML, XML)
 │   ├── delegates/          # Collection rename, environment name delegates
-│   ├── styles/             # Qt stylesheets (.qss) and custom styles
+│   ├── styles/             # Qt stylesheets (.qss), StyleManager, custom styles
 │   ├── theme/              # JSON syntax highlighting theme
 │   ├── hotkeys.py, collection_item_dialogs.py
 │   └── request_save_orchestrator.py
@@ -81,8 +80,8 @@ pypost/
 ```
 
 **Layer rules:** `models/` → stdlib only; `core/` → `models/`; `ui/` → `core/`, `models/`.
-Known exception: `core/style_manager.py` imports from `ui/` at runtime — see
-[architecture_audit.md](architecture_audit.md#dependency-direction).
+Appearance orchestration (`StyleManager`) lives in `ui/styles/` — see
+[ui_font_and_styles.md](ui_font_and_styles.md).
 
 ## Composition root (`main.py`)
 

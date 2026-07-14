@@ -23,7 +23,7 @@ from pypost.core.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.core.storage import StorageManager
-from pypost.core.style_manager import StyleManager
+from pypost.ui.styles.style_manager import StyleManager
 from pypost.core.template_service import TemplateService
 from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed

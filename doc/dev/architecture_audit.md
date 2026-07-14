@@ -21,14 +21,12 @@ The layered modular monolith is **largely intact**:
 - HTTP execution, templating, and MCP tool calls converge on `RequestService.execute()`.
 - Presenter extraction (PYPOST-43) keeps most UI orchestration out of widgets.
 
-**Three areas need attention:**
+**Two areas need attention:**
 
-1. **Dependency-direction violation** — `core/style_manager.py` imports `PyPostStyle` from
-   `ui/` at runtime (the only confirmed core → ui import outside `TYPE_CHECKING` guards).
-2. **Qt bleed into core** — Eight `core/` modules import PySide6 (workers, MCP lifecycle,
+1. **Qt bleed into core** — Eight `core/` modules import PySide6 (workers, MCP lifecycle,
    state, metrics, encryption/env async). Documented for MCP/UI bridging but it weakens the
    presentation/core boundary.
-3. **Partial composition root** — `main.py` wires `ConfigManager`, `MetricsManager`,
+2. **Partial composition root** — `main.py` wires `ConfigManager`, `MetricsManager`,
    `TemplateService`, and `AlertManager`, but `MainWindow` still constructs
    `StorageManager`, `RequestManager`, `HistoryManager`, `MCPServerManager`, and
    `StyleManager`.
@@ -66,7 +64,7 @@ models/  →  (stdlib only)
 | L-001 | Layer map matches intent; MCP/worker Qt glue in `core/` is a caveat | PASS |
 | L-002 | Presenter pattern holds for collections, tabs, and env/MCP wiring | PASS |
 | L-003 | `request_sync.is_tab_dirty` ties core semantics to UI `RequestTab` | MEDIUM |
-| L-004 | `StyleManager` is a UI concern living in `core/` | HIGH |
+| L-004 | `StyleManager` is a UI concern living in `core/` | **Remediated** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
 | L-005 | `fixtures/` not imported by production code | PASS |
 | L-006 | `utils/` package is empty and unused | LOW |
 
@@ -74,7 +72,7 @@ models/  →  (stdlib only)
 
 | ID | Finding | Severity |
 | --- | --- | --- |
-| D-001 | Runtime core → ui import in `style_manager.py` | HIGH |
+| D-001 | Runtime core → ui import in `style_manager.py` | **Remediated** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
 | D-002 | `models/` layer clean (no core/ui imports) | PASS |
 | D-003 | `TYPE_CHECKING` guards used appropriately | PASS |
 | D-004 | PySide6 imports in eight `core/` modules | MEDIUM |
@@ -94,7 +92,7 @@ models/  →  (stdlib only)
 
 | Priority | ID | Finding | Jira |
 | --- | --- | --- | --- |
-| **P1** | R-P1-001 | `style_manager.py` core → ui import | [PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692) |
+| **P1** | R-P1-001 | `style_manager.py` core → ui import | **Done** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
 | **P1** | R-P1-002 | Qt throughout `core/` | [PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693) |
 | **P2** | R-P2-001 | `HistoryManager` outside composition root | [PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694) |
 | **P2** | R-P2-002 | Partial composition root in `MainWindow` | [PYPOST-695](https://pypost.atlassian.net/browse/PYPOST-695) |

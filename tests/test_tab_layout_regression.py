@@ -15,7 +15,7 @@ import re
 import pytest
 from PySide6.QtWidgets import QApplication, QStyle, QTabBar, QTabWidget, QWidget
 
-from pypost.core.style_manager import StyleManager
+from pypost.ui.styles.style_manager import StyleManager
 from pypost.ui.styles.custom_style import PyPostStyle
 from pypost.ui.widgets.tab_header import RequestTabHeader
 

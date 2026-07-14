@@ -8,7 +8,7 @@ pytestmark = pytest.mark.timeout(60)
 
 from PySide6.QtWidgets import QApplication, QWidget
 
-from pypost.core.style_manager import StyleManager
+from pypost.ui.styles.style_manager import StyleManager
 
 
 @pytest.fixture(scope="module")
