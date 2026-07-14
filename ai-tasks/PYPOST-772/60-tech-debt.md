@@ -28,6 +28,7 @@ retroactively fixed.
 - **Description:** Optional verifier script that fails `make check` when a newly closed task folder
   is missing required workflow files.
 - **Remediation:** Implement `scripts/verify_ai_task_artifacts.py` and wire into Makefile.
+- **Jira:** [PYPOST-816](https://pypost.atlassian.net/browse/PYPOST-816)
 
 ## Blocker Review
 
