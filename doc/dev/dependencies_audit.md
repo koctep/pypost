@@ -71,11 +71,11 @@ available.
 
 | Category | Install source | Packages |
 | --- | --- | --- |
-| Production | `requirements.txt` via `make install` | 15 runtime deps |
-| Development | `Makefile` `venv-test` + CI `pip install` | pytest, pytest-cov, pytest-timeout, flake8, flake8-print |
+| Production | `requirements.txt` via `make install` | Runtime deps (locked) |
+| Development | `requirements-dev.txt` via `make venv-test` and CI | pytest, pytest-cov, pytest-timeout, flake8, flake8-print |
 
-Dev packages are **not** in `requirements.txt` (good separation) but versions are **unpinned**
-and declared in two places (gap).
+Dev packages are **not** in `requirements.txt` (good separation). Versions are **pinned** in
+`requirements-dev.in` / `requirements-dev.txt` (PYPOST-780).
 
 ## MCP Stack
 
@@ -102,7 +102,7 @@ No transitive license inventory is checked into the repo.
 | **P1** | R-P1-001 | Pin direct dependencies; add `mcp>=1.27,<2` upper bound |
 | **P1** | R-P1-002 | Add `pip-audit` (or OSV) CI job on requirements/lock — **Done (PYPOST-778)** |
 | P2 | R-P2-001 | Commit a lock file (`pip-compile` or `uv lock`) — **Done (PYPOST-779)** |
-| P2 | R-P2-002 | Consolidate dev deps in `requirements-dev.txt` with pins |
+| P2 | R-P2-002 | Consolidate dev deps in `requirements-dev.txt` with pins — **Done (PYPOST-780)** |
 | P2 | R-P2-003 | Add Dependabot for pip and GitHub Actions — **Done** |
 | P2 | R-P2-004 | Align `pydantic` constraint with MCP SDK (`>=2.11,<3`) |
 | P2 | R-P2-005 | Reconcile redundant `starlette`/`uvicorn` direct declarations |

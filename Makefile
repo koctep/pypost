@@ -1,4 +1,4 @@
-.PHONY: help venv venv-test install lock check-lock run clean test test-slow test-cov lint check security-audit generate-mcp-fixtures check-mcp-fixtures
+.PHONY: help venv venv-test install lock check-lock lock-dev check-lock-dev run clean test test-slow test-cov lint check security-audit generate-mcp-fixtures check-mcp-fixtures
 
 .DEFAULT_GOAL := help
 
@@ -22,8 +22,8 @@ $(VENV_MARKER):
 	$(BIN)/python -m pip install --upgrade pip
 	touch "$(VENV_MARKER)"
 
-venv-test: $(VENV_MARKER) ## Install pytest, flake8, and test tooling into the venv
-	$(BIN)/python -m pip install pytest flake8 flake8-print pytest-cov pytest-timeout
+venv-test: $(VENV_MARKER) ## Install pinned test and lint tooling from requirements-dev.txt
+	$(BIN)/python -m pip install -r requirements-dev.txt
 
 install: $(VENV_MARKER) venv-test ## Install application and test dependencies
 	$(BIN)/python -m pip install -r requirements.txt
@@ -37,6 +37,16 @@ check-lock: ## Verify requirements.txt matches requirements.in (needs uv on PATH
 	tail -n +3 requirements.txt.check > requirements.txt.check.body
 	diff -q requirements.txt.body requirements.txt.check.body
 	rm -f requirements.txt.check requirements.txt.body requirements.txt.check.body
+
+lock-dev: ## Regenerate requirements-dev.txt transitive lock from requirements-dev.in
+	$(UV) pip compile requirements-dev.in -o requirements-dev.txt --python-version $(LOCK_PYTHON_VERSION)
+
+check-lock-dev: ## Verify requirements-dev.txt matches requirements-dev.in (needs uv on PATH)
+	$(UV) pip compile requirements-dev.in -o requirements-dev.txt.check --python-version $(LOCK_PYTHON_VERSION)
+	tail -n +3 requirements-dev.txt > requirements-dev.txt.body
+	tail -n +3 requirements-dev.txt.check > requirements-dev.txt.check.body
+	diff -q requirements-dev.txt.body requirements-dev.txt.check.body
+	rm -f requirements-dev.txt.check requirements-dev.txt.body requirements-dev.txt.check.body
 
 run: $(VENV_MARKER) ## Run the PyPost desktop application
 	PYTHONPATH=. $(BIN)/python pypost/main.py

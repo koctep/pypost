@@ -64,6 +64,30 @@ Verify the committed lock matches the source file:
 make check-lock
 ```
 
+### Development dependency lock file (PYPOST-780)
+
+Test and lint tooling uses the same **two-file** layout as production:
+
+| File | Role |
+| --- | --- |
+| `requirements-dev.in` | Direct dev deps (pytest, flake8, etc.) |
+| `requirements-dev.txt` | Compiled transitive lock (committed; do not hand-edit) |
+
+`make venv-test` and CI install from `requirements-dev.txt`, so local and CI share one pinned
+dev stack.
+
+**Regenerate the dev lock** after editing `requirements-dev.in`:
+
+```bash
+make lock-dev
+```
+
+Verify the committed dev lock matches the source file:
+
+```bash
+make check-lock-dev
+```
+
 **Dependabot / upgrade workflow:** weekly pip PRs may bump `requirements.in` or `requirements.txt`.
 After merging dependency changes, run `make lock`, commit both files, and run `make check`.
 
@@ -141,7 +165,8 @@ setting `PYTHONPATH` (see PYPOST-434).
 
 **Reproducible test environment** (PYPOST-465): on a clean checkout, run `make install` once —
 it provisions app deps (`requirements.txt`) and test tooling (`pytest`, `pytest-cov`,
-`pytest-timeout`, `flake8`, `flake8-print` via `venv-test`). Then run full regression with:
+`pytest-timeout`, `flake8`, `flake8-print` via `venv-test` → `requirements-dev.txt`). Then run
+full regression with:
 
 ```bash
 make test        # fast suite (-m "not slow")

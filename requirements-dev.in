@@ -1,0 +1,9 @@
+# Direct development / test dependencies for PyPost.
+# Regenerate the transitive lock with: make lock-dev
+# See doc/dev/setup.md § Development dependency lock file.
+
+pytest>=8,<9
+pytest-cov>=6,<7
+pytest-timeout>=2,<3
+flake8>=7,<8
+flake8-print>=5,<6

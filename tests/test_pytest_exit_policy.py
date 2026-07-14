@@ -11,6 +11,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO_ROOT / "Makefile"
+REQUIREMENTS_DEV = REPO_ROOT / "requirements-dev.txt"
 PYTEST_EXIT_NO_TESTS = 5
 
 
@@ -36,6 +37,7 @@ def test_pytest_returns_exit_code_5_for_empty_tests_dir(tmp_path: Path) -> None:
 def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path) -> None:
     """make test must propagate pytest exit 5 — zero collection is a failure."""
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
+    shutil.copy(REQUIREMENTS_DEV, tmp_path / "requirements-dev.txt")
     (tmp_path / "requirements.txt").write_text(
         "# empty fixture for make install\n",
         encoding="utf-8",

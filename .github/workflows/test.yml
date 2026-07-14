@@ -43,12 +43,14 @@ jobs:
           cache-dependency-path: |
             requirements.in
             requirements.txt
+            requirements-dev.in
+            requirements-dev.txt
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
       - name: Install test tools
-        run: python -m pip install pytest pytest-cov flake8 flake8-print pytest-timeout
+        run: python -m pip install -r requirements-dev.txt
 
       - name: Install application dependencies
         run: python -m pip install -r requirements.txt
@@ -151,12 +153,14 @@ jobs:
           cache-dependency-path: |
             requirements.in
             requirements.txt
+            requirements-dev.in
+            requirements-dev.txt
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install pytest tooling
-        run: python -m pip install pytest pytest-timeout
+      - name: Install test tooling
+        run: python -m pip install -r requirements-dev.txt
 
       - name: Run slow Makefile install smoke
         run: |
@@ -176,6 +180,8 @@ jobs:
           cache-dependency-path: |
             requirements.in
             requirements.txt
+            requirements-dev.in
+            requirements-dev.txt
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
