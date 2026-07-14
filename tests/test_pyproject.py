@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 REQUIREMENTS_IN = REPO_ROOT / "requirements.in"
 REQUIREMENTS_DEV_IN = REPO_ROOT / "requirements-dev.in"
+REQUIREMENTS_OTEL_IN = REPO_ROOT / "requirements-otel.in"
 
 _SPEC_RE = re.compile(r"^([A-Za-z0-9_.-]+)\s*(.*)$")
 
@@ -64,6 +65,15 @@ class TestPyprojectToml:
         pyproject_specs = [_normalize_spec(spec) for spec in dev_specs]
         requirements_specs = [
             _normalize_spec(spec) for spec in _read_direct_specs(REQUIREMENTS_DEV_IN)
+        ]
+        assert pyproject_specs == requirements_specs
+
+    def test_otel_extra_matches_requirements_otel_in(self) -> None:
+        project = _load_pyproject()["project"]
+        otel_specs = project["optional-dependencies"]["otel"]
+        pyproject_specs = [_normalize_spec(spec) for spec in otel_specs]
+        requirements_specs = [
+            _normalize_spec(spec) for spec in _read_direct_specs(REQUIREMENTS_OTEL_IN)
         ]
         assert pyproject_specs == requirements_specs
 

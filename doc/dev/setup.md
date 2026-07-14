@@ -106,17 +106,41 @@ PyPost declares PEP 621 metadata and optional dependency groups in root `pyproje
 | --- | --- |
 | `[project].dependencies` | Direct production pins in `requirements.in` |
 | `[project.optional-dependencies].dev` | Direct dev pins in `requirements-dev.in` |
-| `[project.optional-dependencies].otel` | OpenTelemetry API/SDK (for future optional install) |
+| `[project.optional-dependencies].otel` | Direct OTel pins in `requirements-otel.in` |
 
-`make install` and CI still install from `requirements.txt` / `requirements-dev.txt`. When you
-change `requirements.in` or `requirements-dev.in`, update the matching `pyproject.toml` sections
-and run `make check` — `tests/test_pyproject.py` fails on drift.
+`make install` installs production (`requirements.txt`), dev test tooling (`requirements-dev.txt`),
+and the OTel overlay (`requirements-otel.txt`) so `make test` can run OTel unit tests. Production
+`requirements.txt` no longer includes OpenTelemetry (PYPOST-787). When you change
+`requirements.in`, `requirements-dev.in`, or `requirements-otel.in`, update the matching
+`pyproject.toml` sections and run `make check` — `tests/test_pyproject.py` fails on drift.
 
-Optional extras (not wired to Makefile yet):
+### OpenTelemetry optional overlay (PYPOST-787)
+
+OpenTelemetry is optional for runtime (Prometheus is the default metrics backend). Install paths:
+
+| File | Role |
+| --- | --- |
+| `requirements-otel.in` | Direct OTel API/SDK pins (edit this) |
+| `requirements-otel.txt` | Compiled transitive lock (committed; do not hand-edit) |
+
+**Regenerate the OTel lock** after editing `requirements-otel.in`:
 
 ```bash
-pip install -e ".[dev]"    # dev/test tooling
+make lock-otel
+```
+
+Verify the committed OTel lock matches the source file:
+
+```bash
+make check-lock-otel
+```
+
+`make venv-otel` installs only the OTel overlay; CI and `make install` include it for OTel tests.
+End users who need OTel export can also use:
+
+```bash
 pip install -e ".[otel]"   # OpenTelemetry metrics backend
+pip install -r requirements-otel.txt   # overlay lock file
 ```
 
 ### 3. Run the Application
@@ -174,9 +198,9 @@ Common targets:
 
 - `venv` is driven by `$(VENV_MARKER)` and is version-aware
   (`.venv/.initialized-<major.minor>`).
-- `run`, `test`, and `lint` depend on `$(VENV_MARKER)` only and do not trigger `install`.
-- If dependencies are missing, `run/test/lint` fail naturally with interpreter/module errors.
-- Use `make install` explicitly when dependencies must be installed or refreshed.
+- `run`, `test`, and `lint` depend on `$(VENV_MARKER)` only and do not trigger full `install`.
+- `test`, `test-slow`, and `test-cov` depend on `venv-otel` so OTel unit tests can import SDK
+  packages; run `make install` (or `pip install -r requirements.txt`) for application deps.
 
 ### Unit tests (pytest)
 
@@ -185,9 +209,9 @@ The repository root is not installed as a package by default. Root `pytest.ini` 
 setting `PYTHONPATH` (see PYPOST-434).
 
 **Reproducible test environment** (PYPOST-465): on a clean checkout, run `make install` once —
-it provisions app deps (`requirements.txt`) and test tooling (`pytest`, `pytest-cov`,
-`pytest-timeout`, `flake8`, `flake8-print` via `venv-test` → `requirements-dev.txt`). Then run
-full regression with:
+it provisions app deps (`requirements.txt`), test tooling (`pytest`, `pytest-cov`,
+`pytest-timeout`, `flake8`, `flake8-print` via `venv-test` → `requirements-dev.txt`), and the
+OTel overlay (`venv-otel` → `requirements-otel.txt`). Then run full regression with:
 
 ```bash
 make test        # fast suite (-m "not slow")

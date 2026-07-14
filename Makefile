@@ -1,4 +1,4 @@
-.PHONY: help venv venv-test install lock check-lock lock-dev check-lock-dev run clean test test-slow test-cov lint check security-audit generate-mcp-fixtures check-mcp-fixtures
+.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov lint check security-audit generate-mcp-fixtures check-mcp-fixtures
 
 .DEFAULT_GOAL := help
 
@@ -25,7 +25,10 @@ $(VENV_MARKER):
 venv-test: $(VENV_MARKER) ## Install pinned test and lint tooling from requirements-dev.txt
 	$(BIN)/python -m pip install -r requirements-dev.txt
 
-install: $(VENV_MARKER) venv-test ## Install application and test dependencies
+venv-otel: $(VENV_MARKER) ## Install optional OpenTelemetry overlay from requirements-otel.txt
+	$(BIN)/python -m pip install -r requirements-otel.txt
+
+install: $(VENV_MARKER) venv-test venv-otel ## Install application, test, and OTel test dependencies
 	$(BIN)/python -m pip install -r requirements.txt
 
 lock: ## Regenerate requirements.txt transitive lock from requirements.in
@@ -48,18 +51,28 @@ check-lock-dev: ## Verify requirements-dev.txt matches requirements-dev.in (need
 	diff -q requirements-dev.txt.body requirements-dev.txt.check.body
 	rm -f requirements-dev.txt.check requirements-dev.txt.body requirements-dev.txt.check.body
 
+lock-otel: ## Regenerate requirements-otel.txt transitive lock from requirements-otel.in
+	$(UV) pip compile requirements-otel.in -o requirements-otel.txt --python-version $(LOCK_PYTHON_VERSION)
+
+check-lock-otel: ## Verify requirements-otel.txt matches requirements-otel.in (needs uv on PATH)
+	$(UV) pip compile requirements-otel.in -o requirements-otel.txt.check --python-version $(LOCK_PYTHON_VERSION)
+	tail -n +3 requirements-otel.txt > requirements-otel.txt.body
+	tail -n +3 requirements-otel.txt.check > requirements-otel.txt.check.body
+	diff -q requirements-otel.txt.body requirements-otel.txt.check.body
+	rm -f requirements-otel.txt.check requirements-otel.txt.body requirements-otel.txt.check.body
+
 run: $(VENV_MARKER) ## Run the PyPost desktop application
 	PYTHONPATH=. $(BIN)/python pypost/main.py
 
-test: $(VENV_MARKER) ## Run fast test suite (excludes slow integration tests)
+test: $(VENV_MARKER) venv-otel ## Run fast test suite (excludes slow integration tests)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m "not slow")
 
-test-slow: $(VENV_MARKER) ## Run slow integration tests only (Makefile install smoke)
+test-slow: $(VENV_MARKER) venv-otel ## Run slow integration tests only (Makefile install smoke)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m slow)
 
-test-cov: $(VENV_MARKER) venv-test ## Run fast tests with coverage report
+test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage report
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
 		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov)

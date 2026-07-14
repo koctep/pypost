@@ -10,13 +10,13 @@ stack, license compatibility, and Dependabot/CI gaps. It complements the securit
 Full report:
 [ai-tasks/PYPOST-691/30-audit-report.md](../../ai-tasks/PYPOST-691/30-audit-report.md)
 
-**Date:** 2026-06-12 | **Scope:** 15 direct production dependencies, Makefile/CI install paths
+**Date:** 2026-06-12 | **Scope:** 13 direct production dependencies, Makefile/CI install paths
 
 ## Executive Summary
 
 | Metric | Value |
 | --- | --- |
-| Direct production deps | 15 |
+| Direct production deps | 13 |
 | Unpinned direct deps | 1 (`pydantic>=2.0` lower bound only) |
 | Lock / constraints file | `requirements.txt` (uv `pip compile` from `requirements.in`) |
 | `pyproject.toml` | PEP 621 metadata + `dev` / `otel` optional extras (PYPOST-785) |
@@ -61,8 +61,6 @@ available.
 | platformdirs | `==4.10.0` | Config paths |
 | mcp | `>=1.27,<2` | MCP server SDK (pulls starlette/uvicorn) |
 | prometheus_client | `==0.25.0` | Default metrics |
-| opentelemetry-api | `==1.42.1` | Alternate metrics API |
-| opentelemetry-sdk | `==1.42.1` | Alternate metrics SDK |
 | sseclient-py | `==1.9.0` | SSE response probe |
 | cryptography | `==48.0.1` | Encryption at rest |
 | keyring | `==25.7.0` | OS key store |
@@ -73,6 +71,7 @@ available.
 | --- | --- | --- |
 | Production | `requirements.txt` via `make install` | Runtime deps (locked) |
 | Development | `requirements-dev.txt` via `make venv-test` and CI | pytest, pytest-cov, pytest-timeout, flake8, flake8-print |
+| OpenTelemetry (optional) | `requirements-otel.txt` via `make venv-otel`, CI test jobs | opentelemetry-api, opentelemetry-sdk |
 
 Dev packages are **not** in `requirements.txt` (good separation). Versions are **pinned** in
 `requirements-dev.in` / `requirements-dev.txt` (PYPOST-780).
@@ -111,7 +110,7 @@ No transitive license inventory is checked into the repo. Distributor guidance f
 | P2 | R-P2-006 | Pin GitHub Actions to full commit SHAs |
 | P3 | R-P3-001 | Introduce `pyproject.toml` for metadata and optional extras — **Done (PYPOST-785)** |
 | P3 | R-P3-002 | Document PySide6 LGPL distribution obligations — **Done (PYPOST-786)** |
-| P3 | R-P3-003 | Split OpenTelemetry deps into optional extra |
+| P3 | R-P3-003 | Split OpenTelemetry deps into optional extra — **Done (PYPOST-787)** |
 | P3 | R-P3-004 | Refresh `setup.md` dependency list |
 
 | Priority | Count |

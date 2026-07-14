@@ -1,0 +1,6 @@
+# Optional OpenTelemetry metrics backend (PYPOST-787).
+# Regenerate the transitive lock with: make lock-otel
+# See doc/dev/setup.md § OpenTelemetry optional overlay.
+
+opentelemetry-api==1.42.1
+opentelemetry-sdk==1.42.1

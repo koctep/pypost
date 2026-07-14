@@ -11,8 +11,6 @@ platformdirs==4.10.0
 mcp>=1.27,<2
 # starlette and uvicorn are installed transitively via mcp; metrics_server imports them directly.
 prometheus_client==0.25.0
-opentelemetry-api==1.42.1
-opentelemetry-sdk==1.42.1
 sseclient-py==1.9.0
 cryptography==48.0.1
 keyring==25.7.0

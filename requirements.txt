@@ -68,15 +68,6 @@ more-itertools==11.1.0
     # via
     #   jaraco-classes
     #   jaraco-functools
-opentelemetry-api==1.42.1
-    # via
-    #   -r requirements.in
-    #   opentelemetry-sdk
-    #   opentelemetry-semantic-conventions
-opentelemetry-sdk==1.42.1
-    # via -r requirements.in
-opentelemetry-semantic-conventions==0.63b1
-    # via opentelemetry-sdk
 platformdirs==4.10.0
     # via -r requirements.in
 prometheus-client==0.25.0
@@ -135,9 +126,6 @@ typing-extensions==4.16.0
     # via
     #   anyio
     #   mcp
-    #   opentelemetry-api
-    #   opentelemetry-sdk
-    #   opentelemetry-semantic-conventions
     #   pydantic
     #   pydantic-core
     #   referencing
