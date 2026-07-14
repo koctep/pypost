@@ -518,13 +518,14 @@ CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest (`pyt
 ## CI dependency caching (PYPOST-311)
 
 Both CI jobs use `actions/setup-python@v5` with `cache: pip` and an explicit
-`cache-dependency-path: requirements.txt`. The cache stores downloaded pip wheels under the
-runner home directory and restores them before dependency installation.
+`cache-dependency-path` listing `requirements.in` and `requirements.txt`. The cache stores
+downloaded pip wheels under the runner home directory and restores them before dependency
+installation.
 
 | Aspect | Behavior |
 | --- | --- |
-| **Cache key** | OS + Python version + SHA-256 hash of `requirements.txt` |
-| **Invalidation** | Any edit to `requirements.txt` produces a new key (cold install) |
+| **Cache key** | OS + Python version + SHA-256 hash of `requirements.in` and `requirements.txt` |
+| **Invalidation** | Any edit to either lock file produces a new key (cold install) |
 | **Scope** | Main `test` matrix (3.11, 3.13) and `make-install-smoke` (3.11) |
 | **Not cached** | CI test tooling (`pytest`, `flake8`, etc.) — small, installed outside the lock file |
 | **Local dev** | `make install` uses Makefile `.venv`; GitHub cache applies to CI only |

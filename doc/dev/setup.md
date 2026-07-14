@@ -39,6 +39,34 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+### Dependency lock file (PYPOST-779)
+
+Production dependencies use a **two-file** layout:
+
+| File | Role |
+| --- | --- |
+| `requirements.in` | Direct dependencies and version constraints (edit this) |
+| `requirements.txt` | Compiled transitive lock with exact pins (committed; do not hand-edit) |
+
+`make install` and CI install from `requirements.txt`, so every clone gets the same resolved
+graph. The lock is compiled for **Python 3.11** (minimum supported); CI also tests **3.13**.
+
+**Regenerate the lock** after editing `requirements.in` (requires [uv](https://docs.astral.sh/uv/)
+on `PATH`):
+
+```bash
+make lock
+```
+
+Verify the committed lock matches the source file:
+
+```bash
+make check-lock
+```
+
+**Dependabot / upgrade workflow:** weekly pip PRs may bump `requirements.in` or `requirements.txt`.
+After merging dependency changes, run `make lock`, commit both files, and run `make check`.
+
 **Key Dependencies:**
 - `PySide6`: The Qt framework for Python (GUI).
 - `requests`: HTTP library for sending requests.

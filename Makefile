@@ -1,9 +1,11 @@
-.PHONY: help venv venv-test install run clean test test-slow test-cov lint check security-audit generate-mcp-fixtures check-mcp-fixtures
+.PHONY: help venv venv-test install lock check-lock run clean test test-slow test-cov lint check security-audit generate-mcp-fixtures check-mcp-fixtures
 
 .DEFAULT_GOAL := help
 
 PYTHON := python3
 PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+LOCK_PYTHON_VERSION ?= 3.11
+UV ?= uv
 VENV := .venv
 BIN := $(VENV)/bin
 VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
@@ -25,6 +27,16 @@ venv-test: $(VENV_MARKER) ## Install pytest, flake8, and test tooling into the v
 
 install: $(VENV_MARKER) venv-test ## Install application and test dependencies
 	$(BIN)/python -m pip install -r requirements.txt
+
+lock: ## Regenerate requirements.txt transitive lock from requirements.in
+	$(UV) pip compile requirements.in -o requirements.txt --python-version $(LOCK_PYTHON_VERSION)
+
+check-lock: ## Verify requirements.txt matches requirements.in (needs uv on PATH)
+	$(UV) pip compile requirements.in -o requirements.txt.check --python-version $(LOCK_PYTHON_VERSION)
+	tail -n +3 requirements.txt > requirements.txt.body
+	tail -n +3 requirements.txt.check > requirements.txt.check.body
+	diff -q requirements.txt.body requirements.txt.check.body
+	rm -f requirements.txt.check requirements.txt.body requirements.txt.check.body
 
 run: $(VENV_MARKER) ## Run the PyPost desktop application
 	PYTHONPATH=. $(BIN)/python pypost/main.py

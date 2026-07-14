@@ -18,7 +18,7 @@ Full report:
 | --- | --- |
 | Direct production deps | 15 |
 | Unpinned direct deps | 1 (`pydantic>=2.0` lower bound only) |
-| Lock / constraints file | None |
+| Lock / constraints file | `requirements.txt` (uv `pip compile` from `requirements.in`) |
 | `pyproject.toml` | None |
 | CI vulnerability scanner | `pip-audit` job in `.github/workflows/test.yml` (PYPOST-778) |
 | Dependabot config | `.github/dependabot.yml` (pip + GitHub Actions, weekly) |
@@ -32,7 +32,8 @@ Full report:
 3. **Automation gaps** — Dev tool versions still duplicated unpinned in Makefile and CI.
 
 **Positive:** Test tooling is excluded from `requirements.txt`. CI pip cache invalidates when
-`requirements.txt` changes (PYPOST-311). Dependabot opens weekly dependency PRs.
+`requirements.in` or `requirements.txt` changes (PYPOST-311, PYPOST-779). Dependabot opens weekly
+dependency PRs. Transitive production graph is locked via `uv pip compile` (PYPOST-779).
 
 ## CVE Scanning (PYPOST-778)
 
@@ -100,7 +101,7 @@ No transitive license inventory is checked into the repo.
 | --- | --- | --- |
 | **P1** | R-P1-001 | Pin direct dependencies; add `mcp>=1.27,<2` upper bound |
 | **P1** | R-P1-002 | Add `pip-audit` (or OSV) CI job on requirements/lock — **Done (PYPOST-778)** |
-| P2 | R-P2-001 | Commit a lock file (`pip-compile` or `uv lock`) |
+| P2 | R-P2-001 | Commit a lock file (`pip-compile` or `uv lock`) — **Done (PYPOST-779)** |
 | P2 | R-P2-002 | Consolidate dev deps in `requirements-dev.txt` with pins |
 | P2 | R-P2-003 | Add Dependabot for pip and GitHub Actions — **Done** |
 | P2 | R-P2-004 | Align `pydantic` constraint with MCP SDK (`>=2.11,<3`) |
