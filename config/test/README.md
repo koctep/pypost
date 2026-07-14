@@ -44,7 +44,8 @@ ones, merge the "MCP Test" entry into your current file instead of overwriting.
 Connect Cursor to `http://127.0.0.1:1080/mcp` (Streamable HTTP). Then:
 
 - Ask the agent to list MCP tools — expect `sse_probe_metrics`, `sse_probe_main`.
-- Call `sse_probe_main` or `sse_probe_metrics` and confirm a connection/summary response.
+- Call `sse_probe_main` or `sse_probe_metrics` and confirm the agent parses the JSON
+  envelope (`json.loads` on `TextContent.text` → `status`, `error`, `body`).
 
 See [Cursor verification checklist](../../ai-tasks/PYPOST-552/cursor-verification-checklist.md).
 

@@ -67,18 +67,46 @@ switch environments while an agent is connected, the next tool call resolves var
 the new environment — the agent is not notified automatically. Keep one environment selected
 for the duration of an agent session when you need stable URLs or credentials.
 
-## Active environment
+## Tool call responses (JSON envelope)
 
-MCP tools always use the **environment currently selected** in PyPost's top bar. If you
-switch environments while an agent is connected, the next tool call resolves variables from
-the new environment — the agent is not notified automatically. Keep one environment selected
-for the duration of an agent session when you need stable URLs or credentials.
+Every successful PyPost `call_tool` returns a **JSON envelope** in the MCP `TextContent.text`
+field — not the raw upstream HTTP body. Agents and operators must parse it with `json.loads`
+before reading outcomes.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `status` | `int` | Upstream HTTP status; `0` when PyPost could not complete the request |
+| `error` | `bool` | `true` when PyPost execution failed; `false` for completed HTTP calls (including 4xx/5xx) |
+| `body` | `str` | Upstream response body (may be JSON text or plain text) |
+| `logs` | `string[]` | Optional post-request script log lines |
+
+Example (Python MCP client):
+
+```python
+import json
+
+payload = json.loads(result.content[0].text)
+if payload["error"]:
+    raise RuntimeError(payload.get("error_message", "PyPost execution failed"))
+http_status = payload["status"]
+response_body = payload["body"]
+script_logs = payload.get("logs", [])
+```
+
+**Breaking change:** Agents that treated tool output as raw HTTP body text must migrate to
+JSON parsing. Protocol errors (unknown tool, internal server failure) are **not** JSON
+envelopes — they remain plain text or MCP errors.
+
+Full schema and error semantics:
+[Developer MCP guide](dev/mcp_integration.md#structured-tool-results-pypost-557).
 
 **Verify in Cursor:**
 
 1. Confirm the MCP server shows as connected (no transport or handshake errors).
 2. Ask the agent to list available PyPost MCP tools — names match requests marked "MCP Tool".
-3. Invoke one tool (e.g. a simple GET) and confirm the response body appears in chat.
+3. Invoke one tool (e.g. a simple GET) and confirm the agent parses the JSON envelope
+   (`status`, `error`, `body`, optional `logs`) — not raw HTTP body text alone.
+4. Optional: add a system prompt telling the agent to `json.loads` PyPost tool `TextContent`.
 
 See [Cursor verification checklist](../ai-tasks/PYPOST-552/cursor-verification-checklist.md)
 for a full manual checklist.
@@ -127,6 +155,7 @@ errors).
 | Cursor shows disconnected / transport error | Wrong URL or type (SSE instead of Streamable HTTP) | Use `http://127.0.0.1:1080/mcp` and Streamable HTTP |
 | No tools listed | MCP off, wrong environment, or no requests marked MCP Tool | Enable MCP on environment; check "MCP Tool" on requests |
 | Tool call fails | Missing env vars or bad request template | Define variables in active environment; test send in GUI first |
+| Agent misreads HTTP status | Treating `TextContent.text` as raw body | Parse JSON envelope; read `status` and `error` fields |
 | Wrong host or credentials mid-session | Active environment switched while agent connected | Reselect intended environment; avoid switching during agent use |
 | Connection refused | PyPost not running or MCP not started | Select environment with MCP enabled; check "MCP: ON" in top bar |
 

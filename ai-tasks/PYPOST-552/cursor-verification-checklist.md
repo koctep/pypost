@@ -35,7 +35,10 @@ Streamable HTTP, discover tools, and invoke them. Automated protocol coverage:
 ## Cursor agent: call_tool
 
 - [ ] Invoke `sse_probe_main` (or another simple exposed tool)
-- [ ] Agent receives a text response (SSE probe summary or HTTP body)
+- [ ] Agent receives `TextContent` whose `text` is a JSON envelope (not raw HTTP body alone)
+- [ ] Parsed envelope includes `status`, `error`, and `body` keys
+- [ ] `error` is `false` for a successful probe; `status` reflects upstream HTTP code
+- [ ] Optional: confirm agent prompt instructs `json.loads` on PyPost tool results
 - [ ] No timeout or "tool not found" errors
 - [ ] Optional: invoke a second tool to confirm repeat calls work
 

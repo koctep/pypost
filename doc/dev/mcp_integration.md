@@ -284,6 +284,31 @@ Example network failure:
 **Protocol errors** (unknown tool, unexpected internal exception) are **not** JSON envelopes —
 unknown tools raise; internal failures return plain `Error executing request: …` text.
 
+#### Agent parsing (PYPOST-680)
+
+MCP clients receive the envelope as a string in `TextContent.text`. **Always** parse before
+using fields — do not assume the text is the upstream HTTP body.
+
+```python
+import json
+
+envelope = json.loads(text_content.text)
+status = envelope["status"]
+failed = envelope["error"]
+body = envelope["body"]
+logs = envelope.get("logs", [])
+```
+
+| Consumer | Guidance |
+| --- | --- |
+| AI agents (Cursor, Claude Desktop) | Parse JSON on every successful `call_tool`; check `error` before `body` |
+| Custom MCP clients | Same as integration tests: `json.loads(result.content[0].text)` |
+| Operators | User-facing setup: [mcp_integration.md](../mcp_integration.md#tool-call-responses-json-envelope) |
+
+`error: false` with `status: 404` means PyPost executed successfully and the upstream API
+returned 404. `error: true` with `status: 0` means PyPost failed before a normal HTTP
+response (network, template, script).
+
 Metrics: `track_mcp_response_sent` uses outcome `"error"` when the envelope `error` flag is
 `true`, else `"success"`.
 
