@@ -216,5 +216,36 @@ class TestAlertManagerAccumulation(unittest.TestCase):
         self.assertEqual(self._line_count(), 1)
 
 
+class TestAlertManagerLogSanitization(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.log_path = Path(self.tmpdir) / "alerts.log"
+
+    def test_emit_log_redacts_endpoint_secrets(self):
+        mgr = AlertManager(log_path=self.log_path)
+        with self.assertLogs("pypost.core.alert_manager", level="WARNING") as logs:
+            mgr.emit(
+                _make_payload(endpoint="http://api.example.com/v1?token=supersecret")
+            )
+        joined = "\n".join(logs.output)
+        self.assertNotIn("supersecret", joined)
+        self.assertIn("token=***", joined)
+
+    def test_webhook_failure_log_omits_query_secrets(self):
+        mgr = AlertManager(
+            log_path=self.log_path,
+            webhook_url="http://hooks.example.com/alert?key=supersecret",
+        )
+        with patch(
+            "pypost.core.alert_manager.requests.post",
+            side_effect=ConnectionError("unreachable"),
+        ):
+            with self.assertLogs("pypost.core.alert_manager", level="WARNING") as logs:
+                mgr.emit(_make_payload())
+        joined = "\n".join(logs.output)
+        self.assertNotIn("supersecret", joined)
+        self.assertIn("hooks.example.com", joined)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -8,10 +8,27 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from urllib.parse import urlparse
+
 import requests
 from platformdirs import user_data_dir
 
+from pypost.core.sensitive_text_sanitizer import sanitize_text
+
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_log_url(url: str) -> str:
+    return sanitize_text(url)
+
+
+def _webhook_log_target(url: str) -> str:
+    """Return host (and path prefix) for logs — omit query secrets."""
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return "***"
+    path = parsed.path or "/"
+    return f"{parsed.scheme}://{parsed.netloc}{path}"
 
 
 @dataclass
@@ -107,9 +124,9 @@ class AlertManager:
         """Write JSON alert to the rotating log file and optionally send to webhook."""
         self._logger.info(json.dumps(payload.to_dict()))
         logger.warning(
-            "alert_emitted request_name=%r endpoint=%r retries=%d" " error_category=%s webhook=%s",
+            "alert_emitted request_name=%r endpoint=%r retries=%d error_category=%s webhook=%s",
             payload.request_name,
-            payload.endpoint,
+            _sanitize_log_url(payload.endpoint),
             payload.retries_attempted,
             payload.final_error_category,
             "yes" if self._webhook_url else "no",
@@ -128,6 +145,14 @@ class AlertManager:
                 headers=headers,
                 timeout=5.0,
             )
-            logger.debug("alert_webhook_ok url=%r status=%d", self._webhook_url, resp.status_code)
+            logger.debug(
+                "alert_webhook_ok target=%s status=%d",
+                _webhook_log_target(self._webhook_url),
+                resp.status_code,
+            )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("alert_webhook_failed url=%r error=%s", self._webhook_url, exc)
+            logger.warning(
+                "alert_webhook_failed target=%s error=%s",
+                _webhook_log_target(self._webhook_url),
+                exc,
+            )
