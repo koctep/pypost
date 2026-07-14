@@ -63,7 +63,14 @@ python -m pypost.main
 
 ### 4. Development Commands
 
-The project uses a `Makefile` to simplify common tasks:
+The project uses a `Makefile` to simplify common tasks. Run `make` or `make help` to list all
+documented targets and descriptions:
+
+```bash
+make help
+```
+
+Common targets:
 
 - **Initialize virtual environment only**:
   ```bash
@@ -80,6 +87,10 @@ The project uses a `Makefile` to simplify common tasks:
 - **Lint code**:
   ```bash
   make lint
+  ```
+- **Quality gate** (lint + fast tests):
+  ```bash
+  make check
   ```
 - **Clean up** (removes `.venv` and cache):
   ```bash
