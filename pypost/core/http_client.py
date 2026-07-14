@@ -217,10 +217,10 @@ class HTTPClient:
     def send_request(
         self,
         request_data: RequestData,
-        variables: Dict[str, str] = None,
-        stream_callback: Callable[[str], None] = None,
-        stop_flag: Callable[[], bool] = None,
-        headers_callback: Callable[[int, Dict], None] = None,
+        variables: Dict[str, str] | None = None,
+        stream_callback: Callable[[str], None] | None = None,
+        stop_flag: Callable[[], bool] | None = None,
+        headers_callback: Callable[[int, Dict], None] | None = None,
     ) -> HTTPRequestResult:
         if variables is None:
             variables = {}

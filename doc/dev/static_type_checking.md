@@ -27,7 +27,7 @@ To see raw mypy output (including all known baseline errors):
 | File | Role |
 | --- | --- |
 | `pyproject.toml` `[tool.mypy]` | Checker settings and scoped paths |
-| `mypy-baseline.json` | Frozen `path:line:error-code` signatures (54 as of PYPOST-734) |
+| `mypy-baseline.json` | Frozen `path:line:error-code` signatures (42 as of PYPOST-813) |
 | `scripts/check_mypy_baseline.py` | Runs mypy and compares against baseline |
 | `Makefile` `typecheck` | Developer entry point |
 
@@ -85,22 +85,27 @@ Key mypy settings (see `pyproject.toml` for the full list):
 
 Dev dependencies: `mypy` and `types-PyYAML` (YAML stub types) in `requirements-dev.in`.
 
-## Baseline Triage (PYPOST-734)
+## Baseline Triage (PYPOST-734 / PYPOST-813)
 
-54 errors in 16 files under `pypost/core/` (July 2026 snapshot). Top categories:
+42 errors in 15 files under `pypost/core/` (July 2026 snapshot). Top categories:
 
 | Code | Count | Typical fix |
 | --- | ---: | --- |
-| `assignment` | 15 | Add `\| None` to optional parameters |
 | `arg-type` | 12 | Narrow `str \| None` before use |
+| `assignment` | 7 | Add `\| None` to optional parameters |
 | `attr-defined` | 7 | Optional attributes, MCP server API typing |
 | `var-annotated` | 4 | Add local variable annotations |
+| `union-attr` | 4 | Nullable `TemplateService` |
+| `misc` | 4 | Conditional `cryptography` imports |
+| `return-value` | 2 | Protocol / envelope mismatches |
+| `no-any-return` | 2 | Untyped third-party returns |
 
-Suggested fix order: `http_client.py` / `request_service.py` optional defaults →
-`alert_manager.py` webhook URL guards → `ExecuteRequestProtocol` alignment → encryption codec
-conditional imports.
+Suggested fix order: `alert_manager.py` webhook URL guards → `ExecuteRequestProtocol` alignment
+(PYPOST-814) → encryption codec conditional imports → nullable `TemplateService` in
+`request_service.py`.
 
-Full breakdown: `ai-tasks/PYPOST-734/20-architecture.md`.
+Full breakdown: `ai-tasks/PYPOST-734/20-architecture.md` (initial triage);
+`ai-tasks/PYPOST-813/20-architecture.md` (R-P2-005a delta).
 
 ## Relationship to Other Quality Gates
 
