@@ -6,6 +6,8 @@ import sys
 import pytest
 from PySide6.QtWidgets import QApplication
 
+pytest_plugins = ["tests._pytest_plugins.duration_report"]
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
