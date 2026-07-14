@@ -94,6 +94,7 @@ PYTHONPATH=. python pypost/main.py
 
 Additional commands for developers are available in the project:
 
+*   [Developer documentation](doc/dev/README.md) — setup, architecture, capability docs, and audits.
 *   `make lint` — check code with linter (flake8).
 *   `make test` — run tests (pytest).
 *   `make clean` — clean temporary files and virtual environment.
