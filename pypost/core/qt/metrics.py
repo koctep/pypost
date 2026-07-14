@@ -148,6 +148,15 @@ class MetricsManager(QObject):
             render_path, code, function_name
         )
 
+    def track_template_expression_render_duration(
+        self,
+        render_path: str,
+        duration_seconds: float,
+    ) -> None:
+        self._registry.track_template_expression_render_duration(
+            render_path, duration_seconds
+        )
+
     def track_variable_validation(self, result: str) -> None:
         self._registry.track_variable_validation(result)
 

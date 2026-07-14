@@ -32,10 +32,10 @@ You should see `# HELP` lines and counter names ending in `_total`.
 
 ## Metric inventory
 
-PyPost registers **32 Prometheus instruments** in
+PyPost registers **33 Prometheus instruments** in
 [`pypost/core/metrics_registry.py`](../pypost/core/metrics_registry.py): **30 counters**, **1
-gauge**, and **1 histogram**. Counters and the gauge are monotonic or point-in-time values;
-the histogram records MCP tool call durations.
+gauge**, and **2 histograms**. Counters and the gauge are monotonic or point-in-time values;
+histograms record MCP tool call and template render durations.
 
 Verify the registration count:
 
@@ -76,6 +76,7 @@ rg 'Counter\(|Histogram\(|Gauge\(' pypost/core/metrics_registry.py | wc -l
 | `request_retry_exhaustions_total` | Counter | `endpoint` | All configured retries exhausted for a URL |
 | `template_expression_render_attempts_total` | Counter | `render_path`, `outcome` | `{{…}}` function placeholder render attempt (`render_path`: `runtime`, `hover`, `curl`; `outcome`: `success`, `empty_content`, `validation_error`, `render_error`) |
 | `template_expression_validation_failures_total` | Counter | `render_path`, `code`, `function_name` | Template function validation failure (`code`: `unknown_function`, `invalid_arity`, …) |
+| `template_expression_render_duration_seconds` | Histogram | `render_path` | Jinja compile+render wall time in seconds (`render_path`: `runtime`, `hover`, `curl`) |
 
 ### MCP server
 

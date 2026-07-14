@@ -74,6 +74,12 @@ class MetricsTrackerProtocol(Protocol):
         function_name: str | None = None,
     ) -> None: ...
 
+    def track_template_expression_render_duration(
+        self,
+        render_path: str,
+        duration_seconds: float,
+    ) -> None: ...
+
     def track_variable_validation(self, result: str) -> None: ...
 
     def track_variable_validation_failure(self, reason: str) -> None: ...
@@ -177,6 +183,13 @@ class NullMetrics:
         render_path: str,
         code: str,
         function_name: str | None = None,
+    ) -> None:
+        return None
+
+    def track_template_expression_render_duration(
+        self,
+        render_path: str,
+        duration_seconds: float,
     ) -> None:
         return None
 

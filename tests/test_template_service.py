@@ -3,6 +3,7 @@ import pytest
 pytestmark = pytest.mark.timeout(30)
 
 import unittest
+from functools import lru_cache
 from unittest.mock import MagicMock, call, patch
 
 import jinja2.nodes
@@ -10,6 +11,7 @@ import jinja2.nodes
 from pypost.core.template_service import TemplateService
 from pypost.core.template_service_render import (
     fallback_content_after_render_exception,
+    render_with_jinja,
 )
 from tests.test_function_expression_resolver import MALFORMED_NESTED_EXPRESSION_CASES
 
@@ -445,6 +447,10 @@ class TestTemplateServiceRenderStages(unittest.TestCase):
             render_path="runtime", outcome="success",
         )
         self.metrics.track_template_expression_validation_failure.assert_not_called()
+        self.metrics.track_template_expression_render_duration.assert_called_once()
+        duration_args = self.metrics.track_template_expression_render_duration.call_args[0]
+        self.assertEqual("runtime", duration_args[0])
+        self.assertGreaterEqual(duration_args[1], 0.0)
 
     def test_stage_render_error_returns_original_content_and_tracks_render_error(self):
         content = "{{urlencode(db)}}"
@@ -503,6 +509,49 @@ class TestTemplateServiceHelperStages(unittest.TestCase):
 
         self.assertEqual("{{not_allowed(db)}}", result)
         self.metrics.track_template_expression_render_attempt.assert_not_called()
+
+    def test_render_with_jinja_records_duration_on_success(self):
+        from jinja2 import Environment
+
+        env = Environment()
+
+        @lru_cache(maxsize=256)
+        def compile_template(content: str):
+            return env.from_string(content)
+
+        result = render_with_jinja(
+            compile_template,
+            "{{ name }}",
+            {"name": "alice"},
+            self.metrics,
+            "hover",
+        )
+
+        self.assertEqual("alice", result)
+        self.metrics.track_template_expression_render_duration.assert_called_once()
+        args = self.metrics.track_template_expression_render_duration.call_args[0]
+        self.assertEqual("hover", args[0])
+        self.assertGreaterEqual(args[1], 0.0)
+
+    def test_render_with_jinja_records_duration_on_render_error(self):
+        def compile_template(_content: str):
+            mock_template = MagicMock()
+            mock_template.render.side_effect = RuntimeError("boom")
+            return mock_template
+
+        with self.assertRaises(RuntimeError):
+            render_with_jinja(
+                compile_template,
+                "{{ urlencode(db) }}",
+                {"db": "alice"},
+                self.metrics,
+                "runtime",
+            )
+
+        self.metrics.track_template_expression_render_duration.assert_called_once()
+        args = self.metrics.track_template_expression_render_duration.call_args[0]
+        self.assertEqual("runtime", args[0])
+        self.assertGreaterEqual(args[1], 0.0)
 
 
 if __name__ == "__main__":

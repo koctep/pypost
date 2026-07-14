@@ -1,6 +1,7 @@
 """Private render and observability helpers for ``TemplateService`` (PYPOST-700)."""
 
 import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -64,17 +65,26 @@ def render_with_jinja(
     compile_template: Callable[[str], Any],
     content: str,
     variables: dict[str, Any],
+    metrics: MetricsTrackerProtocol,
+    render_path: str,
 ) -> str:
-    template = compile_template(content)
-    if logger.isEnabledFor(logging.DEBUG):
-        info = compile_template.cache_info()
-        logger.debug(
-            "template_compile_cache hits=%d misses=%d size=%d",
-            info.hits,
-            info.misses,
-            info.currsize,
+    start = time.perf_counter()
+    try:
+        template = compile_template(content)
+        if logger.isEnabledFor(logging.DEBUG):
+            info = compile_template.cache_info()
+            logger.debug(
+                "template_compile_cache hits=%d misses=%d size=%d",
+                info.hits,
+                info.misses,
+                info.currsize,
+            )
+        return template.render(**variables)
+    finally:
+        metrics.track_template_expression_render_duration(
+            render_path,
+            time.perf_counter() - start,
         )
-    return template.render(**variables)
 
 
 def emit_render_success_observability(

@@ -156,6 +156,11 @@ class OtelMetricsTracker:
             "template_expression_validation_failures_total",
             description="TemplateService function-placeholder validation failures",
         )
+        self._template_expression_render_duration_seconds = meter.create_histogram(
+            "template_expression_render_duration_seconds",
+            description="TemplateService Jinja render duration in seconds",
+            unit="s",
+        )
         self._environment_value_encryptions_total = meter.create_counter(
             "environment_value_encryptions_total",
             description="Number of environment values encrypted before persistence",
@@ -284,6 +289,16 @@ class OtelMetricsTracker:
                 "code": code,
                 "function_name": function_name or "n/a",
             },
+        )
+
+    def track_template_expression_render_duration(
+        self,
+        render_path: str,
+        duration_seconds: float,
+    ) -> None:
+        self._template_expression_render_duration_seconds.record(
+            duration_seconds,
+            {"render_path": render_path},
         )
 
     def track_variable_validation(self, result: str) -> None:

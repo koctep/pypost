@@ -90,6 +90,20 @@ def test_track_mcp_tool_call_duration_records_histogram(otel_reader):
     )
 
 
+def test_track_template_expression_render_duration_records_histogram(otel_reader):
+    reader, provider = otel_reader
+    tracker = OtelMetricsTracker(meter=provider.get_meter("template-duration-test"))
+    tracker.track_template_expression_render_duration("hover", 0.001)
+    assert (
+        _histogram_count(
+            reader,
+            "template_expression_render_duration_seconds",
+            {"render_path": "hover"},
+        )
+        == 1
+    )
+
+
 def test_set_mcp_server_up_updates_internal_state(otel_reader):
     _reader, provider = otel_reader
     tracker = OtelMetricsTracker(meter=provider.get_meter("gauge-test"))

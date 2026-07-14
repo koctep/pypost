@@ -99,6 +99,8 @@ class TemplateService:
                 self._compile_template,
                 content,
                 variables,
+                self._metrics,
+                render_path,
             )
             emit_render_success_observability(
                 self._metrics,

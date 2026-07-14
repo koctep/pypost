@@ -52,5 +52,21 @@ class TestMetricsRegistryMcpCounters(unittest.TestCase):
         self.assertIn("mcp_active_env_changes_total 2.0", out)
 
 
+class TestMetricsRegistryTemplateRenderDuration(unittest.TestCase):
+    def test_track_template_expression_render_duration(self):
+        reg = MetricsRegistry()
+        reg.track_template_expression_render_duration("runtime", 0.001)
+        reg.track_template_expression_render_duration("hover", 0.002)
+        out = _scrape(reg)
+        self.assertIn(
+            'template_expression_render_duration_seconds_count{render_path="runtime"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'template_expression_render_duration_seconds_count{render_path="hover"} 1.0',
+            out,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

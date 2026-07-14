@@ -185,6 +185,12 @@ class MetricsRegistry:
             ["render_path", "code", "function_name"],
             registry=self.registry,
         )
+        self.template_expression_render_duration_seconds = Histogram(
+            "template_expression_render_duration_seconds",
+            "TemplateService Jinja render duration in seconds",
+            ["render_path"],
+            registry=self.registry,
+        )
 
     def _init_mcp_metrics(self) -> None:
         """Register MCP server counters, gauge, and histogram."""
@@ -345,6 +351,15 @@ class MetricsRegistry:
             code=code,
             function_name=function_name or "n/a",
         ).inc()
+
+    def track_template_expression_render_duration(
+        self,
+        render_path: str,
+        duration_seconds: float,
+    ) -> None:
+        self.template_expression_render_duration_seconds.labels(
+            render_path=render_path,
+        ).observe(duration_seconds)
 
     def track_variable_validation(self, result: str) -> None:
         """Track variable name validation attempt.

@@ -150,6 +150,15 @@ class TestMetricsManagerRetryExhaustion(unittest.TestCase):
             out,
         )
 
+    def test_track_template_expression_render_duration(self):
+        mm = MetricsManager()
+        mm.track_template_expression_render_duration("runtime", 0.001)
+        out = _scrape(mm)
+        self.assertIn(
+            'template_expression_render_duration_seconds_count{render_path="runtime"} 1.0',
+            out,
+        )
+
 
 class TestMetricsManagerMcpResource(unittest.TestCase):
     def test_read_resource_metrics_success(self):

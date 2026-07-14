@@ -74,7 +74,8 @@ TabsPresenter → RequestWorker → RequestService.execute
 - One shared `jinja2.Environment` per injected `TemplateService`.
 - `@lru_cache(maxsize=256)` on template compile (PYPOST-628).
 - DEBUG logs: `template_compile_cache hits/misses`.
-- No render-duration Prometheus histogram (P3).
+- Prometheus histogram `template_expression_render_duration_seconds` labeled by `render_path`
+  (`runtime`, `hover`, `curl`) — PYPOST-761.
 
 ## UI Responsiveness
 
