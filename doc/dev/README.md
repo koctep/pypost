@@ -9,6 +9,7 @@ set up your development environment, and contribute to the project.
 
 1. [Setup and Installation](setup.md)
 1. [Architecture Overview](architecture.md)
+1. [Architecture Decision Records (ADR) index](../adr/README.md)
 1. [Request Execution](request_execution.md)
 1. [TemplateService — central variable substitution](template_service.md)
 1. [Template Expression Functions (PYPOST-450)](template_expression_functions.md)
