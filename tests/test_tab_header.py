@@ -4,7 +4,9 @@ pytestmark = pytest.mark.timeout(60)
 
 import unittest
 
-from PySide6.QtWidgets import QApplication, QTabWidget, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QTabBar, QTabWidget, QWidget
 
 from pypost.ui.widgets.tab_header import PLUS_TAB_MARKER, RequestTabHeader
 
@@ -30,7 +32,9 @@ class TestRequestTabHeader(unittest.TestCase):
         header, _tabs = self._make_header()
         received = []
         header.new_tab_requested.connect(lambda: received.append(True))
-        header.tab_bar.tabBarClicked.emit(header.plus_tab_index())
+        plus_idx = header.plus_tab_index()
+        plus_btn = header.tab_bar.tabButton(plus_idx, QTabBar.ButtonPosition.LeftSide)
+        QTest.mouseClick(plus_btn, Qt.MouseButton.LeftButton)
         self.assertEqual(received, [True])
 
     def test_is_plus_tab_index(self):

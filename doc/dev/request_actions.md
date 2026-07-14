@@ -16,8 +16,9 @@ This design reduces UI clutter and allows adding more actions in the same menu l
 - **`RequestTabHeader` (`pypost/ui/widgets/tab_header.py`)**:
   - Owns request tab-bar chrome: closable tab setup, trailing plus placeholder tab, and label
     text updates via `set_tab_label`.
-  - Emits `new_tab_requested` when the user clicks the `+` tab; wired to
-    `TabsPresenter.handle_new_tab("plus_button")`.
+  - Emits `new_tab_requested` when the user clicks the embedded `+` button (primary path via
+    `plus_btn.clicked`) or the plus-tab chrome outside the button (fallback via
+    `tabBarClicked`); wired to `TabsPresenter.handle_new_tab("plus_button")`.
 - **`TabsPresenter` (`pypost/ui/presenters/tabs_presenter.py`)**:
   - Receives `save_requested` and `save_as_requested` from each `RequestWidget`.
   - Delegates persistence to `RequestSaveOrchestrator` and updates tab state/signals.
@@ -41,7 +42,9 @@ High-level flow:
 3. `TabsPresenter` calls `RequestSaveOrchestrator.save_request` and emits `request_saved`.
 
 New-tab flow:
-1. User clicks `+` (plus tab) or presses `Ctrl+N`.
+1. User clicks the embedded `+` `QPushButton` (primary), clicks plus-tab chrome outside the
+   button (fallback), or presses `Ctrl+N`.
+1. `RequestTabHeader` emits `new_tab_requested` (`plus_btn.clicked` or `_on_tab_bar_clicked`).
 1. `TabsPresenter.handle_new_tab(source=...)` logs source and request-tab count before action.
 1. `MetricsManager.track_gui_new_tab_action(source)` increments labeled metric.
 1. `TabsPresenter.add_new_tab()` inserts and selects a new request tab before the plus placeholder.
@@ -118,7 +121,11 @@ Layout-managed `+` control using Qt tab-bar APIs:
 
 - Trailing tab marked with `PLUS_TAB_MARKER` in `QTabBar.tabData`.
 - `+` widget attached via `QTabBar.setTabButton(..., LeftSide, ...)`.
-- `tabBarClicked` on the plus index emits `new_tab_requested` → `handle_new_tab("plus_button")`.
+- **Primary click path**: `plus_btn.clicked` → `new_tab_requested` →
+  `handle_new_tab("plus_button")`. Required because `QTabBar.tabBarClicked` does not fire when
+  the user clicks an embedded tab-button widget (Qt routes the event to the child).
+- **Fallback click path**: `_on_tab_bar_clicked` on `tabBarClicked` at the plus index emits
+  `new_tab_requested` when the user clicks plus-tab chrome outside the embedded button.
 - Close requests on the plus tab are ignored; tab cycling skips the placeholder.
 - Use `_request_tab_count()` (or filter `RequestTab` widgets) instead of raw `QTabWidget.count()`.
 
@@ -154,6 +161,23 @@ Tab action UI uses internal constants in `RequestTabHeader`:
 - Plus tab marker: `PLUS_TAB_MARKER` (`pypost_plus_tab`)
 
 ## Testing
+
+Plus-tab click tests in `tests/test_tab_header.py` and `tests/test_tabs_presenter.py` use
+`QTest.mouseClick` on the real embedded `+` button (`tabButton(plus_idx, LeftSide)`), not
+synthetic `tabBarClicked.emit` — matching the user click path wired via `plus_btn.clicked`.
+
+| Test | Behavior verified |
+| ---- | ----------------- |
+| `test_plus_tab_click_emits_new_tab_requested` | `+` button click emits `new_tab_requested` |
+| `test_plus_tab_click_adds_request_tab` | Presenter adds tab; plus placeholder stays last |
+| `test_plus_tab_is_last` | Plus placeholder remains trailing tab |
+| `test_plus_tab_close_is_ignored` | Close on plus tab is ignored |
+
+Run:
+
+```bash
+make test PYTEST_ARGS="tests/test_tab_header.py tests/test_tabs_presenter.py -k plus_tab -v"
+```
 
 Save-as orchestrator tests live in `tests/test_request_save_orchestrator.py` (mocked
 `SaveRequestDialog`):
@@ -239,8 +263,13 @@ QT_QPA_PLATFORM=offscreen python -m pytest \
 
 ### `Ctrl+N` works but `+` click does nothing
 
-- Confirm `tabBarClicked` on the plus index calls `handle_new_tab("plus_button")`.
-- Verify `handle_new_tab` still calls `add_new_tab()` (not an early return path).
+- Confirm `plus_btn.clicked` is connected to `new_tab_requested` in `ensure_plus_tab()` (primary
+  path for clicks on the visible `+` widget).
+- Verify the embedded button exists: `tab_bar.tabButton(plus_idx, LeftSide)` returns a
+  `QPushButton`.
+- Fallback only: `_on_tab_bar_clicked` handles `tabBarClicked` on the plus index for chrome
+  clicks outside the button — not sufficient alone when users click the embedded widget.
+- Verify `handle_new_tab("plus_button")` still calls `add_new_tab()` (not an early return path).
 
 ### New-tab metrics are missing
 

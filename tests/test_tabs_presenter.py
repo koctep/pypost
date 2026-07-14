@@ -4,7 +4,9 @@ pytestmark = pytest.mark.timeout(60)
 
 import unittest
 from unittest.mock import MagicMock, patch
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QTabBar
 
 from pypost.core.request_sync import is_tab_dirty, persisted_fields_equal, snapshot_persisted_fields
 from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab, PLUS_TAB_MARKER
@@ -254,7 +256,9 @@ class TestTabsPresenter(unittest.TestCase):
         p.add_new_tab()
         before = _request_tab_count(p)
         plus_idx = _plus_tab_index(p)
-        p.widget.tabBar().tabBarClicked.emit(plus_idx)
+        tab_bar = p.widget.tabBar()
+        plus_btn = tab_bar.tabButton(plus_idx, QTabBar.ButtonPosition.LeftSide)
+        QTest.mouseClick(plus_btn, Qt.MouseButton.LeftButton)
         self.assertEqual(_request_tab_count(p), before + 1)
         self.assertEqual(_plus_tab_index(p), p.widget.count() - 1)
 

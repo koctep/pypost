@@ -45,6 +45,7 @@ class RequestTabHeader(QObject):
         plus_btn = QPushButton("+")
         plus_btn.setToolTip("New Tab (Ctrl+N)")
         plus_btn.setFixedSize(ADD_TAB_BUTTON_SIZE, ADD_TAB_BUTTON_SIZE)
+        plus_btn.clicked.connect(self.new_tab_requested.emit)
         self._tab_bar.setTabButton(index, QTabBar.ButtonPosition.LeftSide, plus_btn)
         self._tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
 
