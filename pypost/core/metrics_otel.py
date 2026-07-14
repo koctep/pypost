@@ -3,14 +3,29 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import Any
 
-from opentelemetry import metrics
-from opentelemetry.metrics import Meter, Observation
-from opentelemetry.sdk.metrics import MeterProvider
+try:
+    from opentelemetry import metrics
+    from opentelemetry.metrics import Meter, Observation
+    from opentelemetry.sdk.metrics import MeterProvider
+except ImportError:  # pragma: no cover - exercised when dependency is absent.
+    metrics = None  # type: ignore[assignment]
+    Meter = Any  # type: ignore[assignment,misc]
+    Observation = Any  # type: ignore[assignment,misc]
+    MeterProvider = Any  # type: ignore[assignment,misc]
 
 from pypost.core.metrics_registry import _normalize_new_tab_source
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.models.errors import ErrorCategory
+
+
+def _ensure_otel_available() -> None:
+    if metrics is None:
+        raise ImportError(
+            "OpenTelemetry dependency is missing. Install the OTel extra "
+            "(pip install -e '.[otel]' or make venv-otel) to use metrics_otel."
+        )
 
 
 class OtelMetricsTracker:
@@ -21,6 +36,7 @@ class OtelMetricsTracker:
     """
 
     def __init__(self, meter: Meter | None = None) -> None:
+        _ensure_otel_available()
         self._meter = meter or metrics.get_meter(__name__)
         self._mcp_server_ready = 0
         self._init_instruments()
@@ -324,6 +340,7 @@ def create_otel_metrics_tracker(
     meter_name: str = "pypost",
 ) -> MetricsTrackerProtocol:
     """Build an OTel tracker, optionally installing a ``MeterProvider`` first."""
+    _ensure_otel_available()
     if meter_provider is not None:
         metrics.set_meter_provider(meter_provider)
     meter = metrics.get_meter(meter_name)
