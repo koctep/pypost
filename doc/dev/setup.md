@@ -133,6 +133,10 @@ Production `requirements.txt` no longer includes OpenTelemetry (PYPOST-787). Whe
 `requirements.in`, `requirements-dev.in`, or `requirements-otel.in`, update the matching
 `pyproject.toml` sections and run `make check` — `tests/test_pyproject.py` fails on drift.
 
+**Version:** `pypost/version.py` (`__version__`) is the single source of truth. Packaging reads
+it via `[tool.setuptools.dynamic]` in `pyproject.toml` (PYPOST-808); the About dialog imports
+the same constant.
+
 ### OpenTelemetry optional overlay (PYPOST-787)
 
 OpenTelemetry is optional for runtime (Prometheus is the default metrics backend). Install paths:

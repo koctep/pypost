@@ -1,4 +1,4 @@
-"""Validate pyproject.toml stays aligned with requirements.in sources (PYPOST-785)."""
+"""Validate pyproject.toml stays aligned with requirements.in sources (PYPOST-785/808)."""
 
 from __future__ import annotations
 
@@ -47,9 +47,14 @@ class TestPyprojectToml:
         assert PYPROJECT.is_file()
 
     def test_project_metadata(self) -> None:
-        project = _load_pyproject()["project"]
+        data = _load_pyproject()
+        project = data["project"]
         assert project["name"] == "pypost"
-        assert project["version"] == __version__
+        assert project.get("dynamic") == ["version"]
+        assert "version" not in project
+        dynamic_version = data["tool"]["setuptools"]["dynamic"]["version"]
+        assert dynamic_version == {"attr": "pypost.version.__version__"}
+        assert __version__
         assert project["requires-python"] == ">=3.11"
         assert project["license"] == {"text": "MIT"}
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pypost"
-version = "0.1.0"
+dynamic = ["version"]
 description = "HTTP client with GUI and MCP tools for local AI agents"
 readme = "README.md"
 license = { text = "MIT" }
@@ -46,6 +46,9 @@ otel = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pypost*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pypost.version.__version__" }
 
 [tool.mypy]
 python_version = "3.11"
