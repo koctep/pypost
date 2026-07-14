@@ -1,4 +1,3 @@
-import logging
 from functools import lru_cache
 from typing import Any
 
@@ -9,8 +8,14 @@ from pypost.core.function_registry import FunctionRegistry
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_expression_tokenizer import tokenize_template_expressions
 from pypost.core.template_expression_types import ValidationResult
-
-logger = logging.getLogger(__name__)
+from pypost.core.template_service_render import (
+    emit_render_success_observability,
+    emit_validation_failure_observability,
+    fallback_content_after_render_exception,
+    record_empty_render_attempt,
+    render_with_jinja,
+    validation_message,
+)
 
 
 class TemplateService:
@@ -23,13 +28,6 @@ class TemplateService:
     Jinja2 ``Environment``; isolated callers get separate envs (cheap, intentional).
     See ``doc/dev/template_service.md`` for consumers and test seams.
     """
-
-    _VALIDATION_MESSAGES = {
-        "unknown_function": "Unknown function: {function_name}",
-        "invalid_arity": "Invalid function arity",
-        "invalid_argument": "Invalid function argument",
-        "invalid_syntax": "Invalid template function expression",
-    }
 
     def __init__(self, metrics: MetricsTrackerProtocol | None = None):
         self.env = Environment()
@@ -54,13 +52,6 @@ class TemplateService:
         - {{allowed_function(nested_func(identifier))}} (recursive allow-list)
         """
         return self._function_expression_resolver.validate_content(content)
-
-    def _validation_message(self, result: ValidationResult) -> str:
-        template = self._VALIDATION_MESSAGES.get(
-            result.code,
-            "Invalid template function expression",
-        )
-        return template.format(function_name=result.function_name)
 
     def render_string(
         self,
@@ -89,7 +80,7 @@ class TemplateService:
             The rendered string with variables substituted.
         """
         if not content:
-            self._record_empty_render_attempt(render_path)
+            record_empty_render_attempt(self._metrics, render_path)
             return ""
 
         expressions = tokenize_template_expressions(content)
@@ -97,105 +88,38 @@ class TemplateService:
         try:
             validation = self._validate_template_expressions(expressions)
             if not validation.is_valid:
-                self._emit_validation_failure_observability(
+                emit_validation_failure_observability(
+                    self._metrics,
                     validation,
                     render_path,
                     expression_count,
                 )
-                raise ValueError(self._validation_message(validation))
-            rendered = self._render_with_jinja(content, variables)
-            self._emit_render_success_observability(render_path, expression_count)
+                raise ValueError(validation_message(validation))
+            rendered = render_with_jinja(
+                self._compile_template,
+                content,
+                variables,
+            )
+            emit_render_success_observability(
+                self._metrics,
+                render_path,
+                expression_count,
+            )
             return rendered
         except Exception as e:
-            return self._fallback_content_after_render_exception(
+            return fallback_content_after_render_exception(
+                self._metrics,
                 e,
                 content,
                 render_path,
                 expression_count,
             )
 
-    def _record_empty_render_attempt(self, render_path: str) -> None:
-        self._metrics.track_template_expression_render_attempt(
-            render_path=render_path,
-            outcome="empty_content",
-        )
-
     def _validate_template_expressions(
         self,
         expressions: list[str],
     ) -> ValidationResult:
         return self._function_expression_resolver.validate_expressions(expressions)
-
-    def _emit_validation_failure_observability(
-        self,
-        validation: ValidationResult,
-        render_path: str,
-        expression_count: int,
-    ) -> None:
-        logger.info(
-            "template_expression_validation_failed "
-            "render_path=%s code=%s function_name=%s token_count=%d",
-            render_path,
-            validation.code,
-            validation.function_name or "n/a",
-            expression_count,
-        )
-        self._metrics.track_template_expression_render_attempt(
-            render_path=render_path,
-            outcome="validation_error",
-        )
-        self._metrics.track_template_expression_validation_failure(
-            render_path=render_path,
-            code=validation.code or "unknown",
-            function_name=validation.function_name,
-        )
-
-    def _render_with_jinja(self, content: str, variables: dict[str, Any]) -> str:
-        template = self._compile_template(content)
-        if logger.isEnabledFor(logging.DEBUG):
-            info = self._compile_template.cache_info()
-            logger.debug(
-                "template_compile_cache hits=%d misses=%d size=%d",
-                info.hits,
-                info.misses,
-                info.currsize,
-            )
-        return template.render(**variables)
-
-    def _emit_render_success_observability(
-        self,
-        render_path: str,
-        expression_count: int,
-    ) -> None:
-        self._metrics.track_template_expression_render_attempt(
-            render_path=render_path,
-            outcome="success",
-        )
-        logger.debug(
-            "template_expression_render_succeeded render_path=%s token_count=%d",
-            render_path,
-            expression_count,
-        )
-
-    def _fallback_content_after_render_exception(
-        self,
-        exc: Exception,
-        content: str,
-        render_path: str,
-        expression_count: int,
-    ) -> str:
-        if not isinstance(exc, ValueError):
-            self._metrics.track_template_expression_render_attempt(
-                render_path=render_path,
-                outcome="render_error",
-            )
-        logger.warning(
-            "template_render_fallback_to_original render_path=%s error_type=%s " "token_count=%d",
-            render_path,
-            type(exc).__name__,
-            expression_count,
-        )
-        return content
 
     def parse(self, content: str):
         """

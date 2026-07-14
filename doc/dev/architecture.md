@@ -20,7 +20,8 @@ pypost/
 │   ├── http_client_protocol.py
 │   ├── execute_request_protocol.py
 │   ├── script_executor.py  # Post-request Python script sandbox
-│   ├── template_service.py # Jinja2 variable interpolation
+│   ├── template_service.py # Jinja2 variable interpolation orchestration
+│   ├── template_service_render.py # Template render + observability helpers
 │   ├── function_registry.py, function_expression_resolver.py
 │   ├── template_expression_tokenizer.py, template_expression_types.py
 │   ├── storage.py          # JSON persistence (collections, environments)

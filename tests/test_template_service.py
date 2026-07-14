@@ -8,6 +8,9 @@ from unittest.mock import MagicMock, call, patch
 import jinja2.nodes
 
 from pypost.core.template_service import TemplateService
+from pypost.core.template_service_render import (
+    fallback_content_after_render_exception,
+)
 from tests.test_function_expression_resolver import MALFORMED_NESTED_EXPRESSION_CASES
 
 
@@ -446,9 +449,8 @@ class TestTemplateServiceRenderStages(unittest.TestCase):
     def test_stage_render_error_returns_original_content_and_tracks_render_error(self):
         content = "{{urlencode(db)}}"
 
-        with patch.object(
-            self.svc,
-            "_render_with_jinja",
+        with patch(
+            "pypost.core.template_service.render_with_jinja",
             side_effect=RuntimeError("boom"),
         ):
             result = self.svc.render_string(content, {"db": "alice"}, render_path="hover")
@@ -477,7 +479,8 @@ class TestTemplateServiceHelperStages(unittest.TestCase):
         self.assertEqual(3, result)
 
     def test_fallback_helper_tracks_render_error_for_non_value_error(self):
-        result = self.svc._fallback_content_after_render_exception(
+        result = fallback_content_after_render_exception(
+            self.metrics,
             RuntimeError("boom"),
             "{{name.upper(}}",
             "runtime",
@@ -490,7 +493,8 @@ class TestTemplateServiceHelperStages(unittest.TestCase):
         )
 
     def test_fallback_helper_skips_render_error_for_value_error(self):
-        result = self.svc._fallback_content_after_render_exception(
+        result = fallback_content_after_render_exception(
+            self.metrics,
             ValueError("bad validation"),
             "{{not_allowed(db)}}",
             "runtime",

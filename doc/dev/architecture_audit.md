@@ -100,7 +100,7 @@ models/  →  (stdlib only)
 | **P2** | R-P2-005 | Stale `architecture.md` tree | Resolved in PYPOST-684 Step 7 |
 | **P2** | R-P2-006 | Worker always builds `RequestService` | [PYPOST-698](https://pypost.atlassian.net/browse/PYPOST-698) |
 | **P3** | R-P3-001 | Empty `utils/` package | **Done** ([PYPOST-699](https://pypost.atlassian.net/browse/PYPOST-699)) |
-| **P3** | R-P3-002 | `template_service.py` LOC cap exceeded | [PYPOST-700](https://pypost.atlassian.net/browse/PYPOST-700) |
+| **P3** | R-P3-002 | `template_service.py` LOC cap exceeded | **Done** ([PYPOST-700](https://pypost.atlassian.net/browse/PYPOST-700)) |
 | **P3** | R-P3-003 | MCP inbound skips history | **Done** ([PYPOST-701](https://pypost.atlassian.net/browse/PYPOST-701)) |
 | **P3** | R-P3-004 | `main.py` duplicates `PyPostStyle` setup | [PYPOST-702](https://pypost.atlassian.net/browse/PYPOST-702) |
 

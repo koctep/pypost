@@ -44,6 +44,7 @@ flowchart LR
 | `function_registry.py` | Allow-listed callable names (`urlencode`, `md5`, `base64`) |
 | `function_expression_resolver.py` | Validates `{{func(...)}}` before render |
 | `template_expression_tokenizer.py` | Shared `{{...}}` token patterns |
+| `template_service_render.py` | Private render stages, metrics, and logging helpers (PYPOST-700) |
 
 See also [template_expression_functions.md](template_expression_functions.md) for function
 expression policy and test matrix.
