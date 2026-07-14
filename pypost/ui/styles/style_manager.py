@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QStyleFactory
+from PySide6.QtWidgets import QApplication, QStyleFactory
 
 from pypost.ui.styles.custom_style import PyPostStyle
 
@@ -125,3 +125,25 @@ class StyleManager:
             style_sheet += self._font_size_rule(font_size)
         # Replace existing stylesheet to avoid accumulation on reload
         app_or_widget.setStyleSheet(style_sheet)
+
+    def apply_appearance(
+        self,
+        app: QApplication,
+        *,
+        theme: str,
+        font_size: int,
+    ) -> None:
+        """Apply full application appearance from persisted settings.
+
+        Order: theme (style + palette) → global QSS (+ font-size rule) → app default font.
+        Production callers must use this method; do not reimplement the sequence elsewhere.
+        """
+        logger.debug("apply_appearance_start font_size=%d", font_size)
+        self.apply_theme(app, theme)
+        self.apply_styles(app, font_size=font_size)
+        font = app.font()
+        font.setPointSize(font_size)
+        app.setFont(font)
+        logger.debug(
+            "apply_appearance_font_applied point_size=%d", app.font().pointSize()
+        )

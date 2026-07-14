@@ -312,16 +312,12 @@ class MainWindow(QMainWindow):
 
     def apply_settings(self, settings: AppSettings) -> None:
         self.settings = settings
-        logger.debug("apply_settings_start font_size=%d", settings.font_size)
         app = QApplication.instance()
         if app:
-            self.style_manager.apply_theme(app, settings.theme)
-            self.style_manager.apply_styles(app, font_size=settings.font_size)
-            font = app.font()
-            font.setPointSize(settings.font_size)
-            app.setFont(font)
-            logger.debug(
-                "apply_settings_font_applied point_size=%d", app.font().pointSize()
+            self.style_manager.apply_appearance(
+                app,
+                theme=settings.theme,
+                font_size=settings.font_size,
             )
         self.tabs.apply_settings(settings)
         self.env.apply_settings(settings)

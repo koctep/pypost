@@ -92,7 +92,9 @@ class TabsPresenterWorkerHandlers:
         if err:
             logger.warning("script_error tab_id=%s error=%s", id(tab), err)
 
-    def _on_headers_received(self: TabsPresenter, tab: RequestTab, status: int, headers: dict) -> None:
+    def _on_headers_received(
+        self: TabsPresenter, tab: RequestTab, status: int, headers: dict
+    ) -> None:
         tab.response_view.status_label.setText(f"Status: {status}")
 
     def _on_chunk_received(self: TabsPresenter, tab: RequestTab, chunk: str) -> None:
