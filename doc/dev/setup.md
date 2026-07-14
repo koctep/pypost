@@ -307,6 +307,11 @@ As of the PYPOST-690 documentation audit (2026-06-12): 590 of 595 folders have `
 519 have `60-tech-debt.md`, and 95 have ≤2 markdown files. New tasks should meet the standard
 rows above; backfilling historical stubs is optional cleanup.
 
+**CI enforcement (PYPOST-816):** `make verify-ai-tasks` (included in `make check`) scans completed
+task folders and fails when required files are missing. Legacy gaps are grandfathered in
+`ai-tasks-artifacts-baseline.json`; refresh with
+`python scripts/verify_ai_task_artifacts.py --update-baseline` only after intentional backfill.
+
 ## Troubleshooting
 
 - **Missing modules**: Ensure your virtual environment is activated and you have installed

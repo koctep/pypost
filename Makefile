@@ -1,4 +1,4 @@
-.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov lint typecheck check security-audit generate-mcp-fixtures check-mcp-fixtures
+.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures
 
 .DEFAULT_GOAL := help
 
@@ -83,7 +83,10 @@ lint: $(VENV_MARKER) ## Run flake8 static analysis on pypost/
 typecheck: $(VENV_MARKER) venv-test ## Optional mypy on pypost/core/, models/, and ui/ (baseline gate)
 	$(BIN)/python scripts/check_mypy_baseline.py
 
-check: lint test ## Convenience quality gate: static analysis + full test suite
+verify-ai-tasks: $(VENV_MARKER) ## Verify closed ai-tasks folders have required workflow artifacts
+	$(BIN)/python scripts/verify_ai_task_artifacts.py
+
+check: lint test verify-ai-tasks ## Convenience quality gate: static analysis + full test suite
 
 security-audit: install ## Scan production dependencies for known CVEs (mirrors CI)
 	$(BIN)/pip-audit -r requirements.txt
