@@ -114,7 +114,7 @@ former monolithic `MetricsManager` into focused modules:
 
 | Module | Class | Responsibility |
 | --- | --- | --- |
-| `pypost/core/metrics_registry.py` | `MetricsRegistry` | Prometheus counters and `track_*` methods (no I/O) |
+| `pypost/core/metrics_registry.py` | `MetricsRegistry` | Prometheus counters and `track_*` methods (no I/O); init split into `_init_gui_metrics`, `_init_http_metrics`, `_init_mcp_metrics`, `_init_encryption_metrics` (PYPOST-746) |
 | `pypost/core/metrics_otel.py` | `OtelMetricsTracker` | OTel-backed `MetricsTrackerProtocol` adapter (PYPOST-579) |
 | `pypost/core/metrics_server.py` | `MetricsServer` | MCP resources, Starlette app, uvicorn thread lifecycle |
 | `pypost/core/metrics.py` | `MetricsManager` | Facade composed at `main.py`; same injection API as before |

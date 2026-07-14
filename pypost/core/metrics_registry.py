@@ -24,6 +24,13 @@ class MetricsRegistry:
 
     def _init_metrics(self) -> None:
         """Initialize all Prometheus metrics."""
+        self._init_gui_metrics()
+        self._init_http_metrics()
+        self._init_mcp_metrics()
+        self._init_encryption_metrics()
+
+    def _init_gui_metrics(self) -> None:
+        """Register GUI interaction counters."""
         self.gui_send_clicks = Counter(
             "gui_send_clicks_total",
             "Number of times Send button was clicked",
@@ -94,6 +101,8 @@ class MetricsRegistry:
             registry=self.registry,
         )
 
+    def _init_http_metrics(self) -> None:
+        """Register HTTP request, history, and template counters."""
         self.requests_sent = Counter(
             "requests_sent_total",
             "Number of HTTP requests sent",
@@ -112,39 +121,6 @@ class MetricsRegistry:
             "response_body_truncated_total",
             "Number of HTTP responses truncated due to max_response_bytes",
             ["method"],
-            registry=self.registry,
-        )
-
-        self.mcp_requests_received = Counter(
-            "mcp_requests_received_total",
-            "Number of requests received by MCP server",
-            ["method"],
-            registry=self.registry,
-        )
-
-        self.mcp_responses_sent = Counter(
-            "mcp_responses_sent_total",
-            "Number of responses sent by MCP server",
-            ["method", "status"],
-            registry=self.registry,
-        )
-
-        self.mcp_server_up = Gauge(
-            "mcp_server_up",
-            "Whether the MCP tool server has registered tools (1=ready, 0=idle)",
-            registry=self.registry,
-        )
-
-        self.mcp_tool_call_duration_seconds = Histogram(
-            "mcp_tool_call_duration_seconds",
-            "MCP tool call execution duration in seconds",
-            ["method", "status"],
-            registry=self.registry,
-        )
-
-        self.mcp_active_env_changes = Counter(
-            "mcp_active_env_changes_total",
-            "Active environment changed while MCP server was running",
             registry=self.registry,
         )
 
@@ -209,6 +185,44 @@ class MetricsRegistry:
             ["render_path", "code", "function_name"],
             registry=self.registry,
         )
+
+    def _init_mcp_metrics(self) -> None:
+        """Register MCP server counters, gauge, and histogram."""
+        self.mcp_requests_received = Counter(
+            "mcp_requests_received_total",
+            "Number of requests received by MCP server",
+            ["method"],
+            registry=self.registry,
+        )
+
+        self.mcp_responses_sent = Counter(
+            "mcp_responses_sent_total",
+            "Number of responses sent by MCP server",
+            ["method", "status"],
+            registry=self.registry,
+        )
+
+        self.mcp_server_up = Gauge(
+            "mcp_server_up",
+            "Whether the MCP tool server has registered tools (1=ready, 0=idle)",
+            registry=self.registry,
+        )
+
+        self.mcp_tool_call_duration_seconds = Histogram(
+            "mcp_tool_call_duration_seconds",
+            "MCP tool call execution duration in seconds",
+            ["method", "status"],
+            registry=self.registry,
+        )
+
+        self.mcp_active_env_changes = Counter(
+            "mcp_active_env_changes_total",
+            "Active environment changed while MCP server was running",
+            registry=self.registry,
+        )
+
+    def _init_encryption_metrics(self) -> None:
+        """Register environment encryption counters."""
         self.environment_value_encryptions_total = Counter(
             "environment_value_encryptions_total",
             "Number of environment values encrypted before persistence",

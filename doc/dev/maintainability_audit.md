@@ -68,8 +68,10 @@ See [solid_audit.md](solid_audit.md) for cap refresh procedure.
 | `tabs_presenter.py` | 715 | Tab/send/save orchestration |
 | `encryption_migration.py` | 656 | Migration orchestration |
 | `_rewrite_environments` | 225 | Single longest function |
-| `metrics_registry._init_metrics` | 196 | Monolithic metric registration |
 | `request_service._execute_http_with_retry` | 145 | HTTP retry loop |
+
+`metrics_registry._init_metrics` was split into domain helpers (`_init_gui_metrics`,
+`_init_http_metrics`, `_init_mcp_metrics`, `_init_encryption_metrics`) in PYPOST-746.
 
 `settings_dialog.py` improved from 423 to **188 LOC** via settings section widgets (PYPOST-374
 follow-up).
