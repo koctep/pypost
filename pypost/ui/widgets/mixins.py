@@ -86,12 +86,19 @@ class VariableHoverResolver:
     """Resolve ``{{...}}`` tokens to hover preview values (PYPOST-129)."""
 
     @classmethod
+    def set_template_service(cls, template_service: TemplateService) -> None:
+        """Wire composition-root TemplateService for hover expression rendering."""
+        global _hover_template_service
+        _hover_template_service = template_service
+
+    @classmethod
     def set_metrics(cls, metrics: MetricsTrackerProtocol | None) -> None:
         """
         Rebuild helper TemplateService so hover path exports observability metrics.
+
+        Prefer ``set_template_service`` with the composition-root instance (PYPOST-697).
         """
-        global _hover_template_service
-        _hover_template_service = TemplateService(metrics=resolve_metrics(metrics))
+        cls.set_template_service(TemplateService(metrics=resolve_metrics(metrics)))
 
     @classmethod
     def _template_service(cls) -> TemplateService:
@@ -207,6 +214,10 @@ class VariableHoverHelper(metaclass=_HoverHelperMeta):
     @classmethod
     def set_metrics(cls, metrics: MetricsTrackerProtocol | None) -> None:
         VariableHoverResolver.set_metrics(metrics)
+
+    @classmethod
+    def set_template_service(cls, template_service: TemplateService) -> None:
+        VariableHoverResolver.set_template_service(template_service)
 
     @staticmethod
     def find_variable_at_index(text: str, index: int) -> Optional[str]:

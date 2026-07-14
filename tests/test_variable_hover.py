@@ -23,6 +23,7 @@ from PySide6.QtGui import QMouseEvent, QTextCursor
 from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit, QTableWidgetItem
 
 from pypost.core.constants import HIDDEN_MASK
+from pypost.core.template_service import TemplateService
 from pypost.core.template_expression_tokenizer import (
     TEMPLATE_PLACEHOLDER_PATTERN,
     tokenize_template_expressions,
@@ -361,6 +362,16 @@ class TestVariableHoverSplit(unittest.TestCase):
             fake = MagicMock()
             VariableHoverHelper._template_service = fake
             self.assertIs(VariableHoverResolver._template_service(), fake)
+        finally:
+            VariableHoverHelper._template_service = original
+
+    def test_set_template_service_wires_resolver(self):
+        original = VariableHoverHelper._template_service
+        try:
+            service = TemplateService()
+            VariableHoverResolver.set_template_service(service)
+            self.assertIs(VariableHoverResolver._template_service(), service)
+            self.assertIs(VariableHoverHelper._template_service, service)
         finally:
             VariableHoverHelper._template_service = original
 

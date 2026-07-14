@@ -16,7 +16,9 @@ Hover support is split into two classes in `pypost/ui/widgets/mixins.py`:
   cell text (no cursor index). Per-cell resolution cache avoids redundant `resolve_text` on
   repeated `mouseMoveEvent` over the same cell (PYPOST-132). This path is separate from
   line-scoped scan (PYPOST-120 / PYPOST-122), which applies only to multiline editors.
-- **Metrics:** `VariableHoverResolver.set_metrics` (also exposed on the facade).
+- **TemplateService:** `VariableHoverResolver.set_template_service` wires the composition-root
+  instance from `MainWindow` / `RequestWidget.set_template_service`. `set_metrics` remains as a
+  test-only fallback that builds a local instance.
 
 ## VariableHoverMixin
 

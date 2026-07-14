@@ -34,6 +34,7 @@ from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.main_window_signals import wire_presenter_signals
 from pypost.ui.presenters import CollectionsPresenter, EnvPresenter, TabsPresenter
 from pypost.ui.widgets.history_panel import HistoryPanel
+from pypost.ui.widgets.mixins import VariableHoverResolver
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ class MainWindow(QMainWindow):
         self.metrics = metrics
         self.metrics.connect_start_failed(self._on_metrics_start_failed)
         self.template_service = template_service
+        VariableHoverResolver.set_template_service(template_service)
         self.storage = StorageManager(metrics=self.metrics)
         if config_manager is not None:
             logger.debug("config_manager_source source=injected")

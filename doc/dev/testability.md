@@ -81,7 +81,7 @@ root singleton**: one `TemplateService(metrics=...)` in `main.py`, propagated by
 | --- | --- | --- |
 | `HTTPClient`, `RequestService`, `MCPServerImpl` | Optional `template_service` param | `TemplateService()` or `MagicMock()` |
 | `MainWindow` | Required `template_service` | `MagicMock()` in patched constructor tests |
-| Hover (`mixins.py`) | Module `_hover_template_service` | Assign `VariableHoverHelper._template_service` |
+| Hover (`mixins.py`) | `VariableHoverResolver.set_template_service` from `MainWindow` / `RequestWidget` | Assign `VariableHoverHelper._template_service` |
 
 Leaf classes may create a local `TemplateService()` when the parameter is omitted — intentional for
 isolated unit tests. Production always injects from `main.py`.

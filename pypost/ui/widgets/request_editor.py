@@ -72,7 +72,6 @@ class RequestWidget(QWidget):
         self._metrics = resolve_metrics(metrics)
         self._template_service: TemplateService | None = None
         self._hidden_keys: set[str] = set()
-        VariableHoverResolver.set_metrics(metrics)
         self.request_data = request_data or RequestData()
         self.init_ui()
 
@@ -223,6 +222,8 @@ class RequestWidget(QWidget):
 
     def set_template_service(self, template_service: TemplateService | None) -> None:
         self._template_service = template_service
+        if template_service is not None:
+            VariableHoverResolver.set_template_service(template_service)
         self._refresh_mcp_preview()
 
     def set_hidden_keys(self, hidden_keys: set):
