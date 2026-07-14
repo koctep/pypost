@@ -363,6 +363,25 @@ wired on the execution path for masking — but **PYPOST-554** supplies `hidden_
 `McpSecretsPolicy` so `list_tools` schemas exclude hidden and env-only placeholders. See
 `doc/dev/mcp_secrets_policy.md`.
 
+#### History asymmetry (product choice, PYPOST-701)
+
+Inbound MCP tool calls **do not** append to persistent request history. This is an accepted
+product choice, not a defect (audit R-P3-003 / S-HIST-004).
+
+| Entry point | `history_manager` on `RequestService` | Persistent history |
+| --- | --- | --- |
+| GUI send (`RequestWorker`) | Injected from composition root | Yes — masked entries via `HistoryManager` |
+| Inbound MCP (`call_tool`) | Omitted in `_create_request_service()` | No |
+
+**Why:** Inbound MCP uses a fresh, isolated `RequestService` per invocation (PYPOST-138) for
+thread safety and session isolation. GUI history is operator-centric (replay, compare, audit
+from the UI). Agent-driven tool calls are already surfaced in the session **MCP activity log**
+(PYPOST-141), which is separate from the on-disk history file.
+
+**Revisit when:** External agents need masked, persistent audit-trail parity with GUI sends.
+Until then, do not wire `history_manager` into `_create_request_service()` without an explicit
+product decision. See [Request Execution](request_execution.md#history-recording-by-entry-point).
+
 #### Observability
 
 DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with

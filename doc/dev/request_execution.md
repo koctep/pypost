@@ -43,6 +43,22 @@ History entries use `SensitiveDataMaskingPolicy` with resolved fields from trans
 4. When **hidden keys** are present, templates are re-rendered with `***` placeholders (masking
    requires a separate render pass).
 
+### History recording by entry point (PYPOST-701)
+
+Not every caller of `RequestService.execute()` records history. History requires an injected
+`HistoryManager`; when `history_manager` is `None`, `_record_execution_history()` is a no-op.
+
+| Entry point | `history_manager` | Records history |
+| --- | --- | --- |
+| GUI (`RequestWorker` via `TabsPresenter`) | Composition-root `HistoryManager` | Yes |
+| Inbound MCP (`MCPServerImpl._create_request_service`) | Omitted (per-call instance) | No |
+| Outbound MCP request (user sends MCP tab) | Same as GUI when worker has manager | Yes |
+
+**Product choice:** Inbound MCP asymmetry is intentional (audit R-P3-003). Session-scoped MCP
+activity telemetry lives in `McpActivityDialog` (PYPOST-141), not the history file. See
+[History asymmetry (product choice)](mcp_integration.md#history-asymmetry-product-choice-pypost-701)
+in `mcp_integration.md`.
+
 ## Error handling
 
 Execution failures return `ExecutionResult` with `execution_error` set (PYPOST-400). Transport

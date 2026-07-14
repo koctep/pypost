@@ -65,7 +65,7 @@ models/  →  (stdlib only)
 | L-003 | `request_sync.is_tab_dirty` ties core semantics to UI `RequestTab` | **Remediated** ([PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696)) |
 | L-004 | `StyleManager` is a UI concern living in `core/` | **Remediated** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
 | L-005 | `fixtures/` not imported by production code | PASS |
-| L-006 | `utils/` package is empty and unused | LOW |
+| L-006 | `utils/` package is empty and unused | **Remediated** ([PYPOST-699](https://pypost.atlassian.net/browse/PYPOST-699)) |
 
 ### Dependency direction
 
@@ -99,9 +99,9 @@ models/  →  (stdlib only)
 | **P2** | R-P2-004 | Dual `TemplateService` for hover | [PYPOST-697](https://pypost.atlassian.net/browse/PYPOST-697) |
 | **P2** | R-P2-005 | Stale `architecture.md` tree | Resolved in PYPOST-684 Step 7 |
 | **P2** | R-P2-006 | Worker always builds `RequestService` | [PYPOST-698](https://pypost.atlassian.net/browse/PYPOST-698) |
-| **P3** | R-P3-001 | Empty `utils/` package | [PYPOST-699](https://pypost.atlassian.net/browse/PYPOST-699) |
+| **P3** | R-P3-001 | Empty `utils/` package | **Done** ([PYPOST-699](https://pypost.atlassian.net/browse/PYPOST-699)) |
 | **P3** | R-P3-002 | `template_service.py` LOC cap exceeded | [PYPOST-700](https://pypost.atlassian.net/browse/PYPOST-700) |
-| **P3** | R-P3-003 | MCP inbound skips history | [PYPOST-701](https://pypost.atlassian.net/browse/PYPOST-701) |
+| **P3** | R-P3-003 | MCP inbound skips history | **Done** ([PYPOST-701](https://pypost.atlassian.net/browse/PYPOST-701)) |
 | **P3** | R-P3-004 | `main.py` duplicates `PyPostStyle` setup | [PYPOST-702](https://pypost.atlassian.net/browse/PYPOST-702) |
 
 Full remediation directions: [60-tech-debt.md](../../ai-tasks/PYPOST-684/60-tech-debt.md)
@@ -112,8 +112,8 @@ Full remediation directions: [60-tech-debt.md](../../ai-tasks/PYPOST-684/60-tech
 | --- | --- | --- |
 | `architecture.md` | Refreshed (PYPOST-684) | Tree and MCP/encryption/metrics sections updated |
 | `testability.md` | Mostly aligned | Omits several MainWindow-constructed services |
-| `request_execution.md` | Aligned | Pipeline, history, cancellation match code |
-| `mcp_integration.md` | Aligned | Threading, per-call `RequestService` verified |
+| `request_execution.md` | Aligned | Pipeline, history by entry point, cancellation match code |
+| `mcp_integration.md` | Aligned | Threading, per-call `RequestService`, inbound history product choice |
 | `template_service.md` | Aligned | Consumer matrix matches grep results |
 | `collection_loading.md` | Aligned | Presenters use `RequestManager.get_collections()` |
 
