@@ -159,12 +159,16 @@ make check-lock-otel
 ```
 
 `make venv-otel` runs `pip install -e ".[otel]"`; CI and `make install` include the OTel extra
-for OTel tests. End users who need OTel export can also use:
+for OTel tests. End users who need OTel export without dev tooling:
 
 ```bash
-pip install -e ".[otel]"   # OpenTelemetry metrics backend
-pip install -r requirements-otel.txt   # overlay lock file
+make venv-otel
+# or
+pip install -e ".[otel]"   # OpenTelemetry metrics backend (PEP 621 extra)
 ```
+
+Use `requirements-otel.txt` only for lock regeneration (`make lock-otel`) and transitive pin
+verification — not for day-to-day installs (PYPOST-812).
 
 ### 3. Run the Application
 
