@@ -40,7 +40,6 @@ class TestMainWindow(unittest.TestCase):
             patch("pypost.ui.main_window.RequestManager"),
             patch("pypost.ui.main_window.StateManager") as mock_sm,
             patch("pypost.ui.main_window.MCPServerManager"),
-            patch("pypost.ui.main_window.HistoryManager"),
             patch("pypost.ui.main_window.CollectionsPresenter", return_value=mock_collections),
             patch("pypost.ui.main_window.TabsPresenter"),
             patch("pypost.ui.main_window.EnvPresenter"),
@@ -55,6 +54,7 @@ class TestMainWindow(unittest.TestCase):
             window = MainWindow(
                 metrics=metrics,
                 template_service=template_service,
+                history_manager=MagicMock(),
             )
             window.settings_btn = MagicMock()
 
@@ -63,18 +63,19 @@ class TestMainWindow(unittest.TestCase):
         mock_collections.load_collections.assert_not_called()
 
     def test_constructor_stores_injected_dependencies(self):
-        """PYPOST-382: metrics, template_service, config_manager, alert_manager are retained."""
+        """PYPOST-382: metrics, template_service, config_manager, alert_manager,
+        history_manager are retained."""
         metrics = MagicMock()
         template_service = MagicMock()
         config_manager = MagicMock()
         alert_manager = MagicMock()
+        history_manager = MagicMock()
         with (
             patch("pypost.ui.main_window.StorageManager"),
             patch("pypost.ui.main_window.ConfigManager"),
             patch("pypost.ui.main_window.RequestManager"),
             patch("pypost.ui.main_window.StateManager") as mock_sm,
             patch("pypost.ui.main_window.MCPServerManager"),
-            patch("pypost.ui.main_window.HistoryManager"),
             patch("pypost.ui.main_window.CollectionsPresenter"),
             patch("pypost.ui.main_window.TabsPresenter"),
             patch("pypost.ui.main_window.EnvPresenter"),
@@ -92,11 +93,13 @@ class TestMainWindow(unittest.TestCase):
                 template_service=template_service,
                 config_manager=config_manager,
                 alert_manager=alert_manager,
+                history_manager=history_manager,
             )
         self.assertIs(metrics, window.metrics)
         self.assertIs(template_service, window.template_service)
         self.assertIs(config_manager, window.config_manager)
         self.assertIs(alert_manager, window._alert_manager)
+        self.assertIs(history_manager, window.history_manager)
 
     def test_build_layout_sidebar_is_qtabwidget(self):
         """PYPOST-61: left sidebar uses QTabWidget with Collections and History tabs."""
@@ -110,7 +113,6 @@ class TestMainWindow(unittest.TestCase):
             patch("pypost.ui.main_window.RequestManager"),
             patch("pypost.ui.main_window.StateManager") as mock_sm,
             patch("pypost.ui.main_window.MCPServerManager"),
-            patch("pypost.ui.main_window.HistoryManager"),
             patch(
                 "pypost.ui.main_window.CollectionsPresenter",
                 return_value=mock_collections,
@@ -134,6 +136,7 @@ class TestMainWindow(unittest.TestCase):
             window = MainWindow(
                 metrics=metrics,
                 template_service=template_service,
+                history_manager=MagicMock(),
             )
             splitter = window.centralWidget().layout().itemAt(1).widget()
             sidebar = splitter.widget(0)

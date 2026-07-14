@@ -28,6 +28,7 @@ item dispatch uses a strategy registry
 | `MetricsServer` (uvicorn/MCP) | inside `MetricsManager` | started via `metrics.start_server()` in `main.py` |
 | `TemplateService` | `main.py` | `MainWindow`, `MCPServerManager`, `TabsPresenter` → workers |
 | `AlertManager` | `main.py` (from `AppSettings`) | `MainWindow` |
+| `HistoryManager` | `main.py` | `MainWindow` → `TabsPresenter` → `RequestWorker` → `RequestService` |
 
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
 `TemplateService` chain and [template_service.md](template_service.md) for lifecycle design
@@ -227,6 +228,7 @@ presenters, and widgets internally. Full presenter extraction is tracked separat
 | `template_service` | yes | `MagicMock()` or real instance |
 | `config_manager` | no | Inject to avoid disk I/O |
 | `alert_manager` | no | Inject to assert alert propagation |
+| `history_manager` | no | `MagicMock(spec=HistoryManager)` or temp-path instance |
 
 ### Recommended pattern
 

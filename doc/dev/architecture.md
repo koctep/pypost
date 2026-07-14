@@ -104,9 +104,9 @@ The same `ConfigManager` instance is injected into `MainWindow` so `settings.jso
 [PYPOST-404 dev notes](../ai-tasks/PYPOST-404/70-dev-docs.md).
 
 `MainWindow` still constructs several services not wired in `main.py`: `StorageManager`,
-`RequestManager`, `HistoryManager`, `MCPServerManager`, and `StyleManager`. This partial
-composition root increases test-setup cost — see
-[architecture_audit.md](architecture_audit.md#executive-summary) (PYPOST-684).
+`RequestManager`, `MCPServerManager`, and `StyleManager`. `HistoryManager` is created in
+`main.py` and injected (PYPOST-694). This partial composition root increases test-setup cost —
+see [architecture_audit.md](architecture_audit.md#executive-summary) (PYPOST-684).
 
 ## Core Components
 

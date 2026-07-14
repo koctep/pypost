@@ -33,7 +33,6 @@ def _make_main_window(qapp, *, alert_manager=None):  # noqa: ARG001
         patch("pypost.ui.main_window.RequestManager"),
         patch("pypost.ui.main_window.StateManager") as mock_sm,
         patch("pypost.ui.main_window.MCPServerManager"),
-        patch("pypost.ui.main_window.HistoryManager"),
         patch("pypost.ui.main_window.CollectionsPresenter", return_value=mock_collections),
         patch("pypost.ui.main_window.TabsPresenter", return_value=mock_tabs),
         patch("pypost.ui.main_window.EnvPresenter"),
@@ -53,6 +52,7 @@ def _make_main_window(qapp, *, alert_manager=None):  # noqa: ARG001
             template_service=template_service,
             config_manager=config_manager,
             alert_manager=alert_manager,
+            history_manager=MagicMock(),
         )
     window.env = MagicMock()
     window.env.wait_storage_idle = MagicMock()

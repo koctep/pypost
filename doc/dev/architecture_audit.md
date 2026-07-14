@@ -25,8 +25,8 @@ The layered modular monolith is **largely intact**:
 
 1. **Partial composition root** — `main.py` wires `ConfigManager`, `MetricsManager`,
    `TemplateService`, and `AlertManager`, but `MainWindow` still constructs
-   `StorageManager`, `RequestManager`, `HistoryManager`, `MCPServerManager`, and
-   `StyleManager`.
+   `StorageManager`, `RequestManager`, `MCPServerManager`, and
+   `StyleManager`. `HistoryManager` is created in `main.py` (PYPOST-694).
 
 Capability docs (`request_execution.md`, `mcp_integration.md`, `template_service.md`,
 `collection_loading.md`) align well with observed call chains. The main documentation gap
@@ -84,7 +84,7 @@ models/  →  (stdlib only)
 | --- | --- | --- |
 | HTTP execution | `RequestWorker` → `RequestService` → `HTTPClient` | PASS |
 | Templating | `TemplateService` (single Jinja2 `Environment`) | PASS (hover duplicate: MEDIUM) |
-| History | `RequestService` → `HistoryManager` | PASS (not in composition root: MEDIUM) |
+| History | `RequestService` → `HistoryManager` | PASS (composition root: PYPOST-694) |
 | MCP tools | `MCPServerManager`, `MCPServerImpl` | PASS (env suppliers in `EnvPresenter`) |
 
 ## Prioritized Recommendations
@@ -93,7 +93,7 @@ models/  →  (stdlib only)
 | --- | --- | --- | --- |
 | **P1** | R-P1-001 | `style_manager.py` core → ui import | **Done** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
 | **P1** | R-P1-002 | Qt throughout `core/` | **Done** ([PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693)) |
-| **P2** | R-P2-001 | `HistoryManager` outside composition root | [PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694) |
+| **P2** | R-P2-001 | `HistoryManager` outside composition root | Done ([PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694)) |
 | **P2** | R-P2-002 | Partial composition root in `MainWindow` | [PYPOST-695](https://pypost.atlassian.net/browse/PYPOST-695) |
 | **P2** | R-P2-003 | `request_sync.is_tab_dirty` in core | **Done** ([PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696)) |
 | **P2** | R-P2-004 | Dual `TemplateService` for hover | [PYPOST-697](https://pypost.atlassian.net/browse/PYPOST-697) |

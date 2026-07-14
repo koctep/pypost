@@ -46,6 +46,7 @@ class MainWindow(QMainWindow):
         template_service: TemplateService,
         config_manager: ConfigManager | None = None,
         alert_manager: AlertManager | None = None,
+        history_manager: HistoryManager | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("PyPost")
@@ -72,7 +73,12 @@ class MainWindow(QMainWindow):
         )
         self.settings = self.state_manager.settings
         self.icons = self._load_icons()
-        self.history_manager = HistoryManager()
+        if history_manager is not None:
+            logger.debug("history_manager_source source=injected")
+            self.history_manager = history_manager
+        else:
+            logger.debug("history_manager_source source=new")
+            self.history_manager = HistoryManager()
         self.collections = CollectionsPresenter(
             self.request_manager,
             self.state_manager,

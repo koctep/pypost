@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
+from pypost.core.history_manager import HistoryManager
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
 from pypost.ui.main_window import MainWindow
@@ -60,11 +61,15 @@ def main():
         bool(settings.alert_webhook_url),
     )
 
+    history_manager = HistoryManager()
+    logger.info("history_manager_created id=%d", id(history_manager))
+
     window = MainWindow(
         metrics=metrics_manager,
         template_service=template_service,
         config_manager=config_manager,
         alert_manager=alert_manager,
+        history_manager=history_manager,
     )
     window.show()
 

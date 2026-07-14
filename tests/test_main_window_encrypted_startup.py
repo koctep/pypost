@@ -52,7 +52,6 @@ def _make_encrypted_startup_window(qapp, mock_env, mock_collections):  # noqa: A
         patch("pypost.ui.main_window.RequestManager"),
         patch("pypost.ui.main_window.StateManager") as mock_sm,
         patch("pypost.ui.main_window.MCPServerManager"),
-        patch("pypost.ui.main_window.HistoryManager"),
         patch("pypost.ui.main_window.CollectionsPresenter", return_value=mock_collections),
         patch("pypost.ui.main_window.TabsPresenter", return_value=mock_tabs),
         patch("pypost.ui.main_window.EnvPresenter", return_value=mock_env),
@@ -66,7 +65,11 @@ def _make_encrypted_startup_window(qapp, mock_env, mock_collections):  # noqa: A
         mock_sm.return_value.settings = AppSettings(env_encryption_enabled=True)
         from pypost.ui.main_window import MainWindow
 
-        window = MainWindow(metrics=metrics, template_service=template_service)
+        window = MainWindow(
+            metrics=metrics,
+            template_service=template_service,
+            history_manager=MagicMock(),
+        )
     window.settings_btn = MagicMock()
     return window, mock_tabs, mock_collections
 
