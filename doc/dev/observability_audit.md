@@ -1,6 +1,7 @@
 # Observability and Logging Audit
 
 This document summarizes the PyPost observability and logging audit (PYPOST-688). It complements
+[logging.md](logging.md) (event naming convention and catalog),
 [security_audit.md](security_audit.md) (sensitive data in logs), [testing.md](testing.md) (pytest
 log_cli and CI guardrails), and [mcp_integration.md](mcp_integration.md) (MCP activity viewer).
 
@@ -48,19 +49,13 @@ suppressed unless developers change this configuration.
 
 ### Event naming
 
-Preferred pattern (newer code):
+See [logging.md](logging.md) for the full **key=value convention**, domain-grouped event catalog,
+and legacy migration guide (PYPOST-747). Summary:
 
-```text
-mcp_activity_recorded operation=call_tool outcome=success tool_name=foo mcp_arg_count=2 ...
-metrics_server_listening host=127.0.0.1 port=9080
-alert_emitted request_name='Get User' endpoint='https://...' retries=3 error_category=network
-```
-
-Legacy pattern (migrate when touching):
-
-```text
-Connection failed: GET https://api.example.com/v1?key=secret
-```
+- **Preferred:** `snake_case_event key=value ...` (for example `mcp_activity_recorded
+  operation=call_tool outcome=success`)
+- **Legacy:** human-readable prefixes such as `Connection failed: GET url` — migrate when
+  touching the module
 
 ## Metrics Stack
 

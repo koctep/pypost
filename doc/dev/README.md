@@ -26,6 +26,7 @@ set up your development environment, and contribute to the project.
 1. [Security and Secrets Handling Audit (PYPOST-685)](security_audit.md)
 1. [Test Coverage and Quality Audit (PYPOST-686)](test_audit.md)
 1. [Code Quality and Maintainability Audit (PYPOST-687)](maintainability_audit.md)
+1. [Logging Event Naming Convention (PYPOST-747)](logging.md)
 1. [Observability and Logging Audit (PYPOST-688)](observability_audit.md)
 1. [Performance and Scalability Audit (PYPOST-689)](performance_audit.md)
 1. [Documentation and ADR Alignment Audit (PYPOST-690)](documentation_audit.md)

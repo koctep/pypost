@@ -104,7 +104,8 @@ N/A for this audit. Metrics cardinality and log volume under load not profiled.
   failed: GET url`).
 - **Remediation:** Add section to `doc/dev/observability_audit.md` or new `logging.md` with
   event catalog and migration guidance for legacy modules.
-- **Jira:** [PYPOST-747](https://pypost.atlassian.net/browse/PYPOST-747)
+- **Jira:** [PYPOST-747](https://pypost.atlassian.net/browse/PYPOST-747) — **Resolved**
+  ([doc/dev/logging.md](../../doc/dev/logging.md))
 
 #### R-P2-006 — Sanitize MCP activity log detail field
 
