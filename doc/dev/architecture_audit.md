@@ -87,24 +87,12 @@ models/  →  (stdlib only)
 | History | `RequestService` → `HistoryManager` | PASS (composition root: PYPOST-694) |
 | MCP tools | `MCPServerManager`, `MCPServerImpl` | PASS (env suppliers in `EnvPresenter`) |
 
-## Prioritized Recommendations
+## Follow-up Work
 
-| Priority | ID | Finding | Jira |
-| --- | --- | --- | --- |
-| **P1** | R-P1-001 | `style_manager.py` core → ui import | **Done** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
-| **P1** | R-P1-002 | Qt throughout `core/` | **Done** ([PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693)) |
-| **P2** | R-P2-001 | `HistoryManager` outside composition root | Done ([PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694)) |
-| **P2** | R-P2-002 | Partial composition root in `MainWindow` | [PYPOST-695](https://pypost.atlassian.net/browse/PYPOST-695) |
-| **P2** | R-P2-003 | `request_sync.is_tab_dirty` in core | **Done** ([PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696)) |
-| **P2** | R-P2-004 | Dual `TemplateService` for hover | [PYPOST-697](https://pypost.atlassian.net/browse/PYPOST-697) |
-| **P2** | R-P2-005 | Stale `architecture.md` tree | Resolved in PYPOST-684 Step 7 |
-| **P2** | R-P2-006 | Worker always builds `RequestService` | [PYPOST-698](https://pypost.atlassian.net/browse/PYPOST-698) |
-| **P3** | R-P3-001 | Empty `utils/` package | **Done** ([PYPOST-699](https://pypost.atlassian.net/browse/PYPOST-699)) |
-| **P3** | R-P3-002 | `template_service.py` LOC cap exceeded | **Done** ([PYPOST-700](https://pypost.atlassian.net/browse/PYPOST-700)) |
-| **P3** | R-P3-003 | MCP inbound skips history | **Done** ([PYPOST-701](https://pypost.atlassian.net/browse/PYPOST-701)) |
-| **P3** | R-P3-004 | `main.py` duplicates `PyPostStyle` setup | [PYPOST-702](https://pypost.atlassian.net/browse/PYPOST-702) |
-
-Full remediation directions: [60-tech-debt.md](../../ai-tasks/PYPOST-684/60-tech-debt.md)
+Eleven prioritized remediation items (2 P1, 5 P2, 4 P3) are listed in
+[ai-tasks/PYPOST-684/60-tech-debt.md](../../ai-tasks/PYPOST-684/60-tech-debt.md). Jira tickets
+are created by the sprint orchestrator. R-P2-005 (stale `architecture.md` tree) was resolved in
+PYPOST-684 Step 7.
 
 ## Documentation Alignment
 

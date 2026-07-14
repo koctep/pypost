@@ -112,26 +112,12 @@ Findings use **P1** (critical/high exposure), **P2** (policy gap or secondary su
 | C-002 | `enable_mcp` is environment-level server gate, not collection ACL | PASS (document) |
 | C-003 | No role-based or multi-user ACL | OUT OF SCOPE |
 
-## Prioritized Recommendations
+## Follow-up Work
 
-| Priority | ID | Finding | Jira |
-| --- | --- | --- | --- |
-| **P1** | M-002 / P-001 | Full response body in MCP tool results | [PYPOST-703](https://pypost.atlassian.net/browse/PYPOST-703) |
-| **P1** | T-002 | Metrics bind `0.0.0.0` default | [PYPOST-704](https://pypost.atlassian.net/browse/PYPOST-704) |
-| **P1** | T-004 | No inbound MCP authentication | [PYPOST-705](https://pypost.atlassian.net/browse/PYPOST-705) |
-| **P2** | E-001 | History stores non-hidden credentials | [PYPOST-706](https://pypost.atlassian.net/browse/PYPOST-706) |
-| **P2** | S-002 | Encryption scope is hidden keys only | [PYPOST-707](https://pypost.atlassian.net/browse/PYPOST-707) |
-| **P2** | S-003 | Webhook auth in plaintext settings | [PYPOST-708](https://pypost.atlassian.net/browse/PYPOST-708) |
-| **P2** | E-003 | Resolved URLs in ERROR logs | [PYPOST-709](https://pypost.atlassian.net/browse/PYPOST-709) |
-| **P2** | M-003 | Script logs in MCP results | [PYPOST-710](https://pypost.atlassian.net/browse/PYPOST-710) |
-| **P2** | C-001 | All collections contribute MCP tools | [PYPOST-711](https://pypost.atlassian.net/browse/PYPOST-711) |
-| **P2** | M-007 | Unauthenticated metrics MCP | [PYPOST-712](https://pypost.atlassian.net/browse/PYPOST-712) |
-| **P2** | R-P2-008 | Security documentation gaps | Resolved in PYPOST-685 Step 7 |
-| **P3** | S-005 | Plaintext collections — operator guidance | Resolved in [PYPOST-713](https://pypost.atlassian.net/browse/PYPOST-713) ([collection_storage.md](collection_storage.md#security-operator-guidance)) |
-| **P3** | M-005 | MCP path omits `hidden_keys` | [PYPOST-714](https://pypost.atlassian.net/browse/PYPOST-714) |
-| **P3** | T-005 | Starlette debug=True | [PYPOST-715](https://pypost.atlassian.net/browse/PYPOST-715) |
-
-Full remediation directions: [60-tech-debt.md](../../ai-tasks/PYPOST-685/60-tech-debt.md)
+Twelve prioritized remediation items (3 P1, 8 P2, 3 P3) are listed in
+[ai-tasks/PYPOST-685/60-tech-debt.md](../../ai-tasks/PYPOST-685/60-tech-debt.md). Jira tickets
+are created by the sprint orchestrator. R-P2-008 (security documentation gaps) was resolved in
+PYPOST-685 Step 7.
 
 ## Documentation Alignment
 
