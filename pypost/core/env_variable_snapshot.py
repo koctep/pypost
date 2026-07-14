@@ -1,4 +1,5 @@
 """Snapshot of active environment variables for MCP supplier callbacks."""
+from __future__ import annotations
 
 
 class EnvVariableSnapshot:

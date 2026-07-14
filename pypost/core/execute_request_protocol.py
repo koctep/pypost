@@ -1,4 +1,5 @@
 """Protocol for full request execution consumed by workers and MCP inbound path."""
+from __future__ import annotations
 
 from typing import Any, Callable, Dict, Protocol, runtime_checkable
 

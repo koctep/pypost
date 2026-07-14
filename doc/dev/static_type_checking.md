@@ -45,6 +45,33 @@ After fixing type errors intentionally:
 git add mypy-baseline.json
 ```
 
+## Postponed annotations convention
+
+All modules under **`pypost/core/`** and **`pypost/models/`** must include postponed evaluation
+of annotations (PEP 563 behavior via PEP 649 backport on 3.11):
+
+```python
+"""Optional module docstring."""
+
+from __future__ import annotations
+
+import json
+from typing import Optional
+```
+
+Rules:
+
+1. **`from __future__ import annotations`** is the first import — only a module docstring may
+   precede it.
+2. Leave a **blank line** after the future import before other imports.
+3. **New modules** in core or models must follow this pattern from the first commit.
+
+This keeps forward references (`EncryptionKey | None`) consistent and aligns with mypy's scoped
+paths. The UI layer (`pypost/ui/`) is not yet fully migrated; expand there in a separate debt
+item when touching those files.
+
+Adopted project-wide in core/models via PYPOST-738 (follow-up to maintainability audit R-P3-002).
+
 ## Configuration
 
 Key mypy settings (see `pyproject.toml` for the full list):

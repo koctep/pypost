@@ -1,4 +1,5 @@
 """Jinja2-compatible environment variable name validation."""
+from __future__ import annotations
 
 from typing import Literal
 

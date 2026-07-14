@@ -1,4 +1,5 @@
 """Shared tokenization for ``{{ ... }}`` template placeholders."""
+from __future__ import annotations
 
 import re
 

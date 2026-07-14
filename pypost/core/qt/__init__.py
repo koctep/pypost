@@ -10,3 +10,5 @@ Import rule: code that must run headless without PySide6 must NOT import from
 Test setup: prefer ``pytest-qt`` or an offscreen ``QApplication`` when testing
 modules here; see ``doc/dev/testability.md`` (updated in Step 7).
 """
+
+from __future__ import annotations

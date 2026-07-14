@@ -1,4 +1,5 @@
 """User-visible strings for environment management UI and validation."""
+from __future__ import annotations
 
 DIALOG_TITLE_MANAGE_ENVIRONMENTS = "Manage Environments"
 DIALOG_TITLE_NEW_ENVIRONMENT = "New Environment"

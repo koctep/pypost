@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pypost.core.constants import HIDDEN_MASK
 
 

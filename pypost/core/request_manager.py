@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+import uuid
 from typing import Dict, List, Optional, Tuple
 
 from pypost.core.collection_item_strategies import (
@@ -115,8 +118,6 @@ class RequestManager:
 
     def create_collection(self, name: str) -> Collection:
         """Creates a new collection."""
-        import uuid
-
         normalized = name.strip()
         if not normalized:
             raise ValueError("Collection name cannot be empty")

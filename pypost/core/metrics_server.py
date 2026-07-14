@@ -1,4 +1,5 @@
 """Metrics HTTP/MCP server lifecycle (uvicorn thread)."""
+from __future__ import annotations
 
 import asyncio
 import errno

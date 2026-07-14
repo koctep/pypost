@@ -1,4 +1,5 @@
 """Prometheus counter registry and tracking methods (no I/O)."""
+from __future__ import annotations
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 

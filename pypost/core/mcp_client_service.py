@@ -1,4 +1,5 @@
 """MCP client service for testing MCP endpoints via full protocol handshake."""
+from __future__ import annotations
 
 import json
 import logging

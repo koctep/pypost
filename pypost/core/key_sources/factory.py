@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pypost.core.key_sources.env import EnvKeySource
 from pypost.core.key_sources.keyring import KeyringKeySource
 from pypost.core.key_sources.protocol import KeySource

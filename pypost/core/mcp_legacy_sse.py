@@ -8,6 +8,7 @@ Routing efficiency (PYPOST-159): the outer app mounts this module via ``Mount`` 
 only GET ``/`` uses ``handle_sse_get`` (``request_response``) to return an empty ``Response``
 after ``connect_sse`` completes. See ``doc/dev/mcp_integration.md``.
 """
+from __future__ import annotations
 
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport

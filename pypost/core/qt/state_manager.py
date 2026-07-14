@@ -14,6 +14,7 @@ Design contract (see doc/dev/state_manager.md):
 - User preference changes bypass debounce and save immediately through
   ``ConfigManager`` in ``MainWindow.open_settings()``.
 """
+from __future__ import annotations
 
 import logging
 from typing import Final, List, Optional, Tuple

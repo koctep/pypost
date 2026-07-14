@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from pypost.core.function_registry import FunctionRegistry

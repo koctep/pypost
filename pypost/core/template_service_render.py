@@ -1,4 +1,5 @@
 """Private render and observability helpers for ``TemplateService`` (PYPOST-700)."""
+from __future__ import annotations
 
 import logging
 import time

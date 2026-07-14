@@ -1,4 +1,5 @@
 """Protocol for metrics tracking consumed by services, workers, and UI."""
+from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 

@@ -1,4 +1,5 @@
 """Metrics facade composing registry (counters) and server (uvicorn/MCP)."""
+from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal
 

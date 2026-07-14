@@ -1,4 +1,5 @@
 """Shared encryption key source identifiers and fallback parsing."""
+from __future__ import annotations
 
 from typing import Literal
 

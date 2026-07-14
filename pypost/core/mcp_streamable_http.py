@@ -1,4 +1,5 @@
 """Shared Streamable HTTP transport setup for PyPost MCP servers."""
+from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager

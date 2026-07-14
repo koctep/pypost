@@ -1,4 +1,5 @@
 """Protocol for HTTP transport consumed by RequestService."""
+from __future__ import annotations
 
 from typing import Callable, Dict, Protocol, runtime_checkable
 

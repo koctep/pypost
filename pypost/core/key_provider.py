@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from pypost.core.encryption_key import EncryptionKey, EnvironmentEncryptionError, build_key_id
