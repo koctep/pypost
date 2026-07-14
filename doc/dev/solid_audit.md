@@ -38,8 +38,8 @@ LOC baselines and caps so god-object regressions (especially `MainWindow` growth
 
 | Metric | Audit era (PYPOST-40) | Baseline (2026-06-11) | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 393 | 425 |
-| `MainWindow` class LOC | 1040 | 353 | 380 |
+| `main_window.py` file LOC | 1040 | 416 | 425 |
+| `MainWindow` class LOC | 1040 | 375 | 380 |
 
 Authoritative snapshot (all module caps): [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
 
@@ -71,6 +71,10 @@ update caps with ~10% headroom, and refresh the snapshot.
 marked [PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43) resolved; Key Findings and
 regression table cite [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
 (393 file / 353 class baseline; 425 / 380 caps).
+
+**PYPOST-776 (2026-07-14):** Closed R-P3-004 (PYPOST-690) — regenerated
+[baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md) snapshot; regression table
+synced (416 file / 375 class baseline; caps unchanged).
 
 ## Individual dialog audit (PYPOST-374)
 
