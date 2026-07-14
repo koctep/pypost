@@ -128,3 +128,16 @@ Follow-ups: [ai-tasks/PYPOST-691/60-tech-debt.md](../../ai-tasks/PYPOST-691/60-t
 - [PYPOST-311](../../ai-tasks/PYPOST-311/) — Pip cache keyed on `requirements.txt`
 - [PYPOST-434](../../ai-tasks/PYPOST-434/10-requirements.md) — No `pyproject.toml`
 - [PYPOST-579](../../ai-tasks/PYPOST-579/00-roadmap.md) — OpenTelemetry deps added
+
+## Related Audits
+
+Sibling Code Audit summaries — hub:
+[documentation_audit.md § Code Audit Hub](documentation_audit.md#code-audit-hub).
+
+- [Architecture and Package Boundary Audit (PYPOST-684)](architecture_audit.md)
+- [Security and Secrets Handling Audit (PYPOST-685)](security_audit.md)
+- [Test Coverage and Quality Audit (PYPOST-686)](test_audit.md)
+- [Code Quality and Maintainability Audit (PYPOST-687)](maintainability_audit.md)
+- [Observability and Logging Audit (PYPOST-688)](observability_audit.md)
+- [Performance and Scalability Audit (PYPOST-689)](performance_audit.md)
+- [Documentation and ADR Alignment Audit (PYPOST-690)](documentation_audit.md)

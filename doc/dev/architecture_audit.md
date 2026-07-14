@@ -124,3 +124,16 @@ Full remediation directions: [60-tech-debt.md](../../ai-tasks/PYPOST-684/60-tech
 - [Unit Testability Patterns](testability.md)
 - [MCP Integration](mcp_integration.md)
 - [Request Execution](request_execution.md)
+
+## Related Audits
+
+Sibling Code Audit summaries — hub:
+[documentation_audit.md § Code Audit Hub](documentation_audit.md#code-audit-hub).
+
+- [Security and Secrets Handling Audit (PYPOST-685)](security_audit.md)
+- [Test Coverage and Quality Audit (PYPOST-686)](test_audit.md)
+- [Code Quality and Maintainability Audit (PYPOST-687)](maintainability_audit.md)
+- [Observability and Logging Audit (PYPOST-688)](observability_audit.md)
+- [Performance and Scalability Audit (PYPOST-689)](performance_audit.md)
+- [Documentation and ADR Alignment Audit (PYPOST-690)](documentation_audit.md)
+- [Dependencies and Supply Chain Audit (PYPOST-691)](dependencies_audit.md)

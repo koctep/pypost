@@ -99,3 +99,16 @@ follow-up).
 Prioritized remediation (2 P1, 7 P2, 4 P3) is listed in
 [ai-tasks/PYPOST-687/60-tech-debt.md](../../ai-tasks/PYPOST-687/60-tech-debt.md). Jira tickets
 are created by the sprint orchestrator.
+
+## Related Audits
+
+Sibling Code Audit summaries — hub:
+[documentation_audit.md § Code Audit Hub](documentation_audit.md#code-audit-hub).
+
+- [Architecture and Package Boundary Audit (PYPOST-684)](architecture_audit.md)
+- [Security and Secrets Handling Audit (PYPOST-685)](security_audit.md)
+- [Test Coverage and Quality Audit (PYPOST-686)](test_audit.md)
+- [Observability and Logging Audit (PYPOST-688)](observability_audit.md)
+- [Performance and Scalability Audit (PYPOST-689)](performance_audit.md)
+- [Documentation and ADR Alignment Audit (PYPOST-690)](documentation_audit.md)
+- [Dependencies and Supply Chain Audit (PYPOST-691)](dependencies_audit.md)

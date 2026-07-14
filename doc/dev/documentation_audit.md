@@ -1,7 +1,7 @@
 # Documentation and ADR Alignment Audit
 
 This document summarizes the PyPost documentation and ADR alignment audit (PYPOST-690). It
-complements the seven Code Audit summaries (PYPOST-684 through PYPOST-689) and the legacy SOLID
+complements the eight Code Audit summaries (PYPOST-684 through PYPOST-691) and the legacy SOLID
 audit ([solid_audit.md](solid_audit.md), PYPOST-40).
 
 ## Audit Report
@@ -14,7 +14,7 @@ audit cross-links, README TOC, ai-tasks artifact quality
 
 ## Executive Summary
 
-PyPost has **strong capability documentation** (60 markdown files under `doc/dev/`) and seven
+PyPost has **strong capability documentation** (60 markdown files under `doc/dev/`) and eight
 Code Audit developer summaries with links to full `ai-tasks/` reports. `architecture.md` was
 refreshed in PYPOST-684 and module counts (141 Python files: 68 core, 61 ui, 6 models) match
 the live tree.
@@ -26,7 +26,7 @@ the live tree.
    `sensitive_data_masking_policy.md`) are absent from the table of contents.
 2. **No ADR index (P1)** — No `doc/adr/` directory or central index. Architectural decisions
    live in scattered `ai-tasks/` artifacts and inline PYPOST references in dev docs.
-3. **Audit doc fragmentation (P2)** — Seven audit summaries cross-link inconsistently; some
+3. **Audit doc fragmentation (P2)** — Eight audit summaries cross-link inconsistently; some
    embed Jira URLs in dev docs while others defer to `60-tech-debt.md` without links.
 
 Findings use **P1** (onboarding blocker or missing structural doc), **P2** (discoverability or
@@ -43,6 +43,7 @@ consistency gap), **P3** (minor hygiene).
 | Observability (688) | [observability_audit.md](observability_audit.md) | [30-audit-report](../../ai-tasks/PYPOST-688/30-audit-report.md) |
 | Performance (689) | [performance_audit.md](performance_audit.md) | [30-audit-report](../../ai-tasks/PYPOST-689/30-audit-report.md) |
 | Documentation (690) | This file | [30-audit-report](../../ai-tasks/PYPOST-690/30-audit-report.md) |
+| Dependencies (691) | [dependencies_audit.md](dependencies_audit.md) | [30-audit-report](../../ai-tasks/PYPOST-691/30-audit-report.md) |
 | SOLID (legacy, 40) | [solid_audit.md](solid_audit.md) | [30-audit-report](../../ai-tasks/PYPOST-40/30-audit-report.md) |
 
 ## doc/dev Completeness
@@ -98,6 +99,18 @@ roadmap-only stubs or missing Step 6 debt files.
 
 Twelve items in [60-tech-debt.md](../../ai-tasks/PYPOST-690/60-tech-debt.md) — P1: 2, P2: 6,
 P3: 4. Prioritize dev README TOC expansion and ADR index creation.
+
+## Related Audits
+
+Sibling Code Audit summaries (this file is the hub).
+
+- [Architecture and Package Boundary Audit (PYPOST-684)](architecture_audit.md)
+- [Security and Secrets Handling Audit (PYPOST-685)](security_audit.md)
+- [Test Coverage and Quality Audit (PYPOST-686)](test_audit.md)
+- [Code Quality and Maintainability Audit (PYPOST-687)](maintainability_audit.md)
+- [Observability and Logging Audit (PYPOST-688)](observability_audit.md)
+- [Performance and Scalability Audit (PYPOST-689)](performance_audit.md)
+- [Dependencies and Supply Chain Audit (PYPOST-691)](dependencies_audit.md)
 
 ## Related Commands
 
