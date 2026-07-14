@@ -19,7 +19,7 @@ Full report:
 | Direct production deps | 15 |
 | Unpinned direct deps | 1 (`pydantic>=2.0` lower bound only) |
 | Lock / constraints file | `requirements.txt` (uv `pip compile` from `requirements.in`) |
-| `pyproject.toml` | None |
+| `pyproject.toml` | PEP 621 metadata + `dev` / `otel` optional extras (PYPOST-785) |
 | CI vulnerability scanner | `pip-audit` job in `.github/workflows/test.yml` (PYPOST-778) |
 | Dependabot config | `.github/dependabot.yml` (pip + GitHub Actions, weekly) |
 
@@ -107,7 +107,7 @@ No transitive license inventory is checked into the repo.
 | P2 | R-P2-004 | Align `pydantic` constraint with MCP SDK (`>=2.11,<3`) |
 | P2 | R-P2-005 | Reconcile redundant `starlette`/`uvicorn` direct declarations |
 | P2 | R-P2-006 | Pin GitHub Actions to full commit SHAs |
-| P3 | R-P3-001 | Introduce `pyproject.toml` for metadata and optional extras |
+| P3 | R-P3-001 | Introduce `pyproject.toml` for metadata and optional extras — **Done (PYPOST-785)** |
 | P3 | R-P3-002 | Document PySide6 LGPL distribution obligations |
 | P3 | R-P3-003 | Split OpenTelemetry deps into optional extra |
 | P3 | R-P3-004 | Refresh `setup.md` dependency list |

@@ -98,6 +98,27 @@ After merging dependency changes, run `make lock`, commit both files, and run `m
 - `pydantic`: Data validation using Python type hints.
 - `prometheus_client`: Library for exposing Prometheus metrics.
 
+### Project metadata (`pyproject.toml`, PYPOST-785)
+
+PyPost declares PEP 621 metadata and optional dependency groups in root `pyproject.toml`:
+
+| Section | Mirrors |
+| --- | --- |
+| `[project].dependencies` | Direct production pins in `requirements.in` |
+| `[project.optional-dependencies].dev` | Direct dev pins in `requirements-dev.in` |
+| `[project.optional-dependencies].otel` | OpenTelemetry API/SDK (for future optional install) |
+
+`make install` and CI still install from `requirements.txt` / `requirements-dev.txt`. When you
+change `requirements.in` or `requirements-dev.in`, update the matching `pyproject.toml` sections
+and run `make check` — `tests/test_pyproject.py` fails on drift.
+
+Optional extras (not wired to Makefile yet):
+
+```bash
+pip install -e ".[dev]"    # dev/test tooling
+pip install -e ".[otel]"   # OpenTelemetry metrics backend
+```
+
 ### 3. Run the Application
 
 Use `make` to run the application:
