@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    logger.info("PyPost starting up")
+    logger.info("app_startup")
     app = QApplication(sys.argv)
     app.setApplicationName("PyPost")
 
@@ -95,7 +95,7 @@ def main():
     exit_code = app.exec()
 
     # Stop metrics server on exit
-    logger.info("PyPost shutting down")
+    logger.info("app_shutdown")
     metrics_manager.stop_server()
 
     sys.exit(exit_code)

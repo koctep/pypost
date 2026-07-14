@@ -70,8 +70,8 @@ different call sites.
 
 | Event | Level | Key fields | Module |
 | --- | --- | --- | --- |
-| `PyPost starting up` | INFO | — | `main` (legacy) |
-| `PyPost shutting down` | INFO | — | `main` (legacy) |
+| `app_startup` | INFO | — | `main` |
+| `app_shutdown` | INFO | — | `main` |
 | `log_level_applied` | INFO | `level` | `main` |
 | `template_service_created` | INFO | `id` | `main` |
 | `storage_created` | INFO | `id`, `encryption_applied` | `main` |
@@ -369,8 +369,7 @@ metrics_server_stopped
 curl_generated method=%s url=%s
 ```
 
-Startup/shutdown in `main.py` may stay legacy until a dedicated refactor — low operational
-impact.
+Startup/shutdown in `main.py` migrated to `app_startup` / `app_shutdown` ([PYPOST-801](https://pypost.atlassian.net/browse/PYPOST-801)).
 
 ### Migration checklist
 
