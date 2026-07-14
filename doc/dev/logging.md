@@ -118,6 +118,9 @@ different call sites.
 | `request_complete` | DEBUG | `method`, `status`, `elapsed_ms`, `size` | `http_client` |
 | `response_body_truncated` | WARNING | `method`, `url`, `max_bytes` | `http_client` |
 | `sse_stream_detected` | DEBUG | `method`, `url`, `content_type` | `http_client` |
+| `http_connection_failed` | ERROR | `method`, `url` | `http_client` |
+| `http_request_timed_out` | ERROR | `method`, `url` | `http_client` |
+| `http_request_failed` | ERROR | `method`, `url`, `detail` | `http_client` |
 | `yaml_to_json_conversion_failed` | ERROR | `method`, `url`, `detail` | `http_client` |
 | `worker_run_started` | DEBUG | `method`, `url`, `request_id` | `qt/worker` |
 | `worker_run_completed` | DEBUG | `method`, `url`, `stopped` | `qt/worker` |
@@ -304,14 +307,16 @@ logger.error(
 
 ```python
 logger.error(
-    "request_timed_out method=%s url=%r",
+    "http_request_timed_out method=%s url=%r",
     request_data.method,
     self._error_log_url(url, variables),
 )
 ```
 
-Same for `Connection failed:` → `connection_failed`, `Request failed:` → `request_failed`.
-Use `_error_log_url()` for ERROR-level URLs (sanitized per [PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741)).
+Same for `Connection failed:` → `http_connection_failed`, `Request failed:` →
+`http_request_failed`. Use `_error_log_url()` for ERROR-level URLs (sanitized per
+[PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741)). Migrated in
+[PYPOST-751](https://pypost.atlassian.net/browse/PYPOST-751).
 
 ### Pattern B — ClassName: diagnostic prefix
 

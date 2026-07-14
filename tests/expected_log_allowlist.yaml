@@ -42,13 +42,13 @@ rules:
   - logger: pypost.core.mcp_client_service
     message_prefix: mcp_operation_timeout
 
-  # pypost.core.http_client (structured and legacy message shapes)
+  # pypost.core.http_client (structured key=value events)
   - logger: pypost.core.http_client
-    message_prefix: Connection failed
+    message_prefix: http_connection_failed
   - logger: pypost.core.http_client
-    message_prefix: Request failed
+    message_prefix: http_request_failed
   - logger: pypost.core.http_client
-    message_prefix: Request timed out
+    message_prefix: http_request_timed_out
   - logger: pypost.core.http_client
     message_prefix: yaml_to_json_conversion_failed
 

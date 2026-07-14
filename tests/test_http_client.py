@@ -502,8 +502,9 @@ class TestHTTPClientErrorLogging(unittest.TestCase):
             method="GET", url="http://{{host}}/api?token={{token}}"
         )
 
-    def _assert_error_log_redacts_secrets(self, logs):
+    def _assert_error_log_redacts_secrets(self, logs, event_name):
         joined = "\n".join(logs.output)
+        self.assertIn(event_name, joined)
         self.assertIn("secret.example.com", joined)
         self.assertNotIn("abc", joined)
         self.assertIn("token=***", joined)
@@ -513,21 +514,22 @@ class TestHTTPClientErrorLogging(unittest.TestCase):
         with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
             with self.assertRaises(ExecutionError):
                 self.client.send_request(self.req, variables=self.variables)
-        self._assert_error_log_redacts_secrets(logs)
+        self._assert_error_log_redacts_secrets(logs, "http_connection_failed")
 
     def test_timeout_error_logs_redacted_resolved_url(self):
         self.client.session.request.side_effect = requests_lib.Timeout("timed out")
         with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
             with self.assertRaises(ExecutionError):
                 self.client.send_request(self.req, variables=self.variables)
-        self._assert_error_log_redacts_secrets(logs)
+        self._assert_error_log_redacts_secrets(logs, "http_request_timed_out")
 
     def test_request_exception_logs_redacted_resolved_url(self):
         self.client.session.request.side_effect = requests_lib.RequestException("boom")
         with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
             with self.assertRaises(ExecutionError):
                 self.client.send_request(self.req, variables=self.variables)
-        self._assert_error_log_redacts_secrets(logs)
+        self._assert_error_log_redacts_secrets(logs, "http_request_failed")
+        self.assertIn("detail=boom", "\n".join(logs.output))
 
     def test_yaml_conversion_error_logs_redacted_resolved_url(self):
         req = RequestData(

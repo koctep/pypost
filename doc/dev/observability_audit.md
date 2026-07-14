@@ -55,8 +55,8 @@ and legacy migration guide (PYPOST-747). Summary:
 
 - **Preferred:** `snake_case_event key=value ...` (for example `mcp_activity_recorded
   operation=call_tool outcome=success`)
-- **Legacy:** human-readable prefixes such as `Connection failed: GET url` — migrate when
-  touching the module
+- **Legacy:** human-readable prefixes such as `Connection failed: GET url` — `http_client`
+  transport ERROR paths migrated in [PYPOST-751](https://pypost.atlassian.net/browse/PYPOST-751)
 
 ## Metrics Stack
 

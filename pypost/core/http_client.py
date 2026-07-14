@@ -250,7 +250,7 @@ class HTTPClient:
             response = self.session.request(**kwargs)
         except requests.Timeout as exc:
             logger.error(
-                "Request timed out: %s %s",
+                "http_request_timed_out method=%s url=%r",
                 request_data.method,
                 self._error_log_url(url, variables),
             )
@@ -261,7 +261,7 @@ class HTTPClient:
             ) from exc
         except requests.ConnectionError as exc:
             logger.error(
-                "Connection failed: %s %s",
+                "http_connection_failed method=%s url=%r",
                 request_data.method,
                 self._error_log_url(url, variables),
             )
@@ -272,7 +272,7 @@ class HTTPClient:
             ) from exc
         except requests.RequestException as exc:
             logger.error(
-                "Request failed: %s %s — %s",
+                "http_request_failed method=%s url=%r detail=%s",
                 request_data.method,
                 self._error_log_url(url, variables),
                 exc,
