@@ -5,8 +5,9 @@ The audit verifies environment storage, UI masking, execution/history/logs, MCP 
 surfaces, transport posture, and collection exposure. It complements the policy docs in
 [mcp_secrets_policy.md](mcp_secrets_policy.md),
 [sensitive_data_masking_policy.md](sensitive_data_masking_policy.md),
-[environment_encryption_at_rest.md](environment_encryption_at_rest.md), and
-[hidden_variables.md](hidden_variables.md).
+[environment_encryption_at_rest.md](environment_encryption_at_rest.md),
+[hidden_variables.md](hidden_variables.md), and
+[collection_storage.md](collection_storage.md) (operator guidance for plaintext collections).
 
 ## Audit Report
 
@@ -66,7 +67,7 @@ Findings use **P1** (critical/high exposure), **P2** (policy gap or secondary su
 | S-002 | Non-hidden environment values always plaintext on disk | P2 |
 | S-003 | Settings store webhook auth header in plaintext | P2 |
 | S-004 | Hidden-variable UI masking aligned | PASS |
-| S-005 | Collections persisted as plaintext JSON | P3 |
+| S-005 | Collections persisted as plaintext JSON — operator guidance in [collection_storage.md](collection_storage.md#security-operator-guidance) | P3 (documented) |
 
 ### Execution, History, and Logs
 
@@ -126,7 +127,7 @@ Findings use **P1** (critical/high exposure), **P2** (policy gap or secondary su
 | **P2** | C-001 | All collections contribute MCP tools | [PYPOST-711](https://pypost.atlassian.net/browse/PYPOST-711) |
 | **P2** | M-007 | Unauthenticated metrics MCP | [PYPOST-712](https://pypost.atlassian.net/browse/PYPOST-712) |
 | **P2** | R-P2-008 | Security documentation gaps | Resolved in PYPOST-685 Step 7 |
-| **P3** | S-005 | Plaintext collections | [PYPOST-713](https://pypost.atlassian.net/browse/PYPOST-713) |
+| **P3** | S-005 | Plaintext collections — operator guidance | Resolved in [PYPOST-713](https://pypost.atlassian.net/browse/PYPOST-713) ([collection_storage.md](collection_storage.md#security-operator-guidance)) |
 | **P3** | M-005 | MCP path omits `hidden_keys` | [PYPOST-714](https://pypost.atlassian.net/browse/PYPOST-714) |
 | **P3** | T-005 | Starlette debug=True | [PYPOST-715](https://pypost.atlassian.net/browse/PYPOST-715) |
 
@@ -140,6 +141,7 @@ Full remediation directions: [60-tech-debt.md](../../ai-tasks/PYPOST-685/60-tech
 | `sensitive_data_masking_policy.md` | History masking for `hidden_keys` matches | Scope is hidden env keys only |
 | `environment_encryption_at_rest.md` | Hidden-key-only encryption matches | Operators may misread "encryption enabled" as whole-env |
 | `hidden_variables.md` | UI mask + toggle logs match | — |
+| `collection_storage.md` | Plaintext persistence and hidden-env guidance match S-005 | — |
 | `mcp_integration.md` | Activity log fields, supplier wiring match | Network exposure / no-auth assumption implicit |
 | `copy_curl.md` | Active vs history copy behavior matches | — |
 | `request_execution.md` | GUI/MCP converge on `RequestService.execute` | MCP omits `hidden_keys` (latent; no history today) |
@@ -155,4 +157,6 @@ audit report linked above.
 - [Hidden Variables](hidden_variables.md)
 - [MCP Integration](mcp_integration.md)
 - [Request Execution](request_execution.md)
+- [Collection Storage](collection_storage.md) — plaintext persistence and operator security
+  guidance (S-005 / PYPOST-713)
 - [Architecture and Package Boundary Audit](architecture_audit.md)
