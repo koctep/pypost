@@ -549,6 +549,15 @@ relative to `requirements-dev.in` (same check as local maintainer workflow in
 Production lock verification (`make check-lock`) remains local-only until a sibling CI job is
 added; dev lock drift is now gated in CI because test tooling installs from `requirements-dev.txt`.
 
+## CI dependency CVE scan (PYPOST-778, PYPOST-805)
+
+The `security-audit` job installs production deps (`requirements.txt`) and dev tooling
+(`requirements-dev.txt`, which includes pinned `pip-audit`), then runs `pip-audit -r
+requirements.txt` once per workflow on Python 3.11. Local parity: `make security-audit` after
+`make install` (PYPOST-805 removed inline `pip install pip-audit` from Makefile and CI).
+
+See [dependencies_audit.md](dependencies_audit.md) § CVE Scanning for ignore-vuln policy.
+
 ## Pytest exit codes (PYPOST-279)
 
 Pytest uses distinct exit codes. PyPost treats them as follows in `make test` and CI (native

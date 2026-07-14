@@ -86,7 +86,6 @@ typecheck: $(VENV_MARKER) venv-test ## Optional mypy on pypost/core/, models/, a
 check: lint test ## Convenience quality gate: static analysis + full test suite
 
 security-audit: install ## Scan production dependencies for known CVEs (mirrors CI)
-	$(BIN)/python -m pip install pip-audit
 	$(BIN)/pip-audit -r requirements.txt
 
 generate-mcp-fixtures: $(VENV_MARKER) ## Regenerate MCP test collection and environment JSON fixtures

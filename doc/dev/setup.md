@@ -70,7 +70,7 @@ Test and lint tooling uses the same **two-file** layout as production:
 
 | File | Role |
 | --- | --- |
-| `requirements-dev.in` | Direct dev deps (pytest, flake8, etc.) |
+| `requirements-dev.in` | Direct dev deps (pytest, flake8, pip-audit, etc.) |
 | `requirements-dev.txt` | Compiled transitive lock (committed; do not hand-edit) |
 
 `make venv-test` and CI install from `requirements-dev.txt`, so local and CI share one pinned

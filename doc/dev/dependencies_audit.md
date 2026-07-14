@@ -29,7 +29,8 @@ Full report:
    accidental v2 installs ([PYPOST-777](https://pypost.atlassian.net/browse/PYPOST-777)).
 2. **CVE gate in CI** — `security-audit` job runs `pip-audit -r requirements.txt` on every push/PR
    ([PYPOST-778](https://pypost.atlassian.net/browse/PYPOST-778)).
-3. **Automation gaps** — Dev tool versions still duplicated unpinned in Makefile and CI.
+3. **Automation gaps** — Resolved for dev security tooling: `pip-audit` is pinned in
+   `requirements-dev.txt` (PYPOST-805). Production lock CI verification remains local-only.
 
 **Positive:** Test tooling is excluded from `requirements.txt`. CI pip cache invalidates when
 `requirements.in` or `requirements.txt` changes (PYPOST-311, PYPOST-779). Dependabot opens weekly
@@ -42,8 +43,10 @@ dependency PRs. Transitive production graph is locked via `uv pip compile` (PYPO
 | CI | Job `security-audit` in `.github/workflows/test.yml` |
 | Local | `make security-audit` (requires `make install` first) |
 
-The scan installs production dependencies, then runs `pip-audit -r requirements.txt`. The job
-fails when known vulnerabilities are reported.
+The scan installs production dependencies (`requirements.txt`), then runs `pip-audit -r
+requirements.txt`. The `pip-audit` CLI is pinned in `requirements-dev.txt` (PYPOST-805) — not
+installed ephemerally — so local and CI share the same scanner version via `make install` /
+`requirements-dev.txt`. The job fails when known vulnerabilities are reported.
 
 **Temporary exceptions:** If a CVE has no fixed release, add `pip-audit --ignore-vuln <CVE-ID>`
 to the CI step and document the rationale here. Remove the ignore when a patched version is

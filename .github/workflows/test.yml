@@ -199,16 +199,18 @@ jobs:
       - name: Install application dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Install dev tooling (pip-audit)
+        run: python -m pip install -r requirements-dev.txt
+
       - name: Audit dependencies for known CVEs
-        run: |
-          python -m pip install pip-audit
-          pip-audit -r requirements.txt
+        run: pip-audit -r requirements.txt
 
       - name: Write job summary
         if: always()
         run: |
           echo "## Dependency CVE scan" >> "$GITHUB_STEP_SUMMARY"
-          echo "Scanned \`requirements.txt\` with \`pip-audit\` (PYPOST-778)." \
+          echo "Scanned \`requirements.txt\` with pinned \`pip-audit\` from \`requirements-dev.txt\`" \
+            " (PYPOST-778, PYPOST-805)." \
             >> "$GITHUB_STEP_SUMMARY"
 
   check-lock-dev:
