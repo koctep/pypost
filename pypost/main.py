@@ -46,10 +46,8 @@ def main():
         bool(settings.alert_webhook_url),
     )
 
-    # Apply custom style
-    custom_style = PyPostStyle()
-    custom_style.set_close_button_size(48)
-    app.setStyle(custom_style)
+    # Apply custom style (native metrics by default; see PyPostStyle)
+    app.setStyle(PyPostStyle())
 
     window = MainWindow(
         metrics=metrics_manager,

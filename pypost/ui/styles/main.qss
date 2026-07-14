@@ -1,16 +1,16 @@
 /* PyPost Default Styles */
 
-/* 
-   Example: Adjusting Tab Close Button Size
-   Uncomment and modify the values below to change the size of the close button on tabs.
+/*
+   Tab close-button icons. The icon scales into the rectangle sized by the
+   active QStyle's PM_TabCloseIndicator metrics.
+
+   Do NOT style QTabBar::tab here: setting any box-model property on that
+   sub-control disables native tab rendering, collapsing tabs to bare text
+   width so labels concatenate (PYPOST-792).
 */
 
 QTabBar::close-button {
     image: url(%ICONS_DIR%/close.svg);
-}
-
-QTabBar::tab {
-    padding: 0px 0px 0px 0px;
 }
 
 QTabBar::close-button:hover {
@@ -43,7 +43,7 @@ QTreeView::branch:open:has-children:has-siblings:hover {
 /* Menu Styles */
 QMenu::item {
     /* Top Right Bottom Left */
-    padding: 8px 60px 8px 30px; 
+    padding: 8px 60px 8px 30px;
     margin: 2px;
 }
 

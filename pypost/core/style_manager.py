@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -5,6 +6,8 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QStyleFactory
 
 from pypost.ui.styles.custom_style import PyPostStyle
+
+logger = logging.getLogger(__name__)
 
 _THEME_SYSTEM = "system"
 _THEME_LIGHT = "light"
@@ -46,9 +49,11 @@ class StyleManager:
     def load_styles(self) -> str:
         """Reads all .qss files from the styles directory and returns the combined stylesheet."""
         if not self.styles_dir.exists():
+            logger.warning("styles_directory_missing path=%s", self.styles_dir)
             return ""
 
         combined_style = ""
+        qss_files: list[Path] = []
         try:
             # Sort files to ensure deterministic loading order (e.g. alphabetical)
             qss_files = sorted(self.styles_dir.glob("*.qss"))
@@ -59,16 +64,29 @@ class StyleManager:
                         content = f.read()
                         combined_style += f"\n/* File: {file_path.name} */\n{content}\n"
                 except Exception as e:
-                    print(f"Error reading style file {file_path}: {e}")
+                    logger.warning(
+                        "style_file_read_failed path=%s error=%s",
+                        file_path,
+                        e,
+                    )
 
         except Exception as e:
-            print(f"Error scanning styles directory: {e}")
+            logger.warning(
+                "styles_directory_scan_failed path=%s error=%s",
+                self.styles_dir,
+                e,
+            )
 
         # Replace placeholders with absolute path
         # Convert to absolute path and resolve any symlinks
         icons_path = self.icons_dir.resolve().as_posix()
         combined_style = combined_style.replace("%ICONS_DIR%", icons_path)
 
+        logger.debug(
+            "styles_loaded file_count=%d bytes=%d",
+            len(qss_files),
+            len(combined_style),
+        )
         return combined_style
 
     def _font_size_rule(self, font_size: int) -> str:
@@ -76,14 +94,19 @@ class StyleManager:
 
     def apply_theme(self, app, theme: str = _THEME_SYSTEM) -> None:
         """Apply Qt Fusion palette for light/dark, or system default style."""
+        requested_theme = theme
         if theme not in _VALID_THEMES:
             theme = _THEME_SYSTEM
 
         if theme == _THEME_SYSTEM:
             custom_style = PyPostStyle()
-            custom_style.set_close_button_size(48)
             app.setStyle(custom_style)
             app.setPalette(custom_style.standardPalette())
+            logger.debug(
+                "theme_applied theme=%s style=PyPostStyle requested=%s",
+                theme,
+                requested_theme,
+            )
             return
 
         fusion = QStyleFactory.create("Fusion")
@@ -92,6 +115,11 @@ class StyleManager:
             app.setPalette(_fusion_dark_palette())
         else:
             app.setPalette(_fusion_light_palette())
+        logger.debug(
+            "theme_applied theme=%s style=Fusion requested=%s",
+            theme,
+            requested_theme,
+        )
 
     def apply_styles(self, app_or_widget, font_size: int | None = None):
         """Applies the loaded styles to the given application or widget."""

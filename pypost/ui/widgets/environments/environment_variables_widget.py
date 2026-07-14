@@ -24,15 +24,15 @@ from pypost.core.environment_messages import (
     MCP_ENABLE_LABEL,
     MCP_ENABLE_TOOLTIP,
 )
+from pypost.core.environment_ops import validate_environment_variable_name
+from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
+from pypost.models.models import Environment
+from pypost.ui.collection_item_dialogs import show_invalid_variable_name_error
 
 HIDDEN_COLUMN_TOOLTIP = (
     "Hidden variables are masked in the UI and encrypted at rest when encryption is enabled. "
     "Non-hidden variables are stored as plaintext."
 )
-from pypost.core.environment_ops import validate_environment_variable_name
-from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
-from pypost.models.models import Environment
-from pypost.ui.collection_item_dialogs import show_invalid_variable_name_error
 
 logger = logging.getLogger(__name__)
 

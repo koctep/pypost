@@ -1,4 +1,4 @@
-.PHONY: venv venv-test install run clean test test-slow test-cov lint
+.PHONY: venv venv-test install run clean test test-slow test-cov lint check
 
 PYTHON := python3
 PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])')
@@ -47,6 +47,8 @@ test-cov: $(VENV_MARKER) venv-test
 # Linting
 lint: $(VENV_MARKER)
 	$(BIN)/python -m flake8 --jobs=1 pypost/
+
+check: lint test ## Convenience quality gate: static analysis + full test suite
 
 # Clean
 clean:
