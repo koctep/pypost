@@ -200,8 +200,8 @@ No environment variables or app settings.
 
 ## Observability
 
-- **ERR** (`http_client.py`): `yaml_to_json_conversion_failed` with `method`, `url`, `detail` on
-  conversion failure (never logs body content).
+- **ERR** (`http_client.py`): `yaml_to_json_conversion_failed` with `method`, sanitized `url`,
+  `detail` on conversion failure (never logs body content).
 - **ERR** (`tabs_presenter.py`): `request_error` with `category=body` when the user sees the error
   dialog.
 

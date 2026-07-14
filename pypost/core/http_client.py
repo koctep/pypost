@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, List
 import requests
 
 from pypost.core.http_response_body_reader import read_streamed_body
+from pypost.core.sensitive_text_sanitizer import sanitize_text
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_service import TemplateService
 from pypost.core.yaml_json_converter import (
@@ -79,6 +80,12 @@ class HTTPClient:
         else:
             logger.debug("HTTPClient: using default TemplateService")
 
+    @staticmethod
+    def _error_log_url(url: str, variables: Dict[str, str]) -> str:
+        """Return a URL safe for ERROR logs (heuristic + env-value redaction)."""
+        env_vars = {key: str(value) for key, value in variables.items()}
+        return sanitize_text(url, env_vars=env_vars)
+
     def _prepare_request_kwargs(
         self,
         request_data: RequestData,
@@ -124,7 +131,7 @@ class HTTPClient:
                 logger.error(
                     "yaml_to_json_conversion_failed method=%s url=%r detail=%s",
                     request_data.method,
-                    request_data.url,
+                    self._error_log_url(url, variables),
                     exc,
                 )
                 self._metrics.track_yaml_to_json_conversion_failed()
@@ -243,7 +250,9 @@ class HTTPClient:
             response = self.session.request(**kwargs)
         except requests.Timeout as exc:
             logger.error(
-                "Request timed out: %s %s", request_data.method, request_data.url
+                "Request timed out: %s %s",
+                request_data.method,
+                self._error_log_url(url, variables),
             )
             raise ExecutionError(
                 category=ErrorCategory.TIMEOUT,
@@ -252,7 +261,9 @@ class HTTPClient:
             ) from exc
         except requests.ConnectionError as exc:
             logger.error(
-                "Connection failed: %s %s", request_data.method, request_data.url
+                "Connection failed: %s %s",
+                request_data.method,
+                self._error_log_url(url, variables),
             )
             raise ExecutionError(
                 category=ErrorCategory.NETWORK,
@@ -263,7 +274,7 @@ class HTTPClient:
             logger.error(
                 "Request failed: %s %s — %s",
                 request_data.method,
-                request_data.url,
+                self._error_log_url(url, variables),
                 exc,
             )
             raise ExecutionError(

@@ -494,18 +494,67 @@ class TestHTTPClientInjection(unittest.TestCase):
 
 
 class TestHTTPClientErrorLogging(unittest.TestCase):
-    def test_connection_error_logs_template_url_not_resolved(self):
-        client = HTTPClient(metrics=MagicMock(), template_service=TemplateService())
-        client.session = MagicMock()
-        client.session.request.side_effect = requests_lib.ConnectionError("refused")
-        req = RequestData(method="GET", url="http://{{host}}/api?token={{token}}")
+    def setUp(self):
+        self.client = HTTPClient(metrics=MagicMock(), template_service=TemplateService())
+        self.client.session = MagicMock()
+        self.variables = {"host": "secret.example.com", "token": "abc"}
+        self.req = RequestData(
+            method="GET", url="http://{{host}}/api?token={{token}}"
+        )
+
+    def _assert_error_log_redacts_secrets(self, logs):
+        joined = "\n".join(logs.output)
+        self.assertIn("secret.example.com", joined)
+        self.assertNotIn("abc", joined)
+        self.assertIn("token=***", joined)
+
+    def test_connection_error_logs_redacted_resolved_url(self):
+        self.client.session.request.side_effect = requests_lib.ConnectionError("refused")
         with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
             with self.assertRaises(ExecutionError):
-                client.send_request(req, variables={"host": "secret.example.com", "token": "abc"})
+                self.client.send_request(self.req, variables=self.variables)
+        self._assert_error_log_redacts_secrets(logs)
+
+    def test_timeout_error_logs_redacted_resolved_url(self):
+        self.client.session.request.side_effect = requests_lib.Timeout("timed out")
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError):
+                self.client.send_request(self.req, variables=self.variables)
+        self._assert_error_log_redacts_secrets(logs)
+
+    def test_request_exception_logs_redacted_resolved_url(self):
+        self.client.session.request.side_effect = requests_lib.RequestException("boom")
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError):
+                self.client.send_request(self.req, variables=self.variables)
+        self._assert_error_log_redacts_secrets(logs)
+
+    def test_yaml_conversion_error_logs_redacted_resolved_url(self):
+        req = RequestData(
+            method="POST",
+            url="http://{{host}}/api?token={{token}}",
+            body_type="yaml",
+            yaml_as_json=True,
+            body="not: valid: yaml: [[",
+        )
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError):
+                self.client.send_request(req, variables=self.variables)
         joined = "\n".join(logs.output)
-        self.assertIn("http://{{host}}/api?token={{token}}", joined)
-        self.assertNotIn("secret.example.com", joined)
+        self.assertIn("yaml_to_json_conversion_failed", joined)
+        self.assertIn("secret.example.com", joined)
         self.assertNotIn("abc", joined)
+        self.assertIn("token=***", joined)
+
+    def test_literal_query_secret_redacted_without_placeholders(self):
+        req = RequestData(method="GET", url="http://example.com/api?token=supersecret")
+        self.client.session.request.side_effect = requests_lib.ConnectionError("refused")
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError):
+                self.client.send_request(req)
+        joined = "\n".join(logs.output)
+        self.assertNotIn("supersecret", joined)
+        self.assertIn("token=***", joined)
 
 
 class TestHTTPClientResponseBodyCap(unittest.TestCase):
