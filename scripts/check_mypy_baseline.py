@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run mypy on core/models and enforce a frozen error baseline (PYPOST-734)."""
+"""Run mypy on core/models/ui and enforce a frozen error baseline (PYPOST-734/815)."""
 from __future__ import annotations
 
 import argparse
@@ -11,9 +11,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = REPO_ROOT / "mypy-baseline.json"
-MYPY_PATHS = ("pypost/core", "pypost/models")
+MYPY_PATHS = ("pypost/core", "pypost/models", "pypost/ui")
 _ERROR_RE = re.compile(
-    r"^(?P<path>pypost/(?:core|models)/[^:]+):(?P<line>\d+): error: .* \[(?P<code>[^\]]+)\]$",
+    r"^(?P<path>pypost/(?:core|models|ui)/[^:]+):(?P<line>\d+): error: .* \[(?P<code>[^\]]+)\]$",
 )
 
 

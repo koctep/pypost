@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter

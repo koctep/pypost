@@ -1,5 +1,8 @@
 """JSON body validation."""
 
+from __future__ import annotations
+
+
 import json
 
 from PySide6.QtGui import QTextDocument

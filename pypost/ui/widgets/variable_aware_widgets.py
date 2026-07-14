@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Dict, Optional, Set, Tuple
 
 from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QTableWidget, QToolTip

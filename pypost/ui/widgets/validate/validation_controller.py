@@ -1,5 +1,8 @@
 """Debounced format validation and inline error display."""
 
+from __future__ import annotations
+
+
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QLabel, QPlainTextEdit, QTextEdit

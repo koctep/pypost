@@ -1,5 +1,8 @@
 """Structure scanner protocol and format registry."""
 
+from __future__ import annotations
+
+
 from typing import Protocol
 
 from PySide6.QtGui import QTextDocument

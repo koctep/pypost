@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pypost.ui.widgets.environments.environment_list_widget import (
     EnvironmentListWidget,
 )

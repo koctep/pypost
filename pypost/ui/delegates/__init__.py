@@ -1,5 +1,8 @@
 """Qt item delegates for PyPost UI."""
 
+from __future__ import annotations
+
+
 from pypost.ui.delegates.collection_item_rename_delegate import (
     CollectionItemRenameDelegate,
 )

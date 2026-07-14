@@ -35,6 +35,7 @@ dev = [
     "flake8-print>=5,<6",
     "mypy>=1.15,<2",
     "types-PyYAML>=6,<7",
+    "types-PySide6>=6.10,<7",
 ]
 otel = [
     "opentelemetry-api==1.42.1",
@@ -47,7 +48,7 @@ include = ["pypost*"]
 
 [tool.mypy]
 python_version = "3.11"
-files = ["pypost/core", "pypost/models"]
+files = ["pypost/core", "pypost/models", "pypost/ui"]
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = "."
@@ -60,5 +61,5 @@ disallow_untyped_defs = false
 ignore_missing_imports = false
 
 [[tool.mypy.overrides]]
-module = ["pypost.ui.*", "pypost.fixtures.*"]
+module = ["pypost.fixtures.*"]
 ignore_errors = true

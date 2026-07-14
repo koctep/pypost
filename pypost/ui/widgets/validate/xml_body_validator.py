@@ -1,5 +1,8 @@
 """XML body validation."""
 
+from __future__ import annotations
+
+
 import xml.etree.ElementTree as ET
 
 from PySide6.QtGui import QTextDocument

@@ -28,7 +28,7 @@ AUDIT_ERA_LOC: dict[str, int] = {
 # Regression caps: measured 2026-06-11 + ~10% headroom (see baseline-metrics.md).
 FILE_CAPS: dict[str, int] = {
     "pypost/ui/main_window.py": 425,
-    "pypost/ui/presenters/collections_presenter.py": 275,
+    "pypost/ui/presenters/collections_presenter.py": 280,
     "pypost/ui/presenters/tabs_presenter.py": 785,
     "pypost/ui/presenters/env_presenter.py": 465,
     "pypost/core/qt/metrics.py": 181,

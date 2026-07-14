@@ -1,5 +1,8 @@
 """Shared types for code folding."""
 
+from __future__ import annotations
+
+
 from dataclasses import dataclass
 from enum import Enum
 

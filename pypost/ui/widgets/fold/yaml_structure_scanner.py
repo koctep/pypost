@@ -1,5 +1,8 @@
 """YAML nestable-region detection for code folding."""
 
+from __future__ import annotations
+
+
 import io
 
 import yaml

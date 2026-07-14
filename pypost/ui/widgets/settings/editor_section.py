@@ -1,5 +1,8 @@
 """Editor settings section (font size, JSON indent)."""
 
+from __future__ import annotations
+
+
 from typing import Any
 
 from PySide6.QtWidgets import QComboBox, QFormLayout, QSpinBox, QWidget

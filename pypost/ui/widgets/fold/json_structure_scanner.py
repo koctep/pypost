@@ -1,5 +1,8 @@
 """JSON nestable-region detection for code folding."""
 
+from __future__ import annotations
+
+
 import json
 from dataclasses import dataclass, field
 

@@ -1,5 +1,8 @@
 """Background collection load bridge for CollectionsPresenter."""
 
+from __future__ import annotations
+
+
 import logging
 
 from typing import Callable

@@ -80,7 +80,7 @@ test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage rep
 lint: $(VENV_MARKER) ## Run flake8 static analysis on pypost/
 	$(BIN)/python -m flake8 --jobs=1 pypost/
 
-typecheck: $(VENV_MARKER) venv-test ## Optional mypy on pypost/core/ and pypost/models/ (baseline gate)
+typecheck: $(VENV_MARKER) venv-test ## Optional mypy on pypost/core/, models/, and ui/ (baseline gate)
 	$(BIN)/python scripts/check_mypy_baseline.py
 
 check: lint test ## Convenience quality gate: static analysis + full test suite

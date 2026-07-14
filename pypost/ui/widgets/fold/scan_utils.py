@@ -1,5 +1,8 @@
 """Shared helpers for fold structure scanners (PYPOST-732)."""
 
+from __future__ import annotations
+
+
 from pypost.ui.widgets.fold.fold_region import FoldRegion
 
 

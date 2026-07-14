@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Dict, Generic, Iterable, Optional, Set, Tuple, TypeVar
 
 from PySide6.QtGui import QMouseEvent

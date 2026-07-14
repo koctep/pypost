@@ -45,6 +45,8 @@ pytest-timeout==2.4.0
     # via -r requirements-dev.in
 tomli==2.4.1
     # via coverage
+types-pyside6==6.10.1.1
+    # via -r requirements-dev.in
 types-pyyaml==6.0.12.20260518
     # via -r requirements-dev.in
 typing-extensions==4.16.0

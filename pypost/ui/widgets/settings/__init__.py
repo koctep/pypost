@@ -1,5 +1,8 @@
 """Settings dialog section builders."""
 
+from __future__ import annotations
+
+
 from pypost.ui.widgets.settings.editor_section import EditorSettingsSection
 from pypost.ui.widgets.settings.encryption_config_section import EncryptionConfigSection
 from pypost.ui.widgets.settings.encryption_migration_section import (

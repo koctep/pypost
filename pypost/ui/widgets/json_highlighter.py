@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 

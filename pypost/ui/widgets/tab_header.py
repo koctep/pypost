@@ -1,5 +1,8 @@
 """Request tab bar chrome: closable tabs, trailing + control, label updates."""
 
+from __future__ import annotations
+
+
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QPushButton, QTabBar, QTabWidget, QWidget
 
