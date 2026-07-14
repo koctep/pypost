@@ -63,6 +63,9 @@ update caps with ~10% headroom, and refresh the snapshot.
 `MainWindow` class (353/380), and `template_service.py` (204/225) all within refreshed caps.
 `audit_baseline_metrics.py --check` and `test_solid_audit_baseline.py` pass.
 
+**PYPOST-735 (2026-07-14):** Closed R-P2-006 — `pypost/core/qt/metrics.py` cap raised 165→181
+(164 LOC measured); `pypost/ui/widgets/mixins.py` added at cap 411 (373 LOC). Snapshot refreshed.
+
 ## Individual dialog audit (PYPOST-374)
 
 PYPOST-40 grouped `ui/dialogs/` (~400 LOC) without per-dialog SOLID scoring. PYPOST-374 audits
