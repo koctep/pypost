@@ -238,7 +238,8 @@ opens `McpActivityDialog` from **MCP Activity (N)** in the top bar.
     -   Executes the HTTP request via `HTTPClient`.
     -   Runs any post-request scripts via `ScriptExecutor` (same variable dict as GUI).
 7.  `format_structured_tool_result()` builds a JSON envelope (`status`, `error`, `body`,
-    optional `logs`, `error_category`, `error_message`) returned as `TextContent`.
+    optional `logs`, `error_category`, `error_message`, `error_detail`) returned as
+    `TextContent`.
 
 ### Structured tool results (PYPOST-557)
 
@@ -256,6 +257,7 @@ redacted to `***`.
 | `logs` | `string[]` | Optional post-request script log lines (sanitized like `body`) |
 | `error_category` | `string` | Optional `ErrorCategory` value when `execution_error` is set |
 | `error_message` | `string` | Optional human-readable execution error message |
+| `error_detail` | `string` | Optional technical detail from `ExecutionError.detail` (sanitized like `body`) |
 
 Example success:
 
@@ -277,7 +279,8 @@ Example network failure:
   "error": true,
   "body": "{\"error\": \"...\", \"detail\": \"...\"}",
   "error_category": "network",
-  "error_message": "Could not connect to ..."
+  "error_message": "Could not connect to ...",
+  "error_detail": "Connection refused: ..."
 }
 ```
 

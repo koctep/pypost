@@ -73,6 +73,12 @@ def format_structured_tool_result(
     if result.execution_error is not None:
         payload["error_category"] = result.execution_error.category.value
         payload["error_message"] = result.execution_error.message
+        if result.execution_error.detail is not None:
+            payload["error_detail"] = McpResponseSanitizer.sanitize_text(
+                result.execution_error.detail,
+                env_vars=env,
+                hidden_keys=hidden,
+            )
     return json.dumps(payload, ensure_ascii=False)
 
 

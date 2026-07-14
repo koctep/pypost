@@ -413,6 +413,7 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertEqual(payload["logs"], ["log line"])
         self.assertEqual(payload["error_category"], "script")
         self.assertEqual(payload["error_message"], "Post-script execution failed.")
+        self.assertEqual(payload["error_detail"], "bad script")
 
     def test_call_tool_upstream_http_error_is_not_execution_error(self):
         impl = MCPServerImpl()
@@ -491,6 +492,38 @@ class TestStructuredToolResultHelpers(unittest.TestCase):
         self.assertEqual(payload["status"], 200)
         self.assertFalse(payload["error"])
         self.assertEqual(payload["body"], "ok")
+
+    def test_format_structured_tool_result_includes_error_detail(self):
+        result = _exec_result(script_error="SyntaxError: invalid syntax")
+        text = format_structured_tool_result(result)
+        payload = json.loads(text)
+        self.assertEqual(payload["error_detail"], "SyntaxError: invalid syntax")
+
+    def test_format_structured_tool_result_omits_error_detail_when_none(self):
+        result = _exec_result(status_code=0)
+        result.execution_error = ExecutionError(
+            category=ErrorCategory.NETWORK,
+            message="Could not connect.",
+        )
+        text = format_structured_tool_result(result)
+        payload = json.loads(text)
+        self.assertNotIn("error_detail", payload)
+
+    def test_format_structured_tool_result_sanitizes_error_detail(self):
+        result = _exec_result(status_code=0)
+        result.execution_error = ExecutionError(
+            category=ErrorCategory.NETWORK,
+            message="Could not connect.",
+            detail="token=secret-echo-123",
+        )
+        text = format_structured_tool_result(
+            result,
+            env_vars={"api_key": "secret-echo-123"},
+            hidden_keys={"api_key"},
+        )
+        payload = json.loads(text)
+        self.assertNotIn("secret-echo-123", payload["error_detail"])
+        self.assertIn("***", payload["error_detail"])
 
 
 class TestMcpToolSchemaHelpers(unittest.TestCase):
