@@ -112,6 +112,16 @@ class TestMcpServerImplActivity(unittest.TestCase):
         self.assertEqual(entry.http_status, 200)
         self.assertIsNotNone(entry.duration_ms)
 
+    def test_call_tool_detail_redacts_secrets(self):
+        entry = McpActivityEntry.new_call_tool(
+            "echo",
+            outcome="error",
+            mcp_arg_count=1,
+            detail="failed at http://x?token=supersecret",
+        )
+        self.assertNotIn("supersecret", entry.detail)
+        self.assertIn("token=***", entry.detail)
+
 
 if __name__ == "__main__":
     unittest.main()

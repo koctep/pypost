@@ -9,6 +9,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from pypost.core.sensitive_text_sanitizer import sanitize_text
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_ENTRIES = 100
@@ -28,6 +30,12 @@ class McpActivityEntry:
     http_status: int | None = None
     detail: str | None = None
     duration_ms: float | None = None
+
+    @staticmethod
+    def _sanitize_detail(detail: str | None) -> str | None:
+        if detail is None:
+            return None
+        return sanitize_text(detail)
 
     @staticmethod
     def new_list_tools(tool_count: int) -> McpActivityEntry:
@@ -57,7 +65,7 @@ class McpActivityEntry:
             tool_name=tool_name,
             mcp_arg_count=mcp_arg_count,
             http_status=http_status,
-            detail=detail,
+            detail=McpActivityEntry._sanitize_detail(detail),
             duration_ms=duration_ms,
         )
 
