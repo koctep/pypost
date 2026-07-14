@@ -10,6 +10,19 @@ from pypost.core.qt.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
 from pypost.ui.main_window import MainWindow
 
+_LOG_LEVELS = {
+    "CRITICAL": logging.CRITICAL,
+    "ERROR": logging.ERROR,
+    "WARNING": logging.WARNING,
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
+}
+
+
+def _resolve_log_level(name: str) -> int:
+    return _LOG_LEVELS.get((name or "INFO").upper(), logging.INFO)
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
@@ -26,6 +39,8 @@ def main():
     # MainWindow. The same ConfigManager instance is injected into MainWindow.
     config_manager = ConfigManager()
     settings = config_manager.load_config()
+    logging.getLogger().setLevel(_resolve_log_level(settings.log_level))
+    logger.info("log_level_applied level=%s", settings.log_level.upper())
 
     metrics_manager = MetricsManager()
     metrics_manager.start_server(settings.metrics_host, settings.metrics_port)

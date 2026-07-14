@@ -28,7 +28,8 @@ PyPost uses stdlib logging with a **key=value event convention** in newer module
 only), and **AlertManager** JSON files plus optional webhooks. CI disables live `log_cli` but
 verifies captured logs against an allowlist.
 
-**Top gaps:** hardcoded INFO log level (P2). `print()` in config paths remediated in
+**Top gaps:** hardcoded INFO log level remediated in
+[PYPOST-743](https://pypost.atlassian.net/browse/PYPOST-743). `print()` in config paths remediated in
 [PYPOST-742](https://pypost.atlassian.net/browse/PYPOST-742). Resolved URLs in `http_client`
 ERROR logs remediated in [PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741).
 
