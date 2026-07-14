@@ -10,9 +10,10 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 
 ## Key Findings
 
-- **MainWindow** (282 file / 246 class LOC as of 2026-06-11 baseline; 1040 at audit time):
-  Acts as a composition root after PYPOST-43 presenter split. Regression caps in
-  [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
+- **MainWindow** — **resolved ([PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43))**:
+  Decomposed into presenters; now a composition root (audit-era god-object was 1040 LOC).
+  Current baseline LOC and CI regression caps:
+  [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md) (PYPOST-376).
 - **Singletons/globals**: ~~MetricsManager~~ resolved (PYPOST-44, [PYPOST-167](../../ai-tasks/PYPOST-167/70-dev-docs.md));
   ~~`template_service` module global~~ resolved (PYPOST-45); lifecycle and test seams documented
   ([PYPOST-143](../../ai-tasks/PYPOST-143/70-dev-docs.md), [template_service.md](template_service.md)).
@@ -26,7 +27,7 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 
 | Priority | Recommendation |
 |----------|----------------|
-| P1 | ~~Decompose MainWindow~~ (PYPOST-43); ~~MetricsManager/template_service injection~~ (PYPOST-44/45/167) |
+| P1 | ~~Decompose MainWindow~~ **resolved** ([PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43)); ~~MetricsManager/template_service injection~~ (PYPOST-44/45/167) |
 | P2 | HTTPClient protocol; ~~unified collection loading~~ (PYPOST-47); item_type strategy; ~~split MetricsManager~~ (PYPOST-49) |
 | P3 | ~~StorageInterface~~ (PYPOST-50); ~~ExecuteRequestProtocol~~ (PYPOST-51) |
 
@@ -37,10 +38,10 @@ LOC baselines and caps so god-object regressions (especially `MainWindow` growth
 
 | Metric | Audit era (PYPOST-40) | Baseline (2026-06-11) | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 383 | 425 |
-| `MainWindow` class LOC | 1040 | 343 | 380 |
+| `main_window.py` file LOC | 1040 | 393 | 425 |
+| `MainWindow` class LOC | 1040 | 353 | 380 |
 
-Full module table: [ai-tasks/PYPOST-376/baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
+Authoritative snapshot (all module caps): [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
 
 **Regenerate snapshot:**
 
@@ -65,6 +66,11 @@ update caps with ~10% headroom, and refresh the snapshot.
 
 **PYPOST-735 (2026-07-14):** Closed R-P2-006 — `pypost/core/qt/metrics.py` cap raised 165→181
 (164 LOC measured); `pypost/ui/widgets/mixins.py` added at cap 411 (373 LOC). Snapshot refreshed.
+
+**PYPOST-768 (2026-07-14):** Closed R-P2-002 (PYPOST-690) — refreshed MainWindow narrative;
+marked [PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43) resolved; Key Findings and
+regression table cite [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
+(393 file / 353 class baseline; 425 / 380 caps).
 
 ## Individual dialog audit (PYPOST-374)
 
