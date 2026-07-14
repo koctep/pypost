@@ -79,12 +79,118 @@ follow-up).
 
 ## Error Handling
 
-- **No bare `except:`** in `pypost/` — good
-- **29 `except Exception`** — mostly storage, alerts, I/O; prefer typed catches +
-  `logger.exception`
-- **PYPOST-733** narrowed persistence-layer handlers in `storage.py` and `alert_manager.py`;
-  one intentional last-resort `except Exception` remains in `deserialize_environment_records`
-- User dialogs centralized in `collection_item_dialogs.py`
+PyPost uses three intentional patterns for failure paths. Pick one based on whether the user
+must act, whether the failure is user-initiated, and whether the code path is an optional
+probe. Full naming rules for log lines are in [logging.md](logging.md).
+
+### Layer rules
+
+| Layer | Responsibility |
+| --- | --- |
+| `models/` | Raise typed errors (`ExecutionError`, `EnvironmentEncryptionError`, …); no logging |
+| `core/` | Catch, log, return safe defaults or propagate; **never** show Qt dialogs |
+| `core/qt/` | Workers emit failure signals; log on worker-side errors |
+| `ui/` | Presenters choose log-only vs log+dialog; call `collection_item_dialogs` helpers |
+
+**No bare `except:`** anywhere in `pypost/`. Prefer typed exceptions over `except Exception`;
+when a last-resort catch is required (desktop resilience), use `logger.exception` and document
+why (see `deserialize_environment_records` in `storage.py`).
+
+### Pattern 1 — Log-only
+
+**When:** Background or automatic work failed, but the app can continue with a safe default and
+the user does not need a blocking modal.
+
+**Do:**
+
+- Log at `error` or `warning` with a stable event name and `key=value` context (see
+  [logging.md](logging.md)).
+- Apply a degraded but usable UI state (empty list, skip metric, status-bar hint).
+- Do **not** open `QMessageBox`.
+
+**Examples:**
+
+| Module | Behavior |
+| --- | --- |
+| `EnvPresenter._on_storage_load_failed` | `storage_load_failed` log → empty environment list |
+| `CollectionsAsyncLoader` | `collection_storage_async_load_failed` log → presenter handles empty state |
+| `TabsPresenter._handle_copy_curl_request` | `copy_curl_failed` log → status bar message (non-modal) |
+| `storage.py` corrupt file read | `logger.warning` → skip file, continue loading others |
+
+Persistence file-level vs per-record behavior is documented in
+[environment_encryption_at_rest.md](environment_encryption_at_rest.md).
+
+### Pattern 2 — Log + dialog
+
+**When:** The user initiated an action (save, rename, send, delete) and must know it failed, or
+must confirm a destructive step.
+
+**Do:**
+
+1. Log the failure (`logger.error` with context, or `logger.exception` for unexpected errors).
+2. Show a dialog via a helper in `pypost/ui/collection_item_dialogs.py` — do not call
+   `QMessageBox` directly in presenters except for flows not yet migrated (tracked in tech debt).
+3. Keep dialog **titles and bodies** in helpers or `environment_messages.py`; presenters pass
+   domain facts only.
+
+**Examples:**
+
+| Module | Log event | Dialog helper |
+| --- | --- | --- |
+| `CollectionTreeActions` rename/delete | `collection_item_rename_failed`, … | `show_rename_failure`, `show_delete_failure` |
+| `EnvPresenter._on_storage_save_failed` | `storage_save_failed` | `show_env_save_failed` |
+| `TabsPresenterWorker._on_request_error` | `request_error` | `show_request_error`, `show_request_failed_error` |
+| `EnvPresenter` MCP start failure | `mcp_server_start_failed_ui` | inline warning (migration candidate) |
+
+Helper catalog: [collection_tree_actions.md](collection_tree_actions.md#collection_item_dialogs).
+Structured HTTP/MCP failures use `ExecutionError` / `ErrorCategory` from `models/errors.py` —
+see [request_execution.md](request_execution.md).
+
+**Cancelled requests** are not errors: log at `info` (`request_cancelled`) and return without a
+dialog.
+
+### Pattern 3 — Silent pass
+
+**When:** Failure is expected on an optional probe, cleanup path, or parse fallback; surfacing
+an error would be noise.
+
+**Do:**
+
+- Use a **narrow** exception type (`json.JSONDecodeError`, `ImportError`, `OSError` on close).
+- Prefer `pass` or return `None` / default; optional `logger.debug` when diagnostics help.
+- Add a one-line comment if the intent is non-obvious.
+
+**Examples:**
+
+| Module | Reason |
+| --- | --- |
+| `RequestService._execute_mcp` | Body may not be JSON; non-dict body falls through to `list_tools` |
+| `AlertManager.close` | Handler `close()` may raise `OSError` during teardown |
+| `key_sources/keyring.py` | Keyring unavailable or lookup failed → try next source |
+| `bind_address_validation.py` | Optional address probe |
+
+Do **not** use silent pass for persistence, encryption, or user data mutations — those belong in
+log-only or log+dialog.
+
+### Decision checklist
+
+1. Did the user click something that should succeed or fail visibly? → **Log + dialog**
+2. Is this background load/save/sync where a modal would interrupt workflow? → **Log-only**
+   (+ safe default UI)
+3. Is this probing optional input shape or tearing down resources? → **Silent pass**
+   (typed catch, no user message)
+4. Can you catch a **specific** exception instead of `Exception`? → Do so (R-P2-004)
+
+### Inventory (2026-06-12 audit)
+
+- **~29 `except Exception`** — mostly storage, alerts, I/O; narrowing tracked in
+  [PYPOST-733](https://pypost.atlassian.net/browse/PYPOST-733) and R-P2-004
+- **PYPOST-733** narrowed persistence handlers in `storage.py` and `alert_manager.py`; one
+  intentional last-resort `except Exception` remains in `deserialize_environment_records`
+- **~37 modules** log errors; **~20 QMessageBox** call sites centralized in
+  `collection_item_dialogs.py` (PYPOST-539)
+
+Convention documented in **PYPOST-739** (R-P3-003).
 
 ## PYPOST-40 Alignment
 
