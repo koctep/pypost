@@ -22,14 +22,14 @@ $(VENV_MARKER):
 	$(BIN)/python -m pip install --upgrade pip
 	touch "$(VENV_MARKER)"
 
-venv-test: $(VENV_MARKER) ## Install pinned test and lint tooling from requirements-dev.txt
-	$(BIN)/python -m pip install -r requirements-dev.txt
+venv-test: $(VENV_MARKER) ## Install dev optional extra from pyproject.toml (pytest, flake8, etc.)
+	$(BIN)/python -m pip install -e ".[dev]"
 
-venv-otel: $(VENV_MARKER) ## Install optional OpenTelemetry overlay from requirements-otel.txt
-	$(BIN)/python -m pip install -r requirements-otel.txt
+venv-otel: $(VENV_MARKER) ## Install OpenTelemetry optional extra from pyproject.toml
+	$(BIN)/python -m pip install -e ".[otel]"
 
-install: $(VENV_MARKER) venv-test venv-otel ## Install application, test, and OTel test dependencies
-	$(BIN)/python -m pip install -r requirements.txt
+install: $(VENV_MARKER) ## Install editable package with dev and OTel extras
+	$(BIN)/python -m pip install -e ".[dev,otel]"
 
 lock: ## Regenerate requirements.txt transitive lock from requirements.in
 	$(UV) pip compile requirements.in -o requirements.txt --python-version $(LOCK_PYTHON_VERSION)

@@ -43,10 +43,11 @@ dependency PRs. Transitive production graph is locked via `uv pip compile` (PYPO
 | CI | Job `security-audit` in `.github/workflows/test.yml` |
 | Local | `make security-audit` (requires `make install` first) |
 
-The scan installs production dependencies (`requirements.txt`), then runs `pip-audit -r
-requirements.txt`. The `pip-audit` CLI is pinned in `requirements-dev.txt` (PYPOST-805) — not
-installed ephemerally — so local and CI share the same scanner version via `make install` /
-`requirements-dev.txt`. The job fails when known vulnerabilities are reported.
+The scan runs `pip-audit -r requirements.txt` against the committed production lock. The
+`pip-audit` CLI is pinned in `pyproject.toml` `[dev]` extra (mirrored in `requirements-dev.txt`,
+PYPOST-805) — not installed ephemerally — so local and CI share the same scanner version via
+`make install` / `pip install -e ".[dev]"`. The job fails when known vulnerabilities are
+reported.
 
 **Temporary exceptions:** If a CVE has no fixed release, add `pip-audit --ignore-vuln <CVE-ID>`
 to the CI step and document the rationale here. Remove the ignore when a patched version is
@@ -72,9 +73,9 @@ available.
 
 | Category | Install source | Packages |
 | --- | --- | --- |
-| Production | `requirements.txt` via `make install` | Runtime deps (locked) |
-| Development | `requirements-dev.txt` via `make venv-test` and CI | pytest, pytest-cov, pytest-timeout, flake8, flake8-print |
-| OpenTelemetry (optional) | `requirements-otel.txt` via `make venv-otel`, CI test jobs | opentelemetry-api, opentelemetry-sdk |
+| Production | `pyproject.toml` via `make install` (`pip install -e ".[dev,otel]"`) | Runtime deps (direct pins; transitive via lock files) |
+| Development | `pyproject.toml` `[dev]` extra via `make venv-test` / CI | pytest, pytest-cov, pytest-timeout, flake8, flake8-print, mypy, pip-audit |
+| OTel overlay | `pyproject.toml` `[otel]` extra via `make venv-otel` / `make install` | opentelemetry-api, opentelemetry-sdk |
 
 Dev packages are **not** in `requirements.txt` (good separation). Versions are **pinned** in
 `requirements-dev.in` / `requirements-dev.txt` (PYPOST-780).

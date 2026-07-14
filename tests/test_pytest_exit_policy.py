@@ -11,9 +11,35 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO_ROOT / "Makefile"
-REQUIREMENTS_DEV = REPO_ROOT / "requirements-dev.txt"
-REQUIREMENTS_OTEL = REPO_ROOT / "requirements-otel.txt"
 PYTEST_EXIT_NO_TESTS = 5
+
+_MINIMAL_PYPROJECT = """\
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pypost"
+version = "0.0.0"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "flake8>=7,<8",
+]
+otel = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pypost*"]
+"""
+
+
+def _seed_minimal_project(workspace: Path) -> None:
+    pypost_dir = workspace / "pypost"
+    pypost_dir.mkdir(exist_ok=True)
+    (pypost_dir / "__init__.py").write_text("", encoding="utf-8")
 
 
 @pytest.mark.timeout(30)
@@ -38,12 +64,8 @@ def test_pytest_returns_exit_code_5_for_empty_tests_dir(tmp_path: Path) -> None:
 def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path) -> None:
     """make test must propagate pytest exit 5 — zero collection is a failure."""
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
-    shutil.copy(REQUIREMENTS_DEV, tmp_path / "requirements-dev.txt")
-    shutil.copy(REQUIREMENTS_OTEL, tmp_path / "requirements-otel.txt")
-    (tmp_path / "requirements.txt").write_text(
-        "# empty fixture for make install\n",
-        encoding="utf-8",
-    )
+    (tmp_path / "pyproject.toml").write_text(_MINIMAL_PYPROJECT, encoding="utf-8")
+    _seed_minimal_project(tmp_path)
     tests_dir = tmp_path / "tests"
     tests_dir.mkdir()
 

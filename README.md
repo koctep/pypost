@@ -72,7 +72,7 @@ To simplify the installation and startup process, a `Makefile` is provided in th
 
 3.  Install dependencies:
     ```bash
-    pip install -r requirements.txt
+    pip install -e ".[dev,otel]"
     ```
 
 ## Running

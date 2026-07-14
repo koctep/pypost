@@ -10,7 +10,7 @@ Configuration lives in root `pyproject.toml` under `[tool.mypy]`. Known errors a
 ## Quick Start
 
 ```bash
-make install      # includes mypy via requirements-dev.txt
+make install      # editable install with [dev] extra (includes mypy)
 make typecheck    # mypy + baseline gate (optional; not part of make check)
 ```
 
@@ -137,8 +137,8 @@ CI (`.github/workflows/test.yml`) does not run mypy yet.
 | --- | --- |
 | `make typecheck` reports new errors | Fix types or revert; do not edit baseline to hide regressions |
 | Fixed errors but gate still fails | Run `check_mypy_baseline.py --update-baseline` and commit JSON |
-| `Library stubs not installed for "yaml"` | Run `make venv-test` (installs `types-PyYAML`) |
-| `Library stubs not installed for "PySide6"` | Run `make venv-test` (installs `types-PySide6`) |
+| `Library stubs not installed for "yaml"` | Run `make venv-test` (installs `types-PyYAML` via `[dev]` extra) |
+| `Library stubs not installed for "PySide6"` | Run `make venv-test` (installs `types-PySide6` via `[dev]` extra) |
 | mypy cannot import `pypost` | Run from repo root; config sets `mypy_path = "."` |
 
 ## See Also

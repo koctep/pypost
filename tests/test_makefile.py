@@ -14,6 +14,7 @@ pytestmark = pytest.mark.timeout(120)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO_ROOT / "Makefile"
+PYPROJECT = REPO_ROOT / "pyproject.toml"
 REQUIREMENTS = REPO_ROOT / "requirements.txt"
 REQUIREMENTS_IN = REPO_ROOT / "requirements.in"
 REQUIREMENTS_DEV = REPO_ROOT / "requirements-dev.txt"
@@ -98,6 +99,37 @@ def _seed_minimal_project(workspace: Path) -> None:
     (pypost_dir / "__init__.py").write_text("", encoding="utf-8")
 
 
+_MINIMAL_PYPROJECT = """\
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pypost"
+version = "0.0.0"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "flake8>=7,<8",
+]
+otel = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pypost*"]
+"""
+
+
+def _write_minimal_pyproject(workspace: Path) -> None:
+    (workspace / "pyproject.toml").write_text(_MINIMAL_PYPROJECT, encoding="utf-8")
+
+
+def _copy_pyproject(workspace: Path) -> None:
+    shutil.copy(PYPROJECT, workspace / "pyproject.toml")
+
+
 def _copy_dev_requirements(workspace: Path) -> None:
     shutil.copy(REQUIREMENTS_DEV, workspace / "requirements-dev.txt")
 
@@ -109,12 +141,7 @@ def _copy_otel_requirements(workspace: Path) -> None:
 @pytest.fixture
 def make_workspace(tmp_path: Path) -> Path:
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
-    (tmp_path / "requirements.txt").write_text(
-        "# empty fixture for make install\n",
-        encoding="utf-8",
-    )
-    _copy_dev_requirements(tmp_path)
-    _copy_otel_requirements(tmp_path)
+    _write_minimal_pyproject(tmp_path)
     _seed_minimal_project(tmp_path)
     return tmp_path
 
@@ -122,9 +149,7 @@ def make_workspace(tmp_path: Path) -> Path:
 @pytest.fixture
 def make_workspace_full_deps(tmp_path: Path) -> Path:
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
-    shutil.copy(REQUIREMENTS, tmp_path / "requirements.txt")
-    _copy_dev_requirements(tmp_path)
-    _copy_otel_requirements(tmp_path)
+    _copy_pyproject(tmp_path)
     _seed_minimal_project(tmp_path)
     return tmp_path
 
@@ -151,14 +176,11 @@ class TestMarkerLifecycle:
 
 
 class TestDependencyChain:
-    def test_install_depends_on_venv_test_venv_otel_and_marker(
-        self,
-        make_workspace: Path,
-    ) -> None:
+    def test_install_depends_on_marker_only(self, make_workspace: Path) -> None:
         prereqs = _prerequisites(make_workspace, "install")
-        assert "venv-test" in prereqs
-        assert "venv-otel" in prereqs
         assert MARKER_REL in prereqs
+        assert "venv-test" not in prereqs
+        assert "venv-otel" not in prereqs
 
     def test_test_depends_on_venv_otel_and_marker(self, make_workspace: Path) -> None:
         prereqs = _prerequisites(make_workspace, "test")
@@ -297,7 +319,7 @@ class TestTargetExecution:
         test_result = _run_make(make_workspace, "test")
         assert test_result.returncode == 0, test_result.stderr
 
-    def test_install_succeeds_with_empty_requirements(self, make_workspace: Path) -> None:
+    def test_install_succeeds_with_minimal_pyproject(self, make_workspace: Path) -> None:
         result = _run_make(make_workspace, "install")
         assert result.returncode == 0, result.stderr
 
@@ -341,7 +363,7 @@ class TestTargetExecution:
 @pytest.mark.slow
 @pytest.mark.timeout(180)
 class TestSlowInstallSmoke:
-    def test_install_succeeds_with_project_requirements(
+    def test_install_succeeds_with_project_pyproject(
         self,
         make_workspace_full_deps: Path,
     ) -> None:

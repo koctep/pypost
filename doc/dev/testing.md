@@ -36,11 +36,11 @@ Use this checklist on a **clean checkout** to match CI regression coverage local
 | Step | Command / detail |
 | --- | --- |
 | **Python** | 3.11+ recommended ([README](../../README.md)); CI matrix runs **3.11** and **3.13** |
-| **Install** | `make install` — creates `.venv`, installs test tooling via `venv-test` (`requirements-dev.txt`), then app deps from `requirements.txt` |
+| **Install** | `make install` — creates `.venv`, runs `pip install -e ".[dev,otel]"` |
 | **Fast regression** | `make test` — full suite except `-m slow` |
 | **Slow smoke** | `make test-slow` — Makefile install smoke (`tests/test_makefile.py`) |
 | **Coverage** | `make test-cov` — fast suite with `--cov=pypost` |
-| **CI parity** | Main job (`.github/workflows/test.yml`) installs the same pinned dev stack from `requirements-dev.txt` (aligned with local `venv-test`) |
+| **CI parity** | Main job (`.github/workflows/test.yml`) installs `pip install -e ".[dev,otel]"` |
 
 `run`, `test`, and `lint` do not auto-install dependencies — run `make install` first after
 clone or Python version change. See [setup.md](setup.md).
@@ -466,7 +466,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-277] | Smoke for `venv`, `install`, `test`, `lint` (closed with PYPOST-274) |
 | [PYPOST-307] | Implementation slice: marker lifecycle, `make -p` chains, lint failure |
 | [PYPOST-310] | Implementation slice: execution smoke for install/test/lint exit codes |
-| [PYPOST-559] | Optional slow `make install` with real requirements in isolated workspace |
+| [PYPOST-559] | Optional slow `make install` with real `pyproject.toml` in isolated workspace |
 | [PYPOST-279] | Pytest exit code `5` (no tests collected) policy in `make test` and CI |
 | [PYPOST-800] | Smoke for `make help` non-empty output (PYPOST-794 follow-up) |
 
@@ -481,10 +481,10 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | Area | What is checked |
 | ---- | ---------------- |
 | Marker lifecycle | `make venv` creates marker; `make clean` removes `.venv`; idempotent `venv` |
-| Dependency chain | `install`/`test-cov` depend on marker + `venv-test`; others depend on marker only |
+| Dependency chain | `install` depends on marker only; `test-cov` depends on marker + `venv-test` + `venv-otel` |
 | Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `test`/`lint` |
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
-| Slow install smoke | `make install` with real requirements succeeds; marked `@pytest.mark.slow` |
+| Slow install smoke | `make install` with real `pyproject.toml` succeeds; marked `@pytest.mark.slow` |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
 
 ### Python interpreter decoupling (PYPOST-718)
@@ -518,13 +518,13 @@ CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest (`pyt
 ## CI dependency caching (PYPOST-311)
 
 Both CI jobs use `actions/setup-python@v5` with `cache: pip` and an explicit
-`cache-dependency-path` listing `requirements.in`, `requirements.txt`, `requirements-dev.in`,
-and `requirements-dev.txt`. The cache stores downloaded pip wheels under the runner home
-directory and restores them before dependency installation.
+`cache-dependency-path` listing `pyproject.toml`, `requirements.in`, `requirements.txt`,
+`requirements-dev.in`, and `requirements-dev.txt`. The cache stores downloaded pip wheels under
+the runner home directory and restores them before dependency installation.
 
 | Aspect | Behavior |
 | --- | --- |
-| **Cache key** | OS + Python version + SHA-256 hash of all four requirements files |
+| **Cache key** | OS + Python version + SHA-256 hash of `pyproject.toml` and all four requirements files |
 | **Invalidation** | Any edit to a lock or source file produces a new key (cold install) |
 | **Scope** | Main `test` matrix (3.11, 3.13), `make-install-smoke` (3.11), `security-audit`, and `check-lock-dev` |
 | **Local dev** | `make install` uses Makefile `.venv`; GitHub cache applies to CI only |
@@ -547,14 +547,15 @@ relative to `requirements-dev.in` (same check as local maintainer workflow in
 | `check-lock-dev` | `requirements-dev.in` → `requirements-dev.txt` | `uv pip compile` via Makefile |
 
 Production lock verification (`make check-lock`) remains local-only until a sibling CI job is
-added; dev lock drift is now gated in CI because test tooling installs from `requirements-dev.txt`.
+added; dev lock drift is now gated in CI because test tooling installs from `pyproject.toml`
+`[dev]` extra (PYPOST-806).
 
-## CI dependency CVE scan (PYPOST-778, PYPOST-805)
+## CI dependency CVE scan (PYPOST-778, PYPOST-805, PYPOST-806)
 
-The `security-audit` job installs production deps (`requirements.txt`) and dev tooling
-(`requirements-dev.txt`, which includes pinned `pip-audit`), then runs `pip-audit -r
-requirements.txt` once per workflow on Python 3.11. Local parity: `make security-audit` after
-`make install` (PYPOST-805 removed inline `pip install pip-audit` from Makefile and CI).
+The `security-audit` job installs dev tooling via `pip install -e ".[dev]"` (includes pinned
+`pip-audit`), then runs `pip-audit -r requirements.txt` once per workflow on Python 3.11. Local
+parity: `make security-audit` after `make install` (PYPOST-805 removed inline `pip install
+pip-audit` from Makefile and CI).
 
 See [dependencies_audit.md](dependencies_audit.md) § CVE Scanning for ignore-vuln policy.
 

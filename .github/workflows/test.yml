@@ -35,12 +35,13 @@ jobs:
             libxcb-cursor0 \
             libxkbcommon0
 
-      # Pip wheel cache keyed on requirements.txt content hash (PYPOST-311).
+      # Pip wheel cache keyed on lock files and pyproject.toml (PYPOST-311, PYPOST-806).
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: |
+            pyproject.toml
             requirements.in
             requirements.txt
             requirements-dev.in
@@ -51,14 +52,8 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install test tools
-        run: python -m pip install -r requirements-dev.txt
-
-      - name: Install application dependencies
-        run: python -m pip install -r requirements.txt
-
-      - name: Install OpenTelemetry overlay (OTel tests)
-        run: python -m pip install -r requirements-otel.txt
+      - name: Install package and dependencies
+        run: python -m pip install -e ".[dev,otel]"
 
       - name: Run lint
         run: python -m flake8 --jobs=1 pypost/
@@ -150,12 +145,13 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      # Same pip cache key as main matrix — invalidates when requirements.txt changes.
+      # Same pip cache key as main matrix — invalidates when pyproject.toml or locks change.
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: |
+            pyproject.toml
             requirements.in
             requirements.txt
             requirements-dev.in
@@ -167,10 +163,7 @@ jobs:
         run: python -m pip install --upgrade pip
 
       - name: Install test tooling
-        run: python -m pip install -r requirements-dev.txt
-
-      - name: Install OpenTelemetry overlay (OTel tests)
-        run: python -m pip install -r requirements-otel.txt
+        run: python -m pip install -e ".[dev]"
 
       - name: Run slow Makefile install smoke
         run: |
@@ -188,6 +181,7 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: |
+            pyproject.toml
             requirements.in
             requirements.txt
             requirements-dev.in
@@ -196,11 +190,8 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install application dependencies
-        run: python -m pip install -r requirements.txt
-
       - name: Install dev tooling (pip-audit)
-        run: python -m pip install -r requirements-dev.txt
+        run: python -m pip install -e ".[dev]"
 
       - name: Audit dependencies for known CVEs
         run: pip-audit -r requirements.txt
@@ -209,8 +200,8 @@ jobs:
         if: always()
         run: |
           echo "## Dependency CVE scan" >> "$GITHUB_STEP_SUMMARY"
-          echo "Scanned \`requirements.txt\` with pinned \`pip-audit\` from \`requirements-dev.txt\`" \
-            " (PYPOST-778, PYPOST-805)." \
+          echo "Scanned \`requirements.txt\` with pinned \`pip-audit\` from editable \`[dev]\` extra" \
+            " (PYPOST-778, PYPOST-805, PYPOST-806)." \
             >> "$GITHUB_STEP_SUMMARY"
 
   check-lock-dev:
