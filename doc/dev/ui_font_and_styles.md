@@ -96,6 +96,10 @@ with native chrome (segmented control on macOS).
 Bundled `close.svg` / `close-hover.svg` icons in `main.qss` scale into the metric rectangle;
 only the close-button sub-control is styled, not `::tab`.
 
+Default close icon (`close.svg`) uses `#999999` stroke (PYPOST-796) for better contrast on dark
+native tab chrome. Hover icon (`close-hover.svg`) uses a light pill background with `#333333`
+stroke — unchanged.
+
 ### Tab bar styling policy (PYPOST-792)
 
 **Do not add `QTabBar::tab` rules to shipped QSS.**
@@ -192,7 +196,7 @@ Delegates appearance to `style_manager.apply_appearance`, then calls `tabs.apply
 | Request tab close button overlaps title | `PyPostStyle.set_close_button_size` called globally, or default forced to a large pixel value | Leave `close_button_size` as `None`; use native `PM_TabCloseIndicator*` metrics |
 | Tabs look correct on Fusion but broken on macOS with `system` theme | Native tab chrome disabled by QSS while platform style is active | Same as first row — native renderer requires an unstylized `::tab` sub-control |
 | `+` new-tab control cramped | Consequence of zero-padding `::tab` rule stripping chrome around the pseudo-tab | Restore native tab rendering (remove `::tab` styling) |
-| Close icon hard to see in dark mode | Bundled `close.svg` stroke colour vs native dark tab chrome | Consider icon contrast follow-up (see `ai-tasks/PYPOST-792/60-tech-debt.md`); hover icon is visible |
+| Close icon hard to see in dark mode | Outdated `close.svg` stroke (`#666666`) vs native dark tab chrome | Fixed in PYPOST-796 (`#999999` default stroke); verify with macOS dark appearance; hover icon unchanged |
 
 **Verify locally:**
 
