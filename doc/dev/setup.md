@@ -245,6 +245,57 @@ CI runs the fast suite on every push and pull request via `.github/workflows/tes
 packages so PySide6 can import under `QT_QPA_PLATFORM=offscreen`. Jobs do not use a Docker
 container so `actions/setup-python` toolcache builds match the runner libc.
 
+## ai-tasks artifact expectations (PYPOST-772)
+
+When you close a Jira task via the [top-down workflow](../../.cursor/templates/top-to-bottom/roadmap.md),
+create `ai-tasks/<JIRA-ID>/` with the markdown artifacts below. Step 3 also produces source code,
+tests, and any `doc/dev/` updates recorded in `70-dev-docs.md`.
+
+#### Standard closed task (7 files)
+
+| File | Workflow step | Purpose |
+| --- | --- | --- |
+| `00-roadmap.md` | All | Step checklist and artifact index |
+| `10-requirements.md` | 1 | Business goals, acceptance criteria |
+| `20-architecture.md` | 2 | High-level design before coding |
+| `40-code-cleanup.md` | 4 | Cleanup notes and review checklist |
+| `50-observability.md` | 5 | Logging, metrics, tracing (or explicit N/A) |
+| `60-tech-debt.md` | 6 | Debt analysis and Jira-linked follow-ups |
+| `70-dev-docs.md` | 7 | Summary of `doc/dev/` changes |
+
+`60-tech-debt.md` is **required** even when no debt remains — state that explicitly. After adding
+Jira-linked follow-ups, regenerate the inventory with
+[`scripts/consolidate_tech_debt.py`](../../scripts/consolidate_tech_debt.py) (see
+[tech_debt_inventory.md](tech_debt_inventory.md)).
+
+#### Code Audit 8-file standard
+
+Code Audit tasks (PYPOST-684–689) add one file between Steps 2 and 4:
+
+| Additional file | Step | Purpose |
+| --- | --- | --- |
+| `30-audit-report.md` | 3 (audit) | Full findings report with severity and evidence |
+
+PYPOST-684 through PYPOST-689 each contain the full eight-file set. See
+[documentation_audit.md](documentation_audit.md) § ai-tasks Artifact Quality for baseline metrics.
+
+#### Legacy exceptions
+
+Older or out-of-workflow folders may not match the table above. Treat these as historical, not
+templates for new work:
+
+| Pattern | Example | Notes |
+| --- | --- | --- |
+| Roadmap-only stub | PYPOST-328, PYPOST-333–350 | `00-roadmap.md` only |
+| Debt file only | PYPOST-312 | `60-tech-debt.md` without other steps |
+| Alternate debt filename | Pre-2024 tasks | `60-review.md` or `40-tech-debt.md` (see inventory scan list) |
+| Partial audit set | PYPOST-40 | Five files; predates the 8-file Code Audit pattern |
+| Supplemental reports | PYPOST-429, PYPOST-376 | `investigation-report.md`, `baseline-metrics.md` — add-ons, not replacements |
+
+As of the PYPOST-690 documentation audit (2026-06-12): 590 of 595 folders have `00-roadmap.md`,
+519 have `60-tech-debt.md`, and 95 have ≤2 markdown files. New tasks should meet the standard
+rows above; backfilling historical stubs is optional cleanup.
+
 ## Troubleshooting
 
 - **Missing modules**: Ensure your virtual environment is activated and you have installed
