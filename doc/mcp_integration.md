@@ -1,5 +1,8 @@
 # PyPost MCP Integration
 
+See also [MCP Integration (Developer Guide)](dev/mcp_integration.md) for architecture,
+implementation details, threading, and the structured tool-result schema.
+
 PyPost supports the **Model Context Protocol (MCP)**, allowing it to act as a server for AI
 agents (like Cursor, Claude Desktop, etc.).
 

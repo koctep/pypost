@@ -1,5 +1,8 @@
 # MCP Integration (Developer Guide)
 
+See also [PyPost MCP Integration](../mcp_integration.md) for user-facing setup, client
+configuration (Cursor, Claude Desktop), and operator troubleshooting.
+
 This document describes the internal implementation of the **Model Context Protocol (MCP)** server within PyPost.
 
 ## Overview
