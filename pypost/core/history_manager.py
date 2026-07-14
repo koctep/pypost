@@ -3,7 +3,7 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import List
+from typing import Callable, List
 
 from platformdirs import user_data_dir
 
@@ -20,19 +20,46 @@ class HistoryManager:
         app_name: str = "pypost",
         max_entries: int = DEFAULT_MAX_ENTRIES,
         history_path: Path | None = None,
+        *,
+        defer_initial_load: bool = False,
     ) -> None:
         self._max_entries = max_entries
         self._lock = threading.Lock()
+        self._load_state_lock = threading.Lock()
         self._save_lock = threading.Lock()
         self._save_running = False
         self._save_pending = False
         self._save_thread: threading.Thread | None = None
+        self._load_thread: threading.Thread | None = None
+        self._loaded = False
         self._entries: List[HistoryEntry] = []
         if history_path is not None:
             self._history_path = Path(history_path)
         else:
             self._history_path = Path(user_data_dir(app_name)) / "history.json"
-        self._load()
+        if not defer_initial_load:
+            self._load()
+            self._loaded = True
+
+    @property
+    def is_loaded(self) -> bool:
+        with self._load_state_lock:
+            return self._loaded
+
+    def load_async(self, on_complete: Callable[[], None] | None = None) -> bool:
+        """Load history.json in a daemon thread. Returns False when load already done or running."""
+        with self._load_state_lock:
+            if self._loaded or self._load_thread is not None:
+                return False
+            thread = threading.Thread(
+                target=self._run_async_load,
+                args=(on_complete,),
+                daemon=True,
+            )
+            self._load_thread = thread
+            thread.start()
+        logger.info("history_load_async_dispatched path=%s", self._history_path)
+        return True
 
     # ── Read ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +72,7 @@ class HistoryManager:
 
     def append(self, entry: HistoryEntry) -> None:
         """Thread-safe. Insert entry at front. Drops oldest when cap exceeded. Async save."""
+        self._ensure_loaded()
         with self._lock:
             self._entries.insert(0, entry)
             cap_enforced = len(self._entries) > self._max_entries
@@ -62,6 +90,7 @@ class HistoryManager:
 
     def delete_entry(self, entry_id: str) -> None:
         """Remove the entry with the given id. Triggers an async save."""
+        self._ensure_loaded()
         with self._lock:
             self._entries = [e for e in self._entries if e.id != entry_id]
             count = len(self._entries)
@@ -70,6 +99,7 @@ class HistoryManager:
 
     def clear(self) -> None:
         """Remove all entries. Triggers an async save."""
+        self._ensure_loaded()
         with self._lock:
             count = len(self._entries)
             self._entries = []
@@ -77,6 +107,33 @@ class HistoryManager:
         self._save_async()
 
     # ── Internal ──────────────────────────────────────────────────────────────
+
+    def _run_async_load(self, on_complete: Callable[[], None] | None) -> None:
+        try:
+            self._load()
+        finally:
+            with self._load_state_lock:
+                self._loaded = True
+            count = len(self._entries)
+            logger.info("history_load_async_completed count=%d", count)
+            if on_complete is not None:
+                on_complete()
+
+    def _wait_for_pending_load(self) -> None:
+        with self._load_state_lock:
+            thread = self._load_thread
+        if thread is not None and thread.is_alive():
+            thread.join()
+
+    def _ensure_loaded(self) -> None:
+        """Wait for async load and run a sync load when deferred startup never dispatched one."""
+        self._wait_for_pending_load()
+        with self._load_state_lock:
+            if self._loaded:
+                return
+        self._load()
+        with self._load_state_lock:
+            self._loaded = True
 
     def _load(self) -> None:
         """Read history.json; populate self._entries. Handles all I/O errors."""
@@ -86,7 +143,9 @@ class HistoryManager:
         try:
             with open(self._history_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self._entries = [HistoryEntry(**item) for item in data]
+            entries = [HistoryEntry(**item) for item in data]
+            with self._lock:
+                self._entries = entries
             logger.debug("history_manager_loaded count=%d", len(self._entries))
         except Exception as exc:
             logger.warning("history_manager_load_failed path=%s error=%s", self._history_path, exc)

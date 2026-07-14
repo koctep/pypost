@@ -52,7 +52,8 @@ QThread workers
 Daemon / pool threads
 ├── MCPServerManager → uvicorn; call_tool limited by asyncio.Semaphore (PYPOST-759)
 ├── MetricsServer    → /metrics scrape
-└── HistoryManager   → debounced history.json save
+├── HistoryManager   → debounced history.json save
+└── HistoryManager   → deferred startup history.json load (PYPOST-762)
 ```
 
 ## Request Hot Path
@@ -102,7 +103,7 @@ independent of Qt. Default threadpool size is **not configured** (P2).
 | --- | --- | --- |
 | `load_collections` at startup | Main | Sequential `json.load` per file (P1) |
 | `save_collection` | Caller | Full `model_dump_json` rewrite |
-| `HistoryManager._load` | Main | Up to 500 entries at startup (P3) |
+| `HistoryManager._load` at startup | Daemon (async) | Deferred via `defer_initial_load`; panel refreshes when ready (PYPOST-762) |
 | `HistoryManager` save | Daemon | Debounced async write |
 
 Incremental tree insert exists for single saves; full reload rebuilds the model.

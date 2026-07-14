@@ -64,7 +64,7 @@ def main():
         bool(settings.alert_webhook_url),
     )
 
-    history_manager = HistoryManager()
+    history_manager = HistoryManager(defer_initial_load=True)
     logger.info("history_manager_created id=%d", id(history_manager))
 
     storage = StorageManager(metrics=metrics_manager)

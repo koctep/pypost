@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import QTimer
+
 if TYPE_CHECKING:
     from pypost.ui.main_window import MainWindow
 
@@ -34,4 +36,7 @@ def wire_presenter_signals(window: MainWindow) -> None:
     window.history_panel.load_into_editor.connect(window.tabs.load_request_from_history)
     window.history_panel.curl_copied.connect(
         lambda: window.statusBar().showMessage("Copied to clipboard", 3000),
+    )
+    window.history_manager.load_async(
+        on_complete=lambda: QTimer.singleShot(0, window.history_panel.refresh),
     )

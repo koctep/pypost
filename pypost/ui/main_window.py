@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
             self.history_manager = history_manager
         else:
             logger.debug("history_manager_source source=new")
-            self.history_manager = HistoryManager()
+            self.history_manager = HistoryManager(defer_initial_load=True)
         self.collections = CollectionsPresenter(
             self.request_manager,
             self.state_manager,

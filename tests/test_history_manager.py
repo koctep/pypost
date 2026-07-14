@@ -117,6 +117,72 @@ class TestHistoryManagerPersistence(unittest.TestCase):
             self.assertEqual(201, entries[0].status_code)
 
 
+class TestHistoryManagerDeferredLoad(unittest.TestCase):
+    def test_defer_initial_load_starts_empty(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "history.json"
+            path.write_text(
+                json.dumps([_make_entry(url="https://stored.com").model_dump()]),
+                encoding="utf-8",
+            )
+            hm = HistoryManager(history_path=path, defer_initial_load=True)
+            self.assertFalse(hm.is_loaded)
+            self.assertEqual([], hm.get_entries())
+
+    def test_load_async_populates_entries(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "history.json"
+            path.write_text(
+                json.dumps([_make_entry(url="https://async.com").model_dump()]),
+                encoding="utf-8",
+            )
+            hm = HistoryManager(history_path=path, defer_initial_load=True)
+            done = threading.Event()
+
+            self.assertTrue(hm.load_async(on_complete=done.set))
+            done.wait(timeout=5)
+            self.assertTrue(hm.is_loaded)
+            entries = hm.get_entries()
+            self.assertEqual(1, len(entries))
+            self.assertEqual("https://async.com", entries[0].url)
+
+    def test_load_async_skips_when_already_loaded(self):
+        with tempfile.TemporaryDirectory() as td:
+            hm = _manager_at(td)
+            self.assertFalse(hm.load_async())
+
+    def test_append_waits_for_async_load(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "history.json"
+            path.write_text(
+                json.dumps([_make_entry(url="https://stored.com").model_dump()]),
+                encoding="utf-8",
+            )
+            hm = HistoryManager(history_path=path, defer_initial_load=True)
+            started = threading.Event()
+            release = threading.Event()
+
+            def slow_load() -> None:
+                started.set()
+                release.wait(timeout=5)
+                hm._load()
+                with hm._load_state_lock:
+                    hm._loaded = True
+
+            with hm._load_state_lock:
+                hm._load_thread = threading.Thread(target=slow_load, daemon=True)
+                hm._load_thread.start()
+
+            started.wait(timeout=5)
+            hm.append(_make_entry(url="https://new.com"))
+            release.set()
+            hm._wait_for_pending_load()
+            entries = hm.get_entries()
+            self.assertEqual(2, len(entries))
+            self.assertEqual("https://new.com", entries[0].url)
+            hm.flush()
+
+
 class TestHistoryManagerConcurrency(unittest.TestCase):
     def test_concurrent_appends(self):
         with tempfile.TemporaryDirectory() as td:
