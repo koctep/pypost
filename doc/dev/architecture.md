@@ -75,9 +75,8 @@ pypost/
 │   ├── theme/              # JSON syntax highlighting theme
 │   ├── hotkeys.py, collection_item_dialogs.py
 │   └── request_save_orchestrator.py
-├── fixtures/               # Test fixtures only (not imported by production)
-│   └── mcp_test_fixtures.py
-└── utils/                  # Empty package (unused; see architecture_audit.md)
+└── fixtures/               # Test fixtures only (not imported by production)
+    └── mcp_test_fixtures.py
 ```
 
 **Layer rules:** `models/` → stdlib only; `core/` → `models/` (Qt-free); `core/qt/` → PySide6
