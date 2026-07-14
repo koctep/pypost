@@ -7,12 +7,7 @@ from PySide6.QtGui import QTextDocument
 from yaml.nodes import MappingNode, SequenceNode
 
 from pypost.ui.widgets.fold.fold_region import FoldRegion
-
-
-def _path_id(segments: list[str | int]) -> str:
-    if not segments:
-        return "/"
-    return "/" + "/".join(str(segment) for segment in segments)
+from pypost.ui.widgets.fold.scan_utils import append_region_if_multiline, path_id
 
 
 def _collect_regions(
@@ -23,32 +18,26 @@ def _collect_regions(
     if isinstance(node, MappingNode):
         start = node.start_mark.line
         end = node.end_mark.line
-        if end > start:
-            regions.append(
-                FoldRegion(
-                    region_id=_path_id(path),
-                    header_block=start,
-                    start_block=start,
-                    end_block=end,
-                    kind="object",
-                )
-            )
+        append_region_if_multiline(
+            regions,
+            region_id=path_id(path),
+            start_line=start,
+            end_line=end,
+            kind="object",
+        )
         for key_node, value_node in node.value:
             key = key_node.value if key_node.value is not None else "?"
             _collect_regions(value_node, [*path, key], regions)
     elif isinstance(node, SequenceNode):
         start = node.start_mark.line
         end = node.end_mark.line
-        if end > start:
-            regions.append(
-                FoldRegion(
-                    region_id=_path_id(path),
-                    header_block=start,
-                    start_block=start,
-                    end_block=end,
-                    kind="array",
-                )
-            )
+        append_region_if_multiline(
+            regions,
+            region_id=path_id(path),
+            start_line=start,
+            end_line=end,
+            kind="array",
+        )
         for index, child in enumerate(node.value):
             _collect_regions(child, [*path, index], regions)
 

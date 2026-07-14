@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from PySide6.QtGui import QTextDocument
 
 from pypost.ui.widgets.fold.fold_region import FoldRegion
+from pypost.ui.widgets.fold.scan_utils import append_region_if_multiline, line_at_offset, path_id
 
 
 @dataclass
@@ -25,16 +26,6 @@ class JsonStructureScanner:
         except json.JSONDecodeError:
             return []
         return _scan_regions(text)
-
-
-def _line_at_offset(text: str, offset: int) -> int:
-    return text[:offset].count("\n")
-
-
-def _pointer_path(segments: list[str | int]) -> str:
-    if not segments:
-        return "/"
-    return "/" + "/".join(str(s) for s in segments)
 
 
 def _child_path(
@@ -102,8 +93,8 @@ def _scan_regions(text: str) -> list[FoldRegion]:
 
         if ch == "{":
             path = _child_path(contexts, pending_object_key)
-            line = _line_at_offset(text, i)
-            region_id = _pointer_path(path)
+            line = line_at_offset(text, i)
+            region_id = path_id(path)
             open_stack.append((line, "object", region_id))
             contexts.append(_ScanContext("object", list(path)))
             pending_key = None
@@ -111,8 +102,8 @@ def _scan_regions(text: str) -> list[FoldRegion]:
             after_colon = False
         elif ch == "[":
             path = _child_path(contexts, pending_object_key)
-            line = _line_at_offset(text, i)
-            region_id = _pointer_path(path)
+            line = line_at_offset(text, i)
+            region_id = path_id(path)
             open_stack.append((line, "array", region_id))
             contexts.append(_ScanContext("array", list(path)))
             pending_key = None
@@ -123,17 +114,13 @@ def _scan_regions(text: str) -> list[FoldRegion]:
                 return []
             start_line, kind, region_id = open_stack.pop()
             contexts.pop()
-            end_line = _line_at_offset(text, i)
-            if end_line > start_line:
-                regions.append(
-                    FoldRegion(
-                        region_id=region_id,
-                        header_block=start_line,
-                        start_block=start_line,
-                        end_block=end_line,
-                        kind=kind,
-                    )
-                )
+            append_region_if_multiline(
+                regions,
+                region_id=region_id,
+                start_line=start_line,
+                end_line=line_at_offset(text, i),
+                kind=kind,
+            )
             pending_key = None
             pending_object_key = None
             after_colon = False
@@ -142,17 +129,13 @@ def _scan_regions(text: str) -> list[FoldRegion]:
                 return []
             start_line, kind, region_id = open_stack.pop()
             contexts.pop()
-            end_line = _line_at_offset(text, i)
-            if end_line > start_line:
-                regions.append(
-                    FoldRegion(
-                        region_id=region_id,
-                        header_block=start_line,
-                        start_block=start_line,
-                        end_block=end_line,
-                        kind=kind,
-                    )
-                )
+            append_region_if_multiline(
+                regions,
+                region_id=region_id,
+                start_line=start_line,
+                end_line=line_at_offset(text, i),
+                kind=kind,
+            )
             pending_key = None
             pending_object_key = None
             after_colon = False

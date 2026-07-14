@@ -6,16 +6,7 @@ from collections import defaultdict
 from PySide6.QtGui import QTextDocument
 
 from pypost.ui.widgets.fold.fold_region import FoldRegion
-
-
-def _line_at_offset(text: str, offset: int) -> int:
-    return text[:offset].count("\n")
-
-
-def _path_id(segments: list[str]) -> str:
-    if not segments:
-        return "/"
-    return "/" + "/".join(segments)
+from pypost.ui.widgets.fold.scan_utils import append_region_if_multiline, line_at_offset, path_id
 
 
 def _scan_regions(text: str) -> list[FoldRegion]:
@@ -78,23 +69,19 @@ def _scan_regions(text: str) -> list[FoldRegion]:
 
         tag_text = text[index:cursor + 1]
         self_closing = tag_text.rstrip().endswith("/>")
-        line = _line_at_offset(text, index)
+        line = line_at_offset(text, index)
 
         if closing:
             if not stack or stack[-1][0] != tag_name:
                 return []
             _, start_line, path = stack.pop()
-            end_line = _line_at_offset(text, cursor)
-            if end_line > start_line:
-                regions.append(
-                    FoldRegion(
-                        region_id=_path_id(path),
-                        header_block=start_line,
-                        start_block=start_line,
-                        end_block=end_line,
-                        kind="element",
-                    )
-                )
+            append_region_if_multiline(
+                regions,
+                region_id=path_id(path),
+                start_line=start_line,
+                end_line=line_at_offset(text, cursor),
+                kind="element",
+            )
         elif not self_closing:
             parent_path = stack[-1][2] if stack else []
             sibling_index = sibling_counts[tuple(parent_path)][tag_name]
