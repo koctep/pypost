@@ -14,6 +14,7 @@ from pypost.core.yaml_json_converter import (
     YamlBodyConversionError,
     convert_yaml_body_to_object,
 )
+from pypost.core.request_fields import ResolvedRequestFields
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
@@ -40,15 +41,6 @@ def _headers_accept_event_stream(headers: Dict[str, str]) -> bool:
     """Return True when the request Accept header asks for event-stream."""
     accept = headers.get("Accept", "")
     return "text/event-stream" in accept.lower()
-
-
-@dataclass(frozen=True)
-class ResolvedRequestFields:
-    """Template-resolved URL, headers, and body sent on the wire."""
-
-    url: str
-    headers: Dict[str, str]
-    body: str
 
 
 @dataclass(frozen=True)

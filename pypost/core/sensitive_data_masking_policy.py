@@ -1,19 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Set
+from typing import Any, Mapping, Set
 
-from pypost.core.http_client import ResolvedRequestFields
+from pypost.core.request_fields import MaskedRequestData, ResolvedRequestFields
 from pypost.core.sensitive_text_sanitizer import HIDDEN_PLACEHOLDER, sanitize_headers, sanitize_text
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
-
-
-@dataclass(frozen=True)
-class MaskedRequestData:
-    url: str
-    headers: Dict[str, str]
-    body: str
 
 
 class SensitiveDataMaskingPolicy:

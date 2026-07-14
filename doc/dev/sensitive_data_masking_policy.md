@@ -9,11 +9,14 @@ storage.
 
 ## Architecture
 
+- **Canonical type**: `pypost.core.request_fields.RequestFields` — frozen dataclass with
+  `url`, `headers`, and `body`. Semantic aliases: `ResolvedRequestFields` (transport) and
+  `MaskedRequestData` (history-safe output); all names refer to the same class (PYPOST-802).
 - **Model**: `pypost.core.sensitive_data_masking_policy.SensitiveDataMaskingPolicy`
   - Accepts a `TemplateService`, a `RequestData`, the active variables mapping, and the hidden
     key set.
   - Renders URL, headers, and body; replaces values for hidden keys with `***` before rendering.
-  - Returns a frozen `MaskedRequestData` dataclass with sanitized fields.
+  - Returns a frozen `MaskedRequestData` instance with sanitized fields.
 - **RequestService**: `pypost.core.request_service.RequestService`
   - Always owns a `_masking_policy` (created with an injected or fallback `TemplateService`).
   - Applies policy in the history-recording block before constructing `HistoryEntry`.
