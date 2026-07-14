@@ -1,5 +1,6 @@
 """PYPOST-621: MainWindow reloads AlertManager after alert settings save."""
 
+import json
 import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -10,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 from pypost.core.alert_manager import AlertManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
+from tests.test_alert_manager import _make_payload
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -66,6 +68,27 @@ def _open_settings_with_webhook_url(window, webhook_url: str) -> AppSettings:
     def init_and_configure(self, current, parent=None, *, storage=None):
         original_init(self, current, parent, storage=storage)
         self.alert_webhook_url_edit.setText(webhook_url)
+
+    def exec_accept(self):
+        self.accept()
+        return 1
+
+    with (
+        patch.object(SettingsDialog, "__init__", init_and_configure),
+        patch.object(SettingsDialog, "exec", exec_accept),
+        patch.object(window.style_manager, "apply_styles"),
+        patch.object(window.env, "reload_current_env"),
+    ):
+        window.open_settings()
+    return window.settings
+
+
+def _open_settings_with_alert_log_path(window, log_path: str) -> AppSettings:
+    original_init = SettingsDialog.__init__
+
+    def init_and_configure(self, current, parent=None, *, storage=None):
+        original_init(self, current, parent, storage=storage)
+        self.alert_log_path_edit.setText(log_path)
 
     def exec_accept(self):
         self.accept()
@@ -152,3 +175,26 @@ def test_open_settings_skips_reload_when_alert_fields_unchanged(qapp):
 
     mock_reload.assert_not_called()
     assert window._alert_manager is manager
+
+
+def test_open_settings_emit_after_log_path_change_writes_to_new_file(qapp, tmp_path):
+    old_log = tmp_path / "alerts-old.log"
+    new_log = tmp_path / "alerts-new.log"
+    initial = AlertManager(log_path=old_log)
+    window = _make_main_window(qapp, alert_manager=initial)
+    window.settings = AppSettings(alert_log_path=str(old_log))
+
+    initial.emit(_make_payload(request_name="before-reload"))
+
+    settings = _open_settings_with_alert_log_path(window, str(new_log))
+    assert settings.alert_log_path == str(new_log)
+    assert window._alert_manager is not initial
+
+    window._alert_manager.emit(_make_payload(request_name="after-reload"))
+
+    old_lines = [line for line in old_log.read_text().splitlines() if line.strip()]
+    new_lines = [line for line in new_log.read_text().splitlines() if line.strip()]
+    assert len(old_lines) == 1
+    assert json.loads(old_lines[0])["request_name"] == "before-reload"
+    assert len(new_lines) == 1
+    assert json.loads(new_lines[0])["request_name"] == "after-reload"
