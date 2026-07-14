@@ -16,8 +16,6 @@ pypost/
 │   ├── request_manager.py  # Request & collection lifecycle
 │   ├── request_service.py  # Unified request execution
 │   ├── request_sync.py     # RequestData copy/compare and dirty-check helpers
-│   ├── worker.py           # Background request execution (QThread)
-│   │                       # Thread model: see performance_audit.md#thread-model
 │   ├── http_client.py      # HTTP handling (wraps `requests`)
 │   ├── http_client_protocol.py
 │   ├── execute_request_protocol.py
@@ -28,27 +26,30 @@ pypost/
 │   ├── storage.py          # JSON persistence (collections, environments)
 │   ├── storage_interface.py, collection_item_strategies.py
 │   ├── config_manager.py   # Configuration management
-│   ├── state_manager.py    # Debounced UI session state persistence
 │   ├── history_manager.py  # Execution history read/write
 │   ├── sensitive_data_masking_policy.py, curl_generator.py
 │   ├── environment_ops.py, environment_messages.py
 │   ├── environment_variables_adapter.py, env_variable_snapshot.py
-│   ├── environment_storage_worker.py   # Background env load/save (encrypted)
-│   ├── environment_storage_gateway.py  # Single-flight async env storage queue
 │   ├── environment_secrets_codec.py
 │   ├── encryption_config.py, encryption_key.py
-│   ├── encryption_migration.py, encryption_migration_worker.py
+│   ├── encryption_migration.py
 │   ├── key_provider.py, key_source_constants.py
 │   ├── key_sources/        # Keyring, env, file, chain, factory, registry
-│   ├── mcp_server.py       # MCP lifecycle (thread + uvicorn + Qt signals)
 │   ├── mcp_server_impl.py  # Starlette routes, tool list/call
 │   ├── mcp_client_service.py   # Outbound MCP protocol client
 │   ├── mcp_secrets_policy.py, mcp_activity_log.py, mcp_tool_contract.py
 │   ├── mcp_tools_overview.py, mcp_transport_routes.py
 │   ├── mcp_legacy_sse.py, mcp_streamable_http.py
-│   ├── metrics.py          # MetricsManager facade (composition root)
 │   ├── metrics_registry.py, metrics_server.py, metrics_otel.py
 │   ├── metrics_protocol.py, alert_manager.py
+│   ├── qt/                 # PySide6 integration (threads, signals, timers)
+│   │   ├── worker.py           # Background request execution (QThread)
+│   │   ├── mcp_server.py       # MCP lifecycle (thread + uvicorn + Qt signals)
+│   │   ├── state_manager.py    # Debounced UI session state persistence
+│   │   ├── metrics.py          # MetricsManager facade (Qt signals)
+│   │   ├── collection_storage_worker.py, collection_storage_gateway.py
+│   │   ├── environment_storage_worker.py, environment_storage_gateway.py
+│   │   └── encryption_migration_worker.py
 │   ├── bind_address_validation.py, server_bind.py
 │   ├── variable_name_validation.py, hidden_toggle_log_policy.py
 │   ├── yaml_json_converter.py, constants.py
@@ -79,9 +80,11 @@ pypost/
 └── utils/                  # Empty package (unused; see architecture_audit.md)
 ```
 
-**Layer rules:** `models/` → stdlib only; `core/` → `models/`; `ui/` → `core/`, `models/`.
-Appearance orchestration (`StyleManager`) lives in `ui/styles/` — see
-[ui_font_and_styles.md](ui_font_and_styles.md).
+**Layer rules:** `models/` → stdlib only; `core/` → `models/` (Qt-free); `core/qt/` → PySide6
+integration glue; `ui/` → `core/`, `core/qt/`, `models/`. Appearance orchestration
+(`StyleManager`) lives in `ui/styles/` — see [ui_font_and_styles.md](ui_font_and_styles.md).
+Qt-dependent integration modules live in `core/qt/` — see
+[testability.md](testability.md#qt-integration-layer).
 
 ## Composition root (`main.py`)
 

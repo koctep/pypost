@@ -7,7 +7,7 @@ from prometheus_client import generate_latest
 
 from pypost.core.environment_variables_adapter import EnvironmentVariablesAdapter
 from pypost.core.key_provider import EnvironmentEncryptionError
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 

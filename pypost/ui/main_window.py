@@ -18,10 +18,10 @@ from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.history_manager import HistoryManager
-from pypost.core.mcp_server import MCPServerManager
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.mcp_server import MCPServerManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
-from pypost.core.state_manager import StateManager
+from pypost.core.qt.state_manager import StateManager
 from pypost.core.storage import StorageManager
 from pypost.ui.styles.style_manager import StyleManager
 from pypost.core.template_service import TemplateService

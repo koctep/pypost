@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtTest import QSignalSpy
 
-from pypost.core.environment_storage_gateway import EnvironmentStorageGateway
+from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.models.models import Environment
 
 

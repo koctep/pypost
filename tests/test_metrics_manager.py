@@ -9,7 +9,7 @@ import unittest
 
 from prometheus_client import generate_latest
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.models.errors import ErrorCategory
 
 

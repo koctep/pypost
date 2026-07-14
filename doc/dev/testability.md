@@ -50,6 +50,28 @@ Production must inject from `main.py` so `settings.json` is read exactly once an
 [PYPOST-404 dev notes](../../ai-tasks/PYPOST-404/70-dev-docs.md) and
 [architecture.md](architecture.md#composition-root-mainpy).
 
+## Qt integration layer
+
+PySide6-dependent modules live in `pypost/core/qt/` ([PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693)).
+They use `QThread`, `QObject`, `Signal`, and `QTimer` to bridge async work to UI presenters.
+
+| Module | Role |
+| --- | --- |
+| `qt/worker.py` | HTTP request execution off UI thread |
+| `qt/mcp_server.py` | MCP uvicorn lifecycle + Qt signals |
+| `qt/state_manager.py` | Debounced UI session persistence |
+| `qt/metrics.py` | Metrics facade with Qt signals |
+| `qt/collection_storage_*` | Async collection load queue |
+| `qt/environment_storage_*` | Async env save/load with coalescing |
+| `qt/encryption_migration_worker.py` | Background bulk re-encryption |
+
+**Import rule:** headless or Qt-free code must not import from `pypost.core.qt`. Use
+`pypost.core.metrics_protocol`, `pypost.core.mcp_server_impl`, and other Qt-free modules
+instead.
+
+**Test setup:** modules under `core/qt/` require `pytest-qt` or an offscreen `QApplication`.
+Logger names use the `pypost.core.qt.*` prefix (e.g. `pypost.core.qt.worker`).
+
 ## TemplateService lifecycle
 
 The module-level `template_service` global was removed in PYPOST-45. Production uses a **composition-

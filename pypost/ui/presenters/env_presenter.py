@@ -14,9 +14,9 @@ from PySide6.QtWidgets import (
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.env_variable_snapshot import EnvVariableSnapshot
-from pypost.core.environment_storage_gateway import EnvironmentStorageGateway
+from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
-from pypost.core.mcp_server import MCPServerManager
+from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.storage_interface import StorageInterface
 from pypost.core.variable_name_validation import (

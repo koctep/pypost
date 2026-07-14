@@ -3,7 +3,7 @@ from typing import Literal
 
 from PySide6.QtCore import QObject, Signal
 
-from pypost.core.environment_storage_worker import EnvironmentStorageWorker
+from pypost.core.qt.environment_storage_worker import EnvironmentStorageWorker
 from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Environment
 

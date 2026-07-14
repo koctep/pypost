@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pypost.core.mcp_activity_log import McpActivityEntry
-from pypost.core.mcp_server import MCPServerManager, format_mcp_bind_error
+from pypost.core.qt.mcp_server import MCPServerManager, format_mcp_bind_error
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 from tests.helpers.mcp_live_server import free_port, wait_for_port
@@ -151,7 +151,7 @@ def test_set_hidden_keys_supplier_forwards_to_impl():
 
 def test_init_with_template_service_logs_debug(caplog):
     ts = MagicMock(spec=TemplateService)
-    with caplog.at_level(logging.DEBUG, logger="pypost.core.mcp_server"):
+    with caplog.at_level(logging.DEBUG, logger="pypost.core.qt.mcp_server"):
         MCPServerManager(template_service=ts)
     assert any("propagating TemplateService" in m for m in caplog.messages)
 
@@ -198,7 +198,7 @@ def test_unexpected_server_exit_emits_false_and_warns(caplog):
     with (
         patch.object(manager._impl, "create_app", return_value=MagicMock()),
         patch("uvicorn.Server.serve", serve_noop),
-        caplog.at_level(logging.WARNING, logger="pypost.core.mcp_server"),
+        caplog.at_level(logging.WARNING, logger="pypost.core.qt.mcp_server"),
     ):
         manager._current_port = 0
         manager._current_host = "127.0.0.1"

@@ -12,7 +12,7 @@ from unittest.mock import patch
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.core.server_bind import format_bind_error
 
 

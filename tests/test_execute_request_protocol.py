@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 from pypost.core.execute_request_protocol import ExecuteRequestProtocol
 from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
-from pypost.core.worker import RequestWorker
+from pypost.core.qt.worker import RequestWorker
 from pypost.models.models import RequestData
 
 

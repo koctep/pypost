@@ -46,7 +46,7 @@ def classify_group(logger: str, message_prefix: str) -> str:
     """Tag inventory group: expected, suspicious, or unknown."""
     expected_loggers = (
         "pypost.core.request_service",
-        "pypost.core.worker",
+        "pypost.core.qt.worker",
         "pypost.ui.presenters.tabs_presenter",
         "pypost.ui.presenters.collection_tree_actions",
     )

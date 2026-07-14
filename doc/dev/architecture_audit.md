@@ -21,12 +21,9 @@ The layered modular monolith is **largely intact**:
 - HTTP execution, templating, and MCP tool calls converge on `RequestService.execute()`.
 - Presenter extraction (PYPOST-43) keeps most UI orchestration out of widgets.
 
-**Two areas need attention:**
+**One area needs attention:**
 
-1. **Qt bleed into core** — Eight `core/` modules import PySide6 (workers, MCP lifecycle,
-   state, metrics, encryption/env async). Documented for MCP/UI bridging but it weakens the
-   presentation/core boundary.
-2. **Partial composition root** — `main.py` wires `ConfigManager`, `MetricsManager`,
+1. **Partial composition root** — `main.py` wires `ConfigManager`, `MetricsManager`,
    `TemplateService`, and `AlertManager`, but `MainWindow` still constructs
    `StorageManager`, `RequestManager`, `HistoryManager`, `MCPServerManager`, and
    `StyleManager`.
@@ -42,6 +39,7 @@ was the stale directory tree in [architecture.md](architecture.md) (refreshed in
 | Composition root | `main.py` | Wire shared services | `ui/`, `core/` |
 | Presentation | `pypost/ui/` | PySide6 windows, presenters, widgets | `core/`, `models/` |
 | Core | `pypost/core/` | Request lifecycle, HTTP, templating, storage, MCP, metrics | `models/` |
+| Qt integration | `pypost/core/qt/` | Threads, signals, timers bridging async work to UI | `core/`, `models/` |
 | Data | `pypost/models/` | Schemas only | stdlib / typing |
 | Integration (MCP) | `core/mcp_*` | ASGI server, tool exposure | `core/` services, `models/` |
 | Test fixtures | `pypost/fixtures/` | MCP/integration test helpers | Not imported by production |
@@ -51,7 +49,8 @@ was the stale directory tree in [architecture.md](architecture.md) (refreshed in
 ```text
 main.py  →  ui/, core/
 ui/      →  core/, models/
-core/    →  models/          (not core → ui at runtime)
+core/    →  models/          (Qt-free business logic)
+core/qt/ →  core/, models/   (PySide6 integration glue)
 models/  →  (stdlib only)
 ```
 
@@ -61,7 +60,7 @@ models/  →  (stdlib only)
 
 | ID | Finding | Severity |
 | --- | --- | --- |
-| L-001 | Layer map matches intent; MCP/worker Qt glue in `core/` is a caveat | PASS |
+| L-001 | Layer map matches intent; Qt glue isolated in `core/qt/` | PASS |
 | L-002 | Presenter pattern holds for collections, tabs, and env/MCP wiring | PASS |
 | L-003 | `request_sync.is_tab_dirty` ties core semantics to UI `RequestTab` | MEDIUM |
 | L-004 | `StyleManager` is a UI concern living in `core/` | **Remediated** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
@@ -75,7 +74,7 @@ models/  →  (stdlib only)
 | D-001 | Runtime core → ui import in `style_manager.py` | **Remediated** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
 | D-002 | `models/` layer clean (no core/ui imports) | PASS |
 | D-003 | `TYPE_CHECKING` guards used appropriately | PASS |
-| D-004 | PySide6 imports in eight `core/` modules | MEDIUM |
+| D-004 | PySide6 imports in core modules | **Remediated** ([PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693)) |
 | D-005 | Import smoke test passes (no circular-import failures) | PASS |
 | D-006 | Protocol seams present where documented | PASS |
 
@@ -93,7 +92,7 @@ models/  →  (stdlib only)
 | Priority | ID | Finding | Jira |
 | --- | --- | --- | --- |
 | **P1** | R-P1-001 | `style_manager.py` core → ui import | **Done** ([PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692)) |
-| **P1** | R-P1-002 | Qt throughout `core/` | [PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693) |
+| **P1** | R-P1-002 | Qt throughout `core/` | **Done** ([PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693)) |
 | **P2** | R-P2-001 | `HistoryManager` outside composition root | [PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694) |
 | **P2** | R-P2-002 | Partial composition root in `MainWindow` | [PYPOST-695](https://pypost.atlassian.net/browse/PYPOST-695) |
 | **P2** | R-P2-003 | `request_sync.is_tab_dirty` in core | [PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696) |

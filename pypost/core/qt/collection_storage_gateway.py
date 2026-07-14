@@ -2,7 +2,7 @@ import logging
 
 from PySide6.QtCore import QObject, Signal
 
-from pypost.core.collection_storage_worker import CollectionStorageWorker
+from pypost.core.qt.collection_storage_worker import CollectionStorageWorker
 from pypost.core.storage_interface import StorageInterface
 
 logger = logging.getLogger(__name__)

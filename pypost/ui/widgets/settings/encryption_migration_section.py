@@ -11,7 +11,7 @@ from pypost.core.encryption_migration import (
     MigrationReport,
     format_migration_report,
 )
-from pypost.core.encryption_migration_worker import EncryptionMigrationWorker
+from pypost.core.qt.encryption_migration_worker import EncryptionMigrationWorker
 from pypost.core.storage_interface import StorageInterface
 from pypost.models.settings import AppSettings
 from pypost.ui.widgets.settings._common import make_section_header

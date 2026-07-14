@@ -7,7 +7,7 @@ import json
 
 from prometheus_client import generate_latest
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.core.key_provider import EnvironmentEncryptionError, build_key_id
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment

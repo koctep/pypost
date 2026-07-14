@@ -6,7 +6,7 @@ pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import MagicMock, patch
 
-from pypost.core.worker import RequestWorker
+from pypost.core.qt.worker import RequestWorker
 from pypost.models.models import RequestData
 from pypost.models.errors import ErrorCategory, ExecutionError
 
@@ -185,7 +185,7 @@ def test_worker_wraps_unexpected_exception_logs_error(caplog):
     import logging
     from unittest.mock import MagicMock, patch
 
-    from pypost.core.worker import RequestWorker
+    from pypost.core.qt.worker import RequestWorker
     from pypost.models.errors import ErrorCategory, ExecutionError
     from pypost.models.models import RequestData
 
@@ -194,7 +194,7 @@ def test_worker_wraps_unexpected_exception_logs_error(caplog):
     received = []
     worker.error.connect(lambda e: received.append(e))
 
-    with caplog.at_level(logging.ERROR, logger="pypost.core.worker"):
+    with caplog.at_level(logging.ERROR, logger="pypost.core.qt.worker"):
         with patch.object(worker.service, "execute", side_effect=RuntimeError("boom")):
             worker.run()
 

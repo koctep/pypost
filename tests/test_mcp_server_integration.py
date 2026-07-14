@@ -16,7 +16,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
 from pypost.core.mcp_client_service import MCPClientService
-from pypost.core.mcp_server import MCPServerManager
+from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.request_service import ExecutionResult
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData

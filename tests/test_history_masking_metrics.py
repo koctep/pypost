@@ -10,7 +10,7 @@ from prometheus_client import generate_latest
 
 from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
 from pypost.core.history_manager import HistoryManager
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData

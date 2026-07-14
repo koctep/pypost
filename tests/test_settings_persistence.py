@@ -20,7 +20,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager
-from pypost.core.state_manager import StateManager
+from pypost.core.qt.state_manager import StateManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 

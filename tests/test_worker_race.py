@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 from PySide6.QtWidgets import QApplication
 
-from pypost.core.worker import RequestWorker
+from pypost.core.qt.worker import RequestWorker
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.request_service import ExecutionResult

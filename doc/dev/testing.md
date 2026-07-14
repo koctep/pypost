@@ -23,7 +23,7 @@ unchanged.
 ```bash
 make test PYTEST_ARGS="tests/test_mcp_server_manager.py -q"
 make test PYTEST_ARGS="-k test_format_mcp_bind_error"
-make test-cov PYTEST_ARGS="--cov=pypost.core.mcp_server tests/test_mcp_server_manager.py"
+make test-cov PYTEST_ARGS="--cov=pypost.core.qt.mcp_server tests/test_mcp_server_manager.py"
 ```
 
 See § Reproducible test environment, § Per-test timeouts, § CI guardrails, and § Makefile
@@ -409,7 +409,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_request_manager_delete.py \
   tests/test_settings_persistence.py::TestStateManagerPersistence \
   tests/test_settings_persistence.py::test_state_manager_debounced_save_persists_after_timer \
-  -v --cov=pypost.core.request_manager --cov=pypost.core.state_manager --cov-report=term-missing
+  -v --cov=pypost.core.request_manager --cov=pypost.core.qt.state_manager --cov-report=term-missing
 ```
 
 ## Delete metric unit tests
@@ -691,7 +691,7 @@ risk. Full per-test ratings: `ai-tasks/PYPOST-568/error-path-test-audit.md`.
 | `tests/test_retry.py` | 12 | `pypost.core.request_service` |
 | `tests/test_tabs_presenter.py` | 6 | `pypost.ui.presenters.tabs_presenter` |
 | `tests/test_collection_tree_delete_metrics.py` | 3 | `pypost.ui.presenters.collection_tree_actions` |
-| `tests/test_worker.py` | 1 | `pypost.core.worker` |
+| `tests/test_worker.py` | 1 | `pypost.core.qt.worker` |
 
 Re-verify after worker/presenter/retry changes:
 

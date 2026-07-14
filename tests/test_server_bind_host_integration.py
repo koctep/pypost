@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
-from pypost.core.metrics import MetricsManager
-from pypost.core.mcp_server import MCPServerManager
+from pypost.core.qt.metrics import MetricsManager
+from pypost.core.qt.mcp_server import MCPServerManager
 
 
 @dataclass(frozen=True)

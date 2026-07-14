@@ -18,11 +18,11 @@ storage.
   - Always owns a `_masking_policy` (created with an injected or fallback `TemplateService`).
   - Applies policy in the history-recording block before constructing `HistoryEntry`.
   - Emits `hidden_value_masks_applied_total` metric when any hidden keys are present.
-- **Worker**: `pypost.core.worker.RequestWorker`
+- **Worker**: `pypost.core.qt.worker.RequestWorker`
   - Accepts `hidden_keys: set[str] | None` and forwards it to `RequestService.execute`.
 - **TabsPresenter**: `pypost.ui.presenters.tabs_presenter.TabsPresenter`
   - Passes `self._current_hidden_keys` when creating `RequestWorker`.
-- **Metrics**: `pypost.core.metrics.MetricsManager`
+- **Metrics**: `pypost.core.qt.metrics.MetricsManager`
   - `hidden_value_masks_applied_total` counter with `surface` label tracks where masking occurs.
 
 ## Data Flow

@@ -6,7 +6,7 @@ pytestmark = pytest.mark.timeout(10)
 
 from unittest.mock import MagicMock
 
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.core.metrics_protocol import (
     NULL_METRICS,
     MetricsTrackerProtocol,

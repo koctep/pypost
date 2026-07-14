@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
 from pypost.ui.main_window import MainWindow
 from pypost.ui.styles.custom_style import PyPostStyle

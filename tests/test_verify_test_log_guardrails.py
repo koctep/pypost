@@ -56,7 +56,7 @@ def test_allowed_error_lines_pass_verification() -> None:
     lines = _sample_log(
         "20:30:26 ERROR pypost.core.request_service: "
         "request_execution_failed method=GET url='http://x'",
-        "20:30:27 ERROR pypost.core.worker: RequestWorker unexpected error: boom",
+        "20:30:27 ERROR pypost.core.qt.worker: RequestWorker unexpected error: boom",
     )
     result = guardrails.verify_log_lines(lines, allowlist)
     assert result.unknown_errors == ()
@@ -94,8 +94,8 @@ def test_error_count_above_baseline_plus_margin_fails() -> None:
     )
     lines = _sample_log(
         "20:30:26 ERROR pypost.core.request_service: request_execution_failed x=1",
-        "20:30:26 ERROR pypost.core.worker: RequestWorker unexpected error: a",
-        "20:30:26 ERROR pypost.core.worker: RequestWorker unexpected error: b",
+        "20:30:26 ERROR pypost.core.qt.worker: RequestWorker unexpected error: a",
+        "20:30:26 ERROR pypost.core.qt.worker: RequestWorker unexpected error: b",
     )
     result = guardrails.verify_log_lines(lines, allowlist)
     assert result.error_count == 3

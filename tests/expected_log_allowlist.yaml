@@ -10,8 +10,8 @@ rules:
   - logger: pypost.core.request_service
     message_prefix: history_record_failed
 
-  # pypost.core.worker
-  - logger: pypost.core.worker
+  # pypost.core.qt.worker
+  - logger: pypost.core.qt.worker
     message_prefix: RequestWorker unexpected error
 
   # pypost.ui.presenters.tabs_presenter
@@ -59,9 +59,9 @@ rules:
     message_prefix: encryption_key_unavailable
   - logger: pypost.core.environment_secrets_codec
     message_prefix: env_value_decrypt_failed
-  - logger: pypost.core.environment_storage_worker
+  - logger: pypost.core.qt.environment_storage_worker
     message_prefix: environment_storage_worker_load_failed
-  - logger: pypost.core.environment_storage_worker
+  - logger: pypost.core.qt.environment_storage_worker
     message_prefix: environment_storage_worker_save_failed
   - logger: pypost.core.environment_variables_adapter
     message_prefix: environment_value_encrypt_failed

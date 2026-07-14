@@ -11,7 +11,7 @@ import time
 from prometheus_client import generate_latest
 
 from pypost.core.environment_variables_adapter import EnvironmentVariablesAdapter
-from pypost.core.metrics import MetricsManager
+from pypost.core.qt.metrics import MetricsManager
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 

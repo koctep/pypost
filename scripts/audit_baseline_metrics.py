@@ -15,13 +15,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # Audit-era snapshot from ai-tasks/PYPOST-40/30-audit-report.md (2026-03).
 AUDIT_ERA_LOC: dict[str, int] = {
     "pypost/ui/main_window.py": 1040,
-    "pypost/core/metrics.py": 286,
+    "pypost/core/qt/metrics.py": 286,
     "pypost/core/template_service.py": 36,
     "pypost/core/request_service.py": 95,
     "pypost/core/request_manager.py": 201,
     "pypost/core/http_client.py": 198,
     "pypost/core/storage.py": 80,
-    "pypost/core/worker.py": 57,
+    "pypost/core/qt/worker.py": 57,
     "pypost/core/mcp_server_impl.py": 231,
 }
 
@@ -31,13 +31,13 @@ FILE_CAPS: dict[str, int] = {
     "pypost/ui/presenters/collections_presenter.py": 275,
     "pypost/ui/presenters/tabs_presenter.py": 785,
     "pypost/ui/presenters/env_presenter.py": 465,
-    "pypost/core/metrics.py": 165,
+    "pypost/core/qt/metrics.py": 165,
     "pypost/core/template_service.py": 225,
     "pypost/core/request_service.py": 530,
     "pypost/core/request_manager.py": 260,
     "pypost/core/http_client.py": 340,
     "pypost/core/storage.py": 380,
-    "pypost/core/worker.py": 180,
+    "pypost/core/qt/worker.py": 180,
     "pypost/core/mcp_server_impl.py": 325,
 }
 

@@ -28,9 +28,9 @@ from pypost.core.request_sync import (
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_manager import RequestManager
-from pypost.core.state_manager import StateManager
+from pypost.core.qt.state_manager import StateManager
 from pypost.core.template_service import TemplateService
-from pypost.core.worker import RequestWorker
+from pypost.core.qt.worker import RequestWorker
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings

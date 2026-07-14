@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtTest import QSignalSpy
 
-from pypost.core.collection_storage_gateway import CollectionStorageGateway
+from pypost.core.qt.collection_storage_gateway import CollectionStorageGateway
 from pypost.models.models import Collection
 
 

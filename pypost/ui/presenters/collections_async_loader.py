@@ -6,7 +6,7 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
 
-from pypost.core.collection_storage_gateway import CollectionStorageGateway
+from pypost.core.qt.collection_storage_gateway import CollectionStorageGateway
 from pypost.core.request_manager import RequestManager
 from pypost.core.storage_interface import StorageInterface
 

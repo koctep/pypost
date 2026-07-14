@@ -6,7 +6,7 @@ import unittest
 
 import pytest
 
-from pypost.core.mcp_server import format_mcp_bind_error
+from pypost.core.qt.mcp_server import format_mcp_bind_error
 from pypost.core.server_bind import drain_pending_tasks, format_bind_error
 
 pytestmark = pytest.mark.timeout(30)
