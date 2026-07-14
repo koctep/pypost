@@ -198,6 +198,11 @@ Common targets:
   ```bash
   make lint
   ```
+- **Optional static type check** (mypy on `pypost/core/` and `pypost/models/`; baseline gate):
+  ```bash
+  make typecheck
+  ```
+  See [static_type_checking.md](static_type_checking.md).
 - **Quality gate** (lint + fast tests):
   ```bash
   make check

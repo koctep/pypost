@@ -1,4 +1,4 @@
-.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov lint check security-audit generate-mcp-fixtures check-mcp-fixtures
+.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov lint typecheck check security-audit generate-mcp-fixtures check-mcp-fixtures
 
 .DEFAULT_GOAL := help
 
@@ -79,6 +79,9 @@ test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage rep
 
 lint: $(VENV_MARKER) ## Run flake8 static analysis on pypost/
 	$(BIN)/python -m flake8 --jobs=1 pypost/
+
+typecheck: $(VENV_MARKER) venv-test ## Optional mypy on pypost/core/ and pypost/models/ (baseline gate)
+	$(BIN)/python scripts/check_mypy_baseline.py
 
 check: lint test ## Convenience quality gate: static analysis + full test suite
 

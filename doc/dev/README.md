@@ -83,6 +83,7 @@ set up your development environment, and contribute to the project.
 
 1. [Unit Testability Patterns (PYPOST-382)](testability.md)
 1. [Testing via MCP and Prometheus](testing.md)
+1. [Static Type Checking (PYPOST-734)](static_type_checking.md)
 1. [GUI Testing](gui_testing.md)
 1. [Metric Rename Migration (PYPOST-443)](metric_rename_migration.md)
 
