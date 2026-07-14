@@ -17,7 +17,7 @@ Full report:
 | Metric | Value |
 | --- | --- |
 | Direct production deps | 15 |
-| Unpinned direct deps | 14 |
+| Unpinned direct deps | 1 (`pydantic>=2.0` lower bound only) |
 | Lock / constraints file | None |
 | `pyproject.toml` | None |
 | CI vulnerability scanner | None |
@@ -25,8 +25,8 @@ Full report:
 
 **Three areas need attention:**
 
-1. **Unpinned production graph** — Fresh `pip install -r requirements.txt` can pull new releases,
-   including `mcp` 2.x pre-releases, without review.
+1. **Production pins adopted** — Direct deps pinned to CI-tested versions; `mcp>=1.27,<2` blocks
+   accidental v2 installs ([PYPOST-777](https://pypost.atlassian.net/browse/PYPOST-777)).
 2. **No CVE gate in CI** — `cryptography`, HTTP, and ASGI packages are not scanned before merge.
 3. **Automation gaps** — No Dependabot; dev tool versions duplicated unpinned in Makefile and CI.
 
@@ -37,21 +37,21 @@ Full report:
 
 | Package | Pinned | Primary role |
 | --- | --- | --- |
-| PySide6 | no | Qt GUI |
-| requests | no | Outbound HTTP |
-| PyYAML | no | YAML parsing |
-| jinja2 | no | Request templating |
+| PySide6 | `==6.11.1` | Qt GUI |
+| requests | `==2.34.2` | Outbound HTTP |
+| PyYAML | `==6.0.3` | YAML parsing |
+| jinja2 | `==3.1.6` | Request templating |
 | pydantic | `>=2.0` | Models / settings |
-| platformdirs | no | Config paths |
-| mcp | no | MCP server SDK |
-| starlette | no | ASGI routing |
-| uvicorn | no | ASGI server |
-| prometheus_client | no | Default metrics |
-| opentelemetry-api | no | Alternate metrics API |
-| opentelemetry-sdk | no | Alternate metrics SDK |
-| sseclient-py | no | SSE response probe |
-| cryptography | no | Encryption at rest |
-| keyring | no | OS key store |
+| platformdirs | `==4.10.0` | Config paths |
+| mcp | `>=1.27,<2` | MCP server SDK |
+| starlette | `==1.3.1` | ASGI routing |
+| uvicorn | `==0.49.0` | ASGI server |
+| prometheus_client | `==0.25.0` | Default metrics |
+| opentelemetry-api | `==1.42.1` | Alternate metrics API |
+| opentelemetry-sdk | `==1.42.1` | Alternate metrics SDK |
+| sseclient-py | `==1.9.0` | SSE response probe |
+| cryptography | `==48.0.1` | Encryption at rest |
+| keyring | `==25.7.0` | OS key store |
 
 ## Dev vs Production
 
