@@ -1,5 +1,6 @@
 import logging
 import threading
+from collections.abc import Callable
 
 from PySide6.QtCore import QThread, Signal
 
@@ -45,6 +46,8 @@ class RequestWorker(QThread):
         alert_manager: AlertManager | None = None,
         default_retry_policy: RetryPolicy | None = None,
         max_response_bytes: int | None = None,
+        service: ExecuteRequestProtocol | None = None,
+        service_factory: Callable[[], ExecuteRequestProtocol] | None = None,
     ):
         super().__init__()
         self.request_data = request_data
@@ -63,14 +66,24 @@ class RequestWorker(QThread):
             default_retry_policy is not None,
             default_retry_policy.max_retries if default_retry_policy is not None else "N/A",
         )
-        self.service: ExecuteRequestProtocol = RequestService(
-            metrics=metrics,
-            history_manager=history_manager,
-            template_service=template_service,
-            alert_manager=alert_manager,
-            default_retry_policy=default_retry_policy,
-            max_response_bytes=max_response_bytes,
-        )
+        if service is not None:
+            logger.debug("RequestWorker: using injected ExecuteRequestProtocol id=%d", id(service))
+            self.service = service
+        elif service_factory is not None:
+            self.service = service_factory()
+            logger.debug(
+                "RequestWorker: using service_factory ExecuteRequestProtocol id=%d",
+                id(self.service),
+            )
+        else:
+            self.service = RequestService(
+                metrics=metrics,
+                history_manager=history_manager,
+                template_service=template_service,
+                alert_manager=alert_manager,
+                default_retry_policy=default_retry_policy,
+                max_response_bytes=max_response_bytes,
+            )
         self._stop_event = threading.Event()
 
     def stop(self):

@@ -341,8 +341,13 @@ constructs `RequestService` when no executor is injected.
 from pypost.core.execute_request_protocol import ExecuteRequestProtocol
 
 class RequestWorker:
-  def __init__(self, ...):
-      self.service: ExecuteRequestProtocol = RequestService(...)
+  def __init__(self, ..., service=None, service_factory=None):
+      if service is not None:
+          self.service = service
+      elif service_factory is not None:
+          self.service = service_factory()
+      else:
+          self.service = RequestService(...)
 ```
 
 ```python
@@ -359,7 +364,6 @@ mock_executor = MagicMock(spec=ExecuteRequestProtocol)
 
 | Gap | Follow-up |
 | --- | --- |
-| `RequestWorker` accepts `RequestService` injection | [PYPOST-379](https://pypost.atlassian.net/browse/PYPOST-379) |
 | MainWindow presenter decomposition | [PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43) |
 | Full composition-root DI container | Backlog — not planned |
 

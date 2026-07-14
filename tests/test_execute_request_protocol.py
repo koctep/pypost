@@ -25,3 +25,21 @@ def test_magic_mock_can_stand_in_for_execute_request_protocol():
 def test_request_worker_default_executor_satisfies_protocol():
     worker = RequestWorker(RequestData(name="t", method="GET", url="http://example.com"))
     assert isinstance(worker.service, ExecuteRequestProtocol)
+
+
+def test_request_worker_accepts_injected_service():
+    mock = MagicMock(spec=ExecuteRequestProtocol)
+    worker = RequestWorker(
+        RequestData(name="t", method="GET", url="http://example.com"),
+        service=mock,
+    )
+    assert worker.service is mock
+
+
+def test_request_worker_accepts_service_factory():
+    mock = MagicMock(spec=ExecuteRequestProtocol)
+    worker = RequestWorker(
+        RequestData(name="t", method="GET", url="http://example.com"),
+        service_factory=lambda: mock,
+    )
+    assert worker.service is mock
