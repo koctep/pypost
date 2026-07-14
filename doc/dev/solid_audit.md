@@ -59,6 +59,10 @@ pytest tests/test_solid_audit_baseline.py -v
 Caps live in `scripts/audit_baseline_metrics.py`. After intentional module growth, remeasure,
 update caps with ~10% headroom, and refresh the snapshot.
 
+**PYPOST-728 (2026-07-14):** Verified R-P1-001 compliance — `main_window.py` (393/425),
+`MainWindow` class (353/380), and `template_service.py` (204/225) all within refreshed caps.
+`audit_baseline_metrics.py --check` and `test_solid_audit_baseline.py` pass.
+
 ## Individual dialog audit (PYPOST-374)
 
 PYPOST-40 grouped `ui/dialogs/` (~400 LOC) without per-dialog SOLID scoring. PYPOST-374 audits
