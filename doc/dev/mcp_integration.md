@@ -121,6 +121,8 @@ former monolithic `MetricsManager` into focused modules:
 | `pypost/core/server_bind.py` | `format_bind_error`, `drain_pending_tasks` | Shared bind-failure messages and asyncio loop teardown before `loop.close()` (PYPOST-726) |
 
 *   **Role**: Provides application metrics via MCP Resources.
+*   **Operator catalog**: Full metric names, types, labels, and meanings —
+    [Prometheus Monitoring](../prometheus_monitoring.md#metric-inventory).
 *   **Framework**: Same stack as the main server (`Starlette` + `mcp` SDK + `uvicorn`).
 *   **Hybrid Server**: Hosts Prometheus (`/metrics`), Streamable HTTP MCP (`/mcp`), and
     legacy SSE (`/sse`, `/messages`) on the same port (default 9080).

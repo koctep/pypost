@@ -30,36 +30,73 @@ curl -s http://127.0.0.1:9080/metrics | head
 
 You should see `# HELP` lines and counter names ending in `_total`.
 
-## Counter families
+## Metric inventory
 
-PyPost registers counters (not gauges or histograms). Values only increase. Common series:
+PyPost registers **32 Prometheus instruments** in
+[`pypost/core/metrics_registry.py`](../pypost/core/metrics_registry.py): **30 counters**, **1
+gauge**, and **1 histogram**. Counters and the gauge are monotonic or point-in-time values;
+the histogram records MCP tool call durations.
 
-### HTTP requests (GUI and MCP tools)
+Verify the registration count:
 
-| Metric | Labels | Meaning |
-| --- | --- | --- |
-| `requests_sent_total` | `method` | Outbound HTTP requests started |
-| `responses_received_total` | `method`, `status_code` | HTTP responses received |
-| `request_errors_total` | `category` | Execution failures (timeout, connection, etc.) |
-| `request_retries_total` | `method`, `status_category` | Retry attempts |
-| `request_retry_exhaustions_total` | `endpoint` | All retries exhausted for an endpoint |
+```bash
+rg 'Counter\(|Histogram\(|Gauge\(' pypost/core/metrics_registry.py | wc -l
+```
 
-### MCP server (request tools on port 1080)
+### GUI interaction
 
-| Metric | Labels | Meaning |
-| --- | --- | --- |
-| `mcp_requests_received_total` | `method` | MCP operations received (`list_tools`, `call_tool`, …) |
-| `mcp_responses_sent_total` | `method`, `status` | MCP responses (`success` or `error`) |
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `gui_send_clicks_total` | Counter | — | Send button clicked in the request editor |
+| `gui_save_actions_total` | Counter | `source` | Save action triggered (`menu`, `shortcut`, `overwrite`, `new`, …) |
+| `gui_save_as_actions_total` | Counter | `source` | Save As action triggered (`menu`, `shortcut`, …) |
+| `gui_new_tab_actions_total` | Counter | `source` | New tab opened (`plus_button`, `shortcut`, `collections_context`, `unknown`) |
+| `gui_copy_curl_actions_total` | Counter | — | Copy as cURL action triggered |
+| `gui_collection_delete_actions_total` | Counter | `item_type`, `status` | Collection tree delete flow (`item_type`: `request`, `collection`; `status`: `selected`, `cancelled`, `succeeded`, `not_found`, `error`) |
+| `gui_collection_rename_actions_total` | Counter | `item_type`, `status` | Collection tree rename flow (same `item_type` values; `status`: `selected`, `cancelled`, `rejected_empty`, `succeeded`, `not_found`, `error`) |
+| `gui_response_search_actions_total` | Counter | `source`, `has_matches` | Response body search (`source`: `enter`, `next`, `previous`, `typed`; `has_matches`: `true`/`false`) |
+| `gui_variable_validation_total` | Counter | `result` | Environment variable name validation attempt (`valid`, `invalid`) |
+| `gui_variable_validation_failures_total` | Counter | `reason` | Failed validation (`empty`, `starts_with_digit`, `invalid_chars`) |
+| `gui_method_body_autoswitches_total` | Counter | `method` | Body tab auto-selected after HTTP method change |
 
-The observability MCP server (port 9080) increments these when agents read `metrics://all`.
+### HTTP requests, history, and templates
 
-### GUI activity (optional dashboards)
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `requests_sent_total` | Counter | `method` | Outbound HTTP request started |
+| `responses_received_total` | Counter | `method`, `status_code` | HTTP response received |
+| `response_body_truncated_total` | Counter | `method` | Response body truncated by `max_response_bytes` |
+| `history_entries_appended_total` | Counter | `method` | Request recorded in history |
+| `history_entries_loaded_into_editor_total` | Counter | — | History entry loaded into the request editor |
+| `request_errors_total` | Counter | `category` | Request execution error (`network`, `timeout`, `template`, `body`, `script`, `history`, `cancelled`, `unknown`) |
+| `yaml_to_json_conversion_failed_total` | Counter | — | YAML body could not be converted to JSON at send time |
+| `history_record_errors_total` | Counter | — | History persistence failed |
+| `hidden_value_masks_applied_total` | Counter | `surface` | Hidden environment variable masked before persistence (`history`, …) |
+| `request_retries_total` | Counter | `method`, `status_category` | Outbound retry attempt (`status_category` matches error category, e.g. `timeout`) |
+| `request_retry_exhaustions_total` | Counter | `endpoint` | All configured retries exhausted for a URL |
+| `template_expression_render_attempts_total` | Counter | `render_path`, `outcome` | `{{…}}` function placeholder render attempt (`render_path`: `runtime`, `hover`, `curl`; `outcome`: `success`, `empty_content`, `validation_error`, `render_error`) |
+| `template_expression_validation_failures_total` | Counter | `render_path`, `code`, `function_name` | Template function validation failure (`code`: `unknown_function`, `invalid_arity`, …) |
 
-Examples: `gui_send_clicks_total`, `gui_save_actions_total{source="toolbar"}`,
-`gui_response_search_actions_total`, `history_entries_appended_total{method="GET"}`.
+### MCP server
 
-These help correlate operator actions with HTTP/MCP volume; they are not required for basic
-monitoring.
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `mcp_requests_received_total` | Counter | `method` | MCP operation received on the request-tool server (e.g. `list_tools`, `call_tool`) or observability server (`read_resource:metrics`) |
+| `mcp_responses_sent_total` | Counter | `method`, `status` | MCP response sent (`status`: `success`, `error`) |
+| `mcp_server_up` | Gauge | — | Request-tool MCP server readiness (`1` = tools registered, `0` = idle) |
+| `mcp_tool_call_duration_seconds` | Histogram | `method`, `status` | MCP tool call wall time in seconds |
+| `mcp_active_env_changes_total` | Counter | — | Active environment changed while MCP server was running |
+
+The observability server on port 9080 increments `mcp_requests_received_total` and
+`mcp_responses_sent_total` when agents read the `metrics://all` resource.
+
+### Environment encryption
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `environment_value_encryptions_total` | Counter | — | Environment value encrypted before save |
+| `environment_value_decryptions_total` | Counter | — | Environment value decrypted on load |
+| `environment_encryption_errors_total` | Counter | `stage`, `reason` | Encryption flow error (`stage`: `save`, `load`; `reason`: `encrypt_failed`, `decrypt_failed`, `unsupported_format`) |
 
 ## Prometheus scrape config
 
@@ -93,5 +130,7 @@ Agents or scripts can read the same payload via MCP resource `metrics://all` on
 Counter definitions, test coverage, and migration notes for operators maintaining dashboards:
 
 - [Developer MCP & metrics stack](dev/mcp_integration.md#4-metrics-observability-stack-pypostcoremetricspy)
+- [Prometheus metrics inventory](prometheus_monitoring.md#metric-inventory) — complete operator
+  catalog (PYPOST-750)
 - [Metric rename migration](dev/metric_rename_migration.md)
 - [Testing MCP and metrics](dev/testing.md#mcp-and-metrics-test-coverage)
