@@ -18,7 +18,7 @@ alignment, dead code
 | --- | --- |
 | `pypost/` modules | 141 |
 | `pypost/` LOC | ~16,425 |
-| `make lint` | **FAIL** (4 flake8 violations) |
+| `make lint` | **PASS** (flake8 clean) |
 | SOLID cap check | **FAIL** (3 violations) |
 | Functions ≥80 LOC | 12 |
 | `except Exception` in `pypost/` | 29 |
@@ -33,16 +33,17 @@ exceeded on `main_window` and `template_service`; lint no longer clean.
 make lint   # flake8 on pypost/ only
 ```
 
-Current failures (2026-06-12):
+Historical failures (2026-06-12 audit) — **all remediated in PYPOST-729**:
 
-| File | Issue |
-| --- | --- |
-| `encryption_migration.py` | Unused variable `error_prefix` |
-| `encryption_migration_worker.py` | Unused import `MigrationReport` |
-| `mixins.py` | Trailing blank line at EOF |
-| `request_editor.py` | Line too long (104 > 100) |
+| File | Issue | Status |
+| --- | --- | --- |
+| `encryption_migration.py` | Unused variable `error_prefix` (F841) | **Done** — [PYPOST-737](https://pypost.atlassian.net/browse/PYPOST-737) |
+| `qt/encryption_migration_worker.py` | Unused import `MigrationReport` (F401) | **Done** — [PYPOST-737](https://pypost.atlassian.net/browse/PYPOST-737) |
+| `mixins.py` | Trailing blank line at EOF (W391) | **Done** — [PYPOST-729](https://pypost.atlassian.net/browse/PYPOST-729) |
+| `request_editor.py` | Line too long (E501) | **Done** — [PYPOST-729](https://pypost.atlassian.net/browse/PYPOST-729) |
 
-CI installs flake8 but **does not run** `make lint` today.
+CI installs flake8; wiring `make lint` into the workflow is tracked in
+[PYPOST-736](https://pypost.atlassian.net/browse/PYPOST-736).
 
 ## SOLID Regression Caps
 
