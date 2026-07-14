@@ -1,4 +1,4 @@
-# Licensing and Distribution (PYPOST-786)
+# Licensing and Distribution (PYPOST-786, PYPOST-810)
 
 ## Overview
 
@@ -73,6 +73,97 @@ When you redistribute PyPost **with** PySide6/Qt libraries, plan to:
      in [`LICENSES/transitive.csv`](../../LICENSES/transitive.csv) (PYPOST-809); regenerate
      with `make generate-license-inventory` after production lock changes.
 
+## Pre-binary-release legal review gate (PYPOST-810)
+
+PyPost has **not** published official frozen binaries or installers yet. Before the **first**
+binary artifact is released under the PyPost project name, complete this gate. Treat unchecked
+items as **release blockers** until resolved or explicitly waived in writing by qualified
+counsel.
+
+This gate supplements — it does not replace — the [Distributor checklist](#distributor-checklist-lgpl-30)
+above and the [platform notes](#platform-specific-distribution-notes) below.
+
+### Release readiness checklist
+
+| # | Gate item | Owner | Evidence |
+| --- | --- | --- | --- |
+| G1 | **Counsel review** — qualified legal counsel reviews this guide, the distributor checklist, and the planned artifact layout for each target platform | Legal / maintainer | Written sign-off (email, memo, or ticket comment) referencing PySide6/Qt versions |
+| G2 | **LGPL packaging plan** — notices, LGPL-3.0 text, and PyPost MIT `LICENSE` are included in the shipped bundle (e.g. `LICENSES/`, `ThirdPartyNotices.txt`, or in-app About) | Release engineer | File manifest or installer spec |
+| G3 | **Corresponding source offer** — written offer or bundled source pointers for LGPL libraries (PySide6/Qt) valid for ≥3 years per LGPL §6 | Release engineer | Offer text in package + URL or archive location |
+| G4 | **Re-linking / replacement** — bundle layout allows substituting user-built PySide6/Qt shared libraries where technically feasible (see platform notes) | Release engineer | Packaging doc or smoke test replacing one Qt `.so`/`.dylib`/`.dll` |
+| G5 | **Transitive inventory** — `LICENSES/transitive.csv` regenerated from the production lock used to build the binary; `make check-license-inventory` passes | Maintainer | Committed CSV + CI green |
+| G6 | **Version record** — exact `PySide6`, Qt, and Python versions bundled are recorded in release notes and build metadata | Release engineer | Release notes / SBOM / build log |
+| G7 | **Platform matrix** — each target OS/format (macOS `.dmg`, Windows `.msi`/`.exe`, Linux Flatpak/AppImage/deb) reviewed against the platform table below | Release engineer + counsel | Per-platform checklist sign-off |
+| G8 | **Downstream clarity** — README or release page states who is **conveying** the combined work and where to obtain LGPL components | Maintainer | Published release page |
+
+### Maintainer workflow
+
+1. Freeze production dependencies (`requirements.txt`) and regenerate
+   `LICENSES/transitive.csv` (`make generate-license-inventory`).
+2. Draft the binary layout (which Qt `.so`/`.dylib`/`.dll` files ship, where notices live).
+3. Complete G1–G8; do not tag a binary release until all items are checked or counsel documents
+   an explicit waiver.
+4. After the first binary release, re-run G2–G6 whenever PySide6/Qt versions or packaging
+   tooling change.
+
+### What this gate does not cover
+
+- Automated SPDX/SBOM export formats (out of scope; see PYPOST-809).
+- Trademark, export-control, or app-store policy review (counsel may add items under G1).
+- Security signing (codesign, notarization, Authenticode) — required for distribution on some
+  platforms but separate from LGPL license compliance.
+
+## Platform-specific distribution notes
+
+When bundling PySide6/Qt shared libraries, obligations are broadly the same across platforms
+(LGPL notices, source offer, replacement rights). **Packaging mechanics differ** — plan per
+target OS before building installers.
+
+### macOS
+
+| Topic | Guidance |
+| --- | --- |
+| Typical artifacts | `.app` bundle inside a `.dmg` or zip; PyInstaller/cx_Freeze place Qt frameworks under `Contents/Frameworks/` or adjacent `.dylib` files |
+| Dynamic libraries | PySide6 wheels ship `libQt6*.dylib` and plugin directories (`platforms`, `styles`, etc.). Include all Qt libs the app loads at runtime, not only `libpyside6` |
+| Replacement (LGPL) | Prefer `@rpath` / `@loader_path` layouts so users can swap bundled `.dylib` files without re-signing the entire bundle if your counsel agrees; document which paths are user-replaceable |
+| Plugins | Qt platform plugins (e.g. `libqcocoa.dylib`) must be discoverable via `QT_PLUGIN_PATH` or standard bundle layout — missing plugins are a common packaging failure, not a license issue |
+| Codesigning / notarization | Apple Gatekeeper requires signed and notarized binaries for wide distribution. Coordinate with G1 — signing may affect how users replace LGPL libraries |
+| Python runtime | Frozen builds often embed a Python framework; MIT-licensed PyPost code remains separate from LGPL Qt libs in the bundle |
+
+### Windows
+
+| Topic | Guidance |
+| --- | --- |
+| Typical artifacts | Folder-style frozen exe, one-file PyInstaller extract, or `.msi` installer |
+| Dynamic libraries | PySide6 ships `Qt6*.dll`, `pyside6.abi3.dll`, and plugin folders (`platforms`, `styles`). Ship MSVC runtime dependencies if your freeze tool does not bundle them |
+| Replacement (LGPL) | Keep Qt `.dll` files in a dedicated directory (e.g. `PySide6/` or `_internal/`) documented in `ThirdPartyNotices.txt` so users can overwrite DLLs with a modified build |
+| PATH / plugin discovery | Set `PATH` or use `QCoreApplication` library paths so Qt finds `platforms/qwindows.dll` — test on a clean VM without dev tools installed |
+| Installer vs portable | MSI may write to `Program Files` (admin install). LGPL obligations apply regardless; ensure notices are visible post-install (About dialog or `LICENSES` in install dir) |
+| Authenticode | Recommended for SmartScreen trust; not an LGPL requirement |
+
+### Linux
+
+| Topic | Guidance |
+| --- | --- |
+| Typical artifacts | Tarball with frozen binary, `.AppImage`, Flatpak, `.deb`/`.rpm` |
+| Dynamic libraries | PySide6 wheels bundle `libQt6*.so` and plugins under `PySide6/Qt/lib` or similar; glibc baseline matters — build on an old enough distro or use manylinux-style baseline |
+| Replacement (LGPL) | Prefer `$ORIGIN`-relative `RPATH` so users can replace `.so` files beside the executable; avoid stripping `DT_NEEDED` paths that force system Qt unless you intend users to use distro Qt |
+| Flatpak / sandbox | Flatpak runtimes may supply Qt separately — clarify whether **you** convey LGPL Qt or the runtime does; counsel should review Flatpak manifest licensing |
+| Distro packages | `.deb`/`.rpm` that depend on `python3-pyside6` from distro repos may shift conveyance to the distro maintainer; document which model PyPost official builds use |
+| FHS paths | If installing to `/usr/lib`, ensure license files land in `/usr/share/doc/pypost/` or equivalent per distro policy |
+
+### Cross-platform packaging checklist
+
+Before tagging a binary release, verify on each platform:
+
+1. Application launches on a **clean** machine/VM without a development venv.
+2. `LICENSES/` or equivalent notices are present in the installed tree.
+3. LGPL-3.0 full text and PySide6 copyright notices are included.
+4. Documented path exists for users to obtain PySide6/Qt corresponding source matching the
+   bundled versions.
+5. At least one documented method to replace bundled Qt shared libraries (or counsel-approved
+   alternative) has been tested or reviewed.
+
 ## Transitive license inventory (PYPOST-809)
 
 | Context | Command |
@@ -114,6 +205,8 @@ can be identified (PyPI sdist/wheel and Qt version metadata).
 | Where is the PySide6 license in a venv? | After `pip install PySide6`, see `site-packages/PySide6/` and package metadata on PyPI |
 | How do I refresh third-party attribution? | `make generate-license-inventory` after editing `requirements.in`; commit `LICENSES/transitive.csv` |
 | Who owns compliance for a downstream fork's installer? | The party **conveying** the binary bundle |
+| What must happen before the first official binary? | Complete [Pre-binary-release legal review gate](#pre-binary-release-legal-review-gate-pypost-810) (G1–G8) |
+| Where are macOS/Windows/Linux packaging notes? | [Platform-specific distribution notes](#platform-specific-distribution-notes) |
 
 ## References
 

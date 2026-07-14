@@ -100,7 +100,8 @@ See [mcp_integration.md](mcp_integration.md) for runtime architecture.
 Transitive license inventory: [`LICENSES/transitive.csv`](../../LICENSES/transitive.csv)
 (PYPOST-809). Regenerate with `make generate-license-inventory`; CI job
 `check-license-inventory` verifies drift. Distributor guidance for PySide6:
-[licensing.md](licensing.md).
+[licensing.md](licensing.md). Pre-binary-release legal review gate (PYPOST-810): see
+[licensing.md § Pre-binary-release legal review gate](licensing.md#pre-binary-release-legal-review-gate-pypost-810).
 
 ## Prioritized Recommendations
 
