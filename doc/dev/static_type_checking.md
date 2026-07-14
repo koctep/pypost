@@ -65,7 +65,8 @@ Rules:
 3. **New modules** in core, models, or ui must follow this pattern from the first commit.
 
 This keeps forward references (`EncryptionKey | None`) consistent and aligns with mypy's scoped
-paths. Core/models adopted in PYPOST-738; UI completed in PYPOST-815.
+paths. Core/models adopted in PYPOST-738; UI bulk migration in PYPOST-815; 100% UI coverage
+verified in PYPOST-817 (67 modules).
 
 ## Configuration
 
