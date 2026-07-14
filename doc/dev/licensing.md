@@ -69,14 +69,30 @@ When you redistribute PyPost **with** PySide6/Qt libraries, plan to:
 
 5. **Attribution for other dependencies**
    - PySide6 is not the only third-party component in a full environment. A complete release
-     may also need notices for MIT/Apache/BSD deps (see audit note L-003 — no transitive
-     inventory is checked into this repo yet).
+     should include notices for MIT/Apache/BSD deps. The committed transitive inventory lives
+     in [`LICENSES/transitive.csv`](../../LICENSES/transitive.csv) (PYPOST-809); regenerate
+     with `make generate-license-inventory` after production lock changes.
+
+## Transitive license inventory (PYPOST-809)
+
+| Context | Command |
+| --- | --- |
+| Committed output | `LICENSES/transitive.csv` (50 packages from `requirements.txt`) |
+| Regenerate | `make generate-license-inventory` (requires `make install`) |
+| Verify | `make check-license-inventory` |
+| CI | Job `check-license-inventory` in `.github/workflows/test.yml` |
+
+The inventory is built with pinned `pip-licenses` from the dev lock. The script filters
+`pip-licenses --format=csv --with-urls` output to packages listed in the committed production
+lock so dev-only tooling is excluded.
 
 ## What PyPost ships today
 
 The upstream repository distributes:
 
 - MIT-licensed **source code** and the root **`LICENSE`** file.
+- **`LICENSES/transitive.csv`** — SPDX-style attribution for all packages in the production
+  lock (`requirements.txt`), regenerated via `make generate-license-inventory` (PYPOST-809).
 - **No** pre-built installers, frozen binaries, or bundled Qt libraries.
 
 End users and developers install PySide6 via `requirements.txt` / `pip` (currently pinned
@@ -96,6 +112,7 @@ can be identified (PyPI sdist/wheel and Qt version metadata).
 | Do I need this guide for local development? | No — running from source with your own venv is not redistribution |
 | Does MIT PyPost code "infect" to GPL/LGPL? | Not when PySide6 is dynamically linked and LGPL terms are satisfied for the Qt libraries |
 | Where is the PySide6 license in a venv? | After `pip install PySide6`, see `site-packages/PySide6/` and package metadata on PyPI |
+| How do I refresh third-party attribution? | `make generate-license-inventory` after editing `requirements.in`; commit `LICENSES/transitive.csv` |
 | Who owns compliance for a downstream fork's installer? | The party **conveying** the binary bundle |
 
 ## References

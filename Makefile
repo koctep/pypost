@@ -1,4 +1,4 @@
-.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures
+.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures generate-license-inventory check-license-inventory
 
 .DEFAULT_GOAL := help
 
@@ -96,6 +96,12 @@ generate-mcp-fixtures: $(VENV_MARKER) ## Regenerate MCP test collection and envi
 
 check-mcp-fixtures: $(VENV_MARKER) ## Verify committed MCP test fixtures match canonical builders
 	$(BIN)/python scripts/generate_mcp_test_fixtures.py --check
+
+generate-license-inventory: install ## Regenerate LICENSES/transitive.csv from requirements.txt
+	$(BIN)/python scripts/generate_license_inventory.py
+
+check-license-inventory: install ## Verify LICENSES/transitive.csv matches production lock (mirrors CI)
+	$(BIN)/python scripts/generate_license_inventory.py --check
 
 clean: ## Remove virtual environment and Python cache directories
 	rm -rf $(VENV)

@@ -97,7 +97,9 @@ See [mcp_integration.md](mcp_integration.md) for runtime architecture.
   [licensing.md](licensing.md) (PYPOST-786)
 - **Most Python deps:** MIT / Apache / BSD (permissive)
 
-No transitive license inventory is checked into the repo. Distributor guidance for PySide6:
+Transitive license inventory: [`LICENSES/transitive.csv`](../../LICENSES/transitive.csv)
+(PYPOST-809). Regenerate with `make generate-license-inventory`; CI job
+`check-license-inventory` verifies drift. Distributor guidance for PySide6:
 [licensing.md](licensing.md).
 
 ## Prioritized Recommendations
@@ -116,6 +118,7 @@ No transitive license inventory is checked into the repo. Distributor guidance f
 | P3 | R-P3-002 | Document PySide6 LGPL distribution obligations — **Done (PYPOST-786)** |
 | P3 | R-P3-003 | Split OpenTelemetry deps into optional extra — **Done (PYPOST-787)** |
 | P3 | R-P3-004 | Refresh `setup.md` dependency list — **Done (PYPOST-788)** |
+| P3 | R-P3-005 | Commit transitive license inventory (`LICENSES/`) — **Done (PYPOST-809)** |
 
 | Priority | Count |
 | --- | ---: |

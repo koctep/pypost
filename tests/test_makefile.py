@@ -224,6 +224,14 @@ class TestDependencyChain:
         prereqs = _prerequisites(make_workspace, "check-mcp-fixtures")
         assert MARKER_REL in prereqs
 
+    def test_generate_license_inventory_depends_on_install(self, make_workspace: Path) -> None:
+        prereqs = _prerequisites(make_workspace, "generate-license-inventory")
+        assert "install" in prereqs
+
+    def test_check_license_inventory_depends_on_install(self, make_workspace: Path) -> None:
+        prereqs = _prerequisites(make_workspace, "check-license-inventory")
+        assert "install" in prereqs
+
     @pytest.mark.parametrize("target", ["run", "test", "lint"])
     def test_runtime_targets_depend_on_marker_only(
         self,

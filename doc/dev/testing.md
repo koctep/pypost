@@ -529,7 +529,7 @@ the runner home directory and restores them before dependency installation.
 | --- | --- |
 | **Cache key** | OS + Python version + SHA-256 hash of `pyproject.toml` and all four requirements files |
 | **Invalidation** | Any edit to a lock or source file produces a new key (cold install) |
-| **Scope** | Main `test` matrix (3.11, 3.13), `make-install-smoke` (3.11), `security-audit`, and `check-lock-dev` |
+| **Scope** | Main `test` matrix (3.11, 3.13), `make-install-smoke` (3.11), `security-audit`, `check-license-inventory`, and `check-lock-dev` |
 | **Local dev** | `make install` uses Makefile `.venv`; GitHub cache applies to CI only |
 
 The slow install smoke runs `make install` in an isolated `tmp_path` workspace; pip still
@@ -561,6 +561,20 @@ parity: `make security-audit` after `make install` (PYPOST-805 removed inline `p
 pip-audit` from Makefile and CI).
 
 See [dependencies_audit.md](dependencies_audit.md) § CVE Scanning for ignore-vuln policy.
+
+## CI transitive license inventory (PYPOST-809)
+
+The `check-license-inventory` job installs dev tooling via `pip install -e ".[dev]"` (includes
+pinned `pip-licenses`), then runs `python scripts/generate_license_inventory.py --check` once per
+workflow on Python 3.11. Local parity: `make check-license-inventory` after `make install`.
+
+Regenerate committed output after production lock changes:
+
+```bash
+make generate-license-inventory
+```
+
+See [licensing.md](licensing.md) § Transitive license inventory.
 
 ## Pytest exit codes (PYPOST-279)
 

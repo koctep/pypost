@@ -204,6 +204,41 @@ jobs:
             " (PYPOST-778, PYPOST-805, PYPOST-806)." \
             >> "$GITHUB_STEP_SUMMARY"
 
+  check-license-inventory:
+    name: "check-license-inventory (transitive licenses)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.in
+            requirements.txt
+            requirements-dev.in
+            requirements-dev.txt
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install dev tooling (pip-licenses)
+        run: python -m pip install -e ".[dev]"
+
+      - name: Verify transitive license inventory
+        run: python scripts/generate_license_inventory.py --check
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## Transitive license inventory (PYPOST-809)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified \`LICENSES/transitive.csv\` matches \`requirements.txt\` via" \
+            "\`pip-licenses\` from editable \`[dev]\` extra." \
+            >> "$GITHUB_STEP_SUMMARY"
+
   check-lock-dev:
     name: "check-lock-dev (requirements-dev.txt)"
     runs-on: ubuntu-latest
