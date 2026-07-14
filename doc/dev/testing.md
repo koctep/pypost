@@ -586,6 +586,9 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_pytest_exit_poli
 
 ## Pytest live logging (`log_cli`) (PYPOST-570)
 
+See [observability_audit.md — Test and CI Logging](observability_audit.md#test-and-ci-logging)
+for the audit summary table (local vs CI `log_cli`, guardrail baseline 72 + margin 5).
+
 `pytest.ini` enables live application logs during test runs:
 
 | Setting | Value |
@@ -801,6 +804,8 @@ both in the same PR or file a Debt follow-up.
 
 ## References
 
+- [observability_audit.md](observability_audit.md) — observability audit summary, Test and CI
+  Logging (`log_cli` local vs CI, guardrail baseline)
 - [gui_testing.md](gui_testing.md) — Qt offscreen setup, `qapp` fixture, GUI test patterns
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — AI assistant rules
 - [MCP Integration](mcp_integration.md) — MCP setup

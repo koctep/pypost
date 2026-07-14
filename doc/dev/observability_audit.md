@@ -2,8 +2,9 @@
 
 This document summarizes the PyPost observability and logging audit (PYPOST-688). It complements
 [logging.md](logging.md) (event naming convention and catalog),
-[security_audit.md](security_audit.md) (sensitive data in logs), [testing.md](testing.md) (pytest
-log_cli and CI guardrails), and [mcp_integration.md](mcp_integration.md) (MCP activity viewer).
+[security_audit.md](security_audit.md) (sensitive data in logs),
+[testing.md](testing.md#pytest-live-logging-log_cli-pypost-570) (pytest log_cli and CI
+guardrails), and [mcp_integration.md](mcp_integration.md) (MCP activity viewer).
 
 ## Audit Report
 
