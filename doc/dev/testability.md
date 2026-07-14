@@ -98,6 +98,8 @@ isolated unit tests. Production always injects from `main.py`.
 Tracking consumers accept `MetricsTrackerProtocol | None` and normalize with
 `resolve_metrics()` to `NULL_METRICS` when omitted ([PYPOST-74](https://pypost.atlassian.net/browse/PYPOST-74)).
 Call sites invoke `self._metrics.track_*()` directly — no `if self._metrics` guards.
+[PYPOST-799](https://pypost.atlassian.net/browse/PYPOST-799) verified PYPOST-44 TD-2 closure:
+zero optional-injection guards in `pypost/`, 11 `resolve_metrics` normalization sites.
 
 ```python
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
