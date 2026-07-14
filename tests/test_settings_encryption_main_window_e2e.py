@@ -42,14 +42,14 @@ def _make_storage(tmp_path, monkeypatch) -> StorageManager:
     return StorageManager()
 
 
-def _make_main_window(qapp, storage, config_manager):  # noqa: ARG001
+def _make_main_window(qapp, storage, config_manager, request_manager=None):  # noqa: ARG001
     metrics = MagicMock()
     template_service = MagicMock()
     mock_tabs = MagicMock()
     mock_collections = MagicMock()
+    if request_manager is None:
+        request_manager = MagicMock()
     with (
-        patch("pypost.ui.main_window.StorageManager"),
-        patch("pypost.ui.main_window.RequestManager"),
         patch("pypost.ui.main_window.StateManager") as mock_sm,
         patch("pypost.ui.main_window.MCPServerManager"),
         patch("pypost.ui.main_window.CollectionsPresenter", return_value=mock_collections),
@@ -70,8 +70,9 @@ def _make_main_window(qapp, storage, config_manager):  # noqa: ARG001
             template_service=template_service,
             config_manager=config_manager,
             history_manager=MagicMock(),
+            storage=storage,
+            request_manager=request_manager,
         )
-    window.storage = storage
     window.env = MagicMock()
     window.env.wait_storage_idle = MagicMock()
     window.collections = mock_collections

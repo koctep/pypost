@@ -26,9 +26,8 @@ def _make_main_window(qapp, config_manager):  # noqa: ARG001
     template_service = MagicMock()
     mock_tabs = MagicMock()
     mock_collections = MagicMock()
+    storage = MagicMock()
     with (
-        patch("pypost.ui.main_window.StorageManager"),
-        patch("pypost.ui.main_window.RequestManager"),
         patch("pypost.ui.main_window.StateManager") as mock_sm,
         patch("pypost.ui.main_window.MCPServerManager"),
         patch(
@@ -54,8 +53,9 @@ def _make_main_window(qapp, config_manager):  # noqa: ARG001
             template_service=template_service,
             config_manager=config_manager,
             history_manager=MagicMock(),
+            storage=storage,
+            request_manager=MagicMock(),
         )
-    window.storage = MagicMock()
     window.env = MagicMock()
     window.env.wait_storage_idle = MagicMock()
     window.collections = mock_collections

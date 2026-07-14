@@ -29,6 +29,9 @@ item dispatch uses a strategy registry
 | `TemplateService` | `main.py` | `MainWindow`, `MCPServerManager`, `TabsPresenter` → workers |
 | `AlertManager` | `main.py` (from `AppSettings`) | `MainWindow` |
 | `HistoryManager` | `main.py` | `MainWindow` → `TabsPresenter` → `RequestWorker` → `RequestService` |
+| `StorageManager` | `main.py` (`apply_encryption_settings` before UI) | `MainWindow`, presenters, workers |
+| `RequestManager` | `main.py` (`defer_initial_load=True`) | `MainWindow` → presenters |
+| `MCPServerManager` | `main.py` | `MainWindow` → `EnvPresenter` |
 
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
 `TemplateService` chain and [template_service.md](template_service.md) for lifecycle design
@@ -216,8 +219,8 @@ Patching `client.session` after construction remains valid for legacy tests.
 
 ## MainWindow
 
-`MainWindow` is a Qt composition root: it still constructs `StorageManager`, `RequestManager`,
-presenters, and widgets internally. Full presenter extraction is tracked separately
+`MainWindow` is a Qt composition root: it still constructs presenters and widgets internally.
+Full presenter extraction is tracked separately
 ([PYPOST-43](https://pypost.atlassian.net/browse/PYPOST-43)).
 
 ### Injectable dependencies (today)
@@ -229,6 +232,9 @@ presenters, and widgets internally. Full presenter extraction is tracked separat
 | `config_manager` | no | Inject to avoid disk I/O |
 | `alert_manager` | no | Inject to assert alert propagation |
 | `history_manager` | no | `MagicMock(spec=HistoryManager)` or temp-path instance |
+| `storage` | no | `FakeStorageManager` or temp-path `StorageManager` |
+| `request_manager` | no | `MagicMock(spec=RequestManager)` or real instance with fake storage |
+| `mcp_manager` | no | `MagicMock()` or `FakeMCPManager` |
 
 ### Recommended pattern
 
@@ -309,8 +315,8 @@ mock_http = MagicMock(spec=HTTPClientProtocol)
 ## StorageInterface
 
 `RequestManager`, environment presenters, migration services, and async storage workers depend
-on `StorageInterface` instead of the concrete `StorageManager`. Production still constructs
-`StorageManager` in `MainWindow`.
+on `StorageInterface` instead of the concrete `StorageManager`. Production constructs
+`StorageManager` in `main.py` and injects it into `MainWindow` (PYPOST-695).
 
 ```python
 from pypost.core.storage_interface import StorageInterface

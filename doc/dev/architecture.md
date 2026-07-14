@@ -95,7 +95,10 @@ because several startup components need `AppSettings` from disk before the UI ex
 ConfigManager.load_config() → AppSettings
     ├─ MetricsManager.start_server(host, port)
     ├─ AlertManager(log_path, webhook, …)
-    └─ MainWindow(config_manager=…) → StateManager (same AppSettings object)
+    ├─ StorageManager.apply_encryption_settings(settings)
+    ├─ RequestManager(storage, defer_initial_load=True)
+    ├─ MCPServerManager(metrics, template_service)
+    └─ MainWindow(…injected services…) → StateManager (same AppSettings object)
 ```
 
 The same `ConfigManager` instance is injected into `MainWindow` so `settings.json` is read once
@@ -103,10 +106,11 @@ The same `ConfigManager` instance is injected into `MainWindow` so `settings.jso
 [testability.md](testability.md#composition-root) and
 [PYPOST-404 dev notes](../ai-tasks/PYPOST-404/70-dev-docs.md).
 
-`MainWindow` still constructs several services not wired in `main.py`: `StorageManager`,
-`RequestManager`, `MCPServerManager`, and `StyleManager`. `HistoryManager` is created in
-`main.py` and injected (PYPOST-694). This partial composition root increases test-setup cost —
-see [architecture_audit.md](architecture_audit.md#executive-summary) (PYPOST-684).
+`MainWindow` still constructs `StyleManager` and presenters/widgets internally.
+`StorageManager`, `RequestManager`, and `MCPServerManager` are created in `main.py` and injected
+(PYPOST-695). `HistoryManager` is created in `main.py` and injected (PYPOST-694). Remaining
+partial composition root items are tracked in
+[architecture_audit.md](architecture_audit.md#executive-summary) (PYPOST-684).
 
 ## Core Components
 

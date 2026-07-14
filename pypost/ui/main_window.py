@@ -47,6 +47,9 @@ class MainWindow(QMainWindow):
         config_manager: ConfigManager | None = None,
         alert_manager: AlertManager | None = None,
         history_manager: HistoryManager | None = None,
+        storage: StorageManager | None = None,
+        request_manager: RequestManager | None = None,
+        mcp_manager: MCPServerManager | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("PyPost")
@@ -55,7 +58,12 @@ class MainWindow(QMainWindow):
         self.metrics.connect_start_failed(self._on_metrics_start_failed)
         self.template_service = template_service
         VariableHoverResolver.set_template_service(template_service)
-        self.storage = StorageManager(metrics=self.metrics)
+        if storage is not None:
+            logger.debug("storage_source source=injected")
+            self.storage = storage
+        else:
+            logger.debug("storage_source source=new")
+            self.storage = StorageManager(metrics=self.metrics)
         if config_manager is not None:
             logger.debug("config_manager_source source=injected")
             self.config_manager = config_manager
@@ -64,13 +72,24 @@ class MainWindow(QMainWindow):
             self.config_manager = ConfigManager()
         self._alert_manager = alert_manager
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
-        self.request_manager = RequestManager(self.storage, defer_initial_load=True)
+        if request_manager is not None:
+            logger.debug("request_manager_source source=injected")
+            self.request_manager = request_manager
+        else:
+            logger.debug("request_manager_source source=new")
+            self.request_manager = RequestManager(self.storage, defer_initial_load=True)
         self.state_manager = StateManager(self.config_manager, parent=self)
-        self.storage.apply_encryption_settings(self.state_manager.settings)
+        if storage is None:
+            self.storage.apply_encryption_settings(self.state_manager.settings)
         self.style_manager = StyleManager()
-        self.mcp_manager = MCPServerManager(
-            metrics=self.metrics, template_service=self.template_service
-        )
+        if mcp_manager is not None:
+            logger.debug("mcp_manager_source source=injected")
+            self.mcp_manager = mcp_manager
+        else:
+            logger.debug("mcp_manager_source source=new")
+            self.mcp_manager = MCPServerManager(
+                metrics=self.metrics, template_service=self.template_service
+            )
         self.settings = self.state_manager.settings
         self.icons = self._load_icons()
         if history_manager is not None:

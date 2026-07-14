@@ -7,7 +7,10 @@ from PySide6.QtWidgets import QApplication
 from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.history_manager import HistoryManager
+from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.qt.metrics import MetricsManager
+from pypost.core.request_manager import RequestManager
+from pypost.core.storage import StorageManager
 from pypost.core.template_service import TemplateService
 from pypost.ui.main_window import MainWindow
 
@@ -64,12 +67,28 @@ def main():
     history_manager = HistoryManager()
     logger.info("history_manager_created id=%d", id(history_manager))
 
+    storage = StorageManager(metrics=metrics_manager)
+    storage.apply_encryption_settings(settings)
+    logger.info("storage_created id=%d encryption_applied=true", id(storage))
+
+    request_manager = RequestManager(storage, defer_initial_load=True)
+    logger.info("request_manager_created id=%d", id(request_manager))
+
+    mcp_manager = MCPServerManager(
+        metrics=metrics_manager,
+        template_service=template_service,
+    )
+    logger.info("mcp_manager_created id=%d", id(mcp_manager))
+
     window = MainWindow(
         metrics=metrics_manager,
         template_service=template_service,
         config_manager=config_manager,
         alert_manager=alert_manager,
         history_manager=history_manager,
+        storage=storage,
+        request_manager=request_manager,
+        mcp_manager=mcp_manager,
     )
     window.show()
 
