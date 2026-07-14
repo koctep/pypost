@@ -1,5 +1,7 @@
 """Tests for delete metric emission by status and item type in handle_delete."""
 
+import logging
+
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
@@ -67,7 +69,14 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
         )
         presenter, metrics = self._make_presenter(rm)
         presenter.load_collections()
-        presenter._tree_actions.handle_delete("c1", "collection", "My API")
+        with self.assertLogs(
+            "pypost.ui.presenters.collection_tree_actions",
+            level=logging.ERROR,
+        ) as logs:
+            presenter._tree_actions.handle_delete("c1", "collection", "My API")
+        self.assertTrue(
+            any("collection_item_delete_failed" in r.message for r in logs.records)
+        )
         metrics.track_gui_collection_delete_action.assert_called_once_with(
             "collection", "error"
         )
@@ -80,7 +89,14 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
         rm = FakeRequestManager([col], delete_error=OSError("permission denied"))
         presenter, metrics = self._make_presenter(rm)
         presenter.load_collections()
-        presenter._tree_actions.handle_delete("r1", "request", "Get users")
+        with self.assertLogs(
+            "pypost.ui.presenters.collection_tree_actions",
+            level=logging.ERROR,
+        ) as logs:
+            presenter._tree_actions.handle_delete("r1", "request", "Get users")
+        self.assertTrue(
+            any("collection_item_delete_failed" in r.message for r in logs.records)
+        )
         metrics.track_gui_collection_delete_action.assert_called_once_with("request", "error")
         self.assertEqual(presenter._model.item(0).rowCount(), 1)
 
@@ -116,7 +132,14 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
         )
         presenter, metrics = self._make_presenter(rm)
         presenter.load_collections()
-        presenter._tree_actions.handle_delete("c1", "collection", "My API")
+        with self.assertLogs(
+            "pypost.ui.presenters.collection_tree_actions",
+            level=logging.ERROR,
+        ) as logs:
+            presenter._tree_actions.handle_delete("c1", "collection", "My API")
+        self.assertTrue(
+            any("collection_item_delete_failed" in r.message for r in logs.records)
+        )
         metrics.track_gui_collection_delete_action.assert_has_calls(
             [call("collection", "error")],
             any_order=False,

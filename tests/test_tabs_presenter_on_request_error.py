@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,17 +38,19 @@ def test_str_cancellation_message_no_dialog(presenter_with_tab) -> None:
 
 
 @pytest.mark.timeout(60)
-def test_str_error_shows_dialog(presenter_with_tab) -> None:
+def test_str_error_shows_dialog(presenter_with_tab, caplog) -> None:
     presenter, tab = presenter_with_tab
     with patch(
         "pypost.ui.presenters.tabs_presenter_worker.show_request_failed_error"
     ) as mock_show:
-        presenter._on_request_error(tab, "connection refused")
+        with caplog.at_level(logging.ERROR, logger="pypost.ui.presenters.tabs_presenter"):
+            presenter._on_request_error(tab, "connection refused")
         mock_show.assert_called_once()
+        assert any("request_error" in r.message for r in caplog.records)
 
 
 @pytest.mark.timeout(60)
-def test_execution_error_network_shows_category_message(presenter_with_tab) -> None:
+def test_execution_error_network_shows_category_message(presenter_with_tab, caplog) -> None:
     from pypost.models.errors import ErrorCategory, ExecutionError
 
     presenter, tab = presenter_with_tab
@@ -57,9 +60,11 @@ def test_execution_error_network_shows_category_message(presenter_with_tab) -> N
         detail="connection refused",
     )
     with patch("pypost.ui.presenters.tabs_presenter_worker.show_request_error") as mock_show:
-        presenter._on_request_error(tab, exc)
+        with caplog.at_level(logging.ERROR, logger="pypost.ui.presenters.tabs_presenter"):
+            presenter._on_request_error(tab, exc)
         mock_show.assert_called_once()
         assert "server is running" in mock_show.call_args[0][1]
+        assert any("request_error category=" in r.message for r in caplog.records)
 
 
 @pytest.mark.timeout(60)
