@@ -111,7 +111,7 @@ No transitive license inventory is checked into the repo. Distributor guidance f
 | P3 | R-P3-001 | Introduce `pyproject.toml` for metadata and optional extras — **Done (PYPOST-785)** |
 | P3 | R-P3-002 | Document PySide6 LGPL distribution obligations — **Done (PYPOST-786)** |
 | P3 | R-P3-003 | Split OpenTelemetry deps into optional extra — **Done (PYPOST-787)** |
-| P3 | R-P3-004 | Refresh `setup.md` dependency list |
+| P3 | R-P3-004 | Refresh `setup.md` dependency list — **Done (PYPOST-788)** |
 
 | Priority | Count |
 | --- | ---: |

@@ -91,12 +91,25 @@ make check-lock-dev
 **Dependabot / upgrade workflow:** weekly pip PRs may bump `requirements.in` or `requirements.txt`.
 After merging dependency changes, run `make lock`, commit both files, and run `make check`.
 
-**Key Dependencies:**
-- `PySide6`: The Qt framework for Python (GUI).
-- `requests`: HTTP library for sending requests.
-- `jinja2`: Template engine for variable interpolation.
-- `pydantic`: Data validation using Python type hints.
-- `prometheus_client`: Library for exposing Prometheus metrics.
+**Production packages:** `make install` resolves 11 direct production dependencies from
+`requirements.in` (locked in `requirements.txt`). Pinned versions and audit notes live in
+[dependencies_audit.md](dependencies_audit.md) § Production Dependencies.
+
+| Package | Role |
+| --- | --- |
+| PySide6 | Qt GUI framework |
+| requests | Outbound HTTP |
+| PyYAML | YAML parsing |
+| jinja2 | Request templating |
+| pydantic | Models and settings validation |
+| platformdirs | Cross-platform config paths |
+| mcp | MCP server SDK (pulls starlette/uvicorn transitively) |
+| prometheus_client | Default Prometheus metrics backend |
+| sseclient-py | SSE response probe |
+| cryptography | Encryption at rest |
+| keyring | OS credential store |
+
+See [dependencies_audit.md](dependencies_audit.md) § MCP Stack for transitive MCP dependencies.
 
 ### Project metadata (`pyproject.toml`, PYPOST-785)
 
