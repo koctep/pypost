@@ -1,4 +1,4 @@
-# UI Font Size, Themes, and Global Styles (PYPOST-106, PYPOST-112, PYPOST-792, PYPOST-793)
+# UI Font Size, Themes, and Global Styles (PYPOST-106, PYPOST-112, PYPOST-792, PYPOST-793, PYPOST-795)
 
 ## Overview
 
@@ -164,8 +164,36 @@ Returns the concatenated QSS from all `*.qss` files (sorted alphabetically) with
 
 ### `PyPostStyle.set_close_button_size(size: int)`
 
-Opt-in override for tab close-button width and height metrics. Prefer leaving
-`close_button_size` at `None` so native platform metrics apply.
+**Decision (PYPOST-795): keep as documented opt-in override** — no production caller
+sets it after PYPOST-792 removed the global 48px default. The method stays so
+maintainers can deliberately override native `PM_TabCloseIndicator*` metrics without
+reintroducing unconditional startup wiring.
+
+**Default:** leave `close_button_size` at `None` (native platform metrics).
+
+**When to call:**
+
+- Platform-specific bug where native close indicators are clipped or unreadable and
+  a measured pixel size fixes layout without touching QSS `::tab` rules.
+- Accessibility requirement for a larger close-button hit target on a specific tab bar
+  (apply to a dedicated `PyPostStyle` instance, not the global app style).
+- Unit or regression tests that assert opt-in override behaviour
+  (`tests/test_tab_layout_regression.py`).
+
+**When not to call:**
+
+- Application startup or `StyleManager.apply_theme` — production `system` theme must
+  use native metrics (see `test_apply_theme_system_uses_native_close_metrics`).
+- Global “make close buttons bigger” — oversized metrics overlap tab titles; fix icon
+  contrast in QSS (`close.svg`) or tab policy instead (PYPOST-796).
+
+Example (tests or targeted override only):
+
+```python
+style = PyPostStyle()
+style.set_close_button_size(32)  # opt-in; not used in production today
+app.setStyle(style)
+```
 
 ### `MainWindow.apply_settings(settings: AppSettings)`
 
@@ -224,6 +252,7 @@ current `indent_size`. Indent width alone is still updated via
 
 ## Related
 
+- PYPOST-795 — `set_close_button_size` kept as documented opt-in override (no production caller)
 - PYPOST-793 — `StyleManager.apply_appearance` as single appearance entry point
 - PYPOST-792 — macOS tab layout: no `QTabBar::tab` QSS; native close-indicator metrics
 - PYPOST-404 — startup font size bug (call-order fix)

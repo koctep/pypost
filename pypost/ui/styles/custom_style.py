@@ -26,10 +26,18 @@ class PyPostStyle(QProxyStyle):
         return super().pixelMetric(metric, option, widget)
 
     def set_close_button_size(self, size: int) -> None:
-        """Set the size of the tab close button.
+        """Opt-in override for tab close-indicator width and height metrics.
+
+        Production code leaves ``close_button_size`` at ``None`` so
+        ``PM_TabCloseIndicatorWidth`` / ``Height`` come from the platform style
+        (PYPOST-792). Call this only when native metrics are unsuitable — for
+        example a future platform where indicators are clipped, an accessibility
+        requirement for larger hit targets, or a targeted experiment in tests.
+
+        Do **not** call globally at startup; an oversized value (e.g. 48px) draws
+        the close control over tab titles while native padding stays intact.
 
         Args:
-            size: Width and height in pixels used for the
-                ``PM_TabCloseIndicatorWidth``/``Height`` metrics.
+            size: Width and height in pixels for both close-indicator metrics.
         """
         self.close_button_size = size
