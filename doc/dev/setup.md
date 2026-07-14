@@ -88,6 +88,9 @@ Verify the committed dev lock matches the source file:
 make check-lock-dev
 ```
 
+CI runs the same check in the `check-lock-dev` job (`.github/workflows/test.yml`) on every
+push and pull request (PYPOST-804).
+
 **Dependabot / upgrade workflow:** weekly pip PRs may bump `requirements.in` or `requirements.txt`.
 After merging dependency changes, run `make lock`, commit both files, and run `make check`.
 

@@ -526,7 +526,7 @@ directory and restores them before dependency installation.
 | --- | --- |
 | **Cache key** | OS + Python version + SHA-256 hash of all four requirements files |
 | **Invalidation** | Any edit to a lock or source file produces a new key (cold install) |
-| **Scope** | Main `test` matrix (3.11, 3.13), `make-install-smoke` (3.11), and `security-audit` |
+| **Scope** | Main `test` matrix (3.11, 3.13), `make-install-smoke` (3.11), `security-audit`, and `check-lock-dev` |
 | **Local dev** | `make install` uses Makefile `.venv`; GitHub cache applies to CI only |
 
 The slow install smoke runs `make install` in an isolated `tmp_path` workspace; pip still
@@ -534,6 +534,20 @@ reuses cached wheels from the restored `~/.cache/pip` on the runner.
 
 Verify cache behavior in the GitHub Actions log for the `setup-python` step (`Cache hit` /
 `Cache miss`). First run after a dependency change is expected to miss and download fresh wheels.
+
+## CI lock verification (PYPOST-804)
+
+The `check-lock-dev` job in `.github/workflows/test.yml` installs [uv](https://docs.astral.sh/uv/)
+and runs `make check-lock-dev` once per workflow. It fails when `requirements-dev.txt` is stale
+relative to `requirements-dev.in` (same check as local maintainer workflow in
+[setup.md](setup.md) § Development dependency lock file).
+
+| Job | Input | Tool |
+| --- | --- | --- |
+| `check-lock-dev` | `requirements-dev.in` → `requirements-dev.txt` | `uv pip compile` via Makefile |
+
+Production lock verification (`make check-lock`) remains local-only until a sibling CI job is
+added; dev lock drift is now gated in CI because test tooling installs from `requirements-dev.txt`.
 
 ## Pytest exit codes (PYPOST-279)
 
