@@ -1,5 +1,5 @@
 {
-  "error_count": 42,
+  "error_count": 41,
   "errors": [
     "pypost/core/alert_manager.py:140:arg-type",
     "pypost/core/alert_manager.py:147:arg-type",
@@ -25,7 +25,6 @@
     "pypost/core/metrics_server.py:88:arg-type",
     "pypost/core/qt/mcp_server.py:176:attr-defined",
     "pypost/core/qt/mcp_server.py:184:method-assign",
-    "pypost/core/qt/worker.py:42:assignment",
     "pypost/core/request_service.py:108:union-attr",
     "pypost/core/request_service.py:109:union-attr",
     "pypost/core/request_service.py:111:union-attr",

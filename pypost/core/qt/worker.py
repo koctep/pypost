@@ -39,7 +39,7 @@ class RequestWorker(QThread):
     def __init__(
         self,
         request_data: RequestData,
-        variables: dict = None,
+        variables: dict | None = None,
         hidden_keys: set[str] | None = None,
         metrics: MetricsTrackerProtocol | None = None,
         history_manager: HistoryManager | None = None,
