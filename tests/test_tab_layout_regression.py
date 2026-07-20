@@ -8,9 +8,13 @@ Two root causes are pinned here:
   render as one string ("CollectionsHistory", "ParamsHeadersBodyScriptMCP").
 * ``PyPostStyle`` must not force an oversized tab close-indicator metric: the
   old unconditional 48px value produced close buttons drawn over tab titles.
+
+PYPOST-821 adds a static smoke check for the dark-theme default close-icon
+contrast contract from PYPOST-796 (``close.svg`` stroke ``#999999``).
 """
 
 import re
+from pathlib import Path
 
 import pytest
 from PySide6.QtWidgets import QApplication, QStyle, QTabBar, QTabWidget, QWidget
@@ -20,6 +24,13 @@ from pypost.ui.styles.custom_style import PyPostStyle
 from pypost.ui.widgets.tab_header import RequestTabHeader
 
 pytestmark = pytest.mark.timeout(60)
+
+# PYPOST-796: default close stroke for dark native tab chrome (~5:1 vs ~#333).
+# Do not revert to #666666 — that colour blends into dark tab chrome at native
+# PM_TabCloseIndicator size. Pixel contrast is impractical offscreen; this
+# constant is the CI-facing contrast contract.
+DEFAULT_CLOSE_ICON_STROKE = "#999999"
+LEGACY_LOW_CONTRAST_CLOSE_STROKE = "#666666"
 
 SIDEBAR_LABELS = ("Collections", "History")
 EDITOR_SUBTAB_LABELS = ("Params", "Headers", "Body", "Script", "MCP")
@@ -178,3 +189,38 @@ def test_request_tab_close_button_uses_native_size(qapp_pypost_style):
         assert geometry.width() <= tab_rect.width()
     finally:
         tabs.deleteLater()
+
+
+def test_default_close_icon_dark_theme_contrast_contract():
+    """PYPOST-821: default close.svg keeps the dark-theme contrast contract.
+
+    Expected behaviour (PYPOST-796): ``close.svg`` ships with stroke ``#999999``
+    so the default tab close control stays visible on dark native tab chrome.
+    CI cannot measure rendered pixel contrast offscreen, so this smoke test
+    asserts the bundled asset path and stroke value, plus QSS wiring to that
+    asset. Do not weaken the stroke back to ``#666666``.
+    """
+    icons_dir = StyleManager().icons_dir
+    close_svg = Path(icons_dir) / "close.svg"
+    assert close_svg.is_file(), f"missing default close icon: {close_svg}"
+
+    svg_text = close_svg.read_text(encoding="utf-8")
+    strokes = re.findall(r'stroke="(#[0-9A-Fa-f]{6})"', svg_text)
+    assert strokes, "close.svg has no stroke colours to verify"
+    assert all(s.lower() == DEFAULT_CLOSE_ICON_STROKE.lower() for s in strokes), (
+        f"close.svg strokes {strokes} must all be {DEFAULT_CLOSE_ICON_STROKE} "
+        f"(dark-theme contrast; not {LEGACY_LOW_CONTRAST_CLOSE_STROKE})"
+    )
+    assert LEGACY_LOW_CONTRAST_CLOSE_STROKE.lower() not in svg_text.lower()
+
+    styles = StyleManager().load_styles()
+    assert re.search(
+        r"QTabBar::close-button\s*\{[^}]*close\.svg",
+        styles,
+        flags=re.DOTALL,
+    ), "QTabBar::close-button must reference close.svg"
+    assert re.search(
+        r"QTabBar::close-button:hover\s*\{[^}]*close-hover\.svg",
+        styles,
+        flags=re.DOTALL,
+    ), "QTabBar::close-button:hover must reference close-hover.svg"

@@ -116,7 +116,7 @@ Allowed in `main.qss`:
   `PM_TabCloseIndicator*` via the active style.
 
 Regression coverage: `tests/test_tab_layout_regression.py` (QSS guard + tab geometry +
-close-indicator metrics).
+close-indicator metrics + PYPOST-821 dark-theme `close.svg` stroke/path smoke check).
 
 ## Font inheritance investigation (PYPOST-112)
 
@@ -230,7 +230,7 @@ Delegates appearance to `style_manager.apply_appearance`, then calls `tabs.apply
 | Request tab close button overlaps title | `PyPostStyle.set_close_button_size` called globally, or default forced to a large pixel value | Leave `close_button_size` as `None`; use native `PM_TabCloseIndicator*` metrics |
 | Tabs look correct on Fusion but broken on macOS with `system` theme | Native tab chrome disabled by QSS while platform style is active | Same as first row — native renderer requires an unstylized `::tab` sub-control |
 | `+` new-tab control cramped | Consequence of zero-padding `::tab` rule stripping chrome around the pseudo-tab | Restore native tab rendering (remove `::tab` styling) |
-| Close icon hard to see in dark mode | Outdated `close.svg` stroke (`#666666`) vs native dark tab chrome | Fixed in PYPOST-796 (`#999999` default stroke); verify with macOS dark appearance; hover icon unchanged |
+| Close icon hard to see in dark mode | Outdated `close.svg` stroke (`#666666`) vs native dark tab chrome | Fixed in PYPOST-796 (`#999999` default stroke); guarded by `test_default_close_icon_dark_theme_contrast_contract` (PYPOST-821); hover icon unchanged |
 
 **Verify locally:**
 
@@ -238,9 +238,9 @@ Delegates appearance to `style_manager.apply_appearance`, then calls `tabs.apply
 make test PYTEST_ARGS=tests/test_tab_layout_regression.py
 ```
 
-All seven tests must pass. The QSS guard (`test_loaded_styles_do_not_customize_tab_geometry`)
-runs without a display; geometry tests need the production stylesheet applied to a
-`QApplication`.
+All eight tests must pass. The QSS guard (`test_loaded_styles_do_not_customize_tab_geometry`)
+and the close-icon contrast smoke test run without a display; geometry tests need the
+production stylesheet applied to a `QApplication`.
 
 **Qt references:** [Style Sheets overview](https://doc.qt.io/qt-6/stylesheet.html) (sub-control
 customization disables native rendering); see also `ai-tasks/PYPOST-792/20-architecture.md`.
