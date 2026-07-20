@@ -285,6 +285,40 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(_plus_tab_index(p), plus_idx)
         self.assertEqual(_request_tab_count(p), 1)
 
+    def test_close_first_of_two_tabs_focuses_remaining_request_tab(self):
+        """PYPOST-818: after closing first of two tabs, focus stays on request, not +."""
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        self.assertEqual(_request_tab_count(p), 2)
+        p.widget.setCurrentIndex(0)
+        p.close_tab(0)
+        self.assertEqual(_request_tab_count(p), 1)
+        current = p.widget.currentIndex()
+        plus_idx = _plus_tab_index(p)
+        self.assertNotEqual(current, plus_idx)
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
+
+    def test_close_rightmost_of_two_tabs_does_not_land_on_plus(self):
+        """PYPOST-818: closing the request tab next to + must not select +.
+
+        This is the common app path (close current / rightmost request tab).
+        Qt removeTab advances current to the next index, which is the trailing
+        + placeholder — production must reselect a remaining RequestTab.
+        """
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        self.assertEqual(_request_tab_count(p), 2)
+        p.widget.setCurrentIndex(1)
+        self.assertEqual(p.widget.currentIndex() + 1, _plus_tab_index(p))
+        p.close_tab(1)
+        self.assertEqual(_request_tab_count(p), 1)
+        current = p.widget.currentIndex()
+        plus_idx = _plus_tab_index(p)
+        self.assertNotEqual(current, plus_idx)
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
+
     def test_handle_close_tab_closes_current(self):
         p = self._make_presenter()
         p.add_new_tab()
@@ -293,6 +327,9 @@ class TestTabsPresenter(unittest.TestCase):
         p.widget.setCurrentIndex(1)
         p.handle_close_tab()
         self.assertEqual(_request_tab_count(p), 1)
+        current = p.widget.currentIndex()
+        self.assertNotEqual(current, _plus_tab_index(p))
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
 
     def test_handle_next_tab_cycles(self):
         p = self._make_presenter()

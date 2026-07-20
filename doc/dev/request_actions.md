@@ -179,6 +179,8 @@ both click paths:
 | `test_plus_tab_tab_bar_clicked_adds_request_tab` | Fallback path adds tab via presenter |
 | `test_plus_tab_is_last` | Plus placeholder remains trailing tab |
 | `test_plus_tab_close_is_ignored` | Close on plus tab is ignored |
+| `test_close_first_of_two_tabs_focuses_remaining_request_tab` | After closing first of two request tabs, focus stays on remaining request tab (not `+`) |
+| `test_close_rightmost_of_two_tabs_does_not_land_on_plus` | Closing the request tab adjacent to `+` must not leave current on `+` (Qt `removeTab` next-index trap) |
 
 Run:
 
