@@ -137,6 +137,12 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | Missing timeout marker | `conftest.py` fails setup — add `pytestmark` or per-function marker |
 | ELF `core` file in repo root | Native crash (SIGSEGV), not a Python exception. Delete the file; do not commit. Repo-root `/core` is gitignored. Run tests via `make test` or set `QT_QPA_PLATFORM=offscreen`. If it recurs, capture `lldb -c core --batch -o bt` and file a ticket with Python/PySide6 versions. See [PYPOST-429 investigation](../../ai-tasks/PYPOST-429/investigation-report.md). |
 
+## Agent lifecycle (in-process)
+
+For launch → ready → shutdown without `app.exec()`, use
+[`AgentAppSession`](agent_lifecycle.md) (`pypost.agent.lifecycle`). See that doc for
+the contract; smoke coverage is `tests/test_agent_lifecycle_smoke.py`.
+
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing
