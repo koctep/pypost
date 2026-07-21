@@ -1,41 +1,23 @@
 """Tests for CollectionStorageGateway."""
 
-import pytest
-
-pytestmark = pytest.mark.timeout(120)
-
 import unittest
 from unittest.mock import MagicMock
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QEventLoop, QTimer
+import pytest
 from PySide6.QtTest import QSignalSpy
+from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.collection_storage_gateway import CollectionStorageGateway
 from pypost.models.models import Collection
+from tests.helpers.process_until import process_until
+
+pytestmark = pytest.mark.timeout(120)
 
 
 class TestCollectionStorageGateway(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
-
-    def _process_until(self, predicate, timeout_ms: int = 5000) -> None:
-        loop = QEventLoop()
-        elapsed = [0]
-
-        def tick():
-            elapsed[0] += 10
-            if predicate() or elapsed[0] >= timeout_ms:
-                loop.quit()
-
-        timer = QTimer()
-        timer.setInterval(10)
-        timer.timeout.connect(tick)
-        timer.start()
-        loop.exec()
-        timer.stop()
-        self.assertTrue(predicate())
 
     def test_load_async_emits_load_completed(self):
         storage = MagicMock()
@@ -44,7 +26,7 @@ class TestCollectionStorageGateway(unittest.TestCase):
         gateway = CollectionStorageGateway(storage)
         spy = QSignalSpy(gateway.load_completed)
         gateway.load_async()
-        self._process_until(lambda: spy.count() == 1)
+        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
         self.assertEqual(spy.at(0)[0], expected)
 
     def test_queued_load_runs_after_first_completes(self):
@@ -54,7 +36,7 @@ class TestCollectionStorageGateway(unittest.TestCase):
         spy = QSignalSpy(gateway.load_completed)
         gateway.load_async()
         gateway.load_async()
-        self._process_until(lambda: spy.count() == 2)
+        process_until(lambda: spy.count() == 2, timeout_ms=5_000)
         self.assertEqual(spy.count(), 2)
 
     def test_is_busy_false_when_idle(self):

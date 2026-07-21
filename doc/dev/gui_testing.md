@@ -64,14 +64,16 @@ class TestMyWidget:
   § Bounded nested `QEventLoop` waits below). Use the shared `qapp` fixture — do not create a
   second module-local `QApplication`.
 
-### Bounded nested `QEventLoop` waits (PYPOST-823)
+### Bounded nested `QEventLoop` waits (PYPOST-823 / PYPOST-827)
 
 Waiting for `QThread` queued signals with a nested `QEventLoop.exec()` is fine **only** if the
 wait is guaranteed to return to Python on a wall-clock deadline. A QTimer-only timeout is not
 enough: if timer slots never run, `exec()` stays in Qt C++ and `pytest-timeout` SIGALRM cannot
 interrupt it (multi-minute stalls past the module timeout until SIGTERM).
 
-Reference implementation: `_process_until` in `tests/test_env_storage_responsiveness.py`.
+Shared hang-resistant wait: `tests.helpers.process_until.process_until`
+(`tests/helpers/process_until.py`). Use it for any nested-`exec()` wait that must finish on a
+wall-clock deadline.
 
 | Defense | Role |
 | --- | --- |
@@ -87,13 +89,17 @@ Contract:
    Qt event-loop tests.
 4. Prefer shared `qapp` from `tests/conftest.py`.
 
-Hang-regression coverage in the same module:
+Hang-regression coverage in `tests/test_env_storage_responsiveness.py`:
 
 - `test_process_until_exits_on_wall_clock_deadline`
 - `test_process_until_exits_via_posted_quit_without_poll_timer`
 
-Sibling gateway/worker tests still use older QTimer-only `_process_until` copies; porting them
-is tracked as [PYPOST-827](https://pypost.atlassian.net/browse/PYPOST-827).
+Modules that use the shared helper (PYPOST-827):
+
+- `tests/test_env_storage_responsiveness.py`
+- `tests/test_environment_storage_gateway.py`
+- `tests/test_collection_storage_gateway.py`
+- `tests/test_collection_storage_worker.py`
 
 ### Timeouts
 

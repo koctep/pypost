@@ -1,18 +1,17 @@
 """Tests for EnvironmentStorageGateway queue and coalescing."""
 
-import pytest
-
-pytestmark = pytest.mark.timeout(120)
-
 import unittest
 from unittest.mock import MagicMock
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QEventLoop, QTimer
+import pytest
 from PySide6.QtTest import QSignalSpy
+from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.models.models import Environment
+from tests.helpers.process_until import process_until
+
+pytestmark = pytest.mark.timeout(120)
 
 
 class TestEnvironmentStorageGateway(unittest.TestCase):
@@ -23,23 +22,6 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
     def _make_env(self, name: str) -> Environment:
         return Environment(name=name, variables={"A": "1"})
 
-    def _process_until(self, predicate, timeout_ms: int = 5000) -> None:
-        loop = QEventLoop()
-        elapsed = [0]
-
-        def tick():
-            elapsed[0] += 10
-            if predicate() or elapsed[0] >= timeout_ms:
-                loop.quit()
-
-        timer = QTimer()
-        timer.setInterval(10)
-        timer.timeout.connect(tick)
-        timer.start()
-        loop.exec()
-        timer.stop()
-        self.assertTrue(predicate())
-
     def test_load_async_emits_load_completed(self):
         storage = MagicMock()
         expected = [self._make_env("Prod")]
@@ -47,7 +29,7 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
         gateway = EnvironmentStorageGateway(storage)
         spy = QSignalSpy(gateway.load_completed)
         gateway.load_async()
-        self._process_until(lambda: spy.count() == 1)
+        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
         self.assertEqual(spy.at(0)[0], expected)
 
     def test_save_async_emits_save_completed(self):
@@ -56,7 +38,7 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
         spy = QSignalSpy(gateway.save_completed)
         envs = [self._make_env("Staging")]
         gateway.save_async(envs)
-        self._process_until(lambda: spy.count() == 1)
+        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
         storage.save_environments.assert_called_once()
         saved = storage.save_environments.call_args[0][0]
         self.assertEqual(len(saved), 1)
@@ -81,7 +63,10 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
         save_spy = QSignalSpy(gateway.save_completed)
         gateway.save_async([self._make_env("Save")])
         gateway.load_async()
-        self._process_until(lambda: save_spy.count() == 1 and load_spy.count() == 1)
+        process_until(
+            lambda: save_spy.count() == 1 and load_spy.count() == 1,
+            timeout_ms=5_000,
+        )
         self.assertEqual(save_spy.count(), 1)
         self.assertEqual(load_spy.count(), 1)
 
@@ -112,5 +97,5 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
         spy = QSignalSpy(gateway.load_completed)
         gateway.load_async()
         self.assertTrue(gateway.wait_idle())
-        self._process_until(lambda: spy.count() == 1)
+        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
         self.assertFalse(gateway.has_pending_work())
