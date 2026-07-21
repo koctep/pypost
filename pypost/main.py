@@ -1,5 +1,6 @@
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
@@ -12,6 +13,7 @@ from pypost.core.qt.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
 from pypost.core.storage import StorageManager
 from pypost.core.template_service import TemplateService
+from pypost.models.settings import AppSettings
 from pypost.ui.main_window import MainWindow
 
 _LOG_LEVELS = {
@@ -34,17 +36,45 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main():
-    logger.info("app_startup")
-    app = QApplication(sys.argv)
-    app.setApplicationName("PyPost")
+@dataclass(frozen=True)
+class ComposedApp:
+    """Wired application graph shared by interactive main and agent sessions."""
 
-    # Composition root: load settings once for MetricsManager, AlertManager, and
-    # MainWindow. The same ConfigManager instance is injected into MainWindow.
-    config_manager = ConfigManager()
+    window: MainWindow
+    metrics: MetricsManager
+    mcp_manager: MCPServerManager
+    config_manager: ConfigManager
+    settings: AppSettings
+
+
+def compose_app(
+    *,
+    config_dir: Path | str | None = None,
+    data_dir: Path | str | None = None,
+    metrics_host: str | None = None,
+    metrics_port: int | None = None,
+    apply_log_level: bool = True,
+) -> ComposedApp:
+    """Build managers and MainWindow with injectable paths and metrics bind.
+
+    Both interactive ``main()`` and ``AgentAppSession`` use this factory so the
+    object graph stays singular; only event-loop ownership and isolation knobs
+    differ between callers.
+    """
+    config_kwargs: dict = {}
+    if config_dir is not None:
+        config_kwargs["config_dir"] = config_dir
+    config_manager = ConfigManager(**config_kwargs)
     settings = config_manager.load_config()
-    logging.getLogger().setLevel(_resolve_log_level(settings.log_level))
-    logger.info("log_level_applied level=%s", settings.log_level.upper())
+
+    if metrics_host is not None:
+        settings.metrics_host = metrics_host
+    if metrics_port is not None:
+        settings.metrics_port = metrics_port
+
+    if apply_log_level:
+        logging.getLogger().setLevel(_resolve_log_level(settings.log_level))
+        logger.info("log_level_applied level=%s", settings.log_level.upper())
 
     metrics_manager = MetricsManager()
     metrics_manager.start_server(settings.metrics_host, settings.metrics_port)
@@ -64,10 +94,16 @@ def main():
         bool(settings.alert_webhook_url),
     )
 
-    history_manager = HistoryManager(defer_initial_load=True)
+    history_kwargs: dict = {"defer_initial_load": True}
+    if data_dir is not None:
+        history_kwargs["history_path"] = Path(data_dir) / "history.json"
+    history_manager = HistoryManager(**history_kwargs)
     logger.info("history_manager_created id=%d", id(history_manager))
 
-    storage = StorageManager(metrics=metrics_manager)
+    storage_kwargs: dict = {"metrics": metrics_manager}
+    if data_dir is not None:
+        storage_kwargs["data_dir"] = data_dir
+    storage = StorageManager(**storage_kwargs)
     storage.apply_encryption_settings(settings)
     logger.info("storage_created id=%d encryption_applied=true", id(storage))
 
@@ -90,13 +126,27 @@ def main():
         request_manager=request_manager,
         mcp_manager=mcp_manager,
     )
-    window.show()
+    return ComposedApp(
+        window=window,
+        metrics=metrics_manager,
+        mcp_manager=mcp_manager,
+        config_manager=config_manager,
+        settings=settings,
+    )
+
+
+def main():
+    logger.info("app_startup")
+    app = QApplication(sys.argv)
+    app.setApplicationName("PyPost")
+
+    composed = compose_app()
+    composed.window.show()
 
     exit_code = app.exec()
 
-    # Stop metrics server on exit
     logger.info("app_shutdown")
-    metrics_manager.stop_server()
+    composed.metrics.stop_server()
 
     sys.exit(exit_code)
 
