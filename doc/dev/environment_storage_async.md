@@ -217,6 +217,20 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_env_presenter.py
 ```
 
+### Responsiveness harness hang defense (PYPOST-823)
+
+`tests/test_env_storage_responsiveness.py` waits for gateway `load_completed` /
+`load_failed` (and save paths) via a nested `QEventLoop`. The helper `_process_until` uses a
+**dual deadline**: a Qt poll timer plus a daemon `threading.Timer` that posts
+`loop.quit()` onto the GUI thread with `QTimer.singleShot(0, loop, loop.quit)`. That guarantees
+the wait ends within ~`timeout_ms` even when Qt timer slots never run — a case where
+`pytest-timeout` SIGALRM alone cannot interrupt C++ `exec()` and previously stalled the full
+suite for minutes.
+
+Hang-regression tests in the same module prove wall-clock and posted-quit exits. Prefer the
+shared `qapp` fixture (no second module-local `QApplication`). Details:
+[gui_testing.md](gui_testing.md) § Bounded nested `QEventLoop` waits.
+
 Persistence and crypto regression (unchanged sync API):
 
 ```bash

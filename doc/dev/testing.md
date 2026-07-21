@@ -110,8 +110,17 @@ For bounded event-loop polling (e.g. waiting for Qt signals while a background s
 use `wait_until` from `tests/helpers/qt_wait.py` (PYPOST-727). For TCP listen readiness, use
 `wait_for_port` from `tests/helpers/mcp_live_server.py`.
 
+When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
+on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a
+stuck C++ `exec()` without Python callbacks. Use a wall-clock deadline plus a daemon
+`threading.Timer` that posts `QTimer.singleShot(0, loop, loop.quit)` onto the GUI thread
+(PYPOST-823). Reference: `_process_until` in `tests/test_env_storage_responsiveness.py`. Full
+contract and troubleshooting: [gui_testing.md](gui_testing.md) § Bounded nested `QEventLoop`
+waits.
+
 See [gui_testing.md](gui_testing.md) for patterns, representative modules, focused commands,
-and troubleshooting (including ELF core dumps from native Qt crashes — [PYPOST-429](../../ai-tasks/PYPOST-429/investigation-report.md)).
+and troubleshooting (including ELF core dumps from native Qt crashes —
+[PYPOST-429](../../ai-tasks/PYPOST-429/investigation-report.md)).
 
 Unit testability seams for `RequestService`, `HTTPClient`, and `MainWindow` are documented in
 [testability.md](testability.md) (PYPOST-382).
