@@ -39,6 +39,7 @@ from pypost.ui.request_save_orchestrator import (
     StaleCheckContext,
 )
 from pypost.ui.theme.json_syntax_theme import resolve_json_syntax_colors
+from pypost.ui.widget_ids import REQUEST_TABS, set_widget_id
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 from pypost.ui.widgets.tab_header import PLUS_TAB_MARKER, RequestTabHeader
@@ -116,6 +117,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._chunk_flush_ms = 33
 
         self._tabs = QTabWidget()
+        set_widget_id(self._tabs, REQUEST_TABS)
         self._header = RequestTabHeader(self)
         self._header.attach(self._tabs)
         self._header.new_tab_requested.connect(

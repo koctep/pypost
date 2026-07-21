@@ -171,6 +171,10 @@ entries live under **Application lifecycle** in [logging.md](logging.md).
 `tests/test_agent_lifecycle_smoke.py` covers launch → ready → shutdown (and a
 second launch after shutdown) under `make test` with offscreen Qt.
 
+After ready, resolve key widgets by stable identities — see
+[UI widget identity](ui_identity.md). Spot-check:
+`tests/test_ui_identity_spotcheck.py`.
+
 ## Troubleshooting
 
 - **Ready `TimeoutError`** — Collections/env load stuck; raise `ready_timeout`;

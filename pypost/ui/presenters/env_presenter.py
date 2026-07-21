@@ -36,6 +36,12 @@ from pypost.ui.collection_item_dialogs import (
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.dialogs.mcp_activity_dialog import McpActivityDialog
 from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
+from pypost.ui.widget_ids import (
+    ENV_BAR,
+    ENV_MANAGE_BUTTON,
+    ENV_SELECTOR,
+    set_widget_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,15 +88,18 @@ class EnvPresenter(QObject):
 
         # Build top-bar widget
         self._widget = QWidget()
+        set_widget_id(self._widget, ENV_BAR)
         layout = QHBoxLayout(self._widget)
         layout.setContentsMargins(0, 0, 0, 0)
 
         self._env_label = QLabel("Environment:")
         self._env_selector = QComboBox()
+        set_widget_id(self._env_selector, ENV_SELECTOR)
         self._env_selector.addItem("No Environment")
         self._env_selector.currentIndexChanged.connect(self._on_env_changed)
 
         self._manage_btn = QPushButton("Manage")
+        set_widget_id(self._manage_btn, ENV_MANAGE_BUTTON)
         self._manage_btn.clicked.connect(self._open_env_manager)
 
         self._mcp_status_label = QLabel("MCP: OFF")

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.models.response import ResponseData
+from pypost.ui.widget_ids import RESPONSE_PANEL, set_widget_id
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ class ResponseView(QWidget):
 
     def __init__(self, indent_size=2, metrics: MetricsTrackerProtocol | None = None):
         super().__init__()
+        set_widget_id(self, RESPONSE_PANEL)
         self.indent_size = indent_size
         self._metrics = resolve_metrics(metrics)
         self.current_env_keys = None

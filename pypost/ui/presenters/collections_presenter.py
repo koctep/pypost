@@ -18,6 +18,7 @@ from pypost.ui.presenters.collection_tree_incremental import (
     try_incremental_tree_refresh,
 )
 from pypost.ui.presenters.collections_async_loader import CollectionsAsyncLoader
+from pypost.ui.widget_ids import COLLECTION_TREE, set_widget_id
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class CollectionsPresenter(QObject):
         self._model = QStandardItemModel()
         self._collection_items_by_id: dict[str, QStandardItem] = {}
         self._view = QTreeView()
+        set_widget_id(self._view, COLLECTION_TREE)
         self._view.setHeaderHidden(True)
         self._view.setModel(self._model)
         self._view.clicked.connect(self._on_collection_clicked)

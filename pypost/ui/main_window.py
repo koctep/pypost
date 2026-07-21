@@ -35,6 +35,7 @@ from pypost.ui.hotkeys import register_hotkey, register_hotkey_group, tag_action
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.main_window_signals import wire_presenter_signals
 from pypost.ui.presenters import CollectionsPresenter, EnvPresenter, TabsPresenter
+from pypost.ui.widget_ids import MAIN_WINDOW, SETTINGS_BUTTON, set_widget_id
 from pypost.ui.widgets.history_panel import HistoryPanel
 from pypost.ui.widgets.mixins import VariableHoverResolver
 
@@ -54,6 +55,7 @@ class MainWindow(QMainWindow):
         mcp_manager: MCPServerManager | None = None,
     ) -> None:
         super().__init__()
+        set_widget_id(self, MAIN_WINDOW)
         self.setWindowTitle("PyPost")
         self.resize(1200, 800)
         self.metrics = metrics
@@ -179,6 +181,7 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central)
         top_bar = QHBoxLayout()
         self.settings_btn = QPushButton("Settings")
+        set_widget_id(self.settings_btn, SETTINGS_BUTTON)
         self.settings_btn.clicked.connect(self.open_settings)
         top_bar.addWidget(self.env.widget)
         top_bar.addWidget(self.settings_btn)

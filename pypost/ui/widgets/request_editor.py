@@ -38,6 +38,7 @@ from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.mixins import VariableHoverResolver, push_snapshot_to_widgets
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwareTableWidget
+from pypost.ui.widget_ids import METHOD_COMBO, SEND_BUTTON, URL_INPUT, set_widget_id
 
 logger = logging.getLogger(__name__)
 
@@ -83,14 +84,17 @@ class RequestWidget(QWidget):
         url_layout = QHBoxLayout()
 
         self.method_combo = QComboBox()
+        set_widget_id(self.method_combo, METHOD_COMBO)
         self.method_combo.addItems(["GET", "POST", "PUT", "DELETE", "PATCH", "MCP"])
         self.method_combo.setCurrentText(self.request_data.method)
         self.method_combo.currentTextChanged.connect(self._on_method_changed)
 
         self.url_input = VariableAwareLineEdit(self.request_data.url)
+        set_widget_id(self.url_input, URL_INPUT)
         self.url_input.setPlaceholderText("Enter request URL")
 
         self.send_btn = QPushButton("Send")
+        set_widget_id(self.send_btn, SEND_BUTTON)
         self.send_btn.clicked.connect(self.on_send)
 
         self.actions_btn = QToolButton()

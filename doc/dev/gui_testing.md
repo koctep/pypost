@@ -143,6 +143,9 @@ For launch → ready → shutdown without `app.exec()`, use
 [`AgentAppSession`](agent_lifecycle.md) (`pypost.agent.lifecycle`). See that doc for
 the contract; smoke coverage is `tests/test_agent_lifecycle_smoke.py`.
 
+After ready, locate key controls by stable `objectName` values — see
+[UI widget identity](ui_identity.md) (`pypost/ui/widget_ids.py`).
+
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing
