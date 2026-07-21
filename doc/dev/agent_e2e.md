@@ -11,6 +11,8 @@ in sibling docs; the golden Send → response proof lives in
 [agent_golden_e2e.md](agent_golden_e2e.md). The PYPOST-887 double-body
 regression lock (exactly-once panel body) is
 [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md).
+The method × body **presentation matrix** (PYPOST-890) is
+[agent_e2e_presentation_matrix.md](agent_e2e_presentation_matrix.md).
 The reusable **environment pack** model (seed, isolation, fixtures inventory)
 is [agent_e2e_env.md](agent_e2e_env.md).
 
@@ -33,6 +35,7 @@ and Prometheus checks, see [testing.md](testing.md) and
 | Wait | [ui_wait.md](ui_wait.md) | Settle predicates after actions |
 | Golden | [agent_golden_e2e.md](agent_golden_e2e.md) | Composed Send → response proof |
 | Body lock | [lock doc](agent_e2e_double_response_body.md) | Exactly-once body (889) |
+| Presentation matrix | [matrix](agent_e2e_presentation_matrix.md) | Method × body (890) |
 | Env pack | [agent_e2e_env.md](agent_e2e_env.md) | Seed, isolation, HTTP, markers (855) |
 | Seed inventory | [agent_e2e_seed.md](agent_e2e_seed.md) | Known collections/envs/requests (857) |
 | HTTP stubs | [agent_e2e_http.md](agent_e2e_http.md) | Canned responses at send boundary (859) |
@@ -82,6 +85,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_ui_wait.py` | Settle / wait |
 | `tests/test_agent_golden_e2e.py` | Golden product flow |
 | `tests/test_agent_e2e_double_response_body.py` | Double-body lock (889) |
+| `tests/test_agent_e2e_presentation_matrix.py` | Presentation matrix (890) |
 | `tests/test_agent_e2e_seed.py` | Seeded workspace (857) |
 | `tests/test_agent_e2e_http_env.py` | Env Send + shared HTTP (859) |
 | `tests/test_agent_e2e_failure_artifacts.py` | Failure snapshot dumps (860) |
@@ -198,6 +202,14 @@ PUT + malformed nested JSON-like body → stubbed Send with one streamed chunk
 [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md)
 (product discard: [response-streaming-display.md](response-streaming-display.md)).
 
+### Presentation matrix (PYPOST-890)
+
+Parametrized method × body-shape cells assert once-only body token and
+once-only status under `RESPONSE_PANEL`. Smoke slice runs under default
+`make test-agent-e2e`; full 25-cell cartesian needs `-m agent_e2e` (includes
+`slow`). Findings handoff: `ai-tasks/PYPOST-890/findings.md`. See
+[agent_e2e_presentation_matrix.md](agent_e2e_presentation_matrix.md).
+
 ## Configuration
 
 | Setting | Source |
@@ -244,6 +256,7 @@ timeouts: [testing.md](testing.md).
 - [UI Settle / Wait Helpers](ui_wait.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Agent E2E Double Response-Body Lock](agent_e2e_double_response_body.md)
+- [Agent E2E Presentation Matrix](agent_e2e_presentation_matrix.md)
 - [Agent E2E Environment Contract](agent_e2e_env.md)
 - [Agent E2E Seed Inventory](agent_e2e_seed.md)
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)

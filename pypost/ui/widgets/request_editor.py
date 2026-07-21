@@ -41,6 +41,7 @@ from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, Vari
 from pypost.ui.widget_ids import (
     METHOD_COMBO,
     REQUEST_BODY_EDIT,
+    REQUEST_DETAIL_TABS,
     SEND_BUTTON,
     URL_INPUT,
     set_widget_id,
@@ -132,6 +133,7 @@ class RequestWidget(QWidget):
         layout.addLayout(url_layout)
 
         self.detail_tabs = QTabWidget()
+        set_widget_id(self.detail_tabs, REQUEST_DETAIL_TABS)
 
         self.params_table = KeyValueTable()
         self.detail_tabs.addTab(self.params_table, "Params")

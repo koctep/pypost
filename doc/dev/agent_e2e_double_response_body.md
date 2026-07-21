@@ -74,5 +74,6 @@ No extra env vars. Prefer `make test-agent-e2e` for offscreen Qt.
 - [Agent UI E2E](agent_e2e.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)
+- [Agent E2E Presentation Matrix](agent_e2e_presentation_matrix.md)
 - [Response Streaming Display (PYPOST-887)](response-streaming-display.md)
 - [UI Widget Identity](ui_identity.md)

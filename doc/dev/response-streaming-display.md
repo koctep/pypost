@@ -62,11 +62,16 @@ No settings or env vars. Flush interval is the presenter field `_chunk_flush_ms`
 Regression: `tests/test_tabs_presenter_response_display.py` (presenter unit).
 Agent UI e2e lock (Send → panel, exactly once):
 [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md)
-(`tests/test_agent_e2e_double_response_body.py`).
+(`tests/test_agent_e2e_double_response_body.py`). Method × body presentation
+matrix: [agent_e2e_presentation_matrix.md](agent_e2e_presentation_matrix.md)
+(`tests/test_agent_e2e_presentation_matrix.py`).
 
 ```bash
 make test PYTEST_ARGS="tests/test_tabs_presenter_response_display.py -v"
-make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_double_response_body.py -v"
+make test-agent-e2e \
+  PYTEST_ARGS="tests/test_agent_e2e_double_response_body.py -v"
+make test-agent-e2e \
+  PYTEST_ARGS='tests/test_agent_e2e_presentation_matrix.py -m "agent_e2e and not slow" -v'
 ```
 
 Observability: discard is silent by design; use existing `request_finished` /

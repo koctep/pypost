@@ -56,6 +56,7 @@ Production UI must not import `pypost.agent`. Agents import constants from
 | `URL_INPUT` | `pypost_url_input` | URL field (per tab) |
 | `SEND_BUTTON` | `pypost_send_button` | Send button (per tab) |
 | `REQUEST_BODY_EDIT` | `pypost_request_body_edit` | Request body editor (per tab) |
+| `REQUEST_DETAIL_TABS` | `pypost_request_detail_tabs` | Params/Headers/Body/… tab widget |
 | `RESPONSE_PANEL` | `pypost_response_panel` | Response panel (per tab) |
 | `ENV_BAR` | `pypost_env_bar` | Environments top-bar container |
 | `ENV_SELECTOR` | `pypost_env_selector` | Environment combo |

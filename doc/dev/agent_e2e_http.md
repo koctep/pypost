@@ -13,6 +13,8 @@ Env contract area: [agent_e2e_env.md](agent_e2e_env.md). Session packaging:
 [agent_e2e.md](agent_e2e.md). Golden composition:
 [agent_golden_e2e.md](agent_golden_e2e.md). Double-body lock (streaming stub):
 [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md).
+Method × body presentation matrix (streaming stubs, once-only asserts):
+[agent_e2e_presentation_matrix.md](agent_e2e_presentation_matrix.md).
 
 ## Architecture
 
@@ -64,6 +66,8 @@ with stub_agent_e2e_http(canned_send_with_one_chunk(CANNED_DOUBLE_BODY_LOCK_OK))
 ```
 
 See [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md).
+The presentation matrix uses the same side effect per cell —
+[agent_e2e_presentation_matrix.md](agent_e2e_presentation_matrix.md).
 
 ### Stub install
 
@@ -134,5 +138,6 @@ No extra env vars.
 - [Agent UI E2E](agent_e2e.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Agent E2E Double Response-Body Lock](agent_e2e_double_response_body.md)
+- [Agent E2E Presentation Matrix](agent_e2e_presentation_matrix.md)
 - [Agent E2E Seed Inventory](agent_e2e_seed.md)
 - [Logging Event Naming Convention](logging.md)
