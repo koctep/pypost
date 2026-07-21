@@ -139,11 +139,18 @@ condition not met within {timeout_ms}ms
 | `timeout_detail: Callable[[], str] \| None` | Evaluated **only on timeout**; appended after `; ` |
 | `format_storage_async_timeout_detail(...)` | Formats `busy=` / `pending=` and optional |
 | | `worker_running=` / `worker_operation=` (omit `None`) |
-| `gateway_timeout_detail(gateway)` | One-liner lazy snapshot for gateway waits |
+| `gateway_timeout_detail(gateway)` | One-liner lazy snapshot for gateway waits; |
+| | includes `worker_operation=` when the worker |
+| | exposes string `_operation` (env load/save; |
+| | PYPOST-878). Collection load-only workers omit it. |
 
 Rules:
 
 - **Gateway** load/save waits: pass busy/pending (use `gateway_timeout_detail`).
+- **Env gateway** timeouts may also show `worker_operation=load|save` when a
+  worker is attached (PYPOST-878).
+- **Collection gateway** waits stay without `worker_operation=` (load-only;
+  no `_operation` attribute).
 - **Worker-only** waits: optional `worker_running` (busy/pending omitted).
 - **Hang-regression** / no domain context: omit `timeout_detail`; default text is enough.
 - Detail failures never mask the timeout (`timeout_detail failed: ...` note) and never
@@ -161,11 +168,11 @@ process_until(
 )
 ```
 
-Example failure text:
+Example failure text (env gateway with active save worker):
 
 ```text
 condition not met within 10000ms (wall-clock deadline; predicate still false);
-busy=True pending=True worker_running=True
+busy=True pending=True worker_running=True worker_operation=save
 ```
 
 Focused diagnostic tests: `tests/test_process_until_diagnostics.py`.

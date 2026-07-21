@@ -60,6 +60,48 @@ def test_gateway_timeout_detail_reads_busy_pending_and_worker():
     assert idle() == "busy=False pending=False worker_running=False"
 
 
+def test_gateway_timeout_detail_includes_worker_operation_when_present():
+    """Env workers expose _operation; collection-style workers omit it (PYPOST-878)."""
+
+    class EnvStyleWorker:
+        _operation = "save"
+
+        def isRunning(self) -> bool:
+            return True
+
+    class EnvStyleGateway:
+        _worker = EnvStyleWorker()
+
+        def is_busy(self) -> bool:
+            return True
+
+        def has_pending_work(self) -> bool:
+            return True
+
+    env_detail = gateway_timeout_detail(EnvStyleGateway())
+    assert (
+        env_detail()
+        == "busy=True pending=True worker_running=True worker_operation=save"
+    )
+
+    class LoadOnlyWorker:
+        def isRunning(self) -> bool:
+            return True
+
+    class CollectionStyleGateway:
+        _worker = LoadOnlyWorker()
+
+        def is_busy(self) -> bool:
+            return True
+
+        def has_pending_work(self) -> bool:
+            return False
+
+    collection_detail = gateway_timeout_detail(CollectionStyleGateway())
+    assert collection_detail() == "busy=True pending=False worker_running=True"
+    assert "worker_operation=" not in collection_detail()
+
+
 def test_process_until_default_timeout_message_is_neutral(qapp):
     with pytest.raises(AssertionError, match="predicate still false") as exc_info:
         process_until(lambda: False, timeout_ms=300)

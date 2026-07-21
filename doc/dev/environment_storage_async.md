@@ -288,6 +288,9 @@ On timeout, the helper raises a **neutral** `AssertionError` (duration + wall-cl
 no hard-coded `load_completed/load_failed` wording). Gateway waits pass
 `timeout_detail=gateway_timeout_detail(gateway)` so the failure text also includes
 `busy=` / `pending=` and optional `worker_running=` at the deadline (PYPOST-828).
+For environment gateways, the snapshot also includes `worker_operation=load|save`
+when the worker exposes `_operation` (PYPOST-878); collection load-only waits
+omit that field.
 
 Hang-regression tests in the responsiveness module prove wall-clock and posted-quit exits.
 Sibling gateway/worker modules

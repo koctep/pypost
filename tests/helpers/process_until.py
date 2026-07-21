@@ -64,14 +64,20 @@ def format_storage_async_timeout_detail(
 
 
 def gateway_timeout_detail(gateway: _StorageAsyncGateway) -> Callable[[], str]:
-    """Lazy busy/pending (+ optional worker) snapshot for gateway waits."""
+    """Lazy busy/pending (+ optional worker) snapshot for gateway waits.
+
+    Includes ``worker_operation=…`` when the attached worker exposes a string
+    ``_operation`` (env load/save). Collection load-only workers omit it.
+    """
 
     def detail() -> str:
         worker = gateway._worker
+        operation = getattr(worker, "_operation", None) if worker is not None else None
         return format_storage_async_timeout_detail(
             is_busy=gateway.is_busy(),
             has_pending_work=gateway.has_pending_work(),
             worker_running=worker.isRunning() if worker is not None else False,
+            worker_operation=operation if isinstance(operation, str) else None,
         )
 
     return detail
