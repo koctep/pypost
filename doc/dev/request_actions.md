@@ -181,6 +181,7 @@ both click paths:
 | `test_plus_tab_close_is_ignored` | Close on plus tab is ignored |
 | `test_close_first_of_two_tabs_focuses_remaining_request_tab` | After closing first of two request tabs, focus stays on remaining request tab (not `+`) |
 | `test_close_rightmost_of_two_tabs_does_not_land_on_plus` | Closing the request tab adjacent to `+` must not leave current on `+` (Qt `removeTab` next-index trap) |
+| `test_close_last_request_tab_focuses_replacement_not_plus` | Closing the last request tab creates a blank replacement via `add_new_tab` and focuses it (not `+`) |
 
 Run:
 

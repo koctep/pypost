@@ -319,6 +319,25 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertNotEqual(current, plus_idx)
         self.assertIsInstance(p.widget.widget(current), RequestTab)
 
+    def test_close_last_request_tab_focuses_replacement_not_plus(self):
+        """PYPOST-819: closing the last request tab focuses a replacement, not +.
+
+        Product expectation: close_tab replaces the last closed request tab via
+        add_new_tab (blank "New Request") and selects that RequestTab. Focus must
+        never stick on the trailing + control as the only active tab without a
+        request workspace.
+        """
+        p = self._make_presenter()
+        p.add_new_tab()
+        self.assertEqual(_request_tab_count(p), 1)
+        p.close_tab(0)
+        self.assertEqual(_request_tab_count(p), 1)
+        current = p.widget.currentIndex()
+        plus_idx = _plus_tab_index(p)
+        self.assertNotEqual(current, plus_idx)
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
+        self.assertEqual(p.widget.tabText(current), "New Request")
+
     def test_handle_close_tab_closes_current(self):
         p = self._make_presenter()
         p.add_new_tab()
