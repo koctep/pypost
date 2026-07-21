@@ -176,9 +176,9 @@ truncation, and ready integration via `AgentAppSession` (run with
 
 ## Out of scope
 
-Network MCP `ui_snapshot` tool, golden flow (838), exhaustive
-offscreen/historical widgets. Actions and settle waits are documented
-separately.
+Network MCP `ui_snapshot` tool, exhaustive offscreen/historical widgets.
+Actions and settle waits are documented separately. Composed product proof:
+[agent_golden_e2e.md](agent_golden_e2e.md) (838).
 
 ## Related
 
@@ -186,6 +186,7 @@ separately.
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog
 - [UI action tools](ui_actions.md) — click / fill / select / send key by id
 - [UI settle / wait helpers](ui_wait.md) — wait for conditions after actions
+- [Agent golden e2e](agent_golden_e2e.md) — composed Send → response proof
 - [GUI testing](gui_testing.md) — offscreen Qt test patterns
 - [Sensitive data masking policy](sensitive_data_masking_policy.md) — broader
   secrets handling

@@ -125,5 +125,6 @@ widgets that already have `objectName` set via `set_widget_id`.
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog
 - [UI state snapshot](ui_snapshot.md) — observe after acting
 - [UI settle / wait helpers](ui_wait.md) — wait for exists / enabled / text / snapshot
+- [Agent golden e2e](agent_golden_e2e.md) — composed Send → response proof
 - [GUI testing](gui_testing.md) — offscreen Qt / `QTest` patterns
 - [Logging](logging.md) — `ui_action_applied` DEBUG event

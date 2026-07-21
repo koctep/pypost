@@ -120,4 +120,5 @@ No environment variables. Identity strings are compile-time constants in
 - [UI state snapshot](ui_snapshot.md) — visible-UI tree keyed by these names
 - [UI action tools](ui_actions.md) — click / fill / select / send key by id
 - [UI settle / wait helpers](ui_wait.md) — wait for conditions after actions
+- [Agent golden e2e](agent_golden_e2e.md) — composed Send → response proof
 - [GUI testing](gui_testing.md) — offscreen Qt test patterns

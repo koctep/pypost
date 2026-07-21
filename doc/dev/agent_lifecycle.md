@@ -207,9 +207,9 @@ see [UI settle / wait helpers](ui_wait.md). Gate: `tests/test_ui_wait.py`.
 
 ## Out of scope (siblings)
 
-Golden flow (838), epic `make agent-*` docs (839). Identity (834), snapshots
-(835), actions (836), and settle waits (837) are documented separately — see
-Related.
+Epic `make agent-*` docs (839). Identity (834), snapshots (835), actions (836),
+and settle waits (837) are documented separately — see Related. The composed
+golden product flow is [agent_golden_e2e.md](agent_golden_e2e.md) (838).
 
 ## Related documentation
 
@@ -220,6 +220,7 @@ Related.
 | [ui_snapshot.md](ui_snapshot.md) | Visible-UI tree for agents after ready |
 | [ui_actions.md](ui_actions.md) | Click / fill / select / send key by id |
 | [ui_wait.md](ui_wait.md) | Settle waits after actions |
+| [agent_golden_e2e.md](agent_golden_e2e.md) | Golden request/response product flow (838) |
 | [logging.md](logging.md) | Event catalog including agent session events |
 | [testing.md](testing.md) | Suite timeouts and CI guardrails |
 | [architecture.md](architecture.md) | Broader app structure |

@@ -119,5 +119,6 @@ pairs). DEBUG logs `ui_wait_settled` / `ui_wait_timeout` with timing scalars onl
 - [UI action tools](ui_actions.md) — click / fill / select / send key
 - [UI state snapshot](ui_snapshot.md) — observation tree for predicates
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog
+- [Agent golden e2e](agent_golden_e2e.md) — composed Send → response proof
 - [GUI testing](gui_testing.md) — offscreen Qt / bounded waits
 - [Logging](logging.md) — `ui_wait_settled` / `ui_wait_timeout`

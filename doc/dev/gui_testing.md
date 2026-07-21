@@ -157,6 +157,9 @@ Wait for async settle conditions after actions — see
 [UI settle / wait helpers](ui_wait.md) (`pypost.agent.ui_wait`). Test-only
 `tests.helpers.qt_wait.wait_until` re-exports the production poll helper.
 
+Composed golden product flow (Send → response UI) — see
+[Agent golden e2e](agent_golden_e2e.md) (`tests/test_agent_golden_e2e.py`).
+
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing

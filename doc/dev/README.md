@@ -91,6 +91,7 @@ set up your development environment, and contribute to the project.
 1. [UI State Snapshot (PYPOST-835)](ui_snapshot.md)
 1. [UI Action Tools (PYPOST-836)](ui_actions.md)
 1. [UI Settle / Wait Helpers (PYPOST-837)](ui_wait.md)
+1. [Agent Golden E2E (PYPOST-838)](agent_golden_e2e.md)
 1. [Metric Rename Migration (PYPOST-443)](metric_rename_migration.md)
 
 ### Tech debt
