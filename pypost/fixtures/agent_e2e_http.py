@@ -86,12 +86,58 @@ CANNED_SEED_POST_OK = make_canned_http_result(
     resolved_body=SEED_POST_BODY,
 )
 
+# PYPOST-889 / PYPOST-887 lock: plain body so snapshot count is stable.
+LOCK_DOUBLE_BODY_URL = "https://example.test/pypost-887-double-body"
+LOCK_DOUBLE_BODY_METHOD = "PUT"
+LOCK_DOUBLE_BODY_REQUEST = '{ { "data": { } } }'
+LOCK_DOUBLE_BODY_STATUS = 200
+LOCK_DOUBLE_BODY = "pypost-887-lock-body-once"
+
+CANNED_DOUBLE_BODY_LOCK_OK = make_canned_http_result(
+    url=LOCK_DOUBLE_BODY_URL,
+    status_code=LOCK_DOUBLE_BODY_STATUS,
+    body=LOCK_DOUBLE_BODY,
+    headers={"Content-Type": "text/plain"},
+)
+
 # Name → result for docs and authors extending the catalog.
 CANNED_HTTP_CATALOG: dict[str, HTTPRequestResult] = {
     "golden_ok": CANNED_GOLDEN_OK,
     "seed_get_ok": CANNED_SEED_GET_OK,
     "seed_post_ok": CANNED_SEED_POST_OK,
+    "double_body_lock_ok": CANNED_DOUBLE_BODY_LOCK_OK,
 }
+
+
+def canned_send_with_one_chunk(
+    result: HTTPRequestResult,
+) -> Callable[..., HTTPRequestResult]:
+    """Return a ``send_request`` side_effect that emits one body chunk.
+
+    Stubs that only ``return_value`` never call ``stream_callback``, so the
+    chunk-flush vs ``display_response`` race (PYPOST-887) cannot appear.
+    Agent e2e locks that assert once-only presentation should stub with this
+    helper so a pending flush timer is armed before ``finished``.
+
+    Signature matches MagicMock ``side_effect`` on a patched method (no
+    bound ``self``): positional request plus keyword callbacks.
+    """
+
+    def _send(
+        *_args: object,
+        stream_callback: Callable[[str], None] | None = None,
+        headers_callback: Callable[[int, dict], None] | None = None,
+        **_kwargs: object,
+    ) -> HTTPRequestResult:
+        del _args, _kwargs
+        resp = result.response
+        if headers_callback is not None:
+            headers_callback(resp.status_code, dict(resp.headers))
+        if stream_callback is not None and resp.body:
+            stream_callback(resp.body)
+        return result
+
+    return _send
 
 
 @contextmanager
@@ -112,6 +158,8 @@ def stub_agent_e2e_http(
         catalog_name = "seed_get_ok"
     elif result is CANNED_SEED_POST_OK:
         catalog_name = "seed_post_ok"
+    elif result is CANNED_DOUBLE_BODY_LOCK_OK:
+        catalog_name = "double_body_lock_ok"
 
     logger.info("agent_e2e_http_stub_installed name=%s", catalog_name)
     if callable(result) and not isinstance(result, HTTPRequestResult):

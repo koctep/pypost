@@ -11,7 +11,8 @@ external HTTP is not the primary agent-flow path under offscreen CI.
 
 Env contract area: [agent_e2e_env.md](agent_e2e_env.md). Session packaging:
 [agent_e2e.md](agent_e2e.md). Golden composition:
-[agent_golden_e2e.md](agent_golden_e2e.md).
+[agent_golden_e2e.md](agent_golden_e2e.md). Double-body lock (streaming stub):
+[agent_e2e_double_response_body.md](agent_e2e_double_response_body.md).
 
 ## Architecture
 
@@ -39,10 +40,30 @@ flowchart LR
 | `golden_ok` | `CANNED_GOLDEN_OK` | `https://example.test/agent-golden` |
 | `seed_get_ok` | `CANNED_SEED_GET_OK` | `https://example.test/get` |
 | `seed_post_ok` | `CANNED_SEED_POST_OK` | `https://example.test/post` |
+| `double_body_lock_ok` | `CANNED_DOUBLE_BODY_LOCK_OK` | `…/pypost-887-double-body` |
 
 Also: `CANNED_HTTP_CATALOG` (`dict` name → result),
 `make_canned_http_result(...)`, URL/body constants (`GOLDEN_*`,
-`SEED_GET_RESOLVED_URL`, …).
+`SEED_GET_RESOLVED_URL`, `LOCK_DOUBLE_BODY_*`, …).
+
+### Streaming side effect (double-body lock)
+
+Plain `return_value` stubs never call `stream_callback`, so the chunk-flush
+vs `display_response` race cannot appear. For once-only presentation locks,
+pass a side effect from `canned_send_with_one_chunk(result)`:
+
+```python
+from pypost.fixtures.agent_e2e_http import (
+    CANNED_DOUBLE_BODY_LOCK_OK,
+    canned_send_with_one_chunk,
+    stub_agent_e2e_http,
+)
+
+with stub_agent_e2e_http(canned_send_with_one_chunk(CANNED_DOUBLE_BODY_LOCK_OK)):
+    session.ui_click(SEND_BUTTON)
+```
+
+See [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md).
 
 ### Stub install
 
@@ -112,5 +133,6 @@ No extra env vars.
 - [Agent E2E Environment Contract](agent_e2e_env.md)
 - [Agent UI E2E](agent_e2e.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
+- [Agent E2E Double Response-Body Lock](agent_e2e_double_response_body.md)
 - [Agent E2E Seed Inventory](agent_e2e_seed.md)
 - [Logging Event Naming Convention](logging.md)

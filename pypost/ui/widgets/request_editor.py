@@ -38,7 +38,13 @@ from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.mixins import VariableHoverResolver, push_snapshot_to_widgets
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwareTableWidget
-from pypost.ui.widget_ids import METHOD_COMBO, SEND_BUTTON, URL_INPUT, set_widget_id
+from pypost.ui.widget_ids import (
+    METHOD_COMBO,
+    REQUEST_BODY_EDIT,
+    SEND_BUTTON,
+    URL_INPUT,
+    set_widget_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +140,7 @@ class RequestWidget(QWidget):
         self.detail_tabs.addTab(self.headers_table, "Headers")
 
         self.body_edit = CodeEditor()
+        set_widget_id(self.body_edit, REQUEST_BODY_EDIT)
         self.json_highlighter = JsonHighlighter(self.body_edit.document())
 
         self.body_format_combo = QComboBox()

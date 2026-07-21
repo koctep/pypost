@@ -59,10 +59,14 @@ No settings or env vars. Flush interval is the presenter field `_chunk_flush_ms`
 | Body appends after Stop / error clear | Flush after error without discard | `_on_request_error` discard call |
 | Stale chunks on re-Send | Buffer not cleared with `clear_body` | `_handle_send_request` discard |
 
-Regression: `tests/test_tabs_presenter_response_display.py`.
+Regression: `tests/test_tabs_presenter_response_display.py` (presenter unit).
+Agent UI e2e lock (Send → panel, exactly once):
+[agent_e2e_double_response_body.md](agent_e2e_double_response_body.md)
+(`tests/test_agent_e2e_double_response_body.py`).
 
 ```bash
 make test PYTEST_ARGS="tests/test_tabs_presenter_response_display.py -v"
+make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_double_response_body.py -v"
 ```
 
 Observability: discard is silent by design; use existing `request_finished` /

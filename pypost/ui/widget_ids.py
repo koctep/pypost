@@ -20,6 +20,7 @@ REQUEST_TABS = "pypost_request_tabs"
 METHOD_COMBO = "pypost_method_combo"
 URL_INPUT = "pypost_url_input"
 SEND_BUTTON = "pypost_send_button"
+REQUEST_BODY_EDIT = "pypost_request_body_edit"
 RESPONSE_PANEL = "pypost_response_panel"
 ENV_BAR = "pypost_env_bar"
 ENV_SELECTOR = "pypost_env_selector"
@@ -33,6 +34,7 @@ KEY_WIDGET_IDS = (
     METHOD_COMBO,
     URL_INPUT,
     SEND_BUTTON,
+    REQUEST_BODY_EDIT,
     RESPONSE_PANEL,
     ENV_BAR,
     ENV_SELECTOR,

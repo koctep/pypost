@@ -22,12 +22,14 @@ from pypost.ui.widget_ids import (
     ENV_SELECTOR,
     MAIN_WINDOW,
     METHOD_COMBO,
+    REQUEST_BODY_EDIT,
     REQUEST_TABS,
     RESPONSE_PANEL,
     SEND_BUTTON,
     SETTINGS_BUTTON,
     URL_INPUT,
 )
+from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 
@@ -98,12 +100,17 @@ def test_key_widgets_expose_stable_identities(
     assert send is not None
     _assert_id(send, SEND_BUTTON)
 
+    body = current.findChild(CodeEditor, REQUEST_BODY_EDIT)
+    assert body is not None
+    _assert_id(body, REQUEST_BODY_EDIT)
+
     response = current.findChild(ResponseView, RESPONSE_PANEL)
     assert response is not None
     _assert_id(response, RESPONSE_PANEL)
 
     assert isinstance(current.request_editor, RequestWidget)
     assert current.request_editor.send_btn is send
+    assert current.request_editor.body_edit is body
     assert current.response_view is response
 
 
