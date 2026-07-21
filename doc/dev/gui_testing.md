@@ -37,6 +37,40 @@ Representative modules:
 
 ## Writing a GUI Test
 
+### Shared `qapp` — two valid consumers (PYPOST-830)
+
+All Qt tests must obtain the process singleton from `tests/conftest.py`. Do **not**
+create a module-local `QApplication` in `setUpClass` (or a duplicate local
+`def qapp()`). Two request styles are supported:
+
+| Style | When to use | Examples |
+| --- | --- | --- |
+| Fixture parameter `qapp` | Plain pytest / non-`TestCase` | Responsiveness, widgets |
+| `@pytest.mark.usefixtures("qapp")` | `unittest.TestCase` | Gateway units + H3 stress |
+
+Gateway surface aligned onto `usefixtures` (PYPOST-830):
+
+- `tests/test_environment_storage_gateway.py`
+- `tests/test_collection_storage_gateway.py`
+- `tests/test_storage_gateway_h3_stress.py`
+
+```python
+import unittest
+
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
+
+@pytest.mark.usefixtures("qapp")
+class TestEnvironmentStorageGateway(unittest.TestCase):
+    def test_load_async_emits_load_completed(self):
+        # QApplication already provided by shared fixture
+        ...
+```
+
+Plain pytest class (parameter style):
+
 ```python
 import pytest
 
@@ -62,7 +96,7 @@ class TestMyWidget:
 - **Storage / services**: `MagicMock(spec=...)` or helpers under `tests/helpers/`.
 - **Event loop**: prefer calling slot methods directly; for polling use bounded waits (see
   § Bounded nested `QEventLoop` waits below). Use the shared `qapp` fixture — do not create a
-  second module-local `QApplication`.
+  second module-local `QApplication` (including via `setUpClass`).
 
 ### Bounded nested `QEventLoop` waits (PYPOST-823 / PYPOST-827 / PYPOST-828)
 
@@ -87,7 +121,8 @@ Contract:
 2. Assert with a clear message on deadline (do not hang).
 3. Keep `pytest.mark.timeout` (default signal method). Do **not** use `method="thread"` for
    Qt event-loop tests.
-4. Prefer shared `qapp` from `tests/conftest.py`.
+4. Prefer shared `qapp` from `tests/conftest.py` (parameter or
+   `usefixtures("qapp")` on `TestCase` — see § Shared `qapp` above).
 
 #### Timeout diagnostics (PYPOST-828)
 
@@ -142,14 +177,15 @@ Hang-regression coverage in `tests/test_env_storage_responsiveness.py`:
 
 Modules that use the shared helper (PYPOST-827 / PYPOST-828):
 
-- `tests/test_env_storage_responsiveness.py`
-- `tests/test_environment_storage_gateway.py`
-- `tests/test_collection_storage_gateway.py`
-- `tests/test_collection_storage_worker.py`
+- `tests/test_env_storage_responsiveness.py` — `qapp` parameter
+- `tests/test_environment_storage_gateway.py` — `usefixtures("qapp")`
+- `tests/test_collection_storage_gateway.py` — `usefixtures("qapp")`
+- `tests/test_collection_storage_worker.py` — still module-local `setUpClass`
+  (follow-up; not gateway surface)
 
 H3 worker-lifecycle canary (PYPOST-829): `tests/test_storage_gateway_h3_stress.py`
-(≥200 rapid cycles + GC per gateway). Prefer isolation when triaging native crashes;
-suite-prefix noise is a separate concern (PYPOST-830).
+(≥200 rapid cycles + GC per gateway; shared `qapp` via `usefixtures`, PYPOST-830).
+Prefer isolation when triaging native crashes.
 
 ### Timeouts
 
@@ -186,7 +222,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 
 | Issue | Solution |
 | --- | --- |
-| `QApplication` already exists | Use module-scoped `qapp`; do not create per-test `QApplication` |
+| `QApplication` already exists | Use shared `qapp` (param or `usefixtures`); no `setUpClass` app |
 | Segfault in CI | Ensure offscreen is set before any `PySide6` import |
 | Segfault in storage gateway finish | Historical H3 — run `tests/test_storage_gateway_h3_stress.py` in isolation (PYPOST-829) |
 | Hang past module timeout | SIGALRM cannot cut stuck `exec()` — use § Bounded nested waits |
@@ -241,3 +277,5 @@ make test-agent-e2e
 - [PYPOST-823](https://pypost.atlassian.net/browse/PYPOST-823) — nested `QEventLoop` hang defense
 - [PYPOST-827](https://pypost.atlassian.net/browse/PYPOST-827) — shared `process_until` for siblings
 - [PYPOST-828](https://pypost.atlassian.net/browse/PYPOST-828) — richer timeout diagnostics
+- [PYPOST-830](https://pypost.atlassian.net/browse/PYPOST-830) —
+  gateway `TestCase` shared `qapp` via `usefixtures`

@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtTest import QSignalSpy
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.collection_storage_gateway import CollectionStorageGateway
 from pypost.models.models import Collection
@@ -14,11 +13,8 @@ from tests.helpers.process_until import gateway_timeout_detail, process_until
 pytestmark = pytest.mark.timeout(120)
 
 
+@pytest.mark.usefixtures("qapp")
 class TestCollectionStorageGateway(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_load_async_emits_load_completed(self):
         storage = MagicMock()
         expected = [Collection(name="Prod", requests=[])]

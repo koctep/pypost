@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtTest import QSignalSpy
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.models.models import Environment
@@ -14,11 +13,8 @@ from tests.helpers.process_until import gateway_timeout_detail, process_until
 pytestmark = pytest.mark.timeout(120)
 
 
+@pytest.mark.usefixtures("qapp")
 class TestEnvironmentStorageGateway(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _make_env(self, name: str) -> Environment:
         return Environment(name=name, variables={"A": "1"})
 

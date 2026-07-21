@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtTest import QSignalSpy
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.collection_storage_gateway import CollectionStorageGateway
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
@@ -43,11 +42,8 @@ def _assert_idle_not_stranded(gateway, spy_count: int, expected: int) -> None:
     )
 
 
+@pytest.mark.usefixtures("qapp")
 class TestStorageGatewayH3Stress(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_env_gateway_rapid_load_save_and_pending_restart(self):
         """>=200 env cycles: load, save, save-then-queued-load; GC between batches."""
         storage = MagicMock()
