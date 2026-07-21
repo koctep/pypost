@@ -15,6 +15,11 @@ the same change.
 
 *(empty — no product defects recorded yet)*
 
+**Triage (PYPOST-891, 2026-07-21):** Empty table reviewed. Verdict: **no
+product defects found / won’t file**. See
+`ai-tasks/PYPOST-891/triage-summary.md`. Epic comment on PYPOST-888 is
+orchestrator-owned.
+
 ## Step 3 HEAD scan (2026-07-21)
 
 Full cartesian (25 cells) under

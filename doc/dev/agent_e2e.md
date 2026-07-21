@@ -207,7 +207,9 @@ PUT + malformed nested JSON-like body → stubbed Send with one streamed chunk
 Parametrized method × body-shape cells assert once-only body token and
 once-only status under `RESPONSE_PANEL`. Smoke slice runs under default
 `make test-agent-e2e`; full 25-cell cartesian needs `-m agent_e2e` (includes
-`slow`). Findings handoff: `ai-tasks/PYPOST-890/findings.md`. See
+`slow`). Findings handoff: `ai-tasks/PYPOST-890/findings.md`. Triage
+(PYPOST-891, empty findings → won’t file):
+`ai-tasks/PYPOST-891/triage-summary.md`. See
 [agent_e2e_presentation_matrix.md](agent_e2e_presentation_matrix.md).
 
 ## Configuration

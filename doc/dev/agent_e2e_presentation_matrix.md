@@ -17,6 +17,15 @@ of scope** here — record them for
 
 Epic: [PYPOST-888](https://pypost.atlassian.net/browse/PYPOST-888).
 
+### Triage outcome (PYPOST-891)
+
+[PYPOST-891](https://pypost.atlassian.net/browse/PYPOST-891) reviewed the
+findings table on 2026-07-21: **empty** (HEAD matrix **25/25** green).
+Verdict: **no product defects found / won’t file** — zero Bugs created.
+Canonical record: `ai-tasks/PYPOST-891/triage-summary.md`. Future HEAD
+defects still take the xfail + findings-row path, then re-triage under
+the epic.
+
 ## Architecture
 
 | Piece | Role |
@@ -28,6 +37,7 @@ Epic: [PYPOST-888](https://pypost.atlassian.net/browse/PYPOST-888).
 | `REQUEST_DETAIL_TABS` | Select Body tab for GET/PATCH/DELETE + fill |
 | `RESPONSE_PANEL` snapshot walk | Count body token and status label |
 | `ai-tasks/PYPOST-890/findings.md` | Durable failing-cell list for PYPOST-891 |
+| `ai-tasks/PYPOST-891/triage-summary.md` | Triage decision (Bugs filed or won’t-file) |
 
 ```mermaid
 flowchart LR
@@ -123,7 +133,9 @@ make test-agent-e2e \
 Known product defects on HEAD: mark that param with
 `pytest.mark.xfail(strict=False, reason=…)` **and** add a row to
 `ai-tasks/PYPOST-890/findings.md` in the same change. Unexpected smoke
-failures fail the suite — do not skip silently.
+failures fail the suite — do not skip silently. After findings change,
+re-run triage (see `ai-tasks/PYPOST-891/triage-summary.md`); empty
+findings → won’t file Bugs.
 
 ### Red protocol (local only)
 
