@@ -319,6 +319,37 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertNotEqual(current, plus_idx)
         self.assertIsInstance(p.widget.widget(current), RequestTab)
 
+    def test_close_middle_of_three_tabs_focuses_remaining_request_tab(self):
+        """PYPOST-820: after closing middle of three tabs, focus stays on request, not +."""
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        p.add_new_tab()
+        self.assertEqual(_request_tab_count(p), 3)
+        p.widget.setCurrentIndex(1)
+        p.close_tab(1)
+        self.assertEqual(_request_tab_count(p), 2)
+        current = p.widget.currentIndex()
+        plus_idx = _plus_tab_index(p)
+        self.assertNotEqual(current, plus_idx)
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
+
+    def test_close_rightmost_of_three_tabs_does_not_land_on_plus(self):
+        """PYPOST-820: closing last request tab (adjacent to +) must not select +."""
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        p.add_new_tab()
+        self.assertEqual(_request_tab_count(p), 3)
+        p.widget.setCurrentIndex(2)
+        self.assertEqual(p.widget.currentIndex() + 1, _plus_tab_index(p))
+        p.close_tab(2)
+        self.assertEqual(_request_tab_count(p), 2)
+        current = p.widget.currentIndex()
+        plus_idx = _plus_tab_index(p)
+        self.assertNotEqual(current, plus_idx)
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
+
     def test_close_last_request_tab_focuses_replacement_not_plus(self):
         """PYPOST-819: closing the last request tab focuses a replacement, not +.
 
