@@ -1,16 +1,21 @@
-"""PYPOST-838: Golden e2e — agent completes one request/response product flow."""
+"""PYPOST-838/859: Golden e2e — agent completes one request/response flow."""
 
 from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 
 from pypost.agent import AgentAppSession, UiWaitTimeoutError, find_widget
-from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
-from pypost.models.response import ResponseData
+from pypost.fixtures.agent_e2e_http import (
+    CANNED_GOLDEN_OK,
+    GOLDEN_BODY,
+    GOLDEN_METHOD,
+    GOLDEN_STATUS,
+    GOLDEN_URL,
+    stub_agent_e2e_http,
+)
 from pypost.ui.widget_ids import (
     METHOD_COMBO,
     RESPONSE_PANEL,
@@ -23,10 +28,10 @@ pytestmark = [
     pytest.mark.agent_e2e,
 ]
 
-FIXTURE_URL = "https://example.test/agent-golden"
-FIXTURE_METHOD = "GET"
-FIXTURE_STATUS = 200
-FIXTURE_BODY = '{"ok": true}'
+FIXTURE_URL = GOLDEN_URL
+FIXTURE_METHOD = GOLDEN_METHOD
+FIXTURE_STATUS = GOLDEN_STATUS
+FIXTURE_BODY = GOLDEN_BODY
 # Snapshot sanitize_text re-dumps JSON without indent; assert that form.
 FIXTURE_BODY_IN_SNAPSHOT = json.dumps(
     json.loads(FIXTURE_BODY), ensure_ascii=False
@@ -34,21 +39,6 @@ FIXTURE_BODY_IN_SNAPSHOT = json.dumps(
 FIXTURE_STATUS_LABEL = f"Status: {FIXTURE_STATUS}"
 
 _SEND_SETTLE_TIMEOUT_S = 15.0
-
-
-def _canned_ok() -> HTTPRequestResult:
-    return HTTPRequestResult(
-        response=ResponseData(
-            status_code=FIXTURE_STATUS,
-            headers={"Content-Type": "application/json"},
-            body=FIXTURE_BODY,
-            elapsed_time=0.01,
-            size=len(FIXTURE_BODY),
-        ),
-        resolved=ResolvedRequestFields(
-            url=FIXTURE_URL, headers={}, body=""
-        ),
-    )
 
 
 def _walk_values(node: dict[str, Any]) -> list[str]:
@@ -124,10 +114,7 @@ def test_agent_golden_request_response_flow(
     session.ui_fill(URL_INPUT, FIXTURE_URL)
     session.ui_select(METHOD_COMBO, FIXTURE_METHOD)
 
-    with patch(
-        "pypost.core.request_service.HTTPClient.send_request",
-        return_value=_canned_ok(),
-    ):
+    with stub_agent_e2e_http(CANNED_GOLDEN_OK):
         session.ui_click(SEND_BUTTON)
         try:
             snap = session.wait_for_snapshot(
@@ -150,3 +137,4 @@ def test_agent_golden_request_response_flow(
             ) from exc
 
     _assert_response_ui(snap)
+    assert CANNED_GOLDEN_OK.response.status_code == FIXTURE_STATUS

@@ -1,13 +1,15 @@
-"""Pytest fixtures for agent e2e session packaging (PYPOST-858)."""
+"""Pytest fixtures for agent e2e session + HTTP packaging (858/859)."""
 
 from __future__ import annotations
 
 import logging
-from typing import Iterator
+from collections.abc import Callable, Iterator
+from typing import Any
 
 import pytest
 
 from pypost.agent.lifecycle import AgentAppSession
+from pypost.fixtures.agent_e2e_http import stub_agent_e2e_http
 from tests.helpers.agent_e2e_seed import seeded_agent_dirs
 
 logger = logging.getLogger(__name__)
@@ -33,3 +35,9 @@ def seeded_agent_e2e_session() -> Iterator[AgentAppSession]:
         ) as session:
             logger.info("agent_e2e_fixture_ready mode=seeded")
             yield session
+
+
+@pytest.fixture
+def agent_e2e_http_stub() -> Callable[..., Any]:
+    """Yield ``stub_agent_e2e_http`` for ``with agent_e2e_http_stub(...):``."""
+    return stub_agent_e2e_http

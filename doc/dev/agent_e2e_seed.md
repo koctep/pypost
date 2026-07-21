@@ -37,7 +37,8 @@ startup load surfaces it when the UI becomes ready. Post-start UI hand-building
 is out of scope for the shared seed path.
 
 Shared pytest session packaging is PYPOST-858. HTTP determinism is
-PYPOST-859. Callers that inject `config_dir` / `data_dir` own cleanup.
+PYPOST-859 ([agent_e2e_http.md](agent_e2e_http.md)). Callers that inject
+`config_dir` / `data_dir` own cleanup.
 
 ## API / Usage
 

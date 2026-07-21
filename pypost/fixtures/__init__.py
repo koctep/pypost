@@ -1,1 +1,1 @@
-"""Programmatic test fixture builders (MCP samples, agent e2e seed)."""
+"""Programmatic test fixture builders (MCP, agent e2e seed / HTTP)."""

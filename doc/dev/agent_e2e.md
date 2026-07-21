@@ -30,6 +30,7 @@ and Prometheus checks, see [testing.md](testing.md) and
 | Golden | [agent_golden_e2e.md](agent_golden_e2e.md) | Composed Send → response proof |
 | Env pack | [agent_e2e_env.md](agent_e2e_env.md) | Seed, isolation, HTTP, markers (855) |
 | Seed inventory | [agent_e2e_seed.md](agent_e2e_seed.md) | Known collections/envs/requests (857) |
+| HTTP stubs | [agent_e2e_http.md](agent_e2e_http.md) | Canned responses at send boundary (859) |
 | GUI notes | [gui_testing.md](gui_testing.md) | Offscreen Qt, fixtures, pitfalls |
 
 ```mermaid
@@ -76,6 +77,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_ui_wait.py` | Settle / wait |
 | `tests/test_agent_golden_e2e.py` | Golden product flow |
 | `tests/test_agent_e2e_seed.py` | Seeded workspace (857) |
+| `tests/test_agent_e2e_http_env.py` | Env Send + shared HTTP (859) |
 
 Narrow to an explicit file list via `PYTEST_ARGS` (replaces the default
 `-m` expression):
@@ -116,7 +118,8 @@ Defined in `tests/_pytest_plugins/agent_e2e.py` (loaded via
 | Fixture | Workspace | Use when |
 | --- | --- | --- |
 | `agent_e2e_session` | Blank (session-owned temps) | Lifecycle, identity, actions, golden |
-| `seeded_agent_e2e_session` | PYPOST-857 seed via `seeded_agent_dirs()` | Seeded inventory proofs |
+| `seeded_agent_e2e_session` | PYPOST-857 seed via `seeded_agent_dirs()` | Seeded inventory / env Send |
+| `agent_e2e_http_stub` | Yields `stub_agent_e2e_http` | Deterministic Send (PYPOST-859) |
 
 ```python
 def test_ready(agent_e2e_session):
@@ -148,6 +151,7 @@ scenarios.
 | --- | --- |
 | Session (shared) | fixtures `agent_e2e_session` / `seeded_agent_e2e_session` |
 | Session (direct) | `AgentAppSession(offscreen=True)` |
+| HTTP stub (shared) | `stub_agent_e2e_http` / fixture `agent_e2e_http_stub` |
 | Find / ids | `pypost.ui.widget_ids` + `find_widget` |
 | Drive UI | `session.ui_fill` / `ui_select` / `ui_click` / … |
 | Observe | `session.ui_snapshot()` |
@@ -161,9 +165,10 @@ geometry. Details and catalog: [ui_identity.md](ui_identity.md).
 
 ### Golden scenario
 
-One intentional flow: blank request → set URL/method → Send (mocked HTTP
-200) → assert response panel status and body. Full steps and fixtures:
-[agent_golden_e2e.md](agent_golden_e2e.md).
+One intentional flow: blank request → set URL/method → Send (shared HTTP
+stub 200) → assert response panel status and body. Full steps:
+[agent_golden_e2e.md](agent_golden_e2e.md). Shared HTTP catalog:
+[agent_e2e_http.md](agent_e2e_http.md).
 
 ## Configuration
 
@@ -205,6 +210,7 @@ timeouts: [testing.md](testing.md).
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Agent E2E Environment Contract](agent_e2e_env.md)
 - [Agent E2E Seed Inventory](agent_e2e_seed.md)
+- [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)
 - [GUI Testing](gui_testing.md)
 - [Testing via MCP and Prometheus](testing.md)
 - [MCP Integration](mcp_integration.md)

@@ -14,8 +14,9 @@ which fixture areas siblings implement. It does **not** implement those
 fixtures (PYPOST-857–861).
 
 Drive/observe primitives and `make test-agent-e2e` packaging remain under
-[Agent UI E2E](agent_e2e.md). Golden’s blank-tab + one-off HTTP mock
-([agent_golden_e2e.md](agent_golden_e2e.md)) proves composition; the env pack
+[Agent UI E2E](agent_e2e.md). Golden’s blank-tab + shared HTTP stub
+([agent_golden_e2e.md](agent_golden_e2e.md),
+[agent_e2e_http.md](agent_e2e_http.md)) proves composition; the env pack
 is the **primary** path when scenarios need seeded workspace state.
 
 ## Architecture
@@ -74,7 +75,7 @@ flowchart TB
 | Snapshot / wait / golden composition | Consumes (artifacts reuse snapshot) | Owns |
 | Workspace seed inventory | Owns (model); 857 implements | Does not own |
 | Shared marker / session fixture packaging | Owns (model); 858 implements | Does not own |
-| Shared HTTP determinism | Owns (model); 859 | Golden may keep a one-off |
+| Shared HTTP determinism | Owns (model); 859 delivers | Uses shared layer (859) |
 | Failure artifact dumps | Owns (model); 860 implements | Snapshot API only |
 | Make/CI for **env pack** | Owns (model); 861 | `test-agent-e2e` packs 832 harness |
 
@@ -142,7 +143,8 @@ sequenceDiagram
    apply (PYPOST-860).
 
 Golden remains a valid **composition proof**. Env scenarios that need seeded
-workspace state should prefer seed + shared HTTP layer once siblings land.
+workspace state should prefer seed + the shared HTTP layer
+([agent_e2e_http.md](agent_e2e_http.md)).
 
 ## Implementation status
 
@@ -153,7 +155,7 @@ land incrementally:
 | --- | --- | --- |
 | Workspace seed | PYPOST-857 | Delivered — [agent_e2e_seed.md](agent_e2e_seed.md) |
 | Session + `agent_e2e` marker | PYPOST-858 | Delivered — fixtures + marker in [agent_e2e.md](agent_e2e.md) |
-| Deterministic HTTP layer | PYPOST-859 | Not yet |
+| Deterministic HTTP layer | PYPOST-859 | Delivered — [agent_e2e_http.md](agent_e2e_http.md) |
 | Failure artifacts | PYPOST-860 | Not yet |
 | Make / CI for env pack | PYPOST-861 | Not yet |
 
@@ -161,6 +163,7 @@ land incrementally:
 
 - [Agent UI E2E](agent_e2e.md) — PYPOST-832 umbrella + `make test-agent-e2e`
 - [Agent E2E Seed Inventory](agent_e2e_seed.md) — PYPOST-857 workspace seed
+- [Agent E2E HTTP Fixture Layer](agent_e2e_http.md) — PYPOST-859 canned HTTP
 - [Agent Golden E2E](agent_golden_e2e.md) — composition proof
 - [Agent App Lifecycle](agent_lifecycle.md)
 - [UI Widget Identity](ui_identity.md)
