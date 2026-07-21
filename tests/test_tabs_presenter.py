@@ -5,13 +5,15 @@ pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QTabBar
+from PySide6.QtWidgets import QApplication, QTabBar, QWidget
 
 from pypost.core.request_persisted_fields import (
     persisted_fields_equal,
     snapshot_persisted_fields,
 )
+from pypost.ui.hotkeys import register_hotkey
 from pypost.ui.presenters.tab_dirty import is_tab_dirty
 from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab, PLUS_TAB_MARKER
 from pypost.models.models import RequestData
@@ -398,6 +400,71 @@ class TestTabsPresenter(unittest.TestCase):
         p.widget.setCurrentIndex(0)
         p.handle_previous_tab()
         self.assertEqual(p.widget.currentIndex(), 1)
+
+    def test_next_previous_tab_hotkeys_keep_focus_on_request_tabs(self):
+        """PYPOST-822: next/previous tab hotkeys move focus among request tabs, not +.
+
+        Product map (MainWindow._setup_shortcuts): Next Tab Ctrl+Tab →
+        handle_next_tab; Previous Tab Ctrl+Shift+Tab → handle_previous_tab.
+        QShortcut / synthetic key delivery is flaky under QT_QPA_PLATFORM=offscreen
+        (no reliable activated window for shortcut context), so this test registers
+        the same hotkey map via register_hotkey and activates the tagged QActions
+        with triggered.emit — closest product path that still validates map wiring.
+        """
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        self.assertEqual(_request_tab_count(p), 2)
+        plus_idx = _plus_tab_index(p)
+        self.assertEqual(plus_idx, p.widget.count() - 1)
+
+        host = QWidget()
+        try:
+            register_hotkey(
+                host,
+                section="Tabs",
+                label="Next Tab",
+                keys=("Ctrl+Tab",),
+                slot=p.handle_next_tab,
+                order=3,
+            )
+            register_hotkey(
+                host,
+                section="Tabs",
+                label="Previous Tab",
+                keys=("Ctrl+Shift+Tab",),
+                slot=p.handle_previous_tab,
+                order=4,
+            )
+
+            actions_by_label = {
+                action.text(): action
+                for action in host.findChildren(QAction)
+                if action.text() in ("Next Tab", "Previous Tab")
+            }
+            self.assertIn("Next Tab", actions_by_label)
+            self.assertIn("Previous Tab", actions_by_label)
+            next_action = actions_by_label["Next Tab"]
+            prev_action = actions_by_label["Previous Tab"]
+            portable = QKeySequence.SequenceFormat.PortableText
+            self.assertEqual(next_action.shortcut().toString(portable), "Ctrl+Tab")
+            self.assertEqual(prev_action.shortcut().toString(portable), "Ctrl+Shift+Tab")
+
+            def _assert_focus_on_request_tab() -> int:
+                current = p.widget.currentIndex()
+                self.assertNotEqual(current, _plus_tab_index(p))
+                self.assertIsInstance(p.widget.widget(current), RequestTab)
+                return current
+
+            p.widget.setCurrentIndex(0)
+            next_action.triggered.emit()
+            self.assertEqual(_assert_focus_on_request_tab(), 1)
+            next_action.triggered.emit()
+            self.assertEqual(_assert_focus_on_request_tab(), 0)
+            prev_action.triggered.emit()
+            self.assertEqual(_assert_focus_on_request_tab(), 1)
+        finally:
+            host.close()
 
     def test_handle_switch_to_tab_valid_index(self):
         p = self._make_presenter()

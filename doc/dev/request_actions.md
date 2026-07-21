@@ -184,6 +184,7 @@ both click paths:
 | `test_close_middle_of_three_tabs_focuses_remaining_request_tab` | After closing middle of three request tabs, focus stays on a remaining request tab (not `+`) |
 | `test_close_rightmost_of_three_tabs_does_not_land_on_plus` | Closing last of three request tabs (next to `+`) must not select `+` |
 | `test_close_last_request_tab_focuses_replacement_not_plus` | Closing the last request tab creates a blank replacement via `add_new_tab` and focuses it (not `+`) |
+| `test_next_previous_tab_hotkeys_keep_focus_on_request_tabs` | Next/Previous Tab hotkey map (`Ctrl+Tab` / `Ctrl+Shift+Tab` via `register_hotkey` + `QAction.triggered`) cycles request tabs and never focuses `+` |
 
 Run:
 
