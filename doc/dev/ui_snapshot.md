@@ -183,6 +183,7 @@ Network MCP `ui_snapshot` tool, click/type/select (PYPOST-836), settle waits
 
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog
+- [UI action tools](ui_actions.md) — click / fill / select / send key by id
 - [GUI testing](gui_testing.md) — offscreen Qt test patterns
 - [Sensitive data masking policy](sensitive_data_masking_policy.md) — broader
   secrets handling

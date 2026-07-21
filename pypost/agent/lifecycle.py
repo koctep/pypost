@@ -14,6 +14,9 @@ from typing import Any
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
+from PySide6.QtCore import Qt
+
+from pypost.agent.ui_actions import ui_click, ui_fill, ui_select, ui_send_key
 from pypost.agent.ui_snapshot import capture_ui_snapshot
 from pypost.main import ComposedApp, compose_app
 from pypost.ui.main_window import MainWindow
@@ -208,6 +211,28 @@ class AgentAppSession:
     def ui_snapshot(self) -> dict[str, Any]:
         """Return a structured visible-UI snapshot; requires a started session."""
         return capture_ui_snapshot(self.window)
+
+    def ui_click(self, widget_id: str) -> None:
+        """Left-click a named widget under the main window."""
+        ui_click(self.window, widget_id)
+
+    def ui_fill(self, widget_id: str, text: str) -> None:
+        """Fill a named text input under the main window."""
+        ui_fill(self.window, widget_id, text)
+
+    def ui_select(self, widget_id: str, option: str) -> None:
+        """Select an option by display text on a named combo box."""
+        ui_select(self.window, widget_id, option)
+
+    def ui_send_key(
+        self,
+        widget_id: str,
+        key: str,
+        *,
+        modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier,
+    ) -> None:
+        """Send a key (with optional modifiers) to a named widget."""
+        ui_send_key(self.window, widget_id, key, modifiers=modifiers)
 
     def _make_temp_dir(self, prefix: str) -> str:
         td = tempfile.TemporaryDirectory(prefix=prefix)

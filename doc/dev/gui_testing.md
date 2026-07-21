@@ -150,6 +150,9 @@ Capture a structured visible-UI tree for post-action checks — see
 [UI state snapshot](ui_snapshot.md) (`capture_ui_snapshot` /
 `AgentAppSession.ui_snapshot()`).
 
+Drive named controls (click / fill / select / send key) — see
+[UI action tools](ui_actions.md) (`pypost.agent.ui_actions`).
+
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing

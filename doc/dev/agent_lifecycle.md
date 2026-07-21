@@ -78,6 +78,7 @@ with AgentAppSession(offscreen=True) as session:
 | Launch | `AgentAppSession.start()` / context manager |
 | Ready | wait is inside `start()`; after start, `session.window.is_ui_ready` is true |
 | Snapshot | `session.ui_snapshot()` → [ui_snapshot.md](ui_snapshot.md) |
+| Actions | `session.ui_click` / `ui_fill` / `ui_select` / `ui_send_key` → [ui_actions.md](ui_actions.md) |
 | Shutdown | `session.shutdown()` / context `__exit__` |
 | Offscreen | `offscreen=True` (default) sets `QT_QPA_PLATFORM=offscreen` if unset |
 
@@ -166,6 +167,7 @@ entries live under **Application lifecycle** in [logging.md](logging.md).
 | Ready (UI) | `main_window_ui_ready` |
 | Ready (harness) | `agent_session_ready` / `agent_session_ready_timeout` |
 | Snapshot | `ui_snapshot_captured` (DEBUG; see [ui_snapshot.md](ui_snapshot.md)) |
+| Actions | `ui_action_applied` (DEBUG; see [ui_actions.md](ui_actions.md)) |
 | Shutdown | `agent_session_shutdown_started` / `_completed` / `*_failed` |
 
 ## Smoke
@@ -180,6 +182,9 @@ After ready, resolve key widgets by stable identities — see
 Capture a structured visible-UI tree (roles, names, values, hierarchy) with
 `capture_ui_snapshot(window)` or `session.ui_snapshot()` — see
 [UI state snapshot](ui_snapshot.md). Gate: `tests/test_ui_snapshot.py`.
+
+Drive named controls with click / fill / select / send key — see
+[UI action tools](ui_actions.md). Gate: `tests/test_ui_actions.py`.
 
 ## Troubleshooting
 
@@ -197,9 +202,8 @@ Capture a structured visible-UI tree (roles, names, values, hierarchy) with
 
 ## Out of scope (siblings)
 
-Actions (PYPOST-836), settle waits (837), golden flow (838), epic
-`make agent-*` docs (839). Identity (834) and snapshots (835) are documented
-separately — see Related.
+Settle waits (837), golden flow (838), epic `make agent-*` docs (839). Identity
+(834), snapshots (835), and actions (836) are documented separately — see Related.
 
 ## Related documentation
 
@@ -208,6 +212,7 @@ separately — see Related.
 | [gui_testing.md](gui_testing.md) | Offscreen Qt, `wait_until`, GUI test patterns |
 | [ui_identity.md](ui_identity.md) | Stable `objectName` catalog for key controls |
 | [ui_snapshot.md](ui_snapshot.md) | Visible-UI tree for agents after ready |
+| [ui_actions.md](ui_actions.md) | Click / fill / select / send key by id |
 | [logging.md](logging.md) | Event catalog including agent session events |
 | [testing.md](testing.md) | Suite timeouts and CI guardrails |
 | [architecture.md](architecture.md) | Broader app structure |
