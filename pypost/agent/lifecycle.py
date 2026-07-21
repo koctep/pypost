@@ -9,10 +9,12 @@ import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
+from pypost.agent.ui_snapshot import capture_ui_snapshot
 from pypost.main import ComposedApp, compose_app
 from pypost.ui.main_window import MainWindow
 
@@ -202,6 +204,10 @@ class AgentAppSession:
 
     def __exit__(self, *exc: object) -> None:
         self.shutdown()
+
+    def ui_snapshot(self) -> dict[str, Any]:
+        """Return a structured visible-UI snapshot; requires a started session."""
+        return capture_ui_snapshot(self.window)
 
     def _make_temp_dir(self, prefix: str) -> str:
         td = tempfile.TemporaryDirectory(prefix=prefix)

@@ -146,6 +146,10 @@ the contract; smoke coverage is `tests/test_agent_lifecycle_smoke.py`.
 After ready, locate key controls by stable `objectName` values — see
 [UI widget identity](ui_identity.md) (`pypost/ui/widget_ids.py`).
 
+Capture a structured visible-UI tree for post-action checks — see
+[UI state snapshot](ui_snapshot.md) (`capture_ui_snapshot` /
+`AgentAppSession.ui_snapshot()`).
+
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing

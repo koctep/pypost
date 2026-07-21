@@ -125,12 +125,20 @@ class EnvPresenter(QObject):
         return self._widget
 
     @property
-    def current_variables(self) -> dict:
+    def current_variables(self) -> dict[str, str]:
         """Returns currently active env vars."""
         selected = self._env_selector.currentData()
         if isinstance(selected, Environment):
             return dict(selected.variables)
         return {}
+
+    @property
+    def current_hidden_keys(self) -> set[str]:
+        """Returns hidden keys for the currently active environment."""
+        selected = self._env_selector.currentData()
+        if isinstance(selected, Environment):
+            return set(selected.hidden_keys)
+        return set()
 
     def apply_settings(self, settings: AppSettings) -> None:
         self._settings = settings

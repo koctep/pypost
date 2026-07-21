@@ -94,10 +94,13 @@ different call sites.
 | `agent_session_window_close_failed` | ERROR | exception | `agent/lifecycle` |
 | `agent_session_metrics_stop_failed` | ERROR | exception | `agent/lifecycle` |
 | `agent_session_temp_cleanup_failed` | ERROR | exception | `agent/lifecycle` |
+| `ui_snapshot_captured` | DEBUG | `node_count`, `named_count`, `duration_ms` | `agent/ui_snapshot` |
 | `*_source` | DEBUG | `source=injected\|new` | composition-root injectors |
 
 Agent session contract and ready-gate semantics:
-[agent_lifecycle.md](agent_lifecycle.md).
+[agent_lifecycle.md](agent_lifecycle.md). Snapshot capture contract:
+[ui_snapshot.md](ui_snapshot.md) (`ui_snapshot_captured` logs scalars only —
+never the tree or values).
 
 ### Configuration and settings
 

@@ -88,6 +88,7 @@ set up your development environment, and contribute to the project.
 1. [GUI Testing](gui_testing.md)
 1. [Agent App Lifecycle (PYPOST-833)](agent_lifecycle.md)
 1. [UI Widget Identity (PYPOST-834)](ui_identity.md)
+1. [UI State Snapshot (PYPOST-835)](ui_snapshot.md)
 1. [Metric Rename Migration (PYPOST-443)](metric_rename_migration.md)
 
 ### Tech debt

@@ -117,4 +117,5 @@ No environment variables. Identity strings are compile-time constants in
 ## Related
 
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
+- [UI state snapshot](ui_snapshot.md) — visible-UI tree keyed by these names
 - [GUI testing](gui_testing.md) — offscreen Qt test patterns
