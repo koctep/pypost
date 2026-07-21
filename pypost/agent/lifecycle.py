@@ -15,9 +15,18 @@ from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget
 
 from pypost.agent.ui_actions import ui_click, ui_fill, ui_select, ui_send_key
 from pypost.agent.ui_snapshot import capture_ui_snapshot
+from pypost.agent.ui_wait import (
+    DEFAULT_UI_WAIT_TIMEOUT_S,
+    wait_for_enabled,
+    wait_for_snapshot,
+    wait_for_text,
+    wait_for_widget,
+    wait_until,
+)
 from pypost.main import ComposedApp, compose_app
 from pypost.ui.main_window import MainWindow
 
@@ -28,23 +37,6 @@ def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
-
-
-def _wait_until(
-    condition: Callable[[], bool],
-    *,
-    timeout: float,
-    interval: float = 0.05,
-    message: str = "condition not met within timeout",
-) -> None:
-    """Pump Qt events until ``condition()`` is true or ``timeout`` elapses."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        QCoreApplication.processEvents()
-        if condition():
-            return
-        time.sleep(interval)
-    raise TimeoutError(message)
 
 
 class AgentAppSession:
@@ -124,13 +116,14 @@ class AgentAppSession:
 
         ready_wait_started = time.monotonic()
         try:
-            _wait_until(
+            wait_until(
                 lambda: composed.window.is_ui_ready,
                 timeout=self._ready_timeout,
                 message=(
                     "MainWindow.is_ui_ready did not become true within "
                     f"{self._ready_timeout}s"
                 ),
+                condition_name="is_ui_ready",
             )
         except TimeoutError:
             waited_ms = int((time.monotonic() - ready_wait_started) * 1000)
@@ -233,6 +226,68 @@ class AgentAppSession:
     ) -> None:
         """Send a key (with optional modifiers) to a named widget."""
         ui_send_key(self.window, widget_id, key, modifiers=modifiers)
+
+    def wait_until(
+        self,
+        condition: Callable[[], bool],
+        *,
+        timeout: float = DEFAULT_UI_WAIT_TIMEOUT_S,
+        message: str = "condition not met within timeout",
+        condition_name: str = "predicate",
+    ) -> None:
+        """Pump events until ``condition()`` is true (session still started)."""
+        self._require_started()
+        wait_until(
+            condition,
+            timeout=timeout,
+            message=message,
+            condition_name=condition_name,
+        )
+
+    def wait_for_widget(
+        self,
+        widget_id: str,
+        *,
+        timeout: float = DEFAULT_UI_WAIT_TIMEOUT_S,
+    ) -> QWidget:
+        """Wait until a named widget exists under the main window."""
+        self._require_started()
+        return wait_for_widget(self.window, widget_id, timeout=timeout)
+
+    def wait_for_enabled(
+        self,
+        widget_id: str,
+        *,
+        timeout: float = DEFAULT_UI_WAIT_TIMEOUT_S,
+    ) -> QWidget:
+        """Wait until a named widget is visible and enabled."""
+        self._require_started()
+        return wait_for_enabled(self.window, widget_id, timeout=timeout)
+
+    def wait_for_text(
+        self,
+        widget_id: str,
+        expected: str | Callable[[str], bool],
+        *,
+        timeout: float = DEFAULT_UI_WAIT_TIMEOUT_S,
+    ) -> QWidget:
+        """Wait until a named widget's text matches ``expected``."""
+        self._require_started()
+        return wait_for_text(self.window, widget_id, expected, timeout=timeout)
+
+    def wait_for_snapshot(
+        self,
+        predicate: Callable[[dict[str, Any]], bool],
+        *,
+        timeout: float = DEFAULT_UI_WAIT_TIMEOUT_S,
+    ) -> dict[str, Any]:
+        """Wait until a UI snapshot satisfies ``predicate``."""
+        self._require_started()
+        return wait_for_snapshot(self.window, predicate, timeout=timeout)
+
+    def _require_started(self) -> None:
+        if not self._started or self._composed is None:
+            raise RuntimeError("AgentAppSession has not been started")
 
     def _make_temp_dir(self, prefix: str) -> str:
         td = tempfile.TemporaryDirectory(prefix=prefix)

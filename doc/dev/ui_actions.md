@@ -11,8 +11,9 @@ exceptions.
 This is an **in-process Python agent API**, not a network MCP tool on
 `MCPServerImpl`. Call it from tests or harnesses that already use
 [AgentAppSession](agent_lifecycle.md). Combine with
-[UI state snapshot](ui_snapshot.md) for post-action verification. Settle/wait
-helpers remain a sibling story (PYPOST-837).
+[UI state snapshot](ui_snapshot.md) for post-action verification and
+[UI settle / wait helpers](ui_wait.md) after Send, dialog open, or other async
+updates.
 
 ## Architecture
 
@@ -123,5 +124,6 @@ widgets that already have `objectName` set via `set_widget_id`.
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog
 - [UI state snapshot](ui_snapshot.md) — observe after acting
+- [UI settle / wait helpers](ui_wait.md) — wait for exists / enabled / text / snapshot
 - [GUI testing](gui_testing.md) — offscreen Qt / `QTest` patterns
 - [Logging](logging.md) — `ui_action_applied` DEBUG event

@@ -153,6 +153,10 @@ Capture a structured visible-UI tree for post-action checks — see
 Drive named controls (click / fill / select / send key) — see
 [UI action tools](ui_actions.md) (`pypost.agent.ui_actions`).
 
+Wait for async settle conditions after actions — see
+[UI settle / wait helpers](ui_wait.md) (`pypost.agent.ui_wait`). Test-only
+`tests.helpers.qt_wait.wait_until` re-exports the production poll helper.
+
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing

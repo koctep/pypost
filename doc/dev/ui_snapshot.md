@@ -176,14 +176,16 @@ truncation, and ready integration via `AgentAppSession` (run with
 
 ## Out of scope
 
-Network MCP `ui_snapshot` tool, click/type/select (PYPOST-836), settle waits
-(837), golden flow (838), exhaustive offscreen/historical widgets.
+Network MCP `ui_snapshot` tool, golden flow (838), exhaustive
+offscreen/historical widgets. Actions and settle waits are documented
+separately.
 
 ## Related
 
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog
 - [UI action tools](ui_actions.md) — click / fill / select / send key by id
+- [UI settle / wait helpers](ui_wait.md) — wait for conditions after actions
 - [GUI testing](gui_testing.md) — offscreen Qt test patterns
 - [Sensitive data masking policy](sensitive_data_masking_policy.md) — broader
   secrets handling

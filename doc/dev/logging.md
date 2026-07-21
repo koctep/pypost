@@ -96,6 +96,8 @@ different call sites.
 | `agent_session_temp_cleanup_failed` | ERROR | exception | `agent/lifecycle` |
 | `ui_snapshot_captured` | DEBUG | `node_count`, `named_count`, `duration_ms` | `agent/ui_snapshot` |
 | `ui_action_applied` | DEBUG | `primitive`, `widget_id`, `outcome`, `duration_ms` | `agent/ui_actions` |
+| `ui_wait_settled` | DEBUG | `condition`, `waited_ms`, `timeout_s` | `agent/ui_wait` |
+| `ui_wait_timeout` | DEBUG | `condition`, `waited_ms`, `timeout_s` | `agent/ui_wait` |
 | `*_source` | DEBUG | `source=injected\|new` | composition-root injectors |
 
 Agent session contract and ready-gate semantics:
@@ -103,7 +105,9 @@ Agent session contract and ready-gate semantics:
 [ui_snapshot.md](ui_snapshot.md) (`ui_snapshot_captured` logs scalars only —
 never the tree or values). UI action contract:
 [ui_actions.md](ui_actions.md) (`ui_action_applied` logs scalars only — never
-fill text, option labels, or key payloads).
+fill text, option labels, or key payloads). Settle waits:
+[ui_wait.md](ui_wait.md) (`ui_wait_settled` / `ui_wait_timeout` — timing
+scalars only; diagnostics live on `UiWaitTimeoutError`).
 
 ### Configuration and settings
 

@@ -79,6 +79,7 @@ with AgentAppSession(offscreen=True) as session:
 | Ready | wait is inside `start()`; after start, `session.window.is_ui_ready` is true |
 | Snapshot | `session.ui_snapshot()` → [ui_snapshot.md](ui_snapshot.md) |
 | Actions | `session.ui_click` / `ui_fill` / `ui_select` / `ui_send_key` → [ui_actions.md](ui_actions.md) |
+| Settle waits | `session.wait_for_*` / `wait_until` → [ui_wait.md](ui_wait.md) |
 | Shutdown | `session.shutdown()` / context `__exit__` |
 | Offscreen | `offscreen=True` (default) sets `QT_QPA_PLATFORM=offscreen` if unset |
 
@@ -168,6 +169,7 @@ entries live under **Application lifecycle** in [logging.md](logging.md).
 | Ready (harness) | `agent_session_ready` / `agent_session_ready_timeout` |
 | Snapshot | `ui_snapshot_captured` (DEBUG; see [ui_snapshot.md](ui_snapshot.md)) |
 | Actions | `ui_action_applied` (DEBUG; see [ui_actions.md](ui_actions.md)) |
+| Settle waits | `ui_wait_settled` / `ui_wait_timeout` (DEBUG; see [ui_wait.md](ui_wait.md)) |
 | Shutdown | `agent_session_shutdown_started` / `_completed` / `*_failed` |
 
 ## Smoke
@@ -186,6 +188,9 @@ Capture a structured visible-UI tree (roles, names, values, hierarchy) with
 Drive named controls with click / fill / select / send key — see
 [UI action tools](ui_actions.md). Gate: `tests/test_ui_actions.py`.
 
+Wait for post-action settle conditions (exists / enabled / text / snapshot) —
+see [UI settle / wait helpers](ui_wait.md). Gate: `tests/test_ui_wait.py`.
+
 ## Troubleshooting
 
 - **Ready `TimeoutError`** — Collections/env load stuck; raise `ready_timeout`;
@@ -202,8 +207,9 @@ Drive named controls with click / fill / select / send key — see
 
 ## Out of scope (siblings)
 
-Settle waits (837), golden flow (838), epic `make agent-*` docs (839). Identity
-(834), snapshots (835), and actions (836) are documented separately — see Related.
+Golden flow (838), epic `make agent-*` docs (839). Identity (834), snapshots
+(835), actions (836), and settle waits (837) are documented separately — see
+Related.
 
 ## Related documentation
 
@@ -213,6 +219,7 @@ Settle waits (837), golden flow (838), epic `make agent-*` docs (839). Identity
 | [ui_identity.md](ui_identity.md) | Stable `objectName` catalog for key controls |
 | [ui_snapshot.md](ui_snapshot.md) | Visible-UI tree for agents after ready |
 | [ui_actions.md](ui_actions.md) | Click / fill / select / send key by id |
+| [ui_wait.md](ui_wait.md) | Settle waits after actions |
 | [logging.md](logging.md) | Event catalog including agent session events |
 | [testing.md](testing.md) | Suite timeouts and CI guardrails |
 | [architecture.md](architecture.md) | Broader app structure |

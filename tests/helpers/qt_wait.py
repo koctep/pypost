@@ -1,25 +1,12 @@
-"""Bounded Qt event-loop polling helpers for tests."""
+"""Bounded Qt event-loop polling helpers for tests.
+
+Re-exports the production agent wait helper so tests do not maintain a second
+poll loop (PYPOST-837 / PYPOST-840). Prefer importing from ``pypost.agent`` in
+new agent-facing tests.
+"""
 
 from __future__ import annotations
 
-import time
-from collections.abc import Callable
+from pypost.agent.ui_wait import wait_until
 
-from PySide6.QtCore import QCoreApplication
-
-
-def wait_until(
-    condition: Callable[[], bool],
-    *,
-    timeout: float = 10.0,
-    interval: float = 0.05,
-    message: str = "condition not met within timeout",
-) -> None:
-    """Process Qt events until ``condition()`` is true or ``timeout`` elapses."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        QCoreApplication.processEvents()
-        if condition():
-            return
-        time.sleep(interval)
-    raise TimeoutError(message)
+__all__ = ["wait_until"]
