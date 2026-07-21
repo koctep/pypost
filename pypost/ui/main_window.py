@@ -130,6 +130,7 @@ class MainWindow(QMainWindow):
         self._setup_shortcuts()
         self._startup_collections_ready = False
         self._startup_env_ready = False
+        self._ui_ready = False
         self.collections.collections_loaded.connect(self._on_startup_collections_loaded)
         self.env.environments_loaded.connect(self._on_startup_environments_loaded)
         self.collections.load_collections_async()
@@ -137,6 +138,11 @@ class MainWindow(QMainWindow):
         self._startup_settings_reapplied = False
         self.apply_settings(self.settings)
         logger.info("main_window_initialized")
+
+    @property
+    def is_ui_ready(self) -> bool:
+        """True after startup collections+env loads and restore gate completed."""
+        return self._ui_ready
 
     def _on_startup_collections_loaded(self) -> None:
         self.collections.collections_loaded.disconnect(self._on_startup_collections_loaded)
@@ -153,6 +159,7 @@ class MainWindow(QMainWindow):
             return
         self.tabs.restore_tabs()
         self.collections.restore_tree_state()
+        self._ui_ready = True
 
     def _load_icons(self) -> dict:
         d = Path(__file__).parent / "resources" / "icons"
