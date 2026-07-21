@@ -64,7 +64,7 @@ class TestMyWidget:
   § Bounded nested `QEventLoop` waits below). Use the shared `qapp` fixture — do not create a
   second module-local `QApplication`.
 
-### Bounded nested `QEventLoop` waits (PYPOST-823 / PYPOST-827)
+### Bounded nested `QEventLoop` waits (PYPOST-823 / PYPOST-827 / PYPOST-828)
 
 Waiting for `QThread` queued signals with a nested `QEventLoop.exec()` is fine **only** if the
 wait is guaranteed to return to Python on a wall-clock deadline. A QTimer-only timeout is not
@@ -89,12 +89,58 @@ Contract:
    Qt event-loop tests.
 4. Prefer shared `qapp` from `tests/conftest.py`.
 
+#### Timeout diagnostics (PYPOST-828)
+
+On deadline with the predicate still false, `process_until` raises `AssertionError` with a
+**neutral** reason (no env-biased signal names) plus an optional lazy snapshot:
+
+```text
+condition not met within {timeout_ms}ms
+(wall-clock deadline; predicate still false)[; <timeout_detail>]
+```
+
+| API | Role |
+| --- | --- |
+| `timeout_detail: Callable[[], str] \| None` | Evaluated **only on timeout**; appended after `; ` |
+| `format_storage_async_timeout_detail(...)` | Formats `busy=` / `pending=` and optional |
+| | `worker_running=` / `worker_operation=` (omit `None`) |
+| `gateway_timeout_detail(gateway)` | One-liner lazy snapshot for gateway waits |
+
+Rules:
+
+- **Gateway** load/save waits: pass busy/pending (use `gateway_timeout_detail`).
+- **Worker-only** waits: optional `worker_running` (busy/pending omitted).
+- **Hang-regression** / no domain context: omit `timeout_detail`; default text is enough.
+- Detail failures never mask the timeout (`timeout_detail failed: ...` note) and never
+  extend the hang-defense deadline.
+
+Example (gateway wait):
+
+```python
+from tests.helpers.process_until import gateway_timeout_detail, process_until
+
+process_until(
+    lambda: spy.count() >= 1 or fail_spy.count() >= 1,
+    timeout_ms=10_000,
+    timeout_detail=gateway_timeout_detail(gateway),
+)
+```
+
+Example failure text:
+
+```text
+condition not met within 10000ms (wall-clock deadline; predicate still false);
+busy=True pending=True worker_running=True
+```
+
+Focused diagnostic tests: `tests/test_process_until_diagnostics.py`.
+
 Hang-regression coverage in `tests/test_env_storage_responsiveness.py`:
 
 - `test_process_until_exits_on_wall_clock_deadline`
 - `test_process_until_exits_via_posted_quit_without_poll_timer`
 
-Modules that use the shared helper (PYPOST-827):
+Modules that use the shared helper (PYPOST-827 / PYPOST-828):
 
 - `tests/test_env_storage_responsiveness.py`
 - `tests/test_environment_storage_gateway.py`
@@ -139,6 +185,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | `QApplication` already exists | Use module-scoped `qapp`; do not create per-test `QApplication` |
 | Segfault in CI | Ensure offscreen is set before any `PySide6` import |
 | Hang past module timeout | SIGALRM cannot cut stuck `exec()` — use § Bounded nested waits |
+| Timeout assert hard to triage | Pass `timeout_detail` / `gateway_timeout_detail` (PYPOST-828) |
 | Test hangs (general) | Add timeout marker; bound waits; prefer `wait_until` (no nested `exec()`) |
 | Missing timeout marker | `conftest.py` fails setup — add `pytestmark` or per-function marker |
 | ELF `core` file in repo root | Native crash (SIGSEGV), not a Python exception. Delete the file; do not commit. Repo-root `/core` is gitignored. Run tests via `make test` or set `QT_QPA_PLATFORM=offscreen`. If it recurs, capture `lldb -c core --batch -o bt` and file a ticket with Python/PySide6 versions. See [PYPOST-429 investigation](../../ai-tasks/PYPOST-429/investigation-report.md). |
@@ -187,3 +234,5 @@ make test-agent-e2e
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — agent rules
 - [PYPOST-365](https://pypost.atlassian.net/browse/PYPOST-365) — GUI patterns and search tests
 - [PYPOST-823](https://pypost.atlassian.net/browse/PYPOST-823) — nested `QEventLoop` hang defense
+- [PYPOST-827](https://pypost.atlassian.net/browse/PYPOST-827) — shared `process_until` for siblings
+- [PYPOST-828](https://pypost.atlassian.net/browse/PYPOST-828) — richer timeout diagnostics

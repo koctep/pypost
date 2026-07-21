@@ -11,7 +11,7 @@ from PySide6.QtTest import QSignalSpy
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
-from tests.helpers.process_until import process_until
+from tests.helpers.process_until import gateway_timeout_detail, process_until
 
 pytestmark = pytest.mark.timeout(120)
 
@@ -84,6 +84,7 @@ def test_event_loop_stays_responsive_during_encrypted_load(
     process_until(
         lambda: spy.count() >= 1 or fail_spy.count() >= 1,
         timeout_ms=10_000,
+        timeout_detail=gateway_timeout_detail(gateway),
     )
     if fail_spy.count() >= 1:
         pytest.fail(f"load failed: {fail_spy.at(0)[0]}")
@@ -119,6 +120,7 @@ def test_event_loop_stays_responsive_during_encrypted_save(
     process_until(
         lambda: spy.count() >= 1 or fail_spy.count() >= 1,
         timeout_ms=10_000,
+        timeout_detail=gateway_timeout_detail(gateway),
     )
     if fail_spy.count() >= 1:
         pytest.fail(f"save failed: {fail_spy.at(0)[0]}")
@@ -148,7 +150,11 @@ def test_apply_encryption_settings_after_wait_idle_no_mixed_persistence(
     fail_spy = QSignalSpy(gateway.save_failed)
     gateway.save_async(environments)
 
-    process_until(save_started.is_set, timeout_ms=5_000)
+    process_until(
+        save_started.is_set,
+        timeout_ms=5_000,
+        timeout_detail=gateway_timeout_detail(gateway),
+    )
     assert gateway.is_busy()
 
     assert gateway.wait_idle(timeout_ms=100) is False
@@ -159,6 +165,7 @@ def test_apply_encryption_settings_after_wait_idle_no_mixed_persistence(
     process_until(
         lambda: save_spy.count() >= 1 or fail_spy.count() >= 1,
         timeout_ms=10_000,
+        timeout_detail=gateway_timeout_detail(gateway),
     )
     if fail_spy.count() >= 1:
         pytest.fail(f"save failed: {fail_spy.at(0)[0]}")

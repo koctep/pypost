@@ -9,9 +9,21 @@ from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.collection_storage_worker import CollectionStorageWorker
 from pypost.models.models import Collection
-from tests.helpers.process_until import process_until
+from tests.helpers.process_until import (
+    format_storage_async_timeout_detail,
+    process_until,
+)
 
 pytestmark = pytest.mark.timeout(120)
+
+
+def _worker_timeout_detail(worker: CollectionStorageWorker):
+    def detail() -> str:
+        return format_storage_async_timeout_detail(
+            worker_running=worker.isRunning(),
+        )
+
+    return detail
 
 
 class TestCollectionStorageWorker(unittest.TestCase):
@@ -26,7 +38,11 @@ class TestCollectionStorageWorker(unittest.TestCase):
         worker = CollectionStorageWorker(storage)
         spy = QSignalSpy(worker.load_finished)
         worker.start()
-        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
+        process_until(
+            lambda: spy.count() == 1,
+            timeout_ms=5_000,
+            timeout_detail=_worker_timeout_detail(worker),
+        )
         self.assertEqual(spy.at(0)[0], expected)
 
     def test_load_emits_failed_on_unexpected_exception(self):
@@ -35,4 +51,8 @@ class TestCollectionStorageWorker(unittest.TestCase):
         worker = CollectionStorageWorker(storage)
         spy = QSignalSpy(worker.load_failed)
         worker.start()
-        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
+        process_until(
+            lambda: spy.count() == 1,
+            timeout_ms=5_000,
+            timeout_detail=_worker_timeout_detail(worker),
+        )

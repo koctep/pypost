@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.models.models import Environment
-from tests.helpers.process_until import process_until
+from tests.helpers.process_until import gateway_timeout_detail, process_until
 
 pytestmark = pytest.mark.timeout(120)
 
@@ -29,7 +29,11 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
         gateway = EnvironmentStorageGateway(storage)
         spy = QSignalSpy(gateway.load_completed)
         gateway.load_async()
-        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
+        process_until(
+            lambda: spy.count() == 1,
+            timeout_ms=5_000,
+            timeout_detail=gateway_timeout_detail(gateway),
+        )
         self.assertEqual(spy.at(0)[0], expected)
 
     def test_save_async_emits_save_completed(self):
@@ -38,7 +42,11 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
         spy = QSignalSpy(gateway.save_completed)
         envs = [self._make_env("Staging")]
         gateway.save_async(envs)
-        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
+        process_until(
+            lambda: spy.count() == 1,
+            timeout_ms=5_000,
+            timeout_detail=gateway_timeout_detail(gateway),
+        )
         storage.save_environments.assert_called_once()
         saved = storage.save_environments.call_args[0][0]
         self.assertEqual(len(saved), 1)
@@ -66,6 +74,7 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
         process_until(
             lambda: save_spy.count() == 1 and load_spy.count() == 1,
             timeout_ms=5_000,
+            timeout_detail=gateway_timeout_detail(gateway),
         )
         self.assertEqual(save_spy.count(), 1)
         self.assertEqual(load_spy.count(), 1)
@@ -97,5 +106,9 @@ class TestEnvironmentStorageGateway(unittest.TestCase):
         spy = QSignalSpy(gateway.load_completed)
         gateway.load_async()
         self.assertTrue(gateway.wait_idle())
-        process_until(lambda: spy.count() == 1, timeout_ms=5_000)
+        process_until(
+            lambda: spy.count() == 1,
+            timeout_ms=5_000,
+            timeout_detail=gateway_timeout_detail(gateway),
+        )
         self.assertFalse(gateway.has_pending_work())

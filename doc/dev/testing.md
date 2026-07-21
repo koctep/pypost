@@ -131,8 +131,9 @@ on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does n
 stuck C++ `exec()` without Python callbacks. Use the shared
 `tests.helpers.process_until.process_until` helper (wall-clock deadline plus a daemon
 `threading.Timer` that posts `QTimer.singleShot(0, loop, loop.quit)` onto the GUI thread;
-PYPOST-823 / PYPOST-827). Full contract and troubleshooting:
-[gui_testing.md](gui_testing.md) § Bounded nested `QEventLoop` waits.
+PYPOST-823 / PYPOST-827). On timeout, the message is neutral and can include a lazy
+`timeout_detail` snapshot (busy/pending / worker — PYPOST-828). Full contract and
+troubleshooting: [gui_testing.md](gui_testing.md) § Bounded nested `QEventLoop` waits.
 
 See [gui_testing.md](gui_testing.md) for patterns, representative modules, focused commands,
 and troubleshooting (including ELF core dumps from native Qt crashes —
