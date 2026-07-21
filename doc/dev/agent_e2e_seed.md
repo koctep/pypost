@@ -1,0 +1,163 @@
+# Agent E2E Seed Inventory (PYPOST-857)
+
+## Overview
+
+Shared **seeded workspace** for the agent e2e environment pack. After
+bootstrap into an isolated `AgentAppSession` whose `data_dir` was pre-written
+with this seed, scenarios can assume the inventory below without hand-building
+collections, environments, or sample requests.
+
+Source of truth for ids/names: `pypost/fixtures/agent_e2e_seed.py`. This page
+mirrors that inventory for humans and agents. It implements the seeded
+workspace area of the [environment contract](agent_e2e_env.md)
+([PYPOST-857](https://pypost.atlassian.net/browse/PYPOST-857)).
+
+## Architecture
+
+| Component | Role |
+| --- | --- |
+| Inventory constants | Fixed ids/names/URLs in `pypost/fixtures/agent_e2e_seed.py` |
+| `build_agent_e2e_seed_collection()` | Pure builder for the seed `Collection` (GET + POST) |
+| `build_agent_e2e_seed_environments()` | Pure builder for the seed `Environment` list |
+| `write_agent_e2e_seed(data_dir)` | Persist via `StorageManager` before session start |
+| `tests/helpers/agent_e2e_seed.py` | Temp dirs + re-exports for product-facing tests |
+| `tests/test_agent_e2e_seed.py` | Identity + model/item proof after ready |
+
+```mermaid
+flowchart LR
+  Build[Builders / constants] --> Write[write_agent_e2e_seed]
+  Write --> Disk[data_dir via StorageManager]
+  Disk --> Start[AgentAppSession.start]
+  Start --> Ready[is_ui_ready]
+  Ready --> Proof[Identity + model / items]
+```
+
+Seed must be on disk **before** `AgentAppSession.start()` so the normal
+startup load surfaces it when the UI becomes ready. Post-start UI hand-building
+is out of scope for the shared seed path.
+
+Shared pytest session packaging is PYPOST-858. HTTP determinism is
+PYPOST-859. Callers that inject `config_dir` / `data_dir` own cleanup.
+
+## API / Usage
+
+### How to seed
+
+```python
+from pathlib import Path
+from pypost.agent import AgentAppSession
+from pypost.fixtures.agent_e2e_seed import write_agent_e2e_seed
+
+write_agent_e2e_seed(Path(data_dir))  # before start()
+with AgentAppSession(
+    offscreen=True,
+    config_dir=Path(config_dir),
+    data_dir=Path(data_dir),
+) as session:
+    assert session.window.is_ui_ready
+```
+
+### Test helper
+
+```python
+from pypost.agent import AgentAppSession
+from tests.helpers.agent_e2e_seed import seeded_agent_dirs
+
+with seeded_agent_dirs() as (config_dir, data_dir):
+    with AgentAppSession(
+        offscreen=True,
+        config_dir=config_dir,
+        data_dir=data_dir,
+    ) as session:
+        assert session.window.is_ui_ready
+```
+
+### `write_agent_e2e_seed(data_dir)`
+
+Persist the documented seed into `data_dir` via `StorageManager`.
+
+- **data_dir**: Writable workspace root (collections + environments.json).
+- **Returns**: `None`. Raises on persist failure after logging
+  `agent_e2e_seed_failed`.
+- **Side effects**: Writes one collection JSON and `environments.json`; emits
+  `agent_e2e_seed_completed` on success.
+
+### Builders
+
+- `build_agent_e2e_seed_collection()` → `Collection` with GET + POST samples.
+- `build_agent_e2e_seed_environments()` → `[Environment]` with plaintext
+  `base_url` only.
+
+Prefer constants from the fixture module (or the test helper re-exports) in
+asserts — do not hard-code ids in new scenarios.
+
+### How to run tests
+
+```bash
+make test-agent-e2e
+# or one module:
+make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_seed.py -v"
+```
+
+## Inventory after bootstrap
+
+| Kind | Id | Display name | Notes |
+| --- | --- | --- | --- |
+| Collection | `agent-e2e-seed-collection` | `Agent E2E Seed` | One collection |
+| Environment | `agent-e2e-seed-env` | `Agent E2E` | Plaintext vars only |
+| Request | `agent-e2e-seed-get` | `Seed GET` | `GET {{base_url}}/get` |
+| Request | `agent-e2e-seed-post` | `Seed POST` | `POST {{base_url}}/post` + JSON body |
+
+Environment variable:
+
+| Key | Value |
+| --- | --- |
+| `base_url` | `https://example.test` |
+
+Tree row labels use `{method} {name}` (e.g. `GET Seed GET`). The env selector
+lists `Agent E2E`; without a restored `last_environment_id` the active
+selection stays `No Environment` (present ≠ active).
+
+No secrets, no live hosts as the primary HTTP path (determinism: PYPOST-859).
+
+## Proof strategy
+
+After ready, tests prove seed via `COLLECTION_TREE` / `ENV_SELECTOR` identity
+plus model / combo-item enumeration — not blank-ready `ui_snapshot` name
+scan, and not disk-write asserts alone. See
+`tests/test_agent_e2e_seed.py`.
+
+## Configuration
+
+| Setting | Notes |
+| --- | --- |
+| `data_dir` | Must receive seed **before** `AgentAppSession.start()` |
+| `config_dir` | Separate injectable dir; seed does not write config |
+| Offscreen Qt | Prefer `make test-agent-e2e` (`QT_QPA_PLATFORM=offscreen`) |
+| Inventory | Fixed in fixture module; change constants + this page together |
+
+No product settings or env vars gate the seed writer. Logging follows
+[logging.md](logging.md) (`agent_e2e_seed_completed` /
+`agent_e2e_seed_failed`).
+
+## Troubleshooting
+
+- **Seed missing after ready** — Same `data_dir` for write and session;
+  write before `start()`.
+- **Present ≠ active env** — `Agent E2E` is listed; active may stay
+  `No Environment` without `last_environment_id`.
+- **Assert on snapshot names only** — Use identity + model/item enum;
+  blank-ready snapshot is selection-scoped.
+- **Persist / disk errors** — Grep `agent_e2e_seed_failed` (and
+  `storage_*`); exception is re-raised.
+- **Confused with golden blank dir** — Golden uses empty `data_dir`;
+  seed is the env-pack workspace path.
+- **Module not in make target** — Listed under `make test-agent-e2e`;
+  see [agent_e2e.md](agent_e2e.md).
+
+## Related
+
+- [Agent E2E Environment Contract](agent_e2e_env.md)
+- [Agent UI E2E](agent_e2e.md)
+- [Agent App Lifecycle](agent_lifecycle.md)
+- [Logging Event Naming](logging.md)

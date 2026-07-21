@@ -85,7 +85,8 @@ test-agent-e2e: $(VENV_MARKER) venv-otel ## Run agent UI e2e harness tests (life
 		tests/test_ui_actions.py \
 		tests/test_ui_snapshot.py \
 		tests/test_ui_wait.py \
-		tests/test_agent_golden_e2e.py)
+		tests/test_agent_golden_e2e.py \
+		tests/test_agent_e2e_seed.py)
 
 lint: $(VENV_MARKER) ## Run flake8 static analysis on pypost/
 	$(BIN)/python -m flake8 --jobs=1 pypost/

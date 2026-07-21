@@ -1,1 +1,1 @@
-"""Programmatic test fixture builders for committed repo artifacts."""
+"""Programmatic test fixture builders (MCP samples, agent e2e seed)."""

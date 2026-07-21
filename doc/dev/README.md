@@ -88,6 +88,7 @@ set up your development environment, and contribute to the project.
 1. [GUI Testing](gui_testing.md)
 1. [Agent UI E2E (PYPOST-839)](agent_e2e.md)
 1. [Agent E2E Environment Contract (PYPOST-856)](agent_e2e_env.md)
+1. [Agent E2E Seed Inventory (PYPOST-857)](agent_e2e_seed.md)
 1. [Agent App Lifecycle (PYPOST-833)](agent_lifecycle.md)
 1. [UI Widget Identity (PYPOST-834)](ui_identity.md)
 1. [UI State Snapshot (PYPOST-835)](ui_snapshot.md)

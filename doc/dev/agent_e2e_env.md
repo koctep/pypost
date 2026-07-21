@@ -90,8 +90,10 @@ After env bootstrap, a scenario can assume:
 - Known **sample requests** exist so authors need not assemble URL/method/body
   solely to reach a meaningful product state.
 
-Exact seed inventory content is defined when PYPOST-857 lands; this contract
-requires that seed be **shared and documented**, not ad-hoc per test.
+Exact seed inventory (ids, display names, sample requests, `base_url`) lives
+in [agent_e2e_seed.md](agent_e2e_seed.md) and
+`pypost/fixtures/agent_e2e_seed.py` (PYPOST-857). This contract requires that
+seed be **shared and documented**, not ad-hoc per test.
 
 ### Isolation
 
@@ -144,20 +146,21 @@ workspace state should prefer seed + shared HTTP layer once siblings land.
 
 ## Implementation status
 
-This story delivers the contract only. Fixture, marker, HTTP layer, artifact
-hook, and make/CI wiring are **out of scope** here:
+Contract story (PYPOST-856) delivered the model below. Sibling fixture areas
+land incrementally:
 
-| Area | Story |
-| --- | --- |
-| Workspace seed | [PYPOST-857](https://pypost.atlassian.net/browse/PYPOST-857) |
-| Session + `agent_e2e` marker | [PYPOST-858](https://pypost.atlassian.net/browse/PYPOST-858) |
-| Deterministic HTTP layer | [PYPOST-859](https://pypost.atlassian.net/browse/PYPOST-859) |
-| Failure artifacts | [PYPOST-860](https://pypost.atlassian.net/browse/PYPOST-860) |
-| Make / CI for env pack | [PYPOST-861](https://pypost.atlassian.net/browse/PYPOST-861) |
+| Area | Story | Status |
+| --- | --- | --- |
+| Workspace seed | PYPOST-857 | Delivered — [agent_e2e_seed.md](agent_e2e_seed.md) |
+| Session + `agent_e2e` marker | PYPOST-858 | Not yet |
+| Deterministic HTTP layer | PYPOST-859 | Not yet |
+| Failure artifacts | PYPOST-860 | Not yet |
+| Make / CI for env pack | PYPOST-861 | Not yet |
 
 ## Related
 
 - [Agent UI E2E](agent_e2e.md) — PYPOST-832 umbrella + `make test-agent-e2e`
+- [Agent E2E Seed Inventory](agent_e2e_seed.md) — PYPOST-857 workspace seed
 - [Agent Golden E2E](agent_golden_e2e.md) — composition proof
 - [Agent App Lifecycle](agent_lifecycle.md)
 - [UI Widget Identity](ui_identity.md)

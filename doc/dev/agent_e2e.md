@@ -29,6 +29,7 @@ and Prometheus checks, see [testing.md](testing.md) and
 | Wait | [ui_wait.md](ui_wait.md) | Settle predicates after actions |
 | Golden | [agent_golden_e2e.md](agent_golden_e2e.md) | Composed Send → response proof |
 | Env pack | [agent_e2e_env.md](agent_e2e_env.md) | Seed, isolation, HTTP, markers (855) |
+| Seed inventory | [agent_e2e_seed.md](agent_e2e_seed.md) | Known collections/envs/requests (857) |
 | GUI notes | [gui_testing.md](gui_testing.md) | Offscreen Qt, fixtures, pitfalls |
 
 ```mermaid
@@ -65,6 +66,7 @@ Default modules:
 | `tests/test_ui_snapshot.py` | Snapshot capture |
 | `tests/test_ui_wait.py` | Settle / wait |
 | `tests/test_agent_golden_e2e.py` | Golden product flow |
+| `tests/test_agent_e2e_seed.py` | Seeded workspace (857) |
 
 Override the file list like other test targets (`PYTEST_ARGS` **replaces**
 defaults):
@@ -148,6 +150,7 @@ timeouts: [testing.md](testing.md).
 - [UI Settle / Wait Helpers](ui_wait.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Agent E2E Environment Contract](agent_e2e_env.md)
+- [Agent E2E Seed Inventory](agent_e2e_seed.md)
 - [GUI Testing](gui_testing.md)
 - [Testing via MCP and Prometheus](testing.md)
 - [MCP Integration](mcp_integration.md)

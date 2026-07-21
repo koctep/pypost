@@ -98,6 +98,8 @@ different call sites.
 | `ui_action_applied` | DEBUG | `primitive`, `widget_id`, `outcome`, `duration_ms` | `agent/ui_actions` |
 | `ui_wait_settled` | DEBUG | `condition`, `waited_ms`, `timeout_s` | `agent/ui_wait` |
 | `ui_wait_timeout` | DEBUG | `condition`, `waited_ms`, `timeout_s` | `agent/ui_wait` |
+| `agent_e2e_seed_completed` | INFO | `data_dir`, ids, counts | `fixtures/agent_e2e_seed` |
+| `agent_e2e_seed_failed` | ERROR | `data_dir`, exception | `fixtures/agent_e2e_seed` |
 | `*_source` | DEBUG | `source=injected\|new` | composition-root injectors |
 
 Agent session contract and ready-gate semantics:
@@ -446,6 +448,7 @@ Update this document when adding new domains or stable public events operators r
 | --- | --- |
 | [observability_audit.md](observability_audit.md) | Audit summary, metrics, MCP activity, gaps |
 | [agent_lifecycle.md](agent_lifecycle.md) | Agent launch → ready → shutdown (PYPOST-833) |
+| [agent_e2e_seed.md](agent_e2e_seed.md) | Agent e2e seeded workspace (PYPOST-857) |
 | [testing.md](testing.md) | pytest `log_cli`, CI guardrails |
 | [mcp_integration.md](mcp_integration.md) | MCP activity viewer |
 | [security_audit.md](security_audit.md) | Secrets in logs |
