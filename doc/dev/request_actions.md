@@ -127,6 +127,9 @@ Layout-managed `+` control using Qt tab-bar APIs:
 - **Fallback click path**: `_on_tab_bar_clicked` on `tabBarClicked` at the plus index emits
   `new_tab_requested` when the user clicks plus-tab chrome outside the embedded button.
 - Close requests on the plus tab are ignored; tab cycling skips the placeholder.
+- After `TabsPresenter.close_tab` removes a request tab, if any request tabs remain and Qt
+  left current on `+` (common when closing the rightmost request tab), the presenter
+  reselects via `navigable_tab_indices()` (prefer the previous request tab).
 - Use `_request_tab_count()` (or filter `RequestTab` widgets) instead of raw `QTabWidget.count()`.
 
 ### `RequestTabHeader.set_tab_label(index, label)`
@@ -273,6 +276,15 @@ QT_QPA_PLATFORM=offscreen python -m pytest \
 - Confirm `RequestTabHeader.tab_bar.setExpanding(False)` is active after attach.
 - Verify the plus placeholder tab exists (`plus_tab_index() >= 0`) and is the last tab.
 - Check `QTabBar.setTabButton` still attaches the `+` widget on the plus tab index.
+
+### Closing a request tab leaves focus on `+`
+
+- Qt `removeTab` advances current to the next index; when closing the rightmost request tab
+  that next index is the trailing `+`.
+- Confirm `TabsPresenter.close_tab` reselects via `navigable_tab_indices()` when current is
+  not a request tab (PYPOST-824).
+- Regression tests: `test_close_rightmost_of_*_does_not_land_on_plus`,
+  `test_handle_close_tab_closes_current` in `tests/test_tabs_presenter.py`.
 
 ### `Ctrl+N` works but `+` click does nothing
 

@@ -154,6 +154,15 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._tabs.removeTab(index)
         if self._request_tab_count() == 0:
             self.add_new_tab(save_state=False)
+        else:
+            # Qt removeTab can land on trailing +; keep focus on a request tab.
+            indices = self._header.navigable_tab_indices()
+            current = self._tabs.currentIndex()
+            if indices and current not in indices:
+                preferred = max(0, index - 1)
+                if preferred not in indices:
+                    preferred = indices[-1]
+                self._tabs.setCurrentIndex(preferred)
         self.save_tabs_state()
 
     def restore_tabs(self) -> None:
