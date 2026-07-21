@@ -3,10 +3,13 @@ import pytest
 pytestmark = pytest.mark.timeout(60)
 
 import logging
+import os
+import subprocess
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication, QWidget, QInputDialog
 
 from pypost.core.key_provider import EnvironmentEncryptionError
@@ -14,6 +17,9 @@ from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.models.models import Environment, Collection, RequestData
 from pypost.models.settings import AppSettings
+from tests.helpers.process_until import process_until
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _make_env(env_id: str, name: str, variables=None, enable_mcp=False) -> Environment:
@@ -602,22 +608,75 @@ class TestEnvPresenter(unittest.TestCase):
         p.environments_loaded.connect(lambda: loaded.append(True))
         p.load_environments()
 
-        loop = QEventLoop()
-        timer = QTimer()
-        timer.setInterval(10)
-
-        def check_done():
-            if loaded:
-                loop.quit()
-
-        timer.timeout.connect(check_done)
-        timer.start()
-        loop.exec()
-        timer.stop()
+        process_until(lambda: bool(loaded), timeout_ms=5_000)
 
         self.assertEqual(len(loaded), 1)
         self.assertEqual(p.environment_count(), 2)
         self.assertEqual(p.environment_display_name_at(1), "Production")
+
+    @pytest.mark.timeout(15)
+    def test_async_load_wait_exits_near_deadline_when_never_complete(self):
+        """Async-load wait fails near wall-clock deadline (PYPOST-877).
+
+        Never-true predicate must exit in ~300 ms with AssertionError via
+        shared ``process_until`` (wall-clock + posted quit). Run in a
+        subprocess so a hang cannot wedge the parent pytest process.
+        """
+        child = r"""
+import sys
+import time
+from pathlib import Path
+
+repo = Path(r"%s")
+sys.path.insert(0, str(repo))
+
+from PySide6.QtWidgets import QApplication
+
+from tests.helpers.process_until import process_until
+
+app = QApplication.instance() or QApplication([])
+started = time.monotonic()
+try:
+    process_until(lambda: False, timeout_ms=300)
+except AssertionError as exc:
+    if "condition not met within 300ms" not in str(exc):
+        print("BAD_MESSAGE:", exc, file=sys.stderr)
+        raise SystemExit(2)
+    elapsed_s = time.monotonic() - started
+    if elapsed_s >= 2.0:
+        print(f"TOO_SLOW: {elapsed_s:.2f}s", file=sys.stderr)
+        raise SystemExit(3)
+    raise SystemExit(0)
+else:
+    print("NO_ASSERTION", file=sys.stderr)
+    raise SystemExit(4)
+""" % (_REPO_ROOT,)
+        env = {
+            **os.environ,
+            "QT_QPA_PLATFORM": "offscreen",
+            "PYTHONPATH": os.pathsep.join(
+                [str(_REPO_ROOT), *os.environ.get("PYTHONPATH", "").split(os.pathsep)]
+            ),
+        }
+        try:
+            result = subprocess.run(
+                [sys.executable, "-c", child],
+                timeout=2.0,
+                capture_output=True,
+                text=True,
+                env=env,
+                cwd=str(_REPO_ROOT),
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "async-load wait hung past wall-clock deadline "
+                "(expected AssertionError within ~300ms via process_until)"
+            )
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"stdout={result.stdout!r} stderr={result.stderr!r}",
+        )
 
     def test_save_failure_shows_warning_dialog(self):
         p = self._make_presenter([])

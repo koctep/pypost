@@ -175,13 +175,16 @@ Hang-regression coverage in `tests/test_env_storage_responsiveness.py`:
 - `test_process_until_exits_on_wall_clock_deadline`
 - `test_process_until_exits_via_posted_quit_without_poll_timer`
 
-Modules that use the shared helper (PYPOST-827 / PYPOST-828):
+Modules that use the shared helper (PYPOST-827 / PYPOST-828 / PYPOST-877):
 
 - `tests/test_env_storage_responsiveness.py` — `qapp` parameter
 - `tests/test_environment_storage_gateway.py` — `usefixtures("qapp")`
 - `tests/test_collection_storage_gateway.py` — `usefixtures("qapp")`
 - `tests/test_collection_storage_worker.py` — still module-local `setUpClass`
   (follow-up; not gateway surface)
+- `tests/test_env_presenter.py` — still module-local `setUpClass` qapp
+  (suite-wide migration: PYPOST-886); async-load encryption refresh wait and
+  hang-exit proof use shared `process_until` (PYPOST-877)
 
 H3 worker-lifecycle canary (PYPOST-829): `tests/test_storage_gateway_h3_stress.py`
 (≥200 rapid cycles + GC per gateway; shared `qapp` via `usefixtures`, PYPOST-830).
@@ -279,3 +282,5 @@ make test-agent-e2e
 - [PYPOST-828](https://pypost.atlassian.net/browse/PYPOST-828) — richer timeout diagnostics
 - [PYPOST-830](https://pypost.atlassian.net/browse/PYPOST-830) —
   gateway `TestCase` shared `qapp` via `usefixtures`
+- [PYPOST-877](https://pypost.atlassian.net/browse/PYPOST-877) —
+  env-presenter async-load wait on shared `process_until`
