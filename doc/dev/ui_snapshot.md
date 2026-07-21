@@ -188,6 +188,8 @@ Actions and settle waits are documented separately. Composed product proof:
 - [UI action tools](ui_actions.md) — click / fill / select / send key by id
 - [UI settle / wait helpers](ui_wait.md) — wait for conditions after actions
 - [Agent golden e2e](agent_golden_e2e.md) — composed Send → response proof
+- [Agent E2E Failure Artifacts](agent_e2e_failure_artifacts.md) — dump on
+  assert fail (reuses this snapshot API)
 - [GUI testing](gui_testing.md) — offscreen Qt test patterns
 - [Sensitive data masking policy](sensitive_data_masking_policy.md) — broader
   secrets handling

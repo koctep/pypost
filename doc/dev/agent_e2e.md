@@ -80,6 +80,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_golden_e2e.py` | Golden product flow |
 | `tests/test_agent_e2e_seed.py` | Seeded workspace (857) |
 | `tests/test_agent_e2e_http_env.py` | Env Send + shared HTTP (859) |
+| `tests/test_agent_e2e_failure_artifacts.py` | Failure snapshot dumps (860) |
 
 Narrow to an explicit file list via `PYTEST_ARGS` (replaces the default
 `-m` expression):
@@ -170,6 +171,7 @@ scenarios.
 | Drive UI | `session.ui_fill` / `ui_select` / `ui_click` / … |
 | Observe | `session.ui_snapshot()` |
 | Settle | `session.wait_for_snapshot` / `wait_until` / … |
+| Failure dump | Auto on fixture assert fail — [failure artifacts](agent_e2e_failure_artifacts.md) |
 
 ### Identity convention
 
@@ -193,9 +195,11 @@ stub 200) → assert response panel status and body. Full steps:
 | Marker selection | `make test-agent-e2e` → `-m "agent_e2e and not slow"` |
 | File-list override | `PYTEST_ARGS` replaces the default `-m` expression |
 | CI make gate | `.github/workflows/test.yml` job `agent-e2e` (PYPOST-861) |
+| Failure artifacts | `artifacts/agent_e2e/` or `PYPOST_AGENT_E2E_ARTIFACTS` (860) |
 | Module timeouts | Per-test / module `pytest.mark.timeout` (see sibling docs) |
 
-No extra env vars beyond the project’s standard GUI test path.
+Failure dumps: [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
+Otherwise no extra env vars beyond the project’s standard GUI test path.
 
 When adding another agent e2e module, mark it `@pytest.mark.agent_e2e`
 (and link it from this page / the table above). File-list `PYTEST_ARGS`
@@ -213,6 +217,8 @@ overrides remain supported for narrow runs.
 | Marker not listed | Confirm registration in `pyproject.toml`; run `pytest --markers` |
 | CI make gate red | Reproduce with `make install && make test-agent-e2e`; see job |
 | | `agent-e2e` in `.github/workflows/test.yml` |
+| Assert fail, need UI state | Open `artifacts/agent_e2e/` — see |
+| | [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) |
 
 More GUI pitfalls: [gui_testing.md](gui_testing.md). Suite-wide pytest /
 timeouts: [testing.md](testing.md).
@@ -228,6 +234,7 @@ timeouts: [testing.md](testing.md).
 - [Agent E2E Environment Contract](agent_e2e_env.md)
 - [Agent E2E Seed Inventory](agent_e2e_seed.md)
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)
+- [Agent E2E Failure Artifacts](agent_e2e_failure_artifacts.md)
 - [GUI Testing](gui_testing.md)
 - [Testing via MCP and Prometheus](testing.md)
 - [MCP Integration](mcp_integration.md)

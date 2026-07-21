@@ -28,6 +28,9 @@ htmlcov/
 coverage.xml
 junit.xml
 
+# Agent e2e failure artifacts (PYPOST-860)
+artifacts/
+
 # Virtual Environment
 venv/
 env/

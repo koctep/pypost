@@ -156,7 +156,7 @@ land incrementally:
 | Workspace seed | PYPOST-857 | Delivered — [agent_e2e_seed.md](agent_e2e_seed.md) |
 | Session + `agent_e2e` marker | PYPOST-858 | Delivered — fixtures + marker in [agent_e2e.md](agent_e2e.md) |
 | Deterministic HTTP layer | PYPOST-859 | Delivered — [agent_e2e_http.md](agent_e2e_http.md) |
-| Failure artifacts | PYPOST-860 | Not yet |
+| Failure artifacts | PYPOST-860 | Delivered — [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) |
 | Make / CI for env pack | PYPOST-861 | Delivered — see [agent_e2e.md](agent_e2e.md) |
 
 ## Related
@@ -164,6 +164,7 @@ land incrementally:
 - [Agent UI E2E](agent_e2e.md) — PYPOST-832 umbrella + `make test-agent-e2e`
 - [Agent E2E Seed Inventory](agent_e2e_seed.md) — PYPOST-857 workspace seed
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md) — PYPOST-859 canned HTTP
+- [Agent E2E Failure Artifacts](agent_e2e_failure_artifacts.md) — PYPOST-860 dumps
 - [Agent Golden E2E](agent_golden_e2e.md) — composition proof
 - [Agent App Lifecycle](agent_lifecycle.md)
 - [UI Widget Identity](ui_identity.md)
