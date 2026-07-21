@@ -12,7 +12,9 @@ in sibling docs; the golden Send → response proof lives in
 model (seed, isolation, fixtures inventory) is
 [agent_e2e_env.md](agent_e2e_env.md).
 
-Prefer `make test-agent-e2e` over ad-hoc pytest one-liners.
+Prefer `make test-agent-e2e` over ad-hoc pytest one-liners. CI gates the same
+target via the `agent-e2e` job in `.github/workflows/test.yml` (PYPOST-861);
+the main fast suite also includes these tests via `-m "not slow"`.
 
 This is **not** live MCP verification against a running PyPost. For MCP tools
 and Prometheus checks, see [testing.md](testing.md) and
@@ -91,6 +93,18 @@ The same modules still run under the full fast suite:
 ```bash
 make test
 ```
+
+### CI (PYPOST-861)
+
+| Entry | What runs |
+| --- | --- |
+| Job `agent-e2e` | `make install` then `make test-agent-e2e` (Python 3.11) |
+| Job `test` (matrix) | `pytest tests/ -m "not slow"` — includes `agent_e2e` |
+
+Prefer the make target locally and when debugging pack failures. The dedicated
+job proves the Makefile recipe; the matrix keeps multi-version coverage.
+
+See [testing.md](testing.md) for suite-wide CI layout.
 
 ### Marker: `agent_e2e`
 
@@ -178,6 +192,7 @@ stub 200) → assert response panel status and body. Full steps:
 | Session offscreen | Fixtures / `AgentAppSession(offscreen=True)` setdefault the env var |
 | Marker selection | `make test-agent-e2e` → `-m "agent_e2e and not slow"` |
 | File-list override | `PYTEST_ARGS` replaces the default `-m` expression |
+| CI make gate | `.github/workflows/test.yml` job `agent-e2e` (PYPOST-861) |
 | Module timeouts | Per-test / module `pytest.mark.timeout` (see sibling docs) |
 
 No extra env vars beyond the project’s standard GUI test path.
@@ -196,6 +211,8 @@ overrides remain supported for narrow runs.
 | Confused with MCP | MCP needs a running app + MCP enabled; agent e2e is in-process pytest |
 | Want one file only | `make test-agent-e2e PYTEST_ARGS="tests/test_….py -v"` |
 | Marker not listed | Confirm registration in `pyproject.toml`; run `pytest --markers` |
+| CI make gate red | Reproduce with `make install && make test-agent-e2e`; see job |
+| | `agent-e2e` in `.github/workflows/test.yml` |
 
 More GUI pitfalls: [gui_testing.md](gui_testing.md). Suite-wide pytest /
 timeouts: [testing.md](testing.md).

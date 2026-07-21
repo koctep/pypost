@@ -14,14 +14,15 @@ guardrails, and coverage. Agent authoring rules live in
 make test            # fast suite (excludes -m slow)
 make test-cov        # with coverage report
 make test-slow       # network-heavy Makefile smoke
-make test-agent-e2e  # agent UI e2e (-m agent_e2e; file list via PYTEST_ARGS)
+make test-agent-e2e  # agent UI e2e + env pack (-m agent_e2e; PYTEST_ARGS overrides)
 ```
 
 Agent UI e2e (in-process offscreen harness) is documented in
 [agent_e2e.md](agent_e2e.md). The reusable env pack model (seed, isolation,
-fixture areas) is in [agent_e2e_env.md](agent_e2e_env.md). That path is
-separate from live MCP checks against
-a running PyPost (see § Testing via MCP below and
+fixture areas) is in [agent_e2e_env.md](agent_e2e_env.md). CI runs the pack via
+`make test-agent-e2e` in job `agent-e2e` (PYPOST-861); the main fast suite also
+includes those tests under `-m "not slow"`. That path is separate from live MCP
+checks against a running PyPost (see § Testing via MCP below and
 [mcp_integration.md](mcp_integration.md)).
 
 Pass extra pytest arguments via `PYTEST_ARGS` (PYPOST-791). When set, `PYTEST_ARGS`
@@ -495,6 +496,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-559] | Optional slow `make install` with real `pyproject.toml` in isolated workspace |
 | [PYPOST-279] | Pytest exit code `5` (no tests collected) policy in `make test` and CI |
 | [PYPOST-800] | Smoke for `make help` non-empty output (PYPOST-794 follow-up) |
+| [PYPOST-861] | Smoke for `make test-agent-e2e` (deps, help, recipe, marker selection) |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -503,6 +505,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-559]: https://pypost.atlassian.net/browse/PYPOST-559
 [PYPOST-279]: https://pypost.atlassian.net/browse/PYPOST-279
 [PYPOST-800]: https://pypost.atlassian.net/browse/PYPOST-800
+[PYPOST-861]: https://pypost.atlassian.net/browse/PYPOST-861
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -512,6 +515,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
 | Slow install smoke | `make install` with real `pyproject.toml` succeeds; marked `@pytest.mark.slow` |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
+| Agent e2e target | deps (`venv-otel`), help listing, recipe marker, selection smoke (861) |
 
 ### Python interpreter decoupling (PYPOST-718)
 
@@ -541,6 +545,8 @@ CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest
 (`pyproject.toml` `[tool.pytest.ini_options]` `addopts`) and `make test` exclude `-m slow`. A
 separate `make-install-smoke` job in
 `.github/workflows/test.yml` runs `-m slow` Makefile tests on Python 3.11.
+Job `agent-e2e` runs `make install && make test-agent-e2e` on Python 3.11
+(PYPOST-861 env-pack make gate; see [agent_e2e.md](agent_e2e.md)).
 
 ## CI dependency caching (PYPOST-311)
 
@@ -553,7 +559,7 @@ the runner home directory and restores them before dependency installation.
 | --- | --- |
 | **Cache key** | OS + Python version + SHA-256 hash of `pyproject.toml` and all four requirements files |
 | **Invalidation** | Any edit to a lock or source file produces a new key (cold install) |
-| **Scope** | Main `test` matrix (3.11, 3.13), `make-install-smoke` (3.11), `security-audit`, `check-license-inventory`, and `check-lock-dev` |
+| **Scope** | Main `test` matrix (3.11, 3.13), `make-install-smoke` (3.11), `agent-e2e` (3.11), `security-audit`, `check-license-inventory`, and `check-lock-dev` |
 | **Local dev** | `make install` uses Makefile `.venv`; GitHub cache applies to CI only |
 
 The slow install smoke runs `make install` in an isolated `tmp_path` workspace; pip still

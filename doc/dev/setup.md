@@ -250,11 +250,13 @@ full regression with:
 make test            # fast suite (-m "not slow")
 make test-slow       # Makefile install smoke
 make test-cov        # fast suite with coverage
-make test-agent-e2e  # agent UI e2e harness (lifecycle…golden)
+make test-agent-e2e  # agent UI e2e + env pack (-m agent_e2e)
 ```
 
 See [testing.md](testing.md) § Reproducible test environment for the full checklist and CI
 parity notes (main job installs `pip install -e ".[dev,otel]"`, matching local `make install`).
+Agent e2e / env pack: [agent_e2e.md](agent_e2e.md); CI job `agent-e2e` runs
+`make test-agent-e2e` (PYPOST-861).
 
 CI runs the fast suite on every push and pull request via `.github/workflows/test.yml`
 (Python 3.11 and 3.13) on **GitHub-hosted `ubuntu-latest`**. `sudo apt-get` installs EGL/GL/XCB

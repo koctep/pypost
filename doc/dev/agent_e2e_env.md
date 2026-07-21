@@ -110,9 +110,9 @@ seed be **shared and documented**, not ad-hoc per test.
   path ([gui_testing.md](gui_testing.md), [agent_e2e.md](agent_e2e.md)).
 - **Determinism:** no live network as the default agent-flow path; HTTP
   boundary stubbed through the shared layer (PYPOST-859).
-- **Run entry:** the env pack is incomplete until a first-class make (and CI)
-  entry exists (PYPOST-861). Document the expectation here; wire later.
-  Until then, do not treat undocumented shell-only recipes as the contract.
+- **Run entry:** `make test-agent-e2e` (and CI job `agent-e2e`) are the
+  first-class env-pack make/CI path (PYPOST-861). Do not treat undocumented
+  shell-only recipes as the contract.
 - **Secrets:** failure dumps must not weaken snapshot / masking policy
   ([ui_snapshot.md](ui_snapshot.md)); dump format and enforcement are owned by
   PYPOST-860.
@@ -157,7 +157,7 @@ land incrementally:
 | Session + `agent_e2e` marker | PYPOST-858 | Delivered — fixtures + marker in [agent_e2e.md](agent_e2e.md) |
 | Deterministic HTTP layer | PYPOST-859 | Delivered — [agent_e2e_http.md](agent_e2e_http.md) |
 | Failure artifacts | PYPOST-860 | Not yet |
-| Make / CI for env pack | PYPOST-861 | Not yet |
+| Make / CI for env pack | PYPOST-861 | Delivered — see [agent_e2e.md](agent_e2e.md) |
 
 ## Related
 
