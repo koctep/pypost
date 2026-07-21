@@ -11,6 +11,10 @@ from pypost.models.models import Environment
 
 logger = logging.getLogger(__name__)
 
+# Short join after QThread.finished so native cleanup completes before GC/delete
+# (PYPOST-829 H3). Bound must stay small — slot runs on the GUI thread.
+_WORKER_FINISH_WAIT_MS = 100
+
 
 class EnvironmentStorageGateway(QObject):
     load_completed = Signal(list)
@@ -107,7 +111,18 @@ class EnvironmentStorageGateway(QObject):
         self.save_failed.emit(error)
 
     def _on_worker_finished(self) -> None:
+        finished = self._worker
         self._worker = None
+        if finished is not None:
+            finished.deleteLater()
+            if not finished.wait(_WORKER_FINISH_WAIT_MS):
+                logger.warning(
+                    "environment_storage_gateway_worker_finish_wait_timeout "
+                    "wait_ms=%d pending_save=%s pending_load=%s",
+                    _WORKER_FINISH_WAIT_MS,
+                    self._pending_save is not None,
+                    self._pending_load,
+                )
         if self._pending_save is not None:
             pending = self._pending_save
             self._pending_save = None

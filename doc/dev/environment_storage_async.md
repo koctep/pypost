@@ -34,8 +34,8 @@ flowchart TD
 
 | Component | Module | Responsibility |
 | --- | --- | --- |
-| Worker | `pypost/core/environment_storage_worker.py` | Runs one load or save on a background `QThread` |
-| Gateway | `pypost/core/environment_storage_gateway.py` | Single-flight queue, save coalescing, signal bridge |
+| Worker | `pypost/core/qt/environment_storage_worker.py` | Runs one load or save on a background `QThread` |
+| Gateway | `pypost/core/qt/environment_storage_gateway.py` | Single-flight queue, save coalescing, signal bridge |
 | Presenter | `pypost/ui/presenters/env_presenter.py` | Routes sync vs async; applies load results; save errors |
 | Startup | `pypost/ui/main_window.py` | Defers tab/tree restore until `environments_loaded` when encrypted |
 | Storage | `pypost/core/storage.py` | Unchanged sync encrypt/decrypt and atomic I/O (called from worker) |
@@ -57,6 +57,20 @@ flowchart TD
 - **Load after save:** a load requested while busy is queued and runs after the current operation
   and any pending save drain.
 
+### Worker finish teardown (PYPOST-829)
+
+When the worker emits `QThread.finished`, `_on_worker_finished`:
+
+1. Captures the finished worker and clears `self._worker`.
+2. Calls `deleteLater()` then a short `wait(100)` (`_WORKER_FINISH_WAIT_MS`) so native
+   post-`finished` cleanup completes before Python GC can destroy the `QThread`.
+3. Drains pending save/load by starting a **new** worker (coalescing / queue semantics
+   unchanged).
+
+Dropping the only Python ref without `deleteLater` / short `wait` caused segfaults under
+rapid churn + GC (H3). Do not use unbounded `wait()` on the GUI thread. The same pattern
+applies to `CollectionStorageGateway` — see [Collection Loading](collection_loading.md).
+
 ## API / Usage
 
 ### `EnvironmentStorageWorker`
@@ -75,7 +89,8 @@ class EnvironmentStorageWorker(QThread):
 - **save:** `run()` → `storage.save_environments(environments)` → `save_finished` or
   `save_failed`.
 
-Worker objects are created per operation and discarded when the thread finishes.
+Worker objects are created per operation. On `finished`, the gateway schedules
+`deleteLater()` and a short `wait(100)` before starting any pending restart (PYPOST-829).
 
 ### `EnvironmentStorageGateway`
 
@@ -161,6 +176,12 @@ Settings coordination logs (`wait_idle`):
 - `environment_storage_gateway_wait_idle_completed` (`elapsed_ms`)
 - `environment_storage_gateway_wait_idle_timeout` (`elapsed_ms`) — see Troubleshooting
 
+Worker finish hygiene (PYPOST-829; rare path only):
+
+- `environment_storage_gateway_worker_finish_wait_timeout` (WARNING) —
+  `wait_ms`, `pending_save`, `pending_load` — short join after `finished` timed out.
+  Happy-path finish is not logged (would spam every load/save).
+
 ## Troubleshooting
 
 ### UI still feels slow with encryption enabled
@@ -205,6 +226,24 @@ restart or re-apply per encryption-at-rest docs.
 
 **Fix:** investigate worker/storage logs; avoid calling `apply_encryption_settings` until idle.
 
+### Worker finish wait timeout warning
+
+**Symptoms:** log `environment_storage_gateway_worker_finish_wait_timeout`.
+
+**Cause:** after `QThread.finished`, native cleanup did not finish within
+`_WORKER_FINISH_WAIT_MS` (100 ms). Pending restart may still proceed.
+
+**Fix:** triage with pending flags in the log; raise the bound only with field evidence.
+Do not convert to unbounded GUI `wait()`. See `ai-tasks/PYPOST-829/50-observability.md`.
+
+### Segfault in `_on_worker_finished` under suite churn
+
+**Cause (historical):** clearing `self._worker` without `deleteLater` / short `wait`
+allowed premature `QThread` destruction (PYPOST-829 H3). Fixed in both env and collection
+gateways.
+
+**Regression canary:** `tests/test_storage_gateway_h3_stress.py` (≥200 rapid cycles + GC).
+
 ## Tests
 
 Focused suites:
@@ -214,8 +253,16 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_environment_storage_worker.py \
   tests/test_environment_storage_gateway.py \
   tests/test_env_storage_responsiveness.py \
-  tests/test_env_presenter.py
+  tests/test_env_presenter.py \
+  tests/test_storage_gateway_h3_stress.py
 ```
+
+### H3 worker-lifecycle canary (PYPOST-829)
+
+`tests/test_storage_gateway_h3_stress.py` runs ≥200 rapid load/save + pending-restart
+cycles per gateway with `gc.collect()` between batches. Guards against segfault or
+stranded completions after worker finish. Prefer isolation (no heavy suite prefix) when
+triaging native crashes — see [gui_testing.md](gui_testing.md).
 
 ### Responsiveness harness hang defense (PYPOST-823 / PYPOST-827 / PYPOST-828)
 

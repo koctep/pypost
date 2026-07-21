@@ -187,7 +187,7 @@ scalars only; diagnostics live on `UiWaitTimeoutError`).
 | `collection_request_opened` | INFO | `request_id`, `request_name` | collections presenter |
 | `collection_storage_async_load_dispatched` | INFO | — | async loader |
 | `collection_storage_async_load_failed` | ERROR | `error` | async loader |
-| `collection_storage_gateway_*` | DEBUG/INFO | load/save lifecycle | storage gateway |
+| `collection_storage_gateway_*` | DEBUG/INFO/WARNING | load lifecycle; finish wait timeout | storage gateway |
 | `collection_storage_worker_*` | DEBUG/ERROR | `count`, `error` | storage worker |
 | `storage_data_dir_create_failed` | ERROR | `path`, `error` | `storage` |
 | `storage_load_failed` | ERROR | `path`, `error` | `storage` |

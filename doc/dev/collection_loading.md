@@ -83,10 +83,33 @@ CollectionStorageGateway.load_completed
 
 User-triggered reload uses the same `CollectionStorageGateway` as startup (PYPOST-757).
 
+### Worker finish teardown (PYPOST-829)
+
+`CollectionStorageGateway._on_worker_finished` matches the env gateway hygiene:
+
+1. Capture finished worker; clear `self._worker`.
+2. `deleteLater()` + short `wait(100)` (`_WORKER_FINISH_WAIT_MS`).
+3. If `_pending_load`, start a **new** worker via `_start_load`.
+
+Module: `pypost/core/qt/collection_storage_gateway.py`. Same rationale as
+[Async Environment Storage](environment_storage_async.md) § Worker finish teardown —
+avoids premature `QThread` destruction under rapid churn + GC.
+
 ## Configuration
 
 No configuration flags. Collection files live under the user data `collections/` directory; see
 [collection_storage.md](collection_storage.md).
+
+## Observability
+
+Gateway lifecycle logs (DEBUG/INFO for queue and pending restart) live on
+`collection_storage_gateway_*`. Worker finish hygiene (PYPOST-829):
+
+- `collection_storage_gateway_worker_finish_wait_timeout` (WARNING) —
+  `wait_ms`, `pending_load` — short join after `finished` timed out.
+  Happy-path finish is not logged.
+
+See `ai-tasks/PYPOST-829/50-observability.md` and [Logging](logging.md).
 
 ## Troubleshooting
 
@@ -95,6 +118,25 @@ No configuration flags. Collection files live under the user data `collections/`
 | Tree stale after manual JSON edit on disk | Memory not reloaded | Call `load_collections()` or restart app |
 | Tree wrong after save | Bug in RequestManager CRUD | Check `save_request` / index rebuild |
 | Double disk read on startup | Calling `load_collections()` at startup | Use `refresh_tree()` instead |
+| `collection_storage_gateway_worker_finish_wait_timeout` | Native cleanup past 100 ms after `finished` | Triage pending flag; do not use unbounded GUI `wait()` |
+| Segfault in `_on_worker_finished` under churn | Historical H3 (pre-PYPOST-829) | Run `tests/test_storage_gateway_h3_stress.py` |
+
+## Tests
+
+H3 canary (shared with env gateway):
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_storage_gateway_h3_stress.py -v
+```
+
+Gateway / worker unit modules:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_collection_storage_gateway.py \
+  tests/test_collection_storage_worker.py
+```
 
 ## Performance
 
@@ -106,5 +148,6 @@ For a full vs incremental tree refresh inventory (audit closure
 
 - [Collection Tree Performance](collection_tree_performance.md)
 - [Collection Storage](collection_storage.md)
+- [Async Environment Storage](environment_storage_async.md) — shared gateway finish teardown
 - [Architecture Overview](architecture.md)
 - [Technical Debt: PYPOST-40](tech-debt/PYPOST-40.md)

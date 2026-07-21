@@ -147,6 +147,10 @@ Modules that use the shared helper (PYPOST-827 / PYPOST-828):
 - `tests/test_collection_storage_gateway.py`
 - `tests/test_collection_storage_worker.py`
 
+H3 worker-lifecycle canary (PYPOST-829): `tests/test_storage_gateway_h3_stress.py`
+(≥200 rapid cycles + GC per gateway). Prefer isolation when triaging native crashes;
+suite-prefix noise is a separate concern (PYPOST-830).
+
 ### Timeouts
 
 Every test must declare `pytest.mark.timeout`. Use 30–60s for widget tests, 60–120s for
@@ -184,6 +188,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | --- | --- |
 | `QApplication` already exists | Use module-scoped `qapp`; do not create per-test `QApplication` |
 | Segfault in CI | Ensure offscreen is set before any `PySide6` import |
+| Segfault in storage gateway finish | Historical H3 — run `tests/test_storage_gateway_h3_stress.py` in isolation (PYPOST-829) |
 | Hang past module timeout | SIGALRM cannot cut stuck `exec()` — use § Bounded nested waits |
 | Timeout assert hard to triage | Pass `timeout_detail` / `gateway_timeout_detail` (PYPOST-828) |
 | Test hangs (general) | Add timeout marker; bound waits; prefer `wait_until` (no nested `exec()`) |
