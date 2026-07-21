@@ -1,4 +1,4 @@
-.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures generate-license-inventory check-license-inventory
+.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures generate-license-inventory check-license-inventory
 
 .DEFAULT_GOAL := help
 
@@ -76,6 +76,16 @@ test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage rep
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
 		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov)
+
+test-agent-e2e: $(VENV_MARKER) venv-otel ## Run agent UI e2e harness tests (lifecycle through golden)
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
+		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),\
+		tests/test_agent_lifecycle_smoke.py \
+		tests/test_ui_identity_spotcheck.py \
+		tests/test_ui_actions.py \
+		tests/test_ui_snapshot.py \
+		tests/test_ui_wait.py \
+		tests/test_agent_golden_e2e.py)
 
 lint: $(VENV_MARKER) ## Run flake8 static analysis on pypost/
 	$(BIN)/python -m flake8 --jobs=1 pypost/

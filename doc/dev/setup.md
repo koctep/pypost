@@ -247,9 +247,10 @@ it provisions the editable package with `[dev,otel]` extras (`pytest`, `pytest-c
 full regression with:
 
 ```bash
-make test        # fast suite (-m "not slow")
-make test-slow   # Makefile install smoke
-make test-cov    # fast suite with coverage
+make test            # fast suite (-m "not slow")
+make test-slow       # Makefile install smoke
+make test-cov        # fast suite with coverage
+make test-agent-e2e  # agent UI e2e harness (lifecycle…golden)
 ```
 
 See [testing.md](testing.md) § Reproducible test environment for the full checklist and CI

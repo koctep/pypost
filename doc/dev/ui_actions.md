@@ -121,6 +121,7 @@ widgets that already have `objectName` set via `set_widget_id`.
 
 ## Related
 
+- [Agent UI E2E](agent_e2e.md) — umbrella + `make test-agent-e2e`
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog
 - [UI state snapshot](ui_snapshot.md) — observe after acting

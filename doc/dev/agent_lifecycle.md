@@ -7,8 +7,8 @@ Agents and automated harnesses start PyPost **in-process** via
 entry point for launch → ready → shutdown. Interactive humans keep `make run` →
 `pypost.main.main()` (blocking `QApplication.exec()`).
 
-Epic-wide `make agent-*` packaging is deferred to
-[PYPOST-839](https://pypost.atlassian.net/browse/PYPOST-839).
+Epic packaging entry (umbrella doc + `make test-agent-e2e`):
+[Agent UI E2E](agent_e2e.md).
 
 ## Architecture
 
@@ -207,14 +207,16 @@ see [UI settle / wait helpers](ui_wait.md). Gate: `tests/test_ui_wait.py`.
 
 ## Out of scope (siblings)
 
-Epic `make agent-*` docs (839). Identity (834), snapshots (835), actions (836),
-and settle waits (837) are documented separately — see Related. The composed
-golden product flow is [agent_golden_e2e.md](agent_golden_e2e.md) (838).
+Identity (834), snapshots (835), actions (836), and settle waits (837) are
+documented separately — see Related. The composed golden product flow is
+[agent_golden_e2e.md](agent_golden_e2e.md) (838). Epic packaging umbrella:
+[agent_e2e.md](agent_e2e.md) (`make test-agent-e2e`).
 
 ## Related documentation
 
 | Document | Topic |
 | --- | --- |
+| [agent_e2e.md](agent_e2e.md) | Umbrella agent UI e2e + `make test-agent-e2e` |
 | [gui_testing.md](gui_testing.md) | Offscreen Qt, `wait_until`, GUI test patterns |
 | [ui_identity.md](ui_identity.md) | Stable `objectName` catalog for key controls |
 | [ui_snapshot.md](ui_snapshot.md) | Visible-UI tree for agents after ready |

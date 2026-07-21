@@ -9,6 +9,11 @@ This document describes the internal implementation of the **Model Context Proto
 
 PyPost implements an **MCP Server** using the official Python SDK (`mcp`). This allows external MCP Clients (like Claude Desktop or Cursor) to connect to PyPost and execute HTTP requests defined in the user's collections as "Tools".
 
+**Not the same as agent UI e2e:** in-process offscreen harness tests
+(`make test-agent-e2e`) drive the Qt UI without a live MCP client — see
+[agent_e2e.md](agent_e2e.md). MCP below assumes a running PyPost with the MCP
+server enabled.
+
 **Security:** Inbound MCP has no client authentication. Default bind is loopback-only; see
 [mcp_trust_model.md](mcp_trust_model.md) before exposing MCP on a network.
 

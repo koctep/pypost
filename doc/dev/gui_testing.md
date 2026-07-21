@@ -137,7 +137,10 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | Missing timeout marker | `conftest.py` fails setup — add `pytestmark` or per-function marker |
 | ELF `core` file in repo root | Native crash (SIGSEGV), not a Python exception. Delete the file; do not commit. Repo-root `/core` is gitignored. Run tests via `make test` or set `QT_QPA_PLATFORM=offscreen`. If it recurs, capture `lldb -c core --batch -o bt` and file a ticket with Python/PySide6 versions. See [PYPOST-429 investigation](../../ai-tasks/PYPOST-429/investigation-report.md). |
 
-## Agent lifecycle (in-process)
+## Agent UI e2e (in-process)
+
+Umbrella guide (setup, tools, identity, golden, `make test-agent-e2e`):
+[Agent UI E2E](agent_e2e.md).
 
 For launch → ready → shutdown without `app.exec()`, use
 [`AgentAppSession`](agent_lifecycle.md) (`pypost.agent.lifecycle`). See that doc for
@@ -159,6 +162,12 @@ Wait for async settle conditions after actions — see
 
 Composed golden product flow (Send → response UI) — see
 [Agent golden e2e](agent_golden_e2e.md) (`tests/test_agent_golden_e2e.py`).
+
+Run the harness set with:
+
+```bash
+make test-agent-e2e
+```
 
 ## References
 

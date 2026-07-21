@@ -116,6 +116,7 @@ No environment variables. Identity strings are compile-time constants in
 
 ## Related
 
+- [Agent UI E2E](agent_e2e.md) — umbrella + `make test-agent-e2e`
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI state snapshot](ui_snapshot.md) — visible-UI tree keyed by these names
 - [UI action tools](ui_actions.md) — click / fill / select / send key by id

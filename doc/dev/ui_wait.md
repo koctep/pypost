@@ -115,6 +115,7 @@ pairs). DEBUG logs `ui_wait_settled` / `ui_wait_timeout` with timing scalars onl
 
 ## Related
 
+- [Agent UI E2E](agent_e2e.md) — umbrella + `make test-agent-e2e`
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI action tools](ui_actions.md) — click / fill / select / send key
 - [UI state snapshot](ui_snapshot.md) — observation tree for predicates

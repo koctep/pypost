@@ -14,8 +14,8 @@ The golden scenario **is** a documented pytest
 (`tests/test_agent_golden_e2e.py`) that imports the same `pypost.agent` APIs
 agents use. It does not add a parallel scenario runner under `pypost/agent/`.
 
-Broader `make agent-*` packaging remains
-[PYPOST-839](https://pypost.atlassian.net/browse/PYPOST-839).
+Broader packaging (umbrella doc + `make test-agent-e2e`) is
+[Agent UI E2E](agent_e2e.md).
 
 ## Architecture
 
@@ -56,11 +56,16 @@ required. Status and body widgets under `ResponseView` have no dedicated
 
 ### How to run
 
-Under the project offscreen GUI env (`QT_QPA_PLATFORM=offscreen` via
-`make test`):
+Preferred (epic harness set, including this golden):
 
 ```bash
-make test PYTEST_ARGS="tests/test_agent_golden_e2e.py -v"
+make test-agent-e2e
+```
+
+Golden only under the project offscreen GUI env (`QT_QPA_PLATFORM=offscreen`):
+
+```bash
+make test-agent-e2e PYTEST_ARGS="tests/test_agent_golden_e2e.py -v"
 ```
 
 Or as part of the fast suite:
@@ -137,8 +142,8 @@ the pretty-printed `QTextEdit` text.
 | Lifecycle ready | 30s | `AgentAppSession(ready_timeout=…)` |
 | Send settle | 15s | `wait_for_snapshot(timeout=…)` |
 
-Offscreen is set by `make test` and by `AgentAppSession(offscreen=True)`.
-No new Makefile target in this story (839 owns epic packaging).
+Offscreen is set by `make test-agent-e2e` / `make test` and by
+`AgentAppSession(offscreen=True)`.
 
 ## Troubleshooting
 
@@ -170,6 +175,7 @@ agent events from the composed stack (see [logging.md](logging.md)):
 
 ## Related
 
+- [Agent UI E2E](agent_e2e.md)
 - [Agent App Lifecycle](agent_lifecycle.md)
 - [UI Widget Identity](ui_identity.md)
 - [UI Action Tools](ui_actions.md)

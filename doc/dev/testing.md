@@ -11,10 +11,16 @@ guardrails, and coverage. Agent authoring rules live in
 ### Automated pytest (primary)
 
 ```bash
-make test          # fast suite (excludes -m slow)
-make test-cov      # with coverage report
-make test-slow     # network-heavy Makefile smoke
+make test            # fast suite (excludes -m slow)
+make test-cov        # with coverage report
+make test-slow       # network-heavy Makefile smoke
+make test-agent-e2e  # agent UI e2e harness (lifecycle…golden)
 ```
+
+Agent UI e2e (in-process offscreen harness) is documented in
+[agent_e2e.md](agent_e2e.md). That path is separate from live MCP checks against
+a running PyPost (see § Testing via MCP below and
+[mcp_integration.md](mcp_integration.md)).
 
 Pass extra pytest arguments via `PYTEST_ARGS` (PYPOST-791). When set, `PYTEST_ARGS`
 **replaces** the default path/marker arguments for that target; when unset, behavior is
@@ -24,6 +30,7 @@ unchanged.
 make test PYTEST_ARGS="tests/test_mcp_server_manager.py -q"
 make test PYTEST_ARGS="-k test_format_mcp_bind_error"
 make test-cov PYTEST_ARGS="--cov=pypost.core.qt.mcp_server tests/test_mcp_server_manager.py"
+make test-agent-e2e PYTEST_ARGS="tests/test_agent_golden_e2e.py -v"
 ```
 
 See § Reproducible test environment, § Per-test timeouts, § CI guardrails, and § Makefile
@@ -85,6 +92,9 @@ Prometheus metrics when validating UI flows manually.
 
 The AI calls MCP tools (requests with "MCP Tool" checked) and verifies responses.
 See [do-testing.md](../../.cursor/lsr/do-testing.md) for the full procedure.
+
+For **in-process agent UI e2e** (offscreen Qt harness, no live MCP server), use
+`make test-agent-e2e` and [agent_e2e.md](agent_e2e.md) instead.
 
 ## Verification via Prometheus
 
