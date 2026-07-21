@@ -100,3 +100,13 @@ def test_send_request_patch_target_constant() -> None:
     assert SEND_REQUEST_PATCH_TARGET == (
         "pypost.core.request_service.HTTPClient.send_request"
     )
+
+
+def test_seed_post_gui_send_scenario_module_exists() -> None:
+    """PYPOST-871: seed POST GUI Send scenario module must exist."""
+    import importlib
+
+    mod = importlib.import_module("tests.test_agent_e2e_http_seed_post")
+    assert callable(
+        getattr(mod, "test_seed_post_send_uses_shared_http_stub", None)
+    )

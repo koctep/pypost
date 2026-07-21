@@ -88,6 +88,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_e2e_presentation_matrix.py` | Presentation matrix (890) |
 | `tests/test_agent_e2e_seed.py` | Seeded workspace (857) |
 | `tests/test_agent_e2e_http_env.py` | Env Send + shared HTTP (859) |
+| `tests/test_agent_e2e_http_seed_post.py` | Seed POST Send + body (871) |
 | `tests/test_agent_e2e_failure_artifacts.py` | Failure snapshot dumps (860) |
 
 Narrow to an explicit file list via `PYTEST_ARGS` (replaces the default

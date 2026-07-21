@@ -90,6 +90,18 @@ def test_send(agent_e2e_session, agent_e2e_http_stub):
         ...
 ```
 
+### Seed POST Send (body path)
+
+Catalog entry `seed_post_ok` / `CANNED_SEED_POST_OK` is exercised by
+`tests/test_agent_e2e_http_seed_post.py` (PYPOST-871): blank session,
+fill URL + POST + `REQUEST_BODY_EDIT` with `SEED_POST_BODY`, stub with
+`CANNED_SEED_POST_OK`, assert status/body. Mirrors env GET Send
+(`tests/test_agent_e2e_http_env.py`) with the POST body path.
+
+```bash
+make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_seed_post.py -q"
+```
+
 Pass a callable as `result` to use `side_effect` (multi-call sequences).
 Optional `name=` labels custom installs in logs (catalog identities auto-name).
 
@@ -127,8 +139,10 @@ No extra env vars.
 | Failure | What to do |
 | --- | --- |
 | Wait timeout after Send | Confirm stub context wraps the click; grep |
-| | `agent_e2e_http_stub_installed`. Check catalog body vs snapshot |
-| | compact JSON form (see golden docs). |
+| | `agent_e2e_http_stub_installed` (seed POST → `name=seed_post_ok`). |
+| | Check catalog body vs snapshot compact JSON form (see golden docs). |
+| POST body not applied | Confirm `REQUEST_BODY_EDIT` fill after selecting POST; |
+| | see seed POST scenario and [ui_identity.md](ui_identity.md). |
 | Live network / flaky CI | Do not remove the stub; do not mock RequestWorker |
 | | wholesale. |
 | Stub “not restoring” | Ensure `with stub_agent_e2e_http(...):` covers the |
