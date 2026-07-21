@@ -176,6 +176,8 @@ agent events from the composed stack (see [logging.md](logging.md)):
 ## Related
 
 - [Agent UI E2E](agent_e2e.md)
+- [Agent E2E Environment Contract](agent_e2e_env.md) — seeded env pack
+  (PYPOST-855); preferred when scenarios need workspace seed
 - [Agent App Lifecycle](agent_lifecycle.md)
 - [UI Widget Identity](ui_identity.md)
 - [UI Action Tools](ui_actions.md)

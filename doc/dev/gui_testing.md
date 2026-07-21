@@ -140,7 +140,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 ## Agent UI e2e (in-process)
 
 Umbrella guide (setup, tools, identity, golden, `make test-agent-e2e`):
-[Agent UI E2E](agent_e2e.md).
+[Agent UI E2E](agent_e2e.md). Environment pack contract (seed, isolation,
+fixtures inventory): [Agent E2E Environment Contract](agent_e2e_env.md).
 
 For launch → ready → shutdown without `app.exec()`, use
 [`AgentAppSession`](agent_lifecycle.md) (`pypost.agent.lifecycle`). See that doc for

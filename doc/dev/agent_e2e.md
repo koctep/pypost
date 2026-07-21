@@ -8,7 +8,9 @@ wait for settle, capture UI snapshots, and prove one golden product flow.
 
 This page is the **umbrella entry** for that stack. Capability contracts live
 in sibling docs; the golden Send → response proof lives in
-[agent_golden_e2e.md](agent_golden_e2e.md).
+[agent_golden_e2e.md](agent_golden_e2e.md). The reusable **environment pack**
+model (seed, isolation, fixtures inventory) is
+[agent_e2e_env.md](agent_e2e_env.md).
 
 Prefer `make test-agent-e2e` over ad-hoc pytest one-liners.
 
@@ -26,6 +28,7 @@ and Prometheus checks, see [testing.md](testing.md) and
 | Snapshot | [ui_snapshot.md](ui_snapshot.md) | Structured visible-UI tree |
 | Wait | [ui_wait.md](ui_wait.md) | Settle predicates after actions |
 | Golden | [agent_golden_e2e.md](agent_golden_e2e.md) | Composed Send → response proof |
+| Env pack | [agent_e2e_env.md](agent_e2e_env.md) | Seed, isolation, HTTP, markers (855) |
 | GUI notes | [gui_testing.md](gui_testing.md) | Offscreen Qt, fixtures, pitfalls |
 
 ```mermaid
@@ -144,6 +147,7 @@ timeouts: [testing.md](testing.md).
 - [UI State Snapshot](ui_snapshot.md)
 - [UI Settle / Wait Helpers](ui_wait.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
+- [Agent E2E Environment Contract](agent_e2e_env.md)
 - [GUI Testing](gui_testing.md)
 - [Testing via MCP and Prometheus](testing.md)
 - [MCP Integration](mcp_integration.md)

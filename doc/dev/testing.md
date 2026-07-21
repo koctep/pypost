@@ -18,7 +18,9 @@ make test-agent-e2e  # agent UI e2e harness (lifecycle…golden)
 ```
 
 Agent UI e2e (in-process offscreen harness) is documented in
-[agent_e2e.md](agent_e2e.md). That path is separate from live MCP checks against
+[agent_e2e.md](agent_e2e.md). The reusable env pack model (seed, isolation,
+fixture areas) is in [agent_e2e_env.md](agent_e2e_env.md). That path is
+separate from live MCP checks against
 a running PyPost (see § Testing via MCP below and
 [mcp_integration.md](mcp_integration.md)).
 
