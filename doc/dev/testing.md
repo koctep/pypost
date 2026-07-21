@@ -14,7 +14,7 @@ guardrails, and coverage. Agent authoring rules live in
 make test            # fast suite (excludes -m slow)
 make test-cov        # with coverage report
 make test-slow       # network-heavy Makefile smoke
-make test-agent-e2e  # agent UI e2e harness (lifecycle…golden)
+make test-agent-e2e  # agent UI e2e (-m agent_e2e; file list via PYTEST_ARGS)
 ```
 
 Agent UI e2e (in-process offscreen harness) is documented in

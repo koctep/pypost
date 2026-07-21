@@ -25,7 +25,10 @@ from pypost.ui.widget_ids import (
     URL_INPUT,
 )
 
-pytestmark = pytest.mark.timeout(60)
+pytestmark = [
+    pytest.mark.timeout(60),
+    pytest.mark.agent_e2e,
+]
 
 _NODE_KEYS = frozenset({"role", "name", "value", "children"})
 
@@ -155,23 +158,26 @@ def test_capture_ui_snapshot_truncates_long_values(qapp: QApplication) -> None:
     assert len(node["value"]) == UI_SNAPSHOT_MAX_VALUE_LENGTH
 
 
-def test_ui_snapshot_after_ready_includes_key_surfaces(qapp: QApplication) -> None:
+def test_ui_snapshot_after_ready_includes_key_surfaces(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
     """Integration: after ready, snapshot includes key pypost_* names."""
     assert QApplication.instance() is qapp
 
-    with AgentAppSession(offscreen=True, ready_timeout=30.0) as session:
-        assert session.window.is_ui_ready is True
-        snap = session.ui_snapshot()
-        _assert_node_shape(snap)
-        assert snap["role"] == "window"
-        assert snap["name"] == MAIN_WINDOW
+    session = agent_e2e_session
+    assert session.window.is_ui_ready is True
+    snap = session.ui_snapshot()
+    _assert_node_shape(snap)
+    assert snap["role"] == "window"
+    assert snap["name"] == MAIN_WINDOW
 
-        names = _find_names(snap)
-        for expected in (
-            MAIN_WINDOW,
-            COLLECTION_TREE,
-            REQUEST_TABS,
-            URL_INPUT,
-            SEND_BUTTON,
-        ):
-            assert expected in names, f"missing {expected} in snapshot"
+    names = _find_names(snap)
+    for expected in (
+        MAIN_WINDOW,
+        COLLECTION_TREE,
+        REQUEST_TABS,
+        URL_INPUT,
+        SEND_BUTTON,
+    ):
+        assert expected in names, f"missing {expected} in snapshot"

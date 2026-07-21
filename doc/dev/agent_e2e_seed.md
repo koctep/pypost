@@ -41,7 +41,18 @@ PYPOST-859. Callers that inject `config_dir` / `data_dir` own cleanup.
 
 ## API / Usage
 
-### How to seed
+### Preferred: shared seeded fixture (PYPOST-858)
+
+For single-session product proofs, inject `seeded_agent_e2e_session` (see
+[agent_e2e.md](agent_e2e.md)). It writes this inventory before start and
+yields a ready `AgentAppSession`.
+
+```python
+def test_seeded(seeded_agent_e2e_session):
+    assert seeded_agent_e2e_session.window.is_ui_ready
+```
+
+### How to seed (direct writer)
 
 ```python
 from pathlib import Path
@@ -57,7 +68,9 @@ with AgentAppSession(
     assert session.window.is_ui_ready
 ```
 
-### Test helper
+### Test helper (multi-session / custom dirs)
+
+Use when a test needs two sessions or non-fixture control of dirs:
 
 ```python
 from pypost.agent import AgentAppSession

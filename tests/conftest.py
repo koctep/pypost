@@ -6,7 +6,10 @@ import sys
 import pytest
 from PySide6.QtWidgets import QApplication
 
-pytest_plugins = ["tests._pytest_plugins.duration_report"]
+pytest_plugins = [
+    "tests._pytest_plugins.duration_report",
+    "tests._pytest_plugins.agent_e2e",
+]
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -67,4 +70,3 @@ def pytest_sessionfinish(session, exitstatus):
 
             logger = logging.getLogger("pytest")
             logger.warning(msg)
-

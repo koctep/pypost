@@ -152,7 +152,7 @@ land incrementally:
 | Area | Story | Status |
 | --- | --- | --- |
 | Workspace seed | PYPOST-857 | Delivered — [agent_e2e_seed.md](agent_e2e_seed.md) |
-| Session + `agent_e2e` marker | PYPOST-858 | Not yet |
+| Session + `agent_e2e` marker | PYPOST-858 | Delivered — fixtures + marker in [agent_e2e.md](agent_e2e.md) |
 | Deterministic HTTP layer | PYPOST-859 | Not yet |
 | Failure artifacts | PYPOST-860 | Not yet |
 | Make / CI for env pack | PYPOST-861 | Not yet |

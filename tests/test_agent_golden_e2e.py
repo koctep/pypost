@@ -18,7 +18,10 @@ from pypost.ui.widget_ids import (
     URL_INPUT,
 )
 
-pytestmark = pytest.mark.timeout(60)
+pytestmark = [
+    pytest.mark.timeout(60),
+    pytest.mark.agent_e2e,
+]
 
 FIXTURE_URL = "https://example.test/agent-golden"
 FIXTURE_METHOD = "GET"
@@ -108,40 +111,42 @@ def _assert_response_ui(snap: dict[str, Any]) -> None:
     )
 
 
-def test_agent_golden_request_response_flow() -> None:
+def test_agent_golden_request_response_flow(
+    agent_e2e_session: AgentAppSession,
+) -> None:
     """Compose lifecycle + identity + actions + wait + snapshot for Send → 200."""
-    with AgentAppSession(offscreen=True, ready_timeout=30.0) as session:
-        assert session.window.is_ui_ready is True
-        find_widget(session.window, URL_INPUT)
-        find_widget(session.window, METHOD_COMBO)
-        find_widget(session.window, SEND_BUTTON)
+    session = agent_e2e_session
+    assert session.window.is_ui_ready is True
+    find_widget(session.window, URL_INPUT)
+    find_widget(session.window, METHOD_COMBO)
+    find_widget(session.window, SEND_BUTTON)
 
-        session.ui_fill(URL_INPUT, FIXTURE_URL)
-        session.ui_select(METHOD_COMBO, FIXTURE_METHOD)
+    session.ui_fill(URL_INPUT, FIXTURE_URL)
+    session.ui_select(METHOD_COMBO, FIXTURE_METHOD)
 
-        with patch(
-            "pypost.core.request_service.HTTPClient.send_request",
-            return_value=_canned_ok(),
-        ):
-            session.ui_click(SEND_BUTTON)
-            try:
-                snap = session.wait_for_snapshot(
-                    _response_ready,
-                    timeout=_SEND_SETTLE_TIMEOUT_S,
-                )
-            except UiWaitTimeoutError as exc:
-                last = session.ui_snapshot()
-                excerpt = _response_panel_excerpt(last)
-                raise UiWaitTimeoutError(
-                    f"golden Send settle failed: {exc}; "
-                    f"response_excerpt={excerpt!r}",
-                    timeout_s=exc.timeout_s,
-                    condition=exc.condition,
-                    diagnostics={
-                        **exc.diagnostics,
-                        "step": "wait_response_after_send",
-                        "response_excerpt": excerpt,
-                    },
-                ) from exc
+    with patch(
+        "pypost.core.request_service.HTTPClient.send_request",
+        return_value=_canned_ok(),
+    ):
+        session.ui_click(SEND_BUTTON)
+        try:
+            snap = session.wait_for_snapshot(
+                _response_ready,
+                timeout=_SEND_SETTLE_TIMEOUT_S,
+            )
+        except UiWaitTimeoutError as exc:
+            last = session.ui_snapshot()
+            excerpt = _response_panel_excerpt(last)
+            raise UiWaitTimeoutError(
+                f"golden Send settle failed: {exc}; "
+                f"response_excerpt={excerpt!r}",
+                timeout_s=exc.timeout_s,
+                condition=exc.condition,
+                diagnostics={
+                    **exc.diagnostics,
+                    "step": "wait_response_after_send",
+                    "response_excerpt": excerpt,
+                },
+            ) from exc
 
-        _assert_response_ui(snap)
+    _assert_response_ui(snap)

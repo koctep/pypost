@@ -31,7 +31,10 @@ from pypost.ui.widget_ids import (
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 
-pytestmark = pytest.mark.timeout(60)
+pytestmark = [
+    pytest.mark.timeout(60),
+    pytest.mark.agent_e2e,
+]
 
 
 def _assert_id(widget: QObject, expected: str) -> None:
@@ -42,64 +45,66 @@ def _assert_id(widget: QObject, expected: str) -> None:
             assert getter() == expected
 
 
-def test_key_widgets_expose_stable_identities(qapp: QApplication) -> None:
+def test_key_widgets_expose_stable_identities(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
     """FR10: after UI ready, critical surfaces expose documented objectNames."""
     assert QApplication.instance() is qapp
 
-    with AgentAppSession(offscreen=True, ready_timeout=30.0) as session:
-        window = session.window
-        assert window.is_ui_ready is True
-        _assert_id(window, MAIN_WINDOW)
+    window = agent_e2e_session.window
+    assert window.is_ui_ready is True
+    _assert_id(window, MAIN_WINDOW)
 
-        tree = window.findChild(QTreeView, COLLECTION_TREE)
-        assert tree is not None
-        _assert_id(tree, COLLECTION_TREE)
-        assert tree is window.collections.widget
+    tree = window.findChild(QTreeView, COLLECTION_TREE)
+    assert tree is not None
+    _assert_id(tree, COLLECTION_TREE)
+    assert tree is window.collections.widget
 
-        tabs = window.findChild(QTabWidget, REQUEST_TABS)
-        assert tabs is not None
-        _assert_id(tabs, REQUEST_TABS)
-        assert tabs is window.tabs.widget
+    tabs = window.findChild(QTabWidget, REQUEST_TABS)
+    assert tabs is not None
+    _assert_id(tabs, REQUEST_TABS)
+    assert tabs is window.tabs.widget
 
-        settings_btn = window.findChild(QPushButton, SETTINGS_BUTTON)
-        assert settings_btn is not None
-        _assert_id(settings_btn, SETTINGS_BUTTON)
+    settings_btn = window.findChild(QPushButton, SETTINGS_BUTTON)
+    assert settings_btn is not None
+    _assert_id(settings_btn, SETTINGS_BUTTON)
 
-        env_bar = window.findChild(QWidget, ENV_BAR)
-        assert env_bar is not None
-        _assert_id(env_bar, ENV_BAR)
-        assert env_bar is window.env.widget
+    env_bar = window.findChild(QWidget, ENV_BAR)
+    assert env_bar is not None
+    _assert_id(env_bar, ENV_BAR)
+    assert env_bar is window.env.widget
 
-        env_selector = window.findChild(QComboBox, ENV_SELECTOR)
-        assert env_selector is not None
-        _assert_id(env_selector, ENV_SELECTOR)
+    env_selector = window.findChild(QComboBox, ENV_SELECTOR)
+    assert env_selector is not None
+    _assert_id(env_selector, ENV_SELECTOR)
 
-        env_manage = window.findChild(QPushButton, ENV_MANAGE_BUTTON)
-        assert env_manage is not None
-        _assert_id(env_manage, ENV_MANAGE_BUTTON)
+    env_manage = window.findChild(QPushButton, ENV_MANAGE_BUTTON)
+    assert env_manage is not None
+    _assert_id(env_manage, ENV_MANAGE_BUTTON)
 
-        current = tabs.currentWidget()
-        assert isinstance(current, RequestTab)
+    current = tabs.currentWidget()
+    assert isinstance(current, RequestTab)
 
-        method = current.findChild(QComboBox, METHOD_COMBO)
-        assert method is not None
-        _assert_id(method, METHOD_COMBO)
+    method = current.findChild(QComboBox, METHOD_COMBO)
+    assert method is not None
+    _assert_id(method, METHOD_COMBO)
 
-        url = current.findChild(QWidget, URL_INPUT)
-        assert url is not None
-        _assert_id(url, URL_INPUT)
+    url = current.findChild(QWidget, URL_INPUT)
+    assert url is not None
+    _assert_id(url, URL_INPUT)
 
-        send = current.findChild(QPushButton, SEND_BUTTON)
-        assert send is not None
-        _assert_id(send, SEND_BUTTON)
+    send = current.findChild(QPushButton, SEND_BUTTON)
+    assert send is not None
+    _assert_id(send, SEND_BUTTON)
 
-        response = current.findChild(ResponseView, RESPONSE_PANEL)
-        assert response is not None
-        _assert_id(response, RESPONSE_PANEL)
+    response = current.findChild(ResponseView, RESPONSE_PANEL)
+    assert response is not None
+    _assert_id(response, RESPONSE_PANEL)
 
-        assert isinstance(current.request_editor, RequestWidget)
-        assert current.request_editor.send_btn is send
-        assert current.response_view is response
+    assert isinstance(current.request_editor, RequestWidget)
+    assert current.request_editor.send_btn is send
+    assert current.response_view is response
 
 
 def test_widget_ids_are_locale_independent_literals() -> None:

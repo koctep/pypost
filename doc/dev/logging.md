@@ -100,10 +100,13 @@ different call sites.
 | `ui_wait_timeout` | DEBUG | `condition`, `waited_ms`, `timeout_s` | `agent/ui_wait` |
 | `agent_e2e_seed_completed` | INFO | `data_dir`, ids, counts | `fixtures/agent_e2e_seed` |
 | `agent_e2e_seed_failed` | ERROR | `data_dir`, exception | `fixtures/agent_e2e_seed` |
+| `agent_e2e_fixture_ready` | INFO | `mode=blank\|seeded` | `_pytest_plugins/agent_e2e` |
 | `*_source` | DEBUG | `source=injected\|new` | composition-root injectors |
 
 Agent session contract and ready-gate semantics:
-[agent_lifecycle.md](agent_lifecycle.md). Snapshot capture contract:
+[agent_lifecycle.md](agent_lifecycle.md). Packaging fixtures emit
+`agent_e2e_fixture_ready` after ready ([agent_e2e.md](agent_e2e.md)); compose
+with `agent_session_*` / `agent_e2e_seed_*`. Snapshot capture contract:
 [ui_snapshot.md](ui_snapshot.md) (`ui_snapshot_captured` logs scalars only —
 never the tree or values). UI action contract:
 [ui_actions.md](ui_actions.md) (`ui_action_applied` logs scalars only — never
@@ -449,6 +452,7 @@ Update this document when adding new domains or stable public events operators r
 | [observability_audit.md](observability_audit.md) | Audit summary, metrics, MCP activity, gaps |
 | [agent_lifecycle.md](agent_lifecycle.md) | Agent launch → ready → shutdown (PYPOST-833) |
 | [agent_e2e_seed.md](agent_e2e_seed.md) | Agent e2e seeded workspace (PYPOST-857) |
+| [agent_e2e.md](agent_e2e.md) | Agent UI e2e packaging + fixtures (PYPOST-858) |
 | [testing.md](testing.md) | pytest `log_cli`, CI guardrails |
 | [mcp_integration.md](mcp_integration.md) | MCP activity viewer |
 | [security_audit.md](security_audit.md) | Secrets in logs |

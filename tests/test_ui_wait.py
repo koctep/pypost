@@ -25,7 +25,10 @@ from pypost.agent.ui_wait import (
 )
 from pypost.ui.widget_ids import URL_INPUT, set_widget_id
 
-pytestmark = pytest.mark.timeout(60)
+pytestmark = [
+    pytest.mark.timeout(60),
+    pytest.mark.agent_e2e,
+]
 
 _DELAYED = "fixture_delayed_widget"
 _DISABLED = "fixture_delayed_enabled"
@@ -155,24 +158,28 @@ def test_wait_for_widget_timeout_includes_widget_id(qapp: QApplication) -> None:
         root.close()
 
 
-def test_session_wait_for_text_after_fill() -> None:
-    with AgentAppSession(offscreen=True) as session:
-        session.ui_fill(URL_INPUT, "https://wait.example")
-        widget = session.wait_for_text(URL_INPUT, "https://wait.example", timeout=5.0)
-        assert isinstance(widget, QLineEdit)
-        assert widget.text() == "https://wait.example"
+def test_session_wait_for_text_after_fill(
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    session = agent_e2e_session
+    session.ui_fill(URL_INPUT, "https://wait.example")
+    widget = session.wait_for_text(URL_INPUT, "https://wait.example", timeout=5.0)
+    assert isinstance(widget, QLineEdit)
+    assert widget.text() == "https://wait.example"
 
 
-def test_session_wait_for_enabled_send_path() -> None:
+def test_session_wait_for_enabled_send_path(
+    agent_e2e_session: AgentAppSession,
+) -> None:
     """After fill, wait until URL input stays enabled (post-action settle)."""
-    with AgentAppSession(offscreen=True) as session:
-        ui_fill(session.window, URL_INPUT, "https://settle.example")
-        enabled = session.wait_for_enabled(URL_INPUT, timeout=5.0)
-        assert enabled.isEnabled()
-        session.wait_for_snapshot(
-            lambda snap: _snapshot_has_name(snap, URL_INPUT),
-            timeout=5.0,
-        )
+    session = agent_e2e_session
+    ui_fill(session.window, URL_INPUT, "https://settle.example")
+    enabled = session.wait_for_enabled(URL_INPUT, timeout=5.0)
+    assert enabled.isEnabled()
+    session.wait_for_snapshot(
+        lambda snap: _snapshot_has_name(snap, URL_INPUT),
+        timeout=5.0,
+    )
 
 
 def _snapshot_has_name(node: dict, name: str) -> bool:

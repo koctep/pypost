@@ -77,16 +77,9 @@ test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage rep
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
 		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov)
 
-test-agent-e2e: $(VENV_MARKER) venv-otel ## Run agent UI e2e harness tests (lifecycle through golden)
+test-agent-e2e: $(VENV_MARKER) venv-otel ## Run agent UI e2e harness (-m agent_e2e; file list via PYTEST_ARGS)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
-		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),\
-		tests/test_agent_lifecycle_smoke.py \
-		tests/test_ui_identity_spotcheck.py \
-		tests/test_ui_actions.py \
-		tests/test_ui_snapshot.py \
-		tests/test_ui_wait.py \
-		tests/test_agent_golden_e2e.py \
-		tests/test_agent_e2e_seed.py)
+		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "agent_e2e and not slow")
 
 lint: $(VENV_MARKER) ## Run flake8 static analysis on pypost/
 	$(BIN)/python -m flake8 --jobs=1 pypost/

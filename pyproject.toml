@@ -83,6 +83,7 @@ addopts = [
 markers = [
     "timeout(seconds): fail the test if it runs longer than the given seconds",
     "slow: network-heavy or slow integration tests (excluded from default CI)",
+    "agent_e2e: agent UI e2e / env-pack scenarios (select with -m agent_e2e)",
 ]
 log_cli = true
 log_cli_level = "WARNING"

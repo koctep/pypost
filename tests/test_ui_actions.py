@@ -25,7 +25,10 @@ from pypost.agent.ui_actions import (
 )
 from pypost.ui.widget_ids import METHOD_COMBO, URL_INPUT, set_widget_id
 
-pytestmark = pytest.mark.timeout(60)
+pytestmark = [
+    pytest.mark.timeout(60),
+    pytest.mark.agent_e2e,
+]
 
 _BTN = "fixture_click_btn"
 _INPUT = "fixture_line_edit"
@@ -169,15 +172,17 @@ def test_select_missing_option_raises(qapp: QApplication) -> None:
         root.close()
 
 
-def test_main_window_fill_url_and_select_method() -> None:
-    with AgentAppSession(offscreen=True) as session:
-        assert session.window.is_ui_ready
-        session.ui_fill(URL_INPUT, "https://httpbin.org/get")
-        url = find_widget(session.window, URL_INPUT)
-        assert isinstance(url, QLineEdit)
-        assert url.text() == "https://httpbin.org/get"
+def test_main_window_fill_url_and_select_method(
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    session = agent_e2e_session
+    assert session.window.is_ui_ready
+    session.ui_fill(URL_INPUT, "https://httpbin.org/get")
+    url = find_widget(session.window, URL_INPUT)
+    assert isinstance(url, QLineEdit)
+    assert url.text() == "https://httpbin.org/get"
 
-        session.ui_select(METHOD_COMBO, "POST")
-        method = find_widget(session.window, METHOD_COMBO)
-        assert isinstance(method, QComboBox)
-        assert method.currentText() == "POST"
+    session.ui_select(METHOD_COMBO, "POST")
+    method = find_widget(session.window, METHOD_COMBO)
+    assert isinstance(method, QComboBox)
+    assert method.currentText() == "POST"

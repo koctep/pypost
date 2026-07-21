@@ -23,7 +23,10 @@ from pypost.fixtures.agent_e2e_seed import (
 from pypost.ui.widget_ids import COLLECTION_TREE, ENV_SELECTOR
 from tests.helpers.agent_e2e_seed import seeded_agent_dirs
 
-pytestmark = pytest.mark.timeout(60)
+pytestmark = [
+    pytest.mark.timeout(60),
+    pytest.mark.agent_e2e,
+]
 
 
 def _tree_texts(tree: QTreeView) -> tuple[list[str], list[str]]:
@@ -51,29 +54,26 @@ def test_write_agent_e2e_seed_persists_inventory(tmp_path: Path) -> None:
     assert storage.load_environments() == build_agent_e2e_seed_environments()
 
 
-def test_seed_present_after_ready_via_identity(qapp: QApplication) -> None:
+def test_seed_present_after_ready_via_identity(
+    qapp: QApplication,
+    seeded_agent_e2e_session: AgentAppSession,
+) -> None:
     """FR2–FR4/FR8: after ready, seed is visible via tree model + env items."""
     assert QApplication.instance() is qapp
-    with seeded_agent_dirs() as (config_dir, data_dir):
-        with AgentAppSession(
-            offscreen=True,
-            config_dir=config_dir,
-            data_dir=data_dir,
-            ready_timeout=30.0,
-        ) as session:
-            assert session.window.is_ui_ready is True
-            tree = session.window.findChild(QTreeView, COLLECTION_TREE)
-            assert tree is not None
-            collections, requests = _tree_texts(tree)
-            assert SEED_COLLECTION_NAME in collections, collections
-            assert f"GET {SEED_GET_REQUEST_NAME}" in requests, requests
-            assert f"POST {SEED_POST_REQUEST_NAME}" in requests, requests
+    session = seeded_agent_e2e_session
+    assert session.window.is_ui_ready is True
+    tree = session.window.findChild(QTreeView, COLLECTION_TREE)
+    assert tree is not None
+    collections, requests = _tree_texts(tree)
+    assert SEED_COLLECTION_NAME in collections, collections
+    assert f"GET {SEED_GET_REQUEST_NAME}" in requests, requests
+    assert f"POST {SEED_POST_REQUEST_NAME}" in requests, requests
 
-            selector = session.window.findChild(QComboBox, ENV_SELECTOR)
-            assert selector is not None
-            env_texts = _env_item_texts(selector)
-            assert SEED_ENV_NAME in env_texts, env_texts
-            assert selector.currentText() == "No Environment"
+    selector = session.window.findChild(QComboBox, ENV_SELECTOR)
+    assert selector is not None
+    env_texts = _env_item_texts(selector)
+    assert SEED_ENV_NAME in env_texts, env_texts
+    assert selector.currentText() == "No Environment"
 
 
 def test_seed_isolation_across_sessions(qapp: QApplication) -> None:

@@ -56,7 +56,16 @@ make install
 make test-agent-e2e
 ```
 
-Default modules:
+Default selection is the registered `agent_e2e` marker, composed with
+`not slow` (CLI `-m` overrides `addopts`, so the recipe uses
+`-m "agent_e2e and not slow"`):
+
+```bash
+make test-agent-e2e
+# equivalent: pytest -m "agent_e2e and not slow"
+```
+
+Harness modules under the marker (also the documented file-list override):
 
 | Module | Covers |
 | --- | --- |
@@ -68,8 +77,8 @@ Default modules:
 | `tests/test_agent_golden_e2e.py` | Golden product flow |
 | `tests/test_agent_e2e_seed.py` | Seeded workspace (857) |
 
-Override the file list like other test targets (`PYTEST_ARGS` **replaces**
-defaults):
+Narrow to an explicit file list via `PYTEST_ARGS` (replaces the default
+`-m` expression):
 
 ```bash
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_golden_e2e.py -v"
@@ -81,14 +90,55 @@ The same modules still run under the full fast suite:
 make test
 ```
 
+### Marker: `agent_e2e`
+
+Registered in `pyproject.toml` (`[tool.pytest.ini_options] markers`).
+
+Apply it (usually at module scope next to `timeout`) on agent UI e2e /
+env-pack scenarios:
+
+```python
+pytestmark = [
+    pytest.mark.timeout(60),
+    pytest.mark.agent_e2e,
+]
+```
+
+Select with `-m agent_e2e` (or the make target above). List markers via
+`pytest --markers`.
+
+### Shared session fixtures
+
+Defined in `tests/_pytest_plugins/agent_e2e.py` (loaded via
+`tests/conftest.py`). Both are **function-scoped** and yield a ready
+`AgentAppSession` (`offscreen=True`, `ready_timeout=30.0`).
+
+| Fixture | Workspace | Use when |
+| --- | --- | --- |
+| `agent_e2e_session` | Blank (session-owned temps) | Lifecycle, identity, actions, golden |
+| `seeded_agent_e2e_session` | PYPOST-857 seed via `seeded_agent_dirs()` | Seeded inventory proofs |
+
+```python
+def test_ready(agent_e2e_session):
+    assert agent_e2e_session.window.is_ui_ready
+
+
+def test_seeded(seeded_agent_e2e_session):
+    assert seeded_agent_e2e_session.window.is_ui_ready
+```
+
+Multi-session isolation tests keep constructing `AgentAppSession` directly
+(fixtures yield one instance per request). Prefer fixtures for single-session
+scenarios.
+
 ### Setup checklist
 
 1. `make install` (venv + `.[dev,otel]`).
 2. Prefer Makefile targets — they set `QT_QPA_PLATFORM=offscreen`.
 3. Read identity convention before adding controls:
    [ui_identity.md](ui_identity.md).
-4. Compose with `AgentAppSession` + session UI helpers; see lifecycle and
-   actions docs.
+4. Prefer `agent_e2e_session` / `seeded_agent_e2e_session`; mark new modules
+   `agent_e2e`. Direct `AgentAppSession` remains valid for multi-session proofs.
 5. For product proof, start from the golden scenario rather than a new
    one-off flow.
 
@@ -96,7 +146,8 @@ make test
 
 | Need | Entry |
 | --- | --- |
-| Session | `AgentAppSession(offscreen=True)` |
+| Session (shared) | fixtures `agent_e2e_session` / `seeded_agent_e2e_session` |
+| Session (direct) | `AgentAppSession(offscreen=True)` |
 | Find / ids | `pypost.ui.widget_ids` + `find_widget` |
 | Drive UI | `session.ui_fill` / `ui_select` / `ui_click` / … |
 | Observe | `session.ui_snapshot()` |
@@ -119,14 +170,16 @@ One intentional flow: blank request → set URL/method → Send (mocked HTTP
 | Setting | Source |
 | --- | --- |
 | Offscreen Qt | `make test-agent-e2e` / `make test` (`QT_QPA_PLATFORM=offscreen`) |
-| Session offscreen | `AgentAppSession(offscreen=True)` also setdefaults the env var |
-| Scoped args | `PYTEST_ARGS` on make test targets (replaces defaults when set) |
+| Session offscreen | Fixtures / `AgentAppSession(offscreen=True)` setdefault the env var |
+| Marker selection | `make test-agent-e2e` → `-m "agent_e2e and not slow"` |
+| File-list override | `PYTEST_ARGS` replaces the default `-m` expression |
 | Module timeouts | Per-test / module `pytest.mark.timeout` (see sibling docs) |
 
 No extra env vars beyond the project’s standard GUI test path.
 
-When adding another agent e2e module, append it to the default file list in
-the `test-agent-e2e` Makefile target (and link it from this page).
+When adding another agent e2e module, mark it `@pytest.mark.agent_e2e`
+(and link it from this page / the table above). File-list `PYTEST_ARGS`
+overrides remain supported for narrow runs.
 
 ## Troubleshooting
 
@@ -137,6 +190,7 @@ the `test-agent-e2e` Makefile target (and link it from this page).
 | Missing control | Confirm id in `widget_ids` and `is_ui_ready` |
 | Confused with MCP | MCP needs a running app + MCP enabled; agent e2e is in-process pytest |
 | Want one file only | `make test-agent-e2e PYTEST_ARGS="tests/test_….py -v"` |
+| Marker not listed | Confirm registration in `pyproject.toml`; run `pytest --markers` |
 
 More GUI pitfalls: [gui_testing.md](gui_testing.md). Suite-wide pytest /
 timeouts: [testing.md](testing.md).

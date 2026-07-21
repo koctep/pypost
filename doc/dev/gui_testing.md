@@ -143,9 +143,12 @@ Umbrella guide (setup, tools, identity, golden, `make test-agent-e2e`):
 [Agent UI E2E](agent_e2e.md). Environment pack contract (seed, isolation,
 fixtures inventory): [Agent E2E Environment Contract](agent_e2e_env.md).
 
-For launch → ready → shutdown without `app.exec()`, use
-[`AgentAppSession`](agent_lifecycle.md) (`pypost.agent.lifecycle`). See that doc for
-the contract; smoke coverage is `tests/test_agent_lifecycle_smoke.py`.
+Prefer shared fixtures `agent_e2e_session` / `seeded_agent_e2e_session`
+(mark modules `@pytest.mark.agent_e2e`). For launch → ready → shutdown
+without `app.exec()`, those fixtures wrap
+[`AgentAppSession`](agent_lifecycle.md) (`pypost.agent.lifecycle`). Direct
+construction remains valid for multi-session isolation proofs. Smoke
+coverage is `tests/test_agent_lifecycle_smoke.py`.
 
 After ready, locate key controls by stable `objectName` values — see
 [UI widget identity](ui_identity.md) (`pypost/ui/widget_ids.py`).
