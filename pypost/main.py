@@ -2,6 +2,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtWidgets import QApplication
 
@@ -61,7 +62,7 @@ def compose_app(
     object graph stays singular; only event-loop ownership and isolation knobs
     differ between callers.
     """
-    config_kwargs: dict = {}
+    config_kwargs: dict[str, Any] = {}
     if config_dir is not None:
         config_kwargs["config_dir"] = config_dir
     config_manager = ConfigManager(**config_kwargs)
@@ -94,13 +95,13 @@ def compose_app(
         bool(settings.alert_webhook_url),
     )
 
-    history_kwargs: dict = {"defer_initial_load": True}
+    history_kwargs: dict[str, Any] = {"defer_initial_load": True}
     if data_dir is not None:
         history_kwargs["history_path"] = Path(data_dir) / "history.json"
     history_manager = HistoryManager(**history_kwargs)
     logger.info("history_manager_created id=%d", id(history_manager))
 
-    storage_kwargs: dict = {"metrics": metrics_manager}
+    storage_kwargs: dict[str, Any] = {"metrics": metrics_manager}
     if data_dir is not None:
         storage_kwargs["data_dir"] = data_dir
     storage = StorageManager(**storage_kwargs)
@@ -135,7 +136,7 @@ def compose_app(
     )
 
 
-def main():
+def main() -> None:
     logger.info("app_startup")
     app = QApplication(sys.argv)
     app.setApplicationName("PyPost")

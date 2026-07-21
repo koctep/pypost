@@ -80,10 +80,24 @@ different call sites.
 | `mcp_manager_created` | INFO | `id` | `main` |
 | `alert_manager_created` | INFO | `log_path`, `webhook_url_set` | `main` |
 | `main_window_initialized` | INFO | — | `ui/main_window` |
+| `main_window_ui_ready` | INFO | — | `ui/main_window` |
 | `main_window_exit_requested` | INFO | — | `ui/main_window` |
 | `main_window_exit_storage_idle` | INFO | `completed` | `ui/main_window` |
 | `settings_applied` | INFO | `font_size`, `indent_size`, `request_timeout` | `ui/main_window` |
+| `agent_session_started` | INFO | `offscreen`, `ready_timeout_s`, `metrics_port`, `config_dir`, `data_dir` | `agent/lifecycle` |
+| `agent_session_ready` | INFO | `ready_ms`, `launch_ms`, `metrics_port` | `agent/lifecycle` |
+| `agent_session_ready_timeout` | WARNING | `ready_timeout_s`, `waited_ms`, `metrics_port` | `agent/lifecycle` |
+| `agent_session_shutdown_started` | INFO | `metrics_port`, `started` | `agent/lifecycle` |
+| `agent_session_shutdown_completed` | INFO | `shutdown_ms`, `metrics_port` | `agent/lifecycle` |
+| `agent_session_mcp_stop_failed` | ERROR | exception | `agent/lifecycle` |
+| `agent_session_handle_exit_failed` | ERROR | exception | `agent/lifecycle` |
+| `agent_session_window_close_failed` | ERROR | exception | `agent/lifecycle` |
+| `agent_session_metrics_stop_failed` | ERROR | exception | `agent/lifecycle` |
+| `agent_session_temp_cleanup_failed` | ERROR | exception | `agent/lifecycle` |
 | `*_source` | DEBUG | `source=injected\|new` | composition-root injectors |
+
+Agent session contract and ready-gate semantics:
+[agent_lifecycle.md](agent_lifecycle.md).
 
 ### Configuration and settings
 
@@ -421,6 +435,7 @@ Update this document when adding new domains or stable public events operators r
 | Document | Topic |
 | --- | --- |
 | [observability_audit.md](observability_audit.md) | Audit summary, metrics, MCP activity, gaps |
+| [agent_lifecycle.md](agent_lifecycle.md) | Agent launch → ready → shutdown (PYPOST-833) |
 | [testing.md](testing.md) | pytest `log_cli`, CI guardrails |
 | [mcp_integration.md](mcp_integration.md) | MCP activity viewer |
 | [security_audit.md](security_audit.md) | Secrets in logs |

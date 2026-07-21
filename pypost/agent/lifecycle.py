@@ -64,6 +64,7 @@ class AgentAppSession:
         self._temp_dirs: list[tempfile.TemporaryDirectory[str]] = []
         self._app: QApplication | None = None
         self._composed: ComposedApp | None = None
+        self._metrics_port: int | None = None
         self._started = False
         self._shut_down = False
 
@@ -92,26 +93,34 @@ class AgentAppSession:
 
         config_dir = self._config_dir or Path(self._make_temp_dir("pypost-agent-config-"))
         data_dir = self._data_dir or Path(self._make_temp_dir("pypost-agent-data-"))
+        metrics_port = _free_port()
+        self._metrics_port = metrics_port
 
         logger.info(
-            "agent_session_start config_dir=%s data_dir=%s",
+            "agent_session_started offscreen=%s ready_timeout_s=%s "
+            "metrics_port=%s config_dir=%s data_dir=%s",
+            str(self._offscreen).lower(),
+            self._ready_timeout,
+            metrics_port,
             config_dir,
             data_dir,
         )
-        self._composed = compose_app(
+        launch_started = time.monotonic()
+        composed = compose_app(
             config_dir=config_dir,
             data_dir=data_dir,
             metrics_host="127.0.0.1",
-            metrics_port=_free_port(),
+            metrics_port=metrics_port,
             apply_log_level=False,
         )
-        self._composed.window.show()
+        self._composed = composed
+        composed.window.show()
         QCoreApplication.processEvents()
 
+        ready_wait_started = time.monotonic()
         try:
             _wait_until(
-                lambda: self._composed is not None
-                and self._composed.window.is_ui_ready,
+                lambda: composed.window.is_ui_ready,
                 timeout=self._ready_timeout,
                 message=(
                     "MainWindow.is_ui_ready did not become true within "
@@ -119,11 +128,26 @@ class AgentAppSession:
                 ),
             )
         except TimeoutError:
+            waited_ms = int((time.monotonic() - ready_wait_started) * 1000)
+            logger.warning(
+                "agent_session_ready_timeout ready_timeout_s=%s waited_ms=%s "
+                "metrics_port=%s",
+                self._ready_timeout,
+                waited_ms,
+                metrics_port,
+            )
             self.shutdown()
             raise
 
+        ready_ms = int((time.monotonic() - ready_wait_started) * 1000)
+        launch_ms = int((time.monotonic() - launch_started) * 1000)
         self._started = True
-        logger.info("agent_session_ready")
+        logger.info(
+            "agent_session_ready ready_ms=%s launch_ms=%s metrics_port=%s",
+            ready_ms,
+            launch_ms,
+            metrics_port,
+        )
         return self
 
     def shutdown(self) -> None:
@@ -131,7 +155,12 @@ class AgentAppSession:
         if self._shut_down:
             return
         self._shut_down = True
-        logger.info("agent_session_shutdown")
+        shutdown_started = time.monotonic()
+        logger.info(
+            "agent_session_shutdown_started metrics_port=%s started=%s",
+            self._metrics_port,
+            str(self._started).lower(),
+        )
 
         composed = self._composed
         if composed is not None:
@@ -161,7 +190,12 @@ class AgentAppSession:
             except Exception:
                 logger.exception("agent_session_temp_cleanup_failed")
         self._temp_dirs.clear()
-        logger.info("agent_session_shutdown_complete")
+        shutdown_ms = int((time.monotonic() - shutdown_started) * 1000)
+        logger.info(
+            "agent_session_shutdown_completed shutdown_ms=%s metrics_port=%s",
+            shutdown_ms,
+            self._metrics_port,
+        )
 
     def __enter__(self) -> AgentAppSession:
         return self.start()

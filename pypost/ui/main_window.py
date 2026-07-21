@@ -160,6 +160,7 @@ class MainWindow(QMainWindow):
         self.tabs.restore_tabs()
         self.collections.restore_tree_state()
         self._ui_ready = True
+        logger.info("main_window_ui_ready")
 
     def _load_icons(self) -> dict:
         d = Path(__file__).parent / "resources" / "icons"

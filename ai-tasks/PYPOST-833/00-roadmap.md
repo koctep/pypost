@@ -10,10 +10,17 @@
   - [x] Added `pypost.agent.lifecycle.AgentAppSession` (offscreen, temp dirs,
     ephemeral metrics, processEvents ready wait, clean shutdown)
   - [x] Added `tests/test_agent_lifecycle_smoke.py` and `doc/dev/agent_lifecycle.md`
-- [ ] **STEP 4: Code Cleanup**
-- [ ] **STEP 5: Observability**
-- [ ] **STEP 6: Review and Technical Debt**
-- [ ] **STEP 7: Dev Docs**
+- [x] **STEP 4: Code Cleanup**
+- [x] **STEP 5: Observability**
+  - [x] Structured lifecycle logs: launch, ready, timeout, shutdown
+  - [x] `main_window_ui_ready` on production ready gate
+  - [x] `ai-tasks/PYPOST-833/50-observability.md`
+- [x] **STEP 6: Review and Technical Debt**
+  - [x] `ai-tasks/PYPOST-833/60-tech-debt.md` (non-blocking follow-ups; SAFE TO CLOSE)
+- [x] **STEP 7: Dev Docs**
+  - [x] Polished `doc/dev/agent_lifecycle.md` (API, config, troubleshooting)
+  - [x] Catalogued `agent_session_*` / `main_window_ui_ready` in `doc/dev/logging.md`
+  - [x] `ai-tasks/PYPOST-833/70-dev-docs.md`
 
 ## Programming language
 
@@ -55,4 +62,6 @@ Python (`.cursor/lsr/do-python.md`)
 
 ### STEP 7: Dev Docs
 
-- `doc/dev/`
+- `doc/dev/agent_lifecycle.md`
+- `doc/dev/logging.md` (agent lifecycle events)
+- `ai-tasks/PYPOST-833/70-dev-docs.md`
