@@ -282,7 +282,8 @@ QT_QPA_PLATFORM=offscreen python -m pytest \
 - Qt `removeTab` advances current to the next index; when closing the rightmost request tab
   that next index is the trailing `+`.
 - Confirm `TabsPresenter.close_tab` reselects via `navigable_tab_indices()` when current is
-  not a request tab (PYPOST-824).
+  not a request tab (PYPOST-824; verified for two-tab rightmost under PYPOST-825;
+  verified for close-current / `handle_close_tab` under PYPOST-826).
 - Regression tests: `test_close_rightmost_of_*_does_not_land_on_plus`,
   `test_handle_close_tab_closes_current` in `tests/test_tabs_presenter.py`.
 
