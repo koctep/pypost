@@ -35,6 +35,11 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
+from tests.helpers.agent_e2e_response_panel import (
+    joined_panel_values,
+    response_panel_excerpt,
+    subtree_by_name,
+)
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -48,47 +53,8 @@ _SEND_SETTLE_TIMEOUT_S = 15.0
 _STATUS_LABEL = f"Status: {LOCK_DOUBLE_BODY_STATUS}"
 
 
-def _walk_values(node: dict[str, Any]) -> list[str]:
-    values: list[str] = []
-    raw = node.get("value")
-    if isinstance(raw, str) and raw:
-        values.append(raw)
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            values.extend(_walk_values(child))
-    return values
-
-
-def _subtree_by_name(node: dict[str, Any], name: str) -> dict[str, Any] | None:
-    if node.get("name") == name:
-        return node
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            found = _subtree_by_name(child, name)
-            if found is not None:
-                return found
-    return None
-
-
-def _response_panel_excerpt(snap: dict[str, Any]) -> str:
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    if panel is None:
-        return "<response panel not in snapshot>"
-    joined = " | ".join(_walk_values(panel))
-    if len(joined) > 400:
-        return joined[:400] + "…"
-    return joined or "<response panel has no values>"
-
-
-def _joined_panel_values(snap: dict[str, Any]) -> str:
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    if panel is None:
-        return ""
-    return "\n".join(_walk_values(panel))
-
-
 def _response_ready(snap: dict[str, Any]) -> bool:
-    joined = _joined_panel_values(snap)
+    joined = joined_panel_values(snap)
     return _STATUS_LABEL in joined and LOCK_DOUBLE_BODY in joined
 
 
@@ -118,7 +84,7 @@ def test_agent_e2e_response_body_appears_exactly_once(
             )
         except UiWaitTimeoutError as exc:
             last = session.ui_snapshot()
-            excerpt = _response_panel_excerpt(last)
+            excerpt = response_panel_excerpt(last)
             raise UiWaitTimeoutError(
                 f"double-body lock Send settle failed: {exc}; "
                 f"response_excerpt={excerpt!r}",
@@ -134,12 +100,12 @@ def test_agent_e2e_response_body_appears_exactly_once(
         QTest.qWait(_CHUNK_FLUSH_SETTLE_MS)
         snap = session.ui_snapshot()
 
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    excerpt = _response_panel_excerpt(snap)
+    panel = subtree_by_name(snap, RESPONSE_PANEL)
+    excerpt = response_panel_excerpt(snap)
     assert panel is not None, (
         f"RESPONSE_PANEL missing after Send; excerpt={excerpt!r}"
     )
-    joined = _joined_panel_values(snap)
+    joined = joined_panel_values(snap)
     count = joined.count(LOCK_DOUBLE_BODY)
     assert count == 1, (
         f"expected response body {LOCK_DOUBLE_BODY!r} exactly once "

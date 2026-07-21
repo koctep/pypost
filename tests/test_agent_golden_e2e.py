@@ -22,6 +22,11 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
+from tests.helpers.agent_e2e_response_panel import (
+    joined_panel_values,
+    response_panel_excerpt,
+    subtree_by_name,
+)
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -41,43 +46,8 @@ FIXTURE_STATUS_LABEL = f"Status: {FIXTURE_STATUS}"
 _SEND_SETTLE_TIMEOUT_S = 15.0
 
 
-def _walk_values(node: dict[str, Any]) -> list[str]:
-    values: list[str] = []
-    raw = node.get("value")
-    if isinstance(raw, str) and raw:
-        values.append(raw)
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            values.extend(_walk_values(child))
-    return values
-
-
-def _subtree_by_name(node: dict[str, Any], name: str) -> dict[str, Any] | None:
-    if node.get("name") == name:
-        return node
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            found = _subtree_by_name(child, name)
-            if found is not None:
-                return found
-    return None
-
-
-def _response_panel_excerpt(snap: dict[str, Any]) -> str:
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    if panel is None:
-        return "<response panel not in snapshot>"
-    joined = " | ".join(_walk_values(panel))
-    if len(joined) > 400:
-        return joined[:400] + "…"
-    return joined or "<response panel has no values>"
-
-
 def _response_ready(snap: dict[str, Any]) -> bool:
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    if panel is None:
-        return False
-    joined = "\n".join(_walk_values(panel))
+    joined = joined_panel_values(snap)
     return (
         FIXTURE_STATUS_LABEL in joined
         and FIXTURE_BODY_IN_SNAPSHOT in joined
@@ -85,12 +55,12 @@ def _response_ready(snap: dict[str, Any]) -> bool:
 
 
 def _assert_response_ui(snap: dict[str, Any]) -> None:
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    excerpt = _response_panel_excerpt(snap)
+    panel = subtree_by_name(snap, RESPONSE_PANEL)
+    excerpt = response_panel_excerpt(snap)
     assert panel is not None, (
         f"RESPONSE_PANEL missing after Send; excerpt={excerpt!r}"
     )
-    joined = "\n".join(_walk_values(panel))
+    joined = joined_panel_values(snap)
     assert FIXTURE_STATUS_LABEL in joined, (
         f"expected {FIXTURE_STATUS_LABEL!r} in response UI; "
         f"excerpt={excerpt!r}"
@@ -123,7 +93,7 @@ def test_agent_golden_request_response_flow(
             )
         except UiWaitTimeoutError as exc:
             last = session.ui_snapshot()
-            excerpt = _response_panel_excerpt(last)
+            excerpt = response_panel_excerpt(last)
             raise UiWaitTimeoutError(
                 f"golden Send settle failed: {exc}; "
                 f"response_excerpt={excerpt!r}",

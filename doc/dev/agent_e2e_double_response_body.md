@@ -22,7 +22,7 @@ Golden e2e asserts status + body **presence**. This lock asserts **cardinality**
 | `CANNED_DOUBLE_BODY_LOCK_OK` | Plain-text stub body (`pypost-887-lock-body-once`) |
 | `canned_send_with_one_chunk` | Side effect that emits one chunk (arms flush timer) |
 | `REQUEST_BODY_EDIT` | Fill reported request body via identity |
-| `RESPONSE_PANEL` snapshot walk | Count stub token under the panel |
+| `RESPONSE_PANEL` snapshot walk | Count stub token via [shared helpers](agent_e2e_response_panel.md) |
 
 Harness: blank `agent_e2e_session`, `stub_agent_e2e_http`, wait/snapshot — same
 stack as [Agent Golden E2E](agent_golden_e2e.md). HTTP catalog:
@@ -74,6 +74,7 @@ No extra env vars. Prefer `make test-agent-e2e` for offscreen Qt.
 - [Agent UI E2E](agent_e2e.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)
+- [Agent E2E Response-Panel Helpers](agent_e2e_response_panel.md)
 - [Agent E2E Presentation Matrix](agent_e2e_presentation_matrix.md)
 - [Response Streaming Display (PYPOST-887)](response-streaming-display.md)
 - [UI Widget Identity](ui_identity.md)

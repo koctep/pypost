@@ -35,7 +35,7 @@ the epic.
 | `stub_agent_e2e_http` + `canned_send_with_one_chunk` | Streaming stub at send boundary |
 | `make_canned_http_result` | Per-cell unique plain-text body + status |
 | `REQUEST_DETAIL_TABS` | Select Body tab for GET/PATCH/DELETE + fill |
-| `RESPONSE_PANEL` snapshot walk | Count body token and status label |
+| `RESPONSE_PANEL` snapshot walk | Count token/status via [shared helpers](agent_e2e_response_panel.md) |
 | `ai-tasks/PYPOST-890/findings.md` | Durable failing-cell list for PYPOST-891 |
 | `ai-tasks/PYPOST-891/triage-summary.md` | Triage decision (Bugs filed or won’t-file) |
 
@@ -174,6 +174,7 @@ No extra env vars. Prefer `make test-agent-e2e` for offscreen Qt.
 - [Agent UI E2E](agent_e2e.md)
 - [Agent E2E Double Response-Body Lock](agent_e2e_double_response_body.md)
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)
+- [Agent E2E Response-Panel Helpers](agent_e2e_response_panel.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Response Streaming Display (PYPOST-887)](response-streaming-display.md)
 - [UI Widget Identity](ui_identity.md)

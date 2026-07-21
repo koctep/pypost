@@ -41,6 +41,11 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
+from tests.helpers.agent_e2e_response_panel import (
+    joined_panel_values,
+    response_panel_excerpt,
+    subtree_by_name,
+)
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -111,45 +116,6 @@ def _matrix_params() -> list[Any]:
     return params
 
 
-def _walk_values(node: dict[str, Any]) -> list[str]:
-    values: list[str] = []
-    raw = node.get("value")
-    if isinstance(raw, str) and raw:
-        values.append(raw)
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            values.extend(_walk_values(child))
-    return values
-
-
-def _subtree_by_name(node: dict[str, Any], name: str) -> dict[str, Any] | None:
-    if node.get("name") == name:
-        return node
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            found = _subtree_by_name(child, name)
-            if found is not None:
-                return found
-    return None
-
-
-def _response_panel_excerpt(snap: dict[str, Any]) -> str:
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    if panel is None:
-        return "<response panel not in snapshot>"
-    joined = " | ".join(_walk_values(panel))
-    if len(joined) > 400:
-        return joined[:400] + "…"
-    return joined or "<response panel has no values>"
-
-
-def _joined_panel_values(snap: dict[str, Any]) -> str:
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    if panel is None:
-        return ""
-    return "\n".join(_walk_values(panel))
-
-
 def _ensure_body_tab_visible(session: AgentAppSession) -> None:
     """Show Body tab so ``REQUEST_BODY_EDIT`` is interactable (GET/PATCH/DELETE).
 
@@ -208,7 +174,7 @@ def test_agent_e2e_presentation_matrix_cell(
     stub_name = f"presentation_matrix_{method.lower()}_{body_shape}"
 
     def _response_ready(snap: dict[str, Any]) -> bool:
-        joined = _joined_panel_values(snap)
+        joined = joined_panel_values(snap)
         return status_label in joined and token in joined
 
     stub = canned_send_with_one_chunk(canned)
@@ -221,7 +187,7 @@ def test_agent_e2e_presentation_matrix_cell(
             )
         except UiWaitTimeoutError as exc:
             last = session.ui_snapshot()
-            excerpt = _response_panel_excerpt(last)
+            excerpt = response_panel_excerpt(last)
             raise UiWaitTimeoutError(
                 f"presentation matrix Send settle failed cell={cell_id}: "
                 f"{exc}; response_excerpt={excerpt!r}",
@@ -237,12 +203,12 @@ def test_agent_e2e_presentation_matrix_cell(
         QTest.qWait(_CHUNK_FLUSH_SETTLE_MS)
         snap = session.ui_snapshot()
 
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    excerpt = _response_panel_excerpt(snap)
+    panel = subtree_by_name(snap, RESPONSE_PANEL)
+    excerpt = response_panel_excerpt(snap)
     assert panel is not None, (
         f"RESPONSE_PANEL missing after Send cell={cell_id}; excerpt={excerpt!r}"
     )
-    joined = _joined_panel_values(snap)
+    joined = joined_panel_values(snap)
     body_count = joined.count(token)
     status_count = joined.count(status_label)
     assert body_count == 1, (

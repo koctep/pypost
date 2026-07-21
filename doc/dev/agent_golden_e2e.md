@@ -116,9 +116,11 @@ with stub_agent_e2e_http(CANNED_GOLDEN_OK):
     snap = session.wait_for_snapshot(predicate, timeout=15.0)
 ```
 
-Helpers such as `_response_ready`, `_response_panel_excerpt`, and
-`_assert_response_ui` are **test-local** in `tests/test_agent_golden_e2e.py`,
-not a production agent API.
+Scenario helpers `_response_ready` and `_assert_response_ui` are
+**test-local** in `tests/test_agent_golden_e2e.py` (expected status/body
+tokens). Snapshot walk / subtree / excerpt / join come from shared
+[response-panel helpers](agent_e2e_response_panel.md)
+(`tests/helpers/agent_e2e_response_panel.py`) — not a production agent API.
 
 ## Configuration
 

@@ -107,6 +107,10 @@ Optional `name=` labels custom installs in logs (catalog identities auto-name).
 6. Prefer consuming the new entry from golden/env scenarios via
    `stub_agent_e2e_http` / `agent_e2e_http_stub` — do not add private
    `patch("…HTTPClient.send_request")` as the primary path.
+7. For response-panel waits/asserts after Send, import
+   [shared snapshot helpers](agent_e2e_response_panel.md)
+   (`tests.helpers.agent_e2e_response_panel`) instead of copying walk /
+   subtree helpers.
 
 ## Configuration
 
@@ -140,4 +144,5 @@ No extra env vars.
 - [Agent E2E Double Response-Body Lock](agent_e2e_double_response_body.md)
 - [Agent E2E Presentation Matrix](agent_e2e_presentation_matrix.md)
 - [Agent E2E Seed Inventory](agent_e2e_seed.md)
+- [Agent E2E Response-Panel Helpers](agent_e2e_response_panel.md)
 - [Logging Event Naming Convention](logging.md)

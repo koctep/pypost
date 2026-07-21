@@ -180,6 +180,7 @@ scenarios.
 | Observe | `session.ui_snapshot()` |
 | Settle | `session.wait_for_snapshot` / `wait_until` / … |
 | Failure dump | Auto on fixture assert fail — [failure artifacts](agent_e2e_failure_artifacts.md) |
+| Response-panel snapshot helpers | `tests.helpers.agent_e2e_response_panel` — [helpers doc](agent_e2e_response_panel.md) |
 
 ### Identity convention
 

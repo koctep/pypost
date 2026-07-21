@@ -20,6 +20,10 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
+from tests.helpers.agent_e2e_response_panel import (
+    joined_panel_values,
+    subtree_by_name,
+)
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -33,33 +37,8 @@ _BODY_IN_SNAPSHOT = json.dumps(
 _SEND_SETTLE_TIMEOUT_S = 15.0
 
 
-def _walk_values(node: dict[str, Any]) -> list[str]:
-    values: list[str] = []
-    raw = node.get("value")
-    if isinstance(raw, str) and raw:
-        values.append(raw)
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            values.extend(_walk_values(child))
-    return values
-
-
-def _subtree_by_name(node: dict[str, Any], name: str) -> dict[str, Any] | None:
-    if node.get("name") == name:
-        return node
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            found = _subtree_by_name(child, name)
-            if found is not None:
-                return found
-    return None
-
-
 def _response_ready(snap: dict[str, Any]) -> bool:
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
-    if panel is None:
-        return False
-    joined = "\n".join(_walk_values(panel))
+    joined = joined_panel_values(snap)
     return _STATUS_LABEL in joined and _BODY_IN_SNAPSHOT in joined
 
 
@@ -96,9 +75,9 @@ def test_seeded_env_send_uses_shared_http_stub(
                 },
             ) from exc
 
-    panel = _subtree_by_name(snap, RESPONSE_PANEL)
+    panel = subtree_by_name(snap, RESPONSE_PANEL)
     assert panel is not None
-    joined = "\n".join(_walk_values(panel))
+    joined = joined_panel_values(snap)
     assert _STATUS_LABEL in joined
     assert _BODY_IN_SNAPSHOT in joined
     # Catalog entry still importable for authors extending scenarios.
