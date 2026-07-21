@@ -91,6 +91,15 @@ but does **not** increment `request_errors_total`.
 _on_request_error` checks `error.category == ErrorCategory.CANCELLED` and returns without
 showing a dialog. Legacy `str` cancellation payloads still use substring matching.
 
+### Response body streaming display (PYPOST-887)
+
+`RequestWorker` may emit `chunk_received` while the body is still streaming. The presenter
+debounces those chunks (~33 ms) into `ResponseView.append_body`, then on `finished` calls
+`display_response` (`setText` of the full body). Pending flush state is discarded on
+finish, error, and re-send so a late timer cannot double the body.
+
+See [Response Streaming Display](response-streaming-display.md).
+
 ### Tab worker lifecycle (PYPOST-401, PYPOST-415)
 
 Each tab holds at most one active `RequestWorker` in `tab.worker`. Cleanup is centralized in

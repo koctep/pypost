@@ -38,8 +38,22 @@ _ERROR_MESSAGES = {
 class TabsPresenterWorkerHandlers:
     """Worker signal handlers extracted from TabsPresenter."""
 
+    def _discard_chunk_buffer(self: TabsPresenter, tab: RequestTab) -> None:
+        """Stop pending flush timer and drop buffered chunks for *tab*.
+
+        Prevents a late ``_flush_chunk_buffer`` from appending after
+        ``display_response`` (setText) or into a cleared body (PYPOST-887).
+        """
+        tab_key = id(tab)
+        timer = self._chunk_flush_timers.pop(tab_key, None)
+        if timer is not None:
+            timer.stop()
+            timer.deleteLater()
+        self._chunk_buffers.pop(tab_key, None)
+
     def _on_request_finished(self: TabsPresenter, tab: RequestTab, response) -> None:
         self._clear_tab_worker(tab)
+        self._discard_chunk_buffer(tab)
         method = tab.request_data.method if tab.request_data else "UNKNOWN"
         logger.info(
             "request_finished method=%s status_code=%s elapsed_time=%.3fs size=%s",
@@ -58,6 +72,7 @@ class TabsPresenterWorkerHandlers:
 
     def _on_request_error(self: TabsPresenter, tab: RequestTab, error) -> None:
         self._clear_tab_worker(tab)
+        self._discard_chunk_buffer(tab)
         self._reset_tab_ui_state(tab)
 
         if isinstance(error, str):

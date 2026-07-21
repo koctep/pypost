@@ -444,6 +444,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._metrics.track_request_sent(request_data.method)
 
         sender_tab.response_view.clear_body()
+        self._discard_chunk_buffer(sender_tab)
         sender_tab.request_editor.send_btn.setText("Stop")
 
         collection_name = None
