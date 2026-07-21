@@ -157,7 +157,10 @@ class TestTabsPresenter(unittest.TestCase):
         p.add_new_tab(req, save_state=False)
         p.close_tabs_for_request_ids(["r1"])
         self.assertEqual(_request_tab_count(p), 1)
-        self.assertEqual(p.widget.tabText(0), "New Request")
+        current = p.widget.currentIndex()
+        self.assertNotEqual(current, _plus_tab_index(p))
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
+        self.assertEqual(p.widget.tabText(current), "New Request")
 
     def test_close_tabs_for_request_ids_noop_for_empty_list(self):
         req = _make_request("r1", "Open")
@@ -184,6 +187,51 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(p._state_manager.get_open_tabs(), ["r1"])
         p.close_tabs_for_request_ids(["r1"])
         self.assertEqual(p._state_manager.get_open_tabs(), [])
+
+    def test_close_tabs_for_request_ids_rightmost_does_not_land_on_plus(self):
+        """PYPOST-831: bulk-closing the rightmost request tab must not select +.
+
+        Qt removeTab can advance current onto the trailing + placeholder when the
+        closed set includes the request tab adjacent to +. Production must
+        reselect a remaining RequestTab (same rule as single close_tab).
+        """
+        req1 = _make_request("r1", "Left")
+        req2 = _make_request("r2", "Right")
+        p = self._make_presenter()
+        p.add_new_tab(req1, save_state=False)
+        p.add_new_tab(req2, save_state=False)
+        self.assertEqual(_request_tab_count(p), 2)
+        p.widget.setCurrentIndex(1)
+        self.assertEqual(p.widget.currentIndex() + 1, _plus_tab_index(p))
+        p.close_tabs_for_request_ids(["r2"])
+        self.assertEqual(_request_tab_count(p), 1)
+        current = p.widget.currentIndex()
+        plus_idx = _plus_tab_index(p)
+        self.assertNotEqual(current, plus_idx)
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
+        self.assertEqual(p.widget.widget(current).request_data.id, "r1")
+
+    def test_close_tabs_for_request_ids_multiple_rightmost_does_not_land_on_plus(
+        self,
+    ):
+        """PYPOST-831: bulk-closing several rightmost request tabs must not select +."""
+        req1 = _make_request("r1", "Keep")
+        req2 = _make_request("r2", "CloseA")
+        req3 = _make_request("r3", "CloseB")
+        p = self._make_presenter()
+        p.add_new_tab(req1, save_state=False)
+        p.add_new_tab(req2, save_state=False)
+        p.add_new_tab(req3, save_state=False)
+        self.assertEqual(_request_tab_count(p), 3)
+        p.widget.setCurrentIndex(2)
+        self.assertEqual(p.widget.currentIndex() + 1, _plus_tab_index(p))
+        p.close_tabs_for_request_ids(["r2", "r3"])
+        self.assertEqual(_request_tab_count(p), 1)
+        current = p.widget.currentIndex()
+        plus_idx = _plus_tab_index(p)
+        self.assertNotEqual(current, plus_idx)
+        self.assertIsInstance(p.widget.widget(current), RequestTab)
+        self.assertEqual(p.widget.widget(current).request_data.id, "r1")
 
     def test_restore_tabs_opens_saved_tabs(self):
         req = _make_request("r1", "Saved Request")

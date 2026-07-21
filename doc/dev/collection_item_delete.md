@@ -20,6 +20,9 @@ The goal is to allow direct cleanup from the tree without extra navigation.
   - Emits `requests_deleted` after successful delete.
 - **`MainWindow` (`pypost/ui/main_window.py`)**:
   - Wires `CollectionsPresenter.requests_deleted` to `TabsPresenter.close_tabs_for_request_ids`.
+  - After bulk tab removal, `close_tabs_for_request_ids` reselects a navigable request tab
+    via `_ensure_current_is_navigable` (same helper as single `close_tab`; PYPOST-831).
+    See [Request Actions](request_actions.md) for the plus-tab focus rule.
 - **`RequestManager` (`pypost/core/request_manager.py`)**:
   - Owns deletion business logic:
     - `delete_request(request_id)`
@@ -130,7 +133,7 @@ Automated coverage for open-tab closure after delete (PYPOST-332):
 
 | Layer | File | Scenarios |
 | --- | --- | --- |
-| Tab closure | `tests/test_tabs_presenter.py` | Matching tabs close, blank tab fallback, empty ID list, duplicate tabs, persisted state |
+| Tab closure | `tests/test_tabs_presenter.py` | Matching tabs close, blank tab fallback, empty ID list, duplicate tabs, persisted state; rightmost / multiple-rightmost bulk close does not land on `+` (PYPOST-831) |
 | Signal emission | `tests/test_collections_presenter.py` | `requests_deleted` for request and collection delete |
 | Integration | `tests/test_delete_open_tabs_integration.py` | `requests_deleted` → `close_tabs_for_request_ids` wiring |
 

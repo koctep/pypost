@@ -127,9 +127,12 @@ Layout-managed `+` control using Qt tab-bar APIs:
 - **Fallback click path**: `_on_tab_bar_clicked` on `tabBarClicked` at the plus index emits
   `new_tab_requested` when the user clicks plus-tab chrome outside the embedded button.
 - Close requests on the plus tab are ignored; tab cycling skips the placeholder.
-- After `TabsPresenter.close_tab` removes a request tab, if any request tabs remain and Qt
-  left current on `+` (common when closing the rightmost request tab), the presenter
-  reselects via `navigable_tab_indices()` (prefer the previous request tab).
+- After a request tab is removed, if any request tabs remain and Qt left current on `+`
+  (common when closing the rightmost request tab), the presenter reselects via
+  `_ensure_current_is_navigable(preferred_index)`, which uses `navigable_tab_indices()`
+  (prefer the previous request tab; fall back to the last navigable). Both single close
+  (`close_tab`, PYPOST-824) and bulk close (`close_tabs_for_request_ids`, PYPOST-831)
+  share that helper. Bulk preferred index is left of the leftmost closed tab.
 - Use `_request_tab_count()` (or filter `RequestTab` widgets) instead of raw `QTabWidget.count()`.
 
 ### `RequestTabHeader.set_tab_label(index, label)`
@@ -187,12 +190,14 @@ both click paths:
 | `test_close_middle_of_three_tabs_focuses_remaining_request_tab` | After closing middle of three request tabs, focus stays on a remaining request tab (not `+`) |
 | `test_close_rightmost_of_three_tabs_does_not_land_on_plus` | Closing last of three request tabs (next to `+`) must not select `+` |
 | `test_close_last_request_tab_focuses_replacement_not_plus` | Closing the last request tab creates a blank replacement via `add_new_tab` and focuses it (not `+`) |
+| `test_close_tabs_for_request_ids_rightmost_does_not_land_on_plus` | Bulk-closing the rightmost open request tab must not leave current on `+` (PYPOST-831) |
+| `test_close_tabs_for_request_ids_multiple_rightmost_does_not_land_on_plus` | Bulk-closing several rightmost open request tabs must not leave current on `+` |
 | `test_next_previous_tab_hotkeys_keep_focus_on_request_tabs` | Next/Previous Tab hotkey map (`Ctrl+Tab` / `Ctrl+Shift+Tab` via `register_hotkey` + `QAction.triggered`) cycles request tabs and never focuses `+` |
 
 Run:
 
 ```bash
-make test PYTEST_ARGS="tests/test_tab_header.py tests/test_tabs_presenter.py -k plus_tab -v"
+make test PYTEST_ARGS="tests/test_tab_header.py tests/test_tabs_presenter.py -k 'plus_tab or land_on_plus or close_tabs_for_request_ids or close_tab' -v"
 ```
 
 Save-as orchestrator tests live in `tests/test_request_save_orchestrator.py` (mocked
@@ -281,11 +286,16 @@ QT_QPA_PLATFORM=offscreen python -m pytest \
 
 - Qt `removeTab` advances current to the next index; when closing the rightmost request tab
   that next index is the trailing `+`.
-- Confirm `TabsPresenter.close_tab` reselects via `navigable_tab_indices()` when current is
-  not a request tab (PYPOST-824; verified for two-tab rightmost under PYPOST-825;
-  verified for close-current / `handle_close_tab` under PYPOST-826).
+- Confirm `TabsPresenter._ensure_current_is_navigable` reselects via
+  `navigable_tab_indices()` when current is not a request tab. Callers:
+  - `close_tab` (PYPOST-824; verified for two-tab rightmost under PYPOST-825;
+    verified for close-current / `handle_close_tab` under PYPOST-826)
+  - `close_tabs_for_request_ids` once after the remove loop (PYPOST-831; preferred =
+    left of leftmost closed index)
 - Regression tests: `test_close_rightmost_of_*_does_not_land_on_plus`,
-  `test_handle_close_tab_closes_current` in `tests/test_tabs_presenter.py`.
+  `test_handle_close_tab_closes_current`,
+  `test_close_tabs_for_request_ids_*_does_not_land_on_plus` in
+  `tests/test_tabs_presenter.py`.
 
 ### `Ctrl+N` works but `+` click does nothing
 

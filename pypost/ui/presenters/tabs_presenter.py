@@ -150,6 +150,16 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         if save_state:
             self.save_tabs_state()
 
+    def _ensure_current_is_navigable(self, preferred_index: int) -> None:
+        """If current is not a request tab, select preferred or last navigable."""
+        indices = self._header.navigable_tab_indices()
+        current = self._tabs.currentIndex()
+        if indices and current not in indices:
+            preferred = preferred_index
+            if preferred not in indices:
+                preferred = indices[-1]
+            self._tabs.setCurrentIndex(preferred)
+
     def close_tab(self, index: int) -> None:
         if self._header.is_plus_tab_index(index):
             return
@@ -158,13 +168,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             self.add_new_tab(save_state=False)
         else:
             # Qt removeTab can land on trailing +; keep focus on a request tab.
-            indices = self._header.navigable_tab_indices()
-            current = self._tabs.currentIndex()
-            if indices and current not in indices:
-                preferred = max(0, index - 1)
-                if preferred not in indices:
-                    preferred = indices[-1]
-                self._tabs.setCurrentIndex(preferred)
+            self._ensure_current_is_navigable(max(0, index - 1))
         self.save_tabs_state()
 
     def restore_tabs(self) -> None:
@@ -267,6 +271,10 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             self._tabs.removeTab(index)
         if self._request_tab_count() == 0:
             self.add_new_tab(save_state=False)
+        elif indices_to_close:
+            # Qt removeTab can land on trailing +; keep focus on a request tab.
+            preferred = max(0, min(indices_to_close) - 1)
+            self._ensure_current_is_navigable(preferred)
         self.save_tabs_state()
         logger.info(
             "close_tabs_for_deleted_requests closed_count=%d request_ids=%s",
