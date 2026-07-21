@@ -264,6 +264,16 @@ cycles per gateway with `gc.collect()` between batches. Guards against segfault 
 stranded completions after worker finish. Prefer isolation (no heavy suite prefix) when
 triaging native crashes — see [gui_testing.md](gui_testing.md).
 
+### Save-completed + widget GC canary (PYPOST-883)
+
+`tests/test_pypost_883_save_async_gc_probe.py` stresses
+`EnvironmentStorageGateway.save_async` with ≥200 save-completed waits while
+creating/destroying `QComboBox` widgets (`deleteLater` + `gc.collect` between
+batches). Investigation outcome: hang **not_reproduced** — no speculative
+product/harness lifecycle harden. Treat the module as a permanent cheap canary;
+baseline and probe commands live in `ai-tasks/PYPOST-883/30-findings.md`.
+See also [gui_testing.md](gui_testing.md) § Bounded nested waits.
+
 ### Responsiveness harness hang defense (PYPOST-823 / PYPOST-827 / PYPOST-828)
 
 `tests/test_env_storage_responsiveness.py` waits for gateway `load_completed` /

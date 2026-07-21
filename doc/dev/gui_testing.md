@@ -190,6 +190,13 @@ H3 worker-lifecycle canary (PYPOST-829): `tests/test_storage_gateway_h3_stress.p
 (≥200 rapid cycles + GC per gateway; shared `qapp` via `usefixtures`, PYPOST-830).
 Prefer isolation when triaging native crashes.
 
+Save-completed + QComboBox GC canary (PYPOST-883):
+`tests/test_pypost_883_save_async_gc_probe.py` (≥200 `save_async` →
+`process_until` save-completed waits with per-cycle `QComboBox` /
+`deleteLater` churn and `gc.collect()` every 25 idle cycles). Kept after
+hang investigation closed **not_reproduced** (no product lifecycle harden).
+Evidence: `ai-tasks/PYPOST-883/30-findings.md`.
+
 ### Timeouts
 
 Every test must declare `pytest.mark.timeout`. Use 30–60s for widget tests, 60–120s for
@@ -228,6 +235,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | `QApplication` already exists | Use shared `qapp` (param or `usefixtures`); no `setUpClass` app |
 | Segfault in CI | Ensure offscreen is set before any `PySide6` import |
 | Segfault in storage gateway finish | Historical H3 — run `tests/test_storage_gateway_h3_stress.py` in isolation (PYPOST-829) |
+| Save-completed stall under widget GC | Probe C canary (PYPOST-883); see `ai-tasks/PYPOST-883/30-findings.md` |
 | Hang past module timeout | SIGALRM cannot cut stuck `exec()` — use § Bounded nested waits |
 | Timeout assert hard to triage | Pass `timeout_detail` / `gateway_timeout_detail` (PYPOST-828) |
 | Test hangs (general) | Add timeout marker; bound waits; prefer `wait_until` (no nested `exec()`) |
@@ -284,3 +292,5 @@ make test-agent-e2e
   gateway `TestCase` shared `qapp` via `usefixtures`
 - [PYPOST-877](https://pypost.atlassian.net/browse/PYPOST-877) —
   env-presenter async-load wait on shared `process_until`
+- [PYPOST-883](https://pypost.atlassian.net/browse/PYPOST-883) —
+  save-completed + QComboBox GC probe canary (hang not_reproduced)
