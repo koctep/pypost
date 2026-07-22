@@ -20,7 +20,8 @@ updates.
 | Component | Role |
 | --- | --- |
 | `pypost/agent/ui_actions.py` | Lookup, interactable checks, primitives, errors |
-| `AgentAppSession.ui_*` | Convenience after `start()`; root = main window |
+| `AgentAppSession.ui_*` | Convenience after `start()`; root = main window
+  (or current tab when `in_current_tab=True` — PYPOST-851) |
 | `QTest.mouseClick` / `keyClick` | Click and key delivery (matches GUI tests) |
 | Gate | `tests/test_ui_actions.py` under `make test` |
 
@@ -83,21 +84,17 @@ from pypost.ui.widget_ids import METHOD_COMBO, URL_INPUT
 with AgentAppSession(offscreen=True) as session:
     session.ui_fill(URL_INPUT, "https://example.com")
     session.ui_select(METHOD_COMBO, "POST")
+    # Prefer current-tab scope for per-tab role ids (PYPOST-851):
+    session.ui_fill(URL_INPUT, "https://example.com", in_current_tab=True)
+    session.find_in_current_tab(URL_INPUT)
     session.ui_send_key(
         URL_INPUT, "a", modifiers=Qt.KeyboardModifier.ControlModifier
     )
 ```
 
-Module-level functions accept any root — use the **current request tab** when
-resolving per-tab ids across multiple tabs (see [ui_identity.md](ui_identity.md)).
-
-```python
-from pypost.agent import ui_click
-from pypost.ui.widget_ids import SEND_BUTTON
-
-tab = session.window.tabs.widget.currentWidget()
-ui_click(tab, SEND_BUTTON)
-```
+Module-level functions accept any root. Session helpers default to the main
+window; pass `in_current_tab=True` (or use `current_request_tab` /
+`find_in_current_tab`) for multi-tab role ids ([ui_identity.md](ui_identity.md)).
 
 ## Configuration
 
@@ -116,8 +113,9 @@ widgets that already have `objectName` set via `set_widget_id`.
   `findText`).
 - **Fill did not type character-by-character** — By design; use `ui_send_key`
   for keystroke delivery.
-- **Wrong tab’s URL/Send changed** — Session helpers search from the main
-  window; scope to the current tab for multi-tab flows.
+- **Wrong tab’s URL/Send changed** — Default session helpers search from the
+  main window; use `in_current_tab=True` or `find_in_current_tab` for multi-tab
+  flows (PYPOST-851).
 
 ## Related
 

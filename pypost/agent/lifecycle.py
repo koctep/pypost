@@ -17,7 +17,13 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
-from pypost.agent.ui_actions import ui_click, ui_fill, ui_select, ui_send_key
+from pypost.agent.ui_actions import (
+    find_widget,
+    ui_click,
+    ui_fill,
+    ui_select,
+    ui_send_key,
+)
 from pypost.agent.ui_snapshot import capture_ui_snapshot
 from pypost.agent.ui_wait import (
     DEFAULT_UI_WAIT_TIMEOUT_S,
@@ -29,6 +35,7 @@ from pypost.agent.ui_wait import (
 )
 from pypost.main import ComposedApp, compose_app
 from pypost.ui.main_window import MainWindow
+from pypost.ui.widget_ids import REQUEST_TABS
 
 logger = logging.getLogger(__name__)
 
@@ -255,17 +262,52 @@ class AgentAppSession:
         """Return a structured visible-UI snapshot; requires a started session."""
         return capture_ui_snapshot(self.window)
 
-    def ui_click(self, widget_id: str) -> None:
-        """Left-click a named widget under the main window."""
-        ui_click(self.window, widget_id)
+    def current_request_tab(self) -> QWidget:
+        """Return the active request tab widget (scoped lookup root).
 
-    def ui_fill(self, widget_id: str, text: str) -> None:
-        """Fill a named text input under the main window."""
-        ui_fill(self.window, widget_id, text)
+        Per-tab role ids (URL, Send, …) are shared across tabs; resolve them
+        under this widget instead of the main window (PYPOST-851).
+        """
+        tabs = find_widget(self.window, REQUEST_TABS)
+        current = tabs.currentWidget()
+        if current is None:
+            raise RuntimeError("No current request tab")
+        return current
 
-    def ui_select(self, widget_id: str, option: str) -> None:
+    def find_in_current_tab(self, widget_id: str) -> QWidget:
+        """Resolve ``widget_id`` under the active request tab."""
+        return find_widget(self.current_request_tab(), widget_id)
+
+    def _action_root(self, *, in_current_tab: bool) -> QWidget:
+        return self.current_request_tab() if in_current_tab else self.window
+
+    def ui_click(self, widget_id: str, *, in_current_tab: bool = False) -> None:
+        """Left-click a named widget under the main window (or current tab)."""
+        ui_click(self._action_root(in_current_tab=in_current_tab), widget_id)
+
+    def ui_fill(
+        self,
+        widget_id: str,
+        text: str,
+        *,
+        in_current_tab: bool = False,
+    ) -> None:
+        """Fill a named text input under the main window (or current tab)."""
+        ui_fill(self._action_root(in_current_tab=in_current_tab), widget_id, text)
+
+    def ui_select(
+        self,
+        widget_id: str,
+        option: str,
+        *,
+        in_current_tab: bool = False,
+    ) -> None:
         """Select an option by display text on a named combo box."""
-        ui_select(self.window, widget_id, option)
+        ui_select(
+            self._action_root(in_current_tab=in_current_tab),
+            widget_id,
+            option,
+        )
 
     def ui_send_key(
         self,
@@ -273,9 +315,15 @@ class AgentAppSession:
         key: str,
         *,
         modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier,
+        in_current_tab: bool = False,
     ) -> None:
         """Send a key (with optional modifiers) to a named widget."""
-        ui_send_key(self.window, widget_id, key, modifiers=modifiers)
+        ui_send_key(
+            self._action_root(in_current_tab=in_current_tab),
+            widget_id,
+            key,
+            modifiers=modifiers,
+        )
 
     def wait_until(
         self,

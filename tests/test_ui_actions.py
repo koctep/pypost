@@ -186,3 +186,41 @@ def test_main_window_fill_url_and_select_method(
     method = find_widget(session.window, METHOD_COMBO)
     assert isinstance(method, QComboBox)
     assert method.currentText() == "POST"
+
+
+def test_current_tab_scoped_fill(agent_e2e_session: AgentAppSession) -> None:
+    """PYPOST-851: in_current_tab resolves per-tab role ids under active tab."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready
+    tab = session.current_request_tab()
+    assert tab is session.window.tabs.widget.currentWidget()
+    session.ui_fill(URL_INPUT, "https://scoped.example/", in_current_tab=True)
+    url = session.find_in_current_tab(URL_INPUT)
+    assert isinstance(url, QLineEdit)
+    assert url.text() == "https://scoped.example/"
+
+
+def test_ui_action_applied_caplog(qapp: QApplication, caplog: pytest.LogCaptureFixture) -> None:
+    """PYPOST-851: ui_action_applied DEBUG scalars; fill text never logged."""
+    import logging
+
+    root, _ = _make_fixture(qapp)
+    try:
+        secret = "must-not-appear-in-logs"
+        with caplog.at_level(logging.DEBUG, logger="pypost.agent.ui_actions"):
+            ui_fill(root, _INPUT, secret)
+        records = [
+            r
+            for r in caplog.records
+            if r.name == "pypost.agent.ui_actions" and "ui_action_applied" in r.message
+        ]
+        assert records
+        msg = records[-1].getMessage()
+        assert "primitive=fill" in msg
+        assert f"widget_id={_INPUT}" in msg
+        assert "outcome=ok" in msg
+        assert "duration_ms=" in msg
+        assert secret not in msg
+        assert secret not in caplog.text
+    finally:
+        root.close()
