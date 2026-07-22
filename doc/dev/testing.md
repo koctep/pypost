@@ -554,6 +554,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-800] | Smoke for `make help` non-empty output (PYPOST-794 follow-up) |
 | [PYPOST-861] | Smoke for `make test-agent-e2e` (deps, help, recipe, marker selection) |
 | [PYPOST-872] | `venv-test` prerequisite on `test` / `test-slow` / `test-agent-e2e` |
+| [PYPOST-873] | Deferred CI cost trim; dual-run docs + workflow lock |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -605,6 +606,21 @@ separate `make-install-smoke` job in
 `.github/workflows/test.yml` runs `-m slow` Makefile tests on Python 3.11.
 Job `agent-e2e` runs `make install && make test-agent-e2e` on Python 3.11
 (PYPOST-861 env-pack make gate; see [agent_e2e.md](agent_e2e.md)).
+
+### Agent e2e CI double-run (PYPOST-873) — DEFER
+
+On Python **3.11**, agent e2e / env-pack tests run in both the main `test`
+matrix (`-m "not slow"`) and the dedicated `agent-e2e` job. That
+**intentional double-run** is kept: the dedicated job proves
+`make test-agent-e2e`; the matrix keeps multi-version coverage (3.11 +
+3.13). **DEFER** excluding `agent_e2e` from the main matrix until CI
+minutes hurt.
+
+**Revisit when** the pack grows enough that main-job wall time or billable
+minutes are clearly dominated by the overlap, or maintainers report painful
+double failures / queue time. An ENABLE trim must also preserve 3.13 agent
+e2e coverage (for example expand `agent-e2e` to a matrix) and update
+`tests/test_agent_e2e_ci_double_run_doc.py`.
 
 ## CI dependency caching (PYPOST-311)
 
