@@ -105,7 +105,10 @@ No environment variables. Identity strings are compile-time constants in
 ## Spot-check
 
 `tests/test_ui_identity_spotcheck.py` asserts key identities after ready
-(run via `make test`).
+(run via `make test`). `KEY_WIDGET_IDS` includes chrome plus per-tab controls
+(`URL_INPUT`, `SEND_BUTTON`, `REQUEST_BODY_EDIT`, `REQUEST_DETAIL_TABS`,
+`RESPONSE_PANEL`, …); the spot-check finds each id from the correct parent
+scope (window vs current tab).
 
 ## Troubleshooting
 

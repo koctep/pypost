@@ -23,6 +23,7 @@ from pypost.ui.widget_ids import (
     MAIN_WINDOW,
     METHOD_COMBO,
     REQUEST_BODY_EDIT,
+    REQUEST_DETAIL_TABS,
     REQUEST_TABS,
     RESPONSE_PANEL,
     SEND_BUTTON,
@@ -92,6 +93,10 @@ def _assert_key_identities(window: QWidget) -> None:
     send = current.findChild(QPushButton, SEND_BUTTON)
     assert send is not None
     _assert_id(send, SEND_BUTTON)
+
+    detail_tabs = current.findChild(QTabWidget, REQUEST_DETAIL_TABS)
+    assert detail_tabs is not None
+    _assert_id(detail_tabs, REQUEST_DETAIL_TABS)
 
     body = current.findChild(CodeEditor, REQUEST_BODY_EDIT)
     assert body is not None
