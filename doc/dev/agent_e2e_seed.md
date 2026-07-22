@@ -21,7 +21,8 @@ workspace area of the [environment contract](agent_e2e_env.md)
 | `build_agent_e2e_seed_environments()` | Pure builder for the seed `Environment` list |
 | `write_agent_e2e_seed(data_dir)` | Persist via `StorageManager` before session start |
 | `tests/helpers/agent_e2e_seed.py` | Temp dirs + re-exports for product-facing tests |
-| `tests/test_agent_e2e_seed.py` | Identity + model/item proof after ready |
+| `tests/helpers/agent_e2e_tree.py` | Viewport `visualRect` click for collection rows |
+| `tests/test_agent_e2e_seed.py` | Identity + drive-then-snapshot / resolve proof |
 
 ```mermaid
 flowchart LR
@@ -30,6 +31,8 @@ flowchart LR
   Disk --> Start[AgentAppSession.start]
   Start --> Ready[is_ui_ready]
   Ready --> Proof[Identity + model / items]
+  Ready --> Drive[ui_select + tree click]
+  Drive --> Snap[wait_for_snapshot / resolve]
 ```
 
 Seed must be on disk **before** `AgentAppSession.start()` so the normal
@@ -111,6 +114,9 @@ asserts — do not hard-code ids in new scenarios.
 make test-agent-e2e
 # or one module:
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_seed.py -v"
+# drive-then-snapshot soft proof only:
+make test-agent-e2e PYTEST_ARGS=\
+  "tests/test_agent_e2e_seed.py::test_seed_drive_then_snapshot_active_env_and_open_get -v"
 ```
 
 ## Inventory after bootstrap
@@ -130,16 +136,28 @@ Environment variable:
 
 Tree row labels use `{method} {name}` (e.g. `GET Seed GET`). The env selector
 lists `Agent E2E`; without a restored `last_environment_id` the active
-selection stays `No Environment` (present ≠ active).
+selection stays `No Environment` (**present ≠ active**). Selecting `Agent E2E`
+via agent `ui_select` makes it active so `base_url` participates in template
+resolution; the URL field still stores `{{base_url}}/get` (resolved at Send /
+via `TemplateService`, not rewritten in the line edit).
 
 No secrets, no live hosts as the primary HTTP path (determinism: PYPOST-859).
 
 ## Proof strategy
 
-After ready, tests prove seed via `COLLECTION_TREE` / `ENV_SELECTOR` identity
-plus model / combo-item enumeration — not blank-ready `ui_snapshot` name
-scan, and not disk-write asserts alone. See
-`tests/test_agent_e2e_seed.py`.
+After ready, tests prove seed in two complementary ways (see
+`tests/test_agent_e2e_seed.py`):
+
+1. **Identity + model / items (PYPOST-857 baseline)** — `COLLECTION_TREE` /
+   `ENV_SELECTOR` identity plus model / combo-item enumeration. Does **not**
+   use blank-ready `ui_snapshot` name scan, and not disk-write asserts alone.
+2. **Drive-then-snapshot + resolve (PYPOST-863 soft FR2/FR3)** — After
+   documenting present ≠ active (`Agent E2E` listed, current text still
+   `No Environment`), `session.ui_select(ENV_SELECTOR, "Agent E2E")` and a
+   viewport click on `GET Seed GET` (`tests/helpers/agent_e2e_tree.py`), then
+   `wait_for_snapshot` until method / URL / active env match inventory, and
+   `TemplateService.render_string("{{base_url}}/get", current_variables)`
+   equals `https://example.test/get`.
 
 Failure path (PYPOST-862): `test_write_agent_e2e_seed_logs_failure_and_reraises`
 mocks `StorageManager` persist failure, asserts ERROR
@@ -164,9 +182,15 @@ No product settings or env vars gate the seed writer. Logging follows
 - **Seed missing after ready** — Same `data_dir` for write and session;
   write before `start()`.
 - **Present ≠ active env** — `Agent E2E` is listed; active may stay
-  `No Environment` without `last_environment_id`.
-- **Assert on snapshot names only** — Use identity + model/item enum;
-  blank-ready snapshot is selection-scoped.
+  `No Environment` without `last_environment_id` or an explicit
+  `ui_select`. Soft proof:
+  `test_seed_drive_then_snapshot_active_env_and_open_get`.
+- **Assert on snapshot names only** — Use identity + model/item enum for
+  presence; blank-ready snapshot is selection-scoped. After select/open,
+  snapshot may assert current combo / URL / method values.
+- **Tree row click** — Rows are not widgets; use
+  `tests/helpers/agent_e2e_tree.click_tree_row_by_text` (or expand then
+  click) rather than `ui_click(COLLECTION_TREE)`.
 - **Persist / disk errors** — Grep `agent_e2e_seed_failed` (and
   `storage_*`); exception is re-raised. Covered by
   `test_write_agent_e2e_seed_logs_failure_and_reraises`.

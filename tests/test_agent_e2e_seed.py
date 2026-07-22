@@ -1,29 +1,40 @@
-"""PYPOST-857: seeded workspace present after agent session ready."""
+"""PYPOST-857/863: seeded workspace present + drive-then-snapshot proof."""
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import QApplication, QComboBox, QTreeView
 
-from pypost.agent import AgentAppSession
+from pypost.agent import AgentAppSession, UiWaitTimeoutError
 from pypost.core.storage import StorageManager
 from pypost.fixtures.agent_e2e_seed import (
+    SEED_BASE_URL_KEY,
+    SEED_BASE_URL_VALUE,
     SEED_COLLECTION_NAME,
     SEED_ENV_NAME,
     SEED_GET_REQUEST_NAME,
+    SEED_GET_URL,
     SEED_POST_REQUEST_NAME,
     build_agent_e2e_seed_collection,
     build_agent_e2e_seed_environments,
     write_agent_e2e_seed,
 )
-from pypost.ui.widget_ids import COLLECTION_TREE, ENV_SELECTOR
+from pypost.ui.widget_ids import (
+    COLLECTION_TREE,
+    ENV_SELECTOR,
+    METHOD_COMBO,
+    URL_INPUT,
+)
+from tests.helpers.agent_e2e_response_panel import subtree_by_name
 from tests.helpers.agent_e2e_seed import seeded_agent_dirs
+from tests.helpers.agent_e2e_tree import click_tree_row_by_text
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -131,3 +142,73 @@ def test_seed_isolation_across_sessions(qapp: QApplication) -> None:
             selector = blank.window.findChild(QComboBox, ENV_SELECTOR)
             assert selector is not None
             assert SEED_ENV_NAME not in _env_item_texts(selector)
+
+
+def _snapshot_value(snap: dict[str, Any], widget_id: str) -> str | None:
+    node = subtree_by_name(snap, widget_id)
+    if node is None:
+        return None
+    value = node.get("value")
+    return value if isinstance(value, str) else None
+
+
+def _seed_get_editor_ready(snap: dict[str, Any]) -> bool:
+    return (
+        _snapshot_value(snap, ENV_SELECTOR) == SEED_ENV_NAME
+        and _snapshot_value(snap, METHOD_COMBO) == "GET"
+        and _snapshot_value(snap, URL_INPUT) == SEED_GET_URL
+    )
+
+
+def test_seed_drive_then_snapshot_active_env_and_open_get(
+    qapp: QApplication,
+    seeded_agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-863: select env + open Seed GET; snapshot + resolve proof.
+
+    Present ≠ active: before drive, ``Agent E2E`` is listed but selection stays
+    ``No Environment``. After ``ui_select``, snapshot shows the active env.
+    Does not use blank-ready ``ui_snapshot`` name scan as presence proof.
+    """
+    assert QApplication.instance() is qapp
+    session = seeded_agent_e2e_session
+    assert session.window.is_ui_ready is True
+
+    selector = session.window.findChild(QComboBox, ENV_SELECTOR)
+    assert selector is not None
+    assert SEED_ENV_NAME in _env_item_texts(selector)
+    assert selector.currentText() == "No Environment"
+
+    tree = session.window.findChild(QTreeView, COLLECTION_TREE)
+    assert tree is not None
+
+    session.ui_select(ENV_SELECTOR, SEED_ENV_NAME)
+    click_tree_row_by_text(tree, f"GET {SEED_GET_REQUEST_NAME}")
+
+    try:
+        snap = session.wait_for_snapshot(
+            _seed_get_editor_ready,
+            timeout=10.0,
+        )
+    except UiWaitTimeoutError as exc:
+        raise UiWaitTimeoutError(
+            f"seed drive-then-snapshot settle failed: {exc}",
+            timeout_s=exc.timeout_s,
+            condition=exc.condition,
+            diagnostics={
+                **exc.diagnostics,
+                "step": "wait_active_env_and_seed_get",
+            },
+        ) from exc
+
+    assert _snapshot_value(snap, ENV_SELECTOR) == SEED_ENV_NAME
+    assert _snapshot_value(snap, METHOD_COMBO) == "GET"
+    assert _snapshot_value(snap, URL_INPUT) == SEED_GET_URL
+
+    variables = session.window.env.current_variables
+    assert variables.get(SEED_BASE_URL_KEY) == SEED_BASE_URL_VALUE
+    resolved = session.window.template_service.render_string(
+        SEED_GET_URL,
+        variables,
+    )
+    assert resolved == f"{SEED_BASE_URL_VALUE}/get"
