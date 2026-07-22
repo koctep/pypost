@@ -204,6 +204,14 @@ Save-completed + QComboBox GC canary (PYPOST-883):
 hang investigation closed **not_reproduced** (no product lifecycle harden).
 Evidence: `ai-tasks/PYPOST-883/30-findings.md`.
 
+Full-suite re-check after timeout diagnostics (PYPOST-880): focused 828 /
+consumer cluster stayed green. A plain `make check` can still stall on
+`test_save_async_emits_save_completed` under the default signal timeout
+method (nested Qt `exec()`); completing the suite with
+`--timeout-method=thread` showed **no PYPOST-828 harness regressions**.
+Remaining failures were unrelated SOLID LOC caps and ai-tasks baseline
+drift — see `ai-tasks/PYPOST-880/60-tech-debt.md`.
+
 ### Timeouts
 
 Every test must declare `pytest.mark.timeout`. Use 30–60s for widget tests, 60–120s for
@@ -243,6 +251,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | Segfault in CI | Ensure offscreen is set before any `PySide6` import |
 | Segfault in storage gateway finish | Historical H3 — run `tests/test_storage_gateway_h3_stress.py` in isolation (PYPOST-829) |
 | Save-completed stall under widget GC | Probe C canary (PYPOST-883); see `ai-tasks/PYPOST-883/30-findings.md` |
+| Full suite stalls on gateway save_async | Known sibling noise (PYPOST-883 / PYPOST-880); not an 828 diagnostic regression — triage with focused modules or temporary `--timeout-method=thread` |
 | Hang past module timeout | SIGALRM cannot cut stuck `exec()` — use § Bounded nested waits |
 | Timeout assert hard to triage | Pass `timeout_detail` / `gateway_timeout_detail` (PYPOST-828) |
 | Test hangs (general) | Add timeout marker; bound waits; prefer `wait_until` (no nested `exec()`) |
@@ -301,3 +310,5 @@ make test-agent-e2e
   env-presenter async-load wait on shared `process_until`
 - [PYPOST-883](https://pypost.atlassian.net/browse/PYPOST-883) —
   save-completed + QComboBox GC probe canary (hang not_reproduced)
+- [PYPOST-880](https://pypost.atlassian.net/browse/PYPOST-880) —
+  full-suite re-check after PYPOST-828 timeout diagnostics
