@@ -387,6 +387,41 @@ class, or function must declare its own timeout.
 make test
 ```
 
+### Strict markers (PYPOST-865)
+
+Default pytest `addopts` includes `--strict-markers`. Unknown custom markers fail
+collection with a usage error. Local `make test` / `make test-cov` /
+`make test-agent-e2e` and CI inherit the same flag from
+`pyproject.toml` — do **not** duplicate `--strict-markers` in workflow YAML.
+
+Registered custom markers today:
+
+| Marker | Purpose |
+| ------ | ------- |
+| `timeout(seconds)` | Per-test timeout (mandatory; see above) |
+| `slow` | Network-heavy / slow integration (excluded from default CI) |
+| `agent_e2e` | Agent UI e2e / env-pack scenarios (`make test-agent-e2e`) |
+
+When adding a new custom marker, register it under
+`[tool.pytest.ini_options] markers` in `pyproject.toml` in the same change.
+Built-in markers (`parametrize`, `usefixtures`, …) do not need registration.
+Regression guard: `tests/test_pytest_strict_markers.py` (flag in `addopts` +
+required markers registered).
+
+```bash
+make test PYTEST_ARGS="tests/test_pytest_strict_markers.py -v"
+```
+
+#### Troubleshooting
+
+- **Unknown marker / usage error on collection** — typo or unregistered
+  custom mark. Fix the name, or register it under `markers` in
+  `pyproject.toml`.
+- **Guard fails: missing `--strict-markers`** — restore
+  `"--strict-markers"` in `[tool.pytest.ini_options]` `addopts`.
+- **Guard fails: missing marker name** — re-add `timeout`, `slow`, or
+  `agent_e2e` to the `markers` list.
+
 ### PYPOST-400 regression surface
 
 Worker/error-handling and related DI regressions (SSE probe, history flush):
