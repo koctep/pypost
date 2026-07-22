@@ -164,6 +164,16 @@ mocks `StorageManager` persist failure, asserts ERROR
 `agent_e2e_seed_failed` via `caplog` on logger
 `pypost.fixtures.agent_e2e_seed`, and confirms the exception is re-raised.
 
+Inventory drift guard (PYPOST-864):
+`tests/test_agent_e2e_seed_inventory_doc.py` asserts each published
+inventory constant (`SEED_*` ids, names, `base_url`, GET/POST URL templates)
+appears in this page's Inventory section. Pure unit (no Qt / `agent_e2e`
+marker). Run:
+
+```bash
+make test PYTEST_ARGS="tests/test_agent_e2e_seed_inventory_doc.py -v"
+```
+
 ## Configuration
 
 | Setting | Notes |
@@ -171,7 +181,7 @@ mocks `StorageManager` persist failure, asserts ERROR
 | `data_dir` | Must receive seed **before** `AgentAppSession.start()` |
 | `config_dir` | Separate injectable dir; seed does not write config |
 | Offscreen Qt | Prefer `make test-agent-e2e` (`QT_QPA_PLATFORM=offscreen`) |
-| Inventory | Fixed in fixture module; change constants + this page together |
+| Inventory | Fixed in fixture module; sync with this page (PYPOST-864 guard) |
 
 No product settings or env vars gate the seed writer. Logging follows
 [logging.md](logging.md) (`agent_e2e_seed_completed` /
@@ -198,6 +208,9 @@ No product settings or env vars gate the seed writer. Logging follows
   seed is the env-pack workspace path.
 - **Module not in make target** — Listed under `make test-agent-e2e`;
   see [agent_e2e.md](agent_e2e.md).
+- **Doc ↔ code inventory drift** — Change `SEED_*` in
+  `pypost/fixtures/agent_e2e_seed.py` and this page together. CI guard:
+  `tests/test_agent_e2e_seed_inventory_doc.py` (PYPOST-864).
 
 ## Related
 
