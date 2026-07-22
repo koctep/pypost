@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
+from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QLineEdit,
+    QListView,
     QPushButton,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from pypost.agent.lifecycle import AgentAppSession
 from pypost.agent.ui_snapshot import (
+    UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP,
     UI_SNAPSHOT_MAX_VALUE_LENGTH,
     capture_ui_snapshot,
 )
@@ -183,3 +190,120 @@ def test_ui_snapshot_after_ready_includes_key_surfaces(
         SEND_BUTTON,
     ):
         assert expected in names, f"missing {expected} in snapshot"
+
+
+def test_capture_skips_invisible_and_prunes_unnamed_chrome(
+    qapp: QApplication,
+) -> None:
+    """Invisible widgets are omitted; empty unnamed chrome is pruned."""
+    root = QWidget()
+    root.setObjectName("prune_root")
+    layout = QVBoxLayout(root)
+    visible = QPushButton("Visible")
+    visible.setObjectName("visible_btn")
+    hidden = QPushButton("Hidden")
+    hidden.setObjectName("hidden_btn")
+    chrome = QWidget()  # unnamed, no value → prune when empty
+    layout.addWidget(visible)
+    layout.addWidget(hidden)
+    layout.addWidget(chrome)
+    root.show()
+    hidden.hide()
+    qapp.processEvents()
+
+    snap = capture_ui_snapshot(root)
+    names = _find_names(snap)
+    assert "visible_btn" in names
+    assert "hidden_btn" not in names
+    assert "" not in names or snap["name"] == "prune_root"
+
+
+def test_capture_tab_combo_and_item_view_values(qapp: QApplication) -> None:
+    """Tab title, combo current text, and item-view selection extractors."""
+    root = QWidget()
+    root.setObjectName("extractor_root")
+    layout = QVBoxLayout(root)
+
+    tabs = QTabWidget()
+    tabs.setObjectName("test_tabs")
+    tabs.addTab(QWidget(), "Alpha")
+    tabs.addTab(QWidget(), "Beta")
+    tabs.setCurrentIndex(1)
+
+    combo = QComboBox()
+    combo.setObjectName("test_combo")
+    combo.addItems(["one", "two", "three"])
+    combo.setCurrentIndex(2)
+
+    model = QStandardItemModel()
+    for label in ("a", "b", "c", "d", "e", "f"):
+        model.appendRow(QStandardItem(label))
+    view = QListView()
+    view.setObjectName("test_list")
+    view.setModel(model)
+    view.setSelectionMode(QListView.SelectionMode.MultiSelection)
+    for row in range(model.rowCount()):
+        view.selectionModel().select(
+            model.index(row, 0),
+            view.selectionModel().SelectionFlag.Select,
+        )
+
+    layout.addWidget(tabs)
+    layout.addWidget(combo)
+    layout.addWidget(view)
+    root.show()
+    qapp.processEvents()
+
+    snap = capture_ui_snapshot(root)
+    tab_node = _find_by_name(snap, "test_tabs")
+    assert tab_node is not None
+    assert tab_node["role"] == "tab_widget"
+    assert tab_node["value"] == "Beta"
+
+    combo_node = _find_by_name(snap, "test_combo")
+    assert combo_node is not None
+    assert combo_node["role"] == "combo_box"
+    assert combo_node["value"] == "three"
+
+    list_node = _find_by_name(snap, "test_list")
+    assert list_node is not None
+    assert list_node["role"] == "item_view"
+    parts = (list_node["value"] or "").split(", ")
+    assert len(parts) == UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP
+    assert parts == ["a", "b", "c", "d", "e"]
+
+
+def test_capture_logs_ui_snapshot_captured_scalars(
+    qapp: QApplication,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """DEBUG ui_snapshot_captured includes node_count, named_count, duration_ms."""
+    root = QWidget()
+    root.setObjectName("log_root")
+    layout = QVBoxLayout(root)
+    btn = QPushButton("Go")
+    btn.setObjectName("log_btn")
+    layout.addWidget(btn)
+    root.show()
+    qapp.processEvents()
+
+    with caplog.at_level(logging.DEBUG, logger="pypost.agent.ui_snapshot"):
+        capture_ui_snapshot(root)
+
+    matching = [
+        r
+        for r in caplog.records
+        if r.name == "pypost.agent.ui_snapshot" and "ui_snapshot_captured" in r.message
+    ]
+    assert matching, "expected ui_snapshot_captured DEBUG log"
+    msg = matching[-1].getMessage()
+    assert "node_count=" in msg
+    assert "named_count=" in msg
+    assert "duration_ms=" in msg
+
+
+def test_ui_snapshot_before_start_raises() -> None:
+    """session.ui_snapshot() before start raises like other session accessors."""
+    session = AgentAppSession(offscreen=True)
+    with pytest.raises(RuntimeError, match="has not been started"):
+        session.ui_snapshot()

@@ -164,8 +164,9 @@ Scalars only — never the tree, node values, `env_vars`, or `hidden_keys`. See
 ## Tests
 
 `tests/test_ui_snapshot.py` covers shape/hierarchy, hidden-value masking,
-truncation, and ready integration via `AgentAppSession` (run with
-`make test`).
+truncation (+ ellipsis), ready integration, invisible/prune behavior,
+tab/combo/item_view extractors, `ui_snapshot_captured` DEBUG scalars, and
+before-start raise (PYPOST-850). Run with `make test`.
 
 ## Troubleshooting
 
