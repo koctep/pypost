@@ -10,12 +10,9 @@ from PySide6.QtWidgets import QApplication, QSizePolicy
 from pypost.ui.widgets.history_panel import HistoryPanel
 from pypost.models.models import HistoryEntry
 
+@pytest.mark.usefixtures("qapp")
 
 class TestHistoryPanel(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_history_panel_copy_as_curl_shortcut(self):
         history_manager = MagicMock()
         entry = HistoryEntry(
@@ -130,7 +127,6 @@ class TestHistoryPanel(unittest.TestCase):
             )
             self.assertGreater(field.minimumHeight(), 0)
             self.assertEqual(field.maximumHeight(), 16777215)
-
 
 if __name__ == "__main__":
     unittest.main()

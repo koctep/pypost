@@ -9,19 +9,14 @@ pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import MagicMock, call, patch
 
-from PySide6.QtWidgets import QApplication
-
 from pypost.models.models import Collection, RequestData
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
-
 
 def _make_collection(col_id: str, name: str, requests=None) -> Collection:
     return Collection(id=col_id, name=name, requests=requests or [])
 
-
 def _make_request(req_id: str, name: str, method: str = "GET") -> RequestData:
     return RequestData(id=req_id, name=name, method=method)
-
 
 class FakeRequestManager:
     def __init__(self, collections=None, *, delete_result=True, delete_error=None):
@@ -42,7 +37,6 @@ class FakeRequestManager:
             raise self._delete_error
         return self._delete_result
 
-
 class FakeStateManager:
     def get_expanded_collections(self):
         return []
@@ -50,12 +44,9 @@ class FakeStateManager:
     def set_expanded_collections(self, ids):
         pass
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionTreeDeleteMetrics(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _make_presenter(self, request_manager):
         sm = FakeStateManager()
         metrics = MagicMock()
@@ -148,7 +139,6 @@ class TestCollectionTreeDeleteMetrics(unittest.TestCase):
             call("collection", "succeeded"),
             metrics.track_gui_collection_delete_action.call_args_list,
         )
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.alert_manager import AlertManager
 from pypost.models.settings import AppSettings
@@ -14,13 +13,6 @@ from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from tests.test_alert_manager import _make_payload
 
 pytestmark = pytest.mark.timeout(60)
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 def _make_main_window(qapp, *, alert_manager=None):  # noqa: ARG001
     metrics = MagicMock()
@@ -61,7 +53,6 @@ def _make_main_window(qapp, *, alert_manager=None):  # noqa: ARG001
     window.settings_btn = MagicMock()
     return window
 
-
 def _open_settings_with_webhook_url(window, webhook_url: str) -> AppSettings:
     original_init = SettingsDialog.__init__
 
@@ -82,7 +73,6 @@ def _open_settings_with_webhook_url(window, webhook_url: str) -> AppSettings:
         window.open_settings()
     return window.settings
 
-
 def _open_settings_with_alert_log_path(window, log_path: str) -> AppSettings:
     original_init = SettingsDialog.__init__
 
@@ -102,7 +92,6 @@ def _open_settings_with_alert_log_path(window, log_path: str) -> AppSettings:
     ):
         window.open_settings()
     return window.settings
-
 
 def test_reload_alert_manager_closes_old_and_propagates_to_tabs(qapp, tmp_path):
     old_manager = MagicMock(spec=AlertManager)
@@ -126,7 +115,6 @@ def test_reload_alert_manager_closes_old_and_propagates_to_tabs(qapp, tmp_path):
     )
     window.tabs.set_alert_manager.assert_called_once_with(new_manager)
 
-
 def test_open_settings_reloads_alert_manager_when_webhook_changes(qapp, caplog):
     initial = MagicMock(spec=AlertManager)
     window = _make_main_window(qapp, alert_manager=initial)
@@ -147,7 +135,6 @@ def test_open_settings_reloads_alert_manager_when_webhook_changes(qapp, caplog):
     initial.close.assert_called_once()
     window.tabs.set_alert_manager.assert_called_with(new_manager)
     assert any("alert_manager_reloaded" in r.message for r in caplog.records)
-
 
 def test_open_settings_skips_reload_when_alert_fields_unchanged(qapp):
     manager = MagicMock(spec=AlertManager)
@@ -175,7 +162,6 @@ def test_open_settings_skips_reload_when_alert_fields_unchanged(qapp):
 
     mock_reload.assert_not_called()
     assert window._alert_manager is manager
-
 
 def test_open_settings_emit_after_log_path_change_writes_to_new_file(qapp, tmp_path):
     old_log = tmp_path / "alerts-old.log"

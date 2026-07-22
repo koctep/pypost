@@ -23,7 +23,6 @@ from pypost.core.yaml_json_converter import convert_yaml_body_to_object
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
 
-
 def _collect_gutter_numbers(editor: CodeEditor) -> list[str]:
     editor.show()
     editor.resize(400, 300)
@@ -44,12 +43,9 @@ def _collect_gutter_numbers(editor: CodeEditor) -> list[str]:
 
     return drawn
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCodeEditorBasics(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_line_wrap_disabled(self):
         ed = CodeEditor()
         self.assertEqual(ed.lineWrapMode(), QPlainTextEdit.LineWrapMode.NoWrap)
@@ -74,12 +70,9 @@ class TestCodeEditorBasics(unittest.TestCase):
         ed.setFont(font)
         self.assertGreater(ed.tabStopDistance(), base)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCodeEditorReformat(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_reformat_text_valid_json(self):
         ed = CodeEditor(indent_size=2)
         raw = '{"a":1,"b":[2]}'
@@ -108,12 +101,9 @@ class TestCodeEditorReformat(unittest.TestCase):
         ed.reformat_text()
         self.assertEqual(ed.toPlainText(), "")
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCodeEditorPaste(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_insert_from_mime_data_formats_json(self):
         ed = CodeEditor(indent_size=2)
         ed.setPlainText("")
@@ -209,12 +199,9 @@ class TestCodeEditorPaste(unittest.TestCase):
         ed.insertFromMimeData(mime)
         self.assertEqual(ed.toPlainText(), raw)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCodeEditorKeyHandling(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_enter_after_open_brace_adds_indented_newline(self):
         ed = CodeEditor(indent_size=2)
         ed.setPlainText("{")
@@ -270,12 +257,9 @@ class TestCodeEditorKeyHandling(unittest.TestCase):
         QTest.keyClick(ed, Qt.Key.Key_BraceRight)
         self.assertEqual(ed.toPlainText(), '{\n  "a": 1}')
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCodeEditorLineNumbers(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_empty_document_has_single_digit_gutter_width(self):
         ed = CodeEditor()
         self.assertEqual(ed.blockCount(), 1)
@@ -404,7 +388,6 @@ class TestCodeEditorLineNumbers(unittest.TestCase):
         ed.verticalScrollBar().setValue(ed.verticalScrollBar().maximum())
         QApplication.processEvents()
         self.assertEqual(ed._line_number_area.height(), ed.contentsRect().height())
-
 
 if __name__ == "__main__":
     unittest.main()

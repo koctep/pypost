@@ -1,6 +1,5 @@
 """Settings UI for encryption migration verify and re-encrypt (PYPOST-527)."""
 
-
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
@@ -11,26 +10,17 @@ from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.encryption_migration import MigrationReport, ReencryptStats
 from pypost.core.storage import StorageManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
-
 def _wait_for_migration_worker(dlg, timeout_s: float = 5.0) -> None:
     deadline = time.time() + timeout_s
     while dlg._migration_worker is not None and time.time() < deadline:
         QCoreApplication.processEvents()
         QTest.qWait(10)
-
 
 def _empty_report(*, success: bool = True) -> MigrationReport:
     from pypost.core.encryption_migration import EnvironmentInventory
@@ -54,7 +44,6 @@ def _empty_report(*, success: bool = True) -> MigrationReport:
         errors=() if success else ("example error",),
         success=success,
     )
-
 
 class TestSettingsDialogEncryptionMigration:
     def test_migration_buttons_on_form_with_storage(self, qapp):

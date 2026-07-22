@@ -8,7 +8,6 @@ import unittest
 from unittest.mock import call, patch
 
 from PySide6.QtCore import QPoint
-from PySide6.QtWidgets import QApplication
 
 from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
@@ -17,12 +16,9 @@ from tests.helpers.collections_tree import (
     patch_rename_context_menu,
 )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionTreeRenameContextMenu(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_collection_rename_selected_records_selected_metric(self):
         col = make_collection("c1", "My API")
         harness = build_isolated_tree_actions([col])
@@ -121,7 +117,6 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
             call("collection", "succeeded"),
             harness.metrics.track_gui_collection_rename_action.call_args_list,
         )
-
 
 if __name__ == "__main__":
     unittest.main()

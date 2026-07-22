@@ -1,30 +1,16 @@
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-import sys
 import unittest
 
-from PySide6.QtWidgets import QApplication, QComboBox
+from PySide6.QtWidgets import QComboBox
 
 from pypost.models.models import McpToolParam
 from pypost.ui.widgets.request_editor import McpParamsTable, RequestWidget
 
-_app = None
-
-
-def _get_app():
-    global _app
-    if _app is None:
-        _app = QApplication.instance() or QApplication(sys.argv)
-    return _app
-
+@pytest.mark.usefixtures("qapp")
 
 class TestMcpParamsTable(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        _get_app()
-
     def setUp(self):
         self.table = McpParamsTable()
 
@@ -63,12 +49,9 @@ class TestMcpParamsTable(unittest.TestCase):
         self.table.set_data(params)
         self.assertEqual(self.table.get_data(), params)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestWidgetMcpParamSync(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        _get_app()
-
     def setUp(self):
         self.widget = RequestWidget()
 

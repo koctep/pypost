@@ -300,9 +300,10 @@ Sibling gateway/worker modules
 domain-appropriate `timeout_detail` wiring (PYPOST-828). Env-presenter async-load
 checks in `tests/test_env_presenter.py` also use shared `process_until` (PYPOST-877;
 default timeout text, no gateway `timeout_detail`). Gateway and collection-worker `TestCase` modules request the shared suite `qapp`
-via `@pytest.mark.usefixtures("qapp")` (PYPOST-830 / PYPOST-884) — do not add a
-second module-local `QApplication` in `setUpClass`. Presenter modules still on
-local `setUpClass` qapp are tracked under PYPOST-886.
+via `@pytest.mark.usefixtures("qapp")` (PYPOST-830 / PYPOST-884). Presenter
+modules (including `tests/test_env_presenter.py`) use the same shared fixture
+after PYPOST-886 — do not add a second module-local `QApplication` in
+`setUpClass` or a duplicate local `def qapp()`.
 Responsiveness uses the `qapp` fixture parameter instead. Details:
 [gui_testing.md](gui_testing.md) § Shared `qapp` and § Bounded nested `QEventLoop`
 waits.

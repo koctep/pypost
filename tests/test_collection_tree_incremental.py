@@ -6,8 +6,6 @@ pytestmark = pytest.mark.timeout(60)
 
 import unittest
 
-from PySide6.QtWidgets import QApplication
-
 from pypost.models.models import Collection, RequestData
 from pypost.ui.presenters.collection_tree_incremental import try_incremental_tree_refresh
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
@@ -19,12 +17,9 @@ from tests.helpers.collections_tree import (
     make_request,
 )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionTreeIncremental(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _make_presenter(self, collections=None):
         col = collections or []
         rm = FakeRequestManager(col)

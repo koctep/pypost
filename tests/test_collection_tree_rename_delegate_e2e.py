@@ -20,12 +20,9 @@ from tests.helpers.collections_tree import (
     wait_for_rename_editor,
 )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionTreeRenameDelegateE2E(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _prepare_harness(self, collections):
         harness = build_isolated_tree_actions(collections, with_rename_delegate=True)
         harness.view.resize(400, 300)
@@ -116,7 +113,6 @@ class TestCollectionTreeRenameDelegateE2E(unittest.TestCase):
         mock_warning.assert_called_once_with(harness.view)
         self.assertEqual(req.name, "Old Name")
         self.assertIsNone(harness.actions.pending_rename)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
 import pytest
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QWidget
 
 from pypost.ui.hotkeys import (
     collect_hotkey_rows,
@@ -12,23 +12,12 @@ from pypost.ui.hotkeys import (
 
 pytestmark = pytest.mark.timeout(30)
 
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
 def test_format_shortcut_display_joins_alternatives():
     assert format_shortcut_display(["F5", "Ctrl+Return"]) == "F5 / Ctrl+Return"
-
 
 def test_format_shortcut_display_collapses_range():
     keys = [f"Alt+{index}" for index in range(1, 10)]
     assert format_shortcut_display(keys, collapse=True) == "Alt+1 ... Alt+9"
-
 
 def test_collect_hotkey_rows_from_registered_actions(qapp):
     root = QWidget()
@@ -58,7 +47,6 @@ def test_collect_hotkey_rows_from_registered_actions(qapp):
     assert "Ctrl+," in settings_row
     assert "F12" in settings_row
 
-
 def test_register_hotkey_group_collapsed_display(qapp):
     root = QWidget()
     register_hotkey_group(
@@ -72,7 +60,6 @@ def test_register_hotkey_group_collapsed_display(qapp):
     rows = collect_hotkey_rows(root)
     shortcut = next(value for label, value in rows if label == "Switch to Tab 1-9")
     assert shortcut == "Alt+1 ... Alt+9"
-
 
 def test_hotkeys_dialog_uses_parent_actions(qapp):
     from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog

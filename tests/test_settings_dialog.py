@@ -1,6 +1,5 @@
 """Qt-level tests for SettingsDialog (request timeout visibility and persistence)."""
 
-
 import logging
 
 import pytest
@@ -8,8 +7,6 @@ import pytest
 pytestmark = pytest.mark.timeout(60)
 
 from unittest.mock import patch
-
-from PySide6.QtWidgets import QApplication
 
 from PySide6.QtWidgets import QLineEdit
 
@@ -20,13 +17,6 @@ from pypost.ui.dialogs.settings_dialog import (
     WEBHOOK_AUTH_NEW_PLACEHOLDER,
     _resolve_webhook_auth_header,
 )
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 class TestSettingsDialogRequestTimeout:
     def test_request_timeout_spin_is_on_form_layout(self, qapp):
@@ -53,7 +43,6 @@ class TestSettingsDialogRequestTimeout:
         finally:
             dlg.close()
 
-
 class TestSettingsDialogTheme:
     def test_theme_combo_is_on_form_layout(self, qapp):
         dlg = SettingsDialog(AppSettings())
@@ -79,7 +68,6 @@ class TestSettingsDialogTheme:
         finally:
             dlg.close()
 
-
 class TestSettingsDialogLogHiddenKeyNames:
     def test_log_hidden_key_names_checkbox_on_form(self, qapp):
         dlg = SettingsDialog(AppSettings())
@@ -104,7 +92,6 @@ class TestSettingsDialogLogHiddenKeyNames:
             assert dlg.get_settings().log_hidden_key_names is True
         finally:
             dlg.close()
-
 
 class TestSettingsDialogSecurityLoggingSection:
     def test_security_logging_section_header_visible(self, qapp):
@@ -134,7 +121,6 @@ class TestSettingsDialogSecurityLoggingSection:
             )
         finally:
             dlg.close()
-
 
 class TestSettingsDialogAlertSettings:
     def test_alert_log_path_loads_from_settings(self, qapp):
@@ -231,7 +217,6 @@ class TestSettingsDialogAlertSettings:
         finally:
             dlg.close()
 
-
 class TestSettingsDialogBindAddressValidation:
     @patch("pypost.ui.dialogs.settings_dialog.show_invalid_bind_address")
     def test_accept_blocks_save_on_invalid_mcp_host(
@@ -292,7 +277,6 @@ class TestSettingsDialogBindAddressValidation:
         finally:
             dlg.close()
 
-
 class TestSettingsDialogRetryableCodesValidation:
     @pytest.mark.parametrize(
         "codes,expected_reason,message_fragment",
@@ -332,7 +316,6 @@ class TestSettingsDialogRetryableCodesValidation:
             )
         finally:
             dlg.close()
-
 
 class TestResolveWebhookAuthHeader:
     def test_returns_none_when_clear_requested(self):

@@ -1,12 +1,8 @@
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-import sys
 import unittest
 from unittest.mock import MagicMock
-
-from PySide6.QtWidgets import QApplication
 
 from pypost.models.models import RequestData
 from pypost.ui.widgets.fold import BodyFormat
@@ -15,16 +11,6 @@ from pypost.ui.widgets.request_editor import (
     body_format_to_body_type,
     body_type_to_body_format,
 )
-
-_app = None
-
-
-def _get_app():
-    global _app
-    if _app is None:
-        _app = QApplication.instance() or QApplication(sys.argv)
-    return _app
-
 
 class TestBodyFormatMapping(unittest.TestCase):
     def test_body_type_to_format_json(self):
@@ -42,12 +28,9 @@ class TestBodyFormatMapping(unittest.TestCase):
     def test_body_format_to_body_type(self):
         self.assertEqual(body_format_to_body_type(BodyFormat.YAML), "yaml")
 
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestWidgetBodyFormat(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        _get_app()
-
     def setUp(self):
         self.widget = RequestWidget()
 
@@ -121,7 +104,6 @@ class TestRequestWidgetBodyFormat(unittest.TestCase):
         self.widget.body_edit.set_yaml_as_json.assert_called_with(True)
         self.widget.yaml_as_json_check.setChecked(False)
         self.widget.body_edit.set_yaml_as_json.assert_called_with(False)
-
 
 if __name__ == "__main__":
     unittest.main()

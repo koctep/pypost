@@ -6,16 +6,7 @@ pytestmark = pytest.mark.timeout(60)
 
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication
-
 from pypost.ui.styles.style_manager import StyleManager
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 def test_apply_appearance_calls_apply_theme(qapp):
     manager = StyleManager()
@@ -23,18 +14,15 @@ def test_apply_appearance_calls_apply_theme(qapp):
         manager.apply_appearance(qapp, theme="dark", font_size=12)
     apply_theme.assert_called_once_with(qapp, "dark")
 
-
 def test_apply_appearance_stylesheet_contains_font_rule(qapp):
     manager = StyleManager()
     manager.apply_appearance(qapp, theme="light", font_size=16)
     assert "font-size: 16pt" in qapp.styleSheet()
 
-
 def test_apply_appearance_sets_application_font(qapp):
     manager = StyleManager()
     manager.apply_appearance(qapp, theme="system", font_size=18)
     assert qapp.font().pointSize() == 18
-
 
 def test_font_size_survives_stylesheet_reset(qapp):
     manager = StyleManager()
@@ -46,7 +34,6 @@ def test_font_size_survives_stylesheet_reset(qapp):
         manager.apply_appearance(qapp, theme="system", font_size=16)
     assert qapp.font().pointSize() == 16
 
-
 def test_font_size_min(qapp):
     manager = StyleManager()
     with patch.object(
@@ -56,7 +43,6 @@ def test_font_size_min(qapp):
     ):
         manager.apply_appearance(qapp, theme="system", font_size=8)
     assert qapp.font().pointSize() == 8
-
 
 def test_font_size_second_call_wins(qapp):
     manager = StyleManager()
@@ -68,7 +54,6 @@ def test_font_size_second_call_wins(qapp):
         manager.apply_appearance(qapp, theme="system", font_size=14)
         manager.apply_appearance(qapp, theme="system", font_size=20)
     assert qapp.font().pointSize() == 20
-
 
 def test_apply_appearance_call_order(qapp):
     manager = StyleManager()

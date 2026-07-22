@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QTabBar, QWidget
+from PySide6.QtWidgets import QTabBar, QWidget
 
 from pypost.core.request_persisted_fields import (
     persisted_fields_equal,
@@ -19,10 +19,8 @@ from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab, PLUS_
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 
-
 def _make_request(req_id: str = "r1", name: str = "Test", method: str = "GET") -> RequestData:
     return RequestData(id=req_id, name=name, method=method)
-
 
 class FakeRequestManager:
     def __init__(self, requests=None):
@@ -45,7 +43,6 @@ class FakeRequestManager:
         self.collections.append(col)
         return col
 
-
 class FakeStateManager:
     def __init__(self, open_tabs=None):
         self._open_tabs = open_tabs or []
@@ -64,14 +61,12 @@ class FakeStateManager:
     def set_expanded_collections(self, ids):
         self._expanded = ids
 
-
 def _request_tab_count(presenter: TabsPresenter) -> int:
     return sum(
         1
         for i in range(presenter.widget.count())
         if isinstance(presenter.widget.widget(i), RequestTab)
     )
-
 
 def _plus_tab_index(presenter: TabsPresenter) -> int:
     tab_bar = presenter.widget.tabBar()
@@ -80,12 +75,9 @@ def _plus_tab_index(presenter: TabsPresenter) -> int:
             return i
     return -1
 
+@pytest.mark.usefixtures("qapp")
 
 class TestTabsPresenter(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _make_presenter(self, requests=None, open_tabs=None):
         rm = FakeRequestManager(requests)
         sm = FakeStateManager(open_tabs)
@@ -769,12 +761,9 @@ class TestTabsPresenter(unittest.TestCase):
         )
         self.assertFalse(tab_b.stale_persisted)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestSync(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_snapshot_persisted_fields_deep_copy(self):
         req = _make_request("r1", "Snap")
         req.headers = {"X-Test": "1"}
@@ -800,12 +789,9 @@ class TestRequestSync(unittest.TestCase):
         self.assertNotIn("layout", tab.__dict__)
         self.assertIsNotNone(tab.layout())
 
+@pytest.mark.usefixtures("qapp")
 
 class TestTabsPresenterAlertManagerPropagation(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _make_presenter_with_alert_manager(self, alert_manager=None):
         rm = FakeRequestManager()
         sm = FakeStateManager()
@@ -850,12 +836,9 @@ class TestTabsPresenterAlertManagerPropagation(unittest.TestCase):
             _, kwargs = MockWorker.call_args
             self.assertIsNone(kwargs.get("alert_manager"))
 
+@pytest.mark.usefixtures("qapp")
 
 class TestTabsPresenterSendRequestTabBinding(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_handle_send_request_accepts_explicit_tab_without_sender(self):
         """PYPOST-71: send handler must not rely on QObject.sender()."""
         rm = FakeRequestManager()
@@ -883,12 +866,9 @@ class TestTabsPresenterSendRequestTabBinding(unittest.TestCase):
             self.assertIsNone(tab1.worker)
             mock_instance.start.assert_called_once()
 
+@pytest.mark.usefixtures("qapp")
 
 class TestTabsPresenterSaveTabBinding(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _mock_save_dialog(self, *, request_name: str = "Saved Copy"):
         mock_dialog = MagicMock()
         mock_dialog.exec.return_value = True
@@ -987,12 +967,9 @@ class TestTabsPresenterSaveTabBinding(unittest.TestCase):
         self.assertEqual(source_tab.request_data.name, "Saved Name")
         self.assertIsNotNone(source_tab.persisted_baseline)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestTabsPresenterHiddenKeysForwarding(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_hidden_keys_forwarded_to_worker_after_env_hidden_keys_changed(self):
         from pypost.core.template_service import TemplateService
         rm = FakeRequestManager()
@@ -1021,7 +998,6 @@ class TestTabsPresenterHiddenKeysForwarding(unittest.TestCase):
                 kwargs.get("hidden_keys"),
                 "RequestWorker must receive hidden_keys from _current_hidden_keys",
             )
-
 
 if __name__ == "__main__":
     unittest.main()

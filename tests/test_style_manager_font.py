@@ -6,16 +6,9 @@ import pytest
 
 pytestmark = pytest.mark.timeout(60)
 
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QWidget
 
 from pypost.ui.styles.style_manager import StyleManager
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 def test_apply_styles_appends_font_size_rule(qapp):
     widget = QWidget()
@@ -23,13 +16,11 @@ def test_apply_styles_appends_font_size_rule(qapp):
     manager.apply_styles(widget, font_size=16)
     assert "font-size: 16pt" in widget.styleSheet()
 
-
 def test_apply_styles_without_font_size_omits_rule(qapp):
     widget = QWidget()
     manager = StyleManager()
     manager.apply_styles(widget)
     assert "Application font size" not in widget.styleSheet()
-
 
 def test_load_styles_includes_tooltip_qss():
     manager = StyleManager()

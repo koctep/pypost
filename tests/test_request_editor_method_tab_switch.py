@@ -1,30 +1,15 @@
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-import sys
 import unittest
 from unittest.mock import MagicMock
-from PySide6.QtWidgets import QApplication
 
 from pypost.models.models import RequestData
 from pypost.ui.widgets.request_editor import RequestWidget
 
-_app = None
-
-
-def _get_app():
-    global _app
-    if _app is None:
-        _app = QApplication.instance() or QApplication(sys.argv)
-    return _app
-
+@pytest.mark.usefixtures("qapp")
 
 class TestAutoSwitchToBodyTab(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        _get_app()
-
     def setUp(self):
         self.widget = RequestWidget()
 
@@ -81,12 +66,9 @@ class TestAutoSwitchToBodyTab(unittest.TestCase):
         self.widget.load_data()
         self.assertFalse(self.widget._loading)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestAutoSwitchMetrics(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        _get_app()
-
     def setUp(self):
         self.metrics = MagicMock()
         self.widget = RequestWidget(metrics=self.metrics)
@@ -106,7 +88,6 @@ class TestAutoSwitchMetrics(unittest.TestCase):
     def test_get_does_not_increment_autoswitch_counter(self):
         self.widget.method_combo.setCurrentText("GET")
         self.metrics.track_gui_method_body_autoswitch.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()

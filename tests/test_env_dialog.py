@@ -8,18 +8,11 @@ import logging
 
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QApplication, QMessageBox, QTableWidgetItem
+from PySide6.QtWidgets import QMessageBox, QTableWidgetItem
 
 from pypost.models.models import Environment
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.core.constants import HIDDEN_MASK
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 class TestEnvironmentDialog:
     def test_dialog_does_not_mutate_input_environments(self, qapp):

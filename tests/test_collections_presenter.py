@@ -4,7 +4,6 @@ pytestmark = pytest.mark.timeout(60)
 
 import unittest
 from unittest.mock import MagicMock, patch
-from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt, QPoint
 
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
@@ -19,12 +18,9 @@ from tests.helpers.collections_tree import (
     patch_view_context_menu,
 )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionsPresenter(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _make_presenter(self, collections=None):
         col = collections or []
         rm = FakeRequestManager(col)
@@ -480,7 +476,6 @@ class TestCollectionsPresenter(unittest.TestCase):
         metrics.track_gui_collection_rename_action.assert_called_once_with(
             "collection", "selected"
         )
-
 
 if __name__ == "__main__":
     unittest.main()

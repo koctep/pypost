@@ -13,18 +13,15 @@ import unittest
 from dataclasses import dataclass
 
 from PySide6.QtCore import QCoreApplication
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.qt.mcp_server import MCPServerManager
-
 
 @dataclass(frozen=True)
 class BindHostCase:
     bind_host: str
     client_host: str
     expected_listen: frozenset[str]
-
 
 BIND_HOST_CASES = (
     BindHostCase("127.0.0.1", "127.0.0.1", frozenset({"127.0.0.1"})),
@@ -33,12 +30,10 @@ BIND_HOST_CASES = (
     BindHostCase("::1", "::1", frozenset({"::1"})),
 )
 
-
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
-
 
 def _wait_for_listen(host: str, port: int, timeout: float = 10.0) -> None:
     deadline = time.time() + timeout
@@ -50,7 +45,6 @@ def _wait_for_listen(host: str, port: int, timeout: float = 10.0) -> None:
         except OSError:
             time.sleep(0.05)
     raise TimeoutError(f"Server did not listen on {host}:{port} within {timeout}s")
-
 
 def _listen_addresses_for_port(port: int) -> set[str]:
     if shutil.which("lsof") is None:
@@ -80,7 +74,6 @@ def _listen_addresses_for_port(port: int) -> set[str]:
             addresses.add(raw)
     return addresses
 
-
 def _assert_listen_address(port: int, expected: frozenset[str]) -> None:
     observed = _listen_addresses_for_port(port)
     if not observed:
@@ -89,12 +82,9 @@ def _assert_listen_address(port: int, expected: frozenset[str]) -> None:
         f"Expected listen on one of {sorted(expected)}, observed {sorted(observed)}"
     )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestMcpServerBindHost(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _run_case(self, case: BindHostCase) -> None:
         port = _free_port()
         manager = MCPServerManager()
@@ -117,12 +107,9 @@ class TestMcpServerBindHost(unittest.TestCase):
     def test_binds_to_ipv6_loopback(self):
         self._run_case(BIND_HOST_CASES[3])
 
+@pytest.mark.usefixtures("qapp")
 
 class TestMetricsServerBindHost(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _run_case(self, case: BindHostCase) -> None:
         port = _free_port()
         manager = MetricsManager()
@@ -144,7 +131,6 @@ class TestMetricsServerBindHost(unittest.TestCase):
 
     def test_binds_to_ipv6_loopback(self):
         self._run_case(BIND_HOST_CASES[3])
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,11 +1,8 @@
 """Settings UI and persistence for environment encryption (PYPOST-481)."""
 
-
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager
 from pypost.models.settings import AppSettings
@@ -19,13 +16,6 @@ from pypost.ui.dialogs.settings_dialog import (
     SettingsDialog,
     parse_env_encryption_enabled_from_mode,
 )
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 class TestSettingsDialogEnvironmentEncryption:
     def test_encryption_controls_on_form(self, qapp):
@@ -149,7 +139,6 @@ class TestSettingsDialogEnvironmentEncryption:
         finally:
             dlg.close()
 
-
 class TestConfigManagerEncryptionPersistence:
     def test_save_load_encryption_fields(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
@@ -168,7 +157,6 @@ class TestConfigManagerEncryptionPersistence:
         assert reloaded.env_encryption_key_source == KEY_SOURCE_ENVIRONMENT
         assert reloaded.env_encryption_key_source_fallback == ["secret_store"]
 
-
 @pytest.mark.parametrize(
     "mode,expected",
     [
@@ -177,5 +165,6 @@ class TestConfigManagerEncryptionPersistence:
         (ENCRYPTION_MODE_DEFAULT, None),
     ],
 )
+
 def test_parse_env_encryption_enabled_from_mode(mode, expected):
     assert parse_env_encryption_enabled_from_mode(mode) is expected

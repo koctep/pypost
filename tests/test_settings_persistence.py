@@ -17,19 +17,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 class TestConfigManagerPersistence(unittest.TestCase):
     def test_load_missing_file_returns_defaults(self):
@@ -98,7 +90,6 @@ class TestConfigManagerPersistence(unittest.TestCase):
                 s = ConfigManager().load_config()
                 self.assertIsNone(s.env_encryption_enabled)
                 self.assertIsNone(s.env_encryption_key_source)
-
 
 class TestStateManagerPersistence(unittest.TestCase):
     def _cm_and_td(self):
@@ -185,7 +176,6 @@ class TestStateManagerPersistence(unittest.TestCase):
         sm2 = StateManager(ConfigManager())
         self.assertEqual(sm2.get_expanded_collections(), ["immediate"])
 
-
 def test_state_manager_debounced_save_persists_after_timer(qapp):  # noqa: ARG001
     """Debounced timer path persists UI state without flush_pending_save."""
     with tempfile.TemporaryDirectory() as td:
@@ -200,7 +190,6 @@ def test_state_manager_debounced_save_persists_after_timer(qapp):  # noqa: ARG00
 
             sm2 = StateManager(ConfigManager())
             assert sm2.get_expanded_collections() == ["debounced"]
-
 
 def test_request_timeout_survives_settings_dialog_save_and_restart(qapp):  # noqa: ARG001
     """PYPOST-445: Settings UI save path persists request_timeout across restart."""
@@ -232,7 +221,6 @@ def test_request_timeout_survives_settings_dialog_save_and_restart(qapp):  # noq
             finally:
                 dlg_after_restart.close()
 
-
 class TestConfigManagerErrorLogging(unittest.TestCase):
     def test_load_failure_logs_error(self):
         with tempfile.TemporaryDirectory() as td:
@@ -260,7 +248,6 @@ class TestConfigManagerErrorLogging(unittest.TestCase):
                 self.assertTrue(
                     any("config_save_failed" in line for line in logs.output)
                 )
-
 
 if __name__ == "__main__":
     unittest.main()

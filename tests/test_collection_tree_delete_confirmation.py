@@ -8,7 +8,6 @@ import unittest
 from unittest.mock import MagicMock, call, patch
 
 from PySide6.QtCore import QPoint
-from PySide6.QtWidgets import QApplication
 
 from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
@@ -17,12 +16,9 @@ from tests.helpers.collections_tree import (
     patch_delete_context_menu,
 )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
     def test_collection_delete_no_records_cancelled_metric(self, mock_confirm_delete):
         col = make_collection("c1", "My API")
@@ -91,7 +87,6 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         with patch_delete_context_menu(harness.view, item.index(), action_count=2):
             harness.actions.show_context_menu(QPoint(0, 0))
         mock_handle_delete.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()

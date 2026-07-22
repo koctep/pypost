@@ -7,8 +7,6 @@ pytestmark = pytest.mark.timeout(120)
 import unittest
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication
-
 from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
@@ -17,7 +15,6 @@ from pypost.models.settings import AppSettings
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
 
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager
-
 
 def _http_result(status_code: int) -> HTTPRequestResult:
     body = str(status_code)
@@ -32,12 +29,9 @@ def _http_result(status_code: int) -> HTTPRequestResult:
         resolved=ResolvedRequestFields(url="http://example.com", headers={}, body=""),
     )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestDefaultRetryPolicyIntegration(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_tabs_presenter_forwards_app_default_retry_policy_to_worker(self):
         policy = RetryPolicy(max_retries=2, retryable_status_codes=[500])
         settings = AppSettings(default_retry_policy=policy)

@@ -21,10 +21,8 @@ from tests.helpers.process_until import process_until
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
-
 def _make_env(env_id: str, name: str, variables=None, enable_mcp=False) -> Environment:
     return Environment(id=env_id, name=name, variables=variables or {}, enable_mcp=enable_mcp)
-
 
 class FakeStorage:
     def __init__(self, environments=None):
@@ -37,14 +35,12 @@ class FakeStorage:
     def save_environments(self, envs):
         self.saved.append(list(envs))
 
-
 class FakeConfigManager:
     def __init__(self):
         self.saved = []
 
     def save_config(self, settings):
         self.saved.append(settings)
-
 
 class FakeMCPManager:
     status_changed = MagicMock()
@@ -82,7 +78,6 @@ class FakeMCPManager:
     def set_hidden_keys_supplier(self, supplier):
         self.hidden_keys_supplier = supplier
 
-
 def _make_mcp_manager():
     mgr = FakeMCPManager()
     mgr.status_changed = MagicMock()
@@ -93,12 +88,9 @@ def _make_mcp_manager():
     mgr.activity_recorded.connect = MagicMock()
     return mgr
 
+@pytest.mark.usefixtures("qapp")
 
 class TestEnvPresenter(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _make_presenter(self, environments=None, collections=None):
         storage = FakeStorage(environments)
         config = FakeConfigManager()
@@ -708,7 +700,6 @@ else:
             p._save_environments()
             save_async.assert_not_called()
         self.assertEqual(len(p._storage.saved), 1)
-
 
 if __name__ == "__main__":
     unittest.main()

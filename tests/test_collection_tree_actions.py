@@ -8,7 +8,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QPoint, QModelIndex
-from PySide6.QtWidgets import QApplication
 
 from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
@@ -17,12 +16,9 @@ from tests.helpers.collections_tree import (
     patch_view_context_menu,
 )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionTreeActionsIsolated(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_invalid_index_skips_context_menu(self):
         harness = build_isolated_tree_actions([make_collection("c1", "My API")])
         invalid = QModelIndex()
@@ -167,7 +163,6 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         mock_warning.assert_called_once_with(harness.view)
         self.assertEqual(req.name, "Old Name")
         self.assertIsNone(harness.actions.pending_rename)
-
 
 if __name__ == "__main__":
     unittest.main()

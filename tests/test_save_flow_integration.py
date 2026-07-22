@@ -7,8 +7,6 @@ pytestmark = pytest.mark.timeout(120)
 import unittest
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication
-
 from pypost.models.models import Collection
 from pypost.models.settings import AppSettings
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
@@ -16,13 +14,10 @@ from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
 from tests.test_request_save_orchestrator import _mock_save_dialog
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager, _make_request
 
+@pytest.mark.usefixtures("qapp")
 
 class TestSaveFlowIntegration(unittest.TestCase):
     """GUI entry points on RequestWidget wired through TabsPresenter."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
 
     def _make_presenter(self, requests=None):
         rm = FakeRequestManager(requests)
@@ -173,7 +168,6 @@ class TestSaveFlowIntegration(unittest.TestCase):
         self.assertEqual(save_as_events, [])
         self.assertEqual(tab.request_data.id, original_id)
         self.assertEqual(tab.request_editor.request_data.id, original_id)
-
 
 if __name__ == "__main__":
     unittest.main()

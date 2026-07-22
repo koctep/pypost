@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QMouseEvent, QTextCursor
-from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit, QTableWidgetItem
+from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QTableWidgetItem
 
 from pypost.core.constants import HIDDEN_MASK
 from pypost.core.template_service import TemplateService
@@ -35,7 +35,6 @@ from pypost.ui.widgets.mixins import (
     VariableHoverResolver,
 )
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareTableWidget
-
 
 class _FixedCursorHoverLineEdit(VariableHoverMixin, QLineEdit):
     """Same MRO as VariableAwareLineEdit; Python cursorPositionAt for stable tests."""
@@ -55,7 +54,6 @@ class _FixedCursorHoverLineEdit(VariableHoverMixin, QLineEdit):
         pos = event.position().toPoint()
         index = self.cursorPositionAt(pos)
         return text, index
-
 
 class _FixedCursorHoverPlainText(VariableHoverMixin, QPlainTextEdit):
     """Same pattern as VariableAwarePlainTextEdit; stable cursorForPosition for tests."""
@@ -80,7 +78,6 @@ class _FixedCursorHoverPlainText(VariableHoverMixin, QPlainTextEdit):
         cursor = self.cursorForPosition(event.position().toPoint())
         return text, cursor.position()
 
-
 class _FixedHoverTableWidget(VariableAwareTableWidget):
     """Table widget with deterministic itemAt behavior for hover tests."""
 
@@ -96,7 +93,6 @@ class _FixedHoverTableWidget(VariableAwareTableWidget):
 
     def itemAt(self, pos):  # noqa: ARG002
         return self._item_for_hover
-
 
 class TestVariableHoverHelper(unittest.TestCase):
     def test_find_variable_at_index_inside_name(self):
@@ -320,7 +316,6 @@ class TestVariableHoverHelper(unittest.TestCase):
         finally:
             VariableHoverHelper._template_service = original_service
 
-
 class TestVariableHoverSplit(unittest.TestCase):
     """PYPOST-129: locator vs resolver responsibilities."""
 
@@ -375,7 +370,6 @@ class TestVariableHoverSplit(unittest.TestCase):
         finally:
             VariableHoverHelper._template_service = original
 
-
 def _mouse_move_event(widget, local_point: QPoint) -> QMouseEvent:
     return QMouseEvent(
         QEvent.Type.MouseMove,
@@ -386,12 +380,9 @@ def _mouse_move_event(widget, local_point: QPoint) -> QMouseEvent:
         Qt.KeyboardModifier.NoModifier,
     )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestVariableAwareLineEditTooltips(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
     @patch("pypost.ui.widgets.mixins.QToolTip.showText")
     def test_mouse_over_variable_shows_resolved_tooltip(self, show_mock, _hide):
@@ -451,12 +442,9 @@ class TestVariableAwareLineEditTooltips(unittest.TestCase):
         resolve_mock.assert_called_once()
         self.assertEqual(show_mock.call_count, 2)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
     @patch("pypost.ui.widgets.mixins.QToolTip.showText")
     def test_mouse_over_variable_in_body_shows_tooltip(self, show_mock, _hide):
@@ -534,12 +522,9 @@ class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
         resolve_mock.assert_called_once()
         self.assertEqual(show_mock.call_count, 2)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestVariableAwareTableWidgetTooltips(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     @patch("pypost.ui.widgets.variable_aware_widgets.QToolTip.hideText")
     @patch("pypost.ui.widgets.variable_aware_widgets.QToolTip.showText")
     def test_mouse_over_variant_b_function_in_table_cell_shows_runtime_value(
@@ -580,7 +565,6 @@ class TestVariableAwareTableWidgetTooltips(unittest.TestCase):
         w.mouseMoveEvent(event)
         resolve_mock.assert_called_once()
         self.assertEqual(show_mock.call_count, 2)
-
 
 if __name__ == "__main__":
     unittest.main()

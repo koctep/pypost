@@ -6,20 +6,12 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 
 pytestmark = pytest.mark.timeout(120)
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 def _make_main_window(qapp, config_manager):  # noqa: ARG001
     metrics = MagicMock()
@@ -63,7 +55,6 @@ def _make_main_window(qapp, config_manager):  # noqa: ARG001
     window.settings_btn = MagicMock()
     return window
 
-
 def _open_settings_with_alert_fields(
     window,
     *,
@@ -91,7 +82,6 @@ def _open_settings_with_alert_fields(
     ):
         window.open_settings()
     return window.settings
-
 
 def test_open_settings_alert_fields_round_trip_via_settings_json(qapp, tmp_path, monkeypatch):
     """Settings save through MainWindow persists alert fields to disk."""

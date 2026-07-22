@@ -5,10 +5,7 @@ pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication
-
 from pypost.models.models import Collection, RequestData
-
 
 def _mock_save_dialog(
     *,
@@ -31,12 +28,9 @@ from pypost.ui.request_save_orchestrator import (
 )
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager, _make_request
 
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestSaveOrchestrator(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls._app = QApplication.instance() or QApplication([])
-
     def _make_orchestrator(self, requests=None):
         rm = FakeRequestManager(requests or [])
         sm = FakeStateManager()

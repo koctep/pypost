@@ -1,6 +1,5 @@
 """PYPOST-462: integration test for hidden-value masking across save/reload history flow."""
 
-
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
@@ -10,8 +9,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import json
-
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.http_client import HTTPRequestResult, ResolvedRequestFields
 from pypost.core.history_manager import HistoryManager
@@ -26,18 +23,10 @@ HIDDEN_VALUE = "supersecret"
 VISIBLE_KEY = "host"
 VISIBLE_VALUE = "myserver.com"
 
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
-
 def _make_response(status=200, body="OK"):
     return ResponseData(
         status_code=status, headers={}, body=body, elapsed_time=0.1, size=len(body)
     )
-
 
 def _make_request() -> RequestData:
     return RequestData(
@@ -48,10 +37,8 @@ def _make_request() -> RequestData:
         post_script="",
     )
 
-
 def _history_manager_at(history_path: Path) -> HistoryManager:
     return HistoryManager(history_path=history_path)
-
 
 def _execute_and_persist(history_path: Path) -> None:
     hm = _history_manager_at(history_path)
@@ -72,17 +59,14 @@ def _execute_and_persist(history_path: Path) -> None:
     )
     hm.flush()
 
-
 def _reloaded_panel(history_path: Path) -> HistoryPanel:
     hm = _history_manager_at(history_path)
     panel = HistoryPanel(history_manager=hm)
     panel._list_widget.setCurrentRow(0)
     return panel
 
-
 def _assert_no_secret_leak(text: str) -> None:
     assert HIDDEN_VALUE not in text
-
 
 def test_hidden_values_stay_masked_after_history_reload_in_panel(qapp):  # noqa: ARG001
     with tempfile.TemporaryDirectory() as td:

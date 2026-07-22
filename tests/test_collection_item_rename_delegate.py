@@ -9,17 +9,14 @@ from unittest.mock import MagicMock
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QAbstractItemDelegate, QApplication, QLineEdit, QTreeView
+from PySide6.QtWidgets import QAbstractItemDelegate, QLineEdit, QTreeView
 
 from pypost.models.models import RequestData
 from pypost.ui.delegates.collection_item_rename_delegate import CollectionItemRenameDelegate
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionItemRenameDelegate(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls._app = QApplication.instance() or QApplication([])
-
     def _make_delegate(self):
         committed = MagicMock()
         cancelled = MagicMock()
@@ -103,7 +100,6 @@ class TestCollectionItemRenameDelegate(unittest.TestCase):
             None, QAbstractItemDelegate.EndEditHint.RevertModelCache
         )
         cancelled.assert_called_once()
-
 
 if __name__ == "__main__":
     unittest.main()

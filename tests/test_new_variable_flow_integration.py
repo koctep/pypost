@@ -1,24 +1,16 @@
 """Integration tests for ResponseView → EnvPresenter new variable creation (PYPOST-475/480)."""
 
-
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
 
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication, QInputDialog
+from PySide6.QtWidgets import QInputDialog
 
 from pypost.models.models import Environment
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.ui.widgets.response_view import ResponseView
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 def _make_presenter_with_env(env: Environment) -> EnvPresenter:
     storage = MagicMock()
@@ -36,7 +28,6 @@ def _make_presenter_with_env(env: Environment) -> EnvPresenter:
     presenter._env_selector.setCurrentIndex(1)
     presenter._env_selector.blockSignals(False)
     return presenter
-
 
 class TestNewVariableFlowIntegration:
     """End-to-end wiring: ResponseView → dialog → validation → env model + save."""

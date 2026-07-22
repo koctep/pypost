@@ -1,14 +1,11 @@
 """PYPOST-490: settings → apply_settings → env manager → toggle log (PYPOST-448 debt)."""
 
-
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
 
 import logging
 from unittest.mock import MagicMock, patch
-
-from PySide6.QtWidgets import QApplication
 
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
@@ -22,19 +19,11 @@ ENV_NAME = "Dev"
 VARIABLE_KEY = "API_KEY"
 VARIABLE_VALUE = "secret"
 
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
-
 def _settings_after_accept(current: AppSettings, *, log_hidden_key_names: bool) -> AppSettings:
     dlg = SettingsDialog(current)
     dlg.log_hidden_key_names_check.setChecked(log_hidden_key_names)
     dlg.accept()
     return dlg.get_settings()
-
 
 def _make_env_presenter() -> EnvPresenter:
     env = Environment(
@@ -58,7 +47,6 @@ def _make_env_presenter() -> EnvPresenter:
     presenter.load_environments()
     presenter.select_environment_index(1)
     return presenter
-
 
 def _make_integration_window(qapp, env_presenter):  # noqa: ARG001
     metrics = MagicMock()
@@ -96,14 +84,12 @@ def _make_integration_window(qapp, env_presenter):  # noqa: ARG001
     mock_tabs.widget.tabBar.return_value = MagicMock()
     return window
 
-
 def _toggle_hidden_during_exec(dialog: EnvironmentDialog, caplog) -> None:
     dialog.on_env_selected(0)
     hidden_cb = dialog._get_hidden_checkbox(0)
     assert hidden_cb is not None
     with caplog.at_level(logging.INFO):
         hidden_cb.setChecked(True)
-
 
 def _patch_env_dialog_exec(caplog):
     def exec_and_toggle(self):
@@ -112,10 +98,8 @@ def _patch_env_dialog_exec(caplog):
 
     return patch.object(EnvironmentDialog, "exec", exec_and_toggle)
 
-
 def _assert_no_value_leak(caplog) -> None:
     assert not any(VARIABLE_VALUE in r.message for r in caplog.records)
-
 
 def _run_settings_to_toggle_chain(
     qapp,
@@ -134,7 +118,6 @@ def _run_settings_to_toggle_chain(
     with _patch_env_dialog_exec(caplog):
         presenter._open_env_manager()
 
-
 def test_default_masked_toggle_log_after_settings_apply(qapp, caplog):
     # Journey: Settings (default) → apply_settings → open env manager → toggle hidden.
     _run_settings_to_toggle_chain(qapp, caplog, log_hidden_key_names=False)
@@ -144,7 +127,6 @@ def test_default_masked_toggle_log_after_settings_apply(qapp, caplog):
     )
     assert not any(VARIABLE_KEY in r.message for r in caplog.records)
     _assert_no_value_leak(caplog)
-
 
 def test_readable_toggle_log_when_settings_opt_in(qapp, caplog):
     # Journey: Settings (opt-in) → apply_settings → open env manager → toggle hidden.

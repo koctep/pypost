@@ -1,6 +1,5 @@
 """PYPOST-499: settings → open_settings → StorageManager encryption policy (PYPOST-481 debt)."""
 
-
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
@@ -8,8 +7,6 @@ pytestmark = pytest.mark.timeout(120)
 import json
 import logging
 from unittest.mock import MagicMock, patch
-
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
@@ -25,13 +22,6 @@ ENV_NAME = "Dev"
 SECRET_KEY = "SECRET"
 SECRET_VALUE = "s3cr3t"
 
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
-
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:
     monkeypatch.setattr(
         "pypost.core.storage.user_data_dir",
@@ -40,7 +30,6 @@ def _make_storage(tmp_path, monkeypatch) -> StorageManager:
     monkeypatch.delenv("PYPOST_ENV_ENCRYPTION_ENABLED", raising=False)
     monkeypatch.delenv("PYPOST_ENV_ENCRYPTION_KEY", raising=False)
     return StorageManager()
-
 
 def _make_main_window(qapp, storage, config_manager, request_manager=None):  # noqa: ARG001
     metrics = MagicMock()
@@ -81,7 +70,6 @@ def _make_main_window(qapp, storage, config_manager, request_manager=None):  # n
     mock_tabs.widget.tabBar.return_value = MagicMock()
     return window
 
-
 def _open_settings_with_mode(window, mode_data: str) -> AppSettings:
     original_init = SettingsDialog.__init__
 
@@ -104,7 +92,6 @@ def _open_settings_with_mode(window, mode_data: str) -> AppSettings:
         window.open_settings()
     return window.settings
 
-
 def _save_hidden_env(storage: StorageManager) -> dict:
     env = Environment(
         name=ENV_NAME,
@@ -114,7 +101,6 @@ def _save_hidden_env(storage: StorageManager) -> dict:
     storage.save_environments([env])
     with open(storage.environments_file, "r") as f:
         return json.load(f)[0]["variables"]
-
 
 def _run_open_settings_chain(
     qapp,
@@ -155,7 +141,6 @@ def _run_open_settings_chain(
 
     assert any("storage_encryption_config_applied" in r.message for r in caplog.records)
 
-
 @pytest.mark.parametrize(
     ("mode_data", "env_enabled", "expect_encrypted"),
     [
@@ -164,6 +149,7 @@ def _run_open_settings_chain(
         (ENCRYPTION_MODE_DEFAULT, "true", True),
     ],
 )
+
 def test_open_settings_applies_encryption_policy_to_storage(
     qapp,
     tmp_path,

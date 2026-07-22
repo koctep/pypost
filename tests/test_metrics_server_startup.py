@@ -10,17 +10,14 @@ import unittest
 from unittest.mock import patch
 
 from PySide6.QtCore import QCoreApplication
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.server_bind import format_bind_error
-
 
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
-
 
 def _occupy_port(port: int) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -28,7 +25,6 @@ def _occupy_port(port: int) -> socket.socket:
     sock.bind(("127.0.0.1", port))
     sock.listen(1)
     return sock
-
 
 class TestFormatBindError(unittest.TestCase):
     def test_metrics_addr_in_use_message(self):
@@ -38,12 +34,9 @@ class TestFormatBindError(unittest.TestCase):
         self.assertIn("9080", message)
         self.assertIn("busy", message.lower())
 
+@pytest.mark.usefixtures("qapp")
 
 class TestMetricsServerStartup(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_port_listening_after_start(self):
         port = _free_port()
         manager = MetricsManager()
@@ -95,7 +88,6 @@ class TestMetricsServerStartup(unittest.TestCase):
             self.assertIn(str(port), failures[0])
         finally:
             manager.stop_server()
-
 
 if __name__ == "__main__":
     unittest.main()

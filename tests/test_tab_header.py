@@ -6,16 +6,13 @@ import unittest
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QTabBar, QTabWidget, QWidget
+from PySide6.QtWidgets import QTabBar, QTabWidget, QWidget
 
 from pypost.ui.widgets.tab_header import PLUS_TAB_MARKER, RequestTabHeader
 
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestTabHeader(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _make_header(self) -> tuple[RequestTabHeader, QTabWidget]:
         tabs = QTabWidget()
         header = RequestTabHeader()
@@ -79,7 +76,6 @@ class TestRequestTabHeader(unittest.TestCase):
 
     def test_plus_tab_marker_constant(self):
         self.assertEqual(PLUS_TAB_MARKER, "pypost_plus_tab")
-
 
 if __name__ == "__main__":
     unittest.main()

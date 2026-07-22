@@ -3,32 +3,17 @@
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-import sys
 import unittest
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
 
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.request_editor import RequestWidget
 
-_app = None
-
-
-def _get_app():
-    global _app
-    if _app is None:
-        _app = QApplication.instance() or QApplication(sys.argv)
-    return _app
-
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestWidgetBodyGutter(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        _get_app()
-
     def setUp(self):
         self.widget = RequestWidget()
         self.widget.show()
@@ -75,7 +60,6 @@ class TestRequestWidgetBodyGutter(unittest.TestCase):
             pos=QPoint(gutter_x, 5),
         )
         self.assertEqual(editor.toPlainText(), before)
-
 
 if __name__ == "__main__":
     unittest.main()

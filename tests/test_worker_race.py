@@ -8,23 +8,20 @@ pytestmark = pytest.mark.timeout(120)
 import unittest
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication
-
 from pypost.core.qt.worker import RequestWorker
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.request_service import ExecutionResult
 
-
 def _make_worker():
     req = RequestData(method="GET", url="http://x")
     return RequestWorker(req, variables={}, metrics=MagicMock())
-
 
 def _ok_result():
     resp = ResponseData(status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2)
     return ExecutionResult(response=resp, updated_variables={}, script_logs=[])
 
+@pytest.mark.usefixtures("qapp")
 
 class TestWorkerRaceCondition(unittest.TestCase):
 
@@ -72,8 +69,6 @@ class TestWorkerRaceCondition(unittest.TestCase):
         from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab
         from pypost.models.settings import AppSettings
 
-        app = QApplication.instance() or QApplication([])
-
         request_data = RequestData(id="r1", name="Test", method="GET", url="http://x")
 
         rm = MagicMock()
@@ -100,8 +95,6 @@ class TestWorkerRaceCondition(unittest.TestCase):
         """Finished worker with stale tab.worker ref is cleared before creating a new one."""
         from pypost.ui.presenters.tabs_presenter import TabsPresenter
         from pypost.models.settings import AppSettings
-
-        app = QApplication.instance() or QApplication([])
 
         request_data = RequestData(id="r1", name="Test", method="GET", url="http://x")
 
@@ -134,8 +127,6 @@ class TestWorkerRaceCondition(unittest.TestCase):
         from pypost.ui.presenters.tabs_presenter import TabsPresenter
         from pypost.models.settings import AppSettings
 
-        app = QApplication.instance() or QApplication([])
-
         request_data = RequestData(id="r1", name="Test", method="GET", url="http://x")
 
         rm = MagicMock()
@@ -164,7 +155,6 @@ class TestWorkerRaceCondition(unittest.TestCase):
         self.assertEqual(len(stale_logs), 1)
         self.assertIn("method=GET", stale_logs[0].message)
         self.assertIn("url=http://x", stale_logs[0].message)
-
 
 if __name__ == "__main__":
     unittest.main()

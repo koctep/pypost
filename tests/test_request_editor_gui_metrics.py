@@ -3,28 +3,21 @@
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-import sys
 import unittest
 
 from prometheus_client import generate_latest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.metrics import MetricsManager
 from pypost.ui.widgets.request_editor import RequestWidget
 
-
 def _scrape(mm: MetricsManager) -> str:
     return generate_latest(mm.registry).decode("utf-8")
 
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestWidgetGuiActionMetrics(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication(sys.argv)
-
     def setUp(self):
         self.metrics = MetricsManager()
         self.widget = RequestWidget(metrics=self.metrics)
@@ -69,7 +62,6 @@ class TestRequestWidgetGuiActionMetrics(unittest.TestCase):
         self.widget.handle_copy_curl_menu_action()
         out = _scrape(self.metrics)
         self.assertIn("gui_copy_curl_actions_total 1.0", out)
-
 
 if __name__ == "__main__":
     unittest.main()

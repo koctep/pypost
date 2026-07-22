@@ -3,30 +3,15 @@
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-import sys
 import unittest
 
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
 
 from pypost.ui.widgets.request_editor import RequestWidget
 
-_app = None
-
-
-def _get_app():
-    global _app
-    if _app is None:
-        _app = QApplication.instance() or QApplication(sys.argv)
-    return _app
-
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestWidgetBodyValidation(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        _get_app()
-
     def setUp(self):
         self.widget = RequestWidget()
         self.widget.show()
@@ -46,7 +31,6 @@ class TestRequestWidgetBodyValidation(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         label = self.widget.body_edit.validation_controller()._error_label
         self.assertIn("Line 1", label.text())
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,5 @@
 """PYPOST-509 / PYPOST-754: MainWindow defers tab/tree restore until async loads complete."""
 
-
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
@@ -8,10 +7,8 @@ pytestmark = pytest.mark.timeout(120)
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QApplication
 
 from pypost.models.settings import AppSettings
-
 
 class _DeferredEnvPresenter(QObject):
     environments_loaded = Signal()
@@ -24,7 +21,6 @@ class _DeferredEnvPresenter(QObject):
     def load_environments(self) -> None:
         return
 
-
 class _DeferredCollectionsPresenter(QObject):
     collections_loaded = Signal()
 
@@ -34,13 +30,6 @@ class _DeferredCollectionsPresenter(QObject):
 
     def load_collections_async(self) -> None:
         return
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 def _make_encrypted_startup_window(qapp, mock_env, mock_collections):  # noqa: ARG001
     metrics = MagicMock()
@@ -72,7 +61,6 @@ def _make_encrypted_startup_window(qapp, mock_env, mock_collections):  # noqa: A
         )
     window.settings_btn = MagicMock()
     return window, mock_tabs, mock_collections
-
 
 def test_encrypted_startup_defers_restore_until_both_loads_complete(qapp):
     mock_env = _DeferredEnvPresenter()

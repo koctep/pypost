@@ -118,9 +118,11 @@ Key metrics for MCP testing:
 PyPost runs Qt tests headlessly with `QT_QPA_PLATFORM=offscreen` and a module-scoped `qapp`
 fixture (`tests/conftest.py`). The project does not use the `pytest-qt` package; tests call
 widget methods and assert on labels, models, and mocked dialogs. Plain pytest tests take
-`qapp` as a parameter; `unittest.TestCase` gateway / collection-worker modules
-use `@pytest.mark.usefixtures("qapp")` instead of module-local `setUpClass`
-`QApplication` (PYPOST-830 / PYPOST-884) — see [gui_testing.md](gui_testing.md)
+`qapp` as a parameter; `unittest.TestCase` Qt modules use
+`@pytest.mark.usefixtures("qapp")` instead of module-local `setUpClass`
+`QApplication` or a duplicate local `def qapp()` (PYPOST-830 / PYPOST-884 /
+PYPOST-886). Suite inventory guard:
+`tests/test_suite_qapp_alignment.py` — see [gui_testing.md](gui_testing.md)
 § Shared `qapp`.
 
 For bounded event-loop polling (e.g. waiting for Qt signals while a background server starts),

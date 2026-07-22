@@ -9,14 +9,12 @@ from unittest.mock import MagicMock
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
 
 from pypost.models.response import ResponseData
 from pypost.models.settings import AppSettings
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
 
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager
-
 
 def _response_body(text: str) -> ResponseData:
     encoded = text.encode("utf-8")
@@ -28,13 +26,10 @@ def _response_body(text: str) -> ResponseData:
         size=len(encoded),
     )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestResponseSearchFlowIntegration(unittest.TestCase):
     """GUI wiring: display response → type search → navigate → match counter."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
 
     def _active_tab(self, presenter: TabsPresenter) -> RequestTab:
         tab = presenter.widget.currentWidget()
@@ -96,7 +91,6 @@ class TestResponseSearchFlowIntegration(unittest.TestCase):
             self.assertEqual(rv.search_status_label.text(), "")
         finally:
             tab.close()
-
 
 if __name__ == "__main__":
     unittest.main()

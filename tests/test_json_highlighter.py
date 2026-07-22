@@ -12,7 +12,7 @@ pytestmark = pytest.mark.timeout(60)
 import unittest
 
 from PySide6.QtGui import QColor, QTextDocument
-from PySide6.QtWidgets import QApplication, QTextEdit
+from PySide6.QtWidgets import QTextEdit
 
 from pypost.ui.theme.json_syntax_theme import (
     DARK_JSON_SYNTAX_COLORS,
@@ -24,7 +24,6 @@ from pypost.ui.widgets.json_highlighter import (
     MAX_HIGHLIGHT_BLOCK_CHARS,
     JsonHighlighter,
 )
-
 
 def _hex_color_at(doc: QTextDocument, position: int) -> str:
     """Hex foreground from QSyntaxHighlighter ranges at document position."""
@@ -41,12 +40,9 @@ def _hex_color_at(doc: QTextDocument, position: int) -> str:
             return c.name(QColor.NameFormat.HexRgb)
     return "#000000"
 
+@pytest.mark.usefixtures("qapp")
 
 class TestJsonHighlighter(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def _edit_with_highlighted(self, text: str) -> QTextEdit:
         edit = QTextEdit()
         highlighter = JsonHighlighter(edit.document())
@@ -256,7 +252,6 @@ class TestJsonHighlighter(unittest.TestCase):
             _hex_color_at(edit.document(), text.index("true")),
             QColor(DARK_JSON_SYNTAX_COLORS.keyword).name(),
         )
-
 
 if __name__ == "__main__":
     unittest.main()

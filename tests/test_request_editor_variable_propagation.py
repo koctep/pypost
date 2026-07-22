@@ -3,20 +3,13 @@
 import pytest
 
 pytestmark = pytest.mark.timeout(60)
-
-import sys
 import unittest
-
-from PySide6.QtWidgets import QApplication
 
 from pypost.ui.widgets.request_editor import RequestWidget
 
+@pytest.mark.usefixtures("qapp")
 
 class TestRequestWidgetVariablePropagation(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication(sys.argv)
-
     def setUp(self):
         self.widget = RequestWidget()
 

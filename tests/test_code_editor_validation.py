@@ -9,7 +9,6 @@ import unittest
 
 from PySide6.QtGui import QTextDocument
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
 
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
@@ -17,10 +16,8 @@ from pypost.ui.widgets.validate.json_body_validator import JsonBodyValidator
 from pypost.ui.widgets.validate.xml_body_validator import XmlBodyValidator
 from pypost.ui.widgets.validate.yaml_body_validator import YamlBodyValidator
 
-
 def _wait_for_validate(editor: CodeEditor) -> None:
     editor.validation_controller()._run_validate()
-
 
 class TestJsonBodyValidator(unittest.TestCase):
     def test_valid_json_returns_no_errors(self):
@@ -44,7 +41,6 @@ class TestJsonBodyValidator(unittest.TestCase):
         self.assertGreater(errors[0].column, 0)
         self.assertTrue(errors[0].message)
 
-
 class TestYamlBodyValidator(unittest.TestCase):
     def test_valid_yaml_returns_no_errors(self):
         doc = QTextDocument()
@@ -60,7 +56,6 @@ class TestYamlBodyValidator(unittest.TestCase):
         self.assertEqual(errors[0].line, 2)
         self.assertGreater(errors[0].column, 0)
         self.assertTrue(errors[0].message)
-
 
 class TestXmlBodyValidator(unittest.TestCase):
     def test_valid_xml_returns_no_errors(self):
@@ -78,12 +73,9 @@ class TestXmlBodyValidator(unittest.TestCase):
         self.assertGreater(errors[0].column, 0)
         self.assertTrue(errors[0].message)
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCodeEditorValidation(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_valid_json_clears_error_display(self):
         editor = CodeEditor()
         editor.setPlainText('{"ok": true}')
@@ -173,7 +165,6 @@ class TestCodeEditorValidation(unittest.TestCase):
         errors = editor.validation_controller().errors()
         self.assertEqual(len(errors), 1)
         self.assertIn("Line 1", editor.validation_controller()._error_label.text())
-
 
 if __name__ == "__main__":
     unittest.main()

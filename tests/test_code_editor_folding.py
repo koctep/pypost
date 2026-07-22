@@ -10,7 +10,6 @@ import unittest
 from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QPaintEvent, QPainter, QTextCursor
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
 
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
@@ -18,15 +17,12 @@ from pypost.ui.widgets.fold.json_structure_scanner import JsonStructureScanner
 from pypost.ui.widgets.fold.xml_structure_scanner import XmlStructureScanner
 from pypost.ui.widgets.fold.yaml_structure_scanner import YamlStructureScanner
 
-
 def _wait_for_scan(editor: CodeEditor) -> None:
     editor.fold_controller()._run_scan()
-
 
 def _root_region(editor: CodeEditor):
     regions = editor.fold_controller().regions()
     return next(r for r in regions if r.region_id == "/")
-
 
 def _visible_block_numbers(editor: CodeEditor) -> list[int]:
     block = editor.document().firstBlock()
@@ -36,7 +32,6 @@ def _visible_block_numbers(editor: CodeEditor) -> list[int]:
             numbers.append(block.blockNumber())
         block = block.next()
     return numbers
-
 
 def _collect_gutter_numbers(editor: CodeEditor) -> list[str]:
     editor.show()
@@ -59,7 +54,6 @@ def _collect_gutter_numbers(editor: CodeEditor) -> list[str]:
         editor.line_number_area_paint_event(QPaintEvent(rect))
 
     return drawn
-
 
 _NESTED_JSON = json.dumps(
     {"users": [{"id": 1, "name": "Ada"}, {"id": 2, "name": "Bob"}]},
@@ -84,12 +78,9 @@ _NESTED_XML = """<root>
 </root>
 """
 
+@pytest.mark.usefixtures("qapp")
 
 class TestYamlStructureScanner(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_valid_nested_yaml_finds_regions(self):
         from PySide6.QtGui import QTextDocument
 
@@ -106,12 +97,9 @@ class TestYamlStructureScanner(unittest.TestCase):
         regions = YamlStructureScanner().scan(doc)
         self.assertEqual(regions, [])
 
+@pytest.mark.usefixtures("qapp")
 
 class TestXmlStructureScanner(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_valid_nested_xml_finds_regions(self):
         from PySide6.QtGui import QTextDocument
 
@@ -128,12 +116,9 @@ class TestXmlStructureScanner(unittest.TestCase):
         regions = XmlStructureScanner().scan(doc)
         self.assertEqual(regions, [])
 
+@pytest.mark.usefixtures("qapp")
 
 class TestJsonStructureScanner(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_valid_nested_json_finds_regions(self):
         from PySide6.QtGui import QTextDocument
 
@@ -150,12 +135,9 @@ class TestJsonStructureScanner(unittest.TestCase):
         regions = JsonStructureScanner().scan(doc)
         self.assertEqual(regions, [])
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCodeEditorFolding(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_collapse_hides_descendant_blocks(self):
         ed = CodeEditor()
         ed.setPlainText(_NESTED_JSON)
@@ -262,7 +244,6 @@ class TestCodeEditorFolding(unittest.TestCase):
             list(range(ed.blockCount())),
         )
 
-
 def _replace_once(editor: CodeEditor, old: str, new: str) -> None:
     cursor = editor.textCursor()
     cursor.beginEditBlock()
@@ -273,12 +254,9 @@ def _replace_once(editor: CodeEditor, old: str, new: str) -> None:
     cursor.insertText(new)
     cursor.endEditBlock()
 
+@pytest.mark.usefixtures("qapp")
 
 class TestYamlXmlCodeEditorFolding(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_yaml_collapse_hides_descendant_blocks(self):
         ed = CodeEditor()
         ed.set_body_format(BodyFormat.YAML)
@@ -320,13 +298,10 @@ class TestYamlXmlCodeEditorFolding(unittest.TestCase):
         _wait_for_scan(ed)
         self.assertEqual(ed.fold_controller().regions(), [])
 
+@pytest.mark.usefixtures("qapp")
 
 class TestFoldRemappingAfterEdits(unittest.TestCase):
     """PYPOST-517: collapse state survives edits when region boundaries are unchanged."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
 
     def test_collapse_preserved_when_edit_outside_region(self):
         ed = CodeEditor()
@@ -391,7 +366,6 @@ class TestFoldRemappingAfterEdits(unittest.TestCase):
         _wait_for_scan(ed)
         self.assertFalse(ed.fold_controller().is_collapsed(first_user.region_id))
         self.assertFalse(ed.fold_controller().is_collapsed(users.region_id))
-
 
 if __name__ == "__main__":
     unittest.main()

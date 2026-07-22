@@ -4,17 +4,14 @@ pytestmark = pytest.mark.timeout(60)
 
 import unittest
 from unittest.mock import MagicMock, patch
-from PySide6.QtWidgets import QApplication, QTabWidget, QWidget
+from PySide6.QtWidgets import QTabWidget, QWidget
 
 from pypost.models.settings import AppSettings
 from pypost.ui.main_window import MainWindow
 
+@pytest.mark.usefixtures("qapp")
 
 class TestMainWindow(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_main_window_has_no_collection_delete_flow_methods(self):
         """PYPOST-326: delete flow lives in CollectionTreeActions, not MainWindow."""
         delete_flow_names = {

@@ -7,13 +7,10 @@ pytestmark = pytest.mark.timeout(120)
 import unittest
 from unittest.mock import MagicMock
 
-from PySide6.QtWidgets import QApplication
-
 from pypost.models.models import Collection, RequestData
 from pypost.models.settings import AppSettings
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
-
 
 def _request_tab_count(tabs_presenter: TabsPresenter) -> int:
     widget = tabs_presenter.widget
@@ -21,14 +18,11 @@ def _request_tab_count(tabs_presenter: TabsPresenter) -> int:
         1 for i in range(widget.count()) if isinstance(widget.widget(i), RequestTab)
     )
 
-
 def _make_collection(col_id: str, name: str, requests=None) -> Collection:
     return Collection(id=col_id, name=name, requests=requests or [])
 
-
 def _make_request(req_id: str, name: str, method: str = "GET") -> RequestData:
     return RequestData(id=req_id, name=name, method=method)
-
 
 class CollectionsFakeRequestManager:
     def __init__(self, collections=None):
@@ -50,7 +44,6 @@ class CollectionsFakeRequestManager:
             self.collections = [col for col in self.collections if col.id != item_id]
         return True
 
-
 class TabsFakeRequestManager:
     def __init__(self, requests=None):
         self._requests = {r.id: (r, MagicMock(id="c1")) for r in (requests or [])}
@@ -70,7 +63,6 @@ class TabsFakeRequestManager:
         self.collections.append(col)
         return col
 
-
 class FakeStateManager:
     def __init__(self, open_tabs=None):
         self._open_tabs = open_tabs or []
@@ -89,7 +81,6 @@ class FakeStateManager:
     def set_expanded_collections(self, ids):
         self._expanded = ids
 
-
 class FakeMetrics:
     def track_gui_collection_delete_action(self, *args):
         pass
@@ -97,13 +88,10 @@ class FakeMetrics:
     def track_gui_collection_rename_action(self, *args):
         pass
 
+@pytest.mark.usefixtures("qapp")
 
 class TestDeleteOpenTabsIntegration(unittest.TestCase):
     """End-to-end wiring: CollectionsPresenter.requests_deleted → TabsPresenter."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
 
     def _make_connected_presenters(self, collections, tab_requests=None):
         col_rm = CollectionsFakeRequestManager(collections)
@@ -181,7 +169,6 @@ class TestDeleteOpenTabsIntegration(unittest.TestCase):
         collections_presenter._tree_actions.handle_delete("r1", "request", "Persisted")
 
         self.assertEqual(tabs_presenter._state_manager.get_open_tabs(), [])
-
 
 if __name__ == "__main__":
     unittest.main()

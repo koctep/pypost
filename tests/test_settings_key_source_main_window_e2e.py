@@ -1,14 +1,11 @@
 """PYPOST-501: settings key source → open_settings → StorageManager encrypt/decrypt."""
 
-
 import pytest
 
 pytestmark = pytest.mark.timeout(120)
 
 import json
 from unittest.mock import MagicMock, patch
-
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.key_provider import build_key_id
 from pypost.core.storage import StorageManager
@@ -25,13 +22,6 @@ ENV_NAME = "Dev"
 SECRET_KEY = "SECRET"
 SECRET_VALUE = "s3cr3t"
 
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
-
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:
     monkeypatch.setattr(
         "pypost.core.storage.user_data_dir",
@@ -40,7 +30,6 @@ def _make_storage(tmp_path, monkeypatch) -> StorageManager:
     monkeypatch.delenv("PYPOST_ENV_ENCRYPTION_ENABLED", raising=False)
     monkeypatch.delenv("PYPOST_ENV_ENCRYPTION_KEY", raising=False)
     return StorageManager()
-
 
 def _make_main_window(qapp, storage, config_manager):  # noqa: ARG001
     metrics = MagicMock()
@@ -79,7 +68,6 @@ def _make_main_window(qapp, storage, config_manager):  # noqa: ARG001
     mock_tabs.widget.tabBar.return_value = MagicMock()
     return window
 
-
 def _open_settings_with_key_source(
     window,
     *,
@@ -109,7 +97,6 @@ def _open_settings_with_key_source(
     ):
         window.open_settings()
     return window.settings
-
 
 def test_open_settings_secret_store_with_env_fallback_encrypt_decrypt_round_trip(
     qapp,

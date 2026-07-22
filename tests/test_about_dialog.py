@@ -1,19 +1,12 @@
 """Tests for AboutDialog."""
 
 import pytest
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QLabel
 
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.version import __version__
 
 pytestmark = pytest.mark.timeout(60)
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 def test_about_dialog_shows_package_version(qapp):
     dlg = AboutDialog()

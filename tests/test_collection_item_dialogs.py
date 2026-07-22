@@ -7,7 +7,7 @@ pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 from pypost.ui.collection_item_dialogs import (
     confirm_clear_history,
@@ -37,11 +37,11 @@ from pypost.ui.collection_item_dialogs import (
     show_save_request_name_required,
 )
 
+@pytest.mark.usefixtures("qapp")
 
 class TestCollectionItemDialogs(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
         cls.parent = QWidget()
 
     @patch("pypost.ui.collection_item_dialogs.QMessageBox.question")
@@ -210,7 +210,6 @@ class TestCollectionItemDialogs(unittest.TestCase):
             "Error",
             "Please enter a request name",
         )
-
 
 if __name__ == "__main__":
     unittest.main()

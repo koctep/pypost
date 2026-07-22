@@ -37,7 +37,7 @@ Representative modules:
 
 ## Writing a GUI Test
 
-### Shared `qapp` — two valid consumers (PYPOST-830 / PYPOST-884)
+### Shared `qapp` — two valid consumers (PYPOST-830 / PYPOST-884 / PYPOST-886)
 
 All Qt tests must obtain the process singleton from `tests/conftest.py`. Do **not**
 create a module-local `QApplication` in `setUpClass` (or a duplicate local
@@ -45,16 +45,20 @@ create a module-local `QApplication` in `setUpClass` (or a duplicate local
 
 | Style | When to use | Examples |
 | --- | --- | --- |
-| Fixture parameter `qapp` | Plain pytest / non-`TestCase` | Responsiveness, widgets |
-| `@pytest.mark.usefixtures("qapp")` | `unittest.TestCase` | Gateway units, H3 stress, collection worker |
+| Fixture parameter `qapp` | Plain pytest / non-`TestCase` | Responsiveness, widgets, dialogs |
+| `@pytest.mark.usefixtures("qapp")` | `unittest.TestCase` | Gateways, workers, presenters, editors |
 
-Gateway / storage worker surface aligned onto `usefixtures` (PYPOST-830 /
-PYPOST-884):
+Suite-wide alignment (PYPOST-886) removed remaining local lifecycles. Regression
+guard: `tests/test_suite_qapp_alignment.py`.
+
+Reference surfaces (non-exhaustive):
 
 - `tests/test_environment_storage_gateway.py`
 - `tests/test_collection_storage_gateway.py`
 - `tests/test_storage_gateway_h3_stress.py`
 - `tests/test_collection_storage_worker.py`
+- `tests/test_env_presenter.py` / `tests/test_tabs_presenter.py`
+- `tests/test_code_editor.py` / `tests/test_request_editor_*.py`
 
 ```python
 import unittest
@@ -190,9 +194,9 @@ Modules that use the shared helper (PYPOST-827 / PYPOST-828 / PYPOST-877):
 - `tests/test_environment_storage_gateway.py` — `usefixtures("qapp")`
 - `tests/test_collection_storage_gateway.py` — `usefixtures("qapp")`
 - `tests/test_collection_storage_worker.py` — `usefixtures("qapp")` (PYPOST-884)
-- `tests/test_env_presenter.py` — still module-local `setUpClass` qapp
-  (suite-wide migration: PYPOST-886); async-load encryption refresh wait and
-  hang-exit proof use shared `process_until` (PYPOST-877)
+- `tests/test_env_presenter.py` — `usefixtures("qapp")` (PYPOST-886); async-load
+  encryption refresh wait and hang-exit proof use shared `process_until`
+  (PYPOST-877)
 
 H3 worker-lifecycle canary (PYPOST-829): `tests/test_storage_gateway_h3_stress.py`
 (≥200 rapid cycles + GC per gateway; shared `qapp` via `usefixtures`, PYPOST-830).
@@ -257,6 +261,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | Issue | Solution |
 | --- | --- |
 | `QApplication` already exists | Use shared `qapp` (param or `usefixtures`); no `setUpClass` app |
+| Alignment guard fails | Do not reintroduce local `def qapp()` / `setUpClass` QApplication — see `tests/test_suite_qapp_alignment.py` (PYPOST-886) |
+| Segfault combining many large Qt modules | Re-run modules in isolation; shared `qapp` is process-wide (PYPOST-886) |
 | Segfault in CI | Ensure offscreen is set before any `PySide6` import |
 | Segfault in storage gateway finish | Historical H3 — run `tests/test_storage_gateway_h3_stress.py` in isolation (PYPOST-829) |
 | Save-completed stall under widget GC | Probe C canary (PYPOST-883); see `ai-tasks/PYPOST-883/30-findings.md` |
@@ -317,6 +323,8 @@ make test-agent-e2e
   gateway `TestCase` shared `qapp` via `usefixtures`
 - [PYPOST-884](https://pypost.atlassian.net/browse/PYPOST-884) —
   collection storage worker `TestCase` shared `qapp` via `usefixtures`
+- [PYPOST-886](https://pypost.atlassian.net/browse/PYPOST-886) —
+  suite-wide migrate remaining modules onto shared conftest `qapp`
 - [PYPOST-877](https://pypost.atlassian.net/browse/PYPOST-877) —
   env-presenter async-load wait on shared `process_until`
 - [PYPOST-883](https://pypost.atlassian.net/browse/PYPOST-883) —

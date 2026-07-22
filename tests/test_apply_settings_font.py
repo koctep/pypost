@@ -4,16 +4,8 @@ import pytest
 pytestmark = pytest.mark.timeout(60)
 
 from unittest.mock import MagicMock, patch
-from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QShowEvent
 from pypost.models.settings import AppSettings
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
-
 
 def _make_window(qapp):
     """Build a MainWindow with all heavy dependencies mocked."""
@@ -43,7 +35,6 @@ def _make_window(qapp):
             history_manager=MagicMock(),
         )
     return window
-
 
 class TestApplySettingsFont:
 

@@ -40,16 +40,13 @@ EDITOR_SUBTAB_LABELS = ("Params", "Headers", "Body", "Script", "MCP")
 # to the bare text width, so a small positive threshold discriminates cleanly.
 MIN_TAB_HORIZONTAL_PADDING_PX = 6
 
-
 @pytest.fixture(scope="module")
-def qapp_with_styles():
-    """QApplication with the production stylesheet applied, restored on exit."""
-    app = QApplication.instance() or QApplication([])
-    orig_stylesheet = app.styleSheet()
-    StyleManager().apply_styles(app)
-    yield app
-    app.setStyleSheet(orig_stylesheet)
-
+def qapp_with_styles(qapp):
+    """Shared qapp with the production stylesheet applied, restored on exit."""
+    orig_stylesheet = qapp.styleSheet()
+    StyleManager().apply_styles(qapp)
+    yield qapp
+    qapp.setStyleSheet(orig_stylesheet)
 
 def _make_tab_bar(labels) -> QTabBar:
     # expanding=False keeps tabRect() at content size (as in the request tab
@@ -61,7 +58,6 @@ def _make_tab_bar(labels) -> QTabBar:
         bar.addTab(label)
     bar.ensurePolished()
     return bar
-
 
 def _assert_native_tab_spacing(bar: QTabBar, labels) -> None:
     metrics = bar.fontMetrics()
@@ -78,7 +74,6 @@ def _assert_native_tab_spacing(bar: QTabBar, labels) -> None:
                 f"tab rects {first} and {second} overlap"
             )
 
-
 def test_loaded_styles_do_not_customize_tab_geometry():
     """No shipped QSS rule may target QTabBar::tab (kills native layout)."""
     styles = StyleManager().load_styles()
@@ -88,16 +83,13 @@ def test_loaded_styles_do_not_customize_tab_geometry():
         "disables native tab rendering (PYPOST-792)"
     )
 
-
 def test_sidebar_tabs_have_native_spacing(qapp_with_styles):
     bar = _make_tab_bar(SIDEBAR_LABELS)
     _assert_native_tab_spacing(bar, SIDEBAR_LABELS)
 
-
 def test_editor_subtabs_have_native_spacing(qapp_with_styles):
     bar = _make_tab_bar(EDITOR_SUBTAB_LABELS)
     _assert_native_tab_spacing(bar, EDITOR_SUBTAB_LABELS)
-
 
 @pytest.fixture()
 def qapp_pypost_style(qapp_with_styles):
@@ -114,10 +106,8 @@ def qapp_pypost_style(qapp_with_styles):
         app.setStyle(PyPostStyle())
     app.setPalette(orig_palette)
 
-
 def _close_indicator_metrics():
     return (QStyle.PM_TabCloseIndicatorWidth, QStyle.PM_TabCloseIndicatorHeight)
-
 
 def test_close_indicator_defaults_to_base_style_metric(qapp):
     """Without an explicit override PyPostStyle must report native metrics."""
@@ -125,13 +115,11 @@ def test_close_indicator_defaults_to_base_style_metric(qapp):
     for metric in _close_indicator_metrics():
         assert style.pixelMetric(metric) == style.baseStyle().pixelMetric(metric)
 
-
 def test_close_indicator_override_is_opt_in(qapp):
     style = PyPostStyle()
     style.set_close_button_size(48)
     for metric in _close_indicator_metrics():
         assert style.pixelMetric(metric) == 48
-
 
 def test_apply_theme_system_uses_native_close_metrics(qapp_pypost_style):
     """The production 'system' theme path must not force a close-button size."""
@@ -148,14 +136,12 @@ def test_apply_theme_system_uses_native_close_metrics(qapp_pypost_style):
     finally:
         StyleManager().apply_styles(app)
 
-
 def _tab_close_button(bar: QTabBar, index: int):
     for side in (QTabBar.ButtonPosition.LeftSide, QTabBar.ButtonPosition.RightSide):
         button = bar.tabButton(index, side)
         if button is not None:
             return button
     return None
-
 
 def test_request_tab_close_button_uses_native_size(qapp_pypost_style):
     """A request tab's close button is laid out at the native indicator size.
@@ -189,7 +175,6 @@ def test_request_tab_close_button_uses_native_size(qapp_pypost_style):
         assert geometry.width() <= tab_rect.width()
     finally:
         tabs.deleteLater()
-
 
 def test_default_close_icon_dark_theme_contrast_contract():
     """PYPOST-821: default close.svg keeps the dark-theme contrast contract.
