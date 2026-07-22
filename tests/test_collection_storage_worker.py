@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtTest import QSignalSpy
-from PySide6.QtWidgets import QApplication
 
 from pypost.core.qt.collection_storage_worker import CollectionStorageWorker
 from pypost.models.models import Collection
@@ -26,11 +25,8 @@ def _worker_timeout_detail(worker: CollectionStorageWorker):
     return detail
 
 
+@pytest.mark.usefixtures("qapp")
 class TestCollectionStorageWorker(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
-
     def test_load_emits_finished_with_collections(self):
         storage = MagicMock()
         expected = [Collection(name="API", requests=[])]

@@ -37,7 +37,7 @@ Representative modules:
 
 ## Writing a GUI Test
 
-### Shared `qapp` — two valid consumers (PYPOST-830)
+### Shared `qapp` — two valid consumers (PYPOST-830 / PYPOST-884)
 
 All Qt tests must obtain the process singleton from `tests/conftest.py`. Do **not**
 create a module-local `QApplication` in `setUpClass` (or a duplicate local
@@ -46,13 +46,15 @@ create a module-local `QApplication` in `setUpClass` (or a duplicate local
 | Style | When to use | Examples |
 | --- | --- | --- |
 | Fixture parameter `qapp` | Plain pytest / non-`TestCase` | Responsiveness, widgets |
-| `@pytest.mark.usefixtures("qapp")` | `unittest.TestCase` | Gateway units + H3 stress |
+| `@pytest.mark.usefixtures("qapp")` | `unittest.TestCase` | Gateway units, H3 stress, collection worker |
 
-Gateway surface aligned onto `usefixtures` (PYPOST-830):
+Gateway / storage worker surface aligned onto `usefixtures` (PYPOST-830 /
+PYPOST-884):
 
 - `tests/test_environment_storage_gateway.py`
 - `tests/test_collection_storage_gateway.py`
 - `tests/test_storage_gateway_h3_stress.py`
+- `tests/test_collection_storage_worker.py`
 
 ```python
 import unittest
@@ -187,8 +189,7 @@ Modules that use the shared helper (PYPOST-827 / PYPOST-828 / PYPOST-877):
 - `tests/test_env_storage_responsiveness.py` — `qapp` parameter
 - `tests/test_environment_storage_gateway.py` — `usefixtures("qapp")`
 - `tests/test_collection_storage_gateway.py` — `usefixtures("qapp")`
-- `tests/test_collection_storage_worker.py` — still module-local `setUpClass`
-  (follow-up; not gateway surface)
+- `tests/test_collection_storage_worker.py` — `usefixtures("qapp")` (PYPOST-884)
 - `tests/test_env_presenter.py` — still module-local `setUpClass` qapp
   (suite-wide migration: PYPOST-886); async-load encryption refresh wait and
   hang-exit proof use shared `process_until` (PYPOST-877)
@@ -314,6 +315,8 @@ make test-agent-e2e
 - [PYPOST-828](https://pypost.atlassian.net/browse/PYPOST-828) — richer timeout diagnostics
 - [PYPOST-830](https://pypost.atlassian.net/browse/PYPOST-830) —
   gateway `TestCase` shared `qapp` via `usefixtures`
+- [PYPOST-884](https://pypost.atlassian.net/browse/PYPOST-884) —
+  collection storage worker `TestCase` shared `qapp` via `usefixtures`
 - [PYPOST-877](https://pypost.atlassian.net/browse/PYPOST-877) —
   env-presenter async-load wait on shared `process_until`
 - [PYPOST-883](https://pypost.atlassian.net/browse/PYPOST-883) —
