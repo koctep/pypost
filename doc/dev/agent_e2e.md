@@ -168,6 +168,13 @@ Multi-session isolation tests keep constructing `AgentAppSession` directly
 (fixtures yield one instance per request). Prefer fixtures for single-session
 scenarios.
 
+After the session is ready, each packaging fixture logs INFO
+`agent_e2e_fixture_ready mode=blank` or `mode=seeded` (logger
+`tests._pytest_plugins.agent_e2e`). Caplog proof (PYPOST-867):
+`tests/test_agent_e2e_packaging_logs.py` — pure unit (mocked session
+boundary); must **not** carry `agent_e2e` and must **not** appear in the
+harness table above. Catalog: [logging.md](logging.md).
+
 ### Setup checklist
 
 1. `make install` (venv + `.[dev,otel]`).
@@ -262,6 +269,10 @@ for narrow runs.
 | | run `make test PYTEST_ARGS=` |
 | | `"tests/test_agent_e2e_harness_table_doc.py -v"` |
 | | (PYPOST-866) |
+| Ready log missing / renamed | Assert under |
+| | `caplog.at_level(INFO, logger="tests._pytest_plugins.agent_e2e")`; |
+| | run `make test PYTEST_ARGS=` |
+| | `"tests/test_agent_e2e_packaging_logs.py -v"` (PYPOST-867) |
 
 More GUI pitfalls: [gui_testing.md](gui_testing.md). Suite-wide pytest /
 timeouts: [testing.md](testing.md).

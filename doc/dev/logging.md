@@ -108,8 +108,10 @@ different call sites.
 
 Agent session contract and ready-gate semantics:
 [agent_lifecycle.md](agent_lifecycle.md). Packaging fixtures emit
-`agent_e2e_fixture_ready` after ready ([agent_e2e.md](agent_e2e.md)); HTTP
-stubs emit `agent_e2e_http_stub_installed`
+`agent_e2e_fixture_ready` after ready ([agent_e2e.md](agent_e2e.md));
+caplog proof for blank/seeded modes lives in
+`tests/test_agent_e2e_packaging_logs.py` (PYPOST-867). HTTP stubs emit
+`agent_e2e_http_stub_installed`
 ([agent_e2e_http.md](agent_e2e_http.md)); failure dumps emit
 `agent_e2e_failure_artifacts_written` /
 `agent_e2e_failure_artifacts_failed`
