@@ -37,7 +37,7 @@ Representative modules:
 
 ## Writing a GUI Test
 
-### Shared `qapp` — two valid consumers (PYPOST-830 / PYPOST-884 / PYPOST-886)
+### Shared `qapp` — two valid consumers (PYPOST-830 / PYPOST-884 / PYPOST-885 / PYPOST-886)
 
 All Qt tests must obtain the process singleton from `tests/conftest.py`. Do **not**
 create a module-local `QApplication` in `setUpClass` (or a duplicate local
@@ -45,20 +45,37 @@ create a module-local `QApplication` in `setUpClass` (or a duplicate local
 
 | Style | When to use | Examples |
 | --- | --- | --- |
-| Fixture parameter `qapp` | Plain pytest / non-`TestCase` | Responsiveness, widgets, dialogs |
-| `@pytest.mark.usefixtures("qapp")` | `unittest.TestCase` | Gateways, workers, presenters, editors |
+| Fixture parameter `qapp` | Plain pytest / non-`TestCase` | Responsiveness, gateways, H3 stress, widgets |
+| `@pytest.mark.usefixtures("qapp")` | `unittest.TestCase` | Workers, presenters, editors |
 
 Suite-wide alignment (PYPOST-886) removed remaining local lifecycles. Regression
-guard: `tests/test_suite_qapp_alignment.py`.
+guard: `tests/test_suite_qapp_alignment.py`. Gateway free-function style guard:
+`tests/test_gateway_qapp_free_function_style.py` (PYPOST-885).
 
 Reference surfaces (non-exhaustive):
 
-- `tests/test_environment_storage_gateway.py`
-- `tests/test_collection_storage_gateway.py`
-- `tests/test_storage_gateway_h3_stress.py`
-- `tests/test_collection_storage_worker.py`
+- `tests/test_env_storage_responsiveness.py` — free functions + `qapp`
+- `tests/test_environment_storage_gateway.py` — free functions + `qapp` (PYPOST-885)
+- `tests/test_collection_storage_gateway.py` — free functions + `qapp` (PYPOST-885)
+- `tests/test_storage_gateway_h3_stress.py` — free functions + `qapp` (PYPOST-885)
+- `tests/test_collection_storage_worker.py` — `usefixtures("qapp")` (PYPOST-884)
 - `tests/test_env_presenter.py` / `tests/test_tabs_presenter.py`
 - `tests/test_code_editor.py` / `tests/test_request_editor_*.py`
+
+Free-function style (preferred for new plain pytest modules):
+
+```python
+import pytest
+
+pytestmark = pytest.mark.timeout(120)
+
+
+def test_load_async_emits_load_completed(qapp):
+    # QApplication provided by shared fixture parameter
+    ...
+```
+
+`unittest.TestCase` style (when keeping TestCase):
 
 ```python
 import unittest
@@ -69,8 +86,8 @@ pytestmark = pytest.mark.timeout(120)
 
 
 @pytest.mark.usefixtures("qapp")
-class TestEnvironmentStorageGateway(unittest.TestCase):
-    def test_load_async_emits_load_completed(self):
+class TestCollectionStorageWorker(unittest.TestCase):
+    def test_load_finished(self):
         # QApplication already provided by shared fixture
         ...
 ```
@@ -195,15 +212,15 @@ Hang-regression coverage in `tests/test_env_storage_responsiveness.py`:
 Modules that use the shared helper (PYPOST-827 / PYPOST-828 / PYPOST-877):
 
 - `tests/test_env_storage_responsiveness.py` — `qapp` parameter
-- `tests/test_environment_storage_gateway.py` — `usefixtures("qapp")`
-- `tests/test_collection_storage_gateway.py` — `usefixtures("qapp")`
+- `tests/test_environment_storage_gateway.py` — `qapp` parameter (PYPOST-885)
+- `tests/test_collection_storage_gateway.py` — `qapp` parameter (PYPOST-885)
 - `tests/test_collection_storage_worker.py` — `usefixtures("qapp")` (PYPOST-884)
 - `tests/test_env_presenter.py` — `usefixtures("qapp")` (PYPOST-886); async-load
   encryption refresh wait and hang-exit proof use shared `process_until`
   (PYPOST-877)
 
 H3 worker-lifecycle canary (PYPOST-829): `tests/test_storage_gateway_h3_stress.py`
-(≥200 rapid cycles + GC per gateway; shared `qapp` via `usefixtures`, PYPOST-830).
+(≥200 rapid cycles + GC per gateway; free functions + `qapp`, PYPOST-885).
 Prefer isolation when triaging native crashes.
 
 Save-completed + QComboBox GC canary (PYPOST-883):
@@ -324,7 +341,9 @@ make test-agent-e2e
 - [PYPOST-827](https://pypost.atlassian.net/browse/PYPOST-827) — shared `process_until` for siblings
 - [PYPOST-828](https://pypost.atlassian.net/browse/PYPOST-828) — richer timeout diagnostics
 - [PYPOST-830](https://pypost.atlassian.net/browse/PYPOST-830) —
-  gateway `TestCase` shared `qapp` via `usefixtures`
+  gateway shared `qapp` alignment (initial `usefixtures` on `TestCase`)
+- [PYPOST-885](https://pypost.atlassian.net/browse/PYPOST-885) —
+  gateway / H3 stress free functions with `qapp` param
 - [PYPOST-884](https://pypost.atlassian.net/browse/PYPOST-884) —
   collection storage worker `TestCase` shared `qapp` via `usefixtures`
 - [PYPOST-886](https://pypost.atlassian.net/browse/PYPOST-886) —
