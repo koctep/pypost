@@ -44,9 +44,10 @@ make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_double_response_body.py -v
 3. Wait until status + lock body token appear under `RESPONSE_PANEL`.
 4. Assert the lock body token appears **exactly once** in joined panel values.
 
-Default HEAD (discard present) is **green**. To prove red-on-bug locally,
-temporarily no-op `_discard_chunk_buffer` in `_on_request_finished`, run the
-lock (expect count 2), then restore discard — do not commit the no-op.
+Default HEAD (discard present) is **green**. Automated FR5 red proof
+(PYPOST-892): `test_agent_e2e_double_body_red_path_without_discard` monkeypatches
+`TabsPresenterWorkerMixin._discard_chunk_buffer` to a no-op and asserts
+`count >= 2` under the same streaming stub.
 
 ## Configuration
 
