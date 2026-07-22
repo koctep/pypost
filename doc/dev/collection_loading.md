@@ -95,6 +95,11 @@ Module: `pypost/core/qt/collection_storage_gateway.py`. Same rationale as
 [Async Environment Storage](environment_storage_async.md) § Worker finish teardown —
 avoids premature `QThread` destruction under rapid churn + GC.
 
+Keep this finish-slot body **inline** (with the module-local
+`_WORKER_FINISH_WAIT_MS`) until a **third** consumer needs the same ordered
+teardown or the env/collection copies visibly drift; do not extract a shared
+private helper for the original pair alone (PYPOST-881 YAGNI deferral).
+
 ## Configuration
 
 No configuration flags. Collection files live under the user data `collections/` directory; see

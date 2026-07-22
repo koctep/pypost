@@ -71,6 +71,11 @@ Dropping the only Python ref without `deleteLater` / short `wait` caused segfaul
 rapid churn + GC (H3). Do not use unbounded `wait()` on the GUI thread. The same pattern
 applies to `CollectionStorageGateway` — see [Collection Loading](collection_loading.md).
 
+Keep the finish-slot body **inline** in each gateway (and the module-local
+`_WORKER_FINISH_WAIT_MS`) until a **third** consumer needs the same ordered
+teardown or the two copies visibly drift; do not extract a shared private helper
+for the original pair alone (PYPOST-881 YAGNI deferral).
+
 ## API / Usage
 
 ### `EnvironmentStorageWorker`
