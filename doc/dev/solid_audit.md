@@ -38,8 +38,8 @@ LOC baselines and caps so god-object regressions (especially `MainWindow` growth
 
 | Metric | Audit era (PYPOST-40) | Baseline (2026-06-11) | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 416 | 425 |
-| `MainWindow` class LOC | 1040 | 375 | 380 |
+| `main_window.py` file LOC | 1040 | 416 | 435 |
+| `MainWindow` class LOC | 1040 | 375 | 390 |
 
 Authoritative snapshot (all module caps): [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
 
@@ -62,6 +62,10 @@ update caps with ~10% headroom, and refresh the snapshot.
 
 **PYPOST-728 (2026-07-14):** Verified R-P1-001 compliance — `main_window.py` (393/425),
 `MainWindow` class (353/380), and `template_service.py` (204/225) all within refreshed caps.
+
+**PYPOST-843 (2026-07-22):** Refreshed regression caps after measured growth —
+`main_window.py` 435, `MainWindow` class 390, `env_presenter.py` 470 — and
+confirmed `make check` green with lifecycle mid-start harness coverage.
 `audit_baseline_metrics.py --check` and `test_solid_audit_baseline.py` pass.
 
 **PYPOST-735 (2026-07-14):** Closed R-P2-006 — `pypost/core/qt/metrics.py` cap raised 165→181

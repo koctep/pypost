@@ -80,6 +80,7 @@ Harness modules under the marker (also the documented file-list override):
 | Module | Covers |
 | --- | --- |
 | `tests/test_agent_lifecycle_smoke.py` | Lifecycle smoke |
+| `tests/test_agent_lifecycle_mid_start_cleanup.py` | Mid-start cleanup (841) |
 | `tests/test_ui_identity_spotcheck.py` | Identity spot-check |
 | `tests/test_ui_actions.py` | Action primitives |
 | `tests/test_ui_snapshot.py` | Snapshot capture |
