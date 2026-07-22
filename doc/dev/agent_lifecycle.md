@@ -121,8 +121,9 @@ process-level Qt reuse (e.g. a second session), not as a live session handle.
 ### `start() -> AgentAppSession`
 
 Composes the app, shows the window, pumps events until `is_ui_ready`, or raises
-`TimeoutError`. On timeout, logs `agent_session_ready_timeout` and still runs
-`shutdown()` before re-raising.
+(typically `TimeoutError` or compose errors). On **any** failure after resource
+allocation (temps / metrics / compose / ready wait), runs `shutdown()` before
+re-raising (PYPOST-841). Ready timeout also logs `agent_session_ready_timeout`.
 
 ### `shutdown() -> None`
 
@@ -183,6 +184,8 @@ entries live under **Application lifecycle** in [logging.md](logging.md).
 
 `tests/test_agent_lifecycle_smoke.py` covers launch → ready → shutdown (and a
 second launch after shutdown) under `make test` with offscreen Qt.
+`tests/test_agent_lifecycle_mid_start_cleanup.py` locks mid-start failure
+cleanup (PYPOST-841).
 
 After ready, resolve key widgets by stable identities — see
 [UI widget identity](ui_identity.md). Spot-check:

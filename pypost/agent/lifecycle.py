@@ -95,6 +95,8 @@ class AgentAppSession:
         """Launch, pump events until is_ui_ready, or raise TimeoutError."""
         if self._started:
             raise RuntimeError("AgentAppSession already started")
+        # Prior failed start sets _shut_down; clear so this attempt can clean up.
+        self._shut_down = False
 
         if self._offscreen:
             os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -117,50 +119,55 @@ class AgentAppSession:
             data_dir,
         )
         launch_started = time.monotonic()
-        composed = compose_app(
-            config_dir=config_dir,
-            data_dir=data_dir,
-            metrics_host="127.0.0.1",
-            metrics_port=metrics_port,
-            apply_log_level=False,
-        )
-        self._composed = composed
-        composed.window.show()
-        QCoreApplication.processEvents()
-
-        ready_wait_started = time.monotonic()
         try:
-            wait_until(
-                lambda: composed.window.is_ui_ready,
-                timeout=self._ready_timeout,
-                message=(
-                    "MainWindow.is_ui_ready did not become true within "
-                    f"{self._ready_timeout}s"
-                ),
-                condition_name="is_ui_ready",
+            composed = compose_app(
+                config_dir=config_dir,
+                data_dir=data_dir,
+                metrics_host="127.0.0.1",
+                metrics_port=metrics_port,
+                apply_log_level=False,
             )
-        except TimeoutError:
-            waited_ms = int((time.monotonic() - ready_wait_started) * 1000)
-            logger.warning(
-                "agent_session_ready_timeout ready_timeout_s=%s waited_ms=%s "
-                "metrics_port=%s",
-                self._ready_timeout,
-                waited_ms,
+            self._composed = composed
+            composed.window.show()
+            QCoreApplication.processEvents()
+
+            ready_wait_started = time.monotonic()
+            try:
+                wait_until(
+                    lambda: composed.window.is_ui_ready,
+                    timeout=self._ready_timeout,
+                    message=(
+                        "MainWindow.is_ui_ready did not become true within "
+                        f"{self._ready_timeout}s"
+                    ),
+                    condition_name="is_ui_ready",
+                )
+            except TimeoutError:
+                waited_ms = int((time.monotonic() - ready_wait_started) * 1000)
+                logger.warning(
+                    "agent_session_ready_timeout ready_timeout_s=%s waited_ms=%s "
+                    "metrics_port=%s",
+                    self._ready_timeout,
+                    waited_ms,
+                    metrics_port,
+                )
+                raise
+
+            ready_ms = int((time.monotonic() - ready_wait_started) * 1000)
+            launch_ms = int((time.monotonic() - launch_started) * 1000)
+            self._started = True
+            logger.info(
+                "agent_session_ready ready_ms=%s launch_ms=%s metrics_port=%s",
+                ready_ms,
+                launch_ms,
                 metrics_port,
             )
+            return self
+        except BaseException:
+            # Any mid-start failure (compose, show, ready wait, timeout) must
+            # release temps + metrics; shutdown() is idempotent.
             self.shutdown()
             raise
-
-        ready_ms = int((time.monotonic() - ready_wait_started) * 1000)
-        launch_ms = int((time.monotonic() - launch_started) * 1000)
-        self._started = True
-        logger.info(
-            "agent_session_ready ready_ms=%s launch_ms=%s metrics_port=%s",
-            ready_ms,
-            launch_ms,
-            metrics_port,
-        )
-        return self
 
     def shutdown(self) -> None:
         """Request clean exit; stop background servers; release session resources."""
