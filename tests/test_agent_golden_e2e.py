@@ -108,3 +108,38 @@ def test_agent_golden_request_response_flow(
 
     _assert_response_ui(snap)
     assert CANNED_GOLDEN_OK.response.status_code == FIXTURE_STATUS
+
+
+def test_agent_golden_settle_timeout_includes_step_and_excerpt(
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-853 TD-3: forced settle timeout carries step + response_excerpt."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready is True
+    session.ui_fill(URL_INPUT, FIXTURE_URL)
+    session.ui_select(METHOD_COMBO, FIXTURE_METHOD)
+
+    with stub_agent_e2e_http(CANNED_GOLDEN_OK):
+        session.ui_click(SEND_BUTTON)
+        with pytest.raises(UiWaitTimeoutError) as exc_info:
+            try:
+                session.wait_for_snapshot(lambda _snap: False, timeout=0.05)
+            except UiWaitTimeoutError as exc:
+                last = session.ui_snapshot()
+                excerpt = response_panel_excerpt(last)
+                raise UiWaitTimeoutError(
+                    f"golden Send settle failed: {exc}; "
+                    f"response_excerpt={excerpt!r}",
+                    timeout_s=exc.timeout_s,
+                    condition=exc.condition,
+                    diagnostics={
+                        **exc.diagnostics,
+                        "step": "wait_response_after_send",
+                        "response_excerpt": excerpt,
+                    },
+                ) from exc
+
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics.get("step") == "wait_response_after_send"
+    assert "response_excerpt" in diagnostics
+    assert isinstance(diagnostics["response_excerpt"], str)
