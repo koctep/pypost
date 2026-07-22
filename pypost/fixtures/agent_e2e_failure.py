@@ -1,7 +1,9 @@
-"""On-disk failure artifacts for agent e2e (PYPOST-860).
+"""On-disk failure artifacts for agent e2e (PYPOST-860 / PYPOST-875).
 
 Writes a masked UI snapshot plus concise diagnostics when a scenario fails.
 Reuse ``AgentAppSession.ui_snapshot()`` so secrets follow PYPOST-835 masking.
+Direct ``AgentAppSession`` constructions dump via an optional ``__exit__``
+hook installed by the agent e2e pytest plugin (PYPOST-875).
 """
 
 from __future__ import annotations
@@ -10,6 +12,8 @@ import json
 import logging
 import os
 import re
+from collections.abc import Callable
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -19,10 +23,20 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_ARTIFACT_RELATIVE = Path("artifacts") / "agent_e2e"
 ENV_ARTIFACT_ROOT = "PYPOST_AGENT_E2E_ARTIFACTS"
+DIRECT_SESSION_PROVENANCE = "direct"
 MAX_EXC_MESSAGE_LENGTH = 500
 _SESSION_FIXTURE_NAMES = (
     "seeded_agent_e2e_session",
     "agent_e2e_session",
+)
+
+_current_failure_nodeid: ContextVar[str | None] = ContextVar(
+    "agent_e2e_failure_nodeid",
+    default=None,
+)
+_current_artifact_root: ContextVar[Path | None] = ContextVar(
+    "agent_e2e_failure_artifact_root",
+    default=None,
 )
 
 
@@ -94,6 +108,46 @@ def session_from_funcargs(funcargs: dict[str, Any]) -> tuple[AgentAppSession, st
         if isinstance(value, AgentAppSession):
             return value, name
     return None
+
+
+def set_failure_dump_context(
+    *,
+    nodeid: str | None,
+    artifact_root: Path | None = None,
+) -> None:
+    """Bind pytest nodeid / root for direct-session ``__exit__`` dumps."""
+    _current_failure_nodeid.set(nodeid)
+    _current_artifact_root.set(artifact_root)
+
+
+def clear_failure_dump_context() -> None:
+    """Clear per-test dump context after the item finishes."""
+    _current_failure_nodeid.set(None)
+    _current_artifact_root.set(None)
+
+
+def make_direct_session_failure_dump_hook() -> (
+    Callable[[AgentAppSession, type[BaseException], BaseException], None]
+):
+    """Return a hook that dumps artifacts for direct ``AgentAppSession`` exits."""
+
+    def _hook(
+        session: AgentAppSession,
+        exc_type: type[BaseException],
+        exc: BaseException,
+    ) -> None:
+        nodeid = _current_failure_nodeid.get() or "unknown_test"
+        root = _current_artifact_root.get()
+        dump_agent_e2e_failure_artifacts(
+            session,
+            nodeid=nodeid,
+            exc_type=exc_type.__name__,
+            exc_message=str(exc),
+            session_fixture=DIRECT_SESSION_PROVENANCE,
+            artifact_root=root,
+        )
+
+    return _hook
 
 
 def _build_diagnostics(

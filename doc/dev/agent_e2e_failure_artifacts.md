@@ -2,10 +2,11 @@
 
 ## Overview
 
-When an agent e2e scenario that uses a shared session fixture fails during
-the pytest **call** phase, the harness dumps a **masked UI snapshot** and
-**concise diagnostics** to disk. Authors and CI can inspect the UI state
-without re-running the failure locally.
+When an agent e2e scenario fails during the pytest **call** phase — whether
+it used a shared session fixture **or** constructed `AgentAppSession`
+directly — the harness dumps a **masked UI snapshot** and **concise
+diagnostics** to disk. Authors and CI can inspect the UI state without
+re-running the failure locally.
 
 Env contract area: [agent_e2e_env.md](agent_e2e_env.md). Snapshot API and
 masking: [ui_snapshot.md](ui_snapshot.md). Session fixtures:
@@ -16,7 +17,8 @@ masking: [ui_snapshot.md](ui_snapshot.md). Session fixtures:
 | Component | Role |
 | --- | --- |
 | `pypost/fixtures/agent_e2e_failure.py` | Path helpers + `dump_agent_e2e_failure_artifacts` |
-| `pytest_runtest_makereport` in `tests/_pytest_plugins/agent_e2e.py` | Auto-dump on call failure |
+| `pytest_runtest_makereport` in `tests/_pytest_plugins/agent_e2e.py` | Auto-dump on fixture call failure |
+| `AgentAppSession.__exit__` + plugin dump hook | Auto-dump for direct constructions (PYPOST-875) |
 | `session.ui_snapshot()` | Masked tree (PYPOST-835) written to JSON |
 | `artifacts/agent_e2e/` | Default on-disk root (gitignored) |
 
@@ -25,14 +27,17 @@ flowchart LR
   Fail[Call phase failed] --> Hook[makereport hook]
   Hook --> Sess[agent_e2e_session / seeded]
   Sess --> Dump[dump_agent_e2e_failure_artifacts]
+  Direct[assert fail inside with AgentAppSession] --> Exit[session __exit__]
+  Exit --> Dump
   Dump --> Snap[ui_snapshot.json]
   Dump --> Diag[diagnostics.json]
 ```
 
 Wiring is automatic for tests that request `agent_e2e_session` or
-`seeded_agent_e2e_session` (golden and env-pack Send included). Tests that
-construct `AgentAppSession` directly without those fixtures are not
-auto-dumped; call the helper manually if needed.
+`seeded_agent_e2e_session` (golden and env-pack Send included), **and** for
+tests that construct `AgentAppSession` directly with
+`with AgentAppSession(...):` while the agent e2e pytest plugin is loaded
+(PYPOST-875). Manual helper calls remain available for ad-hoc probes.
 
 ## Where artifacts land
 
@@ -74,7 +79,7 @@ Scalars / short strings only:
 | `nodeid` | Pytest node id |
 | `exc_type` | Exception type name |
 | `exc_message` | Truncated message (max 500 chars) |
-| `session_fixture` | `agent_e2e_session` or `seeded_agent_e2e_session` |
+| `session_fixture` | `agent_e2e_session`, `seeded_agent_e2e_session`, or `direct` |
 | `ui_ready` | `MainWindow.is_ui_ready` at dump time (or null) |
 
 Does **not** include env vars, hidden keys, or the snapshot tree.
@@ -95,12 +100,26 @@ test failure remains the primary result.
 
 ### Automatic (preferred)
 
-No per-test code. Use a shared fixture; on assert fail the hook dumps:
+No per-test code for packaging fixtures; on assert fail the makereport hook
+dumps:
 
 ```python
 def test_flow(agent_e2e_session):
     assert agent_e2e_session.window.is_ui_ready
     # …
+```
+
+Direct constructions also auto-dump when the agent e2e plugin is loaded
+(normal `make test` / `make test-agent-e2e`). Dump runs in
+`AgentAppSession.__exit__` while the session is still alive:
+
+```python
+from pypost.agent import AgentAppSession
+
+def test_isolation():
+    with AgentAppSession(offscreen=True) as session:
+        assert session.window.is_ui_ready
+        # assert fail here → dump with session_fixture=direct
 ```
 
 ### Manual helper
@@ -151,17 +170,19 @@ Contract lock: `tests/test_agent_e2e_ci_failure_upload_doc.py`.
 ## Tests
 
 `tests/test_agent_e2e_failure_artifacts.py` covers helper write/masking,
-best-effort errors, and a subprocess proof that the makereport hook dumps
-on fixture assert fail (`make test-agent-e2e`).
+best-effort errors, a subprocess proof that the makereport hook dumps on
+fixture assert fail, and a subprocess proof that direct
+`AgentAppSession` constructions dump on assert fail (`make test-agent-e2e`).
 
 ## Troubleshooting
 
 | Issue | What to do |
 | --- | --- |
-| No dump after failure | Confirm the test uses `agent_e2e_session` or `seeded_agent_e2e_session` |
+| No dump after failure | Confirm packaging fixture **or** `with AgentAppSession` under the agent e2e plugin; assert must fail inside the live session |
 | Empty / wrong root | Check `PYPOST_AGENT_E2E_ARTIFACTS` and pytest `rootpath` |
 | Cleartext secret in JSON | Key must be in `hidden_keys` for the active env; see [ui_snapshot.md](ui_snapshot.md) |
 | Dump WARNING only | Capture failed; fix session ready / window; original fail still reported |
+| `session_fixture=direct` | Expected for bare `AgentAppSession` constructions (PYPOST-875) |
 
 ## Related
 

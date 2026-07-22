@@ -73,6 +73,12 @@ with AgentAppSession(offscreen=True) as session:
 # shutdown runs on context exit
 ```
 
+When an `Exception` propagates out of the `with` body and the agent e2e
+pytest plugin has installed the failure-dump hook, `__exit__` dumps masked
+failure artifacts **before** shutdown (PYPOST-875). Packaging fixtures still
+dump via makereport; yield teardown does not see the test exception.
+See [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
+
 | Concern | API |
 | --- | --- |
 | Launch | `AgentAppSession.start()` / context manager |
@@ -82,6 +88,7 @@ with AgentAppSession(offscreen=True) as session:
 | Settle waits | `session.wait_for_*` / `wait_until` → [ui_wait.md](ui_wait.md) |
 | Shutdown | `session.shutdown()` / context `__exit__` |
 | Offscreen | `offscreen=True` (default) sets `QT_QPA_PLATFORM=offscreen` if unset |
+| Failure dump | Auto on exceptional `__exit__` when plugin hook installed |
 
 ### `AgentAppSession(...)`
 

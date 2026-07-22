@@ -32,6 +32,20 @@ from pypost.ui.main_window import MainWindow
 
 logger = logging.getLogger(__name__)
 
+# Optional best-effort dump callback (installed by agent e2e pytest plugin).
+# Signature: hook(session, exc_type, exc) -> None
+_FailureDumpHook = Callable[
+    ["AgentAppSession", type[BaseException], BaseException],
+    None,
+]
+_failure_dump_hook: _FailureDumpHook | None = None
+
+
+def set_agent_session_failure_dump_hook(hook: _FailureDumpHook | None) -> None:
+    """Install or clear the optional ``__exit__`` failure-dump callback."""
+    global _failure_dump_hook
+    _failure_dump_hook = hook
+
 
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -198,7 +212,29 @@ class AgentAppSession:
     def __enter__(self) -> AgentAppSession:
         return self.start()
 
-    def __exit__(self, *exc: object) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: object,
+    ) -> None:
+        # Direct constructions: dump while the session is still started.
+        # Fixture path keeps makereport (yield teardown sees exc_type=None).
+        if (
+            _failure_dump_hook is not None
+            and exc_type is not None
+            and exc is not None
+            and issubclass(exc_type, Exception)
+            and self._started
+            and not self._shut_down
+        ):
+            try:
+                _failure_dump_hook(self, exc_type, exc)
+            except Exception as dump_exc:  # noqa: BLE001 — never mask the test failure
+                logger.warning(
+                    "agent_session_failure_dump_hook_failed error=%s",
+                    type(dump_exc).__name__,
+                )
         self.shutdown()
 
     def ui_snapshot(self) -> dict[str, Any]:

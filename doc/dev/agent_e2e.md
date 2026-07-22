@@ -178,7 +178,9 @@ def test_seeded(seeded_agent_e2e_session):
 
 Multi-session isolation tests keep constructing `AgentAppSession` directly
 (fixtures yield one instance per request). Prefer fixtures for single-session
-scenarios.
+scenarios. Direct constructions still auto-dump failure artifacts when the
+agent e2e plugin is loaded — see
+[agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) (PYPOST-875).
 
 After the session is ready, each packaging fixture logs INFO
 `agent_e2e_fixture_ready mode=blank` or `mode=seeded` (logger
@@ -209,7 +211,7 @@ harness table above. Catalog: [logging.md](logging.md).
 | Drive UI | `session.ui_fill` / `ui_select` / `ui_click` / … |
 | Observe | `session.ui_snapshot()` |
 | Settle | `session.wait_for_snapshot` / `wait_until` / … |
-| Failure dump | Auto on fixture assert fail — [failure artifacts](agent_e2e_failure_artifacts.md) |
+| Failure dump | Auto on fixture **or** direct-session assert fail — [failure artifacts](agent_e2e_failure_artifacts.md) |
 | Response-panel snapshot helpers | `tests.helpers.agent_e2e_response_panel` — [helpers doc](agent_e2e_response_panel.md) |
 
 ### Identity convention

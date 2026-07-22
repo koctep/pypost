@@ -94,6 +94,7 @@ different call sites.
 | `agent_session_window_close_failed` | ERROR | exception | `agent/lifecycle` |
 | `agent_session_metrics_stop_failed` | ERROR | exception | `agent/lifecycle` |
 | `agent_session_temp_cleanup_failed` | ERROR | exception | `agent/lifecycle` |
+| `agent_session_failure_dump_hook_failed` | WARNING | `error` | `agent/lifecycle` |
 | `ui_snapshot_captured` | DEBUG | `node_count`, `named_count`, `duration_ms` | `agent/ui_snapshot` |
 | `ui_action_applied` | DEBUG | `primitive`, `widget_id`, `outcome`, `duration_ms` | `agent/ui_actions` |
 | `ui_wait_settled` | DEBUG | `condition`, `waited_ms`, `timeout_s` | `agent/ui_wait` |
@@ -466,7 +467,7 @@ Update this document when adding new domains or stable public events operators r
 | [agent_e2e_seed.md](agent_e2e_seed.md) | Agent e2e seeded workspace (PYPOST-857) |
 | [agent_e2e.md](agent_e2e.md) | Agent UI e2e packaging + fixtures (PYPOST-858) |
 | [agent_e2e_http.md](agent_e2e_http.md) | Deterministic HTTP stubs (PYPOST-859) |
-| [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) | Failure snapshot dumps (PYPOST-860) |
+| [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) | Failure snapshot dumps (PYPOST-860 / PYPOST-875) |
 | [testing.md](testing.md) | pytest `log_cli`, CI guardrails |
 | [mcp_integration.md](mcp_integration.md) | MCP activity viewer |
 | [security_audit.md](security_audit.md) | Secrets in logs |

@@ -249,3 +249,73 @@ def test_makereport_hook_dumps_on_fixture_assert_fail(
     assert diag["exc_type"] == "AssertionError"
     assert diag["session_fixture"] == "agent_e2e_session"
     assert "intentional failure" in (diag["exc_message"] or "")
+
+
+def test_dumps_on_direct_session_assert_fail(
+    tmp_path: Path,
+) -> None:
+    """PYPOST-875: direct AgentAppSession fail writes artifact files.
+
+    Bare ``with AgentAppSession(...)`` inside the test body dumps the same
+    snapshot + diagnostics as fixture-backed tests (plugin ``__exit__`` hook).
+    """
+    import os
+    import subprocess
+    import sys
+
+    probe = tmp_path / "test_probe_direct_fail.py"
+    probe.write_text(
+        "\n".join(
+            [
+                "import pytest",
+                "from pypost.agent.lifecycle import AgentAppSession",
+                "pytestmark = [",
+                "    pytest.mark.timeout(60),",
+                "    pytest.mark.agent_e2e,",
+                "]",
+                "",
+                "def test_probe_direct_intentional_fail():",
+                "    with AgentAppSession(offscreen=True, ready_timeout=30.0) as session:",
+                "        assert session.window.is_ui_ready is True",
+                '        assert False, "intentional direct failure for artifact dump"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    artifact_root = tmp_path / "direct_hook_artifacts"
+    repo_root = Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    env["PYPOST_AGENT_E2E_ARTIFACTS"] = str(artifact_root)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            str(probe),
+            "-p",
+            "no:cacheprovider",
+            "-p",
+            "tests._pytest_plugins.agent_e2e",
+            "-q",
+            "--tb=line",
+            "-o",
+            "markers=agent_e2e: agent e2e\ntimeout: per-test timeout",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+    assert result.returncode != 0, result.stdout + result.stderr
+    snaps = list(artifact_root.rglob("ui_snapshot.json"))
+    diags = list(artifact_root.rglob("diagnostics.json"))
+    assert snaps, result.stdout + result.stderr
+    assert diags
+    diag = json.loads(diags[0].read_text(encoding="utf-8"))
+    assert diag["exc_type"] == "AssertionError"
+    assert diag["session_fixture"] == "direct"
+    assert "intentional direct failure" in (diag["exc_message"] or "")
