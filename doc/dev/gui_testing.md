@@ -158,6 +158,10 @@ Rules:
 - **Collection gateway** waits stay without `worker_operation=` (load-only;
   no `_operation` attribute).
 - **Worker-only** waits: optional `worker_running` (busy/pending omitted).
+  Keep a **local** helper (see `tests/test_collection_storage_worker.py`) until
+  a second worker-only consumer appears; do not extract a shared
+  `worker_timeout_detail` into `process_until.py` for a single module
+  (PYPOST-879 YAGNI deferral).
 - **Hang-regression** / no domain context: omit `timeout_detail`; default text is enough.
 - Detail failures never mask the timeout (`timeout_detail failed: ...` note) and never
   extend the hang-defense deadline.
