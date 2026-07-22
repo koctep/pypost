@@ -20,8 +20,10 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
+from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
 from tests.helpers.agent_e2e_response_panel import (
     joined_panel_values,
+    response_panel_excerpt,
     subtree_by_name,
 )
 
@@ -34,8 +36,6 @@ _STATUS_LABEL = "Status: 200"
 _BODY_IN_SNAPSHOT = json.dumps(
     json.loads(SEED_GET_OK_BODY), ensure_ascii=False
 )
-_SEND_SETTLE_TIMEOUT_S = 15.0
-
 
 def _response_ready(snap: dict[str, Any]) -> bool:
     joined = joined_panel_values(snap)
@@ -62,16 +62,20 @@ def test_seeded_env_send_uses_shared_http_stub(
         try:
             snap = session.wait_for_snapshot(
                 _response_ready,
-                timeout=_SEND_SETTLE_TIMEOUT_S,
+                timeout=SEND_SETTLE_TIMEOUT_S,
             )
         except UiWaitTimeoutError as exc:
+            last = session.ui_snapshot()
+            excerpt = response_panel_excerpt(last)
             raise UiWaitTimeoutError(
-                f"env seed Send settle failed: {exc}",
+                f"env seed Send settle failed: {exc}; "
+                f"response_excerpt={excerpt!r}",
                 timeout_s=exc.timeout_s,
                 condition=exc.condition,
                 diagnostics={
                     **exc.diagnostics,
                     "step": "wait_response_after_seed_send",
+                    "response_excerpt": excerpt,
                 },
             ) from exc
 
