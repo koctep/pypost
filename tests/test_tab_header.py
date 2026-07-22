@@ -77,5 +77,15 @@ class TestRequestTabHeader(unittest.TestCase):
     def test_plus_tab_marker_constant(self):
         self.assertEqual(PLUS_TAB_MARKER, "pypost_plus_tab")
 
+    def test_plus_tab_placeholder_uses_pypost_prefix(self):
+        """PYPOST-845: placeholder objectName follows pypost_ convention."""
+        from pypost.ui.widget_ids import PLUS_TAB_PLACEHOLDER
+
+        header, tabs = self._make_header()
+        plus_idx = header.plus_tab_index()
+        placeholder = tabs.widget(plus_idx)
+        self.assertEqual(placeholder.objectName(), PLUS_TAB_PLACEHOLDER)
+        self.assertTrue(PLUS_TAB_PLACEHOLDER.startswith("pypost_"))
+
 if __name__ == "__main__":
     unittest.main()

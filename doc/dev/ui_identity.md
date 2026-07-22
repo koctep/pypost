@@ -63,6 +63,7 @@ Production UI must not import `pypost.agent`. Agents import constants from
 | `ENV_SELECTOR` | `pypost_env_selector` | Environment combo |
 | `ENV_MANAGE_BUTTON` | `pypost_env_manage_button` | Manage environments |
 | `SETTINGS_BUTTON` | `pypost_settings_button` | Settings entry |
+| `PLUS_TAB_PLACEHOLDER` | `pypost_plus_tab_placeholder` | Trailing + tab chrome (not in KEY catalog) |
 
 ## API / Usage
 

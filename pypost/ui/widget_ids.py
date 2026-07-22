@@ -27,6 +27,7 @@ ENV_BAR = "pypost_env_bar"
 ENV_SELECTOR = "pypost_env_selector"
 ENV_MANAGE_BUTTON = "pypost_env_manage_button"
 SETTINGS_BUTTON = "pypost_settings_button"
+PLUS_TAB_PLACEHOLDER = "pypost_plus_tab_placeholder"
 
 KEY_WIDGET_IDS = (
     MAIN_WINDOW,
