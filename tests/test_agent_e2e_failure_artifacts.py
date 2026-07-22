@@ -172,6 +172,22 @@ def test_dump_best_effort_on_capture_error(
     assert "agent_e2e_failure_artifacts_failed" in caplog.text
 
 
+def test_dump_propagates_unexpected_exception(tmp_path: Path) -> None:
+    """PYPOST-876: unexpected dump errors must not be swallowed as dump-failed.
+
+    LookupError is outside the intentional best-effort catalogue
+    (OSError, RuntimeError, TypeError, ValueError, AttributeError).
+    """
+    session = MagicMock(spec=AgentAppSession)
+    session.ui_snapshot.side_effect = LookupError("unexpected dump bug")
+    with pytest.raises(LookupError, match="unexpected dump bug"):
+        dump_agent_e2e_failure_artifacts(
+            session,
+            nodeid="unexpected_dump_error",
+            artifact_root=tmp_path,
+        )
+
+
 def test_session_from_funcargs_prefers_seeded() -> None:
     blank = MagicMock(spec=AgentAppSession)
     seeded = MagicMock(spec=AgentAppSession)

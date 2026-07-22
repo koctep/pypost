@@ -467,7 +467,7 @@ Update this document when adding new domains or stable public events operators r
 | [agent_e2e_seed.md](agent_e2e_seed.md) | Agent e2e seeded workspace (PYPOST-857) |
 | [agent_e2e.md](agent_e2e.md) | Agent UI e2e packaging + fixtures (PYPOST-858) |
 | [agent_e2e_http.md](agent_e2e_http.md) | Deterministic HTTP stubs (PYPOST-859) |
-| [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) | Failure snapshot dumps (PYPOST-860 / PYPOST-875) |
+| [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) | Failure snapshot dumps (PYPOST-860 / 875 / 876) |
 | [testing.md](testing.md) | pytest `log_cli`, CI guardrails |
 | [mcp_integration.md](mcp_integration.md) | MCP activity viewer |
 | [security_audit.md](security_audit.md) | Secrets in logs |

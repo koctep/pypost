@@ -96,6 +96,11 @@ On dump failure (capture/I/O), WARNING
 `agent_e2e_failure_artifacts_failed` with `error=<ExcType>` — the original
 test failure remains the primary result.
 
+Best-effort catch set (`_DUMP_BEST_EFFORT_ERRORS`, PYPOST-876):
+`OSError`, `RuntimeError`, `TypeError`, `ValueError`, `AttributeError`.
+Other exception types from the dump body propagate (they are not converted
+into a dump-failed WARNING).
+
 ## API / Usage
 
 ### Automatic (preferred)
@@ -170,8 +175,9 @@ Contract lock: `tests/test_agent_e2e_ci_failure_upload_doc.py`.
 ## Tests
 
 `tests/test_agent_e2e_failure_artifacts.py` covers helper write/masking,
-best-effort errors, a subprocess proof that the makereport hook dumps on
-fixture assert fail, and a subprocess proof that direct
+best-effort errors (`RuntimeError`), propagation of unexpected dump errors
+(`LookupError`, PYPOST-876), a subprocess proof that the makereport hook
+dumps on fixture assert fail, and a subprocess proof that direct
 `AgentAppSession` constructions dump on assert fail (`make test-agent-e2e`).
 
 ## Troubleshooting
@@ -181,7 +187,8 @@ fixture assert fail, and a subprocess proof that direct
 | No dump after failure | Confirm packaging fixture **or** `with AgentAppSession` under the agent e2e plugin; assert must fail inside the live session |
 | Empty / wrong root | Check `PYPOST_AGENT_E2E_ARTIFACTS` and pytest `rootpath` |
 | Cleartext secret in JSON | Key must be in `hidden_keys` for the active env; see [ui_snapshot.md](ui_snapshot.md) |
-| Dump WARNING only | Capture failed; fix session ready / window; original fail still reported |
+| Dump WARNING only | Capture failed with a best-effort type; fix session ready / window; original fail still reported |
+| Unexpected dump exception in traceback | Helper bug outside the best-effort catch set; fix dump path (PYPOST-876) |
 | `session_fixture=direct` | Expected for bare `AgentAppSession` constructions (PYPOST-875) |
 
 ## Related

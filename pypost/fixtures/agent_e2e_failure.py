@@ -1,9 +1,10 @@
-"""On-disk failure artifacts for agent e2e (PYPOST-860 / PYPOST-875).
+"""On-disk failure artifacts for agent e2e (PYPOST-860 / 875 / 876).
 
 Writes a masked UI snapshot plus concise diagnostics when a scenario fails.
 Reuse ``AgentAppSession.ui_snapshot()`` so secrets follow PYPOST-835 masking.
 Direct ``AgentAppSession`` constructions dump via an optional ``__exit__``
 hook installed by the agent e2e pytest plugin (PYPOST-875).
+Dump I/O uses a narrowed best-effort exception tuple (PYPOST-876).
 """
 
 from __future__ import annotations
@@ -25,6 +26,15 @@ DEFAULT_ARTIFACT_RELATIVE = Path("artifacts") / "agent_e2e"
 ENV_ARTIFACT_ROOT = "PYPOST_AGENT_E2E_ARTIFACTS"
 DIRECT_SESSION_PROVENANCE = "direct"
 MAX_EXC_MESSAGE_LENGTH = 500
+# Intentional best-effort catches for dump I/O / capture / half-torn reads
+# (PYPOST-876). Unexpected Exception subclasses propagate.
+_DUMP_BEST_EFFORT_ERRORS = (
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    AttributeError,
+)
 _SESSION_FIXTURE_NAMES = (
     "seeded_agent_e2e_session",
     "agent_e2e_session",
@@ -68,8 +78,9 @@ def dump_agent_e2e_failure_artifacts(
 ) -> Path | None:
     """Write ``ui_snapshot.json`` + ``diagnostics.json``; return dump dir.
 
-    Best-effort: capture or I/O errors are logged and return ``None`` so the
-    original test failure remains the primary outcome.
+    Best-effort for ``_DUMP_BEST_EFFORT_ERRORS`` (I/O, capture, half-torn
+    reads): those are logged and return ``None`` so the original test
+    failure remains the primary outcome. Other exceptions propagate.
     """
     root = artifact_root if artifact_root is not None else resolve_artifact_root()
     dump_dir = root / safe_nodeid_dirname(nodeid)
@@ -85,7 +96,7 @@ def dump_agent_e2e_failure_artifacts(
         )
         _write_json(dump_dir / "ui_snapshot.json", snapshot)
         _write_json(dump_dir / "diagnostics.json", diagnostics)
-    except Exception as exc:  # noqa: BLE001 — never mask the test failure
+    except _DUMP_BEST_EFFORT_ERRORS as exc:
         logger.warning(
             "agent_e2e_failure_artifacts_failed nodeid=%s error=%s",
             nodeid,
@@ -164,7 +175,7 @@ def _build_diagnostics(
     ui_ready: bool | None
     try:
         ui_ready = bool(session.window.is_ui_ready)
-    except Exception:  # noqa: BLE001 — session may be half-torn
+    except _DUMP_BEST_EFFORT_ERRORS:
         ui_ready = None
     return {
         "nodeid": nodeid,
