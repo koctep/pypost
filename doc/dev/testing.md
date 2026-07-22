@@ -555,6 +555,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-861] | Smoke for `make test-agent-e2e` (deps, help, recipe, marker selection) |
 | [PYPOST-872] | `venv-test` prerequisite on `test` / `test-slow` / `test-agent-e2e` |
 | [PYPOST-873] | Deferred CI cost trim; dual-run docs + workflow lock |
+| [PYPOST-874] | ENABLE agent-e2e failure artifact upload + doc/workflow lock |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -621,6 +622,15 @@ minutes are clearly dominated by the overlap, or maintainers report painful
 double failures / queue time. An ENABLE trim must also preserve 3.13 agent
 e2e coverage (for example expand `agent-e2e` to a matrix) and update
 `tests/test_agent_e2e_ci_double_run_doc.py`.
+
+### Agent e2e failure artifact CI upload (PYPOST-874) — ENABLE
+
+When job `agent-e2e` fails, GitHub Actions uploads `artifacts/agent_e2e/`
+(PYPOST-860 masked dumps) as artifact `agent-e2e-failure-artifacts`
+(`if: failure()`, `if-no-files-found: ignore`). Download from the run’s
+Artifacts UI. Details:
+[agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
+Lock: `tests/test_agent_e2e_ci_failure_upload_doc.py`.
 
 ## CI dependency caching (PYPOST-311)
 

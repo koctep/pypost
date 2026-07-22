@@ -134,11 +134,19 @@ Dumps reuse `session.ui_snapshot()` / `capture_ui_snapshot` — the same
 masking as PYPOST-835. Do not log the tree or values. Avoid putting
 secrets in assert messages (they appear truncated in `diagnostics.json`).
 
-## CI tip
+## CI upload (PYPOST-874) — ENABLE
 
-Optional: upload `artifacts/agent_e2e/` with
-`actions/upload-artifact` when the agent-e2e job fails. Local diagnosis
-only needs the files on disk under the documented root.
+Job `agent-e2e` in `.github/workflows/test.yml` **ENABLE**s failure-only
+upload of `artifacts/agent_e2e/` via pinned `actions/upload-artifact`
+(`if: failure()`). Artifact name: `agent-e2e-failure-artifacts`.
+
+After a red `agent-e2e` run, download that artifact from the Actions run
+summary (Artifacts). Contents match the on-disk layout above (masked
+`ui_snapshot.json` + `diagnostics.json`). If the job failed before dumps
+existed (e.g. `make install`), the upload step ignores a missing path.
+
+Local diagnosis still uses files on disk under the documented root.
+Contract lock: `tests/test_agent_e2e_ci_failure_upload_doc.py`.
 
 ## Tests
 

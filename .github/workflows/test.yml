@@ -222,6 +222,19 @@ jobs:
           echo "Ran \`make test-agent-e2e\` (\`-m \"agent_e2e and not slow\"\`)" \
             "on Python 3.11. Main \`test\` job still includes the same tests via" \
             "\`-m \"not slow\"\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "On failure, masked dumps under \`artifacts/agent_e2e/\` are uploaded" \
+            "as artifact \`agent-e2e-failure-artifacts\` (PYPOST-874)." \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      # PYPOST-874: upload PYPOST-860 failure dumps for Actions UI triage.
+      - name: Upload agent e2e failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: agent-e2e-failure-artifacts
+          path: artifacts/agent_e2e/
+          if-no-files-found: ignore
 
   security-audit:
     name: "pip-audit (dependency CVE scan)"
