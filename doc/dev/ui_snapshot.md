@@ -131,7 +131,8 @@ sanitize_text(text, env_vars=env_vars, hidden_keys=hidden_keys)
 Hidden env **values** are redacted; the same Bearer/query/JSON heuristics as
 MCP responses apply. Widgets that already display the UI mask (`********`)
 stay as shown. After sanitization, values longer than
-`UI_SNAPSHOT_MAX_VALUE_LENGTH` (500) are truncated to that length.
+`UI_SNAPSHOT_MAX_VALUE_LENGTH` (500) are truncated to that length with a
+trailing `…` ellipsis so consumers can see truncation (PYPOST-849).
 
 Exported constants:
 

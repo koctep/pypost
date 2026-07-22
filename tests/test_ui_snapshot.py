@@ -140,7 +140,7 @@ def test_capture_ui_snapshot_masks_hidden_env_values(qapp: QApplication) -> None
 
 
 def test_capture_ui_snapshot_truncates_long_values(qapp: QApplication) -> None:
-    """Unit: long text values are truncated to UI_SNAPSHOT_MAX_VALUE_LENGTH."""
+    """Unit: long text values are truncated with an ellipsis (PYPOST-849)."""
     assert QApplication.instance() is qapp
 
     root = QWidget()
@@ -156,6 +156,8 @@ def test_capture_ui_snapshot_truncates_long_values(qapp: QApplication) -> None:
     assert node is not None
     assert node["value"] is not None
     assert len(node["value"]) == UI_SNAPSHOT_MAX_VALUE_LENGTH
+    assert node["value"].endswith("…")
+    assert node["value"][:-1] == "x" * (UI_SNAPSHOT_MAX_VALUE_LENGTH - 1)
 
 
 def test_ui_snapshot_after_ready_includes_key_surfaces(

@@ -151,7 +151,8 @@ def _sanitize_value(
         return None
     text = sanitize_text(raw, env_vars=env_vars, hidden_keys=hidden_keys)
     if len(text) > UI_SNAPSHOT_MAX_VALUE_LENGTH:
-        return text[:UI_SNAPSHOT_MAX_VALUE_LENGTH]
+        # Reserve one character for the ellipsis marker (PYPOST-849).
+        return text[: UI_SNAPSHOT_MAX_VALUE_LENGTH - 1] + "…"
     return text
 
 
