@@ -49,11 +49,16 @@ Also: `CANNED_HTTP_CATALOG` (`dict` name → result),
 `make_canned_http_result(...)`, URL/body constants (`GOLDEN_*`,
 `SEED_GET_RESOLVED_URL`, `LOCK_DOUBLE_BODY_*`, …).
 
-### Streaming side effect (double-body lock)
+### Streaming side effect (`canned_send_with_one_chunk`)
 
-Plain `return_value` stubs never call `stream_callback`, so the chunk-flush
-vs `display_response` race cannot appear. For once-only presentation locks,
-pass a side effect from `canned_send_with_one_chunk(result)`:
+Catalog naming (PYPOST-893): use **`canned_send_with_one_chunk`** whenever an
+agent e2e scenario must exercise the chunk-flush vs `display_response` race.
+The name means: canned `HTTPRequestResult` + exactly one `stream_callback`
+invocation with `resp.body` (arms the flush timer before `finished`).
+
+Plain `return_value` stubs never call `stream_callback`, so that race cannot
+appear. For once-only presentation locks and the presentation matrix, pass a
+side effect from `canned_send_with_one_chunk(result)`:
 
 ```python
 from pypost.fixtures.agent_e2e_http import (
@@ -139,10 +144,17 @@ Unit proofs: `tests/test_agent_e2e_http.py`
 ### Seed POST Send (body path)
 
 Catalog entry `seed_post_ok` / `CANNED_SEED_POST_OK` is exercised by
-`tests/test_agent_e2e_http_seed_post.py` (PYPOST-871): blank session,
-fill URL + POST + `REQUEST_BODY_EDIT` with `SEED_POST_BODY`, stub with
-`CANNED_SEED_POST_OK`, assert status/body. Mirrors env GET Send
-(`tests/test_agent_e2e_http_env.py`) with the POST body path.
+`tests/test_agent_e2e_http_seed_post.py`:
+
+- **Blank fill** (PYPOST-871): URL + POST + `REQUEST_BODY_EDIT` with
+  `SEED_POST_BODY`, then stub Send.
+- **Collection-tree open** (PYPOST-898): seeded session +
+  `click_tree_row_by_text(..., "POST Seed POST")`, wait for editor, then stub
+  Send (templated `SEED_POST_URL` / body from seed — no manual fill).
+
+Shared settle budget: `SEND_SETTLE_TIMEOUT_S` from
+`tests.helpers.agent_e2e_send` (PYPOST-895). Timeout re-raises attach
+`response_panel_excerpt` (PYPOST-896 / PYPOST-897).
 
 ```bash
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_seed_post.py -q"

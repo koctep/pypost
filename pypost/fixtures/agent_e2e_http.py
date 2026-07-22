@@ -113,12 +113,17 @@ CANNED_HTTP_CATALOG: dict[str, HTTPRequestResult] = {
 def canned_send_with_one_chunk(
     result: HTTPRequestResult,
 ) -> Callable[..., HTTPRequestResult]:
-    """Return a ``send_request`` side_effect that emits one body chunk.
+    """Build a streaming ``send_request`` stub that emits **one** body chunk.
 
-    Stubs that only ``return_value`` never call ``stream_callback``, so the
-    chunk-flush vs ``display_response`` race (PYPOST-887) cannot appear.
-    Agent e2e locks that assert once-only presentation should stub with this
-    helper so a pending flush timer is armed before ``finished``.
+    Catalog / naming (PYPOST-893): prefer this helper (not a bare
+    ``return_value`` stub) whenever an agent e2e scenario must exercise the
+    chunk-flush vs ``display_response`` race. The name means: canned HTTP
+    result + exactly one ``stream_callback`` invocation with ``resp.body``.
+
+    Stubs that only set ``return_value`` never call ``stream_callback``, so the
+    late flush race cannot appear. Double-body lock and presentation-matrix
+    flows should always use this helper (see ``CANNED_HTTP_CATALOG`` entries
+    and ``doc/dev/agent_e2e_http.md``).
 
     Signature matches MagicMock ``side_effect`` on a patched method (no
     bound ``self``): positional request plus keyword callbacks.
