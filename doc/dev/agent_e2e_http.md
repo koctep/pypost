@@ -83,6 +83,12 @@ with stub_agent_e2e_http(CANNED_GOLDEN_OK):
     snap = session.wait_for_snapshot(predicate, timeout=15.0)
 ```
 
+On enter, the CM logs INFO
+`agent_e2e_http_stub_installed name=<catalog_or_custom>` (logger
+`pypost.fixtures.agent_e2e_http`). Caplog proof (PYPOST-870):
+`tests/test_agent_e2e_http_stub_logs.py` — pure unit; must **not** carry
+`agent_e2e`. Catalog: [logging.md](logging.md).
+
 Or via the pytest fixture (same callable):
 
 ```python
@@ -182,6 +188,10 @@ No extra env vars.
 | Wait timeout after Send | Confirm stub context wraps the click; grep |
 | | `agent_e2e_http_stub_installed` (seed POST → `name=seed_post_ok`). |
 | | Check catalog body vs snapshot compact JSON form (see golden docs). |
+| Install log missing / renamed | Assert under |
+| | `caplog.at_level(INFO, logger="pypost.fixtures.agent_e2e_http")`; |
+| | run `make test PYTEST_ARGS=` |
+| | `"tests/test_agent_e2e_http_stub_logs.py -v"` (PYPOST-870). |
 | URL router AssertionError | Confirm map keys equal `request_data.url` exactly |
 | | (resolved UI URL). Message lists `known=` keys. |
 | POST body not applied | Confirm `REQUEST_BODY_EDIT` fill after selecting POST; |

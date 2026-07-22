@@ -112,7 +112,9 @@ Agent session contract and ready-gate semantics:
 caplog proof for blank/seeded modes lives in
 `tests/test_agent_e2e_packaging_logs.py` (PYPOST-867). HTTP stubs emit
 `agent_e2e_http_stub_installed`
-([agent_e2e_http.md](agent_e2e_http.md)); failure dumps emit
+([agent_e2e_http.md](agent_e2e_http.md)); caplog proof for the install
+event lives in `tests/test_agent_e2e_http_stub_logs.py` (PYPOST-870);
+failure dumps emit
 `agent_e2e_failure_artifacts_written` /
 `agent_e2e_failure_artifacts_failed`
 ([agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md)); compose
