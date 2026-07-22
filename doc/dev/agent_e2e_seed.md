@@ -141,6 +141,11 @@ plus model / combo-item enumeration — not blank-ready `ui_snapshot` name
 scan, and not disk-write asserts alone. See
 `tests/test_agent_e2e_seed.py`.
 
+Failure path (PYPOST-862): `test_write_agent_e2e_seed_logs_failure_and_reraises`
+mocks `StorageManager` persist failure, asserts ERROR
+`agent_e2e_seed_failed` via `caplog` on logger
+`pypost.fixtures.agent_e2e_seed`, and confirms the exception is re-raised.
+
 ## Configuration
 
 | Setting | Notes |
@@ -163,7 +168,8 @@ No product settings or env vars gate the seed writer. Logging follows
 - **Assert on snapshot names only** — Use identity + model/item enum;
   blank-ready snapshot is selection-scoped.
 - **Persist / disk errors** — Grep `agent_e2e_seed_failed` (and
-  `storage_*`); exception is re-raised.
+  `storage_*`); exception is re-raised. Covered by
+  `test_write_agent_e2e_seed_logs_failure_and_reraises`.
 - **Confused with golden blank dir** — Golden uses empty `data_dir`;
   seed is the env-pack workspace path.
 - **Module not in make target** — Listed under `make test-agent-e2e`;

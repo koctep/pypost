@@ -86,7 +86,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_golden_e2e.py` | Golden product flow |
 | `tests/test_agent_e2e_double_response_body.py` | Double-body lock (889) |
 | `tests/test_agent_e2e_presentation_matrix.py` | Presentation matrix (890) |
-| `tests/test_agent_e2e_seed.py` | Seeded workspace (857) |
+| `tests/test_agent_e2e_seed.py` | Seeded workspace (857) + failure caplog (862) |
 | `tests/test_agent_e2e_http_env.py` | Env Send + shared HTTP (859) |
 | `tests/test_agent_e2e_http_seed_post.py` | Seed POST Send + body (871) |
 | `tests/test_agent_e2e_failure_artifacts.py` | Failure snapshot dumps (860) |

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtGui import QStandardItemModel
@@ -52,6 +54,28 @@ def test_write_agent_e2e_seed_persists_inventory(tmp_path: Path) -> None:
     storage = StorageManager(data_dir=tmp_path)
     assert storage.load_collections() == [build_agent_e2e_seed_collection()]
     assert storage.load_environments() == build_agent_e2e_seed_environments()
+
+
+def test_write_agent_e2e_seed_logs_failure_and_reraises(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-862: persist failure logs agent_e2e_seed_failed and re-raises."""
+    storage = MagicMock()
+    storage.save_collection.side_effect = OSError("disk full")
+    with patch(
+        "pypost.fixtures.agent_e2e_seed.StorageManager",
+        return_value=storage,
+    ):
+        with caplog.at_level(
+            logging.ERROR,
+            logger="pypost.fixtures.agent_e2e_seed",
+        ):
+            with pytest.raises(OSError, match="disk full"):
+                write_agent_e2e_seed(tmp_path)
+    assert "agent_e2e_seed_failed" in caplog.text
+    storage.save_collection.assert_called_once()
+    storage.save_environments.assert_not_called()
 
 
 def test_seed_present_after_ready_via_identity(
