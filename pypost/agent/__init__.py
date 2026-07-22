@@ -12,6 +12,7 @@ from pypost.agent.ui_actions import (
     ui_send_key,
 )
 from pypost.agent.ui_snapshot import (
+    UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP,
     UI_SNAPSHOT_MAX_VALUE_LENGTH,
     capture_ui_snapshot,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "DEFAULT_UI_WAIT_INTERVAL_S",
     "DEFAULT_UI_WAIT_TIMEOUT_S",
     "AgentAppSession",
+    "UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP",
     "UI_SNAPSHOT_MAX_VALUE_LENGTH",
     "UiActionError",
     "UiTargetNotFoundError",

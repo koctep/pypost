@@ -75,8 +75,10 @@ Role vocabulary (snake_case, owned by the snapshot module):
 | other `QWidget` | `widget` |
 
 Value extractors (before sanitize + truncate): line/combo/button/label text;
-current tab title; plain text from text edits; up to five selected item-view
-cells joined by `", "`. Generic widgets emit `value: null`.
+current tab title; plain text from text edits; selected `QAbstractItemView`
+cells joined by `", "` — at most
+`UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP` (5) indexes (PYPOST-848). Additional
+selected rows are omitted from the summary. Generic widgets emit `value: null`.
 
 ## API / Usage
 
@@ -131,17 +133,21 @@ MCP responses apply. Widgets that already display the UI mask (`********`)
 stay as shown. After sanitization, values longer than
 `UI_SNAPSHOT_MAX_VALUE_LENGTH` (500) are truncated to that length.
 
-Exported constant:
+Exported constants:
 
 ```python
-from pypost.agent import UI_SNAPSHOT_MAX_VALUE_LENGTH  # 500
+from pypost.agent import (
+    UI_SNAPSHOT_MAX_VALUE_LENGTH,  # 500
+    UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP,  # 5
+)
 ```
 
 ## Configuration
 
 No environment variables. Truncation length is the module constant
-`UI_SNAPSHOT_MAX_VALUE_LENGTH`. Env masking uses the live presenter accessors
-on `window.env`, not a second secrets store.
+`UI_SNAPSHOT_MAX_VALUE_LENGTH`. Item-view multi-select summaries use
+`UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP`. Env masking uses the live presenter
+accessors on `window.env`, not a second secrets store.
 
 ## Observability
 

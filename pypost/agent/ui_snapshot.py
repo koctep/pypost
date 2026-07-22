@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 # Max characters kept in a single snapshot ``value`` (verification-sized).
 UI_SNAPSHOT_MAX_VALUE_LENGTH = 500
+# Max selected item-view cells summarized into ``value`` (multi-select cap).
+UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP = 5
 
 _ROLE_BY_TYPE: tuple[tuple[type, str], ...] = (
     (QMainWindow, "window"),
@@ -132,7 +134,7 @@ def _raw_value(widget: QWidget) -> str | None:
             return ""
         parts = [
             str(model.data(idx) or "")
-            for idx in indexes[:5]
+            for idx in indexes[:UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP]
             if model.data(idx) is not None
         ]
         return ", ".join(p for p in parts if p)
