@@ -47,15 +47,8 @@ def _assert_id(widget: QObject, expected: str) -> None:
             assert getter() == expected
 
 
-def test_key_widgets_expose_stable_identities(
-    qapp: QApplication,
-    agent_e2e_session: AgentAppSession,
-) -> None:
-    """FR10: after UI ready, critical surfaces expose documented objectNames."""
-    assert QApplication.instance() is qapp
-
-    window = agent_e2e_session.window
-    assert window.is_ui_ready is True
+def _assert_key_identities(window: QWidget) -> None:
+    """Assert documented key objectNames (and accessibleIdentifier mirrors)."""
     _assert_id(window, MAIN_WINDOW)
 
     tree = window.findChild(QTreeView, COLLECTION_TREE)
@@ -112,6 +105,32 @@ def test_key_widgets_expose_stable_identities(
     assert current.request_editor.send_btn is send
     assert current.request_editor.body_edit is body
     assert current.response_view is response
+
+
+def test_key_widgets_expose_stable_identities(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """FR10: after UI ready, critical surfaces expose documented objectNames."""
+    assert QApplication.instance() is qapp
+    window = agent_e2e_session.window
+    assert window.is_ui_ready is True
+    _assert_key_identities(window)
+
+
+def test_theme_apply_keeps_key_object_names(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """Theme/apply_settings must not clear key objectNames (PYPOST-844)."""
+    window = agent_e2e_session.window
+    assert window.is_ui_ready is True
+    _assert_key_identities(window)
+
+    flipped = "dark" if window.settings.theme != "dark" else "light"
+    window.apply_settings(window.settings.model_copy(update={"theme": flipped}))
+    qapp.processEvents()
+    _assert_key_identities(window)
 
 
 def test_widget_ids_are_locale_independent_literals() -> None:

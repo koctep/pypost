@@ -21,7 +21,8 @@ sole automation identity.
 | `pypost/ui/widget_ids.py` | Canonical id strings + `set_widget_id` |
 | Key UI constructors | Call `set_widget_id` once when widgets are created |
 | `AgentAppSession` | Ensures UI ready before agents look up widgets |
-| Spot-check | `tests/test_ui_identity_spotcheck.py` under `make test` |
+| Spot-check | `tests/test_ui_identity_spotcheck.py` under `make test`
+  (includes theme/`apply_settings` identity lock — PYPOST-844) |
 
 ```mermaid
 flowchart LR
