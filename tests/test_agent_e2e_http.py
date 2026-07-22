@@ -20,10 +20,12 @@ from pypost.fixtures.agent_e2e_http import (
     SEND_REQUEST_PATCH_TARGET,
     SEED_GET_OK_BODY,
     SEED_GET_RESOLVED_URL,
+    SEED_POST_RESOLVED_URL,
     canned_send_with_one_chunk,
     make_canned_http_result,
     stub_agent_e2e_http,
 )
+from pypost.models.models import RequestData
 
 pytestmark = pytest.mark.timeout(10)
 
@@ -94,6 +96,43 @@ def test_stub_agent_e2e_http_callable_side_effect() -> None:
         out = request_service.HTTPClient.send_request(MagicMock(), MagicMock())
         assert out is CANNED_SEED_GET_OK
     assert calls == [1]
+
+
+def test_stub_agent_e2e_http_url_router_map() -> None:
+    """PYPOST-868: Mapping[url → canned] routes each send by request URL."""
+    responses = {
+        SEED_GET_RESOLVED_URL: CANNED_SEED_GET_OK,
+        SEED_POST_RESOLVED_URL: CANNED_SEED_POST_OK,
+    }
+    get_req = RequestData(method="GET", url=SEED_GET_RESOLVED_URL)
+    post_req = RequestData(method="POST", url=SEED_POST_RESOLVED_URL)
+    original = request_service.HTTPClient.send_request
+
+    with stub_agent_e2e_http(responses, name="url_router"):
+        assert request_service.HTTPClient.send_request is not original
+        client = MagicMock()
+        assert (
+            request_service.HTTPClient.send_request(client, get_req)
+            is CANNED_SEED_GET_OK
+        )
+        assert (
+            request_service.HTTPClient.send_request(client, post_req)
+            is CANNED_SEED_POST_OK
+        )
+    assert request_service.HTTPClient.send_request is original
+
+
+def test_stub_agent_e2e_http_url_router_miss_raises() -> None:
+    """PYPOST-868: unknown URL fails loudly with known keys listed."""
+    responses = {SEED_GET_RESOLVED_URL: CANNED_SEED_GET_OK}
+    unknown = RequestData(method="GET", url="https://example.test/missing")
+
+    with stub_agent_e2e_http(responses, name="url_router"):
+        with pytest.raises(AssertionError, match=r"missing|known") as exc_info:
+            request_service.HTTPClient.send_request(MagicMock(), unknown)
+    message = str(exc_info.value)
+    assert "https://example.test/missing" in message
+    assert SEED_GET_RESOLVED_URL in message
 
 
 def test_send_request_patch_target_constant() -> None:

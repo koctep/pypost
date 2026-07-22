@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from typing import Union
 from unittest.mock import patch
@@ -36,6 +36,7 @@ SEED_POST_OK_BODY = '{"seed": "post", "ok": true, "echo": true}'
 CannedResultOrFactory = Union[
     HTTPRequestResult,
     Callable[..., HTTPRequestResult],
+    Mapping[str, HTTPRequestResult],
 ]
 
 
@@ -140,6 +141,49 @@ def canned_send_with_one_chunk(
     return _send
 
 
+def _request_data_from_send_args(
+    args: tuple[object, ...],
+    kwargs: dict[str, object],
+) -> object:
+    """Locate ``RequestData`` (or duck-typed stand-in) among send_request args.
+
+    Prefer an arg whose ``url`` is a ``str`` so MagicMock ``self`` (auto-attrs)
+    is not mistaken for the request when tests call ``send_request(client, req)``.
+    """
+    if "request_data" in kwargs:
+        return kwargs["request_data"]
+    for arg in args:
+        url = getattr(arg, "url", None)
+        if isinstance(url, str) and hasattr(arg, "method"):
+            return arg
+    raise AssertionError(
+        "agent_e2e_http URL router: could not find request_data with .url/.method"
+    )
+
+
+def url_router_side_effect(
+    responses: Mapping[str, HTTPRequestResult],
+) -> Callable[..., HTTPRequestResult]:
+    """Return a ``send_request`` side_effect that routes by exact request URL.
+
+    Match rule (v1): ``request_data.url`` must equal a map key exactly.
+    Unknown URL raises ``AssertionError`` listing known keys.
+    """
+    known = dict(responses)
+
+    def _send(*args: object, **kwargs: object) -> HTTPRequestResult:
+        request_data = _request_data_from_send_args(args, kwargs)
+        url = getattr(request_data, "url", "") or ""
+        if url not in known:
+            raise AssertionError(
+                "agent_e2e_http URL router: no canned response for "
+                f"url={url!r}; known={sorted(known)}"
+            )
+        return known[url]
+
+    return _send
+
+
 @contextmanager
 def stub_agent_e2e_http(
     result: CannedResultOrFactory = CANNED_GOLDEN_OK,
@@ -148,8 +192,9 @@ def stub_agent_e2e_http(
 ) -> Iterator[None]:
     """Patch ``HTTPClient.send_request`` at the RequestService import site.
 
-    Pass a canned ``HTTPRequestResult`` or a callable used as ``side_effect``.
-    Restores the original binding on exit (test isolation).
+    Pass a canned ``HTTPRequestResult``, a callable used as ``side_effect``,
+    or a ``Mapping[str, HTTPRequestResult]`` keyed by exact ``request_data.url``
+    (PYPOST-868 URL router). Restores the original binding on exit.
     """
     catalog_name = name
     if result is CANNED_GOLDEN_OK:
@@ -160,9 +205,16 @@ def stub_agent_e2e_http(
         catalog_name = "seed_post_ok"
     elif result is CANNED_DOUBLE_BODY_LOCK_OK:
         catalog_name = "double_body_lock_ok"
+    elif isinstance(result, Mapping) and not isinstance(result, HTTPRequestResult):
+        if name == "custom":
+            catalog_name = "url_router"
 
     logger.info("agent_e2e_http_stub_installed name=%s", catalog_name)
-    if callable(result) and not isinstance(result, HTTPRequestResult):
+    if isinstance(result, Mapping) and not isinstance(result, HTTPRequestResult):
+        router = url_router_side_effect(result)
+        with patch(SEND_REQUEST_PATCH_TARGET, side_effect=router):
+            yield
+    elif callable(result) and not isinstance(result, HTTPRequestResult):
         with patch(SEND_REQUEST_PATCH_TARGET, side_effect=result):
             yield
     else:

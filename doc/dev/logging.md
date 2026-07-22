@@ -101,7 +101,7 @@ different call sites.
 | `agent_e2e_seed_completed` | INFO | `data_dir`, ids, counts | `fixtures/agent_e2e_seed` |
 | `agent_e2e_seed_failed` | ERROR | `data_dir`, exception | `fixtures/agent_e2e_seed` |
 | `agent_e2e_fixture_ready` | INFO | `mode=blank\|seeded` | `_pytest_plugins/agent_e2e` |
-| `agent_e2e_http_stub_installed` | INFO | `name` (catalog or custom) | `fixtures/agent_e2e_http` |
+| `agent_e2e_http_stub_installed` | INFO | `name` (catalog, `url_router`, or custom) | `fixtures/agent_e2e_http` |
 | `agent_e2e_failure_artifacts_written` | INFO | `path`, `nodeid` | `fixtures/agent_e2e_failure` |
 | `agent_e2e_failure_artifacts_failed` | WARNING | `nodeid`, `error` | `fixtures/agent_e2e_failure` |
 | `*_source` | DEBUG | `source=injected\|new` | composition-root injectors |

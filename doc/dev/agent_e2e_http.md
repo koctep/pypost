@@ -20,7 +20,8 @@ Method × body presentation matrix (streaming stubs, once-only asserts):
 
 | Component | Role |
 | --- | --- |
-| `pypost/fixtures/agent_e2e_http.py` | Catalog, builder, `stub_agent_e2e_http` |
+| `pypost/fixtures/agent_e2e_http.py` | Catalog, builder, `stub_agent_e2e_http`, |
+| | `url_router_side_effect` (PYPOST-868) |
 | `agent_e2e_http_stub` fixture | Yields the same CM from the agent_e2e plugin |
 | Patch target | `pypost.core.request_service.HTTPClient.send_request` |
 | Product path | UI actions → RequestWorker → stubbed send → panel |
@@ -90,6 +91,45 @@ def test_send(agent_e2e_session, agent_e2e_http_stub):
         ...
 ```
 
+### URL→canned response router (PYPOST-868)
+
+For multi-URL Sends in one scenario, pass a `Mapping[str, HTTPRequestResult]`
+keyed by exact `request_data.url` (the URL string on the request object at
+the stub boundary — typically the resolved URL filled in the UI):
+
+```python
+from pypost.fixtures.agent_e2e_http import (
+    CANNED_SEED_GET_OK,
+    CANNED_SEED_POST_OK,
+    SEED_GET_RESOLVED_URL,
+    SEED_POST_RESOLVED_URL,
+    stub_agent_e2e_http,
+)
+
+responses = {
+    SEED_GET_RESOLVED_URL: CANNED_SEED_GET_OK,
+    SEED_POST_RESOLVED_URL: CANNED_SEED_POST_OK,
+}
+with stub_agent_e2e_http(responses):
+    # each Send routes by request URL; unknown URL → AssertionError
+    ...
+```
+
+Match rules (v1):
+
+1. Exact string equality on `request_data.url` vs map keys.
+2. `request_data` is taken from `request_data=` kwarg or the first positional
+   arg whose `.url` is a `str` (avoids MagicMock `self` in unit tests).
+3. Unknown URL raises `AssertionError` listing `url=` and sorted known keys.
+4. Not in v1: glob/prefix match, method+URL compound keys, ordered queues —
+   use a callable `side_effect` for those (including streaming via
+   `canned_send_with_one_chunk`).
+
+Install log uses `name=url_router` when `name=` is left at default `custom`.
+Unit proofs: `tests/test_agent_e2e_http.py`
+(`test_stub_agent_e2e_http_url_router_map`,
+`test_stub_agent_e2e_http_url_router_miss_raises`).
+
 ### Seed POST Send (body path)
 
 Catalog entry `seed_post_ok` / `CANNED_SEED_POST_OK` is exercised by
@@ -102,8 +142,9 @@ fill URL + POST + `REQUEST_BODY_EDIT` with `SEED_POST_BODY`, stub with
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_seed_post.py -q"
 ```
 
-Pass a callable as `result` to use `side_effect` (multi-call sequences).
-Optional `name=` labels custom installs in logs (catalog identities auto-name).
+Pass a callable as `result` to use `side_effect` (multi-call sequences /
+streaming). Optional `name=` labels custom installs in logs (catalog
+identities auto-name; Mapping defaults to `url_router`).
 
 ### How to add a new canned response
 
@@ -141,6 +182,8 @@ No extra env vars.
 | Wait timeout after Send | Confirm stub context wraps the click; grep |
 | | `agent_e2e_http_stub_installed` (seed POST → `name=seed_post_ok`). |
 | | Check catalog body vs snapshot compact JSON form (see golden docs). |
+| URL router AssertionError | Confirm map keys equal `request_data.url` exactly |
+| | (resolved UI URL). Message lists `known=` keys. |
 | POST body not applied | Confirm `REQUEST_BODY_EDIT` fill after selecting POST; |
 | | see seed POST scenario and [ui_identity.md](ui_identity.md). |
 | Live network / flaky CI | Do not remove the stub; do not mock RequestWorker |
