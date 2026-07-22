@@ -83,6 +83,7 @@ See [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
 | --- | --- |
 | Launch | `AgentAppSession.start()` / context manager |
 | Ready | wait is inside `start()`; after start, `session.window.is_ui_ready` is true |
+| Metrics port | `session.metrics_port` (ephemeral bind; set in `start`) |
 | Snapshot | `session.ui_snapshot()` → [ui_snapshot.md](ui_snapshot.md) |
 | Actions | `session.ui_click` / `ui_fill` / `ui_select` / `ui_send_key` → [ui_actions.md](ui_actions.md) |
 | Settle waits | `session.wait_for_*` / `wait_until` → [ui_wait.md](ui_wait.md) |
@@ -183,7 +184,8 @@ entries live under **Application lifecycle** in [logging.md](logging.md).
 ## Smoke
 
 `tests/test_agent_lifecycle_smoke.py` covers launch → ready → shutdown (and a
-second launch after shutdown) under `make test` with offscreen Qt.
+second launch after shutdown) under `make test` with offscreen Qt. Relaunch smoke
+hard-asserts the first session’s metrics port is free after shutdown (PYPOST-842).
 `tests/test_agent_lifecycle_mid_start_cleanup.py` locks mid-start failure
 cleanup (PYPOST-841).
 

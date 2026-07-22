@@ -91,6 +91,13 @@ class AgentAppSession:
             raise RuntimeError("AgentAppSession has not been started")
         return self._composed.window
 
+    @property
+    def metrics_port(self) -> int:
+        """Ephemeral metrics bind port chosen for this session (set in ``start``)."""
+        if self._metrics_port is None:
+            raise RuntimeError("AgentAppSession has not been started")
+        return self._metrics_port
+
     def start(self) -> AgentAppSession:
         """Launch, pump events until is_ui_ready, or raise TimeoutError."""
         if self._started:
