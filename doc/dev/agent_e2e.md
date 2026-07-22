@@ -87,10 +87,19 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_e2e_double_response_body.py` | Double-body lock (889) |
 | `tests/test_agent_e2e_presentation_matrix.py` | Presentation matrix (890) |
 | `tests/test_agent_e2e_seed.py` | Seeded workspace (857) + failure caplog (862) |
-| `tests/test_agent_e2e_seed_inventory_doc.py` | Seed inventory code↔doc drift (864) |
 | `tests/test_agent_e2e_http_env.py` | Env Send + shared HTTP (859) |
 | `tests/test_agent_e2e_http_seed_post.py` | Seed POST Send + body (871) |
 | `tests/test_agent_e2e_failure_artifacts.py` | Failure snapshot dumps (860) |
+
+**Keep this table synced with markers:** when you add or remove
+`@pytest.mark.agent_e2e` on a module, update the Module column above in the
+same change. Pure unit drift guards (for example seed inventory
+`tests/test_agent_e2e_seed_inventory_doc.py`, or this table’s own guard
+`tests/test_agent_e2e_harness_table_doc.py`) must **not** carry `agent_e2e`
+and must **not** appear in this table — see [agent_e2e_seed.md](agent_e2e_seed.md)
+for the seed inventory check. `make test` runs
+`tests/test_agent_e2e_harness_table_doc.py`, which fails if the marked set
+and this table diverge.
 
 Narrow to an explicit file list via `PYTEST_ARGS` (replaces the default
 `-m` expression):
@@ -231,8 +240,9 @@ Failure dumps: [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
 Otherwise no extra env vars beyond the project’s standard GUI test path.
 
 When adding another agent e2e module, mark it `@pytest.mark.agent_e2e`
-(and link it from this page / the table above). File-list `PYTEST_ARGS`
-overrides remain supported for narrow runs.
+and add a row to the harness table above (same PR). When removing the
+mark, drop the row. File-list `PYTEST_ARGS` overrides remain supported
+for narrow runs.
 
 ## Troubleshooting
 
@@ -248,6 +258,10 @@ overrides remain supported for narrow runs.
 | | `agent-e2e` in `.github/workflows/test.yml` |
 | Assert fail, need UI state | Open `artifacts/agent_e2e/` — see |
 | | [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) |
+| Harness table ≠ marks | Align Module rows with `@pytest.mark.agent_e2e`; |
+| | run `make test PYTEST_ARGS=` |
+| | `"tests/test_agent_e2e_harness_table_doc.py -v"` |
+| | (PYPOST-866) |
 
 More GUI pitfalls: [gui_testing.md](gui_testing.md). Suite-wide pytest /
 timeouts: [testing.md](testing.md).
