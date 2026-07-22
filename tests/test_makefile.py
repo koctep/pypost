@@ -182,8 +182,13 @@ class TestDependencyChain:
         assert "venv-test" not in prereqs
         assert "venv-otel" not in prereqs
 
-    def test_test_depends_on_venv_otel_and_marker(self, make_workspace: Path) -> None:
+    def test_test_depends_on_venv_test_venv_otel_and_marker(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        """PYPOST-872: pytest targets must pull [dev] via venv-test."""
         prereqs = _prerequisites(make_workspace, "test")
+        assert "venv-test" in prereqs
         assert "venv-otel" in prereqs
         assert MARKER_REL in prereqs
 
@@ -232,23 +237,35 @@ class TestDependencyChain:
         prereqs = _prerequisites(make_workspace, "check-license-inventory")
         assert "install" in prereqs
 
-    @pytest.mark.parametrize("target", ["run", "test", "lint"])
+    @pytest.mark.parametrize("target", ["run", "lint"])
     def test_runtime_targets_depend_on_marker_only(
         self,
         make_workspace: Path,
         target: str,
     ) -> None:
+        """run/lint stay marker-only; pytest targets use venv-test (PYPOST-872)."""
         prereqs = _prerequisites(make_workspace, target)
         assert MARKER_REL in prereqs
         assert "install" not in prereqs
         assert "venv-test" not in prereqs
 
-    def test_test_agent_e2e_depends_on_venv_otel_and_marker(
+    def test_test_slow_depends_on_venv_test_venv_otel_and_marker(
         self,
         make_workspace: Path,
     ) -> None:
-        """PYPOST-861 / PYPOST-854: agent e2e make entry deps."""
+        """PYPOST-872: slow pytest target also pulls [dev] via venv-test."""
+        prereqs = _prerequisites(make_workspace, "test-slow")
+        assert "venv-test" in prereqs
+        assert "venv-otel" in prereqs
+        assert MARKER_REL in prereqs
+
+    def test_test_agent_e2e_depends_on_venv_test_venv_otel_and_marker(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        """PYPOST-861 / PYPOST-872: agent e2e make entry deps include venv-test."""
         prereqs = _prerequisites(make_workspace, "test-agent-e2e")
+        assert "venv-test" in prereqs
         assert "venv-otel" in prereqs
         assert MARKER_REL in prereqs
 
@@ -392,11 +409,15 @@ class TestTargetExecution:
         result = _run_make(make_workspace, "install")
         assert result.returncode == 0, result.stderr
 
-    def test_test_fails_without_pytest_in_bare_venv(self, make_workspace: Path) -> None:
+    def test_test_succeeds_from_bare_venv_via_venv_test(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        """PYPOST-872: make test auto-installs [dev] so bare venv is enough."""
         venv_result = _run_make(make_workspace, "venv")
         assert venv_result.returncode == 0, venv_result.stderr
         test_result = _run_make(make_workspace, "test")
-        assert test_result.returncode != 0
+        assert test_result.returncode == 0, test_result.stderr + test_result.stdout
 
     def test_test_succeeds_after_install(self, make_workspace: Path) -> None:
         install_result = _run_make(make_workspace, "install")

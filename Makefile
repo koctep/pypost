@@ -64,11 +64,11 @@ check-lock-otel: ## Verify requirements-otel.txt matches requirements-otel.in (n
 run: $(VENV_MARKER) ## Run the PyPost desktop application
 	PYTHONPATH=. $(BIN)/python pypost/main.py
 
-test: $(VENV_MARKER) venv-otel ## Run fast test suite (excludes slow integration tests)
+test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow integration tests)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m "not slow")
 
-test-slow: $(VENV_MARKER) venv-otel ## Run slow integration tests only (Makefile install smoke)
+test-slow: $(VENV_MARKER) venv-test venv-otel ## Run slow integration tests only (Makefile install smoke)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m slow)
 
@@ -77,7 +77,7 @@ test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage rep
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
 		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov)
 
-test-agent-e2e: $(VENV_MARKER) venv-otel ## Agent UI e2e + env pack (-m agent_e2e; PYTEST_ARGS overrides)
+test-agent-e2e: $(VENV_MARKER) venv-test venv-otel ## Agent UI e2e + env pack (-m agent_e2e; PYTEST_ARGS overrides)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "agent_e2e and not slow")
 

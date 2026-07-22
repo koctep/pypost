@@ -52,8 +52,21 @@ Use this checklist on a **clean checkout** to match CI regression coverage local
 | **Coverage** | `make test-cov` — fast suite with `--cov=pypost` |
 | **CI parity** | Main job (`.github/workflows/test.yml`) installs `pip install -e ".[dev,otel]"` |
 
-`run`, `test`, and `lint` do not auto-install dependencies — run `make install` first after
-clone or Python version change. See [setup.md](setup.md).
+### Install-first vs auto `venv-test` (PYPOST-872)
+
+**Preferred after clone / Python version change:** run `make install` once
+(`pip install -e ".[dev,otel]"` in a single editable install). CI does the same
+before pytest.
+
+**Safety net:** `make test`, `make test-slow`, `make test-cov`, and
+`make test-agent-e2e` depend on `venv-test` and `venv-otel`, so a bare
+`.venv` (marker only) still gets `[dev]` + `[otel]` before pytest runs.
+`run` and `lint` stay marker-only — run `make install` (or `make venv-test`)
+before `make lint`. See [setup.md](setup.md).
+
+Neither `venv-test` nor `venv-otel` is stamp-gated today: each Make visit
+re-runs the corresponding `pip install`. Prefer `make install` when iterating
+to avoid two sequential editable installs on every test invocation.
 
 ### Local vs CI test parity troubleshooting (PYPOST-723)
 
@@ -540,6 +553,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-279] | Pytest exit code `5` (no tests collected) policy in `make test` and CI |
 | [PYPOST-800] | Smoke for `make help` non-empty output (PYPOST-794 follow-up) |
 | [PYPOST-861] | Smoke for `make test-agent-e2e` (deps, help, recipe, marker selection) |
+| [PYPOST-872] | `venv-test` prerequisite on `test` / `test-slow` / `test-agent-e2e` |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -549,16 +563,17 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-279]: https://pypost.atlassian.net/browse/PYPOST-279
 [PYPOST-800]: https://pypost.atlassian.net/browse/PYPOST-800
 [PYPOST-861]: https://pypost.atlassian.net/browse/PYPOST-861
+[PYPOST-872]: https://pypost.atlassian.net/browse/PYPOST-872
 
 | Area | What is checked |
 | ---- | ---------------- |
 | Marker lifecycle | `make venv` creates marker; `make clean` removes `.venv`; idempotent `venv` |
-| Dependency chain | `install` depends on marker only; `test-cov` depends on marker + `venv-test` + `venv-otel` |
-| Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `test`/`lint` |
+| Dependency chain | `install` depends on marker only; pytest targets depend on marker + `venv-test` + `venv-otel` |
+| Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `lint`; `make test` succeeds via `venv-test` |
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
 | Slow install smoke | `make install` with real `pyproject.toml` succeeds; marked `@pytest.mark.slow` |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
-| Agent e2e target | deps (`venv-otel`), help listing, recipe marker, selection smoke (861) |
+| Agent e2e target | deps (`venv-test` + `venv-otel`), help listing, recipe marker, selection smoke (861/872) |
 
 ### Python interpreter decoupling (PYPOST-718)
 

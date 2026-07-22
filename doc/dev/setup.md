@@ -230,9 +230,12 @@ Common targets:
 
 - `venv` is driven by `$(VENV_MARKER)` and is version-aware
   (`.venv/.initialized-<major.minor>`).
-- `run`, `test`, and `lint` depend on `$(VENV_MARKER)` only and do not trigger full `install`.
-- `test`, `test-slow`, and `test-cov` depend on `venv-otel` so OTel unit tests can import SDK
-  packages; run `make install` (or `pip install -e ".[dev,otel]"`) for application and test deps.
+- `run` and `lint` depend on `$(VENV_MARKER)` only and do not trigger
+  `venv-test` / `install` (run `make install` or `make venv-test` before lint).
+- `test`, `test-slow`, `test-cov`, and `test-agent-e2e` depend on
+  `venv-test` and `venv-otel` so pytest and OTel imports work from a bare
+  venv (PYPOST-872). Prefer `make install` once after clone for a single
+  `[dev,otel]` editable install (CI does the same).
 
 ### Unit tests (pytest)
 
