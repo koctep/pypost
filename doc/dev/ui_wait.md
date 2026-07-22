@@ -13,7 +13,9 @@ tests or harnesses that already use [AgentAppSession](agent_lifecycle.md),
 [UI action tools](ui_actions.md), and [UI state snapshot](ui_snapshot.md).
 
 Production code must **not** import `tests.helpers`. The historic test helper
-`tests.helpers.qt_wait.wait_until` re-exports the production poll loop.
+`tests.helpers.qt_wait.wait_until` re-exports the production poll loop
+(PYPOST-837 / PYPOST-840). Regression locks live in
+`tests/test_wait_until_dedup_lock.py`.
 
 ## Architecture
 

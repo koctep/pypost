@@ -141,7 +141,8 @@ module-local `setUpClass` `QApplication` or a duplicate local `def qapp()`
 
 For bounded event-loop polling (e.g. waiting for Qt signals while a background server starts),
 use `wait_until` from `tests/helpers/qt_wait.py` (re-exports
-`pypost.agent.ui_wait.wait_until`; PYPOST-727 / PYPOST-837). Agent settle helpers
+`pypost.agent.ui_wait.wait_until`; PYPOST-727 / PYPOST-837 / PYPOST-840). Agent
+settle helpers
 (`wait_for_widget` / `enabled` / `text` / `snapshot`) live in
 [ui_wait.md](ui_wait.md). For TCP listen readiness, use
 `wait_for_port` from `tests/helpers/mcp_live_server.py`.
