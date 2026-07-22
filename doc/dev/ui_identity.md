@@ -22,7 +22,8 @@ sole automation identity.
 | Key UI constructors | Call `set_widget_id` once when widgets are created |
 | `AgentAppSession` | Ensures UI ready before agents look up widgets |
 | Spot-check | `tests/test_ui_identity_spotcheck.py` under `make test`
-  (includes theme/`apply_settings` identity lock — PYPOST-844) |
+  (includes theme/`apply_settings` identity lock — PYPOST-844; multi-tab role
+  ids — PYPOST-846) |
 
 ```mermaid
 flowchart LR

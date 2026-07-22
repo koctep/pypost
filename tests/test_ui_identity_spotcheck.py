@@ -133,6 +133,33 @@ def test_theme_apply_keeps_key_object_names(
     _assert_key_identities(window)
 
 
+def test_second_request_tab_exposes_role_object_names(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """Multi-tab: role ids exist on a newly added request tab (PYPOST-846)."""
+    window = agent_e2e_session.window
+    assert window.is_ui_ready is True
+    window.tabs.add_new_tab(save_state=False)
+    qapp.processEvents()
+
+    tabs = window.findChild(QTabWidget, REQUEST_TABS)
+    assert tabs is not None
+    second = tabs.currentWidget()
+    assert isinstance(second, RequestTab)
+
+    for expected, cls in (
+        (METHOD_COMBO, QComboBox),
+        (URL_INPUT, QWidget),
+        (SEND_BUTTON, QPushButton),
+        (REQUEST_BODY_EDIT, CodeEditor),
+        (RESPONSE_PANEL, ResponseView),
+    ):
+        widget = second.findChild(cls, expected)
+        assert widget is not None, expected
+        _assert_id(widget, expected)
+
+
 def test_widget_ids_are_locale_independent_literals() -> None:
     """FR9: key ids are fixed ASCII constants, not derived from UI text."""
     from pypost.ui import widget_ids
