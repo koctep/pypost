@@ -182,6 +182,22 @@ def test_session_wait_for_enabled_send_path(
     )
 
 
+def test_wait_for_text_fast_fails_without_text_api(qapp: QApplication) -> None:
+    """PYPOST-852: no-text-API widgets fail immediately (no full timeout)."""
+    root = _make_root(qapp)
+    try:
+        plain = QWidget()
+        set_widget_id(plain, "fixture_no_text")
+        root.layout().addWidget(plain)
+        qapp.processEvents()
+        with pytest.raises(UiWaitTimeoutError) as exc_info:
+            wait_for_text(root, "fixture_no_text", "anything", timeout=5.0)
+        assert exc_info.value.condition == "no_text_api"
+        assert exc_info.value.timeout_s == 0.0
+    finally:
+        root.close()
+
+
 def _snapshot_has_name(node: dict, name: str) -> bool:
     if node.get("name") == name:
         return True

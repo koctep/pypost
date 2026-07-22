@@ -71,12 +71,15 @@ Until the widget exists, is visible, and is enabled.
 ### `wait_for_text(root, widget_id, expected, *, timeout=…) -> QWidget`
 
 Until text equals `expected` (string) or `expected(text)` is true. Supports
-line/combo/label/button/plain/text edits.
+line/combo/label/button/plain/text edits. If the widget exists but has **no
+text API**, fails immediately with `UiWaitTimeoutError`
+(`condition=no_text_api`) instead of waiting out the timeout (PYPOST-852).
 
 ### `wait_for_snapshot(root, predicate, *, timeout=…) -> dict`
 
-Until `predicate(capture_ui_snapshot(root))` is true. Prefer widget/text waits
-when they suffice — snapshot polls are heavier.
+Until `predicate(capture_ui_snapshot(root))` is true. **Prefer
+`wait_for_widget` / `wait_for_text` / `wait_for_enabled` on hot paths** —
+snapshot polls re-walk the full visible tree each interval (PYPOST-852).
 
 ### Session helpers
 

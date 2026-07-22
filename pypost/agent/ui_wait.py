@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.agent.ui_actions import UiTargetNotFoundError, find_widget
-from pypost.agent.ui_snapshot import capture_ui_snapshot
+from pypost.agent.ui_snapshot import capture_ui_snapshot, count_snapshot_nodes
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +265,18 @@ def wait_for_text(
         text = _widget_text(widget)
         last_text[0] = text
         if text is None:
-            return False
+            # Fast-fail: widget exists but has no text API (PYPOST-852).
+            raise UiWaitTimeoutError(
+                f"widget has no text API: widget_id={widget_id!r} "
+                f"type={type(widget).__name__}",
+                timeout_s=0.0,
+                condition="no_text_api",
+                diagnostics={
+                    "widget_id": widget_id,
+                    "widget_type": type(widget).__name__,
+                    "found": True,
+                },
+            )
         return _matches(text)
 
     def _diag() -> dict[str, object]:
@@ -310,16 +321,6 @@ def wait_for_snapshot(
     """
     last: list[dict[str, Any] | None] = [None]
 
-    def _count(node: dict[str, Any]) -> tuple[int, int]:
-        named = 1 if node.get("name") else 0
-        total = 1
-        for child in node.get("children") or []:
-            if isinstance(child, dict):
-                c_total, c_named = _count(child)
-                total += c_total
-                named += c_named
-        return total, named
-
     def _ready() -> bool:
         snap = capture_ui_snapshot(root)
         last[0] = snap
@@ -329,7 +330,7 @@ def wait_for_snapshot(
         snap = last[0]
         if snap is None:
             return {"has_snapshot": False}
-        node_count, named_count = _count(snap)
+        node_count, named_count = count_snapshot_nodes(snap)
         return {
             "has_snapshot": True,
             "node_count": node_count,

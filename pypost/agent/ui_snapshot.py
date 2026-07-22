@@ -67,7 +67,7 @@ def capture_ui_snapshot(window: QWidget) -> dict[str, Any]:
             "value": None,
             "children": [],
         }
-    node_count, named_count = _count_nodes(node)
+    node_count, named_count = count_snapshot_nodes(node)
     duration_ms = int((time.monotonic() - started) * 1000)
     # Scalars only — never log tree, values, env_vars, or hidden_keys.
     logger.debug(
@@ -79,15 +79,21 @@ def capture_ui_snapshot(window: QWidget) -> dict[str, Any]:
     return node
 
 
-def _count_nodes(node: dict[str, Any]) -> tuple[int, int]:
-    """Return ``(total_nodes, named_nodes)`` for a snapshot tree."""
+def count_snapshot_nodes(node: dict[str, Any]) -> tuple[int, int]:
+    """Return ``(total_nodes, named_nodes)`` for a snapshot tree (PYPOST-852)."""
     total = 1
     named = 1 if node.get("name") else 0
     for child in node.get("children") or []:
-        child_total, child_named = _count_nodes(child)
-        total += child_total
-        named += child_named
+        if isinstance(child, dict):
+            child_total, child_named = count_snapshot_nodes(child)
+            total += child_total
+            named += child_named
     return total, named
+
+
+def _count_nodes(node: dict[str, Any]) -> tuple[int, int]:
+    """Private alias kept for in-module call sites."""
+    return count_snapshot_nodes(node)
 
 
 def _active_env_context(window: QWidget) -> tuple[dict[str, str], set[str]]:

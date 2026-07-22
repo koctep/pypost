@@ -15,6 +15,7 @@ from pypost.agent.ui_snapshot import (
     UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP,
     UI_SNAPSHOT_MAX_VALUE_LENGTH,
     capture_ui_snapshot,
+    count_snapshot_nodes,
 )
 from pypost.agent.ui_wait import (
     DEFAULT_UI_WAIT_INTERVAL_S,
@@ -38,6 +39,7 @@ __all__ = [
     "UiTargetNotInteractableError",
     "UiWaitTimeoutError",
     "capture_ui_snapshot",
+    "count_snapshot_nodes",
     "find_widget",
     "ui_click",
     "ui_fill",
