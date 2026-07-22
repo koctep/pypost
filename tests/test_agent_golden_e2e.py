@@ -22,6 +22,7 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
+from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
 from tests.helpers.agent_e2e_response_panel import (
     joined_panel_values,
     response_panel_excerpt,
@@ -42,8 +43,6 @@ FIXTURE_BODY_IN_SNAPSHOT = json.dumps(
     json.loads(FIXTURE_BODY), ensure_ascii=False
 )
 FIXTURE_STATUS_LABEL = f"Status: {FIXTURE_STATUS}"
-
-_SEND_SETTLE_TIMEOUT_S = 15.0
 
 
 def _response_ready(snap: dict[str, Any]) -> bool:
@@ -89,7 +88,7 @@ def test_agent_golden_request_response_flow(
         try:
             snap = session.wait_for_snapshot(
                 _response_ready,
-                timeout=_SEND_SETTLE_TIMEOUT_S,
+                timeout=SEND_SETTLE_TIMEOUT_S,
             )
         except UiWaitTimeoutError as exc:
             last = session.ui_snapshot()
