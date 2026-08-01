@@ -30,7 +30,7 @@ Source debt: [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852) TD-1
 | `SETTINGS_BUTTON` | Stable open control ([ui_identity](ui_identity.md)) |
 | `session.ui_click` | Drives `MainWindow.open_settings` → `exec()` |
 | `session.wait_until` | Bounded poll ([ui_wait](ui_wait.md)) |
-| `QApplication.activeModalWidget()` | Presence signal (title + `SettingsDialog`) |
+| `QApplication.activeModalWidget()` | Presence signal (`objectName == SETTINGS_DIALOG`) |
 | `QTimer.singleShot` | Runs wait + `reject()` inside nested `exec()` |
 | `UiWaitTimeoutError` | Rewrap with `step=wait_dialog_after_settings_open` |
 
@@ -58,8 +58,9 @@ on an undismissed modal ([gui_testing](gui_testing.md)).
 
 - Snapshot walks the **main window** tree; the modal is not a reliable child
   for that root.
-- `SettingsDialog` has no `objectName` today — presence is
-  `activeModalWidget` + title/`isinstance`, not `wait_for_widget`.
+- `SettingsDialog` exposes `SETTINGS_DIALOG` (`pypost_settings_dialog`) via
+  `set_widget_id` — presence uses `activeModalWidget().objectName()`, not
+  `wait_for_widget`.
 - Prefer typed / simple waits over full-tree snapshot polls on hot paths
   ([ui_wait](ui_wait.md), PYPOST-852).
 
@@ -149,8 +150,7 @@ Public surfaces consumed: `AgentAppSession` / `ui_click` / `wait_until`,
 `_settings_dialog_present()` requires:
 
 1. `QApplication.activeModalWidget()` is not `None`
-2. `windowTitle() == "Settings"`
-3. `isinstance(modal, SettingsDialog)`
+2. `modal.objectName() == SETTINGS_DIALOG` (see [ui_identity](ui_identity.md))
 
 ## Configuration
 
@@ -176,8 +176,9 @@ No extra environment variables. Prefer `make test-agent-e2e` for
 | | **before** the click. |
 | Dialog settle `UiWaitTimeoutError` | Look for |
 | | `step=wait_dialog_after_settings_open`. Check |
-| | `dialog_title` / `active_modal_type` on |
-| | `err.diagnostics`; confirm title `"Settings"`. |
+| | `dialog_title` / `dialog_object_name` / `active_modal_type` on |
+| | `err.diagnostics`; confirm `dialog_object_name` is |
+| | `pypost_settings_dialog`. |
 | `UiTargetNotFoundError` on Settings | Confirm `SETTINGS_BUTTON` and `is_ui_ready` |
 | | ([ui_identity](ui_identity.md)). |
 | Undismissed modal hangs teardown | Ensure `reject()`/`close()` in `finally` |

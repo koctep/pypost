@@ -29,6 +29,7 @@ ENV_BAR = "pypost_env_bar"
 ENV_SELECTOR = "pypost_env_selector"
 ENV_MANAGE_BUTTON = "pypost_env_manage_button"
 SETTINGS_BUTTON = "pypost_settings_button"
+SETTINGS_DIALOG = "pypost_settings_dialog"
 PLUS_TAB_PLACEHOLDER = "pypost_plus_tab_placeholder"
 PLUS_TAB_BUTTON = "pypost_plus_tab_button"
 

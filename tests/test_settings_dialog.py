@@ -17,6 +17,22 @@ from pypost.ui.dialogs.settings_dialog import (
     WEBHOOK_AUTH_NEW_PLACEHOLDER,
     _resolve_webhook_auth_header,
 )
+from pypost.ui.widget_ids import SETTINGS_DIALOG
+
+
+class TestSettingsDialogWidgetIdentity:
+    def test_settings_dialog_has_stable_widget_id(self, qapp):
+        """PYPOST-935: SettingsDialog exposes canonical SETTINGS_DIALOG identity."""
+        dlg = SettingsDialog(AppSettings())
+        try:
+            assert dlg.objectName() == SETTINGS_DIALOG
+            assert SETTINGS_DIALOG.startswith("pypost_")
+            setter = getattr(dlg, "accessibleIdentifier", None)
+            if callable(setter):
+                assert dlg.accessibleIdentifier() == SETTINGS_DIALOG
+        finally:
+            dlg.close()
+
 
 class TestSettingsDialogRequestTimeout:
     def test_request_timeout_spin_is_on_form_layout(self, qapp):

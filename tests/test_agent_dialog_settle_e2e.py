@@ -13,8 +13,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from pypost.agent import AgentAppSession, UiWaitTimeoutError, find_widget
-from pypost.ui.dialogs.settings_dialog import SettingsDialog
-from pypost.ui.widget_ids import SETTINGS_BUTTON
+from pypost.ui.widget_ids import SETTINGS_BUTTON, SETTINGS_DIALOG
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -30,15 +29,14 @@ def _settings_dialog_present() -> bool:
     modal = QApplication.activeModalWidget()
     if modal is None:
         return False
-    if modal.windowTitle() != "Settings":
-        return False
-    return isinstance(modal, SettingsDialog)
+    return modal.objectName() == SETTINGS_DIALOG
 
 
 def _modal_diag() -> dict[str, object]:
     modal = QApplication.activeModalWidget()
     return {
         "dialog_title": modal.windowTitle() if modal is not None else None,
+        "dialog_object_name": modal.objectName() if modal is not None else None,
         "active_modal_type": type(modal).__name__ if modal is not None else None,
     }
 
@@ -139,4 +137,5 @@ def test_agent_dialog_settle_timeout_includes_step_and_modal_diag(
     diagnostics = settle_error[0].diagnostics
     assert diagnostics.get("step") == SETTLE_STEP
     assert "dialog_title" in diagnostics
+    assert "dialog_object_name" in diagnostics
     assert "active_modal_type" in diagnostics

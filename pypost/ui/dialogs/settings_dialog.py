@@ -41,6 +41,7 @@ from pypost.ui.widgets.settings.security_alert_section import (  # noqa: F401
     WEBHOOK_AUTH_NEW_PLACEHOLDER,
     _resolve_webhook_auth_header,
 )
+from pypost.ui.widget_ids import SETTINGS_DIALOG, set_widget_id
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ class SettingsDialog(QDialog):
         migration_service: EncryptionMigrationService | None = None,
     ):
         super().__init__(parent)
+        set_widget_id(self, SETTINGS_DIALOG)
         self.setWindowTitle("Settings")
         self.resize(400, 400)
         self.current_settings = current_settings
