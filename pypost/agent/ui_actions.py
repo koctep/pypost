@@ -11,13 +11,15 @@ import logging
 import time
 from typing import Final
 
-from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtCore import QCoreApplication, QModelIndex, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QComboBox,
     QLineEdit,
+    QListWidget,
     QPlainTextEdit,
     QTextEdit,
+    QTreeView,
     QWidget,
 )
 
@@ -144,16 +146,15 @@ def ui_fill(root: QWidget, widget_id: str, text: str) -> None:
     )
 
 
-def ui_select(root: QWidget, widget_id: str, option: str) -> None:
-    """Select ``option`` (display text) on a named combo box."""
-    started = time.monotonic()
-    widget = find_widget(root, widget_id)
-    _require_interactable(widget, widget_id)
-    if not isinstance(widget, QComboBox):
-        raise UiTargetNotInteractableError(
-            widget_id,
-            f"not a combo box (type={type(widget).__name__})",
-        )
+def _select_combo(widget: QComboBox, widget_id: str, option: str | int) -> None:
+    if isinstance(option, int):
+        if option < 0 or option >= widget.count():
+            raise UiTargetNotInteractableError(
+                widget_id,
+                f"option index out of range: {option!r}",
+            )
+        widget.setCurrentIndex(option)
+        return
     index = widget.findText(option)
     if index < 0:
         raise UiTargetNotInteractableError(
@@ -161,6 +162,98 @@ def ui_select(root: QWidget, widget_id: str, option: str) -> None:
             f"option not found: {option!r}",
         )
     widget.setCurrentIndex(index)
+
+
+def _select_list(widget: QListWidget, widget_id: str, option: str | int) -> None:
+    if isinstance(option, int):
+        if option < 0 or option >= widget.count():
+            raise UiTargetNotInteractableError(
+                widget_id,
+                f"option index out of range: {option!r}",
+            )
+        widget.setCurrentRow(option)
+        return
+    matches = widget.findItems(option, Qt.MatchFlag.MatchExactly)
+    if not matches:
+        raise UiTargetNotInteractableError(
+            widget_id,
+            f"option not found: {option!r}",
+        )
+    widget.setCurrentItem(matches[0])
+
+
+def _find_tree_index_by_text(tree: QTreeView, text: str) -> QModelIndex | None:
+    model = tree.model()
+    if model is None:
+        return None
+
+    def _walk(parent: QModelIndex) -> QModelIndex | None:
+        rows = model.rowCount(parent)
+        for row in range(rows):
+            index = model.index(row, 0, parent)
+            if not index.isValid():
+                continue
+            if str(index.data(Qt.ItemDataRole.DisplayRole)) == text:
+                return index
+            found = _walk(index)
+            if found is not None:
+                return found
+        return None
+
+    return _walk(QModelIndex())
+
+
+def _select_tree(widget: QTreeView, widget_id: str, option: str | int) -> None:
+    model = widget.model()
+    if model is None:
+        raise UiTargetNotInteractableError(widget_id, "tree has no model")
+    if isinstance(option, int):
+        if option < 0 or option >= model.rowCount():
+            raise UiTargetNotInteractableError(
+                widget_id,
+                f"option index out of range: {option!r}",
+            )
+        index = model.index(option, 0)
+        if not index.isValid():
+            raise UiTargetNotInteractableError(
+                widget_id,
+                f"option index out of range: {option!r}",
+            )
+        widget.setCurrentIndex(index)
+        return
+    index = _find_tree_index_by_text(widget, option)
+    if index is None or not index.isValid():
+        raise UiTargetNotInteractableError(
+            widget_id,
+            f"option not found: {option!r}",
+        )
+    parent = index.parent()
+    if parent.isValid() and not widget.isExpanded(parent):
+        widget.expand(parent)
+        _pump()
+    widget.setCurrentIndex(index)
+
+
+def ui_select(root: QWidget, widget_id: str, option: str | int) -> None:
+    """Select ``option`` by display text (str) or index (int).
+
+    Supports ``QComboBox``, ``QListWidget``, and ``QTreeView``. For trees, an
+    integer selects a top-level row; nested rows are selected by display text.
+    """
+    started = time.monotonic()
+    widget = find_widget(root, widget_id)
+    _require_interactable(widget, widget_id)
+    if isinstance(widget, QComboBox):
+        _select_combo(widget, widget_id, option)
+    elif isinstance(widget, QListWidget):
+        _select_list(widget, widget_id, option)
+    elif isinstance(widget, QTreeView):
+        _select_tree(widget, widget_id, option)
+    else:
+        raise UiTargetNotInteractableError(
+            widget_id,
+            f"not a selectable list/combo/tree (type={type(widget).__name__})",
+        )
     _pump()
     duration_ms = int((time.monotonic() - started) * 1000)
     logger.debug(

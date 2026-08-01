@@ -298,11 +298,11 @@ class AgentAppSession:
     def ui_select(
         self,
         widget_id: str,
-        option: str,
+        option: str | int,
         *,
         in_current_tab: bool = False,
     ) -> None:
-        """Select an option by display text on a named combo box."""
+        """Select by display text or index on a named combo, list, or tree."""
         ui_select(
             self._action_root(in_current_tab=in_current_tab),
             widget_id,

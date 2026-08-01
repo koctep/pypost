@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QHBoxLayout,
     QLineEdit,
+    QListWidget,
     QPushButton,
+    QTreeView,
     QWidget,
 )
 
@@ -33,6 +36,8 @@ pytestmark = [
 _BTN = "fixture_click_btn"
 _INPUT = "fixture_line_edit"
 _COMBO = "fixture_combo"
+_LIST = "fixture_list"
+_TREE = "fixture_tree"
 _DISABLED = "fixture_disabled_btn"
 
 
@@ -59,6 +64,11 @@ def _make_fixture(qapp: QApplication) -> tuple[QWidget, list[int]]:
     set_widget_id(combo, _COMBO)
     layout.addWidget(combo)
 
+    lst = QListWidget()
+    lst.addItems(["Alpha", "Beta", "Gamma"])
+    set_widget_id(lst, _LIST)
+    layout.addWidget(lst)
+
     disabled = QPushButton("Nope")
     disabled.setEnabled(False)
     set_widget_id(disabled, _DISABLED)
@@ -67,6 +77,32 @@ def _make_fixture(qapp: QApplication) -> tuple[QWidget, list[int]]:
     root.show()
     qapp.processEvents()
     return root, clicks
+
+
+def _make_tree_fixture(qapp: QApplication) -> QWidget:
+    """Isolated tree fixture — avoid QTreeView teardown in every combo/list test."""
+    root = QWidget()
+    layout = QHBoxLayout(root)
+    tree = QTreeView()
+    model = QStandardItemModel(tree)
+    parent = QStandardItem("Folder")
+    parent.appendRow(QStandardItem("Child"))
+    model.appendRow(parent)
+    model.appendRow(QStandardItem("Sibling"))
+    tree.setModel(model)
+    set_widget_id(tree, _TREE)
+    layout.addWidget(tree)
+    root.show()
+    qapp.processEvents()
+    return root
+
+
+def _close_tree_fixture(root: QWidget, qapp: QApplication) -> None:
+    tree = find_widget(root, _TREE)
+    if isinstance(tree, QTreeView):
+        tree.setModel(None)
+    root.close()
+    qapp.processEvents()
 
 
 def test_ui_click_on_fixture(qapp: QApplication) -> None:
@@ -97,6 +133,77 @@ def test_ui_select_on_fixture(qapp: QApplication) -> None:
         combo = find_widget(root, _COMBO)
         assert isinstance(combo, QComboBox)
         assert combo.currentText() == "POST"
+    finally:
+        root.close()
+
+
+def test_ui_select_list_by_text(qapp: QApplication) -> None:
+    """PYPOST-916: ui_select selects a QListWidget row by display text."""
+    root, _ = _make_fixture(qapp)
+    try:
+        ui_select(root, _LIST, "Beta")
+        lst = find_widget(root, _LIST)
+        assert isinstance(lst, QListWidget)
+        assert lst.currentItem() is not None
+        assert lst.currentItem().text() == "Beta"
+        assert lst.currentRow() == 1
+    finally:
+        root.close()
+
+
+def test_ui_select_list_by_index(qapp: QApplication) -> None:
+    """PYPOST-916: ui_select selects a QListWidget row by zero-based index."""
+    root, _ = _make_fixture(qapp)
+    try:
+        ui_select(root, _LIST, 0)
+        lst = find_widget(root, _LIST)
+        assert isinstance(lst, QListWidget)
+        assert lst.currentRow() == 0
+        assert lst.currentItem() is not None
+        assert lst.currentItem().text() == "Alpha"
+    finally:
+        root.close()
+
+
+def test_ui_select_tree_by_text(qapp: QApplication) -> None:
+    """PYPOST-916: ui_select selects a nested QTreeView row by display text."""
+    root = _make_tree_fixture(qapp)
+    try:
+        ui_select(root, _TREE, "Child")
+        tree = find_widget(root, _TREE)
+        assert isinstance(tree, QTreeView)
+        current = tree.currentIndex()
+        assert current.isValid()
+        assert current.data(Qt.ItemDataRole.DisplayRole) == "Child"
+    finally:
+        _close_tree_fixture(root, qapp)
+
+
+def test_ui_select_tree_by_index(qapp: QApplication) -> None:
+    """PYPOST-916: ui_select selects a top-level QTreeView row by index."""
+    root = _make_tree_fixture(qapp)
+    try:
+        ui_select(root, _TREE, 1)
+        tree = find_widget(root, _TREE)
+        assert isinstance(tree, QTreeView)
+        current = tree.currentIndex()
+        assert current.isValid()
+        assert current.data(Qt.ItemDataRole.DisplayRole) == "Sibling"
+        assert current.row() == 1
+        assert not current.parent().isValid()
+    finally:
+        _close_tree_fixture(root, qapp)
+
+
+def test_ui_select_combo_by_index(qapp: QApplication) -> None:
+    """PYPOST-916: ui_select selects a QComboBox item by zero-based index."""
+    root, _ = _make_fixture(qapp)
+    try:
+        ui_select(root, _COMBO, 2)
+        combo = find_widget(root, _COMBO)
+        assert isinstance(combo, QComboBox)
+        assert combo.currentIndex() == 2
+        assert combo.currentText() == "PUT"
     finally:
         root.close()
 

@@ -200,7 +200,9 @@ No product settings or env vars gate the seed writer. Logging follows
   snapshot may assert current combo / URL / method values.
 - **Tree row click** — Rows are not widgets; use
   `tests/helpers/agent_e2e_tree.click_tree_row_by_text` (or expand then
-  click) rather than `ui_click(COLLECTION_TREE)`.
+  click) rather than `ui_click(COLLECTION_TREE)`. To set current selection
+  only (without viewport click), use `session.ui_select(COLLECTION_TREE, …)`
+  (PYPOST-916).
 - **Persist / disk errors** — Grep `agent_e2e_seed_failed` (and
   `storage_*`); exception is re-raised. Covered by
   `test_write_agent_e2e_seed_logs_failure_and_reraises`.
