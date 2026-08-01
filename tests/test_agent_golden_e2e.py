@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 
 import pytest
 
@@ -18,16 +17,13 @@ from pypost.fixtures.agent_e2e_http import (
 )
 from pypost.ui.widget_ids import (
     METHOD_COMBO,
-    RESPONSE_PANEL,
+    RESPONSE_BODY,
+    RESPONSE_STATUS,
     SEND_BUTTON,
     URL_INPUT,
 )
 from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
-from tests.helpers.agent_e2e_response_panel import (
-    joined_panel_values,
-    response_panel_excerpt,
-    subtree_by_name,
-)
+from tests.helpers.agent_e2e_response_panel import response_panel_excerpt
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -38,42 +34,15 @@ FIXTURE_URL = GOLDEN_URL
 FIXTURE_METHOD = GOLDEN_METHOD
 FIXTURE_STATUS = GOLDEN_STATUS
 FIXTURE_BODY = GOLDEN_BODY
-# Snapshot sanitize_text re-dumps JSON without indent; assert that form.
-FIXTURE_BODY_IN_SNAPSHOT = json.dumps(
-    json.loads(FIXTURE_BODY), ensure_ascii=False
-)
+# Display form matches ResponseView.display_response default indent_size=2.
+FIXTURE_BODY_DISPLAY = json.dumps(json.loads(FIXTURE_BODY), indent=2)
 FIXTURE_STATUS_LABEL = f"Status: {FIXTURE_STATUS}"
-
-
-def _response_ready(snap: dict[str, Any]) -> bool:
-    joined = joined_panel_values(snap)
-    return (
-        FIXTURE_STATUS_LABEL in joined
-        and FIXTURE_BODY_IN_SNAPSHOT in joined
-    )
-
-
-def _assert_response_ui(snap: dict[str, Any]) -> None:
-    panel = subtree_by_name(snap, RESPONSE_PANEL)
-    excerpt = response_panel_excerpt(snap)
-    assert panel is not None, (
-        f"RESPONSE_PANEL missing after Send; excerpt={excerpt!r}"
-    )
-    joined = joined_panel_values(snap)
-    assert FIXTURE_STATUS_LABEL in joined, (
-        f"expected {FIXTURE_STATUS_LABEL!r} in response UI; "
-        f"excerpt={excerpt!r}"
-    )
-    assert FIXTURE_BODY_IN_SNAPSHOT in joined, (
-        f"expected body {FIXTURE_BODY_IN_SNAPSHOT!r} in response UI; "
-        f"excerpt={excerpt!r}"
-    )
 
 
 def test_agent_golden_request_response_flow(
     agent_e2e_session: AgentAppSession,
 ) -> None:
-    """Compose lifecycle + identity + actions + wait + snapshot for Send → 200."""
+    """Compose lifecycle + identity + actions + text wait for Send → 200."""
     session = agent_e2e_session
     assert session.window.is_ui_ready is True
     find_widget(session.window, URL_INPUT)
@@ -86,8 +55,14 @@ def test_agent_golden_request_response_flow(
     with stub_agent_e2e_http(CANNED_GOLDEN_OK):
         session.ui_click(SEND_BUTTON)
         try:
-            snap = session.wait_for_snapshot(
-                _response_ready,
+            session.wait_for_text(
+                RESPONSE_STATUS,
+                FIXTURE_STATUS_LABEL,
+                timeout=SEND_SETTLE_TIMEOUT_S,
+            )
+            session.wait_for_text(
+                RESPONSE_BODY,
+                FIXTURE_BODY_DISPLAY,
                 timeout=SEND_SETTLE_TIMEOUT_S,
             )
         except UiWaitTimeoutError as exc:
@@ -105,7 +80,6 @@ def test_agent_golden_request_response_flow(
                 },
             ) from exc
 
-    _assert_response_ui(snap)
     assert CANNED_GOLDEN_OK.response.status_code == FIXTURE_STATUS
 
 

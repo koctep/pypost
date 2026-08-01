@@ -7,8 +7,9 @@ One intentional golden product flow proves that the agent UI stack composes:
 lifecycle → identity → actions → wait → snapshot → assert.
 
 The scenario opens a blank request tab, sets URL and method, sends a request
-with a **shared** HTTP canned 200 (PYPOST-859), and asserts the response panel
-shows the expected status and body.
+with a **shared** HTTP canned 200 (PYPOST-859), and settles with
+`wait_for_text` on `RESPONSE_STATUS` / `RESPONSE_BODY` (display-form body;
+PYPOST-920).
 
 The golden scenario **is** a documented pytest
 (`tests/test_agent_golden_e2e.py`) that imports the same `pypost.agent` APIs
@@ -26,8 +27,8 @@ this Send → response golden. Full pattern (timer-before-`exec`,
 `activeModalWidget`, diagnostics):
 [agent_dialog_settle.md](agent_dialog_settle.md).
 
-Golden asserts status + body **presence** (`in joined`). For the PYPOST-887
-**exactly-once** cardinality lock (PUT + malformed body), see
+Golden asserts status + body via identity-scoped text waits. For the
+PYPOST-887 **exactly-once** cardinality lock (PUT + malformed body), see
 [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md) — do
 not overload this module.
 
@@ -39,8 +40,8 @@ not overload this module.
 | `AgentAppSession` / `agent_e2e_session` | Launch → ready → shutdown (858) |
 | `pypost.ui.widget_ids` | Stable control ids (PYPOST-834) |
 | `ui_fill` / `ui_select` / `ui_click` | Drive URL / method / Send (PYPOST-836) |
-| `wait_for_snapshot` | Settle after Send (PYPOST-837) |
-| `ui_snapshot` / panel excerpt | Observe + diagnosable failure (PYPOST-835) |
+| `wait_for_text` | Settle after Send on status/body ids (PYPOST-920) |
+| Panel excerpt | Timeout diagnostics from `RESPONSE_PANEL` (PYPOST-835/869) |
 | `stub_agent_e2e_http(CANNED_GOLDEN_OK)` | Deterministic OK (PYPOST-859) |
 
 ```mermaid
@@ -48,8 +49,8 @@ flowchart LR
   Session[agent_e2e_session] --> Fill[ui_fill / ui_select]
   Fill --> Mock[stub_agent_e2e_http]
   Mock --> Send[ui_click SEND]
-  Send --> Wait[wait_for_snapshot]
-  Wait --> Assert[status + body]
+  Send --> Wait[wait_for_text status/body]
+  Wait --> Assert[canned status]
 ```
 
 Composition at a glance:
@@ -57,15 +58,20 @@ Composition at a glance:
 | Capability | API used |
 | --- | --- |
 | Lifecycle | `agent_e2e_session` (blank) |
-| Identity | `URL_INPUT`, `METHOD_COMBO`, `SEND_BUTTON`, `RESPONSE_PANEL` |
+| Identity | `URL_INPUT`, `METHOD_COMBO`, `SEND_BUTTON`, |
+| | `RESPONSE_STATUS`, `RESPONSE_BODY` |
 | Actions | `session.ui_fill` / `ui_select` / `ui_click` |
-| Wait | `session.wait_for_snapshot` after Send |
-| Snapshot | Predicate + failure excerpt from `RESPONSE_PANEL` |
+| Wait | `session.wait_for_text` on status then body after Send |
+| Snapshot | Failure excerpt only (`response_panel_excerpt`) |
 | HTTP | `stub_agent_e2e_http(CANNED_GOLDEN_OK)` |
 
 Fresh agent sessions restore one blank request tab — no plus-tab click is
-required. Status and body widgets under `ResponseView` have no dedicated
-`objectName`s; snapshot still captures their values under `RESPONSE_PANEL`.
+required. Status and body surfaces under `ResponseView` have dedicated
+ids (`RESPONSE_STATUS`, `RESPONSE_BODY`; PYPOST-920). Golden settles with
+`wait_for_text` on those widgets (display-form body text), not a
+sanitize-coupled `wait_for_snapshot` predicate. Sibling Send scenarios may
+still walk the panel snapshot — see
+[response-panel helpers](agent_e2e_response_panel.md).
 
 ## API / Usage
 
@@ -91,7 +97,8 @@ make test
 ```
 
 Module timeout is 60s (`pytest.mark.timeout(60)`). Send settle uses a 15s
-`wait_for_snapshot` budget; lifecycle ready uses `ready_timeout=30.0`.
+`wait_for_text` budget per status/body wait; lifecycle ready uses
+`ready_timeout=30.0`.
 
 ### Scenario steps
 
@@ -99,8 +106,9 @@ Module timeout is 60s (`pytest.mark.timeout(60)`). Send settle uses a 15s
 2. Pre-flight: `find_widget` for `URL_INPUT`, `METHOD_COMBO`, `SEND_BUTTON`.
 3. `ui_fill(URL_INPUT, GOLDEN_URL)` and `ui_select(METHOD_COMBO, GOLDEN_METHOD)`.
 4. `with stub_agent_e2e_http(CANNED_GOLDEN_OK):` then `ui_click(SEND_BUTTON)`.
-5. `wait_for_snapshot` until response panel shows expected status and body.
-6. Assert final snapshot; on wait timeout, rewrap with `response_excerpt`.
+5. `wait_for_text(RESPONSE_STATUS, FIXTURE_STATUS_LABEL)`.
+6. `wait_for_text(RESPONSE_BODY, FIXTURE_BODY_DISPLAY)` (pretty-printed JSON).
+7. On wait timeout, rewrap with `response_excerpt` from the panel snapshot.
 
 ### Public APIs consumed (do not redefine)
 
@@ -112,7 +120,8 @@ from pypost.fixtures.agent_e2e_http import (
 )
 from pypost.ui.widget_ids import (
     METHOD_COMBO,
-    RESPONSE_PANEL,
+    RESPONSE_BODY,
+    RESPONSE_STATUS,
     SEND_BUTTON,
     URL_INPUT,
 )
@@ -122,14 +131,16 @@ session.ui_fill(URL_INPUT, FIXTURE_URL)
 session.ui_select(METHOD_COMBO, FIXTURE_METHOD)
 with stub_agent_e2e_http(CANNED_GOLDEN_OK):
     session.ui_click(SEND_BUTTON)
-    snap = session.wait_for_snapshot(predicate, timeout=15.0)
+    session.wait_for_text(RESPONSE_STATUS, FIXTURE_STATUS_LABEL, timeout=15.0)
+    session.wait_for_text(RESPONSE_BODY, FIXTURE_BODY_DISPLAY, timeout=15.0)
 ```
 
-Scenario helpers `_response_ready` and `_assert_response_ui` are
-**test-local** in `tests/test_agent_golden_e2e.py` (expected status/body
-tokens). Snapshot walk / subtree / excerpt / join come from shared
+Expected status/body tokens are **test-local** in
+`tests/test_agent_golden_e2e.py`. Timeout diagnostics still use
+`response_panel_excerpt` from shared
 [response-panel helpers](agent_e2e_response_panel.md)
 (`tests/helpers/agent_e2e_response_panel.py`) — not a production agent API.
+Sibling locks/matrix scenarios may still settle via panel snapshot helpers.
 
 ## Configuration
 
@@ -144,7 +155,8 @@ as `FIXTURE_*` aliases in the golden test for readability:
 | `GOLDEN_METHOD` / `FIXTURE_METHOD` | `GET` |
 | `GOLDEN_STATUS` / `FIXTURE_STATUS` | `200` |
 | `GOLDEN_BODY` / `FIXTURE_BODY` | `{"ok": true}` (mock / widget source) |
-| `FIXTURE_BODY_IN_SNAPSHOT` | `{"ok": true}` (compact; what asserts match) |
+| `FIXTURE_BODY_DISPLAY` | Pretty-printed JSON (`indent=2`; matches |
+| | `ResponseView.display_response`) |
 | `FIXTURE_STATUS_LABEL` | `Status: 200` |
 
 HTTP is stubbed via the shared layer at
@@ -154,12 +166,15 @@ HTTP is stubbed via the shared layer at
 `patch(...)` as the primary path — see
 [agent_e2e_http.md](agent_e2e_http.md) (how to add canned responses).
 
-### Snapshot body form
+### Body text form (display vs snapshot)
 
-`ResponseView` pretty-prints JSON in the widget, but snapshot values pass through
-`sanitize_text`, which re-dumps parseable JSON without indentation. Golden
-assertions match the **snapshot-visible** body (`FIXTURE_BODY_IN_SNAPSHOT`), not
-the pretty-printed `QTextEdit` text.
+`ResponseView` pretty-prints JSON in the body widget (`indent_size=2` by
+default). Golden `wait_for_text` matches that **display** form
+(`FIXTURE_BODY_DISPLAY`), not the compact JSON that `sanitize_text` produces
+in snapshot values. Sibling scenarios that still join panel snapshot values
+must keep matching the sanitize/compact shape — see
+[ui_snapshot.md](ui_snapshot.md) and
+[response-panel helpers](agent_e2e_response_panel.md).
 
 ### Timeouts
 
@@ -167,7 +182,7 @@ the pretty-printed `QTextEdit` text.
 | --- | --- | --- |
 | Module pytest timeout | 60s | `pytestmark` |
 | Lifecycle ready | 30s | `AgentAppSession(ready_timeout=…)` |
-| Send settle | 15s | `wait_for_snapshot(timeout=…)` |
+| Send settle | 15s | `wait_for_text(timeout=…)` per status/body |
 
 Offscreen is set by `make test-agent-e2e` / `make test` and by
 `AgentAppSession(offscreen=True)`.
@@ -179,8 +194,8 @@ Offscreen is set by `make test-agent-e2e` / `make test` and by
 | Wait timeout after Send | `UiWaitTimeoutError` with |
 | | `step=wait_response_after_send` and a short `response_excerpt`. |
 | | Grep `agent_e2e_http_stub_installed`; confirm shared stub wraps click. |
-| Wrong status/body | Assertion message includes expected value and response-panel |
-| | excerpt. Remember snapshot body is compact JSON, not pretty-print. |
+| Wrong status/body | Timeout / diagnostics include `response_excerpt`. Match |
+| | display-form body (`indent=2`), not compact snapshot JSON. |
 | Missing control | `UiTargetNotFoundError` / interactable errors from actions. |
 | | Confirm blank tab restore and `is_ui_ready`. |
 | Ready never happens | Lifecycle timeout / `agent_session_ready_timeout` (833). |

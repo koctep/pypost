@@ -23,6 +23,8 @@ SEND_BUTTON = "pypost_send_button"
 REQUEST_BODY_EDIT = "pypost_request_body_edit"
 REQUEST_DETAIL_TABS = "pypost_request_detail_tabs"
 RESPONSE_PANEL = "pypost_response_panel"
+RESPONSE_STATUS = "pypost_response_status"
+RESPONSE_BODY = "pypost_response_body"
 ENV_BAR = "pypost_env_bar"
 ENV_SELECTOR = "pypost_env_selector"
 ENV_MANAGE_BUTTON = "pypost_env_manage_button"
@@ -39,6 +41,8 @@ KEY_WIDGET_IDS = (
     REQUEST_BODY_EDIT,
     REQUEST_DETAIL_TABS,
     RESPONSE_PANEL,
+    RESPONSE_STATUS,
+    RESPONSE_BODY,
     ENV_BAR,
     ENV_SELECTOR,
     ENV_MANAGE_BUTTON,

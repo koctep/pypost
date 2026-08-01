@@ -226,7 +226,8 @@ harness table above. Catalog: [logging.md](logging.md).
 | Find / ids | `pypost.ui.widget_ids` + `find_widget` |
 | Drive UI | `session.ui_fill` / `ui_select` / `ui_click` / … |
 | Observe | `session.ui_snapshot()` |
-| Settle | `session.wait_for_snapshot` / `wait_until` / … |
+| Settle | `session.wait_for_text` / `wait_for_snapshot` / `wait_until` / … |
+| | (golden prefers text-wait on status/body — [golden](agent_golden_e2e.md)) |
 | Failure dump | Auto on fixture **or** direct-session assert fail — [failure artifacts](agent_e2e_failure_artifacts.md) |
 | Response-panel snapshot helpers | `tests.helpers.agent_e2e_response_panel` — [helpers doc](agent_e2e_response_panel.md) |
 
@@ -239,9 +240,12 @@ geometry. Details and catalog: [ui_identity.md](ui_identity.md).
 ### Golden scenario
 
 One intentional flow: blank request → set URL/method → Send (shared HTTP
-stub 200) → assert response panel status and body. Full steps:
+stub 200) → `wait_for_text` on `RESPONSE_STATUS` / `RESPONSE_BODY`
+(display-form body; PYPOST-920). Full steps:
 [agent_golden_e2e.md](agent_golden_e2e.md). Shared HTTP catalog:
-[agent_e2e_http.md](agent_e2e_http.md).
+[agent_e2e_http.md](agent_e2e_http.md). Panel snapshot helpers remain for
+sibling walks / excerpts:
+[agent_e2e_response_panel.md](agent_e2e_response_panel.md).
 
 ### Double-body regression lock
 

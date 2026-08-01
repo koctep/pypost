@@ -20,7 +20,12 @@ from PySide6.QtWidgets import (
 
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.models.response import ResponseData
-from pypost.ui.widget_ids import RESPONSE_PANEL, set_widget_id
+from pypost.ui.widget_ids import (
+    RESPONSE_BODY,
+    RESPONSE_PANEL,
+    RESPONSE_STATUS,
+    set_widget_id,
+)
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
 logger = logging.getLogger(__name__)
@@ -48,6 +53,7 @@ class ResponseView(QWidget):
         # Status Bar + Search (one row)
         self.status_layout = QHBoxLayout()
         self.status_label = QLabel("Status: -")
+        set_widget_id(self.status_label, RESPONSE_STATUS)
         self.time_label = QLabel("Time: -")
         self.size_label = QLabel("Size: -")
 
@@ -90,6 +96,7 @@ class ResponseView(QWidget):
 
         # Body View
         self.body_view = QTextEdit()
+        set_widget_id(self.body_view, RESPONSE_BODY)
         self.body_view.setReadOnly(True)
         self.body_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.body_view.customContextMenuRequested.connect(self.show_context_menu)

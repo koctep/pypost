@@ -77,6 +77,11 @@ line/combo/label/button/plain/text edits. If the widget exists but has **no
 text API**, fails immediately with `UiWaitTimeoutError`
 (`condition=no_text_api`) instead of waiting out the timeout (PYPOST-852).
 
+Golden Send → response settle prefers `wait_for_text` on
+`RESPONSE_STATUS` / `RESPONSE_BODY` (display-form body; PYPOST-920) over a
+panel-wide `wait_for_snapshot` predicate — see
+[agent_golden_e2e.md](agent_golden_e2e.md).
+
 ### `wait_for_snapshot(root, predicate, *, timeout=…) -> dict`
 
 Until `predicate(capture_ui_snapshot(root))` is true. **Prefer

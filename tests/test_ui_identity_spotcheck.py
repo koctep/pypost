@@ -7,8 +7,10 @@ from PySide6.QtCore import QObject
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QLabel,
     QPushButton,
     QTabWidget,
+    QTextEdit,
     QTreeView,
     QWidget,
 )
@@ -25,7 +27,9 @@ from pypost.ui.widget_ids import (
     REQUEST_BODY_EDIT,
     REQUEST_DETAIL_TABS,
     REQUEST_TABS,
+    RESPONSE_BODY,
     RESPONSE_PANEL,
+    RESPONSE_STATUS,
     SEND_BUTTON,
     SETTINGS_BUTTON,
     URL_INPUT,
@@ -106,6 +110,14 @@ def _assert_key_identities(window: QWidget) -> None:
     assert response is not None
     _assert_id(response, RESPONSE_PANEL)
 
+    status = response.findChild(QLabel, RESPONSE_STATUS)
+    assert status is not None
+    _assert_id(status, RESPONSE_STATUS)
+
+    response_body = response.findChild(QTextEdit, RESPONSE_BODY)
+    assert response_body is not None
+    _assert_id(response_body, RESPONSE_BODY)
+
     assert isinstance(current.request_editor, RequestWidget)
     assert current.request_editor.send_btn is send
     assert current.request_editor.body_edit is body
@@ -163,6 +175,15 @@ def test_second_request_tab_exposes_role_object_names(
         widget = second.findChild(cls, expected)
         assert widget is not None, expected
         _assert_id(widget, expected)
+
+    response = second.findChild(ResponseView, RESPONSE_PANEL)
+    assert response is not None
+    status = response.findChild(QLabel, RESPONSE_STATUS)
+    assert status is not None, RESPONSE_STATUS
+    _assert_id(status, RESPONSE_STATUS)
+    response_body = response.findChild(QTextEdit, RESPONSE_BODY)
+    assert response_body is not None, RESPONSE_BODY
+    _assert_id(response_body, RESPONSE_BODY)
 
 
 def test_widget_ids_are_locale_independent_literals() -> None:

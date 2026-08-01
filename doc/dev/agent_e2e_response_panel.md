@@ -3,9 +3,15 @@
 ## Overview
 
 Shared helpers for inspecting the **response panel** subtree of an agent
-UI snapshot after Send. Golden, env-pack Send, double-body lock, and
+UI snapshot after Send. Env-pack Send, double-body lock, and
 presentation-matrix scenarios import these instead of copying walk /
 subtree / excerpt logic.
+
+Golden (PYPOST-920) settles with `wait_for_text` on `RESPONSE_STATUS` /
+`RESPONSE_BODY` instead of a sanitize-coupled panel predicate; it still
+uses `response_panel_excerpt` for timeout diagnostics. Prefer text-wait on
+those ids for new Send → response readiness when matching display text is
+enough; keep these helpers for panel walks, cardinality locks, and excerpts.
 
 ## Architecture
 

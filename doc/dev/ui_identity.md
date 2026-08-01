@@ -59,7 +59,9 @@ Production UI must not import `pypost.agent`. Agents import constants from
 | `SEND_BUTTON` | `pypost_send_button` | Send button (per tab) |
 | `REQUEST_BODY_EDIT` | `pypost_request_body_edit` | Request body editor (per tab) |
 | `REQUEST_DETAIL_TABS` | `pypost_request_detail_tabs` | Params/Headers/Body/… tab widget |
-| `RESPONSE_PANEL` | `pypost_response_panel` | Response panel (per tab) |
+| `RESPONSE_PANEL` | `pypost_response_panel` | Response panel / `ResponseView` (per tab) |
+| `RESPONSE_STATUS` | `pypost_response_status` | Status label under `ResponseView` (per tab) |
+| `RESPONSE_BODY` | `pypost_response_body` | Body editor under `ResponseView` (per tab) |
 | `ENV_BAR` | `pypost_env_bar` | Environments top-bar container |
 | `ENV_SELECTOR` | `pypost_env_selector` | Environment combo |
 | `ENV_MANAGE_BUTTON` | `pypost_env_manage_button` | Manage environments |
@@ -95,7 +97,9 @@ with AgentAppSession(offscreen=True) as session:
 Window-level chrome (tree, tabs, env, settings) can be found from `MainWindow`.
 URL / method / Send / response must be found from the **current** `RequestTab`
 (or an equivalent scoped parent); shared role names would otherwise resolve to
-the first tab in the tree.
+the first tab in the tree. `RESPONSE_STATUS` and `RESPONSE_BODY` are applied in
+`ResponseView.init_ui` (panel id stays on the view in `__init__`); scope them
+the same way as `RESPONSE_PANEL` — per-tab under the current request tab.
 
 ## Configuration
 
@@ -107,8 +111,8 @@ No environment variables. Identity strings are compile-time constants in
 `tests/test_ui_identity_spotcheck.py` asserts key identities after ready
 (run via `make test`). `KEY_WIDGET_IDS` includes chrome plus per-tab controls
 (`URL_INPUT`, `SEND_BUTTON`, `REQUEST_BODY_EDIT`, `REQUEST_DETAIL_TABS`,
-`RESPONSE_PANEL`, …); the spot-check finds each id from the correct parent
-scope (window vs current tab).
+`RESPONSE_PANEL`, `RESPONSE_STATUS`, `RESPONSE_BODY`, …); the spot-check finds
+each id from the correct parent scope (window vs current tab).
 
 ## Troubleshooting
 
