@@ -119,6 +119,17 @@ Right-click a collection or request in the tree:
 Deleting a collection removes its requests from the tree. Work carefully if those requests
 are also marked as MCP tools.
 
+## Example fixtures
+
+Ready-to-import collections live under [`examples/collections/`](../../examples/README.md)
+in the repo (see the [examples README](../../examples/README.md) for inventory, import
+order, and secret rules). The curated **Jira Cloud MCP** collection is
+`examples/collections/jira_mcp.json`; pair it with
+`examples/environments/jira_cloud.json`. The tracked `examples/collections/mcp.json` file
+is a local MCP/SSE probe for contributors, not the primary end-user starter.
+
+Import with **Import Collection…** using the same steps as above — no format conversion.
+
 ## Tips
 
 - Prefer short, stable request names if you expose them as MCP tools — agents see those

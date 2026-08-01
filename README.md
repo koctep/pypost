@@ -42,6 +42,15 @@ reference, and [MCP Integration](doc/mcp_integration.md) for agent setup.
 *   **Prometheus Metrics**: Scrape `/metrics` for request, MCP, and error counters (default port
     9080). See [Prometheus Monitoring](doc/prometheus_monitoring.md).
 
+## Documentation
+
+*   [User Guide](doc/user/README.md) — what PyPost can do and how to use it (step-by-step).
+*   [Example collections and environments](examples/README.md) — importable fixtures
+    (including a curated Jira Cloud + MCP pair).
+*   [Documentation index](doc/README.md) — user, MCP, metrics, and developer docs.
+*   [MCP Integration](doc/mcp_integration.md) — connect local AI agents.
+*   [Developer documentation](doc/dev/README.md) — architecture and contribution notes.
+
 ## Requirements
 
 *   Python 3.11+

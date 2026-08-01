@@ -123,6 +123,17 @@ plaintext.
 Configure key source (environment variable, OS keyring, or secret store) and use the
 migration actions in Settings if you change encryption mode. See [Settings](settings.md).
 
+## Example fixtures
+
+Companion example environments live under
+[`examples/environments/`](../../examples/README.md) (see the
+[examples README](../../examples/README.md) for inventory, recommended import order, and
+placeholder/secret rules). Start with `examples/environments/jira_cloud.json`: replace
+`jira_base_url` and the hidden `jira_credentials` placeholder with your own site URL and
+`email:api_token` after import — never commit real tokens.
+
+Import with **Manage Environments → Import…** using the same steps as above.
+
 ## Using variables in requests
 
 See [Templating](templating.md). Example: set `host` = `https://api.example.com`, then use

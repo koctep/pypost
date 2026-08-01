@@ -3,12 +3,18 @@
 Welcome to the **PyPost** developer documentation. This guide will help you understand the codebase,
 set up your development environment, and contribute to the project.
 
+**End-user documentation** lives in the [User Guide](../user/README.md) under `doc/user/`.
+The docs hub is [`doc/README.md`](../README.md) (user vs integration vs developer).
+See [User Guide and Documentation Layout](user_guide.md) for layout and maintenance
+conventions.
+
 ## Table of Contents
 
 ### Setup and architecture
 
 1. [Setup and Installation](setup.md)
 1. [Architecture Overview](architecture.md)
+1. [User Guide and Documentation Layout (PYPOST-1015)](user_guide.md)
 1. [Architecture Decision Records (ADR) index](../adr/README.md)
 1. [Request Execution](request_execution.md)
 1. [TemplateService — central variable substitution](template_service.md)
@@ -109,6 +115,7 @@ set up your development environment, and contribute to the project.
 ### Tech debt
 
 1. [Tech Debt Inventory](tech_debt_inventory.md)
+1. [Tech Debt → Jira Sync (PYPOST-1016)](tech_debt_jira_sync.md)
 1. [Post-request Scripts Tech Debt (PYPOST-10)](tech-debt/PYPOST-10.md)
 1. [Settings and Hotkeys Tech Debt (PYPOST-11)](tech-debt/PYPOST-11.md)
 1. [Template Service Tech Debt (PYPOST-21)](tech-debt/PYPOST-21.md)
