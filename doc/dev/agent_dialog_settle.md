@@ -25,6 +25,8 @@ Source debt: [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852) TD-1
 | Piece | Role |
 | --- | --- |
 | `tests/test_agent_dialog_settle_e2e.py` | Two tests: happy path + timeout companion |
+| `tests/helpers/agent_e2e_dialog_settle.py` | Shared `run_product_dialog_settle` helper (PYPOST-936) |
+| `tests/test_agent_dialog_settle_convention.py` | Convention lock on helper adoption |
 | `test_agent_dialog_settle_after_settings_open` | Happy-path modal settle + dismiss |
 | `…timeout_includes_step_and_modal_diag` | Forced settle timeout companion (934) |
 | `SETTINGS_BUTTON` | Stable open control ([ui_identity](ui_identity.md)) |
@@ -82,11 +84,13 @@ make test-agent-e2e PYTEST_ARGS="tests/test_agent_dialog_settle_e2e.py -v"
 ### Scenario steps
 
 1. Ready session via `agent_e2e_session`; pre-flight `find_widget(SETTINGS_BUTTON)`.
-2. `QTimer.singleShot(0, _on_dialog)` where `_on_dialog`:
-   - `session.wait_until(_settings_dialog_present, …)`
-   - on `UiWaitTimeoutError`, rewrap with `diagnostics["step"]` + modal scalars
+2. Call `run_product_dialog_settle(session, click_widget_id=SETTINGS_BUTTON, …)` —
+   the helper schedules `QTimer.singleShot(0, _on_settle)` where `_on_settle`:
+   - `session.wait_until(wait_condition, …)`
+   - on `UiWaitTimeoutError`, rewrap with `diagnostics["step"]` + `modal_diag()`
    - `finally`: `activeModalWidget().reject()` if still open
-3. `session.ui_click(SETTINGS_BUTTON)` (blocks in `exec` until reject).
+3. `session.ui_click(SETTINGS_BUTTON)` runs inside the helper (blocks in `exec`
+   until reject).
 4. Re-raise any callback error; assert settle succeeded.
 
 ### Timeout companion (PYPOST-934)
@@ -95,55 +99,48 @@ make test-agent-e2e PYTEST_ARGS="tests/test_agent_dialog_settle_e2e.py -v"
 golden Send timeout companion
 (`test_agent_golden_settle_timeout_includes_step_and_excerpt`):
 
-1. Same timer-before-click skeleton; use a `settle_error: list[BaseException]`
-   because the callback runs async while `ui_click` blocks in `exec()`.
-2. Inside `_on_forced_timeout`, call `wait_until(lambda: False, …)` with
-   `FORCED_SETTLE_TIMEOUT_S` and `condition_name="forced_dialog_settle_timeout"`.
-3. On `UiWaitTimeoutError`, rewrap with the same `step` + `_modal_diag()` as
-   the happy path.
+1. Same `run_product_dialog_settle` skeleton; use a `settle_error` list from the
+   helper return tuple because the callback runs async while `ui_click` blocks in
+   `exec()`.
+2. Pass `wait_condition=lambda: False` with `FORCED_SETTLE_TIMEOUT_S` and
+   `condition_name="forced_dialog_settle_timeout"`.
+3. On `UiWaitTimeoutError`, the helper rewraps with the same `step` +
+   `modal_diag()` as the happy path.
 4. After `ui_click` returns, assert `len(settle_error) == 1`, type is
    `UiWaitTimeoutError`, `diagnostics["step"] == SETTLE_STEP`, and keys
-   `dialog_title` / `active_modal_type` are present (values may be `None`).
+   `dialog_title` / `dialog_object_name` / `active_modal_type` are present
+   (values may be `None`).
 
-### Pattern sketch (do not redefine APIs)
+### Pattern sketch (shared helper)
 
 ```python
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication
-
 from pypost.agent import UiWaitTimeoutError, find_widget
 from pypost.ui.widget_ids import SETTINGS_BUTTON
+from tests.helpers.agent_e2e_dialog_settle import run_product_dialog_settle
 
 # inside agent_e2e_session test:
 find_widget(session.window, SETTINGS_BUTTON)
 
-def _on_dialog() -> None:
-    try:
-        session.wait_until(
-            _settings_dialog_present,
-            timeout=DIALOG_SETTLE_TIMEOUT_S,
-            condition_name="settings_dialog_present",
-        )
-    except UiWaitTimeoutError as exc:
-        raise UiWaitTimeoutError(
-            f"dialog settle failed: {exc}",
-            timeout_s=exc.timeout_s,
-            condition=exc.condition,
-            diagnostics={**exc.diagnostics, "step": SETTLE_STEP, ...},
-        ) from exc
-    finally:
-        modal = QApplication.activeModalWidget()
-        if modal is not None:
-            modal.reject()
-
-QTimer.singleShot(0, _on_dialog)
-session.ui_click(SETTINGS_BUTTON)
+settle_ok, settle_error = run_product_dialog_settle(
+    session,
+    click_widget_id=SETTINGS_BUTTON,
+    wait_condition=_settings_dialog_present,
+    timeout=DIALOG_SETTLE_TIMEOUT_S,
+    message="settings dialog did not appear after SETTINGS_BUTTON click",
+    condition_name="settings_dialog_present",
+    step=SETTLE_STEP,
+)
+if settle_error:
+    raise settle_error[0]
+assert settle_ok
 ```
 
 Public surfaces consumed: `AgentAppSession` / `ui_click` / `wait_until`,
-`find_widget`, `SETTINGS_BUTTON`, `UiWaitTimeoutError`. Predicate helpers and
-`SETTLE_STEP` stay **test-local** in
-`tests/test_agent_dialog_settle_e2e.py`.
+`find_widget`, `SETTINGS_BUTTON`, `UiWaitTimeoutError`. Settings predicate
+(`_settings_dialog_present`) and `SETTLE_STEP` stay **test-local** in
+`tests/test_agent_dialog_settle_e2e.py`. Timer orchestration and timeout rewrap
+live in `tests/helpers/agent_e2e_dialog_settle.py` (`run_product_dialog_settle`,
+`modal_diag`).
 
 ### Presence predicate
 
