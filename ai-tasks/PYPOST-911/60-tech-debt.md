@@ -51,8 +51,7 @@ blockers.**
      screenshot reference; update docs status from DEFER if desired.
    - Files: `live-proof-notes.md`, optionally
      `doc/dev/agent_e2e_failure_artifacts.md`
-   - Jira: *(unticketed — create in Phase D when allowed; or reopen /
-     comment on PYPOST-911 if still open)*
+   - Jira: [PYPOST-933](https://pypost.atlassian.net/browse/PYPOST-933)
 
 2. **Optional: extract shared helpers for CI workflow/doc locks**
    - Priority: Lowest
