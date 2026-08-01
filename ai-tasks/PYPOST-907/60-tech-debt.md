@@ -48,14 +48,14 @@ blockers.**
    - When dedicated `make test-agent-e2e` ≥6m across ≥3 green runs (or other
      documented triggers), exclude `agent_e2e` from the main matrix **with**
      a 3.13 coverage plan; update lock + docs for ENABLE.
-   - Jira: _(unticketed — Phase D)_
+   - Jira: [PYPOST-930](https://pypost.atlassian.net/browse/PYPOST-930)
 
 2. **Optional: automate CI duration evidence capture**
    - Priority: Lowest
    - Script or docs checklist to refresh the evidence table from Actions API
      (may absorb or close [PYPOST-908](https://pypost.atlassian.net/browse/PYPOST-908)
      once maintainers confirm published numbers suffice).
-   - Jira: _(unticketed — Phase D; related existing PYPOST-908)_
+   - Jira: [PYPOST-931](https://pypost.atlassian.net/browse/PYPOST-931) (related existing PYPOST-908)
 
 ## Blocker Verdict
 
