@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.ci_workflow_yaml import workflow_job_block
+
 pytestmark = pytest.mark.timeout(10)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -18,33 +20,6 @@ _DOC_ANCHOR = "PYPOST-910"
 _RETENTION_DAYS = "14"
 _RETENTION_KEY = "retention-days: 14"
 _ARTIFACT_PATH = "artifacts/agent_e2e/"
-
-
-def _job_block(workflow_text: str, job_key: str) -> str:
-    """Return a top-level job YAML block (until next sibling job)."""
-    marker = f"\n  {job_key}:"
-    start = workflow_text.find(marker)
-    if start < 0:
-        alt = f"  {job_key}:"
-        start = workflow_text.find(alt)
-        if start < 0:
-            pytest.fail(
-                f"{_WORKFLOW.relative_to(_REPO_ROOT)}: missing job {job_key}"
-            )
-        start = workflow_text.rfind("\n", 0, start) + 1
-    else:
-        start += 1  # skip leading newline so block starts at "  {job}:"
-    rest = workflow_text[start:]
-    lines = rest.splitlines(keepends=True)
-    collected: list[str] = [lines[0]]
-    for line in lines[1:]:
-        if line.startswith("  ") and not line.startswith("   "):
-            if line.strip().endswith(":") and not line.strip().startswith("#"):
-                key = line.strip()[:-1]
-                if key and " " not in key and key != job_key:
-                    break
-        collected.append(line)
-    return "".join(collected)
 
 
 def _assert_failure_upload_has_retention(block: str, job_key: str) -> None:
@@ -92,5 +67,11 @@ def test_docs_record_failure_artifact_retention_days() -> None:
 def test_workflow_sets_retention_on_agent_e2e_failure_uploads() -> None:
     """Both agent-e2e and test matrix failure uploads set retention-days."""
     text = _WORKFLOW.read_text(encoding="utf-8")
-    _assert_failure_upload_has_retention(_job_block(text, "agent-e2e"), "agent-e2e")
-    _assert_failure_upload_has_retention(_job_block(text, "test"), "test")
+    _assert_failure_upload_has_retention(
+        workflow_job_block(text, "agent-e2e", workflow_path=_WORKFLOW),
+        "agent-e2e",
+    )
+    _assert_failure_upload_has_retention(
+        workflow_job_block(text, "test", workflow_path=_WORKFLOW),
+        "test",
+    )

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.ci_workflow_yaml import workflow_job_block
+
 pytestmark = pytest.mark.timeout(10)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -20,36 +22,6 @@ _ENABLE_PHRASE = "enable"
 _UPLOAD_PHRASE = "agent-e2e-failure-artifacts"
 _FAILURE_GATE = "if: failure()"
 _ARTIFACT_PATH = "artifacts/agent_e2e/"
-
-
-def _agent_e2e_job_block(workflow_text: str) -> str:
-    """Return the agent-e2e job YAML block (until next top-level job)."""
-    marker = "\n  agent-e2e:"
-    start = workflow_text.find(marker)
-    if start < 0:
-        # Allow job at file start without leading newline.
-        alt = "  agent-e2e:"
-        start = workflow_text.find(alt)
-        if start < 0:
-            pytest.fail(
-                f"{_WORKFLOW.relative_to(_REPO_ROOT)}: missing job agent-e2e"
-            )
-        start = workflow_text.rfind("\n", 0, start) + 1
-    else:
-        start += 1  # skip leading newline so block starts at "  agent-e2e:"
-    rest = workflow_text[start:]
-    # Next job at indent of two spaces then name then colon (siblings).
-    lines = rest.splitlines(keepends=True)
-    collected: list[str] = [lines[0]]
-    for line in lines[1:]:
-        if line.startswith("  ") and not line.startswith("   "):
-            # Another top-level job key under `jobs:` (two-space indent, no deeper).
-            if line.strip().endswith(":") and not line.strip().startswith("#"):
-                key = line.strip()[:-1]
-                if key and " " not in key and key != "agent-e2e":
-                    break
-        collected.append(line)
-    return "".join(collected)
 
 
 def test_docs_record_enable_failure_artifact_upload() -> None:
@@ -79,7 +51,7 @@ def test_docs_record_enable_failure_artifact_upload() -> None:
 def test_workflow_uploads_agent_e2e_artifacts_on_failure() -> None:
     """Job agent-e2e must upload artifacts/agent_e2e/ when the job fails."""
     text = _WORKFLOW.read_text(encoding="utf-8")
-    block = _agent_e2e_job_block(text)
+    block = workflow_job_block(text, "agent-e2e", workflow_path=_WORKFLOW)
     if "upload-artifact" not in block:
         pytest.fail(
             f"{_WORKFLOW.relative_to(_REPO_ROOT)} job agent-e2e: missing "

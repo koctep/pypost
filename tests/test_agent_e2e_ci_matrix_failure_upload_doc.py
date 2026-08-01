@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.ci_workflow_yaml import workflow_job_block
+
 pytestmark = pytest.mark.timeout(10)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -20,33 +22,6 @@ _ENABLE_PHRASE = "enable"
 _MATRIX_UPLOAD_PHRASE = "agent-e2e-failure-artifacts-${{ matrix.python-version }}"
 _FAILURE_GATE = "if: failure()"
 _ARTIFACT_PATH = "artifacts/agent_e2e/"
-
-
-def _test_job_block(workflow_text: str) -> str:
-    """Return the main `test` job YAML block (until next top-level job)."""
-    marker = "\n  test:"
-    start = workflow_text.find(marker)
-    if start < 0:
-        alt = "  test:"
-        start = workflow_text.find(alt)
-        if start < 0:
-            pytest.fail(
-                f"{_WORKFLOW.relative_to(_REPO_ROOT)}: missing job test"
-            )
-        start = workflow_text.rfind("\n", 0, start) + 1
-    else:
-        start += 1  # skip leading newline so block starts at "  test:"
-    rest = workflow_text[start:]
-    lines = rest.splitlines(keepends=True)
-    collected: list[str] = [lines[0]]
-    for line in lines[1:]:
-        if line.startswith("  ") and not line.startswith("   "):
-            if line.strip().endswith(":") and not line.strip().startswith("#"):
-                key = line.strip()[:-1]
-                if key and " " not in key and key != "test":
-                    break
-        collected.append(line)
-    return "".join(collected)
 
 
 def test_docs_record_enable_matrix_failure_artifact_upload() -> None:
@@ -82,7 +57,7 @@ def test_docs_record_enable_matrix_failure_artifact_upload() -> None:
 def test_workflow_uploads_agent_e2e_artifacts_on_test_matrix_failure() -> None:
     """Job test must upload artifacts/agent_e2e/ when the matrix cell fails."""
     text = _WORKFLOW.read_text(encoding="utf-8")
-    block = _test_job_block(text)
+    block = workflow_job_block(text, "test", workflow_path=_WORKFLOW)
     if "upload-artifact" not in block:
         pytest.fail(
             f"{_WORKFLOW.relative_to(_REPO_ROOT)} job test: missing "

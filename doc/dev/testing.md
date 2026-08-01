@@ -582,6 +582,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-909] | ENABLE main test matrix failure artifact upload + lock |
 | [PYPOST-910] | Explicit `retention-days: 14` on failure artifact uploads |
 | [PYPOST-911] | DEFER live Artifacts UI proof; procedure + doc lock |
+| [PYPOST-928] | Shared `workflow_job_block` helper for CI workflow YAML contract tests |
 | [PYPOST-905] | Stamp/cache `venv-test` / `venv-otel`; skip pip when extras current |
 | [PYPOST-929] | Contract: `make install` touches both extra stamps |
 | [PYPOST-906] | `lint` depends on `venv-test` (like `typecheck`); `run` stays marker-only |
@@ -606,6 +607,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-909]: https://pypost.atlassian.net/browse/PYPOST-909
 [PYPOST-910]: https://pypost.atlassian.net/browse/PYPOST-910
 [PYPOST-911]: https://pypost.atlassian.net/browse/PYPOST-911
+[PYPOST-928]: https://pypost.atlassian.net/browse/PYPOST-928
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -618,6 +620,37 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | Slow smoke seed contract | Isolated workspace seed mirrors packaging metadata from committed `pyproject.toml` (dynamic version attr, readme), not only dependency pins (PYPOST-943) |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
 | Agent e2e target | deps (`venv-test` + `venv-otel`), help listing, recipe marker, selection smoke (861/872) |
+
+### CI workflow contract helpers (PYPOST-928)
+
+Workflow/doc lock tests slice named jobs from `.github/workflows/test.yml` to assert upload
+wiring, composite `uses:`, retention keys, and similar substrings. Use the shared helper instead
+of copying local `_job_block` heuristics:
+
+| Module | Role |
+| --- | --- |
+| `tests/helpers/ci_workflow_yaml.py` | `workflow_job_block(text, job_id, *, workflow_path=None)` |
+| `tests/test_ci_workflow_yaml_helper.py` | Unit tests + import contract for consumer modules |
+
+The helper validates the top-level `jobs` mapping with `yaml.safe_load`, confirms the job key
+exists, then extracts the raw job text block (scoped to the `jobs:` section) for grep-style
+assertions. New CI locks should import:
+
+```python
+from tests.helpers.ci_workflow_yaml import workflow_job_block
+
+block = workflow_job_block(
+    workflow_text,
+    "my-job",
+    workflow_path=path_to_test_yml,
+)
+```
+
+Focused run:
+
+```bash
+make test PYTEST_ARGS='tests/test_ci_workflow_yaml_helper.py tests/test_ci_*.py tests/test_agent_e2e_ci_*.py -v'
+```
 
 ### Python interpreter decoupling (PYPOST-718)
 
