@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tests.test_makefile import (
+    POST_INSTALL_SANITY_SNIPPETS,
     PYPROJECT,
     REPO_ROOT,
     SLOW_SMOKE_MINIMUM_PYPPOST_FILES,
@@ -83,6 +84,14 @@ def test_slow_smoke_seed_includes_pyproject_packaging_artifacts(
     assert not missing, (
         "slow-smoke seed (make_workspace_full_deps) missing install-time artifacts "
         f"required by pyproject.toml: {[str(p) for p in missing]}"
+    )
+
+
+def test_post_install_sanity_includes_pypost_version_read() -> None:
+    """Slow smoke must assert post-install pypost importability (PYPOST-966)."""
+    assert any("pypost" in snippet for snippet in POST_INSTALL_SANITY_SNIPPETS), (
+        "POST_INSTALL_SANITY_SNIPPETS must include a pypost version read or import "
+        "(PYPOST-966); slow smoke only checks core deps otherwise."
     )
 
 

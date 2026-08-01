@@ -661,7 +661,7 @@ Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across 
 | Extra stamps | Skip pip when stamp current; install when missing/stale; alias→stamp; stamp→marker+pyproject (905); `install` touches both stamps (929) |
 | Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv succeeds `lint` via `venv-test`; `make test` succeeds via `venv-test` |
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
-| Slow install smoke | `make install` with real `pyproject.toml` succeeds; marked `@pytest.mark.slow` |
+| Slow install smoke | `make install` with real `pyproject.toml` succeeds; post-install pydantic + `pypost.version` sanity; marked `@pytest.mark.slow` |
 | Slow smoke seed contract | Isolated workspace seed mirrors packaging metadata from committed `pyproject.toml` (dynamic version attr, readme), not only dependency pins (PYPOST-943) |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
 | Agent e2e target | deps (`venv-test` + `venv-otel`), help listing, recipe marker, selection smoke (861/872) |
@@ -802,6 +802,23 @@ asserts the `pypost/` stub shape exactly — catching under-seeding and accident
 When adding new dynamic or install-time paths to `pyproject.toml`, extend the seed helper,
 `SLOW_SMOKE_MINIMUM_PYPPOST_FILES` (if under `pypost/`), and the contract parser together;
 see `ai-tasks/PYPOST-943/20-architecture.md` § Packaging fields the seed must satisfy.
+
+#### Post-install sanity (PYPOST-559, PYPOST-966)
+
+After `make install` succeeds in the slow smoke workspace, `TestSlowInstallSmoke` runs each
+snippet in `POST_INSTALL_SANITY_SNIPPETS` (`tests/test_makefile.py`) via
+`_assert_post_install_sanity` against `.venv/bin/python`:
+
+| Snippet purpose | Check |
+| --- | --- |
+| Core dependency | `import pydantic` (PYPOST-559) |
+| Installed package | `import pypost.version as v; assert v.__version__` (PYPOST-966) |
+
+The version-module read verifies the installed `pypost` package without importing Qt/UI
+subpackages. A fast contract guard
+(`test_post_install_sanity_includes_pypost_version_read` in
+`tests/test_makefile_install_seed_contract.py`) asserts the snippet list includes a pypost
+check so policy cannot regress without a default-matrix failure.
 
 Focused contract run:
 

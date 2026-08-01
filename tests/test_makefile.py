@@ -328,6 +328,37 @@ def _materialize_slow_smoke_workspace(workspace: Path) -> None:
     _seed_installable_package(workspace)
 
 
+# Post-install sanity snippets for slow-smoke venv (PYPOST-559, PYPOST-966).
+# Version-module read avoids importing UI/Qt subpackages via package __init__.
+POST_INSTALL_SANITY_SNIPPETS: tuple[str, ...] = (
+    "import pydantic",
+    "import pypost.version as v; assert v.__version__",
+)
+
+
+def _run_venv_python_snippet(
+    bin_python: Path,
+    snippet: str,
+    *,
+    timeout: float = 30,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(bin_python), "-c", snippet],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def _assert_post_install_sanity(bin_python: Path) -> None:
+    """Run post-install import checks in the slow-smoke isolated venv."""
+    assert bin_python.is_file()
+    for snippet in POST_INSTALL_SANITY_SNIPPETS:
+        proc = _run_venv_python_snippet(bin_python, snippet)
+        assert proc.returncode == 0, proc.stderr or proc.stdout
+
+
 def _copy_dev_requirements(workspace: Path) -> None:
     shutil.copy(REQUIREMENTS_DEV, workspace / "requirements-dev.txt")
 
@@ -898,12 +929,4 @@ class TestSlowInstallSmoke:
         )
         assert result.returncode == 0, result.stderr
         bin_python = make_workspace_full_deps / ".venv" / "bin" / "python"
-        assert bin_python.is_file()
-        proc = subprocess.run(
-            [str(bin_python), "-c", "import pydantic"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-        assert proc.returncode == 0, proc.stderr
+        _assert_post_install_sanity(bin_python)
