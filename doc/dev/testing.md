@@ -166,6 +166,12 @@ use `tests/helpers/fixture_drive.py` (`unwrap_yield_fixture`, `run_yield_fixture
 `call_yield_fixture`; PYPOST-900). Private pytest unwrap (`_get_wrapped_function`) is isolated
 there so upgrades touch one module. Consumer: `tests/test_agent_e2e_packaging_logs.py`.
 
+Model-backed item views (`QTreeView`, `QListView`, etc.) must call `setModel(None)` before
+closing isolated fixtures; otherwise Qt can emit teardown warnings or destabilize later
+agent e2e sessions. Use `tests/helpers/qt_item_view.py` (`detach_item_view_model`,
+`close_item_view_fixture`; PYPOST-940). Consumer: `tests/test_ui_actions.py` tree and
+list-view ui_select fixtures; unit proofs in `tests/test_qt_item_view_teardown.py`.
+
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a
 stuck C++ `exec()` without Python callbacks. Use the shared

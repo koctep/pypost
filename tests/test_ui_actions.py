@@ -28,6 +28,7 @@ from pypost.agent.ui_actions import (
     ui_send_key,
 )
 from pypost.ui.widget_ids import METHOD_COMBO, URL_INPUT, set_widget_id
+from tests.helpers.qt_item_view import close_item_view_fixture
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -99,14 +100,6 @@ def _make_tree_fixture(qapp: QApplication) -> QWidget:
     return root
 
 
-def _close_tree_fixture(root: QWidget, qapp: QApplication) -> None:
-    tree = find_widget(root, _TREE)
-    if isinstance(tree, QTreeView):
-        tree.setModel(None)
-    root.close()
-    qapp.processEvents()
-
-
 def _make_list_view_fixture(qapp: QApplication) -> QWidget:
     """Isolated QListView fixture — model-backed, not QListWidget."""
     root = QWidget()
@@ -121,14 +114,6 @@ def _make_list_view_fixture(qapp: QApplication) -> QWidget:
     root.show()
     qapp.processEvents()
     return root
-
-
-def _close_list_view_fixture(root: QWidget, qapp: QApplication) -> None:
-    view = find_widget(root, _LIST_VIEW)
-    if isinstance(view, QListView):
-        view.setModel(None)
-    root.close()
-    qapp.processEvents()
 
 
 def test_ui_click_on_fixture(qapp: QApplication) -> None:
@@ -215,7 +200,7 @@ def test_ui_select_list_view_by_text(qapp: QApplication) -> None:
         assert current.data(Qt.ItemDataRole.DisplayRole) == "Beta"
         assert current.row() == 1
     finally:
-        _close_list_view_fixture(root, qapp)
+        close_item_view_fixture(root, qapp, _LIST_VIEW, view_type=QListView)
 
 
 def test_ui_select_list_view_by_index(qapp: QApplication) -> None:
@@ -230,7 +215,7 @@ def test_ui_select_list_view_by_index(qapp: QApplication) -> None:
         assert current.data(Qt.ItemDataRole.DisplayRole) == "Alpha"
         assert current.row() == 0
     finally:
-        _close_list_view_fixture(root, qapp)
+        close_item_view_fixture(root, qapp, _LIST_VIEW, view_type=QListView)
 
 
 def test_ui_select_tree_by_text(qapp: QApplication) -> None:
@@ -244,7 +229,7 @@ def test_ui_select_tree_by_text(qapp: QApplication) -> None:
         assert current.isValid()
         assert current.data(Qt.ItemDataRole.DisplayRole) == "Child"
     finally:
-        _close_tree_fixture(root, qapp)
+        close_item_view_fixture(root, qapp, _TREE, view_type=QTreeView)
 
 
 def test_ui_select_tree_by_index(qapp: QApplication) -> None:
@@ -260,7 +245,7 @@ def test_ui_select_tree_by_index(qapp: QApplication) -> None:
         assert current.row() == 1
         assert not current.parent().isValid()
     finally:
-        _close_tree_fixture(root, qapp)
+        close_item_view_fixture(root, qapp, _TREE, view_type=QTreeView)
 
 
 def test_ui_select_combo_by_index(qapp: QApplication) -> None:
