@@ -1,8 +1,9 @@
-"""PYPOST-859: Env-pack Send uses shared HTTP stub + seed URL."""
+"""PYPOST-859 / PYPOST-904: Env-pack Send uses shared HTTP stub + seed URL."""
 
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import pytest
@@ -31,6 +32,9 @@ pytestmark = [
     pytest.mark.timeout(60),
     pytest.mark.agent_e2e,
 ]
+
+_HTTP_LOGGER = "pypost.fixtures.agent_e2e_http"
+_STUB_INSTALLED_SEED_GET = "agent_e2e_http_stub_installed name=seed_get_ok"
 
 _STATUS_LABEL = "Status: 200"
 _BODY_IN_SNAPSHOT = json.dumps(
@@ -86,3 +90,41 @@ def test_seeded_env_send_uses_shared_http_stub(
     assert _BODY_IN_SNAPSHOT in joined
     # Catalog entry still importable for authors extending scenarios.
     assert stub_agent_e2e_http is agent_e2e_http_stub
+
+
+def test_seeded_env_send_logs_http_stub_installed(
+    seeded_agent_e2e_session: AgentAppSession,
+    agent_e2e_http_stub: Any,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-904: GUI Send path emits agent_e2e_http_stub_installed under caplog."""
+    session = seeded_agent_e2e_session
+    assert session.window.is_ui_ready is True
+
+    session.ui_fill(URL_INPUT, SEED_GET_RESOLVED_URL)
+    session.ui_select(METHOD_COMBO, "GET")
+
+    with caplog.at_level(logging.INFO, logger=_HTTP_LOGGER):
+        with agent_e2e_http_stub(CANNED_SEED_GET_OK):
+            session.ui_click(SEND_BUTTON)
+            try:
+                session.wait_for_snapshot(
+                    _response_ready,
+                    timeout=SEND_SETTLE_TIMEOUT_S,
+                )
+            except UiWaitTimeoutError as exc:
+                last = session.ui_snapshot()
+                excerpt = response_panel_excerpt(last)
+                raise UiWaitTimeoutError(
+                    f"env seed Send caplog smoke settle failed: {exc}; "
+                    f"response_excerpt={excerpt!r}",
+                    timeout_s=exc.timeout_s,
+                    condition=exc.condition,
+                    diagnostics={
+                        **exc.diagnostics,
+                        "step": "wait_response_after_seed_send_caplog_smoke",
+                        "response_excerpt": excerpt,
+                    },
+                ) from exc
+
+    assert _STUB_INSTALLED_SEED_GET in caplog.text

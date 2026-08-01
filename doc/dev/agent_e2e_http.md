@@ -93,8 +93,11 @@ On enter, the CM logs INFO
 `pypost.fixtures.agent_e2e_http`). Caplog matrix (PYPOST-870 / PYPOST-903):
 `tests/test_agent_e2e_http_stub_logs.py` — parametrized pure-unit proofs for
 `golden_ok`, `seed_get_ok`, `seed_post_ok`, `double_body_lock_ok`, `url_router`,
-and explicit custom `name=`; must **not** carry `agent_e2e`. Catalog:
-[logging.md](logging.md).
+and explicit custom `name=`; must **not** carry `agent_e2e`. GUI-path install
+smoke (PYPOST-904): `tests/test_agent_e2e_http_env.py` —
+`test_seeded_env_send_logs_http_stub_installed` re-asserts
+`name=seed_get_ok` under caplog during live offscreen Send (stub CM + click +
+settle, not unit-only CM enter). Catalog: [logging.md](logging.md).
 
 Or via the pytest fixture (same callable):
 
@@ -237,6 +240,9 @@ No extra env vars.
 | | `caplog.at_level(INFO, logger="pypost.fixtures.agent_e2e_http")`; |
 | | run `make test PYTEST_ARGS=` |
 | | `"tests/test_agent_e2e_http_stub_logs.py -v"` (PYPOST-870 / 903 matrix). |
+| | GUI path: `make test-agent-e2e PYTEST_ARGS=` |
+| | `"tests/test_agent_e2e_http_env.py::test_seeded_env_send_logs_http_stub_installed -v"` |
+| | (PYPOST-904). |
 | URL router AssertionError | Confirm map keys equal ``request_data.url`` exactly |
 | | or use compound ``"{method} {url}"`` keys (902). Message lists |
 | | ``known=`` keys. Compound keys take precedence over bare URL. |
