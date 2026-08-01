@@ -193,7 +193,9 @@ Contract locks: `tests/test_agent_e2e_ci_failure_upload_doc.py` (874),
 ### Live Artifacts UI proof (PYPOST-911) — DEFER
 
 **Status:** live screenshot / notes from a real failing run are
-**DEFER**red. Public Actions history (queried 2026-08-01) had no
+**DEFER**red. Public Actions history (queried 2026-08-01; re-scanned by
+[PYPOST-933](https://pypost.atlassian.net/browse/PYPOST-933): 23
+completed runs, 10 failed, **0** qualifying artifacts) had no
 downloadable `agent-e2e-failure-artifacts` (or matrix twin) on failed
 runs — only junit/coverage zips or empty artifact lists. Do **not**
 invent fake screenshots.
