@@ -309,6 +309,9 @@ for narrow runs.
 | --- | --- |
 | Qt / display errors | Run via `make test-agent-e2e` (not bare pytest without offscreen) |
 | Golden wait timeout | See [agent_golden_e2e.md](agent_golden_e2e.md) failure table |
+| Wrong tab / orphan find after strip | Bare `removeTab` leaves orphan role ids; use |
+| | `deleteLater` pattern + current-tab scope — |
+| | [golden removeTab hazard](agent_golden_e2e.md#tab-strip-hazards-removetab-orphans) |
 | Missing control | Confirm id in `widget_ids` and `is_ui_ready` |
 | Confused with MCP | MCP needs a running app + MCP enabled; agent e2e is in-process pytest |
 | Want one file only | `make test-agent-e2e PYTEST_ARGS="tests/test_….py -v"` |

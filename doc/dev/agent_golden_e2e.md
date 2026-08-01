@@ -79,10 +79,78 @@ predicate. Sibling Send scenarios may still walk the panel snapshot — see
 tab, agents click `PLUS_TAB_BUTTON` (`pypost_plus_tab_button`, the embedded
 `+` on the trailing plus chrome — not `PLUS_TAB_PLACEHOLDER`). Covered by
 `test_agent_golden_plus_tab_create_when_no_blank_tab`: strip request tabs
-without presenter close (`removeTab` + `deleteLater`, so orphan role ids do
-not poison finds), `ui_click(PLUS_TAB_BUTTON)`, then the same fill / Send /
-status+body settle. Prefer current-tab roots for fill/click/wait after
-create (shared role ids across tabs).
+without presenter close, then `ui_click(PLUS_TAB_BUTTON)`, then the same fill /
+Send / status+body settle. The strip step must follow the
+[removeTab orphan hazard](#tab-strip-hazards-removetab-orphans) pattern; prefer
+current-tab roots for fill/click/wait after create (shared role ids across tabs).
+
+## Tab-strip hazards: removeTab orphans
+
+Agent e2e authors who manipulate the request tab strip directly — not via
+presenter `close_tab` — must understand Qt tab removal semantics. This is the
+blank-tab strip pattern used by the plus-tab golden and
+`_strip_request_tabs` in `tests/test_agent_golden_e2e.py`.
+
+### Why `removeTab` alone is unsafe
+
+`QTabWidget.removeTab(index)` removes a page from the tab bar but **does not
+destroy** the widget. The detached `RequestTab` and its children (per-tab role
+ids such as `URL_INPUT`, `SEND_BUTTON`, `RESPONSE_STATUS`, `RESPONSE_BODY`)
+can remain alive as orphans in the widget tree.
+
+Window-scoped lookups (`session.ui_click`, `session.ui_fill`,
+`session.wait_for_text` without `in_current_tab=True`, or
+`find_widget(window, …)`) walk the full window subtree. Orphan tabs with the
+same `objectName` values can match **before** the current tab's controls,
+causing:
+
+| Symptom | Typical cause |
+| --- | --- |
+| `UiTargetNotFoundError` | Orphan is hidden or detached but still indexed |
+| URL/Send changed on wrong tab | Click/fill hit orphan panel |
+| Send settle timeout or wrong body | `wait_for_text` rooted at window hits orphan response panel |
+
+Presenter `close_tab` is a different path (auto blank replacement, focus
+reselect). Do not assume it applies when you strip tabs for a precondition.
+
+### Safe strip pattern
+
+When removing request tabs without presenter close (to simulate restore that
+did not open a blank tab):
+
+1. Reverse-index loop: for each `RequestTab` page, `removeTab(index)` and
+   collect the page reference.
+2. For each collected page: `setParent(None)` then `deleteLater()`.
+3. Call `qapp.processEvents()` so deferred deletes run before the next
+   find/action.
+4. Assert only non-request pages remain (for example the plus placeholder).
+
+```python
+# Reference: tests/test_agent_golden_e2e.py::_strip_request_tabs
+orphans: list[RequestTab] = []
+for index in range(tabs.count() - 1, -1, -1):
+    page = tabs.widget(index)
+    if isinstance(page, RequestTab):
+        tabs.removeTab(index)
+        orphans.append(page)
+for page in orphans:
+    page.setParent(None)
+    page.deleteLater()
+qapp.processEvents()
+```
+
+Skipping `deleteLater` (or `processEvents`) leaves orphan role ids that poison
+window-scoped finds even though the tab bar looks empty.
+
+### After tab manipulation
+
+- Prefer **current-tab scoped** actions: `in_current_tab=True` on session
+  helpers, or root `wait_for_text` / `find_widget` at
+  `session.current_request_tab()`.
+- Do not rely on window-scoped finds when multiple tabs (including orphans) may
+  share per-tab role ids. See [ui_identity.md](ui_identity.md) and
+  [ui_actions.md](ui_actions.md).
+
 ## API / Usage
 
 ### How to run
@@ -126,8 +194,9 @@ Primary (blank restore):
 
 Plus-tab create when no blank tab (PYPOST-921):
 
-1. Ready session, then strip all `RequestTab` pages (`removeTab` +
-   `deleteLater` + `processEvents`) so only the plus placeholder remains.
+1. Ready session, then strip all `RequestTab` pages using the
+   [safe strip pattern](#tab-strip-hazards-removetab-orphans) so only the plus
+   placeholder remains.
 2. `ui_click(PLUS_TAB_BUTTON)` — creates a blank request tab via plus chrome.
 3. Continue with fill / Send / status+body settle as above (current-tab
    scoped actions and `wait_for_text` root).
@@ -224,9 +293,11 @@ Offscreen is set by `make test-agent-e2e` / `make test` and by
 | | display-form body (`indent=2`), not compact snapshot JSON. |
 | Missing control | `UiTargetNotFoundError` / interactable errors from actions. |
 | | Confirm blank tab restore and `is_ui_ready`. |
-| Plus-tab create fails | Confirm `PLUS_TAB_BUTTON` (not placeholder) and that strip |
-| | used `deleteLater` (orphans poison window-scoped finds). |
-| | Prefer current-tab fill/click/wait after create. |
+| Plus-tab create fails | Confirm `PLUS_TAB_BUTTON` (not placeholder). Strip must |
+| | follow [removeTab orphan hazard](#tab-strip-hazards-removetab-orphans) |
+| | (`deleteLater` + `processEvents`). Prefer current-tab fill/click/wait. |
+| Wrong tab after strip | Orphan role ids — see |
+| | [removeTab orphan hazard](#tab-strip-hazards-removetab-orphans). |
 | Ready never happens | Lifecycle timeout / `agent_session_ready_timeout` (833). |
 
 Primary observability for this flow is those failure carriers (FR10), not new

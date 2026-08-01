@@ -209,6 +209,13 @@ widgets that already have `objectName` set via `set_widget_id`.
 - **Wrong tab’s URL/Send changed** — Default session helpers search from the
   main window; use `in_current_tab=True` or `find_in_current_tab` for multi-tab
   flows (PYPOST-851).
+- **Find/action fails after tab strip** — Bare `QTabWidget.removeTab` leaves
+  detached pages with the same per-tab role ids. Window-scoped finds can match
+  orphans instead of the current tab. Destroy stripped pages with
+  `setParent(None)` + `deleteLater()` + `processEvents`, then scope actions to
+  the current tab. Full pattern:
+  [agent golden e2e — removeTab orphans](agent_golden_e2e.md#tab-strip-hazards-removetab-orphans)
+  (PYPOST-951).
 
 ## Related
 
