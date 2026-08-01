@@ -1,4 +1,4 @@
-"""PYPOST-873 / PYPOST-907: lock deferred CI agent-e2e double-run + evidence."""
+"""PYPOST-873 / 907 / 908: lock deferred double-run + evidence discoverability."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ _WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "test.yml"
 # Stable anchors for DEFER decision (must appear in developer docs).
 _DOC_ANCHOR_873 = "PYPOST-873"
 _DOC_ANCHOR_907 = "PYPOST-907"
+_DOC_ANCHOR_908 = "PYPOST-908"
 _DOUBLE_RUN_PHRASE = "intentional double-run"
 _REVISIT_PHRASE = "revisit when"
 _EVIDENCE_PHRASE = "CI duration evidence"
@@ -37,6 +38,16 @@ def test_docs_record_deferred_ci_cost_trim() -> None:
         pytest.fail(
             f"Missing {_DOC_ANCHOR_907} in {_TESTING_DOC.name} or "
             f"{_AGENT_E2E_DOC.name} — document evidence revisit"
+        )
+    if _DOC_ANCHOR_908 not in testing:
+        pytest.fail(
+            f"Missing {_DOC_ANCHOR_908} in {_TESTING_DOC.name} — link "
+            "timing-notes ticket from the evidence section"
+        )
+    if _DOC_ANCHOR_908 not in agent:
+        pytest.fail(
+            f"Missing {_DOC_ANCHOR_908} in {_AGENT_E2E_DOC.name} — make "
+            "duration evidence discoverable from the agent e2e entry"
         )
     if _DOUBLE_RUN_PHRASE not in lower:
         pytest.fail(

@@ -20,7 +20,7 @@ Prefer `make test-agent-e2e` over ad-hoc pytest one-liners. CI gates the same
 target via the `agent-e2e` job in `.github/workflows/test.yml` (PYPOST-861);
 the main fast suite also includes these tests via `-m "not slow"` (intentional
 3.11 double-run; DEFER after evidence — PYPOST-873 / PYPOST-907 /
-[testing.md](testing.md)).
+PYPOST-908 timing notes in [testing.md](testing.md)).
 
 This is **not** live MCP verification against a running PyPost. For MCP tools
 and Prometheus checks, see [testing.md](testing.md) and
@@ -132,7 +132,9 @@ matrix + `agent-e2e`). [PYPOST-873](https://pypost.atlassian.net/browse/PYPOST-8
 **DEFER**s a CI cost trim; [PYPOST-907](https://pypost.atlassian.net/browse/PYPOST-907)
 reviewed **CI duration evidence** and chose **DEFER after evidence** —
 **revisit when** the ENABLE threshold in [testing.md](testing.md) § Agent
-e2e CI double-run is met.
+e2e CI double-run is met. Job-duration / overlap timing notes are locked under
+[PYPOST-908](https://pypost.atlassian.net/browse/PYPOST-908) (same section;
+do not invent numbers — refresh automation is PYPOST-931).
 
 [PYPOST-874](https://pypost.atlassian.net/browse/PYPOST-874) **ENABLE**s
 failure-only upload of `artifacts/agent_e2e/` from job `agent-e2e` as Actions

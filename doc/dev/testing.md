@@ -564,6 +564,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-872] | `venv-test` prerequisite on `test` / `test-slow` / `test-agent-e2e` |
 | [PYPOST-873] | Deferred CI cost trim; dual-run docs + workflow lock |
 | [PYPOST-907] | Evidence revisit; continued DEFER after CI duration evidence |
+| [PYPOST-908] | Lock discoverable CI duration / overlap timing notes (cite 907) |
 | [PYPOST-874] | ENABLE agent-e2e failure artifact upload + doc/workflow lock |
 | [PYPOST-909] | ENABLE main test matrix failure artifact upload + lock |
 | [PYPOST-905] | Stamp/cache `venv-test` / `venv-otel`; skip pip when extras current |
@@ -583,6 +584,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-905]: https://pypost.atlassian.net/browse/PYPOST-905
 [PYPOST-906]: https://pypost.atlassian.net/browse/PYPOST-906
 [PYPOST-907]: https://pypost.atlassian.net/browse/PYPOST-907
+[PYPOST-908]: https://pypost.atlassian.net/browse/PYPOST-908
 [PYPOST-909]: https://pypost.atlassian.net/browse/PYPOST-909
 
 | Area | What is checked |
@@ -644,6 +646,12 @@ overlap is measurable but not wall-clock painful (see below).
 
 #### CI duration evidence (Actions, 2026-08-01)
 
+Timing notes (job durations / overlap cost) for the intentional double-run —
+published under PYPOST-907 and discoverable via
+[PYPOST-908](https://pypost.atlassian.net/browse/PYPOST-908). Do not invent
+replacement numbers; optional Actions refresh automation is
+[PYPOST-931](https://pypost.atlassian.net/browse/PYPOST-931).
+
 From completed `Tests` workflow runs on `koctep/pypost` that include job
 `agent-e2e` (n=2 in a 15-run window):
 
@@ -655,7 +663,9 @@ From completed `Tests` workflow runs on `koctep/pypost` that include job
 Wall clock is dominated by the main matrix; `agent-e2e` finishes in
 parallel (~1.6–3.6m), so a trim would not shorten PR feedback in these
 samples. Pack collect size locally: 64 tests (`agent_e2e and not slow`).
-Related: [PYPOST-908](https://pypost.atlassian.net/browse/PYPOST-908).
+Overlap cost: measurable 3.11 billable redundancy (~172s dedicated pack
+step in run #21) while the same marker set also runs in main pytest —
+not wall-clock painful at this sample size.
 
 **Revisit when** (ENABLE threshold): dedicated `make test-agent-e2e` step
 sustained ≥ 6 minutes across ≥3 recent green runs; or maintainers report
