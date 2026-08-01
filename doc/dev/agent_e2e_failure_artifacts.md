@@ -244,7 +244,8 @@ red run.
 
 `tests/test_agent_e2e_failure_artifacts.py` covers helper write/masking,
 diagnostics `session_source` contract (PYPOST-913), best-effort errors
-(`RuntimeError`, `OSError`, `AttributeError`; PYPOST-915), propagation of unexpected dump errors
+(`RuntimeError`, `OSError`, `AttributeError` PYPOST-915; `TypeError`,
+`ValueError` PYPOST-962), propagation of unexpected dump errors
 (`LookupError`, PYPOST-876), in-process caplog proof that a raising dump hook
 logs `agent_session_failure_dump_hook_failed` (PYPOST-912), parametrized hook
 best-effort units for every member of `DUMP_BEST_EFFORT_ERRORS` (PYPOST-961),

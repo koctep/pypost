@@ -250,6 +250,50 @@ def test_dump_best_effort_on_attribute_error(
     assert "error=AttributeError" in caplog.text
 
 
+def test_dump_best_effort_on_type_error(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-962: TypeError on capture is best-effort WARNING + None."""
+    session = MagicMock(spec=AgentAppSession)
+    session.ui_snapshot.side_effect = TypeError(
+        "ui_snapshot() returned unexpected type"
+    )
+    with caplog.at_level(
+        logging.WARNING,
+        logger="pypost.fixtures.agent_e2e_failure",
+    ):
+        dump_dir = dump_agent_e2e_failure_artifacts(
+            session,
+            nodeid="type_error_capture",
+            artifact_root=tmp_path,
+        )
+    assert dump_dir is None
+    assert "agent_e2e_failure_artifacts_failed" in caplog.text
+    assert "error=TypeError" in caplog.text
+
+
+def test_dump_best_effort_on_value_error(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-962: ValueError on capture is best-effort WARNING + None."""
+    session = MagicMock(spec=AgentAppSession)
+    session.ui_snapshot.side_effect = ValueError("invalid snapshot payload")
+    with caplog.at_level(
+        logging.WARNING,
+        logger="pypost.fixtures.agent_e2e_failure",
+    ):
+        dump_dir = dump_agent_e2e_failure_artifacts(
+            session,
+            nodeid="value_error_capture",
+            artifact_root=tmp_path,
+        )
+    assert dump_dir is None
+    assert "agent_e2e_failure_artifacts_failed" in caplog.text
+    assert "error=ValueError" in caplog.text
+
+
 def test_dump_propagates_unexpected_exception(tmp_path: Path) -> None:
     """PYPOST-876: unexpected dump errors must not be swallowed as dump-failed.
 
