@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Final
 
-from PySide6.QtCore import QCoreApplication, QModelIndex, Qt
+from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
     QTreeView,
     QWidget,
 )
+
+from pypost.agent.tree_index import find_tree_index_by_display_text
 
 logger = logging.getLogger(__name__)
 
@@ -236,27 +238,6 @@ def _select_item_view(
     )
 
 
-def _find_tree_index_by_text(tree: QTreeView, text: str) -> QModelIndex | None:
-    model = tree.model()
-    if model is None:
-        return None
-
-    def _walk(parent: QModelIndex) -> QModelIndex | None:
-        rows = model.rowCount(parent)
-        for row in range(rows):
-            index = model.index(row, 0, parent)
-            if not index.isValid():
-                continue
-            if str(index.data(Qt.ItemDataRole.DisplayRole)) == text:
-                return index
-            found = _walk(index)
-            if found is not None:
-                return found
-        return None
-
-    return _walk(QModelIndex())
-
-
 def _select_tree(widget: QTreeView, widget_id: str, option: str | int) -> None:
     model = widget.model()
     if model is None:
@@ -275,7 +256,7 @@ def _select_tree(widget: QTreeView, widget_id: str, option: str | int) -> None:
             )
         widget.setCurrentIndex(index)
         return
-    index = _find_tree_index_by_text(widget, option)
+    index = find_tree_index_by_display_text(widget, option)
     if index is None or not index.isValid():
         raise UiTargetNotInteractableError(
             widget_id,

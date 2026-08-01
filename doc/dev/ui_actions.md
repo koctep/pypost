@@ -106,7 +106,7 @@ Select an item by **display text** (`str`) or **zero-based index** (`int`) on:
 | --- | --- | --- |
 | `QComboBox` | `findText` + `setCurrentIndex` | `setCurrentIndex` |
 | `QListWidget` | `findItems(MatchExactly)` + current item | `setCurrentRow` |
-| `QTreeView` | Depth-first DisplayRole match (expands parent) | Top-level row only |
+| `QTreeView` | Depth-first DisplayRole match via `pypost.agent.tree_index` (expands parent) | Top-level row only |
 | `QListView` / flat `QAbstractItemView` | Column 0 DisplayRole scan + `setCurrentIndex` | Row index on root model |
 
 `QListWidget` is handled before generic item views. Plain `QListView` and other
@@ -115,7 +115,10 @@ flat model-backed views use the last row; they require a model on column 0.
 Missing option/index or unsupported widget type →
 `UiTargetNotInteractableError`. Selection sets the current item; it does
 **not** replace viewport *click* helpers used to open a collection request
-(`tests/helpers/agent_e2e_tree.click_tree_row_by_text`).
+(`tests/helpers/agent_e2e_tree.click_tree_row_by_text`). Both paths share
+`find_tree_index_by_display_text` in `pypost/agent/tree_index.py`; e2e
+helpers raise `AssertionError` on miss, while `ui_select` raises
+`UiTargetNotInteractableError` (PYPOST-941).
 
 ```python
 ui_select(root, METHOD_COMBO, "POST")   # combo by text

@@ -172,6 +172,11 @@ agent e2e sessions. Use `tests/helpers/qt_item_view.py` (`detach_item_view_model
 `close_item_view_fixture`; PYPOST-940). Consumer: `tests/test_ui_actions.py` tree and
 list-view ui_select fixtures; unit proofs in `tests/test_qt_item_view_teardown.py`.
 
+Tree DisplayRole lookup for `ui_select` and `agent_e2e_tree` shares
+`pypost/agent/tree_index.py` (`find_tree_index_by_display_text`; PYPOST-941).
+Unit proofs in `tests/test_tree_index_walk.py` (deep nested row + error-type
+boundaries).
+
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a
 stuck C++ `exec()` without Python callbacks. Use the shared

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, QModelIndex, Qt
-from PySide6.QtGui import QStandardItemModel
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QTreeView
+
+from pypost.agent.tree_index import find_tree_index_by_display_text
 
 __all__ = [
     "click_tree_row_by_text",
@@ -19,18 +20,10 @@ def find_tree_index_by_text(tree: QTreeView, text: str) -> QModelIndex:
     Raises:
         AssertionError: No matching row under the tree model.
     """
-    model = tree.model()
-    assert isinstance(model, QStandardItemModel)
-    root = model.invisibleRootItem()
-    for row in range(root.rowCount()):
-        item = root.child(row)
-        if item is not None and item.text() == text:
-            return item.index()
-        for child_row in range(item.rowCount() if item is not None else 0):
-            child = item.child(child_row)
-            if child is not None and child.text() == text:
-                return child.index()
-    raise AssertionError(f"tree row not found: text={text!r}")
+    index = find_tree_index_by_display_text(tree, text)
+    if index is None or not index.isValid():
+        raise AssertionError(f"tree row not found: text={text!r}")
+    return index
 
 
 def click_tree_row_by_text(tree: QTreeView, text: str) -> None:

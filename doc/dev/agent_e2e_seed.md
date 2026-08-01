@@ -21,7 +21,7 @@ workspace area of the [environment contract](agent_e2e_env.md)
 | `build_agent_e2e_seed_environments()` | Pure builder for the seed `Environment` list |
 | `write_agent_e2e_seed(data_dir)` | Persist via `StorageManager` before session start |
 | `tests/helpers/agent_e2e_seed.py` | Temp dirs + re-exports for product-facing tests |
-| `tests/helpers/agent_e2e_tree.py` | Viewport `visualRect` click for collection rows |
+| `tests/helpers/agent_e2e_tree.py` | Viewport `visualRect` click; delegates DisplayRole walk to `pypost.agent.tree_index` |
 | `tests/test_agent_e2e_seed.py` | Identity + drive-then-snapshot / resolve proof |
 
 ```mermaid
