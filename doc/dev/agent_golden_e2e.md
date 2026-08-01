@@ -18,6 +18,12 @@ Broader packaging (umbrella doc + `make test-agent-e2e`) is
 [Agent UI E2E](agent_e2e.md). HTTP catalog / stub API:
 [agent_e2e_http.md](agent_e2e_http.md).
 
+Product **dialog** settle after Settings open is a sibling `agent_e2e`
+module (`tests/test_agent_dialog_settle_e2e.py`, PYPOST-919) — not part of
+this Send → response golden. Full pattern (timer-before-`exec`,
+`activeModalWidget`, diagnostics):
+[agent_dialog_settle.md](agent_dialog_settle.md).
+
 Golden asserts status + body **presence** (`in joined`). For the PYPOST-887
 **exactly-once** cardinality lock (PUT + malformed body), see
 [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md) — do
@@ -205,5 +211,6 @@ existing agent events from the composed stack (see [logging.md](logging.md)):
 - [UI Action Tools](ui_actions.md)
 - [UI State Snapshot](ui_snapshot.md)
 - [UI Settle / Wait Helpers](ui_wait.md)
+- [Agent E2E Product Dialog Settle](agent_dialog_settle.md)
 - [GUI Testing](gui_testing.md)
 - [Logging Event Naming Convention](logging.md)

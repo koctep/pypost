@@ -26,6 +26,8 @@ Production code must **not** import `tests.helpers`. The historic test helper
 | `capture_ui_snapshot` | Used by `wait_for_snapshot` |
 | `find_widget` | Used by widget/enabled/text waits |
 | Gate | `tests/test_ui_wait.py` under `make test` |
+| Product dialog settle | [agent_dialog_settle.md](agent_dialog_settle.md) |
+| | (`test_agent_dialog_settle_e2e`, PYPOST-919) |
 
 ```mermaid
 flowchart LR
@@ -114,13 +116,18 @@ No environment variables. Requires a started Qt app / `AgentAppSession`.
 | `actual_text=…` mismatch | Expected string/predicate wrong; text not updated |
 | Snapshot wait slow / times out | Predicate too strict; prefer `wait_for_widget`/`text` |
 | Hang without timeout | Do not nest `QEventLoop.exec()`; always pass a timeout |
+| Modal dialog blocks click | Schedule `wait_until` + dismiss with
+  `QTimer.singleShot` *before* `ui_click` — see
+  [agent_dialog_settle.md](agent_dialog_settle.md) |
 
 On timeout, read `err.diagnostics` and the exception message (includes key=value
 pairs). DEBUG logs `ui_wait_settled` / `ui_wait_timeout` with timing scalars only.
 
 ## Related
 
-- [Agent UI E2E](agent_e2e.md) — umbrella + `make test-agent-e2e`
+- [Agent UI E2E](agent_e2e.md) — umbrella, `make test-agent-e2e`
+- [Agent E2E Product Dialog Settle](agent_dialog_settle.md) — Settings modal
+  settle (PYPOST-919)
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI action tools](ui_actions.md) — click / fill / select / send key
 - [UI state snapshot](ui_snapshot.md) — observation tree for predicates

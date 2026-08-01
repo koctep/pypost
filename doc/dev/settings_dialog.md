@@ -135,4 +135,5 @@ Direct ConfigManager round-trip (without dialog): `TestConfigManagerPersistence.
 Parser unit tests: `tests/test_retryable_status_codes_parse.py`,
 `tests/test_bind_address_validation.py` (PYPOST-151).
 
-See also `doc/dev/gui_testing.md`.
+See also `doc/dev/gui_testing.md`. Agent e2e settle after opening Settings
+(real modal, not patched `exec`): [agent_dialog_settle.md](agent_dialog_settle.md).

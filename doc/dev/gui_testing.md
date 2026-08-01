@@ -324,6 +324,11 @@ Wait for async settle conditions after actions — see
 Composed golden product flow (Send → response UI) — see
 [Agent golden e2e](agent_golden_e2e.md) (`tests/test_agent_golden_e2e.py`).
 
+Product dialog settle after Settings open (timer-before-`exec`,
+`activeModalWidget`) — see
+[Agent E2E Product Dialog Settle](agent_dialog_settle.md)
+(`tests/test_agent_dialog_settle_e2e.py`, PYPOST-919).
+
 Run the harness set with:
 
 ```bash

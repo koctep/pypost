@@ -14,7 +14,8 @@ regression lock (exactly-once panel body) is
 The method × body **presentation matrix** (PYPOST-890) is
 [agent_e2e_presentation_matrix.md](agent_e2e_presentation_matrix.md).
 The reusable **environment pack** model (seed, isolation, fixtures inventory)
-is [agent_e2e_env.md](agent_e2e_env.md).
+is [agent_e2e_env.md](agent_e2e_env.md). Product **dialog settle** after Settings
+open (PYPOST-919) is [agent_dialog_settle.md](agent_dialog_settle.md).
 
 Prefer `make test-agent-e2e` over ad-hoc pytest one-liners. CI gates the same
 target via the `agent-e2e` job in `.github/workflows/test.yml` (PYPOST-861);
@@ -93,6 +94,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_e2e_http_env.py` | Env Send + shared HTTP (859) |
 | `tests/test_agent_e2e_http_seed_post.py` | Seed POST Send + body (871) |
 | `tests/test_agent_e2e_failure_artifacts.py` | Failure snapshot dumps (860) |
+| `tests/test_agent_dialog_settle_e2e.py` | Dialog settle (919); [doc](agent_dialog_settle.md) |
 
 **Keep this table synced with markers:** when you add or remove
 `@pytest.mark.agent_e2e` on a module, update the Module column above in the
@@ -328,6 +330,7 @@ timeouts: [testing.md](testing.md).
 - [UI State Snapshot](ui_snapshot.md)
 - [UI Settle / Wait Helpers](ui_wait.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
+- [Agent E2E Product Dialog Settle](agent_dialog_settle.md)
 - [Agent E2E Double Response-Body Lock](agent_e2e_double_response_body.md)
 - [Agent E2E Presentation Matrix](agent_e2e_presentation_matrix.md)
 - [Agent E2E Environment Contract](agent_e2e_env.md)
