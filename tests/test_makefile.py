@@ -437,6 +437,16 @@ class TestDependencyChain:
         assert "venv-test" in prereqs
         assert "install" not in prereqs
 
+    def test_typecheck_depends_on_marker_and_venv_test(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        """PYPOST-932: typecheck must pull [dev] via venv-test (peer lock)."""
+        prereqs = _prerequisites(make_workspace, "typecheck")
+        assert MARKER_REL in prereqs
+        assert "venv-test" in prereqs
+        assert "install" not in prereqs
+
     def test_test_slow_depends_on_venv_test_venv_otel_and_marker(
         self,
         make_workspace: Path,
