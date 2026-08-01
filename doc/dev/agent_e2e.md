@@ -136,7 +136,10 @@ e2e CI double-run is met.
 
 [PYPOST-874](https://pypost.atlassian.net/browse/PYPOST-874) **ENABLE**s
 failure-only upload of `artifacts/agent_e2e/` from job `agent-e2e` as Actions
-artifact `agent-e2e-failure-artifacts` (see
+artifact `agent-e2e-failure-artifacts`.
+[PYPOST-909](https://pypost.atlassian.net/browse/PYPOST-909) **ENABLE**s the
+same path from the main `test` matrix as
+`agent-e2e-failure-artifacts-${{ matrix.python-version }}` (see
 [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md)).
 
 See [testing.md](testing.md) for suite-wide CI layout.
@@ -257,7 +260,9 @@ once-only status under `RESPONSE_PANEL`. Smoke slice runs under default
 | Marker selection | `make test-agent-e2e` → `-m "agent_e2e and not slow"` |
 | File-list override | `PYTEST_ARGS` replaces the default `-m` expression |
 | CI make gate | `.github/workflows/test.yml` job `agent-e2e` (PYPOST-861) |
-| Failure artifacts | `artifacts/agent_e2e/` or `PYPOST_AGENT_E2E_ARTIFACTS` (860); CI upload `agent-e2e-failure-artifacts` on `agent-e2e` failure (874) |
+| Failure artifacts | On disk: `artifacts/agent_e2e/` or `PYPOST_AGENT_E2E_ARTIFACTS` (860) |
+| Failure CI upload | `agent-e2e-failure-artifacts` on `agent-e2e` (874); matrix |
+| | `agent-e2e-failure-artifacts-<py>` on `test` failure (909) |
 | Module timeouts | Per-test / module `pytest.mark.timeout` (see sibling docs) |
 
 Failure dumps: [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
@@ -284,6 +289,8 @@ for narrow runs.
 | | [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) |
 | CI `agent-e2e` red, need dumps | Download Actions artifact |
 | | `agent-e2e-failure-artifacts` (PYPOST-874) |
+| CI main `test` matrix red, need dumps | Download |
+| | `agent-e2e-failure-artifacts-<python>` (PYPOST-909) |
 | Harness table ≠ marks | Align Module rows with `@pytest.mark.agent_e2e`; |
 | | run `make test PYTEST_ARGS=` |
 | | `"tests/test_agent_e2e_harness_table_doc.py -v"` |
