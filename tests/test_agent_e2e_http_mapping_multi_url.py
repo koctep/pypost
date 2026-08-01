@@ -38,6 +38,8 @@ pytestmark = [
     pytest.mark.agent_e2e,
 ]
 
+FORCED_SETTLE_TIMEOUT_S = 0.05
+
 _STATUS_LABEL = "Status: 200"
 _GET_BODY_IN_SNAPSHOT = json.dumps(
     json.loads(SEED_GET_OK_BODY), ensure_ascii=False
@@ -127,3 +129,50 @@ def test_mapping_stub_two_distinct_urls_panel_outcomes(
     assert _STATUS_LABEL in post_joined
     assert _POST_BODY_IN_SNAPSHOT in post_joined
     assert stub_agent_e2e_http is agent_e2e_http_stub
+
+
+def test_mapping_get_send_settle_timeout_includes_step_and_excerpt(
+    agent_e2e_session: AgentAppSession,
+    agent_e2e_http_stub: Any,
+) -> None:
+    """PYPOST-955: forced mapping GET Send settle timeout carries step + excerpt."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready is True
+    find_widget(session.window, URL_INPUT)
+    find_widget(session.window, METHOD_COMBO)
+    find_widget(session.window, SEND_BUTTON)
+
+    responses = {
+        SEED_GET_RESOLVED_URL: CANNED_SEED_GET_OK,
+    }
+
+    with agent_e2e_http_stub(responses):
+        session.ui_fill(URL_INPUT, SEED_GET_RESOLVED_URL)
+        session.ui_select(METHOD_COMBO, "GET")
+        session.ui_click(SEND_BUTTON)
+        with pytest.raises(UiWaitTimeoutError) as exc_info:
+            try:
+                session.wait_for_snapshot(
+                    lambda _: False,
+                    timeout=FORCED_SETTLE_TIMEOUT_S,
+                )
+            except UiWaitTimeoutError as exc:
+                last = session.ui_snapshot()
+                excerpt = response_panel_excerpt(last)
+                raise UiWaitTimeoutError(
+                    "mapping multi-URL Send settle failed "
+                    "(wait_response_after_mapping_get_send): "
+                    f"{exc}; response_excerpt={excerpt!r}",
+                    timeout_s=exc.timeout_s,
+                    condition=exc.condition,
+                    diagnostics={
+                        **exc.diagnostics,
+                        "step": "wait_response_after_mapping_get_send",
+                        "response_excerpt": excerpt,
+                    },
+                ) from exc
+
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics.get("step") == "wait_response_after_mapping_get_send"
+    assert "response_excerpt" in diagnostics
+    assert isinstance(diagnostics["response_excerpt"], str)

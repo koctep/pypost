@@ -185,14 +185,48 @@ Unit proofs: `tests/test_agent_e2e_http.py`
 `test_stub_agent_e2e_http_url_router_miss_raises`,
 `test_stub_agent_e2e_http_url_router_method_url_compound_keys`).
 
-GUI scenario (PYPOST-901): `tests/test_agent_e2e_http_mapping_multi_url.py`
-— blank session, one Mapping stub (`SEED_GET_RESOLVED_URL` /
-`SEED_POST_RESOLVED_URL` → canned GET/POST), two Sends with panel asserts.
-Inventory gate:
-`tests/test_agent_e2e_http.py::test_mapping_multi_url_gui_send_scenario_module_exists`.
+### Mapping multi-URL GUI module (PYPOST-901 / PYPOST-955)
+
+| Test | Role |
+| --- | --- |
+| `test_mapping_stub_two_distinct_urls_panel_outcomes` | Happy path — two Sends, panel asserts (901) |
+| `test_mapping_get_send_settle_timeout_includes_step_and_excerpt` | Forced GET Send settle timeout companion (955) |
+
+Inventory gates in `tests/test_agent_e2e_http.py`:
+
+- `test_mapping_multi_url_gui_send_scenario_module_exists` — happy-path callable
+- `test_mapping_multi_url_settle_timeout_companion_exists` — companion callable
+
+Happy path: blank session, one Mapping stub (`SEED_GET_RESOLVED_URL` /
+`SEED_POST_RESOLVED_URL` → canned GET/POST), two Sends with panel asserts via
+`_wait_response` (15 s `SEND_SETTLE_TIMEOUT_S`, step names
+`wait_response_after_mapping_get_send` /
+`wait_response_after_mapping_post_send`).
+
+#### Timeout companion (PYPOST-955)
+
+`test_mapping_get_send_settle_timeout_includes_step_and_excerpt` mirrors the
+golden Send and [dialog-settle](agent_dialog_settle.md) timeout companions:
+forces near-zero settle failure and asserts `UiWaitTimeoutError.diagnostics`
+carries stable step + excerpt.
+
+1. Same module as happy path; GET-only Send under minimal Mapping stub.
+2. Inline `session.wait_for_snapshot(lambda _: False, timeout=FORCED_SETTLE_TIMEOUT_S)` — not `_wait_response` (15 s budget).
+3. On `UiWaitTimeoutError`, inline rewrap matches happy-path shape:
+   `step=wait_response_after_mapping_get_send`, `response_excerpt` from
+   `response_panel_excerpt(last)`.
+4. Assert `diagnostics["step"]` and presence/type of `response_excerpt`.
+
+| Constant | Value |
+| --- | --- |
+| `FORCED_SETTLE_TIMEOUT_S` | 0.05 (module-local; same as golden/dialog companions) |
+| `SEND_SETTLE_TIMEOUT_S` | 15.0 (happy path only; from `tests.helpers.agent_e2e_send`) |
+| Companion `step` | `wait_response_after_mapping_get_send` |
 
 ```bash
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_mapping_multi_url.py -q"
+make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_mapping_multi_url.py::test_mapping_get_send_settle_timeout_includes_step_and_excerpt -q"
+make test PYTEST_ARGS="tests/test_agent_e2e_http.py::test_mapping_multi_url_settle_timeout_companion_exists -q"
 ```
 
 ### Seed POST Send (body path)
@@ -244,6 +278,8 @@ identities auto-name; Mapping defaults to `url_router`).
 | Patch target | `SEND_REQUEST_PATCH_TARGET` in the fixture module |
 | Offscreen Qt | `make test-agent-e2e` / fixtures `offscreen=True` |
 | Timeouts | Module `pytest.mark.timeout(60)` for GUI Send; unit `timeout(10)` |
+| Mapping happy-path settle | `SEND_SETTLE_TIMEOUT_S` (15 s) in `_wait_response` |
+| Mapping timeout companion | `FORCED_SETTLE_TIMEOUT_S` (0.05 s) in mapping module |
 
 No extra env vars.
 
@@ -272,6 +308,12 @@ No extra env vars.
 | | Send; exceptions still exit the context manager. |
 | Wrong patch target | Always use this helper (RequestService use site), not |
 | | `pypost.core.http_client.HTTPClient.send_request` alone. |
+| Mapping settle timeout missing `step` / excerpt | Run companion: |
+| | `make test-agent-e2e PYTEST_ARGS=` |
+| | `"tests/test_agent_e2e_http_mapping_multi_url.py::` |
+| | `test_mapping_get_send_settle_timeout_includes_step_and_excerpt -v"`. |
+| | Confirm inline rewrap (not `_wait_response`) and impossible snapshot |
+| | predicate; see [agent_dialog_settle.md](agent_dialog_settle.md). |
 
 ## Related
 

@@ -211,3 +211,19 @@ def test_mapping_multi_url_gui_send_scenario_module_exists() -> None:
     assert callable(
         getattr(mod, "test_mapping_stub_two_distinct_urls_panel_outcomes", None)
     )
+
+
+def test_mapping_multi_url_settle_timeout_companion_exists() -> None:
+    """PYPOST-955: mapping Send settle timeout companion must exist."""
+    import importlib
+
+    mod = importlib.import_module(
+        "tests.test_agent_e2e_http_mapping_multi_url"
+    )
+    assert callable(
+        getattr(
+            mod,
+            "test_mapping_get_send_settle_timeout_includes_step_and_excerpt",
+            None,
+        )
+    )
