@@ -177,6 +177,14 @@ Tree DisplayRole lookup for `ui_select` and `agent_e2e_tree` shares
 Unit proofs in `tests/test_tree_index_walk.py` (deep nested row + error-type
 boundaries).
 
+List/tree negative `ui_select` paths (missing display text, out-of-range index)
+are locked in `tests/test_ui_actions.py`
+(`test_select_list_missing_option_raises`,
+`test_select_list_index_out_of_range_raises`,
+`test_select_tree_missing_option_raises`,
+`test_select_tree_index_out_of_range_raises`; PYPOST-942), mirroring combo
+`test_select_missing_option_raises`.
+
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a
 stuck C++ `exec()` without Python callbacks. Use the shared

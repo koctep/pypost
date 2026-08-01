@@ -332,6 +332,58 @@ def test_select_missing_option_raises(qapp: QApplication) -> None:
         root.close()
 
 
+def test_select_list_missing_option_raises(qapp: QApplication) -> None:
+    """PYPOST-942: missing list label raises option not found."""
+    root, _ = _make_fixture(qapp)
+    try:
+        with pytest.raises(UiTargetNotInteractableError) as exc_info:
+            ui_select(root, _LIST, "PATCH")
+        assert "option not found" in str(exc_info.value)
+    finally:
+        root.close()
+
+
+@pytest.mark.parametrize("index", [-1, 3])
+def test_select_list_index_out_of_range_raises(
+    qapp: QApplication,
+    index: int,
+) -> None:
+    """PYPOST-942: out-of-range list index raises option index out of range."""
+    root, _ = _make_fixture(qapp)
+    try:
+        with pytest.raises(UiTargetNotInteractableError) as exc_info:
+            ui_select(root, _LIST, index)
+        assert "option index out of range" in str(exc_info.value)
+    finally:
+        root.close()
+
+
+def test_select_tree_missing_option_raises(qapp: QApplication) -> None:
+    """PYPOST-942: missing tree label raises option not found."""
+    root = _make_tree_fixture(qapp)
+    try:
+        with pytest.raises(UiTargetNotInteractableError) as exc_info:
+            ui_select(root, _TREE, "PATCH")
+        assert "option not found" in str(exc_info.value)
+    finally:
+        close_item_view_fixture(root, qapp, _TREE, view_type=QTreeView)
+
+
+@pytest.mark.parametrize("index", [-1, 2])
+def test_select_tree_index_out_of_range_raises(
+    qapp: QApplication,
+    index: int,
+) -> None:
+    """PYPOST-942: out-of-range top-level tree index raises option index out of range."""
+    root = _make_tree_fixture(qapp)
+    try:
+        with pytest.raises(UiTargetNotInteractableError) as exc_info:
+            ui_select(root, _TREE, index)
+        assert "option index out of range" in str(exc_info.value)
+    finally:
+        close_item_view_fixture(root, qapp, _TREE, view_type=QTreeView)
+
+
 def test_main_window_fill_url_and_select_method(
     agent_e2e_session: AgentAppSession,
 ) -> None:

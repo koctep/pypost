@@ -113,12 +113,21 @@ Select an item by **display text** (`str`) or **zero-based index** (`int`) on:
 flat model-backed views use the last row; they require a model on column 0.
 
 Missing option/index or unsupported widget type →
-`UiTargetNotInteractableError`. Selection sets the current item; it does
-**not** replace viewport *click* helpers used to open a collection request
+`UiTargetNotInteractableError` with `reason=option not found` or
+`reason=option index out of range` (same strings for combo, list, and tree).
+Selection sets the current item; it does **not** replace viewport *click*
+helpers used to open a collection request
 (`tests/helpers/agent_e2e_tree.click_tree_row_by_text`). Both paths share
 `find_tree_index_by_display_text` in `pypost/agent/tree_index.py`; e2e
 helpers raise `AssertionError` on miss, while `ui_select` raises
 `UiTargetNotInteractableError` (PYPOST-941).
+
+Fixture contract tests in `tests/test_ui_actions.py` lock list/tree negative
+paths (`test_select_list_missing_option_raises`,
+`test_select_list_index_out_of_range_raises`,
+`test_select_tree_missing_option_raises`,
+`test_select_tree_index_out_of_range_raises`; PYPOST-942), mirroring combo
+`test_select_missing_option_raises`.
 
 ```python
 ui_select(root, METHOD_COMBO, "POST")   # combo by text
