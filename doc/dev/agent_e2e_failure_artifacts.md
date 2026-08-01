@@ -101,6 +101,11 @@ Best-effort catch set (`_DUMP_BEST_EFFORT_ERRORS`, PYPOST-876):
 Other exception types from the dump body propagate (they are not converted
 into a dump-failed WARNING).
 
+The lifecycle dump-hook wrapper in `AgentAppSession.__exit__` uses the same
+intentional catch set (`_DUMP_HOOK_BEST_EFFORT_ERRORS`, PYPOST-914). Hook
+failures outside that set propagate from `__exit__` instead of logging
+`agent_session_failure_dump_hook_failed`.
+
 ## API / Usage
 
 ### Automatic (preferred)
@@ -238,7 +243,8 @@ red run.
 `tests/test_agent_e2e_failure_artifacts.py` covers helper write/masking,
 diagnostics `session_source` contract (PYPOST-913), best-effort errors (`RuntimeError`), propagation of unexpected dump errors
 (`LookupError`, PYPOST-876), in-process caplog proof that a raising dump hook
-logs `agent_session_failure_dump_hook_failed` (PYPOST-912), a subprocess proof
+logs `agent_session_failure_dump_hook_failed` (PYPOST-912), propagation of
+unexpected hook errors from `__exit__` (`LookupError`, PYPOST-914), a subprocess proof
 that the makereport hook dumps on fixture assert fail, and a subprocess proof
 that direct `AgentAppSession` constructions dump on assert fail
 (`make test-agent-e2e`).
@@ -252,6 +258,7 @@ that direct `AgentAppSession` constructions dump on assert fail
 | Cleartext secret in JSON | Key must be in `hidden_keys` for the active env; see [ui_snapshot.md](ui_snapshot.md) |
 | Dump WARNING only | Capture failed with a best-effort type; fix session ready / window; original fail still reported |
 | Unexpected dump exception in traceback | Helper bug outside the best-effort catch set; fix dump path (PYPOST-876) |
+| Unexpected hook exception in traceback | Hook bug outside the best-effort catch set; fix hook or dump path (PYPOST-914) |
 | `session_source=direct` | Expected for bare `AgentAppSession` constructions (PYPOST-875) |
 | No Artifacts UI proof yet | Expected — PYPOST-911 **DEFER**; complete checklist in § Live Artifacts UI proof and `ai-tasks/PYPOST-911/live-proof-notes.md` |
 

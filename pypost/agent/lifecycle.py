@@ -39,6 +39,18 @@ from pypost.ui.widget_ids import REQUEST_TABS
 
 logger = logging.getLogger(__name__)
 
+# Intentional best-effort catches for failure-dump hook I/O / capture errors
+# (PYPOST-914). Aligned with pypost.fixtures.agent_e2e_failure
+# ``_DUMP_BEST_EFFORT_ERRORS`` (PYPOST-876). Unexpected Exception subclasses
+# propagate so hook bugs are visible.
+_DUMP_HOOK_BEST_EFFORT_ERRORS = (
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    AttributeError,
+)
+
 # Optional best-effort dump callback (installed by agent e2e pytest plugin).
 # Signature: hook(session, exc_type, exc) -> None
 _FailureDumpHook = Callable[
@@ -251,7 +263,7 @@ class AgentAppSession:
         ):
             try:
                 _failure_dump_hook(self, exc_type, exc)
-            except Exception as dump_exc:  # noqa: BLE001 — never mask the test failure
+            except _DUMP_HOOK_BEST_EFFORT_ERRORS as dump_exc:
                 logger.warning(
                     "agent_session_failure_dump_hook_failed error=%s",
                     type(dump_exc).__name__,

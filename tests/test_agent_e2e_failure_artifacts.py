@@ -286,6 +286,36 @@ def test_makereport_hook_dumps_on_fixture_assert_fail(
     assert "intentional failure" in (diag["exc_message"] or "")
 
 
+def test_dump_hook_propagates_unexpected_exception(
+    qapp: QApplication,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-914: unexpected hook errors must propagate from __exit__.
+
+    LookupError is outside the intentional best-effort catalogue aligned with
+    ``_DUMP_BEST_EFFORT_ERRORS`` (PYPOST-876).
+    """
+    assert QApplication.instance() is qapp
+
+    def _unexpected_hook(
+        _session: AgentAppSession,
+        _exc_type: type[BaseException],
+        _exc: BaseException,
+    ) -> None:
+        raise LookupError("unexpected hook bug")
+
+    set_agent_session_failure_dump_hook(_unexpected_hook)
+    try:
+        with caplog.at_level(logging.WARNING, logger="pypost.agent.lifecycle"):
+            with pytest.raises(LookupError, match="unexpected hook bug"):
+                with AgentAppSession(offscreen=True, ready_timeout=30.0) as session:
+                    assert session.window.is_ui_ready is True
+                    assert False, "intentional dump hook propagation"
+        assert "agent_session_failure_dump_hook_failed" not in caplog.text
+    finally:
+        set_agent_session_failure_dump_hook(make_direct_session_failure_dump_hook())
+
+
 def test_dump_hook_failure_logs_warning(
     qapp: QApplication,
     caplog: pytest.LogCaptureFixture,
