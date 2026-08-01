@@ -2,7 +2,11 @@
 
 ## Overview
 
-One `agent_e2e` scenario proves that the shared settle/wait stack can wait for
+One `agent_e2e` module (`tests/test_agent_dialog_settle_e2e.py`) includes a
+**happy-path** proof and a **forced-timeout companion** (PYPOST-934) that
+asserts `step` plus modal scalar keys on `UiWaitTimeoutError.diagnostics`.
+
+The happy-path scenario proves that the shared settle/wait stack can wait for
 a **real product dialog** after a UI action — not only synthetic delayed
 widgets (`tests/test_ui_wait.py`) or the response panel after Send
 ([Agent Golden E2E](agent_golden_e2e.md)).
@@ -20,7 +24,9 @@ Source debt: [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852) TD-1
 
 | Piece | Role |
 | --- | --- |
-| `tests/test_agent_dialog_settle_e2e.py` | Scenario + modal-safe settle |
+| `tests/test_agent_dialog_settle_e2e.py` | Two tests: happy path + timeout companion |
+| `test_agent_dialog_settle_after_settings_open` | Happy-path modal settle + dismiss |
+| `…timeout_includes_step_and_modal_diag` | Forced settle timeout companion (934) |
 | `SETTINGS_BUTTON` | Stable open control ([ui_identity](ui_identity.md)) |
 | `session.ui_click` | Drives `MainWindow.open_settings` → `exec()` |
 | `session.wait_until` | Bounded poll ([ui_wait](ui_wait.md)) |
@@ -82,6 +88,22 @@ make test-agent-e2e PYTEST_ARGS="tests/test_agent_dialog_settle_e2e.py -v"
 3. `session.ui_click(SETTINGS_BUTTON)` (blocks in `exec` until reject).
 4. Re-raise any callback error; assert settle succeeded.
 
+### Timeout companion (PYPOST-934)
+
+`test_agent_dialog_settle_timeout_includes_step_and_modal_diag` mirrors the
+golden Send timeout companion
+(`test_agent_golden_settle_timeout_includes_step_and_excerpt`):
+
+1. Same timer-before-click skeleton; use a `settle_error: list[BaseException]`
+   because the callback runs async while `ui_click` blocks in `exec()`.
+2. Inside `_on_forced_timeout`, call `wait_until(lambda: False, …)` with
+   `FORCED_SETTLE_TIMEOUT_S` and `condition_name="forced_dialog_settle_timeout"`.
+3. On `UiWaitTimeoutError`, rewrap with the same `step` + `_modal_diag()` as
+   the happy path.
+4. After `ui_click` returns, assert `len(settle_error) == 1`, type is
+   `UiWaitTimeoutError`, `diagnostics["step"] == SETTLE_STEP`, and keys
+   `dialog_title` / `active_modal_type` are present (values may be `None`).
+
 ### Pattern sketch (do not redefine APIs)
 
 ```python
@@ -135,9 +157,11 @@ Public surfaces consumed: `AgentAppSession` / `ui_click` / `wait_until`,
 | Setting | Value |
 | --- | --- |
 | Module `pytest.mark.timeout` | 60 s |
-| `DIALOG_SETTLE_TIMEOUT_S` | 10.0 (`wait_until` budget) |
+| `DIALOG_SETTLE_TIMEOUT_S` | 10.0 (happy-path `wait_until` budget) |
+| `FORCED_SETTLE_TIMEOUT_S` | 0.05 (companion near-zero budget) |
 | Timer delay | `QTimer.singleShot(0, …)` |
-| `condition_name` | `settings_dialog_present` |
+| Happy-path `condition_name` | `settings_dialog_present` |
+| Companion `condition_name` | `forced_dialog_settle_timeout` |
 | `SETTLE_STEP` | `wait_dialog_after_settings_open` |
 
 No extra environment variables. Prefer `make test-agent-e2e` for
@@ -160,6 +184,10 @@ No extra environment variables. Prefer `make test-agent-e2e` for
 | | inside the timer callback. |
 | Confused with Settings unit e2e | Those often **patch** `SettingsDialog.exec`. |
 | | This scenario keeps a real modal to prove settle. |
+| Companion diag assertion failure | Confirm rewrap still sets `step` and |
+| | `_modal_diag()` keys. Near-zero budget may leave |
+| | `dialog_title` / `active_modal_type` as `None`; asserts |
+| | check key **presence**, not values. |
 
 Observability reuses DEBUG `ui_wait_settled` / `ui_wait_timeout` with
 `condition=settings_dialog_present`. Failure context is primarily the

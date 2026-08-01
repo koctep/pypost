@@ -22,6 +22,7 @@ pytestmark = [
 ]
 
 DIALOG_SETTLE_TIMEOUT_S = 10.0
+FORCED_SETTLE_TIMEOUT_S = 0.05
 SETTLE_STEP = "wait_dialog_after_settings_open"
 
 
@@ -91,3 +92,51 @@ def test_agent_dialog_settle_after_settings_open(
     if settle_error:
         raise settle_error[0]
     assert settle_ok, "expected Settings dialog settle before dismiss"
+
+
+def test_agent_dialog_settle_timeout_includes_step_and_modal_diag(
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-934: forced dialog-settle timeout carries step + modal scalars."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready is True
+    find_widget(session.window, SETTINGS_BUTTON)
+
+    settle_error: list[BaseException] = []
+
+    def _on_forced_timeout() -> None:
+        try:
+            try:
+                session.wait_until(
+                    lambda: False,
+                    timeout=FORCED_SETTLE_TIMEOUT_S,
+                    message="forced dialog settle timeout",
+                    condition_name="forced_dialog_settle_timeout",
+                )
+            except UiWaitTimeoutError as exc:
+                raise UiWaitTimeoutError(
+                    f"dialog settle failed: {exc}",
+                    timeout_s=exc.timeout_s,
+                    condition=exc.condition,
+                    diagnostics={
+                        **exc.diagnostics,
+                        "step": SETTLE_STEP,
+                        **_modal_diag(),
+                    },
+                ) from exc
+        except BaseException as exc:
+            settle_error.append(exc)
+        finally:
+            modal = QApplication.activeModalWidget()
+            if modal is not None:
+                modal.reject()
+
+    QTimer.singleShot(0, _on_forced_timeout)
+    session.ui_click(SETTINGS_BUTTON)
+
+    assert len(settle_error) == 1
+    assert isinstance(settle_error[0], UiWaitTimeoutError)
+    diagnostics = settle_error[0].diagnostics
+    assert diagnostics.get("step") == SETTLE_STEP
+    assert "dialog_title" in diagnostics
+    assert "active_modal_type" in diagnostics
