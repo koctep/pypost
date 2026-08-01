@@ -773,9 +773,27 @@ from `_seed_minimal_project`. A **fast contract guard** in
 the seed includes those paths before any network install — so future dynamic metadata changes
 fail in the default `make test` matrix instead of only in the 1–3 minute slow smoke job.
 
-When adding new dynamic or install-time paths to `pyproject.toml`, extend the seed helper and
-contract parser together; see `ai-tasks/PYPOST-943/20-architecture.md` § Packaging fields the
-seed must satisfy.
+#### Minimum `pypost/` tree policy (PYPOST-963)
+
+Slow smoke uses a **stub package**, not a full mirror of the repository `pypost/` tree.
+Editable install metadata resolution only needs package discovery plus the dynamic version
+module and readme file — not application subpackages such as `pypost/core/` or `pypost/ui/`.
+
+| Location | Policy |
+| --- | --- |
+| `pypost/__init__.py` | Empty stub from `_seed_minimal_project` |
+| `pypost/version.py` | Copied from repo (PYPOST-808 single version source) |
+| `README.md` (workspace root) | Copied from repo |
+| Other `pypost/**` paths | **Excluded** unless packaging requires them at install time |
+
+The canonical stub file set is `SLOW_SMOKE_MINIMUM_PYPPOST_FILES` in `tests/test_makefile.py`
+(currently `__init__.py` and `version.py`). `test_slow_smoke_seed_materializes_minimum_pypost_tree`
+asserts the seeded workspace matches that set exactly — catching both under-seeding and
+accidental full-tree copies.
+
+When adding new dynamic or install-time paths to `pyproject.toml`, extend the seed helper,
+`SLOW_SMOKE_MINIMUM_PYPPOST_FILES` (if under `pypost/`), and the contract parser together;
+see `ai-tasks/PYPOST-943/20-architecture.md` § Packaging fields the seed must satisfy.
 
 Focused contract run:
 

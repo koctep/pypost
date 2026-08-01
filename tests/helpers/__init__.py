@@ -54,3 +54,11 @@ class FakeStorageManager:
 
     def deserialize_environment_records(self, records):
         return [], ()
+
+    def serialize_environment_records(
+        self,
+        environments,
+        *,
+        target_envelope_version=None,
+    ):
+        return [env.model_dump(mode="json") for env in environments]

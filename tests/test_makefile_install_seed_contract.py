@@ -11,6 +11,7 @@ import pytest
 from tests.test_makefile import (
     MAKEFILE,
     PYPROJECT,
+    SLOW_SMOKE_MINIMUM_PYPPOST_FILES,
     _copy_pyproject,
     _seed_installable_package,
 )
@@ -58,6 +59,16 @@ def _materialize_slow_smoke_seed(workspace: Path) -> None:
     _seed_installable_package(workspace)
 
 
+def _pypost_relative_files(workspace: Path) -> frozenset[str]:
+    """Return workspace-relative paths of files under pypost/."""
+    pypost_dir = workspace / "pypost"
+    return frozenset(
+        path.relative_to(pypost_dir).as_posix()
+        for path in pypost_dir.rglob("*")
+        if path.is_file()
+    )
+
+
 def test_slow_smoke_seed_includes_pyproject_packaging_artifacts(
     tmp_path: Path,
 ) -> None:
@@ -73,4 +84,17 @@ def test_slow_smoke_seed_includes_pyproject_packaging_artifacts(
     assert not missing, (
         "slow-smoke seed (make_workspace_full_deps) missing install-time artifacts "
         f"required by pyproject.toml: {[str(p) for p in missing]}"
+    )
+
+
+def test_slow_smoke_seed_materializes_minimum_pypost_tree(tmp_path: Path) -> None:
+    """Slow-smoke seed uses stub pypost/ tree, not a full repo mirror (PYPOST-963)."""
+    _materialize_slow_smoke_seed(tmp_path)
+
+    actual = _pypost_relative_files(tmp_path)
+    assert actual == SLOW_SMOKE_MINIMUM_PYPPOST_FILES, (
+        "slow-smoke pypost/ tree drifted from SLOW_SMOKE_MINIMUM_PYPPOST_FILES policy: "
+        f"expected {sorted(SLOW_SMOKE_MINIMUM_PYPPOST_FILES)!r}, got {sorted(actual)!r}. "
+        "Update the policy constant and _seed_installable_package together when "
+        "pyproject.toml requires additional install-time modules."
     )

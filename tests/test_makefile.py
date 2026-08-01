@@ -144,8 +144,15 @@ def _seed_minimal_project(workspace: Path) -> None:
     (pypost_dir / "__init__.py").write_text("", encoding="utf-8")
 
 
+# Minimum pypost/ tree for slow-smoke isolated workspace (PYPOST-963).
+# Stub package only — not a full repo mirror. Widen when pyproject.toml requires more
+# install-time modules; keep in sync with _seed_installable_package and the seed contract
+# test in tests/test_makefile_install_seed_contract.py.
+SLOW_SMOKE_MINIMUM_PYPPOST_FILES = frozenset({"__init__.py", "version.py"})
+
+
 def _seed_installable_package(workspace: Path) -> None:
-    """Seed pypost/ and packaging files required by committed pyproject.toml."""
+    """Seed minimum pypost/ tree and packaging files for committed pyproject.toml."""
     _seed_minimal_project(workspace)
     shutil.copy(VERSION_PY, workspace / "pypost" / "version.py")
     shutil.copy(README, workspace / "README.md")
