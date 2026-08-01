@@ -1501,7 +1501,13 @@
     ],
     "PYPOST-89": [
       "60-tech-debt.md"
+    ],
+    "PYPOST-919": [
+      "70-dev-docs.md"
+    ],
+    "PYPOST-922": [
+      "70-dev-docs.md"
     ]
   },
-  "violation_count": 257
+  "violation_count": 259
 }

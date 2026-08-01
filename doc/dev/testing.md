@@ -607,6 +607,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv succeeds `lint` via `venv-test`; `make test` succeeds via `venv-test` |
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
 | Slow install smoke | `make install` with real `pyproject.toml` succeeds; marked `@pytest.mark.slow` |
+| Slow smoke seed contract | Isolated workspace seed mirrors packaging metadata from committed `pyproject.toml` (dynamic version attr, readme), not only dependency pins (PYPOST-943) |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
 | Agent e2e target | deps (`venv-test` + `venv-otel`), help listing, recipe marker, selection smoke (861/872) |
 
@@ -621,6 +622,36 @@ runner's interpreter.
 
 Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, minimal
 `tests/test_noop.py`, and `pypost/__init__.py`. Focused run:
+
+### Slow smoke isolated workspace seed (PYPOST-943)
+
+The slow install smoke (`make_workspace_full_deps` in `tests/test_makefile.py`) copies the
+**committed** `pyproject.toml` into an isolated `tmp_path` and runs `make install` there.
+Dependency pins alone are not enough: setuptools resolves **dynamic metadata** from that
+manifest at build time. The seed must therefore mirror install-time packaging artifacts, not
+only the dependency list.
+
+| `pyproject.toml` field | Seed requirement |
+| --- | --- |
+| `[tool.setuptools.dynamic] version.attr` | `pypost/version.py` with `__version__` (copied from repo) |
+| `[project] readme` | `README.md` on disk (copied from repo) |
+| `[tool.setuptools.packages.find]` | Minimal `pypost/` package dir (`__init__.py` stub) |
+
+`_seed_installable_package` materializes the version and readme files atop the existing stub
+from `_seed_minimal_project`. A **fast contract guard** in
+`tests/test_makefile_install_seed_contract.py` parses committed `pyproject.toml` and asserts
+the seed includes those paths before any network install — so future dynamic metadata changes
+fail in the default `make test` matrix instead of only in the 1–3 minute slow smoke job.
+
+When adding new dynamic or install-time paths to `pyproject.toml`, extend the seed helper and
+contract parser together; see `ai-tasks/PYPOST-943/20-architecture.md` § Packaging fields the
+seed must satisfy.
+
+Focused contract run:
+
+```bash
+make test PYTEST_ARGS='tests/test_makefile_install_seed_contract.py -v'
+```
 
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -v

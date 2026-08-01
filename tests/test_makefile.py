@@ -16,6 +16,8 @@ pytestmark = pytest.mark.timeout(120)
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO_ROOT / "Makefile"
 PYPROJECT = REPO_ROOT / "pyproject.toml"
+README = REPO_ROOT / "README.md"
+VERSION_PY = REPO_ROOT / "pypost" / "version.py"
 REQUIREMENTS = REPO_ROOT / "requirements.txt"
 REQUIREMENTS_IN = REPO_ROOT / "requirements.in"
 REQUIREMENTS_DEV = REPO_ROOT / "requirements-dev.txt"
@@ -137,6 +139,13 @@ def _seed_minimal_project(workspace: Path) -> None:
     (pypost_dir / "__init__.py").write_text("", encoding="utf-8")
 
 
+def _seed_installable_package(workspace: Path) -> None:
+    """Seed pypost/ and packaging files required by committed pyproject.toml."""
+    _seed_minimal_project(workspace)
+    shutil.copy(VERSION_PY, workspace / "pypost" / "version.py")
+    shutil.copy(README, workspace / "README.md")
+
+
 _MINIMAL_PYPROJECT = """\
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -188,7 +197,7 @@ def make_workspace(tmp_path: Path) -> Path:
 def make_workspace_full_deps(tmp_path: Path) -> Path:
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
     _copy_pyproject(tmp_path)
-    _seed_minimal_project(tmp_path)
+    _seed_installable_package(tmp_path)
     return tmp_path
 
 
