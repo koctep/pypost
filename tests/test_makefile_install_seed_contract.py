@@ -2,30 +2,20 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import pytest
 
 from tests.test_makefile import (
-    MAKEFILE,
     PYPROJECT,
     REPO_ROOT,
     SLOW_SMOKE_MINIMUM_PYPPOST_FILES,
-    _copy_pyproject,
+    _materialize_slow_smoke_workspace,
     _required_seed_paths_from_pyproject,
     _script_target_modules,
-    _seed_installable_package,
 )
 
 pytestmark = pytest.mark.timeout(30)
-
-
-def _materialize_slow_smoke_seed(workspace: Path) -> None:
-    """Mirror make_workspace_full_deps seed (no network)."""
-    shutil.copy(MAKEFILE, workspace / "Makefile")
-    _copy_pyproject(workspace)
-    _seed_installable_package(workspace)
 
 
 def _pypost_relative_files(workspace: Path) -> frozenset[str]:
@@ -87,7 +77,7 @@ def test_slow_smoke_seed_includes_pyproject_packaging_artifacts(
         "expected pyproject.toml to declare install-time paths for the slow-smoke seed"
     )
 
-    _materialize_slow_smoke_seed(tmp_path)
+    _materialize_slow_smoke_workspace(tmp_path)
 
     missing = [rel for rel in required if not (tmp_path / rel).is_file()]
     assert not missing, (
@@ -98,7 +88,7 @@ def test_slow_smoke_seed_includes_pyproject_packaging_artifacts(
 
 def test_slow_smoke_seed_materializes_minimum_pypost_tree(tmp_path: Path) -> None:
     """Slow-smoke seed uses stub pypost/ tree, not a full repo mirror (PYPOST-963)."""
-    _materialize_slow_smoke_seed(tmp_path)
+    _materialize_slow_smoke_workspace(tmp_path)
 
     actual = _pypost_relative_files(tmp_path)
     assert actual == SLOW_SMOKE_MINIMUM_PYPPOST_FILES, (

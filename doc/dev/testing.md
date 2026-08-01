@@ -757,6 +757,9 @@ Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, mini
 
 The slow install smoke (`make_workspace_full_deps` in `tests/test_makefile.py`) copies the
 **committed** `pyproject.toml` into an isolated `tmp_path` and runs `make install` there.
+Both the fixture and the fast seed-contract tests assemble that workspace via
+`_materialize_slow_smoke_workspace` (Makefile copy, `pyproject.toml` copy, then
+`_seed_installable_package`) so assembly steps cannot drift between slow and fast guards.
 Dependency pins alone are not enough: setuptools resolves **dynamic metadata** from that
 manifest at build time. The seed must therefore mirror install-time packaging artifacts, not
 only the dependency list.

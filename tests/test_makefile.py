@@ -321,6 +321,13 @@ def _copy_pyproject(workspace: Path) -> None:
     shutil.copy(PYPROJECT, workspace / "pyproject.toml")
 
 
+def _materialize_slow_smoke_workspace(workspace: Path) -> None:
+    """Assemble slow-smoke isolated workspace (Makefile, pyproject, installable seed)."""
+    shutil.copy(MAKEFILE, workspace / "Makefile")
+    _copy_pyproject(workspace)
+    _seed_installable_package(workspace)
+
+
 def _copy_dev_requirements(workspace: Path) -> None:
     shutil.copy(REQUIREMENTS_DEV, workspace / "requirements-dev.txt")
 
@@ -339,9 +346,7 @@ def make_workspace(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def make_workspace_full_deps(tmp_path: Path) -> Path:
-    shutil.copy(MAKEFILE, tmp_path / "Makefile")
-    _copy_pyproject(tmp_path)
-    _seed_installable_package(tmp_path)
+    _materialize_slow_smoke_workspace(tmp_path)
     return tmp_path
 
 
