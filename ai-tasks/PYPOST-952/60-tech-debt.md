@@ -55,21 +55,25 @@ None.
    - Separate loopback port mirroring MetricsServer pattern; compose with stdio
      clients that prefer HTTP
    - Files: `pypost/agent/ui_actions_mcp.py`, docs
+   - Jira: [PYPOST-990](https://pypost.atlassian.net/browse/PYPOST-990)
 
 2. **Attach sidecar to already-running PyPost desktop**
    - Priority: Medium when needed
    - IPC channel to existing QApplication instead of nested session
    - Files: new IPC layer + sidecar lifecycle
+   - Jira: [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991)
 
 3. **call_tool integration tests (click/fill on fixture widgets)**
    - Priority: Low
    - Extend stdio or in-process memory transport tests beyond list_tools
    - Files: `tests/test_agent_ui_actions_mcp.py`
+   - Jira: [PYPOST-992](https://pypost.atlassian.net/browse/PYPOST-992)
 
 4. **Seed/collection injection for sidecar session**
    - Priority: Low
    - Allow agent-ui MCP to launch with agent e2e seed for realistic drive
    - Files: `ui_actions_mcp.py` CLI flags, agent_e2e helpers
+   - Jira: [PYPOST-993](https://pypost.atlassian.net/browse/PYPOST-993)
 
 ## Deviations from Architecture
 
