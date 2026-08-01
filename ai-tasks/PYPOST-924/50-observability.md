@@ -14,6 +14,17 @@ modified (FR5).
 critical execution paths). Those paths are CI gates and committed workflow artifacts,
 not in-process PyPost services.
 
+### Failure signals (CI / contract tests)
+
+| Signal | Operator surface | When it fires |
+| --- | --- | --- |
+| **Job failure** | GitHub Actions job status (red) + step log | Composite `apt-get` fails; pytest collection/import fails after provisioning |
+| **Contract test failure** | `make check` / CI `test` job pytest output | Missing composite, wrong package set, job missing `uses:`, inline apt copy reintroduced, smoke/peer parity drift |
+| **Provisioning success** | Composite step log (`Install Qt / EGL runtime…`) | `apt-get update` + eight-package install completes; downstream pytest runs |
+
+Contract failures emit explicit `pytest.fail(...)` messages naming the workflow path,
+job id, missing packages, or inline-block count — no live Actions API required.
+
 ## Logging Implementation
 
 ### Added Logs
@@ -115,7 +126,7 @@ Expected: five contract tests pass.
 
 ## Worklog
 
-tokens_used: (subagent aggregate)
+tokens_used: 3200
 role: execution
 step: 6
 step_name: Observability

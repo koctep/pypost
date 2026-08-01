@@ -40,10 +40,6 @@ Jira column later.
   `uses:` on smoke and `agent-e2e` plus composite package set; the `test` matrix
   job is covered by `test_qt_using_jobs_reference_install_qt_egl_composite` but
   not by an explicit smoke-style peer frozenset check on its job block (TD-2).
-- **Developer docs still describe inline apt steps.** `doc/dev/setup.md` and
-  `doc/dev/testing.md` reference the **Install Qt / EGL runtime** step name and
-  package list but not `./.github/actions/install-qt-egl-runtime` — deferred to
-  Step 8 (planned, not separate Debt).
 
 ## Missing Tests
 
@@ -78,9 +74,9 @@ Composite indirection adds negligible Actions overhead.
 
 | ID | Priority | Task | Notes | Jira |
 | -- | -------- | ---- | ----- | ---- |
-| TD-2 | Low | Strengthen Qt contract: derive expected package set from composite `action.yml` only (and/or assert all three job blocks share identical provisioning) instead of maintaining `_PEER_QT_EGL_PACKAGES` separately | Reduces dual-edit burden when packages change | Jira: [PYPOST-925](https://pypost.atlassian.net/browse/PYPOST-925) |
-| TD-3 | Lowest | Optionally defer `PySide6` import in `tests/conftest.py` so non-GUI collection paths do not require EGL/GL system libs | Explicitly out of scope for 924; reduces env coupling for future jobs | Jira: [PYPOST-926](https://pypost.atlassian.net/browse/PYPOST-926) |
-| TD-5 | Lowest | Harden workflow YAML parsing helpers shared by CI contract tests (or adopt a tiny YAML subset parser) | Shared fragility with PYPOST-874-style tests | Jira: [PYPOST-928](https://pypost.atlassian.net/browse/PYPOST-928) |
+| TD-2 | Low | Strengthen Qt contract: derive expected package set from composite `action.yml` only (and/or assert all three job blocks share identical provisioning) instead of maintaining `_PEER_QT_EGL_PACKAGES` separately | Reduces dual-edit burden when packages change; remainder / peer equality | [PYPOST-925](https://pypost.atlassian.net/browse/PYPOST-925) |
+| TD-3 | Lowest | Optionally defer `PySide6` import in `tests/conftest.py` so non-GUI collection paths do not require EGL/GL system libs | Explicitly out of scope for 924; reduces env coupling for future jobs | [PYPOST-926](https://pypost.atlassian.net/browse/PYPOST-926) |
+| TD-5 | Lowest | Harden workflow YAML parsing helpers shared by CI contract tests (or adopt a tiny YAML subset parser) | Shared fragility with PYPOST-874-style tests | [PYPOST-928](https://pypost.atlassian.net/browse/PYPOST-928) |
 
 ### Already tracked / do not reticket as new work from this file alone
 
@@ -90,22 +86,17 @@ Composite indirection adds negligible Actions overhead.
 | Workflow contract-test precedent | PYPOST-861 / PYPOST-874 / PYPOST-923 |
 | Parent consolidation debt | [PYPOST-924](https://pypost.atlassian.net/browse/PYPOST-924) closes PYPOST-923 TD-1 |
 
-### Planned this ticket (not separate Debt)
-
-- Step 8: update `doc/dev/setup.md` and `doc/dev/testing.md` to name
-  `./.github/actions/install-qt-egl-runtime` instead of implying three inline
-  apt blocks.
-
 ## User documentation
 
-N/A for end-user `doc/user/` — CI workflow hygiene only. Developer doc touch
-deferred to Step 8.
+N/A for end-user `doc/user/` — CI workflow hygiene only. Step 8 updated
+`doc/dev/setup.md` and `doc/dev/testing.md` to name the composite path (see
+`ai-tasks/PYPOST-924/70-dev-docs.md`).
 
 ## Blocker review
 
-**No blockers.** Timeout markers present; contract tests green; architecture
+**No blockers.** Timeout markers present; five contract tests green; architecture
 decisions (composite action, eight-package parity, three-job coverage) met.
-Safe to proceed to Step 8.
+Definition of Done satisfied.
 
 ## Worklog
 
