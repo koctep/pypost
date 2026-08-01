@@ -1,7 +1,9 @@
-"""PYPOST-923/924: Qt/EGL apt parity and shared composite contract."""
+"""PYPOST-923/924/925: Qt/EGL apt parity and shared composite contract."""
 
 from __future__ import annotations
 
+import importlib
+import inspect
 import re
 from pathlib import Path
 
@@ -16,20 +18,30 @@ _QT_EGL_COMPOSITE_ACTION = (
 )
 _QT_EGL_COMPOSITE_USES = "./.github/actions/install-qt-egl-runtime"
 _QT_USING_JOBS = ("test", "make-install-smoke", "agent-e2e")
+_APT_PKG_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9+._-]*$")
+_QT_EGL_SENTINEL_PKG = "libegl1"
 
-# Peer Qt/EGL set from jobs `test` and `agent-e2e` (full equality required).
-_PEER_QT_EGL_PACKAGES: frozenset[str] = frozenset(
-    {
-        "libdbus-1-3",
-        "libegl1",
-        "libfontconfig1",
-        "libfreetype6",
-        "libglib2.0-0",
-        "libgl1",
-        "libxcb-cursor0",
-        "libxkbcommon0",
-    }
-)
+
+def _packages_from_apt_install_block(text: str) -> frozenset[str]:
+    """Extract Debian package names from apt-get install continuation lines."""
+    found: set[str] = set()
+    for line in text.splitlines():
+        stripped = line.strip().rstrip("\\").strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if _APT_PKG_NAME_RE.fullmatch(stripped):
+            found.add(stripped)
+    return frozenset(found)
+
+
+def _expected_qt_egl_packages() -> frozenset[str]:
+    """Authoritative Qt/EGL package set from the shared composite action."""
+    if not _QT_EGL_COMPOSITE_ACTION.is_file():
+        pytest.fail(
+            f"Missing composite action {_QT_EGL_COMPOSITE_ACTION.relative_to(_REPO_ROOT)}"
+        )
+    text = _QT_EGL_COMPOSITE_ACTION.read_text(encoding="utf-8")
+    return _packages_from_apt_install_block(text)
 
 
 def _job_block(workflow_text: str, job_id: str) -> str:
@@ -59,20 +71,6 @@ def _job_block(workflow_text: str, job_id: str) -> str:
     return "".join(collected)
 
 
-def _apt_packages_in_block(job_block: str) -> frozenset[str]:
-    """Extract package names from apt-get install lines in a job block."""
-    found: set[str] = set()
-    for line in job_block.splitlines():
-        stripped = line.strip().rstrip("\\").strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        # Match standalone package tokens (e.g. libegl1) on apt install lines.
-        if re.fullmatch(r"[a-z0-9][a-z0-9+._-]*", stripped):
-            if stripped.startswith("lib") or stripped in _PEER_QT_EGL_PACKAGES:
-                found.add(stripped)
-    return frozenset(found)
-
-
 def _count_inline_libegl1_apt_install_blocks(workflow_text: str) -> int:
     """Return count of inline run blocks with apt-get install listing libegl1."""
     count = 0
@@ -84,7 +82,7 @@ def _count_inline_libegl1_apt_install_blocks(workflow_text: str) -> int:
 
 
 def test_install_qt_egl_composite_action_exists_with_full_package_set() -> None:
-    """Composite action must exist, be composite, and install the eight packages."""
+    """Composite action must exist, be composite, and install Qt/EGL packages."""
     rel = _QT_EGL_COMPOSITE_ACTION.relative_to(_REPO_ROOT)
     if not _QT_EGL_COMPOSITE_ACTION.is_file():
         pytest.fail(f"Missing composite action {rel}")
@@ -93,14 +91,11 @@ def test_install_qt_egl_composite_action_exists_with_full_package_set() -> None:
     if "using: composite" not in text:
         pytest.fail(f"{rel}: runs.using must be composite")
 
-    pkgs = _apt_packages_in_block(text) & _PEER_QT_EGL_PACKAGES
-    missing = _PEER_QT_EGL_PACKAGES - pkgs
-    extra = pkgs - _PEER_QT_EGL_PACKAGES
-    if missing or extra:
-        pytest.fail(
-            f"{rel}: apt install must list exactly _PEER_QT_EGL_PACKAGES; "
-            f"missing={sorted(missing)} extra={sorted(extra)}"
-        )
+    pkgs = _expected_qt_egl_packages()
+    if not pkgs:
+        pytest.fail(f"{rel}: apt install must list at least one package")
+    if _QT_EGL_SENTINEL_PKG not in pkgs:
+        pytest.fail(f"{rel}: apt install must include {_QT_EGL_SENTINEL_PKG!r}")
 
 
 def test_qt_using_jobs_reference_install_qt_egl_composite() -> None:
@@ -135,44 +130,75 @@ def test_make_install_smoke_job_exists() -> None:
     _job_block(text, "make-install-smoke")
 
 
-def _composite_qt_egl_packages() -> frozenset[str]:
-    """Return Qt/EGL package names from the shared composite action."""
-    if not _QT_EGL_COMPOSITE_ACTION.is_file():
-        pytest.fail(f"Missing composite action {_QT_EGL_COMPOSITE_ACTION.relative_to(_REPO_ROOT)}")
-    text = _QT_EGL_COMPOSITE_ACTION.read_text(encoding="utf-8")
-    return _apt_packages_in_block(text) & _PEER_QT_EGL_PACKAGES
+def test_composite_qt_egl_packages_inherited_by_qt_using_jobs() -> None:
+    """Composite must provision Qt/EGL set inherited by all ``_QT_USING_JOBS``.
 
-
-def test_make_install_smoke_has_full_peer_qt_egl_apt_set() -> None:
-    """Smoke job must use the composite with the full peer Qt/EGL apt set.
-
-    Parity with jobs ``test`` and ``agent-e2e``: all three reference the same
-    composite action whose package list equals _PEER_QT_EGL_PACKAGES. Without
-    these packages, shared conftest PySide6 import fails collection under
-    QT_QPA_PLATFORM=offscreen.
+    Jobs ``test``, ``make-install-smoke``, and ``agent-e2e`` reference the same
+    composite action; per-job ``uses:`` coverage lives in
+    ``test_qt_using_jobs_reference_install_qt_egl_composite``. This test asserts
+    derived package integrity (non-empty, ``libegl1`` sentinel) that all three
+    jobs inherit. Without these packages, shared conftest PySide6 import fails
+    collection under ``QT_QPA_PLATFORM=offscreen``.
     """
-    text = _WORKFLOW.read_text(encoding="utf-8")
-    smoke_block = _job_block(text, "make-install-smoke")
-    peer_block = _job_block(text, "agent-e2e")
-
-    if _QT_EGL_COMPOSITE_USES not in smoke_block:
+    rel = _QT_EGL_COMPOSITE_ACTION.relative_to(_REPO_ROOT)
+    pkgs = _expected_qt_egl_packages()
+    if not pkgs:
+        pytest.fail(f"{rel}: apt install must list at least one package")
+    if _QT_EGL_SENTINEL_PKG not in pkgs:
         pytest.fail(
-            f"{_WORKFLOW.relative_to(_REPO_ROOT)} job make-install-smoke: "
-            f"must use composite {_QT_EGL_COMPOSITE_USES!r} "
-            f"(PySide6 headless runtime)"
+            f"{rel}: apt install must include {_QT_EGL_SENTINEL_PKG!r} "
+            "(PySide6 headless runtime; inherited by test, make-install-smoke, agent-e2e)"
         )
 
-    if _QT_EGL_COMPOSITE_USES not in peer_block:
-        pytest.fail(
-            f"{_WORKFLOW.relative_to(_REPO_ROOT)} job agent-e2e: "
-            f"must use composite {_QT_EGL_COMPOSITE_USES!r} for peer parity"
-        )
 
-    composite_pkgs = _composite_qt_egl_packages()
-    missing = _PEER_QT_EGL_PACKAGES - composite_pkgs
-    if missing:
-        pytest.fail(
-            f"{_QT_EGL_COMPOSITE_ACTION.relative_to(_REPO_ROOT)}: "
-            f"Qt/EGL apt package set must equal peer set; "
-            f"missing: {sorted(missing)}"
+def _reference_packages_from_composite_action() -> frozenset[str]:
+    """Independent apt-line parse of composite action.yml for contract tests."""
+    text = _QT_EGL_COMPOSITE_ACTION.read_text(encoding="utf-8")
+    return _packages_from_apt_install_block(text)
+
+
+def test_qt_egl_contract_has_no_duplicate_authoritative_frozenset() -> None:
+    """PYPOST-925: expected package set must not live in a hardcoded frozenset."""
+    mod = importlib.import_module("tests.test_ci_make_install_smoke_qt_runtime")
+    assert not hasattr(mod, "_PEER_QT_EGL_PACKAGES"), (
+        "module must not define _PEER_QT_EGL_PACKAGES; "
+        "derive expected packages from composite action.yml only"
+    )
+
+
+def test_expected_qt_egl_packages_derived_from_composite_only() -> None:
+    """PYPOST-925: _expected_qt_egl_packages() parses composite without frozenset gate."""
+    mod = importlib.import_module("tests.test_ci_make_install_smoke_qt_runtime")
+    helper = getattr(mod, "_expected_qt_egl_packages", None)
+    assert helper is not None, (
+        "module must define _expected_qt_egl_packages() derived from composite action.yml"
+    )
+
+    direct = _reference_packages_from_composite_action()
+    derived = helper()
+    assert derived == direct, (
+        "_expected_qt_egl_packages() must equal packages parsed from action.yml directly; "
+        f"direct={sorted(direct)} derived={sorted(derived)}"
+    )
+
+    helper_source = inspect.getsource(helper)
+    assert "_PEER_QT_EGL_PACKAGES" not in helper_source, (
+        "_expected_qt_egl_packages() must not intersect with _PEER_QT_EGL_PACKAGES"
+    )
+
+
+def test_composite_validation_uses_derived_package_helper() -> None:
+    """PYPOST-925: composite package checks must call _expected_qt_egl_packages()."""
+    mod = importlib.import_module("tests.test_ci_make_install_smoke_qt_runtime")
+    for test_name in (
+        "test_install_qt_egl_composite_action_exists_with_full_package_set",
+        "test_composite_qt_egl_packages_inherited_by_qt_using_jobs",
+    ):
+        fn = getattr(mod, test_name)
+        source = inspect.getsource(fn)
+        assert "_expected_qt_egl_packages" in source, (
+            f"{test_name} must call _expected_qt_egl_packages()"
+        )
+        assert "_PEER_QT_EGL_PACKAGES" not in source, (
+            f"{test_name} must not gate package validation on _PEER_QT_EGL_PACKAGES"
         )

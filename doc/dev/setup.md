@@ -282,11 +282,14 @@ CI runs the fast suite on every push and pull request via `.github/workflows/tes
 (Python 3.11 and 3.13) on **GitHub-hosted `ubuntu-latest`**. The main `test` matrix,
 `make-install-smoke`, and `agent-e2e` each invoke the shared composite action
 `.github/actions/install-qt-egl-runtime` (**Install Qt / EGL runtime**) so PySide6 can
-import under `QT_QPA_PLATFORM=offscreen` (PYPOST-923; single source of truth in
-PYPOST-924). The composite installs eight Ubuntu packages (`libdbus-1-3`, `libegl1`,
-`libfontconfig1`, `libfreetype6`, `libglib2.0-0`, `libgl1`, `libxcb-cursor0`,
-`libxkbcommon0`). Jobs do not use a Docker container so `actions/setup-python`
-toolcache builds match the runner libc.
+import under `QT_QPA_PLATFORM=offscreen` (PYPOST-923/924). The composite installs
+eight Ubuntu packages (`libdbus-1-3`, `libegl1`, `libfontconfig1`, `libfreetype6`,
+`libglib2.0-0`, `libgl1`, `libxcb-cursor0`, `libxkbcommon0`). **Package list
+maintenance:** edit `.github/actions/install-qt-egl-runtime/action.yml` only —
+contract tests in `tests/test_ci_make_install_smoke_qt_runtime.py` derive the expected
+set via `_expected_qt_egl_packages()` (PYPOST-925); there is no separate hardcoded
+frozenset in the test module to keep in sync. Jobs do not use a Docker container so
+`actions/setup-python` toolcache builds match the runner libc.
 
 ## ai-tasks artifact expectations (PYPOST-772)
 
@@ -350,8 +353,11 @@ task folders and fails when required files are missing. Legacy gaps are grandfat
   requirements (`make install`).
 - **Qt Platform plugin "xcb"**: On Linux, you might need to install `libxcb-cursor0` or similar
   system libraries if the app fails to launch.
-- **CI: missing Qt `.so` (e.g. `libEGL`, `libfontconfig`, `libglib-2.0`)**: Edit the package
-  list in `.github/actions/install-qt-egl-runtime/action.yml` (single source of truth).
-  Jobs `test`, `make-install-smoke`, and `agent-e2e` reference that composite via
-  `uses: ./.github/actions/install-qt-egl-runtime` in `.github/workflows/test.yml`.
-  Contract: `tests/test_ci_make_install_smoke_qt_runtime.py`.
+- **CI: missing Qt `.so` (e.g. `libEGL`, `libfontconfig`, `libglib-2.0`)**: Edit the apt
+  package list in `.github/actions/install-qt-egl-runtime/action.yml` only (sole
+  authoritative source; PYPOST-925). Jobs `test`, `make-install-smoke`, and `agent-e2e`
+  reference that composite via `uses: ./.github/actions/install-qt-egl-runtime` in
+  `.github/workflows/test.yml`. Contract tests parse the same file via
+  `_expected_qt_egl_packages()` — do not add a duplicate package list to the test
+  module. Focused run:
+  `make test PYTEST_ARGS='tests/test_ci_make_install_smoke_qt_runtime.py -v'`.

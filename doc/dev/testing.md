@@ -87,7 +87,7 @@ which can surface differences that don't reproduce in CI or vice versa.
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `test_makefile.py` fails locally but passes in CI (or vice versa) | `make` subprocess spawns with the system `python3`/`PYTHON` default, which may differ from the interpreter running pytest | Tests pass `PYTHON={sys.executable}` explicitly to `make` invocations (PYPOST-718) — if you add a new Makefile integration test, do the same |
-| Qt/PySide6 import errors or segfaults on Linux only | CI runner image lacks EGL/XCB/fontconfig shared libraries that are preinstalled on macOS | Jobs `test`, `make-install-smoke`, and `agent-e2e` invoke `.github/actions/install-qt-egl-runtime` (eight-package apt set including `libegl1`, `libxcb-cursor0`, `libxkbcommon0`; PYPOST-923/924) |
+| Qt/PySide6 import errors or segfaults on Linux only | CI runner image lacks EGL/XCB/fontconfig shared libraries that are preinstalled on macOS | Jobs `test`, `make-install-smoke`, and `agent-e2e` invoke `.github/actions/install-qt-egl-runtime` (eight-package apt set in `action.yml` including `libegl1`, `libxcb-cursor0`, `libxkbcommon0`; PYPOST-923/924). Contract tests derive the expected set from that file only — no test-module frozenset (PYPOST-925) |
 | A test passes locally on Python 3.14 but fails on CI's 3.11/3.13 | Newer Python stdlib/typing behavior not yet exercised by the CI matrix | Install a matching interpreter locally with `pyenv install 3.11` / `3.13` and re-run `make test` under that version before assuming a CI-only bug |
 | Coverage differs slightly between local and CI runs | `--cov-fail-under` threshold (70%) is enforced identically, but conditional imports (e.g. platform-specific branches like `sys.platform == "win32"` in `curl_generator.py`) only execute on the OS where the branch is true | Don't chase 100% parity on OS-gated branches; rely on the CI matrix as the source of truth for the threshold gate |
 | macOS-only Qt segfault during a specific GUI test | Rare; not reproducible on Linux CI | Run the failing module in isolation (`pytest tests/test_x.py -v`) to confirm it's environment-specific before filing a bug — see `doc/dev/test_audit.md` § Local vs CI |
@@ -672,7 +672,10 @@ separate `make-install-smoke` job in
 That job uses the same composite action `.github/actions/install-qt-egl-runtime` as the
 main `test` matrix and `agent-e2e` before pytest collection (shared `conftest.py`
 imports PySide6; PYPOST-923/924). Parity is locked by
-`tests/test_ci_make_install_smoke_qt_runtime.py`.
+`tests/test_ci_make_install_smoke_qt_runtime.py`: all three jobs must reference the
+composite, inline duplicate apt blocks are forbidden, and `_expected_qt_egl_packages()`
+parses `.github/actions/install-qt-egl-runtime/action.yml` as the sole authoritative
+package source (PYPOST-925 — no hardcoded frozenset in the test module).
 Job `agent-e2e` runs `make install && make test-agent-e2e` on Python 3.11
 (PYPOST-861 env-pack make gate; see [agent_e2e.md](agent_e2e.md)).
 
