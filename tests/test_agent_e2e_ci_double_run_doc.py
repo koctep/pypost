@@ -1,4 +1,4 @@
-"""PYPOST-873 / 907 / 908: lock deferred double-run + evidence discoverability."""
+"""PYPOST-873 / 907 / 908 / 930: lock deferred double-run + evidence discoverability."""
 
 from __future__ import annotations
 
@@ -17,10 +17,13 @@ _WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "test.yml"
 _DOC_ANCHOR_873 = "PYPOST-873"
 _DOC_ANCHOR_907 = "PYPOST-907"
 _DOC_ANCHOR_908 = "PYPOST-908"
+_DOC_ANCHOR_930 = "PYPOST-930"
 _DOUBLE_RUN_PHRASE = "intentional double-run"
 _REVISIT_PHRASE = "revisit when"
 _EVIDENCE_PHRASE = "CI duration evidence"
 _DEFER_AFTER_EVIDENCE = "DEFER after evidence"
+_THRESHOLD_NOT_MET = "ENABLE threshold not met"
+_CONTINUED_DEFER_930 = "continued DEFER"
 
 
 def test_docs_record_deferred_ci_cost_trim() -> None:
@@ -68,6 +71,21 @@ def test_docs_record_deferred_ci_cost_trim() -> None:
         pytest.fail(
             f"Missing {_DEFER_AFTER_EVIDENCE!r} (case-insensitive) — state "
             "continued DEFER after the evidence review"
+        )
+    if _DOC_ANCHOR_930 not in combined:
+        pytest.fail(
+            f"Missing {_DOC_ANCHOR_930} in {_TESTING_DOC.name} or "
+            f"{_AGENT_E2E_DOC.name} — document PYPOST-930 threshold revisit"
+        )
+    if _THRESHOLD_NOT_MET.lower() not in lower:
+        pytest.fail(
+            f"Missing {_THRESHOLD_NOT_MET!r} (case-insensitive) — record "
+            "ENABLE threshold assessment outcome"
+        )
+    if _CONTINUED_DEFER_930.lower() not in lower:
+        pytest.fail(
+            f"Missing {_CONTINUED_DEFER_930!r} (case-insensitive) — state "
+            "continued DEFER after PYPOST-930 revisit"
         )
 
 

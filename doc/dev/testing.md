@@ -572,6 +572,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-872] | `venv-test` prerequisite on `test` / `test-slow` / `test-agent-e2e` |
 | [PYPOST-873] | Deferred CI cost trim; dual-run docs + workflow lock |
 | [PYPOST-907] | Evidence revisit; continued DEFER after CI duration evidence |
+| [PYPOST-930] | ENABLE threshold revisit; continued DEFER (threshold not met) |
 | [PYPOST-908] | Lock discoverable CI duration / overlap timing notes (cite 907) |
 | [PYPOST-874] | ENABLE agent-e2e failure artifact upload + doc/workflow lock |
 | [PYPOST-909] | ENABLE main test matrix failure artifact upload + lock |
@@ -596,6 +597,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-929]: https://pypost.atlassian.net/browse/PYPOST-929
 [PYPOST-906]: https://pypost.atlassian.net/browse/PYPOST-906
 [PYPOST-907]: https://pypost.atlassian.net/browse/PYPOST-907
+[PYPOST-930]: https://pypost.atlassian.net/browse/PYPOST-930
 [PYPOST-908]: https://pypost.atlassian.net/browse/PYPOST-908
 [PYPOST-909]: https://pypost.atlassian.net/browse/PYPOST-909
 [PYPOST-910]: https://pypost.atlassian.net/browse/PYPOST-910
@@ -681,7 +683,7 @@ package source (PYPOST-925 — no hardcoded frozenset in the test module).
 Job `agent-e2e` runs `make install && make test-agent-e2e` on Python 3.11
 (PYPOST-861 env-pack make gate; see [agent_e2e.md](agent_e2e.md)).
 
-### Agent e2e CI double-run (PYPOST-873 / PYPOST-907) — DEFER
+### Agent e2e CI double-run (PYPOST-873 / PYPOST-907 / PYPOST-930) — DEFER
 
 On Python **3.11**, agent e2e / env-pack tests run in both the main `test`
 matrix (`-m "not slow"`) and the dedicated `agent-e2e` job. That
@@ -691,6 +693,9 @@ matrix (`-m "not slow"`) and the dedicated `agent-e2e` job. That
 **DEFER**red a cost trim; [PYPOST-907](https://pypost.atlassian.net/browse/PYPOST-907)
 reviewed **CI duration evidence** and chose **DEFER after evidence** —
 overlap is measurable but not wall-clock painful (see below).
+[PYPOST-930](https://pypost.atlassian.net/browse/PYPOST-930) re-assessed the
+**ENABLE threshold** and chose **continued DEFER** — **ENABLE threshold not
+met** (checklist below).
 
 #### CI duration evidence (Actions, 2026-08-01)
 
@@ -710,17 +715,29 @@ From completed `Tests` workflow runs on `koctep/pypost` that include job
 
 Wall clock is dominated by the main matrix; `agent-e2e` finishes in
 parallel (~1.6–3.6m), so a trim would not shorten PR feedback in these
-samples. Pack collect size locally: 64 tests (`agent_e2e and not slow`).
-Overlap cost: measurable 3.11 billable redundancy (~172s dedicated pack
-step in run #21) while the same marker set also runs in main pytest —
-not wall-clock painful at this sample size.
+samples. Pack collect size locally: **82** tests (`agent_e2e and not slow`;
+was 64 at PYPOST-907). Overlap cost: measurable 3.11 billable redundancy
+(~172s dedicated pack step in run #21) while the same marker set also runs
+in main pytest — not wall-clock painful at this sample size.
+
+#### ENABLE threshold checklist (PYPOST-930, 2026-08-01)
+
+| Trigger | Bar | Status |
+| --- | --- | --- |
+| Dedicated pack step | ≥6m across ≥3 recent green runs | **Not met** — n=2; max ~172s (~2.9m) |
+| Maintainer pain | Painful double failures / queue cost | **Not met** — no report |
+| Pack size + domination | ≥120 tests and main pytest pack-dominated | **Not met** — 82 collected; main pytest ~670s total |
+
+**Decision:** **continued DEFER** — **ENABLE threshold not met**. Do not
+exclude `agent_e2e` from the main matrix until a future revisit satisfies
+the bar. An ENABLE trim must preserve 3.13 agent e2e coverage (expand
+`agent-e2e` to a matrix) and update
+`tests/test_agent_e2e_ci_double_run_doc.py`.
 
 **Revisit when** (ENABLE threshold): dedicated `make test-agent-e2e` step
 sustained ≥ 6 minutes across ≥3 recent green runs; or maintainers report
 painful double failures / queue cost; or pack collect size sustained ≥ 120
-**and** main pytest is clearly pack-dominated. An ENABLE trim must preserve
-3.13 agent e2e coverage (for example expand `agent-e2e` to a matrix) and
-update `tests/test_agent_e2e_ci_double_run_doc.py`.
+**and** main pytest is clearly pack-dominated.
 
 ### Agent e2e failure artifact CI upload (PYPOST-874 / PYPOST-909) — ENABLE
 
