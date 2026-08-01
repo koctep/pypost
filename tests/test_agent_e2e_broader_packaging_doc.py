@@ -1,7 +1,7 @@
-"""PYPOST-922 / PYPOST-938: lock broader-than-golden packaging docs.
+"""PYPOST-922 / PYPOST-938 / PYPOST-954: lock broader-than-golden packaging docs.
 
-873-style substring/token guards (KEEP per PYPOST-938 — see
-doc/dev/testing.md § Packaging doc lock strategy).
+873-style substring/token guards via tests.helpers.packaging_doc_lock — see
+doc/dev/testing.md § Packaging doc lock strategy.
 """
 
 from __future__ import annotations
@@ -9,6 +9,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
+from tests.helpers.packaging_doc_lock import (
+    assert_substring,
+    doc_label,
+    read_doc,
+)
 
 pytestmark = pytest.mark.timeout(10)
 
@@ -24,64 +30,72 @@ _MAKE_ENTRY = "make test-agent-e2e"
 _GOLDEN_NARROW = "test_agent_golden_e2e.py"
 
 
-def _read(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
-
-
 def test_docs_attribute_broader_packaging_to_pypost_922() -> None:
     """At least one packaging doc must anchor PYPOST-922."""
     combined = "\n".join(
-        _read(p) for p in (_AGENT_E2E_DOC, _GOLDEN_DOC, _TESTING_DOC)
+        read_doc(p) for p in (_AGENT_E2E_DOC, _GOLDEN_DOC, _TESTING_DOC)
     )
-    if _DOC_ANCHOR not in combined:
-        pytest.fail(
-            f"Missing {_DOC_ANCHOR} in {_AGENT_E2E_DOC.name}, "
-            f"{_GOLDEN_DOC.name}, or {_TESTING_DOC.name} — attribute broader "
-            "packaging close to this debt"
-        )
+    assert_substring(
+        combined,
+        _DOC_ANCHOR,
+        doc_label_str=f"{_AGENT_E2E_DOC.name}, {_GOLDEN_DOC.name}, or "
+        f"{_TESTING_DOC.name}",
+        detail="attribute broader packaging close to this debt",
+    )
 
 
 def test_docs_frame_primary_path_as_broader_beyond_golden() -> None:
     """Umbrella, golden, and testing docs must frame broader beyond golden."""
     for path in (_AGENT_E2E_DOC, _GOLDEN_DOC, _TESTING_DOC):
-        text = _read(path)
-        lower = text.lower()
-        if _MAKE_ENTRY not in lower:
-            pytest.fail(
-                f"{path.relative_to(_REPO_ROOT)}: missing {_MAKE_ENTRY!r} "
-                "as the documented packaging entry"
-            )
-        if _BEYOND_GOLDEN not in lower:
-            pytest.fail(
-                f"{path.relative_to(_REPO_ROOT)}: missing "
-                f"{_BEYOND_GOLDEN!r} (case-insensitive) — frame the pack as "
-                "broader agent e2e beyond the golden scenario"
-            )
-        if "broader" not in lower:
-            pytest.fail(
-                f"{path.relative_to(_REPO_ROOT)}: missing 'broader' "
-                "(case-insensitive) — name the broader pack path"
-            )
+        text = read_doc(path)
+        label = doc_label(path, _REPO_ROOT)
+        assert_substring(
+            text,
+            _MAKE_ENTRY,
+            case_insensitive=True,
+            doc_label_str=label,
+            detail="document the packaging entry",
+        )
+        assert_substring(
+            text,
+            _BEYOND_GOLDEN,
+            case_insensitive=True,
+            doc_label_str=label,
+            detail=(
+                "frame the pack as broader agent e2e beyond the golden scenario"
+            ),
+        )
+        assert_substring(
+            text,
+            "broader",
+            case_insensitive=True,
+            doc_label_str=label,
+            detail="name the broader pack path",
+        )
 
 
 def test_docs_state_primary_packaging_vs_golden_pytest_args_narrow() -> None:
     """Docs must call out primary broader packaging vs golden PYTEST_ARGS."""
     for path in (_AGENT_E2E_DOC, _GOLDEN_DOC, _TESTING_DOC):
-        text = _read(path)
+        text = read_doc(path)
+        label = doc_label(path, _REPO_ROOT)
+        assert_substring(
+            text,
+            _PRIMARY_BROADER,
+            case_insensitive=True,
+            doc_label_str=label,
+            detail="state that make test-agent-e2e is the primary packaging path",
+        )
+        assert_substring(
+            text,
+            "pytest_args",
+            case_insensitive=True,
+            doc_label_str=label,
+            detail="document golden-only / single-module narrow override",
+        )
         lower = text.lower()
-        if _PRIMARY_BROADER not in lower:
-            pytest.fail(
-                f"{path.relative_to(_REPO_ROOT)}: missing "
-                f"{_PRIMARY_BROADER!r} (case-insensitive) — state that "
-                "make test-agent-e2e is the primary packaging path"
-            )
-        if "pytest_args" not in lower:
-            pytest.fail(
-                f"{path.relative_to(_REPO_ROOT)}: missing PYTEST_ARGS — "
-                "document golden-only / single-module narrow override"
-            )
         if "agent_golden_e2e" not in lower and _GOLDEN_NARROW not in text:
             pytest.fail(
-                f"{path.relative_to(_REPO_ROOT)}: missing golden module "
-                "reference (test_agent_golden_e2e) for the narrow override"
+                f"{label}: missing golden module reference "
+                "(test_agent_golden_e2e) for the narrow override"
             )
