@@ -139,7 +139,11 @@ Key metrics for MCP testing:
 ## GUI / Qt widget tests
 
 PyPost runs Qt tests headlessly with `QT_QPA_PLATFORM=offscreen` and a module-scoped `qapp`
-fixture (`tests/conftest.py`). The project does not use the `pytest-qt` package; tests call
+fixture (`tests/conftest.py`). Conftest sets the offscreen platform at import time but
+**defers the PySide6 import until the `qapp` fixture runs** (PYPOST-926), so narrow
+non-GUI collection paths that only load conftest do not require EGL/GL system libraries;
+GUI test modules that import PySide6 at module level still do. Contract:
+`tests/test_conftest_lazy_qt_import.py`. The project does not use the `pytest-qt` package; tests call
 widget methods and assert on labels, models, and mocked dialogs. Plain pytest tests take
 `qapp` as a parameter (including gateway / H3 stress modules after PYPOST-885);
 `unittest.TestCase` Qt modules use `@pytest.mark.usefixtures("qapp")` instead of
@@ -674,8 +678,8 @@ CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest
 separate `make-install-smoke` job in
 `.github/workflows/test.yml` runs `-m slow` Makefile tests on Python 3.11.
 That job uses the same composite action `.github/actions/install-qt-egl-runtime` as the
-main `test` matrix and `agent-e2e` before pytest collection (shared `conftest.py`
-imports PySide6; PYPOST-923/924). Parity is locked by
+main `test` matrix and `agent-e2e` before pytest collection (GUI test modules and `qapp`
+still load PySide6; conftest alone no longer eager-imports — PYPOST-926). Parity is locked by
 `tests/test_ci_make_install_smoke_qt_runtime.py`: all three jobs must reference the
 composite, inline duplicate apt blocks are forbidden, and `_expected_qt_egl_packages()`
 parses `.github/actions/install-qt-egl-runtime/action.yml` as the sole authoritative

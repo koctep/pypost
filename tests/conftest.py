@@ -4,7 +4,6 @@ import os
 import sys
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 pytest_plugins = [
     "tests._pytest_plugins.duration_report",
@@ -17,6 +16,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 @pytest.fixture(scope="module")
 def qapp():
     """Shared QApplication for Qt widget tests (module-scoped singleton)."""
+    from PySide6.QtWidgets import QApplication
+
     app = QApplication.instance() or QApplication([])
     yield app
 

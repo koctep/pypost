@@ -18,9 +18,9 @@ project.
 
 | Component | Role |
 | --- | --- |
-| `tests/conftest.py` | Sets offscreen platform; shared `qapp` fixture; enforces per-test timeouts |
+| `tests/conftest.py` | Sets offscreen platform at module load; **defers PySide6 import until `qapp`** (PYPOST-926); enforces per-test timeouts |
 | Module `pytestmark` | `pytest.mark.timeout(60)` (or 120 for heavy e2e) |
-| `qapp` fixture | `QApplication.instance() or QApplication([])`, scope `module` |
+| `qapp` fixture | Imports `QApplication` on first use; `QApplication.instance() or QApplication([])`, scope `module` |
 | Widget under test | Constructed in test; closed in `finally` block |
 
 Representative modules:
