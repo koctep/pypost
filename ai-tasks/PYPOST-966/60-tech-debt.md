@@ -34,7 +34,7 @@ None. One additional subprocess in slow smoke (negligible vs pip install).
 
 | ID | Priority | Task | Notes | Jira |
 | -- | -------- | ---- | ----- | ---- |
-| TD-1 | Low | Revisit post-install snippet if `pypost/__init__.py` gains eager UI imports | Version-module read avoids today; bare import would not | — |
+| TD-1 | Low | Revisit post-install snippet if `pypost/__init__.py` gains eager UI imports | Version-module read avoids today; bare import would not | [PYPOST-1014](https://pypost.atlassian.net/browse/PYPOST-1014) |
 
 ## Blocker review
 
