@@ -121,6 +121,9 @@ Layout-managed `+` control using Qt tab-bar APIs:
 
 - Trailing tab marked with `PLUS_TAB_MARKER` in `QTabBar.tabData`.
 - `+` widget attached via `QTabBar.setTabButton(..., LeftSide, ...)`.
+- Embedded `+` button identity: `PLUS_TAB_BUTTON` (`pypost_plus_tab_button`) via
+  `set_widget_id` — agent `ui_click` target (PYPOST-921). Distinct from
+  `PLUS_TAB_PLACEHOLDER` on the empty page widget.
 - **Primary click path**: `plus_btn.clicked` → `new_tab_requested` →
   `handle_new_tab("plus_button")`. Required because `QTabBar.tabBarClicked` does not fire when
   the user clicks an embedded tab-button widget (Qt routes the event to the child).

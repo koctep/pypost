@@ -60,19 +60,29 @@ Composition at a glance:
 | Lifecycle | `agent_e2e_session` (blank) |
 | Identity | `URL_INPUT`, `METHOD_COMBO`, `SEND_BUTTON`, |
 | | `RESPONSE_STATUS`, `RESPONSE_BODY` |
+| | (`PLUS_TAB_BUTTON` for no-blank create) |
 | Actions | `session.ui_fill` / `ui_select` / `ui_click` |
-| Wait | `session.wait_for_text` on status then body after Send |
+| Wait | `wait_for_text` on status then body after Send |
+| | (current-tab root after plus-tab create) |
 | Snapshot | Failure excerpt only (`response_panel_excerpt`) |
 | HTTP | `stub_agent_e2e_http(CANNED_GOLDEN_OK)` |
 
-Fresh agent sessions restore one blank request tab — no plus-tab click is
-required. Status and body surfaces under `ResponseView` have dedicated
-ids (`RESPONSE_STATUS`, `RESPONSE_BODY`; PYPOST-920). Golden settles with
-`wait_for_text` on those widgets (display-form body text), not a
-sanitize-coupled `wait_for_snapshot` predicate. Sibling Send scenarios may
-still walk the panel snapshot — see
+Fresh agent sessions restore one blank request tab — the primary golden
+scenario needs no plus-tab click. Status and body surfaces under
+`ResponseView` have dedicated ids (`RESPONSE_STATUS`, `RESPONSE_BODY`;
+PYPOST-920). Golden settles with `wait_for_text` on those widgets
+(display-form body text), not a sanitize-coupled `wait_for_snapshot`
+predicate. Sibling Send scenarios may still walk the panel snapshot — see
 [response-panel helpers](agent_e2e_response_panel.md).
 
+**Plus-tab create (PYPOST-921):** when restore does not leave a blank request
+tab, agents click `PLUS_TAB_BUTTON` (`pypost_plus_tab_button`, the embedded
+`+` on the trailing plus chrome — not `PLUS_TAB_PLACEHOLDER`). Covered by
+`test_agent_golden_plus_tab_create_when_no_blank_tab`: strip request tabs
+without presenter close (`removeTab` + `deleteLater`, so orphan role ids do
+not poison finds), `ui_click(PLUS_TAB_BUTTON)`, then the same fill / Send /
+status+body settle. Prefer current-tab roots for fill/click/wait after
+create (shared role ids across tabs).
 ## API / Usage
 
 ### How to run
@@ -102,6 +112,8 @@ Module timeout is 60s (`pytest.mark.timeout(60)`). Send settle uses a 15s
 
 ### Scenario steps
 
+Primary (blank restore):
+
 1. Obtain ready session via `agent_e2e_session`.
 2. Pre-flight: `find_widget` for `URL_INPUT`, `METHOD_COMBO`, `SEND_BUTTON`.
 3. `ui_fill(URL_INPUT, GOLDEN_URL)` and `ui_select(METHOD_COMBO, GOLDEN_METHOD)`.
@@ -109,6 +121,14 @@ Module timeout is 60s (`pytest.mark.timeout(60)`). Send settle uses a 15s
 5. `wait_for_text(RESPONSE_STATUS, FIXTURE_STATUS_LABEL)`.
 6. `wait_for_text(RESPONSE_BODY, FIXTURE_BODY_DISPLAY)` (pretty-printed JSON).
 7. On wait timeout, rewrap with `response_excerpt` from the panel snapshot.
+
+Plus-tab create when no blank tab (PYPOST-921):
+
+1. Ready session, then strip all `RequestTab` pages (`removeTab` +
+   `deleteLater` + `processEvents`) so only the plus placeholder remains.
+2. `ui_click(PLUS_TAB_BUTTON)` — creates a blank request tab via plus chrome.
+3. Continue with fill / Send / status+body settle as above (current-tab
+   scoped actions and `wait_for_text` root).
 
 ### Public APIs consumed (do not redefine)
 
@@ -198,6 +218,9 @@ Offscreen is set by `make test-agent-e2e` / `make test` and by
 | | display-form body (`indent=2`), not compact snapshot JSON. |
 | Missing control | `UiTargetNotFoundError` / interactable errors from actions. |
 | | Confirm blank tab restore and `is_ui_ready`. |
+| Plus-tab create fails | Confirm `PLUS_TAB_BUTTON` (not placeholder) and that strip |
+| | used `deleteLater` (orphans poison window-scoped finds). |
+| | Prefer current-tab fill/click/wait after create. |
 | Ready never happens | Lifecycle timeout / `agent_session_ready_timeout` (833). |
 
 Primary observability for this flow is those failure carriers (FR10), not new

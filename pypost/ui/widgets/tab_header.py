@@ -6,7 +6,7 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QPushButton, QTabBar, QTabWidget, QWidget
 
-from pypost.ui.widget_ids import PLUS_TAB_PLACEHOLDER, set_widget_id
+from pypost.ui.widget_ids import PLUS_TAB_BUTTON, PLUS_TAB_PLACEHOLDER, set_widget_id
 
 PLUS_TAB_MARKER = "pypost_plus_tab"
 ADD_TAB_BUTTON_SIZE = 24
@@ -48,6 +48,7 @@ class RequestTabHeader(QObject):
         index = self._tabs.addTab(placeholder, "")
         self._tab_bar.setTabData(index, PLUS_TAB_MARKER)
         plus_btn = QPushButton("+")
+        set_widget_id(plus_btn, PLUS_TAB_BUTTON)
         plus_btn.setToolTip("New Tab (Ctrl+N)")
         plus_btn.setFixedSize(ADD_TAB_BUTTON_SIZE, ADD_TAB_BUTTON_SIZE)
         plus_btn.clicked.connect(self.new_tab_requested.emit)

@@ -87,5 +87,19 @@ class TestRequestTabHeader(unittest.TestCase):
         self.assertEqual(placeholder.objectName(), PLUS_TAB_PLACEHOLDER)
         self.assertTrue(PLUS_TAB_PLACEHOLDER.startswith("pypost_"))
 
+    def test_plus_tab_button_uses_pypost_prefix(self):
+        """PYPOST-921: embedded + button has stable agent-clickable id."""
+        from PySide6.QtWidgets import QTabBar
+
+        from pypost.ui.widget_ids import PLUS_TAB_BUTTON
+
+        header, _tabs = self._make_header()
+        plus_idx = header.plus_tab_index()
+        plus_btn = header.tab_bar.tabButton(plus_idx, QTabBar.ButtonPosition.LeftSide)
+        self.assertIsNotNone(plus_btn)
+        self.assertEqual(plus_btn.objectName(), PLUS_TAB_BUTTON)
+        self.assertTrue(PLUS_TAB_BUTTON.startswith("pypost_"))
+
+
 if __name__ == "__main__":
     unittest.main()
