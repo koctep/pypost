@@ -90,6 +90,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_e2e_seed.py` | Seeded workspace (857) + failure caplog (862) |
 | `tests/test_agent_e2e_http_env.py` | Env Send + shared HTTP (859) |
 | `tests/test_agent_e2e_http_seed_post.py` | Seed POST Send + body (871) |
+| `tests/test_agent_e2e_http_mapping_multi_url.py` | Mapping stub two-URL Send (901) |
 | `tests/test_agent_e2e_failure_artifacts.py` | Failure snapshot dumps (860) |
 | `tests/test_agent_dialog_settle_e2e.py` | Dialog settle (919); [doc](agent_dialog_settle.md) |
 

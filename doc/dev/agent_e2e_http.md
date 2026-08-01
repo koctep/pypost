@@ -141,6 +141,16 @@ Unit proofs: `tests/test_agent_e2e_http.py`
 (`test_stub_agent_e2e_http_url_router_map`,
 `test_stub_agent_e2e_http_url_router_miss_raises`).
 
+GUI scenario (PYPOST-901): `tests/test_agent_e2e_http_mapping_multi_url.py`
+— blank session, one Mapping stub (`SEED_GET_RESOLVED_URL` /
+`SEED_POST_RESOLVED_URL` → canned GET/POST), two Sends with panel asserts.
+Inventory gate:
+`tests/test_agent_e2e_http.py::test_mapping_multi_url_gui_send_scenario_module_exists`.
+
+```bash
+make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_mapping_multi_url.py -q"
+```
+
 ### Seed POST Send (body path)
 
 Catalog entry `seed_post_ok` / `CANNED_SEED_POST_OK` is exercised by

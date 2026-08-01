@@ -149,3 +149,13 @@ def test_seed_post_gui_send_scenario_module_exists() -> None:
     assert callable(
         getattr(mod, "test_seed_post_send_uses_shared_http_stub", None)
     )
+
+
+def test_mapping_multi_url_gui_send_scenario_module_exists() -> None:
+    """PYPOST-901: GUI multi-URL Mapping Send scenario module must exist."""
+    import importlib
+
+    mod = importlib.import_module("tests.test_agent_e2e_http_mapping_multi_url")
+    assert callable(
+        getattr(mod, "test_mapping_stub_two_distinct_urls_panel_outcomes", None)
+    )
