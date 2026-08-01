@@ -199,7 +199,9 @@ Inventory gates in `tests/test_agent_e2e_http.py`:
 
 Happy path: blank session, one Mapping stub (`SEED_GET_RESOLVED_URL` /
 `SEED_POST_RESOLVED_URL` → canned GET/POST), two Sends with panel asserts via
-`_wait_response` (15 s `SEND_SETTLE_TIMEOUT_S`, step names
+`wait_response_after_snapshot` from
+[send settle helpers](agent_e2e_send_settle.md) (15 s
+`SEND_SETTLE_TIMEOUT_S` default, step names
 `wait_response_after_mapping_get_send` /
 `wait_response_after_mapping_post_send`).
 
@@ -211,10 +213,9 @@ forces near-zero settle failure and asserts `UiWaitTimeoutError.diagnostics`
 carries stable step + excerpt.
 
 1. Same module as happy path; GET-only Send under minimal Mapping stub.
-2. Inline `session.wait_for_snapshot(lambda _: False, timeout=FORCED_SETTLE_TIMEOUT_S)` — not `_wait_response` (15 s budget).
-3. On `UiWaitTimeoutError`, inline rewrap matches happy-path shape:
-   `step=wait_response_after_mapping_get_send`, `response_excerpt` from
-   `response_panel_excerpt(last)`.
+2. `wait_response_after_snapshot(session, lambda _: False, timeout=FORCED_SETTLE_TIMEOUT_S, …)` — same helper as happy path with a short budget (not 15 s).
+3. Timeout message shape includes step in parentheses:
+   `mapping multi-URL Send settle failed (wait_response_after_mapping_get_send): …`
 4. Assert `diagnostics["step"]` and presence/type of `response_excerpt`.
 
 | Constant | Value |
@@ -278,8 +279,8 @@ identities auto-name; Mapping defaults to `url_router`).
 | Patch target | `SEND_REQUEST_PATCH_TARGET` in the fixture module |
 | Offscreen Qt | `make test-agent-e2e` / fixtures `offscreen=True` |
 | Timeouts | Module `pytest.mark.timeout(60)` for GUI Send; unit `timeout(10)` |
-| Mapping happy-path settle | `SEND_SETTLE_TIMEOUT_S` (15 s) in `_wait_response` |
-| Mapping timeout companion | `FORCED_SETTLE_TIMEOUT_S` (0.05 s) in mapping module |
+| Mapping happy-path settle | `SEND_SETTLE_TIMEOUT_S` (15 s) via `wait_response_after_snapshot` |
+| Mapping timeout companion | `FORCED_SETTLE_TIMEOUT_S` (0.05 s) passed to same helper |
 
 No extra env vars.
 
@@ -312,8 +313,8 @@ No extra env vars.
 | | `make test-agent-e2e PYTEST_ARGS=` |
 | | `"tests/test_agent_e2e_http_mapping_multi_url.py::` |
 | | `test_mapping_get_send_settle_timeout_includes_step_and_excerpt -v"`. |
-| | Confirm inline rewrap (not `_wait_response`) and impossible snapshot |
-| | predicate; see [agent_dialog_settle.md](agent_dialog_settle.md). |
+| | Confirm `wait_response_after_snapshot` with impossible snapshot |
+| | predicate; see [agent_e2e_send_settle.md](agent_e2e_send_settle.md). |
 
 ## Related
 

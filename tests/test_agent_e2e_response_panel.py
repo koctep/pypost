@@ -7,6 +7,9 @@ synthetic snapshot tree; Send consumer modules must not keep local
 PYPOST-948: sibling Send settle convention — mandatory agent e2e locks must
 use identity-scoped ``wait_for_text`` on ``RESPONSE_STATUS`` / ``RESPONSE_BODY``
 instead of ``wait_for_snapshot(_response_ready)`` panel-walk readiness.
+
+PYPOST-956: mapping snapshot Send settle must use shared
+``wait_response_after_snapshot``; no module-local ``_wait_response``.
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ _SEND_SETTLE_MODULES = (
     "test_agent_e2e_presentation_matrix.py",
     "test_agent_e2e_http_env.py",
 )
+_SNAPSHOT_SEND_SETTLE_MODULES = ("test_agent_e2e_http_mapping_multi_url.py",)
 _JSON_BODY_MODULES = frozenset({"test_agent_e2e_http_env.py"})
 _WAIT_FOR_SNAPSHOT_RESPONSE_READY = re.compile(
     r"wait_for_snapshot\s*\(\s*_response_ready\b",
@@ -42,6 +46,10 @@ _WAIT_FOR_TEXT_BODY_IN_SNAPSHOT = re.compile(
 )
 _WAIT_RESPONSE_AFTER_SEND = re.compile(
     r"(?:^|[^\w.])wait_response_after_send\s*\(",
+    re.MULTILINE,
+)
+_WAIT_RESPONSE_AFTER_SNAPSHOT = re.compile(
+    r"(?:^|[^\w.])wait_response_after_snapshot\s*\(",
     re.MULTILINE,
 )
 
@@ -99,6 +107,10 @@ def _uses_wait_for_text_on(source: str, widget_id: str) -> bool:
 
 def _uses_wait_response_after_send(source: str) -> bool:
     return bool(_WAIT_RESPONSE_AFTER_SEND.search(source))
+
+
+def _uses_wait_response_after_snapshot(source: str) -> bool:
+    return bool(_WAIT_RESPONSE_AFTER_SNAPSHOT.search(source))
 
 
 def test_shared_response_panel_helpers_api_and_behavior() -> None:
@@ -210,4 +222,38 @@ def test_send_modules_use_identity_scoped_text_wait_settle(
         pytest.fail(
             f"{module_name} must not pass compact _BODY_IN_SNAPSHOT to "
             "wait_for_text; use display-form body text (indent=2)"
+        )
+
+
+def test_shared_send_settle_exports_wait_response_after_snapshot() -> None:
+    """PYPOST-956: shared snapshot Send settle helper is importable."""
+    from tests.helpers.agent_e2e_send_settle import wait_response_after_snapshot
+
+    assert callable(wait_response_after_snapshot)
+
+
+@pytest.mark.parametrize("module_name", _SNAPSHOT_SEND_SETTLE_MODULES)
+def test_snapshot_send_settle_modules_use_shared_helper(
+    module_name: str,
+) -> None:
+    """PYPOST-956: snapshot Send settle uses shared helper; no local _wait_response."""
+    path = _TESTS_DIR / module_name
+    assert path.is_file(), f"missing snapshot Send settle module {path}"
+    source = _module_source(path)
+    names = _toplevel_def_names(path)
+
+    assert "_wait_response" not in names, (
+        f"{module_name} still defines local _wait_response; "
+        "import wait_response_after_snapshot from "
+        "tests.helpers.agent_e2e_send_settle"
+    )
+    if "agent_e2e_send_settle" not in source:
+        pytest.fail(
+            f"{module_name} must import from tests.helpers.agent_e2e_send_settle "
+            "for snapshot Send settle"
+        )
+    if not _uses_wait_response_after_snapshot(source):
+        pytest.fail(
+            f"{module_name} must call wait_response_after_snapshot for snapshot "
+            "Send settle instead of local _wait_response"
         )

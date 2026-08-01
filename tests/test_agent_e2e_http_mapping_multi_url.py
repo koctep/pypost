@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -28,10 +27,9 @@ from pypost.ui.widget_ids import (
 )
 from tests.helpers.agent_e2e_response_panel import (
     joined_panel_values,
-    response_panel_excerpt,
     subtree_by_name,
 )
-from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
+from tests.helpers.agent_e2e_send_settle import wait_response_after_snapshot
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -39,6 +37,7 @@ pytestmark = [
 ]
 
 FORCED_SETTLE_TIMEOUT_S = 0.05
+_MAPPING_SETTLE_PREFIX = "mapping multi-URL Send settle failed"
 
 _STATUS_LABEL = "Status: 200"
 _GET_BODY_IN_SNAPSHOT = json.dumps(
@@ -57,29 +56,6 @@ def _get_response_ready(snap: dict[str, Any]) -> bool:
 def _post_response_ready(snap: dict[str, Any]) -> bool:
     joined = joined_panel_values(snap)
     return _STATUS_LABEL in joined and _POST_BODY_IN_SNAPSHOT in joined
-
-
-def _wait_response(
-    session: AgentAppSession,
-    ready: Callable[[dict[str, Any]], bool],
-    step: str,
-) -> dict[str, Any]:
-    try:
-        return session.wait_for_snapshot(ready, timeout=SEND_SETTLE_TIMEOUT_S)
-    except UiWaitTimeoutError as exc:
-        last = session.ui_snapshot()
-        excerpt = response_panel_excerpt(last)
-        raise UiWaitTimeoutError(
-            f"mapping multi-URL Send settle failed ({step}): {exc}; "
-            f"response_excerpt={excerpt!r}",
-            timeout_s=exc.timeout_s,
-            condition=exc.condition,
-            diagnostics={
-                **exc.diagnostics,
-                "step": step,
-                "response_excerpt": excerpt,
-            },
-        ) from exc
 
 
 def test_mapping_stub_two_distinct_urls_panel_outcomes(
@@ -103,20 +79,22 @@ def test_mapping_stub_two_distinct_urls_panel_outcomes(
         session.ui_fill(URL_INPUT, SEED_GET_RESOLVED_URL)
         session.ui_select(METHOD_COMBO, "GET")
         session.ui_click(SEND_BUTTON)
-        get_snap = _wait_response(
+        get_snap = wait_response_after_snapshot(
             session,
             _get_response_ready,
-            "wait_response_after_mapping_get_send",
+            step="wait_response_after_mapping_get_send",
+            message_prefix=_MAPPING_SETTLE_PREFIX,
         )
 
         session.ui_fill(URL_INPUT, SEED_POST_RESOLVED_URL)
         session.ui_select(METHOD_COMBO, "POST")
         session.ui_fill(REQUEST_BODY_EDIT, SEED_POST_BODY)
         session.ui_click(SEND_BUTTON)
-        post_snap = _wait_response(
+        post_snap = wait_response_after_snapshot(
             session,
             _post_response_ready,
-            "wait_response_after_mapping_post_send",
+            step="wait_response_after_mapping_post_send",
+            message_prefix=_MAPPING_SETTLE_PREFIX,
         )
 
     assert subtree_by_name(get_snap, RESPONSE_PANEL) is not None
@@ -151,26 +129,13 @@ def test_mapping_get_send_settle_timeout_includes_step_and_excerpt(
         session.ui_select(METHOD_COMBO, "GET")
         session.ui_click(SEND_BUTTON)
         with pytest.raises(UiWaitTimeoutError) as exc_info:
-            try:
-                session.wait_for_snapshot(
-                    lambda _: False,
-                    timeout=FORCED_SETTLE_TIMEOUT_S,
-                )
-            except UiWaitTimeoutError as exc:
-                last = session.ui_snapshot()
-                excerpt = response_panel_excerpt(last)
-                raise UiWaitTimeoutError(
-                    "mapping multi-URL Send settle failed "
-                    "(wait_response_after_mapping_get_send): "
-                    f"{exc}; response_excerpt={excerpt!r}",
-                    timeout_s=exc.timeout_s,
-                    condition=exc.condition,
-                    diagnostics={
-                        **exc.diagnostics,
-                        "step": "wait_response_after_mapping_get_send",
-                        "response_excerpt": excerpt,
-                    },
-                ) from exc
+            wait_response_after_snapshot(
+                session,
+                lambda _: False,
+                step="wait_response_after_mapping_get_send",
+                message_prefix=_MAPPING_SETTLE_PREFIX,
+                timeout=FORCED_SETTLE_TIMEOUT_S,
+            )
 
     diagnostics = exc_info.value.diagnostics
     assert diagnostics.get("step") == "wait_response_after_mapping_get_send"

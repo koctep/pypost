@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any
 
 from pypost.agent import AgentAppSession, UiWaitTimeoutError
@@ -13,6 +14,7 @@ from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
 __all__ = [
     "json_response_body_display",
     "wait_response_after_send",
+    "wait_response_after_snapshot",
 ]
 
 
@@ -50,6 +52,33 @@ def wait_response_after_send(
         excerpt = response_panel_excerpt(session.ui_snapshot())
         raise UiWaitTimeoutError(
             f"{message_prefix}: {exc}; response_excerpt={excerpt!r}",
+            timeout_s=exc.timeout_s,
+            condition=exc.condition,
+            diagnostics={
+                **exc.diagnostics,
+                "step": step,
+                "response_excerpt": excerpt,
+                **(diagnostics_extra or {}),
+            },
+        ) from exc
+
+
+def wait_response_after_snapshot(
+    session: AgentAppSession,
+    ready: Callable[[dict[str, Any]], bool],
+    *,
+    step: str,
+    message_prefix: str = "Send settle failed",
+    timeout: float = SEND_SETTLE_TIMEOUT_S,
+    diagnostics_extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Wait for snapshot readiness after Send; rewrap timeout with step + excerpt."""
+    try:
+        return session.wait_for_snapshot(ready, timeout=timeout)
+    except UiWaitTimeoutError as exc:
+        excerpt = response_panel_excerpt(session.ui_snapshot())
+        raise UiWaitTimeoutError(
+            f"{message_prefix} ({step}): {exc}; response_excerpt={excerpt!r}",
             timeout_s=exc.timeout_s,
             condition=exc.condition,
             diagnostics={
