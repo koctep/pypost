@@ -237,9 +237,11 @@ red run.
 
 `tests/test_agent_e2e_failure_artifacts.py` covers helper write/masking,
 best-effort errors (`RuntimeError`), propagation of unexpected dump errors
-(`LookupError`, PYPOST-876), a subprocess proof that the makereport hook
-dumps on fixture assert fail, and a subprocess proof that direct
-`AgentAppSession` constructions dump on assert fail (`make test-agent-e2e`).
+(`LookupError`, PYPOST-876), in-process caplog proof that a raising dump hook
+logs `agent_session_failure_dump_hook_failed` (PYPOST-912), a subprocess proof
+that the makereport hook dumps on fixture assert fail, and a subprocess proof
+that direct `AgentAppSession` constructions dump on assert fail
+(`make test-agent-e2e`).
 
 ## Troubleshooting
 

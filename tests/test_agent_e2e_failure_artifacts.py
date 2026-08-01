@@ -6,16 +6,18 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
+
 from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtWidgets import QApplication, QLineEdit, QVBoxLayout, QWidget
 
-from pypost.agent.lifecycle import AgentAppSession
+from pypost.agent.lifecycle import AgentAppSession, set_agent_session_failure_dump_hook
 from pypost.agent.ui_snapshot import capture_ui_snapshot
 from pypost.core.sensitive_text_sanitizer import HIDDEN_PLACEHOLDER
 from pypost.fixtures.agent_e2e_failure import (
     dump_agent_e2e_failure_artifacts,
+    make_direct_session_failure_dump_hook,
     resolve_artifact_root,
     safe_nodeid_dirname,
     session_from_funcargs,
@@ -265,6 +267,32 @@ def test_makereport_hook_dumps_on_fixture_assert_fail(
     assert diag["exc_type"] == "AssertionError"
     assert diag["session_fixture"] == "agent_e2e_session"
     assert "intentional failure" in (diag["exc_message"] or "")
+
+
+def test_dump_hook_failure_logs_warning(
+    qapp: QApplication,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-912: raising dump hook logs agent_session_failure_dump_hook_failed."""
+    assert QApplication.instance() is qapp
+
+    def _failing_hook(
+        _session: AgentAppSession,
+        _exc_type: type[BaseException],
+        _exc: BaseException,
+    ) -> None:
+        raise RuntimeError("hook boom")
+
+    set_agent_session_failure_dump_hook(_failing_hook)
+    try:
+        with caplog.at_level(logging.WARNING, logger="pypost.agent.lifecycle"):
+            with pytest.raises(AssertionError, match="intentional dump hook caplog"):
+                with AgentAppSession(offscreen=True, ready_timeout=30.0) as session:
+                    assert session.window.is_ui_ready is True
+                    assert False, "intentional dump hook caplog"
+        assert "agent_session_failure_dump_hook_failed error=RuntimeError" in caplog.text
+    finally:
+        set_agent_session_failure_dump_hook(make_direct_session_failure_dump_hook())
 
 
 def test_dumps_on_direct_session_assert_fail(

@@ -120,7 +120,10 @@ event lives in `tests/test_agent_e2e_http_stub_logs.py` (PYPOST-870);
 failure dumps emit
 `agent_e2e_failure_artifacts_written` /
 `agent_e2e_failure_artifacts_failed`
-([agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md)); compose
+([agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md)); lifecycle
+logs `agent_session_failure_dump_hook_failed` when the optional dump hook
+raises — caplog proof in
+`tests/test_agent_e2e_failure_artifacts.py` (PYPOST-912); compose
 with `agent_session_*` / `agent_e2e_seed_*`. Snapshot capture contract:
 [ui_snapshot.md](ui_snapshot.md) (`ui_snapshot_captured` logs scalars only —
 never the tree or values). UI action contract:
