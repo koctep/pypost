@@ -320,7 +320,7 @@ class AgentAppSession:
         *,
         in_current_tab: bool = False,
     ) -> None:
-        """Select by display text or index on a named combo, list, or tree."""
+        """Select by display text or index on a named combo, list, tree, or item view."""
         ui_select(
             self._action_root(in_current_tab=in_current_tab),
             widget_id,

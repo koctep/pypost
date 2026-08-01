@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLineEdit,
+    QListView,
     QListWidget,
     QPushButton,
     QTreeView,
@@ -37,6 +38,7 @@ _BTN = "fixture_click_btn"
 _INPUT = "fixture_line_edit"
 _COMBO = "fixture_combo"
 _LIST = "fixture_list"
+_LIST_VIEW = "fixture_list_view"
 _TREE = "fixture_tree"
 _DISABLED = "fixture_disabled_btn"
 
@@ -101,6 +103,30 @@ def _close_tree_fixture(root: QWidget, qapp: QApplication) -> None:
     tree = find_widget(root, _TREE)
     if isinstance(tree, QTreeView):
         tree.setModel(None)
+    root.close()
+    qapp.processEvents()
+
+
+def _make_list_view_fixture(qapp: QApplication) -> QWidget:
+    """Isolated QListView fixture — model-backed, not QListWidget."""
+    root = QWidget()
+    layout = QHBoxLayout(root)
+    view = QListView()
+    model = QStandardItemModel(view)
+    for label in ("Alpha", "Beta", "Gamma"):
+        model.appendRow(QStandardItem(label))
+    view.setModel(model)
+    set_widget_id(view, _LIST_VIEW)
+    layout.addWidget(view)
+    root.show()
+    qapp.processEvents()
+    return root
+
+
+def _close_list_view_fixture(root: QWidget, qapp: QApplication) -> None:
+    view = find_widget(root, _LIST_VIEW)
+    if isinstance(view, QListView):
+        view.setModel(None)
     root.close()
     qapp.processEvents()
 
@@ -175,6 +201,36 @@ def test_ui_select_list_by_index(qapp: QApplication) -> None:
         assert lst.currentItem().text() == "Alpha"
     finally:
         root.close()
+
+
+def test_ui_select_list_view_by_text(qapp: QApplication) -> None:
+    """PYPOST-939: ui_select selects a QListView row by display text."""
+    root = _make_list_view_fixture(qapp)
+    try:
+        ui_select(root, _LIST_VIEW, "Beta")
+        view = find_widget(root, _LIST_VIEW)
+        assert isinstance(view, QListView)
+        current = view.currentIndex()
+        assert current.isValid()
+        assert current.data(Qt.ItemDataRole.DisplayRole) == "Beta"
+        assert current.row() == 1
+    finally:
+        _close_list_view_fixture(root, qapp)
+
+
+def test_ui_select_list_view_by_index(qapp: QApplication) -> None:
+    """PYPOST-939: ui_select selects a QListView row by zero-based index."""
+    root = _make_list_view_fixture(qapp)
+    try:
+        ui_select(root, _LIST_VIEW, 0)
+        view = find_widget(root, _LIST_VIEW)
+        assert isinstance(view, QListView)
+        current = view.currentIndex()
+        assert current.isValid()
+        assert current.data(Qt.ItemDataRole.DisplayRole) == "Alpha"
+        assert current.row() == 0
+    finally:
+        _close_list_view_fixture(root, qapp)
 
 
 def test_ui_select_tree_by_text(qapp: QApplication) -> None:

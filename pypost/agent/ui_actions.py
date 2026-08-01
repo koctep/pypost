@@ -14,6 +14,7 @@ from typing import Final
 from PySide6.QtCore import QCoreApplication, QModelIndex, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QLineEdit,
     QListWidget,
@@ -199,6 +200,42 @@ def _select_list(widget: QListWidget, widget_id: str, option: str | int) -> None
     widget.setCurrentItem(matches[0])
 
 
+def _select_item_view(
+    widget: QAbstractItemView,
+    widget_id: str,
+    option: str | int,
+) -> None:
+    model = widget.model()
+    if model is None:
+        raise UiTargetNotInteractableError(widget_id, "item view has no model")
+    if isinstance(option, int):
+        if option < 0 or option >= model.rowCount():
+            raise UiTargetNotInteractableError(
+                widget_id,
+                f"option index out of range: {option!r}",
+            )
+        index = model.index(option, 0)
+        if not index.isValid():
+            raise UiTargetNotInteractableError(
+                widget_id,
+                f"option index out of range: {option!r}",
+            )
+        widget.setCurrentIndex(index)
+        return
+    rows = model.rowCount()
+    for row in range(rows):
+        index = model.index(row, 0)
+        if not index.isValid():
+            continue
+        if str(index.data(Qt.ItemDataRole.DisplayRole)) == option:
+            widget.setCurrentIndex(index)
+            return
+    raise UiTargetNotInteractableError(
+        widget_id,
+        f"option not found: {option!r}",
+    )
+
+
 def _find_tree_index_by_text(tree: QTreeView, text: str) -> QModelIndex | None:
     model = tree.model()
     if model is None:
@@ -254,8 +291,10 @@ def _select_tree(widget: QTreeView, widget_id: str, option: str | int) -> None:
 def ui_select(root: QWidget, widget_id: str, option: str | int) -> None:
     """Select ``option`` by display text (str) or index (int).
 
-    Supports ``QComboBox``, ``QListWidget``, and ``QTreeView``. For trees, an
-    integer selects a top-level row; nested rows are selected by display text.
+    Supports ``QComboBox``, ``QListWidget``, ``QTreeView``, and flat
+    model-backed ``QAbstractItemView`` targets (for example ``QListView``).
+    For trees, an integer selects a top-level row; nested rows are selected
+    by display text.
     """
     started = time.monotonic()
     widget = find_widget(root, widget_id)
@@ -266,6 +305,8 @@ def ui_select(root: QWidget, widget_id: str, option: str | int) -> None:
         _select_list(widget, widget_id, option)
     elif isinstance(widget, QTreeView):
         _select_tree(widget, widget_id, option)
+    elif isinstance(widget, QAbstractItemView):
+        _select_item_view(widget, widget_id, option)
     else:
         raise UiTargetNotInteractableError(
             widget_id,

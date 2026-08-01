@@ -6,7 +6,7 @@ Agents and automated harnesses drive named PyPost controls after `is_ui_ready`
 via `pypost.agent.ui_actions`. Primitives address widgets by stable
 `objectName` values ([UI widget identity](ui_identity.md)): click, fill
 (default setters or opt-in keyClicks — PYPOST-917), select
-(combo / list / tree — PYPOST-916), and send key/hotkey. Missing or
+(combo / list / tree / model list view — PYPOST-916, PYPOST-939), and send key/hotkey. Missing or
 non-interactable targets raise actionable exceptions.
 
 This is an **in-process Python agent API**, not a network MCP tool on
@@ -107,6 +107,10 @@ Select an item by **display text** (`str`) or **zero-based index** (`int`) on:
 | `QComboBox` | `findText` + `setCurrentIndex` | `setCurrentIndex` |
 | `QListWidget` | `findItems(MatchExactly)` + current item | `setCurrentRow` |
 | `QTreeView` | Depth-first DisplayRole match (expands parent) | Top-level row only |
+| `QListView` / flat `QAbstractItemView` | Column 0 DisplayRole scan + `setCurrentIndex` | Row index on root model |
+
+`QListWidget` is handled before generic item views. Plain `QListView` and other
+flat model-backed views use the last row; they require a model on column 0.
 
 Missing option/index or unsupported widget type →
 `UiTargetNotInteractableError`. Selection sets the current item; it does
@@ -116,8 +120,10 @@ Missing option/index or unsupported widget type →
 ```python
 ui_select(root, METHOD_COMBO, "POST")   # combo by text
 ui_select(root, METHOD_COMBO, 1)        # combo by index
-ui_select(root, "fixture_list", "Beta") # list by text
-ui_select(root, "fixture_list", 0)      # list by index
+ui_select(root, "fixture_list", "Beta") # list widget by text
+ui_select(root, "fixture_list", 0)      # list widget by index
+ui_select(root, "fixture_list_view", "Beta")  # QListView by text (PYPOST-939)
+ui_select(root, "fixture_list_view", 0)      # QListView by index
 ui_select(root, COLLECTION_TREE, "GET Seed GET")  # tree by text
 ui_select(root, COLLECTION_TREE, 0)     # tree top-level index
 ```
@@ -170,6 +176,8 @@ widgets that already have `objectName` set via `set_widget_id`.
   enable/show it or pick another target.
 - **`not a text input` / `not a selectable list/combo/tree`** — Primitive does
   not match the widget type; use click/key or a different id.
+- **`item view has no model`** — Model-backed list view has no model attached;
+  set a model before selecting.
 - **`option not found` / `option index out of range`** — Display text mismatch
   (case-sensitive) or index outside the control’s range. Tree index is
   top-level only; use text for nested rows.
