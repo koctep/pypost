@@ -578,6 +578,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-910] | Explicit `retention-days: 14` on failure artifact uploads |
 | [PYPOST-911] | DEFER live Artifacts UI proof; procedure + doc lock |
 | [PYPOST-905] | Stamp/cache `venv-test` / `venv-otel`; skip pip when extras current |
+| [PYPOST-929] | Contract: `make install` touches both extra stamps |
 | [PYPOST-906] | `lint` depends on `venv-test` (like `typecheck`); `run` stays marker-only |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
@@ -592,6 +593,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-873]: https://pypost.atlassian.net/browse/PYPOST-873
 [PYPOST-874]: https://pypost.atlassian.net/browse/PYPOST-874
 [PYPOST-905]: https://pypost.atlassian.net/browse/PYPOST-905
+[PYPOST-929]: https://pypost.atlassian.net/browse/PYPOST-929
 [PYPOST-906]: https://pypost.atlassian.net/browse/PYPOST-906
 [PYPOST-907]: https://pypost.atlassian.net/browse/PYPOST-907
 [PYPOST-908]: https://pypost.atlassian.net/browse/PYPOST-908
@@ -603,7 +605,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | ---- | ---------------- |
 | Marker lifecycle | `make venv` creates marker; `make clean` removes `.venv`; idempotent `venv` |
 | Dependency chain | `install` depends on marker only; pytest targets depend on marker + `venv-test` + `venv-otel`; `lint` depends on marker + `venv-test` (906); `run` marker-only |
-| Extra stamps | Skip pip when stamp current; install when missing/stale; alias→stamp; stamp→marker+pyproject (905) |
+| Extra stamps | Skip pip when stamp current; install when missing/stale; alias→stamp; stamp→marker+pyproject (905); `install` touches both stamps (929) |
 | Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv succeeds `lint` via `venv-test`; `make test` succeeds via `venv-test` |
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
 | Slow install smoke | `make install` with real `pyproject.toml` succeeds; marked `@pytest.mark.slow` |
