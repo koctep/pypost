@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PySide6.QtWidgets import QApplication, QLineEdit, QVBoxLayout, QWidget
 
+from pypost.agent.e2e_dump_errors import DUMP_BEST_EFFORT_ERRORS
 from pypost.agent.lifecycle import AgentAppSession, set_agent_session_failure_dump_hook
 from pypost.agent.ui_snapshot import capture_ui_snapshot
 from pypost.core.sensitive_text_sanitizer import HIDDEN_PLACEHOLDER
@@ -56,6 +57,15 @@ def _find_by_name(node: dict[str, Any], name: str) -> dict[str, Any] | None:
             if found is not None:
                 return found
     return None
+
+
+def test_dump_best_effort_errors_shared_module() -> None:
+    """PYPOST-960: lifecycle and fixtures import one shared catch tuple."""
+    from pypost.agent import lifecycle
+    from pypost.fixtures import agent_e2e_failure
+
+    assert lifecycle.DUMP_BEST_EFFORT_ERRORS is DUMP_BEST_EFFORT_ERRORS
+    assert agent_e2e_failure.DUMP_BEST_EFFORT_ERRORS is DUMP_BEST_EFFORT_ERRORS
 
 
 def test_safe_nodeid_dirname_is_filesystem_safe() -> None:
@@ -341,8 +351,8 @@ def test_dump_hook_propagates_unexpected_exception(
 ) -> None:
     """PYPOST-914: unexpected hook errors must propagate from __exit__.
 
-    LookupError is outside the intentional best-effort catalogue aligned with
-    ``_DUMP_BEST_EFFORT_ERRORS`` (PYPOST-876).
+    LookupError is outside the intentional best-effort catalogue
+    ``DUMP_BEST_EFFORT_ERRORS`` (PYPOST-876 / PYPOST-960).
     """
     assert QApplication.instance() is qapp
 

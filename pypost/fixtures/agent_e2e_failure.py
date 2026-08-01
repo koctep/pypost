@@ -18,6 +18,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
+from pypost.agent.e2e_dump_errors import DUMP_BEST_EFFORT_ERRORS
 from pypost.agent.lifecycle import AgentAppSession
 
 logger = logging.getLogger(__name__)
@@ -26,15 +27,6 @@ DEFAULT_ARTIFACT_RELATIVE = Path("artifacts") / "agent_e2e"
 ENV_ARTIFACT_ROOT = "PYPOST_AGENT_E2E_ARTIFACTS"
 DIRECT_SESSION_PROVENANCE = "direct"
 MAX_EXC_MESSAGE_LENGTH = 500
-# Intentional best-effort catches for dump I/O / capture / half-torn reads
-# (PYPOST-876). Unexpected Exception subclasses propagate.
-_DUMP_BEST_EFFORT_ERRORS = (
-    OSError,
-    RuntimeError,
-    TypeError,
-    ValueError,
-    AttributeError,
-)
 _SESSION_FIXTURE_NAMES = (
     "seeded_agent_e2e_session",
     "agent_e2e_session",
@@ -78,7 +70,7 @@ def dump_agent_e2e_failure_artifacts(
 ) -> Path | None:
     """Write ``ui_snapshot.json`` + ``diagnostics.json``; return dump dir.
 
-    Best-effort for ``_DUMP_BEST_EFFORT_ERRORS`` (I/O, capture, half-torn
+    Best-effort for ``DUMP_BEST_EFFORT_ERRORS`` (I/O, capture, half-torn
     reads): those are logged and return ``None`` so the original test
     failure remains the primary outcome. Other exceptions propagate.
     """
@@ -96,7 +88,7 @@ def dump_agent_e2e_failure_artifacts(
         )
         _write_json(dump_dir / "ui_snapshot.json", snapshot)
         _write_json(dump_dir / "diagnostics.json", diagnostics)
-    except _DUMP_BEST_EFFORT_ERRORS as exc:
+    except DUMP_BEST_EFFORT_ERRORS as exc:
         logger.warning(
             "agent_e2e_failure_artifacts_failed nodeid=%s error=%s",
             nodeid,
@@ -175,7 +167,7 @@ def _build_diagnostics(
     ui_ready: bool | None
     try:
         ui_ready = bool(session.window.is_ui_ready)
-    except _DUMP_BEST_EFFORT_ERRORS:
+    except DUMP_BEST_EFFORT_ERRORS:
         ui_ready = None
     return {
         "nodeid": nodeid,

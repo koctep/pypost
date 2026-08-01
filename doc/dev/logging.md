@@ -122,7 +122,8 @@ failure dumps emit
 `agent_e2e_failure_artifacts_failed`
 ([agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md)); lifecycle
 logs `agent_session_failure_dump_hook_failed` when the optional dump hook
-raises a best-effort type (`_DUMP_HOOK_BEST_EFFORT_ERRORS`, PYPOST-914;
+raises a best-effort type (`DUMP_BEST_EFFORT_ERRORS` in
+`pypost/agent/e2e_dump_errors.py`, PYPOST-914 / PYPOST-960;
 aligned with dump helper PYPOST-876) — caplog proof in
 `tests/test_agent_e2e_failure_artifacts.py` (PYPOST-912); unexpected hook
 errors propagate (PYPOST-914); compose

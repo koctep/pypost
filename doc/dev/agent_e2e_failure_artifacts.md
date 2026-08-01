@@ -96,15 +96,15 @@ On dump failure (capture/I/O), WARNING
 `agent_e2e_failure_artifacts_failed` with `error=<ExcType>` — the original
 test failure remains the primary result.
 
-Best-effort catch set (`_DUMP_BEST_EFFORT_ERRORS`, PYPOST-876):
+Best-effort catch set (`DUMP_BEST_EFFORT_ERRORS` in
+`pypost/agent/e2e_dump_errors.py`, PYPOST-876 / PYPOST-960):
 `OSError`, `RuntimeError`, `TypeError`, `ValueError`, `AttributeError`.
 Other exception types from the dump body propagate (they are not converted
 into a dump-failed WARNING).
 
-The lifecycle dump-hook wrapper in `AgentAppSession.__exit__` uses the same
-intentional catch set (`_DUMP_HOOK_BEST_EFFORT_ERRORS`, PYPOST-914). Hook
-failures outside that set propagate from `__exit__` instead of logging
-`agent_session_failure_dump_hook_failed`.
+The lifecycle dump-hook wrapper in `AgentAppSession.__exit__` imports the same
+tuple (PYPOST-914 / PYPOST-960). Hook failures outside that set propagate
+from `__exit__` instead of logging `agent_session_failure_dump_hook_failed`.
 
 ## API / Usage
 
