@@ -765,6 +765,9 @@ only the dependency list.
 | --- | --- |
 | `[tool.setuptools.dynamic] version.attr` | `pypost/version.py` with `__version__` (copied from repo) |
 | `[project] readme` | `README.md` on disk (copied from repo) |
+| `[project.scripts]` | Entry-point module files and parent `__init__.py` stubs (PYPOST-964) |
+| `[project] license-files` / `[tool.setuptools] license-files` | Listed license files on disk |
+| `[tool.setuptools.package-data]` | Files matching declared globs under the package dir |
 | `[tool.setuptools.packages.find]` | Minimal `pypost/` package dir (`__init__.py` stub) |
 
 `_seed_installable_package` materializes the version and readme files atop the existing stub
@@ -783,13 +786,15 @@ module and readme file — not application subpackages such as `pypost/core/` or
 | --- | --- |
 | `pypost/__init__.py` | Empty stub from `_seed_minimal_project` |
 | `pypost/version.py` | Copied from repo (PYPOST-808 single version source) |
+| `pypost/agent/**` | Stub modules for `[project.scripts]` entry points only (PYPOST-964) |
 | `README.md` (workspace root) | Copied from repo |
 | Other `pypost/**` paths | **Excluded** unless packaging requires them at install time |
 
 The canonical stub file set is `SLOW_SMOKE_MINIMUM_PYPPOST_FILES` in `tests/test_makefile.py`
-(currently `__init__.py` and `version.py`). `test_slow_smoke_seed_materializes_minimum_pypost_tree`
-asserts the seeded workspace matches that set exactly — catching both under-seeding and
-accidental full-tree copies.
+(currently `__init__.py`, `version.py`, and script entry-point stubs under `pypost/agent/`).
+`_required_seed_paths_from_pyproject` derives workspace-root and out-of-tree install artifacts
+(readme, license files, package-data); `test_slow_smoke_seed_materializes_minimum_pypost_tree`
+asserts the `pypost/` stub shape exactly — catching under-seeding and accidental full-tree copies.
 
 When adding new dynamic or install-time paths to `pyproject.toml`, extend the seed helper,
 `SLOW_SMOKE_MINIMUM_PYPPOST_FILES` (if under `pypost/`), and the contract parser together;
