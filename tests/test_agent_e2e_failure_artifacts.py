@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtWidgets import QApplication, QLineEdit, QVBoxLayout, QWidget
@@ -189,6 +189,55 @@ def test_dump_best_effort_on_capture_error(
         )
     assert dump_dir is None
     assert "agent_e2e_failure_artifacts_failed" in caplog.text
+
+
+def test_dump_best_effort_on_oserror(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-915: OSError on dump write is best-effort WARNING + None."""
+    session = MagicMock(spec=AgentAppSession)
+    session.ui_snapshot.return_value = {"role": "window", "children": []}
+    session.window.is_ui_ready = True
+    with patch(
+        "pypost.fixtures.agent_e2e_failure._write_json",
+        side_effect=OSError("disk full"),
+    ):
+        with caplog.at_level(
+            logging.WARNING,
+            logger="pypost.fixtures.agent_e2e_failure",
+        ):
+            dump_dir = dump_agent_e2e_failure_artifacts(
+                session,
+                nodeid="oserror_write",
+                artifact_root=tmp_path,
+            )
+    assert dump_dir is None
+    assert "agent_e2e_failure_artifacts_failed" in caplog.text
+    assert "error=OSError" in caplog.text
+
+
+def test_dump_best_effort_on_attribute_error(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-915: AttributeError on capture is best-effort WARNING + None."""
+    session = MagicMock(spec=AgentAppSession)
+    session.ui_snapshot.side_effect = AttributeError(
+        "'NoneType' object has no attribute 'window'"
+    )
+    with caplog.at_level(
+        logging.WARNING,
+        logger="pypost.fixtures.agent_e2e_failure",
+    ):
+        dump_dir = dump_agent_e2e_failure_artifacts(
+            session,
+            nodeid="attribute_error_capture",
+            artifact_root=tmp_path,
+        )
+    assert dump_dir is None
+    assert "agent_e2e_failure_artifacts_failed" in caplog.text
+    assert "error=AttributeError" in caplog.text
 
 
 def test_dump_propagates_unexpected_exception(tmp_path: Path) -> None:
