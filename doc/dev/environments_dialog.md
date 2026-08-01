@@ -148,6 +148,47 @@ happy path, cancel, invalid file, zero-candidates, single conflict, "apply
 to all", partial-parse success, no-op without `read_import_file`, and the
 `environment_import_completed` log line).
 
+## Export environments (PYPOST-988)
+
+`EnvironmentListWidget` gains an **Export…** button (`BUTTON_EXPORT`,
+`ENV_EXPORT_BUTTON` widget id) beside **Import…**, wired to
+`export_environments()`. Pure logic lives in
+`pypost/core/environment_export.py`:
+
+- `ExportScope` — `SELECTED` or `ALL`.
+- `environments_for_export(all_environments, scope, selected_index)` —
+  resolves which in-memory environments to write.
+- `export_includes_hidden(environments)` — true when any target has
+  `hidden_keys`.
+- `build_export_payload(environments, storage)` — calls the new
+  `StorageManager.serialize_environment_records` (native on-disk JSON shape,
+  including encrypted envelopes when encryption is enabled).
+- `write_export_file(path, payload)` — indented UTF-8 JSON; raises
+  `EnvironmentExportError` on write failure.
+- `format_export_result(ExportPlanResult)` — summary dialog text.
+
+**Hidden/secrets policy:** values are **included, not redacted**, with a
+mandatory `confirm_export_includes_secrets` warning when any exported
+environment has Hidden variables — see `doc/user/environments.md` § Hidden
+values in export files.
+
+`EnvironmentListWidget.export_environments()` orchestrates: scope prompt
+(`prompt_export_scope`) → selected-row guard → secrets confirmation (if
+needed) → save dialog (`prompt_export_environments_file`) → injected
+`serialize_export_records` callable → `write_export_file` →
+`show_export_result`. `EnvPresenter._open_env_manager` wires
+`serialize_export_records=lambda envs:
+self._storage.serialize_environment_records(envs)`.
+
+Export does not mutate the working list or touch disk except for the chosen
+export path. Single-environment exports write one JSON object; multi-
+environment exports write a list — both shapes are accepted by import
+(PYPOST-986).
+
+Tests: `tests/test_environment_export.py` (pure logic, round-trip with
+`load_import_candidates`) and `tests/test_environment_export_ui.py`
+(Qt-level scope/cancel/secrets/no-op/log coverage).
+
 ## Configuration
 N/A
 

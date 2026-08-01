@@ -448,6 +448,9 @@ class EnvPresenter(QObject):
             current_env_name,
             log_hidden_key_names=self._settings.log_hidden_key_names,
             read_import_file=lambda path: load_import_candidates(path, self._storage),
+            serialize_export_records=lambda envs: self._storage.serialize_environment_records(
+                envs
+            ),
         )
         dialog.exec()
         logger.info("env_manager_dialog_closed")

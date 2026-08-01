@@ -14,20 +14,30 @@ from pypost.core.collection_messages import (
     format_collection_import_conflict_message,
 )
 from pypost.core.import_conflicts import ImportConflictDecision
+from pypost.core.environment_export import ExportScope
 from pypost.core.environment_messages import (
+    BUTTON_EXPORT_ALL,
+    BUTTON_EXPORT_SELECTED,
     BUTTON_KEEP_BOTH,
     BUTTON_OVERWRITE,
     BUTTON_SKIP,
     CHECKBOX_APPLY_TO_ALL_CONFLICTS,
     DIALOG_TITLE_COPY_ENVIRONMENT,
     DIALOG_TITLE_DELETE_ENVIRONMENT,
+    DIALOG_TITLE_EXPORT_ENVIRONMENTS,
+    DIALOG_TITLE_EXPORT_SCOPE,
+    DIALOG_TITLE_EXPORT_SECRETS,
     DIALOG_TITLE_IMPORT_CONFLICT,
     DIALOG_TITLE_IMPORT_ENVIRONMENTS,
+    EXPORT_FILE_DIALOG_CAPTION,
+    EXPORT_FILE_DIALOG_FILTER,
     IMPORT_FILE_DIALOG_CAPTION,
     IMPORT_FILE_DIALOG_FILTER,
     MSG_EMPTY_NAME,
+    MSG_EXPORT_NO_SELECTION,
     format_delete_environment_confirm,
     format_duplicate_environment_name,
+    format_export_secrets_warning,
     format_import_conflict_message,
 )
 
@@ -303,6 +313,66 @@ def show_import_result(parent: QWidget, summary_text: str, *, success: bool) -> 
         QMessageBox.information(parent, DIALOG_TITLE_IMPORT_ENVIRONMENTS, summary_text)
     else:
         QMessageBox.warning(parent, DIALOG_TITLE_IMPORT_ENVIRONMENTS, summary_text)
+
+
+def prompt_export_scope(parent: QWidget) -> ExportScope | None:
+    """Ask whether to export the selected environment or all environments."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Question)
+    box.setWindowTitle(DIALOG_TITLE_EXPORT_SCOPE)
+    box.setText("Which environments do you want to export?")
+    selected_btn = box.addButton(
+        BUTTON_EXPORT_SELECTED, QMessageBox.ButtonRole.AcceptRole
+    )
+    all_btn = box.addButton(BUTTON_EXPORT_ALL, QMessageBox.ButtonRole.AcceptRole)
+    box.addButton(QMessageBox.StandardButton.Cancel)
+    box.setDefaultButton(all_btn)
+    box.exec()
+    clicked = box.clickedButton()
+    if clicked is selected_btn:
+        return ExportScope.SELECTED
+    if clicked is all_btn:
+        return ExportScope.ALL
+    return None
+
+
+def show_export_no_selection_error(parent: QWidget) -> None:
+    QMessageBox.warning(parent, DIALOG_TITLE_EXPORT_ENVIRONMENTS, MSG_EXPORT_NO_SELECTION)
+
+
+def confirm_export_includes_secrets(parent: QWidget, environment_names: list[str]) -> bool:
+    reply = QMessageBox.warning(
+        parent,
+        DIALOG_TITLE_EXPORT_SECRETS,
+        format_export_secrets_warning(environment_names),
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No,
+    )
+    return reply == QMessageBox.StandardButton.Yes
+
+
+def prompt_export_environments_file(parent: QWidget, *, suggested_name: str) -> Path | None:
+    """Open a save dialog for an environment export file; None on Cancel."""
+    path_str, _selected_filter = QFileDialog.getSaveFileName(
+        parent,
+        EXPORT_FILE_DIALOG_CAPTION,
+        suggested_name,
+        EXPORT_FILE_DIALOG_FILTER,
+    )
+    if not path_str:
+        return None
+    return Path(path_str)
+
+
+def show_export_result(parent: QWidget, summary_text: str, *, success: bool) -> None:
+    if success:
+        QMessageBox.information(parent, DIALOG_TITLE_EXPORT_ENVIRONMENTS, summary_text)
+    else:
+        QMessageBox.warning(parent, DIALOG_TITLE_EXPORT_ENVIRONMENTS, summary_text)
+
+
+def show_export_error(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, DIALOG_TITLE_EXPORT_ENVIRONMENTS, message)
 
 
 def prompt_import_collection_file(parent: QWidget) -> Path | None:

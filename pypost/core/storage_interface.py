@@ -53,3 +53,10 @@ class StorageInterface(Protocol):
         self,
         records: list[dict],
     ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]: ...
+
+    def serialize_environment_records(
+        self,
+        environments: List[Environment],
+        *,
+        target_envelope_version: int | None = None,
+    ) -> list[dict]: ...

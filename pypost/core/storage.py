@@ -240,6 +240,22 @@ class StorageManager:
             return None
         return data
 
+    def serialize_environment_records(
+        self,
+        environments: List[Environment],
+        *,
+        target_envelope_version: int | None = None,
+    ) -> list[dict]:
+        """Serialize environments to native on-disk JSON records (PYPOST-988)."""
+        data: list[dict] = []
+        for env in environments:
+            serialized, _env_stats = self._env_adapter.serialize_environment(
+                env,
+                target_envelope_version=target_envelope_version,
+            )
+            data.append(serialized)
+        return data
+
     def deserialize_environment_records(
         self,
         records: list[dict],

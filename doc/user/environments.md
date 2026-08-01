@@ -61,8 +61,40 @@ Notes:
 - If the file cannot be read at all, or contains no usable environments, your existing
   environments are left completely unchanged.
 - Import only reads a file — it does not change anything until you see the summary
-  dialog. There is no "Export environments" action yet; use a copy of your own
-  `environments.json`, or one shared by a teammate, as the file to import.
+  dialog. You can also **export** environments from the same screen (see below).
+
+## Export environments
+
+Save one or all environments to a JSON file you can import elsewhere or keep as a backup:
+
+1. In **Manage Environments**, click **Export…** next to **Import…**.
+2. Choose **Selected Environment** (the row highlighted in the list) or **All
+   Environments**.
+3. If the export includes any **Hidden** variables, PyPost asks you to confirm —
+   the saved file will contain those secret values (see [Hidden policy](#hidden-values-in-export-files)
+   below).
+4. Pick where to save the file. One environment is written as a single JSON object;
+   several environments are written as a JSON list — the same shapes **Import…** accepts.
+5. A summary dialog confirms what was exported and where it was saved.
+
+The file format matches PyPost's native `environments.json` records (the same format
+described in [Import environments](#import-environments) above), so export and import
+round-trip on the same installation.
+
+### Hidden values in export files
+
+PyPost **includes Hidden variable values in the export file** (not redacted) so the
+file can be imported back without re-entering secrets. Before writing, you must confirm
+when any exported environment has Hidden variables.
+
+- When [encryption at rest](#encryption-at-rest-optional) is **off**, Hidden values are
+  stored as plaintext strings in the file.
+- When encryption is **on**, Hidden values are stored as encrypted envelopes in the
+  file — the same representation as in your local `environments.json`. Those envelopes
+  import correctly on **this** installation; on another machine with a different
+  encryption key, import reports a clear error for that entry (see Import notes above).
+
+Treat exported files like credential backups: store and share them carefully.
 
 ## Activate an environment
 

@@ -22,6 +22,7 @@ class EnvironmentDialog(QDialog):
         current_env_name: str = None,
         log_hidden_key_names: bool = False,
         read_import_file: Callable[[Path], tuple[list[Environment], list[str]]] | None = None,
+        serialize_export_records: Callable[[list[Environment]], list[dict]] | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle(DIALOG_TITLE_MANAGE_ENVIRONMENTS)
@@ -35,6 +36,7 @@ class EnvironmentDialog(QDialog):
             get_current_env_name=lambda: self.current_env_name,
             set_current_env_name=lambda name: setattr(self, "current_env_name", name),
             read_import_file=read_import_file,
+            serialize_export_records=serialize_export_records,
         )
         self._vars_widget = EnvironmentVariablesWidget(
             log_hidden_key_names=log_hidden_key_names,
@@ -81,6 +83,9 @@ class EnvironmentDialog(QDialog):
 
     def import_environments(self) -> None:
         self._env_list_widget.import_environments()
+
+    def export_environments(self) -> None:
+        self._env_list_widget.export_environments()
 
     def delete_environment(self, row: int | None = None) -> None:
         self._env_list_widget.delete_environment(row)
