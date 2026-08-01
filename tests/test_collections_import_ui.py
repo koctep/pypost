@@ -1,0 +1,334 @@
+"""Qt-level tests for the Import Collection flow (PYPOST-987)."""
+
+import json
+import logging
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+from PySide6.QtWidgets import QPushButton
+
+from pypost.core.collection_import import CollectionImportFileError
+from pypost.core.import_conflicts import ImportConflictDecision
+from pypost.core.request_manager import RequestManager
+from pypost.core.storage import StorageManager
+from pypost.ui.presenters.collections_presenter import CollectionsPresenter
+from pypost.ui.widget_ids import COLLECTION_IMPORT_BUTTON
+from tests.helpers.collections_tree import (
+    FakeMetrics,
+    FakeRequestManager,
+    FakeStateManager,
+    make_collection,
+    make_request,
+)
+
+pytestmark = pytest.mark.timeout(60)
+
+_MODULE = "pypost.ui.presenters.collection_import_actions"
+_PICKER = f"{_MODULE}.prompt_import_collection_file"
+_CONFLICT = f"{_MODULE}.prompt_collection_import_conflict"
+_RESULT = f"{_MODULE}.show_collection_import_result"
+_INVALID = f"{_MODULE}.show_collection_import_invalid_file_error"
+
+_PATH = Path("/tmp/import.json")
+
+
+def _make_presenter(collections=None, read_import_file=None):
+    manager = FakeRequestManager(list(collections or []))
+    presenter = CollectionsPresenter(
+        manager,
+        FakeStateManager(),
+        FakeMetrics(),
+        {},
+        read_import_file=read_import_file,
+    )
+    presenter.refresh_tree()
+    return presenter, manager
+
+
+def _reader(collections, parse_errors=None):
+    def read(path):
+        return list(collections), list(parse_errors or [])
+
+    return read
+
+
+class TestImportCollectionEntryPoint:
+    @patch(_PICKER, return_value=None)
+    def test_panel_exposes_an_identified_import_button_wired_to_the_flow(
+        self, mock_picker, qapp
+    ):
+        presenter, _manager = _make_presenter()
+        try:
+            button = presenter.panel.findChild(QPushButton, COLLECTION_IMPORT_BUTTON)
+            assert button is not None
+            button.click()
+            mock_picker.assert_called_once()
+        finally:
+            presenter.panel.close()
+
+    def test_widget_property_still_returns_the_tree(self, qapp):
+        presenter, _manager = _make_presenter()
+        try:
+            assert presenter.widget is not presenter.panel
+            assert presenter.widget.parent() is presenter.panel
+        finally:
+            presenter.panel.close()
+
+
+class TestImportCollections:
+    @patch(_RESULT)
+    @patch(_PICKER, return_value=_PATH)
+    def test_happy_path_adds_collection_persists_and_refreshes_tree(
+        self, _mock_picker, mock_result, qapp
+    ):
+        incoming = make_collection("new-id", "Imported", [make_request("r1", "Ping")])
+        presenter, manager = _make_presenter(
+            [make_collection("c1", "Existing")], _reader([incoming])
+        )
+        try:
+            presenter.import_collections()
+
+            assert [col.name for col in manager.get_collections()] == [
+                "Existing",
+                "Imported",
+            ]
+            manager.storage.save_collection.assert_called_once()
+            assert presenter.widget.model().rowCount() == 2
+            _args, kwargs = mock_result.call_args
+            assert kwargs["success"] is True
+            assert "Requests imported: 1" in _args[1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_PICKER, return_value=_PATH)
+    def test_emits_collections_changed_so_mcp_tools_re_register(
+        self, _mock_picker, _mock_result, qapp
+    ):
+        incoming = make_collection("new-id", "Imported")
+        presenter, _manager = _make_presenter([], _reader([incoming]))
+        received = []
+        presenter.collections_changed.connect(lambda: received.append(True))
+        try:
+            presenter.import_collections()
+            assert received == [True]
+        finally:
+            presenter.panel.close()
+
+    @patch(_PICKER, return_value=None)
+    def test_cancelled_picker_leaves_collections_unchanged(self, _mock_picker, qapp):
+        presenter, manager = _make_presenter(
+            [make_collection("c1", "Existing")], _reader([])
+        )
+        try:
+            presenter.import_collections()
+            assert [col.name for col in manager.get_collections()] == ["Existing"]
+            manager.storage.save_collection.assert_not_called()
+        finally:
+            presenter.panel.close()
+
+    @patch(_INVALID)
+    @patch(_PICKER, return_value=_PATH)
+    def test_invalid_file_shows_error_and_changes_nothing(
+        self, _mock_picker, mock_invalid, qapp
+    ):
+        def raise_error(path):
+            raise CollectionImportFileError("File is not valid JSON: boom")
+
+        presenter, manager = _make_presenter(
+            [make_collection("c1", "Existing")], raise_error
+        )
+        try:
+            presenter.import_collections()
+            assert [col.name for col in manager.get_collections()] == ["Existing"]
+            manager.storage.save_collection.assert_not_called()
+            mock_invalid.assert_called_once()
+            assert "not valid JSON" in mock_invalid.call_args[0][1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_INVALID)
+    @patch(_PICKER, return_value=_PATH)
+    def test_zero_candidates_treated_as_invalid_file(
+        self, _mock_picker, mock_invalid, qapp
+    ):
+        presenter, manager = _make_presenter(
+            [make_collection("c1", "Existing")],
+            _reader([], ['Entry 1: missing or empty "name" field']),
+        )
+        try:
+            presenter.import_collections()
+            assert len(manager.get_collections()) == 1
+            manager.storage.save_collection.assert_not_called()
+            message = mock_invalid.call_args[0][1]
+            assert "No valid collections" in message
+            assert "Entry 1" in message
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_CONFLICT, return_value=(ImportConflictDecision.OVERWRITE, False))
+    @patch(_PICKER, return_value=_PATH)
+    def test_overwrite_conflict_prompts_once_and_keeps_existing_identity(
+        self, _mock_picker, mock_conflict, _mock_result, qapp
+    ):
+        existing = make_collection("keep-id", "My API", [make_request("old", "Old")])
+        incoming = make_collection("other-id", "My API", [make_request("new", "New")])
+        presenter, manager = _make_presenter([existing], _reader([incoming]))
+        try:
+            presenter.import_collections()
+
+            mock_conflict.assert_called_once()
+            collections = manager.get_collections()
+            assert len(collections) == 1
+            assert collections[0].id == "keep-id"
+            assert [req.id for req in collections[0].requests] == ["new"]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_CONFLICT, return_value=(ImportConflictDecision.SKIP, True))
+    @patch(_PICKER, return_value=_PATH)
+    def test_apply_to_all_prompts_only_once_for_two_conflicts(
+        self, _mock_picker, mock_conflict, _mock_result, qapp
+    ):
+        existing = [make_collection("c1", "My API"), make_collection("c2", "Billing")]
+        incoming = [make_collection("i1", "My API"), make_collection("i2", "Billing")]
+        presenter, manager = _make_presenter(existing, _reader(incoming))
+        try:
+            presenter.import_collections()
+
+            mock_conflict.assert_called_once()
+            assert [col.id for col in manager.get_collections()] == ["c1", "c2"]
+            manager.storage.save_collection.assert_not_called()
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_CONFLICT, return_value=(ImportConflictDecision.KEEP_BOTH, False))
+    @patch(_PICKER, return_value=_PATH)
+    def test_keep_both_adds_a_renamed_copy_alongside_the_original(
+        self, _mock_picker, _mock_conflict, mock_result, qapp
+    ):
+        existing = make_collection("keep-id", "My API", [make_request("old", "Old")])
+        incoming = make_collection("keep-id", "My API", [make_request("old", "Old")])
+        presenter, manager = _make_presenter([existing], _reader([incoming]))
+        try:
+            presenter.import_collections()
+
+            collections = manager.get_collections()
+            assert [col.name for col in collections] == ["My API", "Copy of My API"]
+            assert collections[1].id != "keep-id"
+            assert collections[1].requests[0].id != "old"
+            assert "Copy of My API" in mock_result.call_args[0][1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_PICKER, return_value=_PATH)
+    def test_partial_parse_failure_still_imports_valid_entries(
+        self, _mock_picker, mock_result, qapp
+    ):
+        incoming = make_collection("i1", "Good")
+        presenter, manager = _make_presenter(
+            [], _reader([incoming], ["Broken: missing or empty \"name\" field"])
+        )
+        try:
+            presenter.import_collections()
+
+            assert [col.name for col in manager.get_collections()] == ["Good"]
+            _args, kwargs = mock_result.call_args
+            assert kwargs["success"] is True
+            assert "Broken" in _args[1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_PICKER, return_value=_PATH)
+    def test_save_failure_is_surfaced_as_an_unsuccessful_result(
+        self, _mock_picker, mock_result, qapp
+    ):
+        incoming = make_collection("i1", "Imported")
+        presenter, manager = _make_presenter([], _reader([incoming]))
+        manager.storage.save_collection.side_effect = OSError("disk full")
+        try:
+            presenter.import_collections()
+
+            _args, kwargs = mock_result.call_args
+            assert kwargs["success"] is False
+            assert "disk full" in _args[1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_PICKER, return_value=_PATH)
+    def test_logs_completed_event_with_counts(
+        self, _mock_picker, _mock_result, qapp, caplog
+    ):
+        incoming = make_collection("i1", "Imported", [make_request("r1", "Ping")])
+        presenter, _manager = _make_presenter([], _reader([incoming]))
+        try:
+            with caplog.at_level(logging.INFO):
+                presenter.import_collections()
+            assert any(
+                "collection_import_completed added_count=1" in r.message
+                and "request_count=1" in r.message
+                for r in caplog.records
+            )
+        finally:
+            presenter.panel.close()
+
+
+class TestImportCollectionsEndToEnd:
+    @patch(_RESULT)
+    def test_real_file_lands_on_disk_and_reloads_with_every_request_field(
+        self, mock_result, qapp, tmp_path
+    ):
+        """Real parser, real RequestManager, real StorageManager — no fakes."""
+        source = tmp_path / "shared.json"
+        source.write_text(
+            json.dumps(
+                {
+                    "id": "shared-col",
+                    "name": "Shared API",
+                    "requests": [
+                        {
+                            "id": "shared-req",
+                            "name": "Create user",
+                            "method": "POST",
+                            "url": "https://api.example.com/users",
+                            "headers": {"Authorization": "Bearer {{token}}"},
+                            "params": {"dry_run": "true"},
+                            "body": '{"name": "ada"}',
+                            "body_type": "json",
+                            "post_script": "print(response.status_code)",
+                            "expose_as_mcp": True,
+                            "mcp_description": "Create a user",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        storage = StorageManager(data_dir=tmp_path / "data")
+        manager = RequestManager(storage)
+        presenter = CollectionsPresenter(manager, FakeStateManager(), FakeMetrics(), {})
+        try:
+            with patch(_PICKER, return_value=source):
+                presenter.import_collections()
+
+            assert mock_result.call_args[1]["success"] is True
+            reloaded = StorageManager(data_dir=tmp_path / "data").load_collections()
+            assert [col.name for col in reloaded] == ["Shared API"]
+            request = reloaded[0].requests[0]
+            assert request.method == "POST"
+            assert request.url == "https://api.example.com/users"
+            assert request.headers == {"Authorization": "Bearer {{token}}"}
+            assert request.params == {"dry_run": "true"}
+            assert request.body == '{"name": "ada"}'
+            assert request.post_script == "print(response.status_code)"
+            assert request.expose_as_mcp is True
+            assert request.mcp_description == "Create a user"
+        finally:
+            presenter.panel.close()

@@ -10,25 +10,29 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
-from pypost.core.environment_messages import format_copy_of_name
 from pypost.core.environment_ops import clone_environment
+from pypost.core.import_conflicts import ImportConflictDecision, generate_import_copy_name
 from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Environment
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "EnvironmentImportFileError",
+    "ImportConflictDecision",
+    "ImportPlanResult",
+    "find_conflicts",
+    "format_import_result",
+    "generate_import_copy_name",
+    "load_import_candidates",
+    "plan_import",
+]
+
 
 class EnvironmentImportFileError(Exception):
     """Raised for unreadable, malformed, or wrong-shaped import files."""
-
-
-class ImportConflictDecision(str, Enum):
-    OVERWRITE = "overwrite"
-    KEEP_BOTH = "keep_both"
-    SKIP = "skip"
 
 
 @dataclass(frozen=True)
@@ -104,17 +108,6 @@ def find_conflicts(existing: list[Environment], incoming: list[Environment]) -> 
             conflicts.append(env.name)
             seen.add(env.name)
     return conflicts
-
-
-def generate_import_copy_name(name: str, existing_names: set[str]) -> str:
-    """"Copy of X" when free, else "Copy of X (2)", "(3)", ... until unique."""
-    candidate = format_copy_of_name(name)
-    if candidate not in existing_names:
-        return candidate
-    suffix = 2
-    while f"{candidate} ({suffix})" in existing_names:
-        suffix += 1
-    return f"{candidate} ({suffix})"
 
 
 def plan_import(

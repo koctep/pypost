@@ -151,6 +151,8 @@ For a full vs incremental tree refresh inventory (audit closure
 
 ## Related
 
+- [Collection Import](collection_import.md) — user-triggered file import; shares
+  `apply_loaded_collections` for the in-memory swap
 - [Collection Tree Performance](collection_tree_performance.md)
 - [Collection Storage](collection_storage.md)
 - [Async Environment Storage](environment_storage_async.md) — shared gateway finish teardown

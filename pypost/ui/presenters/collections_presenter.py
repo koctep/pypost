@@ -1,24 +1,29 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QTreeView
+from PySide6.QtWidgets import QHBoxLayout, QPushButton, QTreeView, QVBoxLayout, QWidget
 
+from pypost.core.collection_import import load_collection_import_candidates
+from pypost.core.collection_messages import BUTTON_IMPORT_COLLECTION
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.models import Collection, RequestData
 from pypost.ui.delegates import CollectionItemRenameDelegate
+from pypost.ui.presenters.collection_import_actions import CollectionImportActions
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
 from pypost.ui.presenters.collection_tree_incremental import (
     log_tree_refresh,
     try_incremental_tree_refresh,
 )
 from pypost.ui.presenters.collections_async_loader import CollectionsAsyncLoader
-from pypost.ui.widget_ids import COLLECTION_TREE, set_widget_id
+from pypost.ui.widget_ids import COLLECTION_IMPORT_BUTTON, COLLECTION_TREE, set_widget_id
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +46,17 @@ class CollectionsPresenter(QObject):
         icons: dict,
         storage=None,
         parent: QObject | None = None,
+        *,
+        read_import_file: (
+            Callable[[Path], tuple[list[Collection], list[str]]] | None
+        ) = None,
     ) -> None:
         super().__init__(parent)
         self._request_manager = request_manager
         self._state_manager = state_manager
         self._metrics = metrics
         self._icons = icons
+        self._read_import_file = read_import_file or load_collection_import_candidates
         self._async_loader = (
             CollectionsAsyncLoader(
                 request_manager,
@@ -60,9 +70,12 @@ class CollectionsPresenter(QObject):
         if self._async_loader is not None:
             self._async_loader.collections_loaded.connect(self.collections_loaded.emit)
 
-        self._model = QStandardItemModel()
         self._collection_items_by_id: dict[str, QStandardItem] = {}
         self._view = QTreeView()
+        # Parented to the view so the model outlives it: once the view is held
+        # by the panel's layout, C++ owns the view while Python owns the model,
+        # and an unparented model can be freed first during teardown.
+        self._model = QStandardItemModel(self._view)
         set_widget_id(self._view, COLLECTION_TREE)
         self._view.setHeaderHidden(True)
         self._view.setModel(self._model)
@@ -95,10 +108,42 @@ class CollectionsPresenter(QObject):
             )
         )
         self._view.customContextMenuRequested.connect(self._tree_actions.show_context_menu)
+        self._panel = self._build_panel()
+        self._import_actions = CollectionImportActions(
+            self._panel,
+            self._request_manager,
+            read_import_file=self._read_import_file,
+            refresh_tree=self.refresh_tree,
+            restore_tree_state=self.restore_tree_state,
+            emit_collections_changed=self.collections_changed.emit,
+        )
+
+    def _build_panel(self) -> QWidget:
+        """Wrap the tree with the sidebar action row that hosts Import Collection."""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        import_btn = QPushButton(BUTTON_IMPORT_COLLECTION)
+        set_widget_id(import_btn, COLLECTION_IMPORT_BUTTON)
+        import_btn.clicked.connect(self.import_collections)
+
+        buttons_row = QHBoxLayout()
+        buttons_row.addWidget(import_btn)
+        buttons_row.addStretch(1)
+
+        layout.addWidget(self._view)
+        layout.addLayout(buttons_row)
+        return panel
 
     @property
     def widget(self) -> QTreeView:
         return self._view
+
+    @property
+    def panel(self) -> QWidget:
+        """Sidebar container: the collections tree plus its action row."""
+        return self._panel
 
     @property
     def _pending_rename(self) -> dict | None:
@@ -201,6 +246,10 @@ class CollectionsPresenter(QObject):
             self.collections_loaded.emit()
             return
         self.load_collections()
+
+    def import_collections(self) -> None:
+        """Run the Import Collection flow (delegated to CollectionImportActions)."""
+        self._import_actions.import_collections()
 
     def restore_tree_state(self) -> None:
         """Re-expands nodes from StateManager state."""

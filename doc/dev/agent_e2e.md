@@ -95,6 +95,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_e2e_http_mapping_compound_keys.py` | Mapping compound-key same-URL Send (958) |
 | `tests/test_agent_e2e_failure_artifacts.py` | Failure snapshot dumps (860) |
 | `tests/test_agent_dialog_settle_e2e.py` | Dialog settle (919); [doc](agent_dialog_settle.md) |
+| `tests/test_agent_ui_actions_mcp.py` | Out-of-process agent-UI MCP sidecar (952) |
 
 **Keep this table synced with markers:** when you add or remove
 `@pytest.mark.agent_e2e` on a module, update the Module column above in the

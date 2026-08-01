@@ -53,6 +53,7 @@ Production UI must not import `pypost.agent`. Agents import constants from
 | --- | --- | --- |
 | `MAIN_WINDOW` | `pypost_main_window` | Main window |
 | `COLLECTION_TREE` | `pypost_collection_tree` | Collections tree |
+| `COLLECTION_IMPORT_BUTTON` | `pypost_collection_import_button` | Import Collection… below the tree (not in KEY catalog) |
 | `REQUEST_TABS` | `pypost_request_tabs` | Request tab widget |
 | `METHOD_COMBO` | `pypost_method_combo` | HTTP method combo (per tab) |
 | `URL_INPUT` | `pypost_url_input` | URL field (per tab) |

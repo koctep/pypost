@@ -133,7 +133,7 @@ class TestMainWindow(unittest.TestCase):
             ),
         ):
             mock_sm.return_value.settings = AppSettings()
-            mock_collections.widget = QWidget()
+            mock_collections.panel = QWidget()
             mock_tabs.widget = QWidget()
             mock_env_cls.return_value.widget = QWidget()
             window = MainWindow(
@@ -159,7 +159,7 @@ class TestMainWindow(unittest.TestCase):
             from PySide6.QtWidgets import QWidget, QTabWidget
             
             mock_collections = MockCollections.return_value
-            mock_collections.widget = QWidget()
+            mock_collections.panel = QWidget()
             
             mock_tabs = MockTabs.return_value
             mock_tabs.widget = QTabWidget()

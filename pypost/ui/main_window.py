@@ -189,7 +189,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Horizontal)
         self.history_panel = HistoryPanel(self.history_manager, icons=self.icons)
         sidebar = QTabWidget()
-        sidebar.addTab(self.collections.widget, "Collections")
+        sidebar.addTab(self.collections.panel, "Collections")
         sidebar.addTab(self.history_panel, "History")
         splitter.addWidget(sidebar)
         splitter.addWidget(self.tabs.widget)

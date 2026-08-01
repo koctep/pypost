@@ -6,7 +6,14 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QCheckBox, QFileDialog, QMessageBox, QWidget
 
-from pypost.core.environment_import import ImportConflictDecision
+from pypost.core.collection_messages import (
+    DIALOG_TITLE_IMPORT_COLLECTION,
+    DIALOG_TITLE_IMPORT_COLLECTION_CONFLICT,
+    IMPORT_COLLECTION_FILE_DIALOG_CAPTION,
+    IMPORT_COLLECTION_FILE_DIALOG_FILTER,
+    format_collection_import_conflict_message,
+)
+from pypost.core.import_conflicts import ImportConflictDecision
 from pypost.core.environment_messages import (
     BUTTON_KEEP_BOTH,
     BUTTON_OVERWRITE,
@@ -244,18 +251,18 @@ def show_import_invalid_file_error(parent: QWidget, message: str) -> None:
     QMessageBox.warning(parent, DIALOG_TITLE_IMPORT_ENVIRONMENTS, message)
 
 
-def prompt_import_conflict(
-    parent: QWidget, name: str, *, remaining_count: int
+def _prompt_import_conflict_box(
+    parent: QWidget, title: str, message: str, *, remaining_count: int
 ) -> tuple[ImportConflictDecision, bool]:
-    """Ask how to resolve a single name conflict during import.
+    """Overwrite / Keep Both / Skip box shared by every import flow.
 
     Returns the chosen decision and whether it should apply to all remaining
     conflicts in this import (via the "apply to all" checkbox).
     """
     box = QMessageBox(parent)
     box.setIcon(QMessageBox.Icon.Question)
-    box.setWindowTitle(DIALOG_TITLE_IMPORT_CONFLICT)
-    box.setText(format_import_conflict_message(name))
+    box.setWindowTitle(title)
+    box.setText(message)
     overwrite_btn = box.addButton(BUTTON_OVERWRITE, QMessageBox.ButtonRole.DestructiveRole)
     keep_both_btn = box.addButton(BUTTON_KEEP_BOTH, QMessageBox.ButtonRole.AcceptRole)
     box.addButton(BUTTON_SKIP, QMessageBox.ButtonRole.RejectRole)
@@ -279,11 +286,61 @@ def prompt_import_conflict(
     return decision, apply_to_all
 
 
+def prompt_import_conflict(
+    parent: QWidget, name: str, *, remaining_count: int
+) -> tuple[ImportConflictDecision, bool]:
+    """Ask how to resolve a single environment name conflict during import."""
+    return _prompt_import_conflict_box(
+        parent,
+        DIALOG_TITLE_IMPORT_CONFLICT,
+        format_import_conflict_message(name),
+        remaining_count=remaining_count,
+    )
+
+
 def show_import_result(parent: QWidget, summary_text: str, *, success: bool) -> None:
     if success:
         QMessageBox.information(parent, DIALOG_TITLE_IMPORT_ENVIRONMENTS, summary_text)
     else:
         QMessageBox.warning(parent, DIALOG_TITLE_IMPORT_ENVIRONMENTS, summary_text)
+
+
+def prompt_import_collection_file(parent: QWidget) -> Path | None:
+    """Open a file picker for a collection import file; None on Cancel."""
+    path_str, _selected_filter = QFileDialog.getOpenFileName(
+        parent,
+        IMPORT_COLLECTION_FILE_DIALOG_CAPTION,
+        "",
+        IMPORT_COLLECTION_FILE_DIALOG_FILTER,
+    )
+    if not path_str:
+        return None
+    return Path(path_str)
+
+
+def show_collection_import_invalid_file_error(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, DIALOG_TITLE_IMPORT_COLLECTION, message)
+
+
+def prompt_collection_import_conflict(
+    parent: QWidget, name: str, *, remaining_count: int
+) -> tuple[ImportConflictDecision, bool]:
+    """Ask how to resolve a single collection name conflict during import."""
+    return _prompt_import_conflict_box(
+        parent,
+        DIALOG_TITLE_IMPORT_COLLECTION_CONFLICT,
+        format_collection_import_conflict_message(name),
+        remaining_count=remaining_count,
+    )
+
+
+def show_collection_import_result(
+    parent: QWidget, summary_text: str, *, success: bool
+) -> None:
+    if success:
+        QMessageBox.information(parent, DIALOG_TITLE_IMPORT_COLLECTION, summary_text)
+    else:
+        QMessageBox.warning(parent, DIALOG_TITLE_IMPORT_COLLECTION, summary_text)
 
 
 def show_invalid_retryable_status_codes(parent: QWidget, message: str) -> None:

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QWidget
 # Key surfaces (PYPOST-834). Values are stable across theme/locale.
 MAIN_WINDOW = "pypost_main_window"
 COLLECTION_TREE = "pypost_collection_tree"
+COLLECTION_IMPORT_BUTTON = "pypost_collection_import_button"
 REQUEST_TABS = "pypost_request_tabs"
 METHOD_COMBO = "pypost_method_combo"
 URL_INPUT = "pypost_url_input"

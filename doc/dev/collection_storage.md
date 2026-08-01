@@ -35,6 +35,14 @@ name-based file if present.
 Loads all `*.json` files. Legacy files whose stem equals `collection.name` (but not
 `collection.id`) are migrated to the ID path and the old file is deleted.
 
+## Import
+
+A copy of a `{collection.id}.json` file (or a JSON list of them) can be loaded back into
+the app through **Import Collection…**. Because the filename is the id, an imported
+collection whose id is already taken is given a fresh one before any write, so an import
+can never overwrite an unrelated collection's file. See
+[Collection Import](collection_import.md).
+
 ## Rename behavior
 
 `RequestManager.rename_collection` updates the `name` field in JSON and calls

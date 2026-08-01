@@ -28,7 +28,10 @@ AUDIT_ERA_LOC: dict[str, int] = {
 # Regression caps: measured 2026-06-11 + ~10% headroom (see baseline-metrics.md).
 FILE_CAPS: dict[str, int] = {
     "pypost/ui/main_window.py": 435,
-    "pypost/ui/presenters/collections_presenter.py": 280,
+    # PYPOST-987: +46 lines for the Import Collection panel and its wiring. The
+    # flow itself was extracted to collection_import_actions.py; what remains is
+    # presenter-level layout and delegation.
+    "pypost/ui/presenters/collections_presenter.py": 330,
     "pypost/ui/presenters/tabs_presenter.py": 785,
     "pypost/ui/presenters/env_presenter.py": 470,
     "pypost/core/qt/metrics.py": 181,
