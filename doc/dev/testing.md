@@ -191,6 +191,9 @@ are locked by parametrized `test_ui_action_applied_caplog` in the same module
 Opt-in keyClicks fill on `QPlainTextEdit` and `QTextEdit` is locked by
 `test_ui_fill_via_key_clicks_on_plain_text_fixture` and
 `test_ui_fill_via_key_clicks_on_rich_text_fixture` (PYPOST-945).
+Per-keystroke `textChanged` emission count on the line-edit keyClicks path is
+locked by `test_ui_fill_via_key_clicks_emits_text_changed_per_keystroke`
+(PYPOST-946; empty-start `QLineEdit` expects one emit per character).
 
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a

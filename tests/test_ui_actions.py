@@ -177,6 +177,26 @@ def test_ui_fill_via_key_clicks_on_fixture(qapp: QApplication) -> None:
         root.close()
 
 
+def test_ui_fill_via_key_clicks_emits_text_changed_per_keystroke(
+    qapp: QApplication,
+) -> None:
+    """PYPOST-946: keyClicks fill emits textChanged once per keystroke on QLineEdit."""
+    root, _ = _make_fixture(qapp)
+    try:
+        line = find_widget(root, _INPUT)
+        assert isinstance(line, QLineEdit)
+        emissions: list[str] = []
+        line.textChanged.connect(emissions.append)
+        fill_text = "abc"
+        ui_fill(root, _INPUT, fill_text, via_key_clicks=True)
+        assert line.text() == fill_text
+        # Empty QLineEdit: clear is silent; QTest.keyClicks emits once per char.
+        assert len(emissions) == len(fill_text), emissions
+        assert len(emissions) > 1
+    finally:
+        root.close()
+
+
 def test_ui_fill_via_key_clicks_on_plain_text_fixture(qapp: QApplication) -> None:
     """PYPOST-945: ui_fill opt-in keyClicks fills fixture QPlainTextEdit."""
     root = _make_plain_text_fixture(qapp)
