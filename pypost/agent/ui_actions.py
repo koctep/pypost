@@ -130,11 +130,14 @@ def ui_fill(
     text: str,
     *,
     via_key_clicks: bool = False,
+    delay: int = -1,
 ) -> None:
     """Replace the editable text of the named widget with ``text``.
 
     When ``via_key_clicks`` is True, clear and focus the field, then deliver
-    ``text`` via ``QTest.keyClicks`` for keystroke-level realism.
+    ``text`` via ``QTest.keyClicks`` for keystroke-level realism. Optional
+    ``delay`` (milliseconds between keys, Qt default ``-1``) applies only on
+    that opt-in path.
     """
     started = time.monotonic()
     widget = find_widget(root, widget_id)
@@ -148,7 +151,7 @@ def ui_fill(
         widget.clear()
         widget.setFocus(Qt.FocusReason.OtherFocusReason)
         _pump()
-        QTest.keyClicks(widget, text)
+        QTest.keyClicks(widget, text, delay=delay)
     elif isinstance(widget, QLineEdit):
         widget.clear()
         widget.setText(text)

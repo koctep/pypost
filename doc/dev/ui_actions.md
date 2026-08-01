@@ -80,15 +80,19 @@ itself). Raises `UiTargetNotFoundError` if absent.
 
 Left-click via `QTest.mouseClick`. Requires visible + enabled.
 
-### `ui_fill(root, widget_id, text, *, via_key_clicks=False)`
+### `ui_fill(root, widget_id, text, *, via_key_clicks=False, delay=-1)`
 
 Replace text on `QLineEdit` / `QPlainTextEdit` / `QTextEdit`. Wrong widget
 types raise `UiTargetNotInteractableError`.
 
 | Mode | Behaviour |
 | --- | --- |
-| `via_key_clicks=False` (default) | Clear + `setText` / `setPlainText` (one-shot) |
-| `via_key_clicks=True` | Clear + focus + `QTest.keyClicks(widget, text)` |
+| `via_key_clicks=False` (default) | Clear + `setText` / `setPlainText` (one-shot); `delay` ignored |
+| `via_key_clicks=True` | Clear + focus + `QTest.keyClicks(widget, text, delay=delay)` |
+
+`delay` is milliseconds between simulated keys (Qt default `-1` when omitted).
+Use only with `via_key_clicks=True` for paced typing in harnesses that need
+debounced or animation-sensitive input without looping `ui_send_key`.
 
 Use the default for golden / seed / CI speed and stability. Opt into
 keystroke fill when you need per-key validation, IME-style realism, or
@@ -105,6 +109,8 @@ in logs (PYPOST-851/944). Behavioral keyClicks proofs:
 `textChanged` count on line edit — PYPOST-946),
 `test_ui_fill_via_key_clicks_on_plain_text_fixture`, and
 `test_ui_fill_via_key_clicks_on_rich_text_fixture` (PYPOST-945).
+Opt-in `delay` forwarding to `QTest.keyClicks` is locked by
+`test_ui_fill_via_key_clicks_forwards_delay_kwarg` (PYPOST-947).
 
 ### `ui_select(root, widget_id, option)`
 
@@ -168,16 +174,17 @@ with AgentAppSession(offscreen=True) as session:
     session.ui_select(METHOD_COMBO, 1)  # same combo by index (PYPOST-916)
     # Prefer current-tab scope for per-tab role ids (PYPOST-851):
     session.ui_fill(URL_INPUT, "https://example.com", in_current_tab=True)
-    # Opt-in keystroke fill (PYPOST-917); same keyword on module ui_fill:
+    # Opt-in keystroke fill (PYPOST-917); optional per-key delay (PYPOST-947):
     session.ui_fill(URL_INPUT, "typed", via_key_clicks=True)
+    session.ui_fill(URL_INPUT, "paced", via_key_clicks=True, delay=50)
     session.find_in_current_tab(URL_INPUT)
     session.ui_send_key(
         URL_INPUT, "a", modifiers=Qt.KeyboardModifier.ControlModifier
     )
 ```
 
-`AgentAppSession.ui_fill` mirrors `via_key_clicks` (and `in_current_tab`)
-onto the module API.
+`AgentAppSession.ui_fill` mirrors `via_key_clicks`, `delay`, and
+`in_current_tab` onto the module API.
 
 Module-level functions accept any root. Session helpers default to the main
 window; pass `in_current_tab=True` (or use `current_request_tab` /
@@ -206,8 +213,9 @@ widgets that already have `objectName` set via `set_widget_id`.
   viewport click to open/activate.
 - **Fill did not type character-by-character** — Default fill uses setters
   (`via_key_clicks=False`). For whole-string keystroke realism, call
-  `ui_fill(..., via_key_clicks=True)`. Use `ui_send_key` only for a single
-  key or hotkey, not to type an entire string.
+  `ui_fill(..., via_key_clicks=True)`. Optional `delay` (milliseconds between
+  keys, default Qt `-1`) applies only on that path (PYPOST-947). Use
+  `ui_send_key` only for a single key or hotkey, not to type an entire string.
 - **Wrong tab’s URL/Send changed** — Default session helpers search from the
   main window; use `in_current_tab=True` or `find_in_current_tab` for multi-tab
   flows (PYPOST-851).

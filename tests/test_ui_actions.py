@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
@@ -173,6 +175,19 @@ def test_ui_fill_via_key_clicks_on_fixture(qapp: QApplication) -> None:
         line = find_widget(root, _INPUT)
         assert isinstance(line, QLineEdit)
         assert line.text() == "typed-via-keys"
+    finally:
+        root.close()
+
+
+def test_ui_fill_via_key_clicks_forwards_delay_kwarg(qapp: QApplication) -> None:
+    """PYPOST-947: ui_fill forwards opt-in delay to QTest.keyClicks."""
+    root, _ = _make_fixture(qapp)
+    try:
+        with patch("pypost.agent.ui_actions.QTest.keyClicks") as mock_key_clicks:
+            ui_fill(root, _INPUT, "ab", via_key_clicks=True, delay=42)
+            mock_key_clicks.assert_called_once()
+            _args, kwargs = mock_key_clicks.call_args
+            assert kwargs.get("delay") == 42
     finally:
         root.close()
 

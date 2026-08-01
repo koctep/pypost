@@ -304,6 +304,7 @@ class AgentAppSession:
         *,
         in_current_tab: bool = False,
         via_key_clicks: bool = False,
+        delay: int = -1,
     ) -> None:
         """Fill a named text input under the main window (or current tab)."""
         ui_fill(
@@ -311,6 +312,7 @@ class AgentAppSession:
             widget_id,
             text,
             via_key_clicks=via_key_clicks,
+            delay=delay,
         )
 
     def ui_select(
