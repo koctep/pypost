@@ -375,6 +375,41 @@ def test_dump_hook_propagates_unexpected_exception(
         set_agent_session_failure_dump_hook(make_direct_session_failure_dump_hook())
 
 
+@pytest.mark.parametrize(
+    "hook_exc_type",
+    DUMP_BEST_EFFORT_ERRORS,
+    ids=lambda exc: exc.__name__,
+)
+def test_dump_hook_best_effort_per_type(
+    hook_exc_type: type[BaseException],
+    qapp: QApplication,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-961: each best-effort type logs WARNING without hook propagation."""
+    assert QApplication.instance() is qapp
+
+    def _failing_hook(
+        _session: AgentAppSession,
+        _exc_type: type[BaseException],
+        _exc: BaseException,
+    ) -> None:
+        raise hook_exc_type(f"hook {hook_exc_type.__name__}")
+
+    set_agent_session_failure_dump_hook(_failing_hook)
+    try:
+        with caplog.at_level(logging.WARNING, logger="pypost.agent.lifecycle"):
+            with pytest.raises(AssertionError, match="intentional hook best-effort"):
+                with AgentAppSession(offscreen=True, ready_timeout=30.0) as session:
+                    assert session.window.is_ui_ready is True
+                    assert False, "intentional hook best-effort"
+        assert (
+            f"agent_session_failure_dump_hook_failed error={hook_exc_type.__name__}"
+            in caplog.text
+        )
+    finally:
+        set_agent_session_failure_dump_hook(make_direct_session_failure_dump_hook())
+
+
 def test_dump_hook_failure_logs_warning(
     qapp: QApplication,
     caplog: pytest.LogCaptureFixture,

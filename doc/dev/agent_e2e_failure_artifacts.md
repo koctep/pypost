@@ -246,8 +246,10 @@ red run.
 diagnostics `session_source` contract (PYPOST-913), best-effort errors
 (`RuntimeError`, `OSError`, `AttributeError`; PYPOST-915), propagation of unexpected dump errors
 (`LookupError`, PYPOST-876), in-process caplog proof that a raising dump hook
-logs `agent_session_failure_dump_hook_failed` (PYPOST-912), propagation of
-unexpected hook errors from `__exit__` (`LookupError`, PYPOST-914), a subprocess proof
+logs `agent_session_failure_dump_hook_failed` (PYPOST-912), parametrized hook
+best-effort units for every member of `DUMP_BEST_EFFORT_ERRORS` (PYPOST-961),
+propagation of unexpected hook errors from `__exit__` (`LookupError`, PYPOST-914),
+a subprocess proof
 that the makereport hook dumps on fixture assert fail, and a subprocess proof
 that direct `AgentAppSession` constructions dump on assert fail
 (`make test-agent-e2e`).
