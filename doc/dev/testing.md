@@ -317,6 +317,9 @@ Committed manual-test artifacts under `examples/collections/mcp.json` and
 `config/test/environments.json` are validated in CI without starting a live MCP server.
 Shared loaders live in `tests/helpers/mcp_test_collection.py` for reuse by
 [PYPOST-181](https://pypost.atlassian.net/browse/PYPOST-181) integration tests.
+`mcp.json` is the local MCP/SSE probe fixture; the curated end-user Jira Cloud
+pair and its import contract are covered separately under
+[Example fixtures contract (PYPOST-1017)](#example-fixtures-contract-pypost-1017).
 
 | Module | Scope |
 | --- | --- |
@@ -332,6 +335,51 @@ Focused run:
 ```bash
 .venv/bin/python -m pytest tests/test_mcp_test_collection.py -v
 ```
+
+## Example fixtures contract (PYPOST-1017)
+
+### Overview
+
+Shipped importable fixtures under `examples/` are end-user / probe JSON only —
+no application runtime change. A green contract test loads them through the
+native import parsers and asserts parse success, placeholder markers, and
+`hidden_keys`. Fixture inventory and import order for readers live in
+[`examples/README.md`](../../examples/README.md).
+
+### Architecture
+
+| Artifact | Role |
+| --- | --- |
+| `examples/collections/jira_mcp.json` | Curated end-user Jira Cloud MCP collection |
+| `examples/environments/jira_cloud.json` | Companion env (placeholders, hidden, MCP) |
+| `examples/collections/mcp.json` | Local MCP/SSE probe (also PYPOST-180 helpers) |
+| `tests/test_example_fixtures.py` | Import-parse + placeholder + `hidden_keys` |
+
+Keep roles distinct: Jira pair for end users; `mcp.json` for contributors /
+local probing.
+
+### Usage
+
+Focused contract run:
+
+```bash
+.venv/bin/python -m pytest tests/test_example_fixtures.py -v
+```
+
+### Configuration
+
+No new env vars or settings. Committed fixtures must keep placeholders only
+(sample site URL and `you@example.com:your-api-token`); never commit real
+secrets. After import, substitute values locally and keep credential keys in
+`hidden_keys`.
+
+### Troubleshooting
+
+| Issue | Resolution |
+| --- | --- |
+| Contract fails on placeholders | Keep sample URL/credentials in JSON; do not commit real tokens |
+| Wrong fixture for a workflow | Use Jira pair for end users; `mcp.json` for local MCP/SSE probing |
+| Import order unclear | See [`examples/README.md`](../../examples/README.md) (env first) |
 
 ## MCP test collection integration (PYPOST-181)
 

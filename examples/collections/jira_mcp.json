@@ -1,0 +1,338 @@
+{
+  "id": "jira-cloud-mcp",
+  "name": "Jira Cloud MCP",
+  "requests": [
+    {
+      "id": "jira-search-issues-jql",
+      "name": "Jira Search Issues JQL",
+      "method": "POST",
+      "url": "{{ jira_base_url }}/rest/api/3/search/jql",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.search_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Search Jira issues with JQL. search_payload must be a JSON object accepted by POST /rest/api/3/search/jql, for example {\"jql\":\"project = DEMO\",\"maxResults\":50,\"fields\":[\"summary\",\"status\"]}.",
+      "mcp_params": {
+        "search_payload": {
+          "type": "string",
+          "description": "Serialized JSON request body for Jira enhanced JQL search.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-get-issue",
+      "name": "Jira Get Issue",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Return a Jira issue by key or ID.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Jira issue key or numeric ID, for example DEMO-123.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-create-issue",
+      "name": "Jira Create Issue",
+      "method": "POST",
+      "url": "{{ jira_base_url }}/rest/api/3/issue",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.issue_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Create a Jira issue. issue_payload must be a serialized Jira Create issue JSON body; Jira Cloud rich-text descriptions use Atlassian Document Format.",
+      "mcp_params": {
+        "issue_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for POST /rest/api/3/issue.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-update-issue",
+      "name": "Jira Update Issue",
+      "method": "PUT",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.update_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Update fields on an existing Jira issue. update_payload must be a serialized Jira Edit issue JSON body.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Jira issue key or numeric ID.",
+          "required": true
+        },
+        "update_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for PUT /rest/api/3/issue/{issueIdOrKey}.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-get-transitions",
+      "name": "Jira Get Transitions",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}/transitions",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List workflow transitions available for a Jira issue before changing its status.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Jira issue key or numeric ID.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-transition-issue",
+      "name": "Jira Transition Issue",
+      "method": "POST",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}/transitions",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.transition_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Apply an available Jira workflow transition. transition_payload must be serialized JSON, for example {\"transition\":{\"id\":\"31\"}}.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Jira issue key or numeric ID.",
+          "required": true
+        },
+        "transition_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for POST /transitions.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-add-worklog",
+      "name": "Jira Add Worklog",
+      "method": "POST",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}/worklog",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.worklog_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Add a worklog to a Jira issue. worklog_payload must be a serialized JSON worklog body, including timeSpent or timeSpentSeconds.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Jira issue key or numeric ID.",
+          "required": true
+        },
+        "worklog_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for POST /worklog.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-search-fields",
+      "name": "Jira Search Fields",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/api/3/field/search",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {
+        "query": "{{ mcp.request.query }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Search Jira fields by name, for example to find the custom Story Points field ID.",
+      "mcp_params": {
+        "query": {
+          "type": "string",
+          "description": "Text to match against Jira field names, for example story point.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-list-boards",
+      "name": "Jira List Boards",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/board",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {
+        "maxResults": "50"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List Jira Software boards visible to the configured account.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "jira-list-board-sprints",
+      "name": "Jira List Board Sprints",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/board/{{ mcp.request.board_id }}/sprint",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {
+        "state": "{{ mcp.request.state }}",
+        "maxResults": "50"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List sprints on a Jira Software board filtered by state (future, active, or closed).",
+      "mcp_params": {
+        "board_id": {
+          "type": "integer",
+          "description": "Numeric Jira Software board ID.",
+          "required": true
+        },
+        "state": {
+          "type": "string",
+          "description": "Sprint state: future, active, or closed.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-get-sprint",
+      "name": "Jira Get Sprint",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Return a Jira Software sprint by numeric ID.",
+      "mcp_params": {
+        "sprint_id": {
+          "type": "integer",
+          "description": "Numeric Jira Software sprint ID.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-update-sprint",
+      "name": "Jira Update Sprint",
+      "method": "PUT",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.sprint_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Update a Jira Software sprint, including activating or closing it. sprint_payload must be serialized JSON, for example {\"state\":\"active\"}.",
+      "mcp_params": {
+        "sprint_id": {
+          "type": "integer",
+          "description": "Numeric Jira Software sprint ID.",
+          "required": true
+        },
+        "sprint_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for PUT /rest/agile/1.0/sprint/{sprintId}.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    }
+  ]
+}

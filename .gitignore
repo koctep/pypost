@@ -60,6 +60,12 @@ ENV/
 collections/
 environments.json
 
+# Importable collection examples are source-controlled fixtures, not local data.
+!examples/collections/
+!examples/collections/*.json
+!examples/environments/
+!examples/environments/*.json
+
 # ELF core dumps
 /core
 /core.*
