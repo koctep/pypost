@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import pytest
@@ -38,6 +39,8 @@ pytestmark = [
 
 FORCED_SETTLE_TIMEOUT_S = 0.05
 _MAPPING_SETTLE_PREFIX = "mapping multi-URL Send settle failed"
+_HTTP_LOGGER = "pypost.fixtures.agent_e2e_http"
+_STUB_INSTALLED_URL_ROUTER = "agent_e2e_http_stub_installed name=url_router"
 
 _STATUS_LABEL = "Status: 200"
 _GET_BODY_IN_SNAPSHOT = json.dumps(
@@ -107,6 +110,37 @@ def test_mapping_stub_two_distinct_urls_panel_outcomes(
     assert _STATUS_LABEL in post_joined
     assert _POST_BODY_IN_SNAPSHOT in post_joined
     assert stub_agent_e2e_http is agent_e2e_http_stub
+
+
+def test_mapping_send_logs_http_stub_installed_url_router(
+    agent_e2e_session: AgentAppSession,
+    agent_e2e_http_stub: Any,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """PYPOST-957: Mapping GUI Send path emits url_router install under caplog."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready is True
+    find_widget(session.window, URL_INPUT)
+    find_widget(session.window, METHOD_COMBO)
+    find_widget(session.window, SEND_BUTTON)
+
+    responses = {
+        SEED_GET_RESOLVED_URL: CANNED_SEED_GET_OK,
+    }
+
+    with caplog.at_level(logging.INFO, logger=_HTTP_LOGGER):
+        with agent_e2e_http_stub(responses):
+            session.ui_fill(URL_INPUT, SEED_GET_RESOLVED_URL)
+            session.ui_select(METHOD_COMBO, "GET")
+            session.ui_click(SEND_BUTTON)
+            wait_response_after_snapshot(
+                session,
+                _get_response_ready,
+                step="wait_response_after_mapping_get_send_caplog_smoke",
+                message_prefix=_MAPPING_SETTLE_PREFIX,
+            )
+
+    assert _STUB_INSTALLED_URL_ROUTER in caplog.text
 
 
 def test_mapping_get_send_settle_timeout_includes_step_and_excerpt(

@@ -115,7 +115,11 @@ and explicit custom `name=`; must **not** carry `agent_e2e`. GUI-path install
 smoke (PYPOST-904): `tests/test_agent_e2e_http_env.py` —
 `test_seeded_env_send_logs_http_stub_installed` re-asserts
 `name=seed_get_ok` under caplog during live offscreen Send (stub CM + click +
-settle, not unit-only CM enter). Catalog: [logging.md](logging.md).
+settle, not unit-only CM enter). Mapping GUI-path smoke (PYPOST-957):
+`tests/test_agent_e2e_http_mapping_multi_url.py` —
+`test_mapping_send_logs_http_stub_installed_url_router` re-asserts
+`name=url_router` under caplog during Mapping stub + GET Send + settle.
+Catalog: [logging.md](logging.md).
 
 Or via the pytest fixture (same callable):
 
@@ -190,6 +194,7 @@ Unit proofs: `tests/test_agent_e2e_http.py`
 | Test | Role |
 | --- | --- |
 | `test_mapping_stub_two_distinct_urls_panel_outcomes` | Happy path — two Sends, panel asserts (901) |
+| `test_mapping_send_logs_http_stub_installed_url_router` | Mapping GUI install-log caplog smoke (957) |
 | `test_mapping_get_send_settle_timeout_includes_step_and_excerpt` | Forced GET Send settle timeout companion (955) |
 
 Inventory gates in `tests/test_agent_e2e_http.py`:
@@ -297,7 +302,9 @@ No extra env vars.
 | | `"tests/test_agent_e2e_http_stub_logs.py -v"` (PYPOST-870 / 903 matrix). |
 | | GUI path: `make test-agent-e2e PYTEST_ARGS=` |
 | | `"tests/test_agent_e2e_http_env.py::test_seeded_env_send_logs_http_stub_installed -v"` |
-| | (PYPOST-904). |
+| | (PYPOST-904). Mapping GUI: `make test-agent-e2e PYTEST_ARGS=` |
+| | `"tests/test_agent_e2e_http_mapping_multi_url.py::` |
+| | `test_mapping_send_logs_http_stub_installed_url_router -v"` (PYPOST-957). |
 | URL router AssertionError | Confirm map keys equal ``request_data.url`` exactly |
 | | or use compound ``"{method} {url}"`` keys (902). Message lists |
 | | ``known=`` keys. Compound keys take precedence over bare URL. |
