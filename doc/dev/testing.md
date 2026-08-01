@@ -578,6 +578,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-907] | Evidence revisit; continued DEFER after CI duration evidence |
 | [PYPOST-930] | ENABLE threshold revisit; continued DEFER (threshold not met) |
 | [PYPOST-908] | Lock discoverable CI duration / overlap timing notes (cite 907) |
+| [PYPOST-931] | Actions refresh script + Makefile target for overlap evidence |
 | [PYPOST-874] | ENABLE agent-e2e failure artifact upload + doc/workflow lock |
 | [PYPOST-909] | ENABLE main test matrix failure artifact upload + lock |
 | [PYPOST-910] | Explicit `retention-days: 14` on failure artifact uploads |
@@ -604,6 +605,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-907]: https://pypost.atlassian.net/browse/PYPOST-907
 [PYPOST-930]: https://pypost.atlassian.net/browse/PYPOST-930
 [PYPOST-908]: https://pypost.atlassian.net/browse/PYPOST-908
+[PYPOST-931]: https://pypost.atlassian.net/browse/PYPOST-931
 [PYPOST-909]: https://pypost.atlassian.net/browse/PYPOST-909
 [PYPOST-910]: https://pypost.atlassian.net/browse/PYPOST-910
 [PYPOST-911]: https://pypost.atlassian.net/browse/PYPOST-911
@@ -739,8 +741,29 @@ met** (checklist below).
 Timing notes (job durations / overlap cost) for the intentional double-run —
 published under PYPOST-907 and discoverable via
 [PYPOST-908](https://pypost.atlassian.net/browse/PYPOST-908). Do not invent
-replacement numbers; optional Actions refresh automation is
+replacement numbers; refresh automation lives under
 [PYPOST-931](https://pypost.atlassian.net/browse/PYPOST-931).
+
+#### Refresh procedure (PYPOST-931)
+
+Maintainers update the committed table below with **honest Actions timings**
+only — the script prints fresh numbers; a human reviews and pastes into this
+section (no auto-commit).
+
+```bash
+make refresh-ci-duration-evidence
+# optional: GITHUB_TOKEN=... for higher API rate limits
+# direct: .venv/bin/python scripts/refresh_ci_duration_evidence.py
+```
+
+1. Run `make refresh-ci-duration-evidence` (needs network; queries
+   `koctep/pypost` workflow `Tests` for completed runs with job `agent-e2e`).
+2. Copy the markdown table from stdout into **CI duration evidence** below;
+   adjust the narrative sentence (`n=…`, fetch date) to match the sample.
+3. Re-read overlap interpretation (wall clock vs billable 3.11 redundancy).
+4. Run `make check-ci-duration-evidence` to verify this procedure stays
+   documented; run `make test PYTEST_ARGS='tests/test_refresh_ci_duration_evidence.py -v'`
+   for the wiring lock.
 
 From completed `Tests` workflow runs on `koctep/pypost` that include job
 `agent-e2e` (n=2 in a 15-run window):

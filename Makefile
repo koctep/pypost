@@ -116,6 +116,12 @@ generate-license-inventory: install ## Regenerate LICENSES/transitive.csv from r
 check-license-inventory: install ## Verify LICENSES/transitive.csv matches production lock (mirrors CI)
 	$(BIN)/python scripts/generate_license_inventory.py --check
 
+refresh-ci-duration-evidence: $(VENV_MARKER) ## Print agent-e2e overlap timings from GitHub Actions (paste into testing.md)
+	$(BIN)/python scripts/refresh_ci_duration_evidence.py
+
+check-ci-duration-evidence: $(VENV_MARKER) ## Verify testing.md documents CI duration refresh procedure
+	$(BIN)/python scripts/refresh_ci_duration_evidence.py --check
+
 clean: ## Remove virtual environment and Python cache directories
 	rm -rf $(VENV)
 	find . -type d -name "__pycache__" -exec rm -rf {} +

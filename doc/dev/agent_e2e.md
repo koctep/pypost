@@ -139,7 +139,8 @@ met** (checklist in [testing.md](testing.md) § Agent e2e CI double-run).
 **Revisit when** the ENABLE threshold in that section is met. Job-duration /
 overlap timing notes are locked under
 [PYPOST-908](https://pypost.atlassian.net/browse/PYPOST-908) (same section;
-do not invent numbers — refresh automation is PYPOST-931).
+do not invent numbers — run `make refresh-ci-duration-evidence` and paste into
+[testing.md](testing.md) per PYPOST-931).
 
 [PYPOST-874](https://pypost.atlassian.net/browse/PYPOST-874) **ENABLE**s
 failure-only upload of `artifacts/agent_e2e/` from job `agent-e2e` as Actions
