@@ -145,6 +145,12 @@ same path from the main `test` matrix as
 [PYPOST-910](https://pypost.atlassian.net/browse/PYPOST-910) sets
 `retention-days: 14` on both failure uploads (see
 [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md)).
+[PYPOST-911](https://pypost.atlassian.net/browse/PYPOST-911) **DEFER**s
+a one-time live Artifacts UI screenshot/notes until a qualifying red
+run uploads dumps; maintainer checklist (what to capture) lives in
+[agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) § Live
+Artifacts UI proof and
+`ai-tasks/PYPOST-911/live-proof-notes.md`.
 
 See [testing.md](testing.md) for suite-wide CI layout.
 
@@ -268,6 +274,7 @@ once-only status under `RESPONSE_PANEL`. Smoke slice runs under default
 | Failure CI upload | `agent-e2e-failure-artifacts` on `agent-e2e` (874); matrix |
 | | `agent-e2e-failure-artifacts-<py>` on `test` failure (909) |
 | Failure retention | `retention-days: 14` on both uploads (PYPOST-910) |
+| Live Artifacts UI proof | **DEFER** (PYPOST-911); checklist in failure_artifacts doc |
 | Module timeouts | Per-test / module `pytest.mark.timeout` (see sibling docs) |
 
 Failure dumps: [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
@@ -298,6 +305,9 @@ for narrow runs.
 | | `agent-e2e-failure-artifacts-<python>` (PYPOST-909) |
 | Failure artifact missing after ~14 days | Expected — `retention-days: 14` |
 | | (PYPOST-910); re-run or use local dumps |
+| No live UI proof / screenshot yet | Expected — PYPOST-911 **DEFER**; follow |
+| | checklist in [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md) |
+| | and `ai-tasks/PYPOST-911/live-proof-notes.md` |
 | Harness table ≠ marks | Align Module rows with `@pytest.mark.agent_e2e`; |
 | | run `make test PYTEST_ARGS=` |
 | | `"tests/test_agent_e2e_harness_table_doc.py -v"` |

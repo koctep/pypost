@@ -568,6 +568,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-874] | ENABLE agent-e2e failure artifact upload + doc/workflow lock |
 | [PYPOST-909] | ENABLE main test matrix failure artifact upload + lock |
 | [PYPOST-910] | Explicit `retention-days: 14` on failure artifact uploads |
+| [PYPOST-911] | DEFER live Artifacts UI proof; procedure + doc lock |
 | [PYPOST-905] | Stamp/cache `venv-test` / `venv-otel`; skip pip when extras current |
 | [PYPOST-906] | `lint` depends on `venv-test` (like `typecheck`); `run` stays marker-only |
 
@@ -588,6 +589,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-908]: https://pypost.atlassian.net/browse/PYPOST-908
 [PYPOST-909]: https://pypost.atlassian.net/browse/PYPOST-909
 [PYPOST-910]: https://pypost.atlassian.net/browse/PYPOST-910
+[PYPOST-911]: https://pypost.atlassian.net/browse/PYPOST-911
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -684,11 +686,16 @@ When job `agent-e2e` fails, GitHub Actions uploads `artifacts/agent_e2e/`
 cell fails, the same path is uploaded as
 `agent-e2e-failure-artifacts-${{ matrix.python-version }}` (PYPOST-909).
 Both uploads set `retention-days: 14` (PYPOST-910). Download from the
-run’s Artifacts UI within that window. Details:
+run’s Artifacts UI within that window. Live UI proof of a downloadable
+dump is **DEFER**red (PYPOST-911) until a qualifying red run exists —
+see [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md)
+§ Live Artifacts UI proof for what to capture and
+`ai-tasks/PYPOST-911/live-proof-notes.md`. Details:
 [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
 Locks: `tests/test_agent_e2e_ci_failure_upload_doc.py` (874),
 `tests/test_agent_e2e_ci_matrix_failure_upload_doc.py` (909),
-`tests/test_agent_e2e_ci_failure_retention_doc.py` (910).
+`tests/test_agent_e2e_ci_failure_retention_doc.py` (910),
+`tests/test_agent_e2e_ci_failure_artifacts_ui_proof_doc.py` (911).
 
 ## CI dependency caching (PYPOST-311)
 

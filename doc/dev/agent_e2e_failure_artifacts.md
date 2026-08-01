@@ -182,7 +182,56 @@ missing path.
 Local diagnosis still uses files on disk under the documented root.
 Contract locks: `tests/test_agent_e2e_ci_failure_upload_doc.py` (874),
 `tests/test_agent_e2e_ci_matrix_failure_upload_doc.py` (909),
-`tests/test_agent_e2e_ci_failure_retention_doc.py` (910).
+`tests/test_agent_e2e_ci_failure_retention_doc.py` (910),
+`tests/test_agent_e2e_ci_failure_artifacts_ui_proof_doc.py` (911).
+
+### Live Artifacts UI proof (PYPOST-911) — DEFER
+
+**Status:** live screenshot / notes from a real failing run are
+**DEFER**red. Public Actions history (queried 2026-08-01) had no
+downloadable `agent-e2e-failure-artifacts` (or matrix twin) on failed
+runs — only junit/coverage zips or empty artifact lists. Do **not**
+invent fake screenshots.
+
+Maintainers complete the one-time proof when a qualifying red run
+exists (agent e2e or matrix cell that wrote dumps under
+`artifacts/agent_e2e/` and uploaded them).
+
+#### What to capture
+
+- Actions run URL (failed conclusion).
+- Job name (`agent-e2e` or `test` matrix cell) and Python version if
+  matrix.
+- Artifact name shown in the run **Artifacts** UI:
+  `agent-e2e-failure-artifacts` or
+  `agent-e2e-failure-artifacts-<python>`.
+- Confirmation the zip is downloadable (click Download; optional local
+  unzip showing `ui_snapshot.json` / `diagnostics.json`).
+- Screenshot of the Artifacts list only (not dump contents / secrets).
+
+#### Where to put notes
+
+Record findings in
+[`ai-tasks/PYPOST-911/live-proof-notes.md`](../../ai-tasks/PYPOST-911/live-proof-notes.md)
+(checklist + status). Optionally link the screenshot path or run URL
+there; keep binaries out of `doc/dev` unless maintainers choose
+otherwise.
+
+#### How to find a qualifying run
+
+```bash
+# List recent failed workflow runs (requires gh)
+gh run list --repo koctep/pypost --status failure --limit 20
+
+# Inspect artifacts for a run id
+gh api repos/koctep/pypost/actions/runs/<RUN_ID>/artifacts \
+  --jq '.artifacts[].name'
+```
+
+Look for `agent-e2e-failure-artifacts` or
+`agent-e2e-failure-artifacts-3.11` / `3.13`. If absent, the job failed
+before dumps existed or upload ignored an empty path — wait for another
+red run.
 
 ## Tests
 
@@ -202,6 +251,7 @@ dumps on fixture assert fail, and a subprocess proof that direct
 | Dump WARNING only | Capture failed with a best-effort type; fix session ready / window; original fail still reported |
 | Unexpected dump exception in traceback | Helper bug outside the best-effort catch set; fix dump path (PYPOST-876) |
 | `session_fixture=direct` | Expected for bare `AgentAppSession` constructions (PYPOST-875) |
+| No Artifacts UI proof yet | Expected — PYPOST-911 **DEFER**; complete checklist in § Live Artifacts UI proof and `ai-tasks/PYPOST-911/live-proof-notes.md` |
 
 ## Related
 
