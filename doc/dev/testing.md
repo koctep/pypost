@@ -561,7 +561,10 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 ## Makefile automation tests
 
 `tests/test_makefile.py` validates root `Makefile` contracts without touching the repository
-`.venv`. Scope is split across two tasks to avoid duplicate fixtures:
+`.venv`. Shared static parsers for `##` help lines and target recipe bodies live in
+`tests/makefile_contract_helpers.py` (`makefile_target_help_comment`,
+`makefile_target_recipe_body`) — use them when adding make-entry contract locks (PYPOST-937).
+Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across two tasks to avoid duplicate fixtures:
 
 | Task | Scope |
 | ---- | ----- |
@@ -588,6 +591,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-929] | Contract: `make install` touches both extra stamps |
 | [PYPOST-906] | `lint` depends on `venv-test` (like `typecheck`); `run` stays marker-only |
 | [PYPOST-932] | Contract: `typecheck` depends on marker + `venv-test` (peer lock) |
+| [PYPOST-937] | Shared Makefile help/recipe parse helpers for make-entry contract locks |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -604,6 +608,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-929]: https://pypost.atlassian.net/browse/PYPOST-929
 [PYPOST-906]: https://pypost.atlassian.net/browse/PYPOST-906
 [PYPOST-932]: https://pypost.atlassian.net/browse/PYPOST-932
+[PYPOST-937]: https://pypost.atlassian.net/browse/PYPOST-937
 [PYPOST-907]: https://pypost.atlassian.net/browse/PYPOST-907
 [PYPOST-930]: https://pypost.atlassian.net/browse/PYPOST-930
 [PYPOST-908]: https://pypost.atlassian.net/browse/PYPOST-908
