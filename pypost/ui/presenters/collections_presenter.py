@@ -9,13 +9,15 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QTreeView, QVBoxLayout, QWidget
 
 from pypost.core.collection_import import load_collection_import_candidates
-from pypost.core.collection_messages import BUTTON_IMPORT_COLLECTION
+from pypost.core.collection_export import build_export_payload
+from pypost.core.collection_messages import BUTTON_EXPORT_COLLECTION, BUTTON_IMPORT_COLLECTION
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.models import Collection, RequestData
 from pypost.ui.delegates import CollectionItemRenameDelegate
+from pypost.ui.presenters.collection_export_actions import CollectionExportActions
 from pypost.ui.presenters.collection_import_actions import CollectionImportActions
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
 from pypost.ui.presenters.collection_tree_incremental import (
@@ -23,7 +25,12 @@ from pypost.ui.presenters.collection_tree_incremental import (
     try_incremental_tree_refresh,
 )
 from pypost.ui.presenters.collections_async_loader import CollectionsAsyncLoader
-from pypost.ui.widget_ids import COLLECTION_IMPORT_BUTTON, COLLECTION_TREE, set_widget_id
+from pypost.ui.widget_ids import (
+    COLLECTION_EXPORT_BUTTON,
+    COLLECTION_IMPORT_BUTTON,
+    COLLECTION_TREE,
+    set_widget_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +57,7 @@ class CollectionsPresenter(QObject):
         read_import_file: (
             Callable[[Path], tuple[list[Collection], list[str]]] | None
         ) = None,
+        serialize_collection: Callable[[Collection], dict] | None = build_export_payload,
     ) -> None:
         super().__init__(parent)
         self._request_manager = request_manager
@@ -117,6 +125,13 @@ class CollectionsPresenter(QObject):
             restore_tree_state=self.restore_tree_state,
             emit_collections_changed=self.collections_changed.emit,
         )
+        self._export_actions = CollectionExportActions(
+            self._panel,
+            self._view,
+            self._model,
+            self._request_manager,
+            serialize_collection=serialize_collection,
+        )
 
     def _build_panel(self) -> QWidget:
         """Wrap the tree with the sidebar action row that hosts Import Collection."""
@@ -128,8 +143,13 @@ class CollectionsPresenter(QObject):
         set_widget_id(import_btn, COLLECTION_IMPORT_BUTTON)
         import_btn.clicked.connect(self.import_collections)
 
+        export_btn = QPushButton(BUTTON_EXPORT_COLLECTION)
+        set_widget_id(export_btn, COLLECTION_EXPORT_BUTTON)
+        export_btn.clicked.connect(self.export_collection)
+
         buttons_row = QHBoxLayout()
         buttons_row.addWidget(import_btn)
+        buttons_row.addWidget(export_btn)
         buttons_row.addStretch(1)
 
         layout.addWidget(self._view)
@@ -250,6 +270,10 @@ class CollectionsPresenter(QObject):
     def import_collections(self) -> None:
         """Run the Import Collection flow (delegated to CollectionImportActions)."""
         self._import_actions.import_collections()
+
+    def export_collection(self) -> None:
+        """Run the Export Collection flow (delegated to CollectionExportActions)."""
+        self._export_actions.export_collection()
 
     def restore_tree_state(self) -> None:
         """Re-expands nodes from StateManager state."""

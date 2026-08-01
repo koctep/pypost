@@ -85,6 +85,30 @@ Notes:
 Importing a collection is the reverse of copying a `collections/*.json` file out of your
 data directory; PyPost does not currently read Postman, Insomnia, or OpenAPI files.
 
+## Export a collection
+
+To share or back up a collection without digging into the data directory:
+
+1. Click a **collection name** in the sidebar tree (or a request inside it — the parent
+   collection is exported).
+2. Click **Export Collection…** below the tree.
+3. Choose where to save the file. The default filename is based on the collection name.
+4. When it finishes, a confirmation dialog shows the path and how many requests were
+   exported.
+
+The file is one JSON object with the same shape as **Import a collection** expects — a
+direct copy of what PyPost stores in `collections/<id>.json`. You can send it to a
+teammate or import it on another machine with **Import Collection…**.
+
+Notes:
+
+- If nothing is selected in the tree, export asks you to select a collection first.
+- Every request field is included (`method`, `url`, `headers`, `params`, `body`,
+  `body_type`, `post_script`, retry policy, and MCP tool settings), so the file
+  round-trips through import without manual fixes.
+- Export does not remove or change the collection in your sidebar — it only writes a
+  copy to disk.
+
 ## Rename and delete
 
 Right-click a collection or request in the tree:

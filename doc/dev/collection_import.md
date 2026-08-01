@@ -200,6 +200,7 @@ line logs the collection id, not its name. See
 
 ## Related
 
+- [Collection Export](collection_export.md) — write a collection to the same JSON shape (PYPOST-989)
 - [Collection Storage](collection_storage.md) — the on-disk format this feature reads
 - [Collection Loading](collection_loading.md) — the async startup path that shares
   `apply_loaded_collections`

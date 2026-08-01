@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QWidget
 MAIN_WINDOW = "pypost_main_window"
 COLLECTION_TREE = "pypost_collection_tree"
 COLLECTION_IMPORT_BUTTON = "pypost_collection_import_button"
+COLLECTION_EXPORT_BUTTON = "pypost_collection_export_button"
 REQUEST_TABS = "pypost_request_tabs"
 METHOD_COMBO = "pypost_method_combo"
 URL_INPUT = "pypost_url_input"

@@ -1,10 +1,20 @@
-"""User-visible strings for the collection import UI (PYPOST-987)."""
+"""User-visible strings for the collection import and export UI."""
 from __future__ import annotations
 
 DIALOG_TITLE_IMPORT_COLLECTION = "Import Collection"
 DIALOG_TITLE_IMPORT_COLLECTION_CONFLICT = "Import Conflict"
+DIALOG_TITLE_EXPORT_COLLECTION = "Export Collection"
 
 BUTTON_IMPORT_COLLECTION = "Import Collection…"
+BUTTON_EXPORT_COLLECTION = "Export Collection…"
+
+EXPORT_COLLECTION_FILE_DIALOG_CAPTION = "Export Collection"
+EXPORT_COLLECTION_FILE_DIALOG_FILTER = "JSON Files (*.json);;All Files (*)"
+
+MSG_EXPORT_NO_COLLECTION_SELECTED = (
+    "Select a collection in the tree to export it (click the collection name, "
+    "not only a request)."
+)
 
 IMPORT_COLLECTION_FILE_DIALOG_CAPTION = "Import Collection"
 IMPORT_COLLECTION_FILE_DIALOG_FILTER = "JSON Files (*.json);;All Files (*)"
