@@ -99,7 +99,10 @@ Successful fills emit DEBUG `ui_action_applied` with scalar
 `via_key_clicks=true|false` (lowercase); fill **text is never logged**.
 Fixture caplog contract: `test_ui_action_applied_caplog` parametrizes both
 fill modes (`via_key_clicks=false|true`) and asserts fill text never appears
-in logs (PYPOST-851/944).
+in logs (PYPOST-851/944). Behavioral keyClicks proofs:
+`test_ui_fill_via_key_clicks_on_fixture` (line edit),
+`test_ui_fill_via_key_clicks_on_plain_text_fixture`, and
+`test_ui_fill_via_key_clicks_on_rich_text_fixture` (PYPOST-945).
 
 ### `ui_select(root, widget_id, option)`
 

@@ -188,6 +188,9 @@ are locked in `tests/test_ui_actions.py`
 Fill DEBUG `ui_action_applied` scalars for default and opt-in keyClicks modes
 are locked by parametrized `test_ui_action_applied_caplog` in the same module
 (`via_key_clicks=false|true`; fill text must not appear in caplog; PYPOST-944).
+Opt-in keyClicks fill on `QPlainTextEdit` and `QTextEdit` is locked by
+`test_ui_fill_via_key_clicks_on_plain_text_fixture` and
+`test_ui_fill_via_key_clicks_on_rich_text_fixture` (PYPOST-945).
 
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a

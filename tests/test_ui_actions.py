@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListView,
     QListWidget,
+    QPlainTextEdit,
     QPushButton,
+    QTextEdit,
     QTreeView,
     QWidget,
 )
@@ -41,6 +43,8 @@ _COMBO = "fixture_combo"
 _LIST = "fixture_list"
 _LIST_VIEW = "fixture_list_view"
 _TREE = "fixture_tree"
+_PLAIN_TEXT = "fixture_plain_text"
+_RICH_TEXT = "fixture_rich_text"
 _DISABLED = "fixture_disabled_btn"
 
 
@@ -116,6 +120,30 @@ def _make_list_view_fixture(qapp: QApplication) -> QWidget:
     return root
 
 
+def _make_plain_text_fixture(qapp: QApplication) -> QWidget:
+    """Isolated QPlainTextEdit fixture for fill / keyClicks proofs."""
+    root = QWidget()
+    layout = QHBoxLayout(root)
+    plain = QPlainTextEdit()
+    set_widget_id(plain, _PLAIN_TEXT)
+    layout.addWidget(plain)
+    root.show()
+    qapp.processEvents()
+    return root
+
+
+def _make_rich_text_fixture(qapp: QApplication) -> QWidget:
+    """Isolated QTextEdit fixture for fill / keyClicks proofs."""
+    root = QWidget()
+    layout = QHBoxLayout(root)
+    rich = QTextEdit()
+    set_widget_id(rich, _RICH_TEXT)
+    layout.addWidget(rich)
+    root.show()
+    qapp.processEvents()
+    return root
+
+
 def test_ui_click_on_fixture(qapp: QApplication) -> None:
     root, clicks = _make_fixture(qapp)
     try:
@@ -145,6 +173,30 @@ def test_ui_fill_via_key_clicks_on_fixture(qapp: QApplication) -> None:
         line = find_widget(root, _INPUT)
         assert isinstance(line, QLineEdit)
         assert line.text() == "typed-via-keys"
+    finally:
+        root.close()
+
+
+def test_ui_fill_via_key_clicks_on_plain_text_fixture(qapp: QApplication) -> None:
+    """PYPOST-945: ui_fill opt-in keyClicks fills fixture QPlainTextEdit."""
+    root = _make_plain_text_fixture(qapp)
+    try:
+        ui_fill(root, _PLAIN_TEXT, "plain-via-keys", via_key_clicks=True)
+        plain = find_widget(root, _PLAIN_TEXT)
+        assert isinstance(plain, QPlainTextEdit)
+        assert plain.toPlainText() == "plain-via-keys"
+    finally:
+        root.close()
+
+
+def test_ui_fill_via_key_clicks_on_rich_text_fixture(qapp: QApplication) -> None:
+    """PYPOST-945: ui_fill opt-in keyClicks fills fixture QTextEdit."""
+    root = _make_rich_text_fixture(qapp)
+    try:
+        ui_fill(root, _RICH_TEXT, "rich-via-keys", via_key_clicks=True)
+        rich = find_widget(root, _RICH_TEXT)
+        assert isinstance(rich, QTextEdit)
+        assert rich.toPlainText() == "rich-via-keys"
     finally:
         root.close()
 
