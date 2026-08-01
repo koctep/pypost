@@ -1,4 +1,4 @@
-.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run clean test test-slow test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures generate-license-inventory check-license-inventory
+.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run run-agent-ui-mcp clean test test-slow test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures generate-license-inventory check-license-inventory
 
 .DEFAULT_GOAL := help
 
@@ -72,6 +72,9 @@ check-lock-otel: ## Verify requirements-otel.txt matches requirements-otel.in (n
 
 run: $(VENV_MARKER) ## Run the PyPost desktop application
 	PYTHONPATH=. $(BIN)/python pypost/main.py
+
+run-agent-ui-mcp: $(VENV_MARKER) ## Stdio MCP sidecar for agent UI actions (PYPOST-952)
+	QT_QPA_PLATFORM=offscreen PYTHONPATH=. $(BIN)/python -m pypost.agent.ui_actions_mcp
 
 test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow integration tests)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \

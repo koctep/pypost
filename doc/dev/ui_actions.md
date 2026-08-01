@@ -18,17 +18,20 @@ updates.
 
 ## Out-of-process MCP packaging path (PYPOST-918)
 
-Today UI actions are **in-process only**. When out-of-process MCP for these
-primitives is prioritized, the documented **packaging path** is:
+Today UI actions are **in-process** when imported from Python harnesses.
+**Live stdio sidecar (PYPOST-952):** run `pypost-agent-ui-mcp` or
+`make run-agent-ui-mcp` — see [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md).
 
-1. Ship a **dedicated** agent-UI MCP entry (stdio sidecar and/or separate
-   loopback Streamable HTTP) that wraps `pypost.agent.ui_actions` (or a thin
-   façade over the same primitives).
+When out-of-process MCP for these primitives is used, the **packaging path** is:
+
+1. Ship a **dedicated** agent-UI MCP entry (stdio sidecar) that wraps
+   `pypost.agent.ui_actions` (or a thin façade over the same primitives).
+   Runnable entry: `pypost-agent-ui-mcp` (PYPOST-952).
 2. **Never mount** UI-action tools on product `MCPServerImpl`. Collection HTTP
    request tools stay solely on that server; clients that need both compose
    **two** MCP servers.
-3. Do **not** implement a live bridge in this debt — PYPOST-918 closes the
-   packaging answer only. Live delivery follows this path when prioritized.
+3. PYPOST-918 documented the path; PYPOST-952 ships the stdio bridge. Optional
+   loopback HTTP for agent-UI MCP remains future work.
 
 Product MCP docs: [mcp_integration.md](mcp_integration.md),
 [mcp_trust_model.md](mcp_trust_model.md). In-process agent e2e packaging
@@ -229,6 +232,7 @@ widgets that already have `objectName` set via `set_widget_id`.
 
 ## Related
 
+- [Agent UI Actions MCP](agent_ui_actions_mcp.md) — stdio sidecar (PYPOST-952)
 - [Agent UI E2E](agent_e2e.md) — umbrella + `make test-agent-e2e`
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog

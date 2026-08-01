@@ -44,6 +44,9 @@ otel = [
     "opentelemetry-sdk==1.42.1",
 ]
 
+[project.scripts]
+pypost-agent-ui-mcp = "pypost.agent.ui_actions_mcp:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pypost*"]
