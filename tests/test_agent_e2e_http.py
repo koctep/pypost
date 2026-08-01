@@ -227,3 +227,19 @@ def test_mapping_multi_url_settle_timeout_companion_exists() -> None:
             None,
         )
     )
+
+
+def test_mapping_compound_keys_gui_send_scenario_module_exists() -> None:
+    """PYPOST-958: GUI compound-key same-URL Mapping Send module must exist."""
+    import importlib
+
+    mod = importlib.import_module(
+        "tests.test_agent_e2e_http_mapping_compound_keys"
+    )
+    assert callable(
+        getattr(
+            mod,
+            "test_mapping_compound_keys_same_url_get_post_panel_outcomes",
+            None,
+        )
+    )

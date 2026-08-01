@@ -189,6 +189,17 @@ Unit proofs: `tests/test_agent_e2e_http.py`
 `test_stub_agent_e2e_http_url_router_miss_raises`,
 `test_stub_agent_e2e_http_url_router_method_url_compound_keys`).
 
+GUI proof (PYPOST-958): `tests/test_agent_e2e_http_mapping_compound_keys.py` —
+`test_mapping_compound_keys_same_url_get_post_panel_outcomes` drives GET then
+POST to one resolved URL under compound keys (`GET {url}` / `POST {url}`) and
+asserts distinct panel bodies. Inventory gate:
+`test_mapping_compound_keys_gui_send_scenario_module_exists`.
+
+```bash
+make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_mapping_compound_keys.py -q"
+make test PYTEST_ARGS="tests/test_agent_e2e_http.py::test_mapping_compound_keys_gui_send_scenario_module_exists -q"
+```
+
 ### Mapping multi-URL GUI module (PYPOST-901 / PYPOST-955)
 
 | Test | Role |
