@@ -86,7 +86,7 @@ test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage rep
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
 		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov)
 
-test-agent-e2e: $(VENV_MARKER) venv-test venv-otel ## Agent UI e2e + env pack (-m agent_e2e; PYTEST_ARGS overrides)
+test-agent-e2e: $(VENV_MARKER) venv-test venv-otel ## Broader agent e2e beyond golden (-m agent_e2e; PYTEST_ARGS overrides)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "agent_e2e and not slow")
 

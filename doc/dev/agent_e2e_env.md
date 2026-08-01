@@ -13,8 +13,9 @@ offscreen/CI work at a business level, how scenarios consume a ready env, and
 which fixture areas siblings implement. It does **not** implement those
 fixtures (PYPOST-857–861).
 
-Drive/observe primitives and `make test-agent-e2e` packaging remain under
-[Agent UI E2E](agent_e2e.md). Golden’s blank-tab + shared HTTP stub
+Drive/observe primitives and broader-pack packaging (`make test-agent-e2e`
+beyond golden; PYPOST-922) remain under [Agent UI E2E](agent_e2e.md).
+Golden’s blank-tab + shared HTTP stub
 ([agent_golden_e2e.md](agent_golden_e2e.md),
 [agent_e2e_http.md](agent_e2e_http.md)) proves composition; the env pack
 is the **primary** path when scenarios need seeded workspace state.
@@ -111,8 +112,9 @@ seed be **shared and documented**, not ad-hoc per test.
 - **Determinism:** no live network as the default agent-flow path; HTTP
   boundary stubbed through the shared layer (PYPOST-859).
 - **Run entry:** `make test-agent-e2e` (and CI job `agent-e2e`) are the
-  first-class env-pack make/CI path (PYPOST-861). Do not treat undocumented
-  shell-only recipes as the contract.
+  first-class **broader** pack make/CI path beyond golden (PYPOST-922
+  discoverability; PYPOST-861 smoke). Do not treat undocumented shell-only
+  recipes as the contract.
 - **Secrets:** failure dumps must not weaken snapshot / masking policy
   ([ui_snapshot.md](ui_snapshot.md)); dump format and enforcement are owned by
   PYPOST-860.
@@ -161,7 +163,8 @@ land incrementally:
 
 ## Related
 
-- [Agent UI E2E](agent_e2e.md) — PYPOST-832 umbrella + `make test-agent-e2e`
+- [Agent UI E2E](agent_e2e.md) — umbrella + broader primary packaging
+  (`make test-agent-e2e`, PYPOST-922)
 - [Agent E2E Seed Inventory](agent_e2e_seed.md) — PYPOST-857 workspace seed
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md) — PYPOST-859 canned HTTP
 - [Agent E2E Failure Artifacts](agent_e2e_failure_artifacts.md) — PYPOST-860 dumps

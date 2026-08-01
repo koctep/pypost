@@ -14,20 +14,23 @@ guardrails, and coverage. Agent authoring rules live in
 make test            # fast suite (excludes -m slow)
 make test-cov        # with coverage report
 make test-slow       # network-heavy Makefile smoke
-make test-agent-e2e  # agent UI e2e + env pack (-m agent_e2e; PYTEST_ARGS overrides)
+make test-agent-e2e  # broader agent e2e beyond golden (primary packaging)
 ```
 
-Agent UI e2e (in-process offscreen harness) is documented in
-[agent_e2e.md](agent_e2e.md). The reusable env pack model (seed, isolation,
-fixture areas) is in [agent_e2e_env.md](agent_e2e_env.md). CI runs the pack via
-`make test-agent-e2e` in job `agent-e2e` (PYPOST-861); the main fast suite also
-includes those tests under `-m "not slow"`. That path is separate from live MCP
-checks against a running PyPost (see § Testing via MCP below and
+`make test-agent-e2e` is the **primary packaging** path for the **broader**
+agent e2e pack **beyond golden** (PYPOST-922). Agent UI e2e (in-process
+offscreen harness) is documented in [agent_e2e.md](agent_e2e.md). The reusable
+env pack model (seed, isolation, fixture areas) is in
+[agent_e2e_env.md](agent_e2e_env.md). CI runs the pack via `make test-agent-e2e`
+in job `agent-e2e` (PYPOST-861); the main fast suite also includes those tests
+under `-m "not slow"`. That path is separate from live MCP checks against a
+running PyPost (see § Testing via MCP below and
 [mcp_integration.md](mcp_integration.md)).
 
 Pass extra pytest arguments via `PYTEST_ARGS` (PYPOST-791). When set, `PYTEST_ARGS`
 **replaces** the default path/marker arguments for that target; when unset, behavior is
-unchanged.
+unchanged. Use it to narrow to the golden scenario (`test_agent_golden_e2e.py`)
+or another single module without replacing the broader primary packaging entry:
 
 ```bash
 make test PYTEST_ARGS="tests/test_mcp_server_manager.py -q"

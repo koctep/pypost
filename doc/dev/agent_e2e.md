@@ -17,11 +17,13 @@ The reusable **environment pack** model (seed, isolation, fixtures inventory)
 is [agent_e2e_env.md](agent_e2e_env.md). Product **dialog settle** after Settings
 open (PYPOST-919) is [agent_dialog_settle.md](agent_dialog_settle.md).
 
-Prefer `make test-agent-e2e` over ad-hoc pytest one-liners. CI gates the same
-target via the `agent-e2e` job in `.github/workflows/test.yml` (PYPOST-861);
-the main fast suite also includes these tests via `-m "not slow"` (intentional
-3.11 double-run; DEFER after evidence — PYPOST-873 / PYPOST-907 /
-PYPOST-908 timing notes in [testing.md](testing.md)).
+`make test-agent-e2e` is the **primary packaging** path for the **broader**
+agent e2e pack **beyond golden** (PYPOST-922). Prefer it over ad-hoc pytest
+one-liners. CI gates the same target via the `agent-e2e` job in
+`.github/workflows/test.yml` (PYPOST-861); the main fast suite also includes
+these tests via `-m "not slow"` (intentional 3.11 double-run; DEFER after
+evidence — PYPOST-873 / PYPOST-907 / PYPOST-908 timing notes in
+[testing.md](testing.md)).
 
 This is **not** live MCP verification against a running PyPost. For MCP tools
 and Prometheus checks, see [testing.md](testing.md) and
@@ -61,18 +63,13 @@ step.
 
 ### How to run
 
-Install once, then use the dedicated target (offscreen Qt via Makefile):
+Install once, then use the dedicated primary packaging target (offscreen Qt
+via Makefile). Default selection is the **broader** `@pytest.mark.agent_e2e`
+pack **beyond golden** (`-m "agent_e2e and not slow"`; CLI `-m` overrides
+`addopts`):
 
 ```bash
 make install
-make test-agent-e2e
-```
-
-Default selection is the registered `agent_e2e` marker, composed with
-`not slow` (CLI `-m` overrides `addopts`, so the recipe uses
-`-m "agent_e2e and not slow"`):
-
-```bash
 make test-agent-e2e
 # equivalent: pytest -m "agent_e2e and not slow"
 ```
@@ -106,8 +103,9 @@ for the seed inventory check. `make test` runs
 `tests/test_agent_e2e_harness_table_doc.py`, which fails if the marked set
 and this table diverge.
 
-Narrow to an explicit file list via `PYTEST_ARGS` (replaces the default
-`-m` expression):
+Narrow to the golden scenario (or another single module) via `PYTEST_ARGS`
+(replaces the default `-m` expression; does not change the primary packaging
+entry):
 
 ```bash
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_golden_e2e.py -v"

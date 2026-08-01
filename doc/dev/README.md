@@ -87,7 +87,7 @@ set up your development environment, and contribute to the project.
 1. [Testing via MCP and Prometheus](testing.md)
 1. [Static Type Checking (PYPOST-734)](static_type_checking.md)
 1. [GUI Testing](gui_testing.md)
-1. [Agent UI E2E (PYPOST-839)](agent_e2e.md)
+1. [Agent UI E2E (PYPOST-839; broader packaging PYPOST-922)](agent_e2e.md)
 1. [Agent E2E Environment Contract (PYPOST-856)](agent_e2e_env.md)
 1. [Agent E2E Seed Inventory (PYPOST-857)](agent_e2e_seed.md)
 1. [Agent E2E HTTP Fixture Layer (PYPOST-859)](agent_e2e_http.md)

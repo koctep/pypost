@@ -296,7 +296,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 
 ## Agent UI e2e (in-process)
 
-Umbrella guide (setup, tools, identity, golden, `make test-agent-e2e`):
+Umbrella guide (setup, tools, identity, golden; **primary packaging** =
+broader pack beyond golden via `make test-agent-e2e`, PYPOST-922):
 [Agent UI E2E](agent_e2e.md). Environment pack contract (seed, isolation,
 fixtures inventory): [Agent E2E Environment Contract](agent_e2e_env.md).
 
@@ -329,7 +330,7 @@ Product dialog settle after Settings open (timer-before-`exec`,
 [Agent E2E Product Dialog Settle](agent_dialog_settle.md)
 (`tests/test_agent_dialog_settle_e2e.py`, PYPOST-919).
 
-Run the harness set with:
+Run the broader harness pack (beyond golden) with:
 
 ```bash
 make test-agent-e2e

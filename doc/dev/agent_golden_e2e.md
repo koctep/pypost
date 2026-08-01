@@ -14,7 +14,9 @@ The golden scenario **is** a documented pytest
 (`tests/test_agent_golden_e2e.py`) that imports the same `pypost.agent` APIs
 agents use. It does not add a parallel scenario runner under `pypost/agent/`.
 
-Broader packaging (umbrella doc + `make test-agent-e2e`) is
+`make test-agent-e2e` is the **primary packaging** path for the **broader**
+agent e2e pack **beyond golden** (umbrella + env pack; PYPOST-922). This
+golden module is one scenario inside that pack — see
 [Agent UI E2E](agent_e2e.md). HTTP catalog / stub API:
 [agent_e2e_http.md](agent_e2e_http.md).
 
@@ -69,13 +71,14 @@ required. Status and body widgets under `ResponseView` have no dedicated
 
 ### How to run
 
-Preferred (epic harness set, including this golden):
+Primary packaging (broader pack beyond golden, including this scenario):
 
 ```bash
 make test-agent-e2e
 ```
 
-Golden only under the project offscreen GUI env (`QT_QPA_PLATFORM=offscreen`):
+Golden-only narrow via `PYTEST_ARGS` under the project offscreen GUI env
+(`QT_QPA_PLATFORM=offscreen`):
 
 ```bash
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_golden_e2e.py -v"
