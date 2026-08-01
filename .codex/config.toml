@@ -1,3 +1,0 @@
-[mcp_servers.jira]
-command = "/home/shared/vvt-atlassian-mcp/run.sh"
-args = []

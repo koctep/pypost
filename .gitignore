@@ -47,6 +47,12 @@ ENV/
 # Cursor
 .cursor
 
+# Local agent tooling (machine-specific; may contain credentials)
+.agents/
+.claude/
+.codex/
+.mcp.json
+
 # Zed
 .zed/
 
