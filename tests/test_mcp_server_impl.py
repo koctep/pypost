@@ -13,6 +13,7 @@ from starlette.applications import Starlette
 from starlette.routing import Mount, Route
 from starlette.testclient import TestClient
 
+from pypost.agent.ui_actions_mcp import AGENT_UI_MCP_TOOL_NAMES
 from pypost.core.mcp_server_impl import (
     MCPServerImpl,
     _merge_execution_variables,
@@ -173,6 +174,30 @@ class TestMCPServerImpl(unittest.TestCase):
         impl = MCPServerImpl()
         impl.register_tools([])
         self.assertEqual(asyncio.run(impl.list_tools()), [])
+
+    def test_list_tools_excludes_agent_ui_action_names(self):
+        """PYPOST-953: product MCP catalog must not expose ui_* drive tools."""
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Fetch",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://example.com",
+        )
+        impl.register_tools([req])
+        names = {tool.name for tool in asyncio.run(impl.list_tools())}
+        overlap = names & AGENT_UI_MCP_TOOL_NAMES
+        self.assertEqual(
+            overlap,
+            set(),
+            f"MCPServerImpl must not register agent UI tools; found {sorted(overlap)}",
+        )
+        ui_prefixed = {name for name in names if name.startswith("ui_")}
+        self.assertEqual(
+            ui_prefixed,
+            set(),
+            f"MCPServerImpl must not expose ui_* tools; found {sorted(ui_prefixed)}",
+        )
 
     def test_list_tools_excludes_hidden_env_placeholders_from_schema(self):
         impl = MCPServerImpl(

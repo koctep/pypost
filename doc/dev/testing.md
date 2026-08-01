@@ -366,6 +366,7 @@ duplicate scope: prior tickets already cover the intent.
 | MCP tool Streamable HTTP (`list_tools`, `call_tool`) | `tests/test_mcp_server_integration.py` | Integration | PYPOST-368/551; `RequestService` mocked |
 | MCP test collection live round-trip | `tests/test_mcp_test_collection_integration.py` | Integration | PYPOST-181; collection tools, `RequestService` mocked |
 | `MCPServerImpl` metrics hooks | `tests/test_mcp_server_impl.py` | Unit | PYPOST-367; `MetricsManager` mocked |
+| Product MCP catalog excludes ui_* tools | `tests/test_mcp_server_impl.py` | Unit | PYPOST-953; `list_tools` name guard vs agent sidecar |
 | Metrics `read_resource("metrics://all")` | `tests/test_metrics_manager.py` | Unit | Facade; scrapes `mcp_*_total` after `read_resource` |
 | `MetricsRegistry` MCP counters | `tests/test_metrics_registry.py` | Unit | PYPOST-177; pure `track_mcp_*` scrape assertions |
 | HTTP `/metrics` scrape endpoint | `tests/test_metrics_server_endpoint.py` | Unit | PYPOST-177; `TestClient` on `MetricsServer` ASGI app |

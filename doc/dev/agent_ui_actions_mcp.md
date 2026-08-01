@@ -112,7 +112,9 @@ fill **text is never logged** (same policy as in-process ui_actions).
 - **Client sees no tools** — Ensure the client uses stdio transport, not HTTP,
   for this server.
 - **Accidentally merged with product MCP** — UI tools must never appear on
-  `MCPServerImpl`; use two MCP server entries in the client config.
+  `MCPServerImpl`; use two MCP server entries in the client config. CI enforces
+  this via `TestMCPServerImpl.test_list_tools_excludes_agent_ui_action_names` in
+  `tests/test_mcp_server_impl.py` (PYPOST-953).
 
 ## Related
 
@@ -124,6 +126,10 @@ fill **text is never logged** (same policy as in-process ui_actions).
 ## Tests
 
 ```bash
+# Sidecar module + packaging
 make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -v'
 make test-agent-e2e PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py::test_stdio_sidecar_lists_ui_action_tools -v'
+
+# Product MCP catalog must exclude ui_* tools (PYPOST-953)
+make test PYTEST_ARGS='tests/test_mcp_server_impl.py::TestMCPServerImpl::test_list_tools_excludes_agent_ui_action_names -v'
 ```
