@@ -77,6 +77,23 @@ def test_resolve_artifact_root_default_and_env(
     assert resolve_artifact_root(tmp_path) == override
 
 
+def test_diagnostics_uses_session_source_key(
+    tmp_path: Path,
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-913: diagnostics.json must use session_source, not session_fixture."""
+    dump_dir = dump_agent_e2e_failure_artifacts(
+        agent_e2e_session,
+        nodeid="session_source_contract",
+        session_source="agent_e2e_session",
+        artifact_root=tmp_path,
+    )
+    assert dump_dir is not None
+    diag = json.loads((dump_dir / "diagnostics.json").read_text(encoding="utf-8"))
+    assert diag["session_source"] == "agent_e2e_session"
+    assert "session_fixture" not in diag
+
+
 def test_dump_writes_snapshot_and_diagnostics(
     tmp_path: Path,
     agent_e2e_session: AgentAppSession,
@@ -90,7 +107,7 @@ def test_dump_writes_snapshot_and_diagnostics(
             nodeid=nodeid,
             exc_type="AssertionError",
             exc_message="expected UI state",
-            session_fixture="agent_e2e_session",
+            session_source="agent_e2e_session",
             artifact_root=tmp_path,
         )
     assert dump_dir is not None
@@ -107,7 +124,7 @@ def test_dump_writes_snapshot_and_diagnostics(
     assert diag["nodeid"] == nodeid
     assert diag["exc_type"] == "AssertionError"
     assert diag["exc_message"] == "expected UI state"
-    assert diag["session_fixture"] == "agent_e2e_session"
+    assert diag["session_source"] == "agent_e2e_session"
     assert diag["ui_ready"] is True
     assert "agent_e2e_failure_artifacts_written" in caplog.text
 
@@ -265,7 +282,7 @@ def test_makereport_hook_dumps_on_fixture_assert_fail(
     assert diags
     diag = json.loads(diags[0].read_text(encoding="utf-8"))
     assert diag["exc_type"] == "AssertionError"
-    assert diag["session_fixture"] == "agent_e2e_session"
+    assert diag["session_source"] == "agent_e2e_session"
     assert "intentional failure" in (diag["exc_message"] or "")
 
 
@@ -361,5 +378,5 @@ def test_dumps_on_direct_session_assert_fail(
     assert diags
     diag = json.loads(diags[0].read_text(encoding="utf-8"))
     assert diag["exc_type"] == "AssertionError"
-    assert diag["session_fixture"] == "direct"
+    assert diag["session_source"] == "direct"
     assert "intentional direct failure" in (diag["exc_message"] or "")

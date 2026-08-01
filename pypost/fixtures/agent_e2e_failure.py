@@ -73,7 +73,7 @@ def dump_agent_e2e_failure_artifacts(
     nodeid: str,
     exc_type: str | None = None,
     exc_message: str | None = None,
-    session_fixture: str | None = None,
+    session_source: str | None = None,
     artifact_root: Path | None = None,
 ) -> Path | None:
     """Write ``ui_snapshot.json`` + ``diagnostics.json``; return dump dir.
@@ -92,7 +92,7 @@ def dump_agent_e2e_failure_artifacts(
             nodeid=nodeid,
             exc_type=exc_type,
             exc_message=exc_message,
-            session_fixture=session_fixture,
+            session_source=session_source,
         )
         _write_json(dump_dir / "ui_snapshot.json", snapshot)
         _write_json(dump_dir / "diagnostics.json", diagnostics)
@@ -154,7 +154,7 @@ def make_direct_session_failure_dump_hook() -> (
             nodeid=nodeid,
             exc_type=exc_type.__name__,
             exc_message=str(exc),
-            session_fixture=DIRECT_SESSION_PROVENANCE,
+            session_source=DIRECT_SESSION_PROVENANCE,
             artifact_root=root,
         )
 
@@ -167,7 +167,7 @@ def _build_diagnostics(
     nodeid: str,
     exc_type: str | None,
     exc_message: str | None,
-    session_fixture: str | None,
+    session_source: str | None,
 ) -> dict[str, Any]:
     message = exc_message or ""
     if len(message) > MAX_EXC_MESSAGE_LENGTH:
@@ -181,7 +181,7 @@ def _build_diagnostics(
         "nodeid": nodeid,
         "exc_type": exc_type,
         "exc_message": message or None,
-        "session_fixture": session_fixture,
+        "session_source": session_source,
         "ui_ready": ui_ready,
     }
 

@@ -100,6 +100,6 @@ def pytest_runtest_makereport(
         nodeid=item.nodeid,
         exc_type=exc_type,
         exc_message=exc_message,
-        session_fixture=fixture_name,
+        session_source=fixture_name,
         artifact_root=resolve_artifact_root(Path(str(rootpath))),
     )

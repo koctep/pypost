@@ -79,7 +79,7 @@ Scalars / short strings only:
 | `nodeid` | Pytest node id |
 | `exc_type` | Exception type name |
 | `exc_message` | Truncated message (max 500 chars) |
-| `session_fixture` | `agent_e2e_session`, `seeded_agent_e2e_session`, or `direct` |
+| `session_source` | `agent_e2e_session`, `seeded_agent_e2e_session`, or `direct` |
 | `ui_ready` | `MainWindow.is_ui_ready` at dump time (or null) |
 
 Does **not** include env vars, hidden keys, or the snapshot tree.
@@ -124,7 +124,7 @@ from pypost.agent import AgentAppSession
 def test_isolation():
     with AgentAppSession(offscreen=True) as session:
         assert session.window.is_ui_ready
-        # assert fail here → dump with session_fixture=direct
+        # assert fail here → dump with session_source=direct
 ```
 
 ### Manual helper
@@ -140,7 +140,7 @@ dump_agent_e2e_failure_artifacts(
     nodeid="manual_probe",
     exc_type="AssertionError",
     exc_message="expected panel text",
-    session_fixture="agent_e2e_session",
+    session_source="agent_e2e_session",
     artifact_root=Path("/tmp/agent_e2e_dumps"),
 )
 ```
@@ -236,7 +236,7 @@ red run.
 ## Tests
 
 `tests/test_agent_e2e_failure_artifacts.py` covers helper write/masking,
-best-effort errors (`RuntimeError`), propagation of unexpected dump errors
+diagnostics `session_source` contract (PYPOST-913), best-effort errors (`RuntimeError`), propagation of unexpected dump errors
 (`LookupError`, PYPOST-876), in-process caplog proof that a raising dump hook
 logs `agent_session_failure_dump_hook_failed` (PYPOST-912), a subprocess proof
 that the makereport hook dumps on fixture assert fail, and a subprocess proof
@@ -252,7 +252,7 @@ that direct `AgentAppSession` constructions dump on assert fail
 | Cleartext secret in JSON | Key must be in `hidden_keys` for the active env; see [ui_snapshot.md](ui_snapshot.md) |
 | Dump WARNING only | Capture failed with a best-effort type; fix session ready / window; original fail still reported |
 | Unexpected dump exception in traceback | Helper bug outside the best-effort catch set; fix dump path (PYPOST-876) |
-| `session_fixture=direct` | Expected for bare `AgentAppSession` constructions (PYPOST-875) |
+| `session_source=direct` | Expected for bare `AgentAppSession` constructions (PYPOST-875) |
 | No Artifacts UI proof yet | Expected — PYPOST-911 **DEFER**; complete checklist in § Live Artifacts UI proof and `ai-tasks/PYPOST-911/live-proof-notes.md` |
 
 ## Related
