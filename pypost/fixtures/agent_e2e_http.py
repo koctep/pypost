@@ -166,25 +166,48 @@ def _request_data_from_send_args(
     )
 
 
+def _resolve_url_router_response(
+    responses: Mapping[str, HTTPRequestResult],
+    *,
+    method: str,
+    url: str,
+) -> HTTPRequestResult | None:
+    """Resolve a canned result by compound method+URL key, then bare URL."""
+    compound_key = f"{method} {url}"
+    if compound_key in responses:
+        return responses[compound_key]
+    if url in responses:
+        return responses[url]
+    return None
+
+
 def url_router_side_effect(
     responses: Mapping[str, HTTPRequestResult],
 ) -> Callable[..., HTTPRequestResult]:
-    """Return a ``send_request`` side_effect that routes by exact request URL.
+    """Return a ``send_request`` side_effect that routes by request URL.
 
-    Match rule (v1): ``request_data.url`` must equal a map key exactly.
-    Unknown URL raises ``AssertionError`` listing known keys.
+    Match rules:
+
+    1. Compound key ``"{method} {url}"`` (PYPOST-902) when present in the map.
+    2. Bare ``request_data.url`` key (PYPOST-868 v1 backward compat).
+    3. Unknown request raises ``AssertionError`` listing known keys.
+
+    When both compound and bare keys exist for the same URL, the compound
+    entry wins for matching ``method``.
     """
     known = dict(responses)
 
     def _send(*args: object, **kwargs: object) -> HTTPRequestResult:
         request_data = _request_data_from_send_args(args, kwargs)
         url = getattr(request_data, "url", "") or ""
-        if url not in known:
+        method = getattr(request_data, "method", "") or ""
+        result = _resolve_url_router_response(known, method=method, url=url)
+        if result is None:
             raise AssertionError(
                 "agent_e2e_http URL router: no canned response for "
                 f"url={url!r}; known={sorted(known)}"
             )
-        return known[url]
+        return result
 
     return _send
 
@@ -199,7 +222,8 @@ def stub_agent_e2e_http(
 
     Pass a canned ``HTTPRequestResult``, a callable used as ``side_effect``,
     or a ``Mapping[str, HTTPRequestResult]`` keyed by exact ``request_data.url``
-    (PYPOST-868 URL router). Restores the original binding on exit.
+    and/or compound ``"{method} {url}"`` keys (PYPOST-868 / PYPOST-902 URL router).
+    Restores the original binding on exit.
     """
     catalog_name = name
     if result is CANNED_GOLDEN_OK:

@@ -126,20 +126,41 @@ with stub_agent_e2e_http(responses):
     ...
 ```
 
-Match rules (v1):
+Match rules:
 
-1. Exact string equality on `request_data.url` vs map keys.
-2. `request_data` is taken from `request_data=` kwarg or the first positional
+1. **Compound key (PYPOST-902):** `"{method} {url}"` — e.g.
+   `GET https://example.test/shared` — when that key is in the map. Use when
+   two methods share one resolved URL.
+2. **Bare URL (PYPOST-868):** exact string equality on `request_data.url` vs
+   map keys when no compound key matches.
+3. **Precedence:** compound key is tried first; bare URL is the fallback. If
+   both `GET https://host/path` and `https://host/path` exist, GET matches
+   the compound entry; POST to the same URL matches the bare entry unless a
+   `POST …` compound key is also present.
+4. `request_data` is taken from `request_data=` kwarg or the first positional
    arg whose `.url` is a `str` (avoids MagicMock `self` in unit tests).
-3. Unknown URL raises `AssertionError` listing `url=` and sorted known keys.
-4. Not in v1: glob/prefix match, method+URL compound keys, ordered queues —
-   use a callable `side_effect` for those (including streaming via
+5. Unknown URL raises `AssertionError` listing `url=` and sorted known keys.
+6. Not supported: glob/prefix match, ordered queues — use a callable
+   `side_effect` for those (including streaming via
    `canned_send_with_one_chunk`).
+
+Example — same URL, different methods:
+
+```python
+shared = "https://example.test/shared"
+responses = {
+    f"GET {shared}": CANNED_SEED_GET_OK,
+    f"POST {shared}": CANNED_SEED_POST_OK,
+}
+with stub_agent_e2e_http(responses):
+    ...
+```
 
 Install log uses `name=url_router` when `name=` is left at default `custom`.
 Unit proofs: `tests/test_agent_e2e_http.py`
 (`test_stub_agent_e2e_http_url_router_map`,
-`test_stub_agent_e2e_http_url_router_miss_raises`).
+`test_stub_agent_e2e_http_url_router_miss_raises`,
+`test_stub_agent_e2e_http_url_router_method_url_compound_keys`).
 
 GUI scenario (PYPOST-901): `tests/test_agent_e2e_http_mapping_multi_url.py`
 — blank session, one Mapping stub (`SEED_GET_RESOLVED_URL` /
@@ -214,8 +235,9 @@ No extra env vars.
 | | `caplog.at_level(INFO, logger="pypost.fixtures.agent_e2e_http")`; |
 | | run `make test PYTEST_ARGS=` |
 | | `"tests/test_agent_e2e_http_stub_logs.py -v"` (PYPOST-870). |
-| URL router AssertionError | Confirm map keys equal `request_data.url` exactly |
-| | (resolved UI URL). Message lists `known=` keys. |
+| URL router AssertionError | Confirm map keys equal ``request_data.url`` exactly |
+| | or use compound ``"{method} {url}"`` keys (902). Message lists |
+| | ``known=`` keys. Compound keys take precedence over bare URL. |
 | POST body not applied | Confirm `REQUEST_BODY_EDIT` fill after selecting POST; |
 | | see seed POST scenario and [ui_identity.md](ui_identity.md). |
 | Live network / flaky CI | Do not remove the stub; do not mock RequestWorker |

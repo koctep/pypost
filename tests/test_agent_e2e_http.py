@@ -135,6 +135,58 @@ def test_stub_agent_e2e_http_url_router_miss_raises() -> None:
     assert SEED_GET_RESOLVED_URL in message
 
 
+def test_stub_agent_e2e_http_url_router_method_url_compound_keys() -> None:
+    """PYPOST-902: compound method+URL keys route same URL by HTTP method."""
+    shared_url = "https://example.test/shared"
+    get_result = make_canned_http_result(
+        url=shared_url,
+        body='{"via": "get"}',
+    )
+    post_result = make_canned_http_result(
+        url=shared_url,
+        body='{"via": "post"}',
+    )
+    responses = {
+        f"GET {shared_url}": get_result,
+        f"POST {shared_url}": post_result,
+    }
+    get_req = RequestData(method="GET", url=shared_url)
+    post_req = RequestData(method="POST", url=shared_url)
+
+    with stub_agent_e2e_http(responses, name="url_router"):
+        client = MagicMock()
+        assert (
+            request_service.HTTPClient.send_request(client, get_req) is get_result
+        )
+        assert (
+            request_service.HTTPClient.send_request(client, post_req)
+            is post_result
+        )
+
+
+def test_stub_agent_e2e_http_url_router_compound_precedence_over_bare_url() -> None:
+    """PYPOST-902: compound key wins over bare URL when both exist."""
+    shared_url = "https://example.test/precedence"
+    compound_result = make_canned_http_result(
+        url=shared_url,
+        body='{"via": "compound"}',
+    )
+    bare_result = make_canned_http_result(
+        url=shared_url,
+        body='{"via": "bare"}',
+    )
+    responses = {
+        f"GET {shared_url}": compound_result,
+        shared_url: bare_result,
+    }
+    get_req = RequestData(method="GET", url=shared_url)
+
+    with stub_agent_e2e_http(responses, name="url_router"):
+        out = request_service.HTTPClient.send_request(MagicMock(), get_req)
+        assert out is compound_result
+        assert out.response.body == '{"via": "compound"}'
+
+
 def test_send_request_patch_target_constant() -> None:
     assert SEND_REQUEST_PATCH_TARGET == (
         "pypost.core.request_service.HTTPClient.send_request"
