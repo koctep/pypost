@@ -157,6 +157,11 @@ settle helpers
 [ui_wait.md](ui_wait.md). For TCP listen readiness, use
 `wait_for_port` from `tests/helpers/mcp_live_server.py`.
 
+To drive pytest **yield fixtures** outside a request (e.g. mocked packaging caplog proofs),
+use `tests/helpers/fixture_drive.py` (`unwrap_yield_fixture`, `run_yield_fixture`,
+`call_yield_fixture`; PYPOST-900). Private pytest unwrap (`_get_wrapped_function`) is isolated
+there so upgrades touch one module. Consumer: `tests/test_agent_e2e_packaging_logs.py`.
+
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a
 stuck C++ `exec()` without Python callbacks. Use the shared

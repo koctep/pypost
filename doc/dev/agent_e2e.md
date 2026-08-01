@@ -204,8 +204,9 @@ After the session is ready, each packaging fixture logs INFO
 `agent_e2e_fixture_ready mode=blank` or `mode=seeded` (logger
 `tests._pytest_plugins.agent_e2e`). Caplog proofs:
 - **Unit (PYPOST-867):** `tests/test_agent_e2e_packaging_logs.py` — pure unit
-  (mocked session boundary); must **not** carry `agent_e2e` and must **not**
-  appear in the harness table above.
+  (mocked session boundary); drives fixtures via
+  `tests/helpers/fixture_drive.py` (PYPOST-900); must **not** carry
+  `agent_e2e` and must **not** appear in the harness table above.
 - **Live smoke (PYPOST-899):** `tests/test_agent_e2e_session_ready_logs.py` —
   real `agent_e2e_session` / `seeded_agent_e2e_session` under caplog (no
   session mocks); marked `agent_e2e` and listed in the harness table.
