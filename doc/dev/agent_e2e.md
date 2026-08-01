@@ -79,6 +79,7 @@ Harness modules under the marker (also the documented file-list override):
 | Module | Covers |
 | --- | --- |
 | `tests/test_agent_lifecycle_smoke.py` | Lifecycle smoke |
+| `tests/test_agent_e2e_session_ready_logs.py` | Live ready-log caplog smoke (899) |
 | `tests/test_agent_lifecycle_mid_start_cleanup.py` | Mid-start cleanup (841) |
 | `tests/test_ui_identity_spotcheck.py` | Identity spot-check |
 | `tests/test_ui_actions.py` | Action primitives |
@@ -201,10 +202,14 @@ agent e2e plugin is loaded — see
 
 After the session is ready, each packaging fixture logs INFO
 `agent_e2e_fixture_ready mode=blank` or `mode=seeded` (logger
-`tests._pytest_plugins.agent_e2e`). Caplog proof (PYPOST-867):
-`tests/test_agent_e2e_packaging_logs.py` — pure unit (mocked session
-boundary); must **not** carry `agent_e2e` and must **not** appear in the
-harness table above. Catalog: [logging.md](logging.md).
+`tests._pytest_plugins.agent_e2e`). Caplog proofs:
+- **Unit (PYPOST-867):** `tests/test_agent_e2e_packaging_logs.py` — pure unit
+  (mocked session boundary); must **not** carry `agent_e2e` and must **not**
+  appear in the harness table above.
+- **Live smoke (PYPOST-899):** `tests/test_agent_e2e_session_ready_logs.py` —
+  real `agent_e2e_session` / `seeded_agent_e2e_session` under caplog (no
+  session mocks); marked `agent_e2e` and listed in the harness table.
+  Catalog: [logging.md](logging.md).
 
 ### Setup checklist
 
@@ -319,8 +324,10 @@ for narrow runs.
 | | (PYPOST-866) |
 | Ready log missing / renamed | Assert under |
 | | `caplog.at_level(INFO, logger="tests._pytest_plugins.agent_e2e")`; |
-| | run `make test PYTEST_ARGS=` |
-| | `"tests/test_agent_e2e_packaging_logs.py -v"` (PYPOST-867) |
+| | unit: `make test PYTEST_ARGS=` |
+| | `"tests/test_agent_e2e_packaging_logs.py -v"` (PYPOST-867); |
+| | live: `make test-agent-e2e PYTEST_ARGS=` |
+| | `"tests/test_agent_e2e_session_ready_logs.py -v"` (PYPOST-899) |
 
 More GUI pitfalls: [gui_testing.md](gui_testing.md). Suite-wide pytest /
 timeouts: [testing.md](testing.md).

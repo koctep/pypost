@@ -111,7 +111,9 @@ Agent session contract and ready-gate semantics:
 [agent_lifecycle.md](agent_lifecycle.md). Packaging fixtures emit
 `agent_e2e_fixture_ready` after ready ([agent_e2e.md](agent_e2e.md));
 caplog proof for blank/seeded modes lives in
-`tests/test_agent_e2e_packaging_logs.py` (PYPOST-867). HTTP stubs emit
+`tests/test_agent_e2e_packaging_logs.py` (PYPOST-867, mocked unit) and
+`tests/test_agent_e2e_session_ready_logs.py` (PYPOST-899, live offscreen
+smoke). HTTP stubs emit
 `agent_e2e_http_stub_installed`
 ([agent_e2e_http.md](agent_e2e_http.md)); caplog proof for the install
 event lives in `tests/test_agent_e2e_http_stub_logs.py` (PYPOST-870);
