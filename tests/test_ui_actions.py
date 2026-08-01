@@ -428,15 +428,24 @@ def test_current_tab_scoped_fill(agent_e2e_session: AgentAppSession) -> None:
     assert url.text() == "https://scoped.example/"
 
 
-def test_ui_action_applied_caplog(qapp: QApplication, caplog: pytest.LogCaptureFixture) -> None:
-    """PYPOST-851: ui_action_applied DEBUG scalars; fill text never logged."""
+@pytest.mark.parametrize(
+    ("via_key_clicks", "expected_scalar"),
+    [(False, "false"), (True, "true")],
+)
+def test_ui_action_applied_caplog(
+    qapp: QApplication,
+    caplog: pytest.LogCaptureFixture,
+    via_key_clicks: bool,
+    expected_scalar: str,
+) -> None:
+    """PYPOST-851/944: ui_action_applied DEBUG scalars; fill text never logged."""
     import logging
 
     root, _ = _make_fixture(qapp)
     try:
         secret = "must-not-appear-in-logs"
         with caplog.at_level(logging.DEBUG, logger="pypost.agent.ui_actions"):
-            ui_fill(root, _INPUT, secret)
+            ui_fill(root, _INPUT, secret, via_key_clicks=via_key_clicks)
         records = [
             r
             for r in caplog.records
@@ -448,7 +457,7 @@ def test_ui_action_applied_caplog(qapp: QApplication, caplog: pytest.LogCaptureF
         assert f"widget_id={_INPUT}" in msg
         assert "outcome=ok" in msg
         assert "duration_ms=" in msg
-        assert "via_key_clicks=false" in msg
+        assert f"via_key_clicks={expected_scalar}" in msg
         assert secret not in msg
         assert secret not in caplog.text
     finally:

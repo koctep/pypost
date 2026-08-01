@@ -185,6 +185,10 @@ are locked in `tests/test_ui_actions.py`
 `test_select_tree_index_out_of_range_raises`; PYPOST-942), mirroring combo
 `test_select_missing_option_raises`.
 
+Fill DEBUG `ui_action_applied` scalars for default and opt-in keyClicks modes
+are locked by parametrized `test_ui_action_applied_caplog` in the same module
+(`via_key_clicks=false|true`; fill text must not appear in caplog; PYPOST-944).
+
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a
 stuck C++ `exec()` without Python callbacks. Use the shared

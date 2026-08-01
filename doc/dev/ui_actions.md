@@ -97,6 +97,9 @@ typing-driven UI. For a **single** key or hotkey, use `ui_send_key` instead
 
 Successful fills emit DEBUG `ui_action_applied` with scalar
 `via_key_clicks=true|false` (lowercase); fill **text is never logged**.
+Fixture caplog contract: `test_ui_action_applied_caplog` parametrizes both
+fill modes (`via_key_clicks=false|true`) and asserts fill text never appears
+in logs (PYPOST-851/944).
 
 ### `ui_select(root, widget_id, option)`
 
