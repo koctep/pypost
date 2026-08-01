@@ -238,13 +238,17 @@ Common targets:
   (`.venv/.venv-test-<major.minor>`, `.venv/.venv-otel-<major.minor>`).
   Make skips pip when the stamp is current vs `pyproject.toml`
   (PYPOST-905); missing or stale stamps still install the extra.
-- `run` and `lint` depend on `$(VENV_MARKER)` only and do not trigger
-  `venv-test` / `install` (run `make install` or `make venv-test` before lint).
+- `run` depends on `$(VENV_MARKER)` only and does not trigger
+  `venv-test` / `install` (run `make install` first if the base venv is
+  incomplete).
+- `lint` and `typecheck` depend on `$(VENV_MARKER)` and `venv-test`, so
+  a bare venv gets `[dev]` (flake8 / mypy) before those targets run
+  (PYPOST-906; same ensure path as typecheck).
 - `test`, `test-slow`, `test-cov`, and `test-agent-e2e` depend on
   `venv-test` and `venv-otel` so pytest and OTel imports work from a bare
   venv (PYPOST-872). Prefer `make install` once after clone for a single
   `[dev,otel]` editable install (CI does the same); `install` also touches
-  both extra stamps so later test visits skip redundant pip.
+  both extra stamps so later test / lint visits skip redundant pip.
 
 ### Unit tests (pytest)
 

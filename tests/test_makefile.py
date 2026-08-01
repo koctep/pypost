@@ -370,17 +370,22 @@ class TestDependencyChain:
         prereqs = _prerequisites(make_workspace, "check-license-inventory")
         assert "install" in prereqs
 
-    @pytest.mark.parametrize("target", ["run", "lint"])
-    def test_runtime_targets_depend_on_marker_only(
-        self,
-        make_workspace: Path,
-        target: str,
-    ) -> None:
-        """run/lint stay marker-only; pytest targets use venv-test (PYPOST-872)."""
-        prereqs = _prerequisites(make_workspace, target)
+    def test_run_depends_on_marker_only(self, make_workspace: Path) -> None:
+        """run stays marker-only; lint ensure is PYPOST-906."""
+        prereqs = _prerequisites(make_workspace, "run")
         assert MARKER_REL in prereqs
         assert "install" not in prereqs
         assert "venv-test" not in prereqs
+
+    def test_lint_depends_on_marker_and_venv_test(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        """PYPOST-906: lint must pull [dev] via venv-test (like typecheck)."""
+        prereqs = _prerequisites(make_workspace, "lint")
+        assert MARKER_REL in prereqs
+        assert "venv-test" in prereqs
+        assert "install" not in prereqs
 
     def test_test_slow_depends_on_venv_test_venv_otel_and_marker(
         self,
@@ -465,11 +470,15 @@ class TestExitBehavior:
         result = _run_make(make_workspace, "not-a-real-target")
         assert result.returncode != 0
 
-    def test_lint_fails_without_flake8_in_bare_venv(self, make_workspace: Path) -> None:
+    def test_lint_succeeds_from_bare_venv_via_venv_test(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        """PYPOST-906: make lint auto-installs [dev] so bare venv is enough."""
         venv_result = _run_make(make_workspace, "venv")
         assert venv_result.returncode == 0, venv_result.stderr
         lint_result = _run_make(make_workspace, "lint")
-        assert lint_result.returncode != 0
+        assert lint_result.returncode == 0, lint_result.stderr + lint_result.stdout
 
 
 class TestTargetExecution:
