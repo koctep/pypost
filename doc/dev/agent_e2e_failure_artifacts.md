@@ -169,6 +169,10 @@ via pinned `actions/upload-artifact` (`if: failure()`,
 | `agent-e2e` | `agent-e2e-failure-artifacts` | PYPOST-874 |
 | `test` matrix | `agent-e2e-failure-artifacts-${{ matrix.python-version }}` | PYPOST-909 |
 
+**Retention (PYPOST-910):** both uploads set `retention-days: 14` so
+failure dumps expire after 14 days instead of the Actions default
+window. Download promptly after a red run if you need the zip.
+
 After a red run, download the matching artifact from the Actions run
 summary (Artifacts). Contents match the on-disk layout above (masked
 `ui_snapshot.json` + `diagnostics.json`). If the job failed before dumps
@@ -177,7 +181,8 @@ missing path.
 
 Local diagnosis still uses files on disk under the documented root.
 Contract locks: `tests/test_agent_e2e_ci_failure_upload_doc.py` (874),
-`tests/test_agent_e2e_ci_matrix_failure_upload_doc.py` (909).
+`tests/test_agent_e2e_ci_matrix_failure_upload_doc.py` (909),
+`tests/test_agent_e2e_ci_failure_retention_doc.py` (910).
 
 ## Tests
 

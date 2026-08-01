@@ -141,6 +141,7 @@ jobs:
           if-no-files-found: warn
 
       # PYPOST-909: upload PYPOST-860 failure dumps from main matrix on failure.
+      # PYPOST-910: explicit retention-days (14) for failure triage dumps.
       - name: Upload agent e2e failure artifacts
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -148,6 +149,7 @@ jobs:
           name: agent-e2e-failure-artifacts-${{ matrix.python-version }}
           path: artifacts/agent_e2e/
           if-no-files-found: ignore
+          retention-days: 14
 
   make-install-smoke:
     name: "make install smoke (slow)"
@@ -255,6 +257,7 @@ jobs:
             >> "$GITHUB_STEP_SUMMARY"
 
       # PYPOST-874: upload PYPOST-860 failure dumps for Actions UI triage.
+      # PYPOST-910: explicit retention-days (14) for failure triage dumps.
       - name: Upload agent e2e failure artifacts
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -262,6 +265,7 @@ jobs:
           name: agent-e2e-failure-artifacts
           path: artifacts/agent_e2e/
           if-no-files-found: ignore
+          retention-days: 14
 
   security-audit:
     name: "pip-audit (dependency CVE scan)"
