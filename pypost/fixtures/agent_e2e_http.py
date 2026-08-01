@@ -172,8 +172,12 @@ def _resolve_url_router_response(
     method: str,
     url: str,
 ) -> HTTPRequestResult | None:
-    """Resolve a canned result by compound method+URL key, then bare URL."""
-    compound_key = f"{method} {url}"
+    """Resolve a canned result by compound method+URL key, then bare URL.
+
+    Compound lookup uppercases the request HTTP method (PYPOST-959) so map
+    keys such as ``GET https://…`` match mixed-case request methods.
+    """
+    compound_key = f"{method.upper()} {url}"
     if compound_key in responses:
         return responses[compound_key]
     if url in responses:
@@ -188,7 +192,9 @@ def url_router_side_effect(
 
     Match rules:
 
-    1. Compound key ``"{method} {url}"`` (PYPOST-902) when present in the map.
+    1. Compound key ``"{METHOD} {url}"`` (PYPOST-902) when present in the map.
+       Request ``method`` is uppercased before lookup (PYPOST-959); map keys
+       should use uppercase HTTP methods (``GET``, ``POST``, …).
     2. Bare ``request_data.url`` key (PYPOST-868 v1 backward compat).
     3. Unknown request raises ``AssertionError`` listing known keys.
 

@@ -164,6 +164,36 @@ def test_stub_agent_e2e_http_url_router_method_url_compound_keys() -> None:
         )
 
 
+def test_stub_agent_e2e_http_url_router_compound_key_mixed_case_method() -> None:
+    """PYPOST-959: compound lookup normalizes request HTTP method casing."""
+    shared_url = "https://example.test/mixed-case"
+    get_result = make_canned_http_result(
+        url=shared_url,
+        body='{"via": "get"}',
+    )
+    post_result = make_canned_http_result(
+        url=shared_url,
+        body='{"via": "post"}',
+    )
+    responses = {
+        f"GET {shared_url}": get_result,
+        f"POST {shared_url}": post_result,
+    }
+    lowercase_get = RequestData(method="get", url=shared_url)
+    mixed_post = RequestData(method="PoSt", url=shared_url)
+
+    with stub_agent_e2e_http(responses, name="url_router"):
+        client = MagicMock()
+        assert (
+            request_service.HTTPClient.send_request(client, lowercase_get)
+            is get_result
+        )
+        assert (
+            request_service.HTTPClient.send_request(client, mixed_post)
+            is post_result
+        )
+
+
 def test_stub_agent_e2e_http_url_router_compound_precedence_over_bare_url() -> None:
     """PYPOST-902: compound key wins over bare URL when both exist."""
     shared_url = "https://example.test/precedence"

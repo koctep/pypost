@@ -155,9 +155,11 @@ with stub_agent_e2e_http(responses):
 
 Match rules:
 
-1. **Compound key (PYPOST-902):** `"{method} {url}"` — e.g.
+1. **Compound key (PYPOST-902):** `"{METHOD} {url}"` — e.g.
    `GET https://example.test/shared` — when that key is in the map. Use when
-   two methods share one resolved URL.
+   two methods share one resolved URL. Map keys should use uppercase HTTP
+   methods; the router uppercases `request_data.method` before compound lookup
+   (PYPOST-959), so mixed-case requests still match.
 2. **Bare URL (PYPOST-868):** exact string equality on `request_data.url` vs
    map keys when no compound key matches.
 3. **Precedence:** compound key is tried first; bare URL is the fallback. If
@@ -187,7 +189,8 @@ Install log uses `name=url_router` when `name=` is left at default `custom`.
 Unit proofs: `tests/test_agent_e2e_http.py`
 (`test_stub_agent_e2e_http_url_router_map`,
 `test_stub_agent_e2e_http_url_router_miss_raises`,
-`test_stub_agent_e2e_http_url_router_method_url_compound_keys`).
+`test_stub_agent_e2e_http_url_router_method_url_compound_keys`,
+`test_stub_agent_e2e_http_url_router_compound_key_mixed_case_method`).
 
 GUI proof (PYPOST-958): `tests/test_agent_e2e_http_mapping_compound_keys.py` —
 `test_mapping_compound_keys_same_url_get_post_panel_outcomes` drives GET then
