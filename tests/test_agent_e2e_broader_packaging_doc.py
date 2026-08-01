@@ -1,4 +1,8 @@
-"""PYPOST-922: lock broader-than-golden packaging docs (primary vs override)."""
+"""PYPOST-922 / PYPOST-938: lock broader-than-golden packaging docs.
+
+873-style substring/token guards (KEEP per PYPOST-938 — see
+doc/dev/testing.md § Packaging doc lock strategy).
+"""
 
 from __future__ import annotations
 

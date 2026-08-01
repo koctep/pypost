@@ -592,6 +592,7 @@ Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across 
 | [PYPOST-906] | `lint` depends on `venv-test` (like `typecheck`); `run` stays marker-only |
 | [PYPOST-932] | Contract: `typecheck` depends on marker + `venv-test` (peer lock) |
 | [PYPOST-937] | Shared Makefile help/recipe parse helpers for make-entry contract locks |
+| [PYPOST-938] | KEEP 873-style packaging doc locks; revisit criteria documented |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -617,6 +618,7 @@ Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across 
 [PYPOST-910]: https://pypost.atlassian.net/browse/PYPOST-910
 [PYPOST-911]: https://pypost.atlassian.net/browse/PYPOST-911
 [PYPOST-928]: https://pypost.atlassian.net/browse/PYPOST-928
+[PYPOST-938]: https://pypost.atlassian.net/browse/PYPOST-938
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -629,6 +631,39 @@ Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across 
 | Slow smoke seed contract | Isolated workspace seed mirrors packaging metadata from committed `pyproject.toml` (dynamic version attr, readme), not only dependency pins (PYPOST-943) |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
 | Agent e2e target | deps (`venv-test` + `venv-otel`), help listing, recipe marker, selection smoke (861/872) |
+
+### Packaging doc lock strategy (PYPOST-922 / PYPOST-938)
+
+Broader agent e2e packaging discoverability is guarded by **873-style
+substring / token locks** — not structured doc schema or semantic asserts.
+[PYPOST-938](https://pypost.atlassian.net/browse/PYPOST-938) assessed churn
+since [PYPOST-922](https://pypost.atlassian.net/browse/PYPOST-922) and chose
+**KEEP CURRENT STRATEGY**: locks stay as-is because token churn is low and
+contract tests have not required maintenance-only edits.
+
+| Module | Locked docs | Tokens (examples) |
+| --- | --- | --- |
+| `tests/test_agent_e2e_broader_packaging_doc.py` | `agent_e2e.md`, `agent_golden_e2e.md`, `testing.md` | `PYPOST-922`, `beyond golden`, `primary packaging`, `make test-agent-e2e`, `PYTEST_ARGS` |
+| `tests/test_makefile.py` (`TestAgentE2eTargetRecipe`, help cross-check) | Makefile `test-agent-e2e` | `broader`, `beyond golden`, marker default ≠ golden-only |
+
+When editing locked prose, **preserve the tokens** above (case-insensitive
+where the test uses `.lower()`). Rephrasing without tokens will fail the
+contract suite — that is intentional for discoverability debt.
+
+**Revisit / HARDEN triggers** (open a new Debt story if **any two** occur
+within one sprint):
+
+1. ≥2 lock-test edits required **only** for prose rephrasing (not new
+   packaging semantics) within 90 days.
+2. ≥1 false failure from substring mismatch on an otherwise correct doc update.
+3. A second packaging doc-lock module copies the same token block (consider a
+   shared helper — see PYPOST-928 / 937 patterns — before semantic hardening).
+
+Focused run:
+
+```bash
+make test PYTEST_ARGS='tests/test_agent_e2e_broader_packaging_doc.py tests/test_makefile.py::TestAgentE2eTargetRecipe tests/test_makefile.py::TestHelpTarget::test_help_frames_test_agent_e2e_broader_beyond_golden -v'
+```
 
 ### CI workflow contract helpers (PYPOST-928)
 
