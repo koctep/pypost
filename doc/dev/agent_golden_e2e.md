@@ -120,7 +120,9 @@ Primary (blank restore):
 4. `with stub_agent_e2e_http(CANNED_GOLDEN_OK):` then `ui_click(SEND_BUTTON)`.
 5. `wait_for_text(RESPONSE_STATUS, FIXTURE_STATUS_LABEL)`.
 6. `wait_for_text(RESPONSE_BODY, FIXTURE_BODY_DISPLAY)` (pretty-printed JSON).
-7. On wait timeout, rewrap with `response_excerpt` from the panel snapshot.
+7. On wait timeout, force a text-wait miss on `RESPONSE_STATUS` (companion test)
+   or rewrap happy-path `wait_for_text` failures with `response_excerpt` from
+   the panel snapshot.
 
 Plus-tab create when no blank tab (PYPOST-921):
 
@@ -156,7 +158,9 @@ with stub_agent_e2e_http(CANNED_GOLDEN_OK):
 ```
 
 Expected status/body tokens are **test-local** in
-`tests/test_agent_golden_e2e.py`. Timeout diagnostics still use
+`tests/test_agent_golden_e2e.py`. Timeout diagnostics use the same
+text-wait miss path as Send settle (`wait_for_text` on `RESPONSE_STATUS` with
+an impossible label and short budget), then wrap with
 `response_panel_excerpt` from shared
 [response-panel helpers](agent_e2e_response_panel.md)
 (`tests/helpers/agent_e2e_response_panel.py`) — not a production agent API.

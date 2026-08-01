@@ -144,9 +144,10 @@ def test_agent_golden_plus_tab_create_when_no_blank_tab(
 def test_agent_golden_settle_timeout_includes_step_and_excerpt(
     agent_e2e_session: AgentAppSession,
 ) -> None:
-    """PYPOST-853 TD-3: forced settle timeout carries step + response_excerpt."""
+    """PYPOST-950: forced text-wait settle timeout carries step + excerpt."""
     session = agent_e2e_session
     assert session.window.is_ui_ready is True
+    tab = session.current_request_tab()
     session.ui_fill(URL_INPUT, FIXTURE_URL)
     session.ui_select(METHOD_COMBO, FIXTURE_METHOD)
 
@@ -154,7 +155,12 @@ def test_agent_golden_settle_timeout_includes_step_and_excerpt(
         session.ui_click(SEND_BUTTON)
         with pytest.raises(UiWaitTimeoutError) as exc_info:
             try:
-                session.wait_for_snapshot(lambda _snap: False, timeout=0.05)
+                wait_for_text(
+                    tab,
+                    RESPONSE_STATUS,
+                    "Status: 999",
+                    timeout=0.05,
+                )
             except UiWaitTimeoutError as exc:
                 last = session.ui_snapshot()
                 excerpt = response_panel_excerpt(last)
@@ -174,3 +180,5 @@ def test_agent_golden_settle_timeout_includes_step_and_excerpt(
     assert diagnostics.get("step") == "wait_response_after_send"
     assert "response_excerpt" in diagnostics
     assert isinstance(diagnostics["response_excerpt"], str)
+    assert diagnostics.get("widget_id") == RESPONSE_STATUS
+    assert "expected" in diagnostics
