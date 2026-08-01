@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
-import os
+import time
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,43 @@ REQUIREMENTS_OTEL_IN = REPO_ROOT / "requirements-otel.in"
 PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 MARKER_NAME = f".initialized-{PYTHON_VERSION}"
 MARKER_REL = f".venv/{MARKER_NAME}"
+VENV_TEST_STAMP_NAME = f".venv-test-{PYTHON_VERSION}"
+VENV_OTEL_STAMP_NAME = f".venv-otel-{PYTHON_VERSION}"
+VENV_TEST_STAMP_REL = f".venv/{VENV_TEST_STAMP_NAME}"
+VENV_OTEL_STAMP_REL = f".venv/{VENV_OTEL_STAMP_NAME}"
+
+
+def _combined_output(proc: subprocess.CompletedProcess[str]) -> str:
+    return f"{proc.stdout}\n{proc.stderr}"
+
+
+def _assert_pip_install_extra(output: str, extra: str) -> None:
+    assert "pip install" in output, (
+        f"expected pip install of {extra!r} in make output; got:\n{output}"
+    )
+    assert extra in output, (
+        f"expected extra {extra!r} in make output; got:\n{output}"
+    )
+
+
+def _assert_no_pip_install(output: str) -> None:
+    assert "pip install" not in output, (
+        "second visit must skip pip when extras are current; "
+        f"got:\n{output}"
+    )
+
+
+def _make_stamp_stale(workspace: Path, stamp_name: str) -> None:
+    """Ensure stamp exists and is older than pyproject.toml (FR3 invalidation)."""
+    stamp = workspace / ".venv" / stamp_name
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    if not stamp.exists():
+        stamp.touch()
+    older = time.time() - 120
+    os.utime(stamp, (older, older))
+    pyproject = workspace / "pyproject.toml"
+    newer = time.time()
+    os.utime(pyproject, (newer, newer))
 
 
 def _run_make(
@@ -175,6 +213,88 @@ class TestMarkerLifecycle:
         assert (make_workspace / ".venv" / MARKER_NAME).is_file()
 
 
+class TestVenvExtraStampIdempotency:
+    """PYPOST-905: skip pip when stamp current; install when missing/stale."""
+
+    def test_venv_test_skips_pip_when_current(self, make_workspace: Path) -> None:
+        venv = _run_make(make_workspace, "venv")
+        assert venv.returncode == 0, venv.stderr
+        first = _run_make(make_workspace, "venv-test")
+        assert first.returncode == 0, first.stderr
+        second = _run_make(make_workspace, "venv-test")
+        assert second.returncode == 0, second.stderr
+        _assert_no_pip_install(_combined_output(second))
+
+    def test_venv_otel_skips_pip_when_current(self, make_workspace: Path) -> None:
+        venv = _run_make(make_workspace, "venv")
+        assert venv.returncode == 0, venv.stderr
+        first = _run_make(make_workspace, "venv-otel")
+        assert first.returncode == 0, first.stderr
+        second = _run_make(make_workspace, "venv-otel")
+        assert second.returncode == 0, second.stderr
+        _assert_no_pip_install(_combined_output(second))
+
+    def test_venv_test_installs_when_stamp_missing(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        stamp = make_workspace / ".venv" / VENV_TEST_STAMP_NAME
+        venv = _run_make(make_workspace, "venv")
+        assert venv.returncode == 0, venv.stderr
+        if stamp.exists():
+            stamp.unlink()
+        result = _run_make(make_workspace, "venv-test")
+        assert result.returncode == 0, result.stderr
+        _assert_pip_install_extra(_combined_output(result), ".[dev]")
+
+    def test_venv_otel_installs_when_stamp_missing(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        stamp = make_workspace / ".venv" / VENV_OTEL_STAMP_NAME
+        venv = _run_make(make_workspace, "venv")
+        assert venv.returncode == 0, venv.stderr
+        if stamp.exists():
+            stamp.unlink()
+        result = _run_make(make_workspace, "venv-otel")
+        assert result.returncode == 0, result.stderr
+        _assert_pip_install_extra(_combined_output(result), ".[otel]")
+
+    def test_venv_test_installs_when_stamp_stale(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        venv = _run_make(make_workspace, "venv")
+        assert venv.returncode == 0, venv.stderr
+        first = _run_make(make_workspace, "venv-test")
+        assert first.returncode == 0, first.stderr
+        _make_stamp_stale(make_workspace, VENV_TEST_STAMP_NAME)
+        result = _run_make(make_workspace, "venv-test")
+        assert result.returncode == 0, result.stderr
+        _assert_pip_install_extra(_combined_output(result), ".[dev]")
+
+    def test_venv_otel_installs_when_stamp_stale(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        venv = _run_make(make_workspace, "venv")
+        assert venv.returncode == 0, venv.stderr
+        first = _run_make(make_workspace, "venv-otel")
+        assert first.returncode == 0, first.stderr
+        _make_stamp_stale(make_workspace, VENV_OTEL_STAMP_NAME)
+        result = _run_make(make_workspace, "venv-otel")
+        assert result.returncode == 0, result.stderr
+        _assert_pip_install_extra(_combined_output(result), ".[otel]")
+
+    def test_venv_test_depends_on_stamp(self, make_workspace: Path) -> None:
+        prereqs = _prerequisites(make_workspace, "venv-test")
+        assert VENV_TEST_STAMP_REL in prereqs
+
+    def test_venv_otel_depends_on_stamp(self, make_workspace: Path) -> None:
+        prereqs = _prerequisites(make_workspace, "venv-otel")
+        assert VENV_OTEL_STAMP_REL in prereqs
+
+
 class TestDependencyChain:
     def test_install_depends_on_marker_only(self, make_workspace: Path) -> None:
         prereqs = _prerequisites(make_workspace, "install")
@@ -201,9 +321,22 @@ class TestDependencyChain:
         assert "venv-otel" in prereqs
         assert MARKER_REL in prereqs
 
-    def test_venv_test_depends_on_marker(self, make_workspace: Path) -> None:
-        prereqs = _prerequisites(make_workspace, "venv-test")
+    def test_venv_test_stamp_depends_on_marker_and_pyproject(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        """Option B: marker + pyproject.toml gate the stamp, not the alias."""
+        prereqs = _prerequisites(make_workspace, VENV_TEST_STAMP_REL)
         assert MARKER_REL in prereqs
+        assert "pyproject.toml" in prereqs
+
+    def test_venv_otel_stamp_depends_on_marker_and_pyproject(
+        self,
+        make_workspace: Path,
+    ) -> None:
+        prereqs = _prerequisites(make_workspace, VENV_OTEL_STAMP_REL)
+        assert MARKER_REL in prereqs
+        assert "pyproject.toml" in prereqs
 
     def test_security_audit_depends_on_install(self, make_workspace: Path) -> None:
         prereqs = _prerequisites(make_workspace, "security-audit")

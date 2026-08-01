@@ -76,8 +76,10 @@ Test and lint tooling uses the same **two-file** layout as production:
 | `requirements-dev.in` | Direct dev deps (pytest, flake8, pip-audit, pip-licenses, etc.) |
 | `requirements-dev.txt` | Compiled transitive lock (committed; do not hand-edit) |
 
-`make venv-test` runs `pip install -e ".[dev]"`; CI main job installs `pip install -e ".[dev,otel]"`.
-Local and CI share the same optional extras declared in `pyproject.toml`.
+`make venv-test` installs the `[dev]` extra when its stamp is missing or
+stale (then touches `.venv/.venv-test-<pyver>`); CI main job installs
+`pip install -e ".[dev,otel]"`. Local and CI share the same optional extras
+declared in `pyproject.toml`.
 
 **Regenerate the dev lock** after editing `requirements-dev.in`:
 
@@ -158,8 +160,10 @@ Verify the committed OTel lock matches the source file:
 make check-lock-otel
 ```
 
-`make venv-otel` runs `pip install -e ".[otel]"`; CI and `make install` include the OTel extra
-for OTel tests. End users who need OTel export without dev tooling:
+`make venv-otel` installs the `[otel]` extra when its stamp is missing or
+stale (then touches `.venv/.venv-otel-<pyver>`); CI and `make install`
+include the OTel extra for OTel tests. End users who need OTel export
+without dev tooling:
 
 ```bash
 make venv-otel
@@ -230,12 +234,17 @@ Common targets:
 
 - `venv` is driven by `$(VENV_MARKER)` and is version-aware
   (`.venv/.initialized-<major.minor>`).
+- `venv-test` / `venv-otel` are thin aliases over stamp files
+  (`.venv/.venv-test-<major.minor>`, `.venv/.venv-otel-<major.minor>`).
+  Make skips pip when the stamp is current vs `pyproject.toml`
+  (PYPOST-905); missing or stale stamps still install the extra.
 - `run` and `lint` depend on `$(VENV_MARKER)` only and do not trigger
   `venv-test` / `install` (run `make install` or `make venv-test` before lint).
 - `test`, `test-slow`, `test-cov`, and `test-agent-e2e` depend on
   `venv-test` and `venv-otel` so pytest and OTel imports work from a bare
   venv (PYPOST-872). Prefer `make install` once after clone for a single
-  `[dev,otel]` editable install (CI does the same).
+  `[dev,otel]` editable install (CI does the same); `install` also touches
+  both extra stamps so later test visits skip redundant pip.
 
 ### Unit tests (pytest)
 

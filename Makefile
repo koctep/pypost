@@ -9,6 +9,8 @@ UV ?= uv
 VENV := .venv
 BIN := $(VENV)/bin
 VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
+VENV_TEST_STAMP := $(VENV)/.venv-test-$(PYTHON_VERSION)
+VENV_OTEL_STAMP := $(VENV)/.venv-otel-$(PYTHON_VERSION)
 PYTEST_ARGS ?=
 
 help: ## Show available make targets
@@ -22,14 +24,21 @@ $(VENV_MARKER):
 	$(BIN)/python -m pip install --upgrade pip
 	touch "$(VENV_MARKER)"
 
-venv-test: $(VENV_MARKER) ## Install dev optional extra from pyproject.toml (pytest, flake8, etc.)
-	$(BIN)/python -m pip install -e ".[dev]"
+venv-test: $(VENV_TEST_STAMP) ## Install dev optional extra from pyproject.toml (pytest, flake8, etc.)
 
-venv-otel: $(VENV_MARKER) ## Install OpenTelemetry optional extra from pyproject.toml
+venv-otel: $(VENV_OTEL_STAMP) ## Install OpenTelemetry optional extra from pyproject.toml
+
+$(VENV_TEST_STAMP): $(VENV_MARKER) pyproject.toml
+	$(BIN)/python -m pip install -e ".[dev]"
+	touch "$@"
+
+$(VENV_OTEL_STAMP): $(VENV_MARKER) pyproject.toml
 	$(BIN)/python -m pip install -e ".[otel]"
+	touch "$@"
 
 install: $(VENV_MARKER) ## Install editable package with dev and OTel extras
 	$(BIN)/python -m pip install -e ".[dev,otel]"
+	touch "$(VENV_TEST_STAMP)" "$(VENV_OTEL_STAMP)"
 
 lock: ## Regenerate requirements.txt transitive lock from requirements.in
 	$(UV) pip compile requirements.in -o requirements.txt --python-version $(LOCK_PYTHON_VERSION)

@@ -52,11 +52,12 @@ Use this checklist on a **clean checkout** to match CI regression coverage local
 | **Coverage** | `make test-cov` — fast suite with `--cov=pypost` |
 | **CI parity** | Main job (`.github/workflows/test.yml`) installs `pip install -e ".[dev,otel]"` |
 
-### Install-first vs auto `venv-test` (PYPOST-872)
+### Install-first vs auto `venv-test` (PYPOST-872 / PYPOST-905)
 
 **Preferred after clone / Python version change:** run `make install` once
-(`pip install -e ".[dev,otel]"` in a single editable install). CI does the same
-before pytest.
+(`pip install -e ".[dev,otel]"` in a single editable install). That path also
+touches the extra stamp files so later split prerequisites stay no-ops. CI
+installs `[dev,otel]` before pytest the same way.
 
 **Safety net:** `make test`, `make test-slow`, `make test-cov`, and
 `make test-agent-e2e` depend on `venv-test` and `venv-otel`, so a bare
@@ -64,9 +65,13 @@ before pytest.
 `run` and `lint` stay marker-only — run `make install` (or `make venv-test`)
 before `make lint`. See [setup.md](setup.md).
 
-Neither `venv-test` nor `venv-otel` is stamp-gated today: each Make visit
-re-runs the corresponding `pip install`. Prefer `make install` when iterating
-to avoid two sequential editable installs on every test invocation.
+**Stamp-gated extras (PYPOST-905):** `venv-test` and `venv-otel` are thin
+aliases over version-aware stamp files under `.venv/`
+(`.venv-test-<major.minor>`, `.venv-otel-<major.minor>`). Each stamp recipe
+depends on the base venv marker and `pyproject.toml`. When the stamp is
+current, Make skips pip; when the stamp is missing or older than
+`pyproject.toml`, the recipe reinstalls the extra and refreshes the stamp.
+`make clean` removes `.venv` (and stamps), so the next visit reinstalls.
 
 ### Local vs CI test parity troubleshooting (PYPOST-723)
 
@@ -557,6 +562,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-872] | `venv-test` prerequisite on `test` / `test-slow` / `test-agent-e2e` |
 | [PYPOST-873] | Deferred CI cost trim; dual-run docs + workflow lock |
 | [PYPOST-874] | ENABLE agent-e2e failure artifact upload + doc/workflow lock |
+| [PYPOST-905] | Stamp/cache `venv-test` / `venv-otel`; skip pip when extras current |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -567,11 +573,13 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-800]: https://pypost.atlassian.net/browse/PYPOST-800
 [PYPOST-861]: https://pypost.atlassian.net/browse/PYPOST-861
 [PYPOST-872]: https://pypost.atlassian.net/browse/PYPOST-872
+[PYPOST-905]: https://pypost.atlassian.net/browse/PYPOST-905
 
 | Area | What is checked |
 | ---- | ---------------- |
 | Marker lifecycle | `make venv` creates marker; `make clean` removes `.venv`; idempotent `venv` |
 | Dependency chain | `install` depends on marker only; pytest targets depend on marker + `venv-test` + `venv-otel` |
+| Extra stamps | Skip pip when stamp current; install when missing/stale; alias→stamp; stamp→marker+pyproject (905) |
 | Exit behavior | `clean`/`venv` succeed; unknown targets fail; bare venv fails `lint`; `make test` succeeds via `venv-test` |
 | Target execution | Tools install; `install` succeeds; `test`/`lint` run; `make test` excludes slow |
 | Slow install smoke | `make install` with real `pyproject.toml` succeeds; marked `@pytest.mark.slow` |
