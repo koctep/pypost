@@ -46,7 +46,7 @@ flowchart LR
   Sess --> UI[URL / method / Body / Send]
   Stub -.->|patches send_request| Worker[RequestWorker]
   UI --> Worker --> Panel[RESPONSE_PANEL]
-  Matrix --> Snap[wait + snapshot]
+  Matrix --> Snap[wait_response_after_send + snapshot asserts]
   Snap --> Panel
   Matrix -.->|xfail rows| Findings[findings.md]
 ```
@@ -123,7 +123,7 @@ make test-agent-e2e \
    fill request body.
 2. Build canned result (unique token, status per policy); install
    `canned_send_with_one_chunk` under `stub_agent_e2e_http(..., name=…)`.
-3. Click Send; `wait_for_snapshot` until status label + token appear;
+3. Click Send; `wait_response_after_send` on status label + display-form body;
    settle ~100 ms past chunk flush.
 4. Assert `joined.count(token) == 1` and
    `joined.count("Status: N") == 1` (failure message includes cell id).
@@ -174,6 +174,7 @@ No extra env vars. Prefer `make test-agent-e2e` for offscreen Qt.
 - [Agent UI E2E](agent_e2e.md)
 - [Agent E2E Double Response-Body Lock](agent_e2e_double_response_body.md)
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)
+- [Agent E2E Send Settle Helpers](agent_e2e_send_settle.md)
 - [Agent E2E Response-Panel Helpers](agent_e2e_response_panel.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Response Streaming Display (PYPOST-887)](response-streaming-display.md)

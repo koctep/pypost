@@ -27,7 +27,7 @@ import pytest
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtTest import QTest
 
-from pypost.agent import AgentAppSession, UiWaitTimeoutError, find_widget
+from pypost.agent import AgentAppSession, find_widget
 from pypost.fixtures.agent_e2e_http import (
     canned_send_with_one_chunk,
     make_canned_http_result,
@@ -41,12 +41,12 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
-from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
 from tests.helpers.agent_e2e_response_panel import (
     joined_panel_values,
     response_panel_excerpt,
     subtree_by_name,
 )
+from tests.helpers.agent_e2e_send_settle import wait_response_after_send
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -172,33 +172,19 @@ def test_agent_e2e_presentation_matrix_cell(
     )
     stub_name = f"presentation_matrix_{method.lower()}_{body_shape}"
 
-    def _response_ready(snap: dict[str, Any]) -> bool:
-        joined = joined_panel_values(snap)
-        return status_label in joined and token in joined
-
     stub = canned_send_with_one_chunk(canned)
     with stub_agent_e2e_http(stub, name=stub_name):
         session.ui_click(SEND_BUTTON)
-        try:
-            session.wait_for_snapshot(
-                _response_ready,
-                timeout=SEND_SETTLE_TIMEOUT_S,
-            )
-        except UiWaitTimeoutError as exc:
-            last = session.ui_snapshot()
-            excerpt = response_panel_excerpt(last)
-            raise UiWaitTimeoutError(
-                f"presentation matrix Send settle failed cell={cell_id}: "
-                f"{exc}; response_excerpt={excerpt!r}",
-                timeout_s=exc.timeout_s,
-                condition=exc.condition,
-                diagnostics={
-                    **exc.diagnostics,
-                    "step": "wait_response_after_send",
-                    "cell": cell_id,
-                    "response_excerpt": excerpt,
-                },
-            ) from exc
+        wait_response_after_send(
+            session,
+            status_label=status_label,
+            body_text=token,
+            step="wait_response_after_send",
+            message_prefix=(
+                f"presentation matrix Send settle failed cell={cell_id}"
+            ),
+            diagnostics_extra={"cell": cell_id},
+        )
         QTest.qWait(_CHUNK_FLUSH_SETTLE_MS)
         snap = session.ui_snapshot()
 

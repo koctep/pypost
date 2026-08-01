@@ -12,12 +12,10 @@ Default HEAD (discard present) is green. FR5 red proof (PYPOST-892):
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 from PySide6.QtTest import QTest
 
-from pypost.agent import AgentAppSession, UiWaitTimeoutError, find_widget
+from pypost.agent import AgentAppSession, find_widget
 from pypost.fixtures.agent_e2e_http import (
     CANNED_DOUBLE_BODY_LOCK_OK,
     LOCK_DOUBLE_BODY,
@@ -35,12 +33,12 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
-from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
 from tests.helpers.agent_e2e_response_panel import (
     joined_panel_values,
     response_panel_excerpt,
     subtree_by_name,
 )
+from tests.helpers.agent_e2e_send_settle import wait_response_after_send
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -50,11 +48,6 @@ pytestmark = [
 # Past presenter chunk flush (33 ms) so late append would be visible if present.
 _CHUNK_FLUSH_SETTLE_MS = 100
 _STATUS_LABEL = f"Status: {LOCK_DOUBLE_BODY_STATUS}"
-
-
-def _response_ready(snap: dict[str, Any]) -> bool:
-    joined = joined_panel_values(snap)
-    return _STATUS_LABEL in joined and LOCK_DOUBLE_BODY in joined
 
 
 def test_agent_e2e_response_body_appears_exactly_once(
@@ -76,25 +69,13 @@ def test_agent_e2e_response_body_appears_exactly_once(
     stub = canned_send_with_one_chunk(CANNED_DOUBLE_BODY_LOCK_OK)
     with stub_agent_e2e_http(stub, name="double_body_lock_ok"):
         session.ui_click(SEND_BUTTON)
-        try:
-            session.wait_for_snapshot(
-                _response_ready,
-                timeout=SEND_SETTLE_TIMEOUT_S,
-            )
-        except UiWaitTimeoutError as exc:
-            last = session.ui_snapshot()
-            excerpt = response_panel_excerpt(last)
-            raise UiWaitTimeoutError(
-                f"double-body lock Send settle failed: {exc}; "
-                f"response_excerpt={excerpt!r}",
-                timeout_s=exc.timeout_s,
-                condition=exc.condition,
-                diagnostics={
-                    **exc.diagnostics,
-                    "step": "wait_response_after_send",
-                    "response_excerpt": excerpt,
-                },
-            ) from exc
+        wait_response_after_send(
+            session,
+            status_label=_STATUS_LABEL,
+            body_text=LOCK_DOUBLE_BODY,
+            step="wait_response_after_send",
+            message_prefix="double-body lock Send settle failed",
+        )
         # Allow a pending chunk flush to fire if discard were missing (FR5).
         QTest.qWait(_CHUNK_FLUSH_SETTLE_MS)
         snap = session.ui_snapshot()
@@ -137,7 +118,13 @@ def test_agent_e2e_double_body_red_path_without_discard(
     stub = canned_send_with_one_chunk(CANNED_DOUBLE_BODY_LOCK_OK)
     with stub_agent_e2e_http(stub, name="double_body_lock_ok"):
         session.ui_click(SEND_BUTTON)
-        session.wait_for_snapshot(_response_ready, timeout=SEND_SETTLE_TIMEOUT_S)
+        wait_response_after_send(
+            session,
+            status_label=_STATUS_LABEL,
+            body_text=LOCK_DOUBLE_BODY,
+            step="wait_response_after_send",
+            message_prefix="double-body red-path Send settle failed",
+        )
         QTest.qWait(_CHUNK_FLUSH_SETTLE_MS)
         snap = session.ui_snapshot()
 

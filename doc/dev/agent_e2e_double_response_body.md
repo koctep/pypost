@@ -41,7 +41,8 @@ make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_double_response_body.py -v
 
 1. Fill URL + select PUT + fill `{ { "data": { } } }` via `REQUEST_BODY_EDIT`.
 2. Stub Send with `canned_send_with_one_chunk(CANNED_DOUBLE_BODY_LOCK_OK)`.
-3. Wait until status + lock body token appear under `RESPONSE_PANEL`.
+3. Wait for status + lock body via `wait_response_after_send` (display-form
+   body when JSON).
 4. Assert the lock body token appears **exactly once** in joined panel values.
 
 Default HEAD (discard present) is **green**. Automated FR5 red proof
@@ -75,6 +76,7 @@ No extra env vars. Prefer `make test-agent-e2e` for offscreen Qt.
 - [Agent UI E2E](agent_e2e.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)
+- [Agent E2E Send Settle Helpers](agent_e2e_send_settle.md)
 - [Agent E2E Response-Panel Helpers](agent_e2e_response_panel.md)
 - [Agent E2E Presentation Matrix](agent_e2e_presentation_matrix.md)
 - [Response Streaming Display (PYPOST-887)](response-streaming-display.md)

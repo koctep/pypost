@@ -7,11 +7,11 @@ UI snapshot after Send. Env-pack Send, double-body lock, and
 presentation-matrix scenarios import these instead of copying walk /
 subtree / excerpt logic.
 
-Golden (PYPOST-920) settles with `wait_for_text` on `RESPONSE_STATUS` /
-`RESPONSE_BODY` instead of a sanitize-coupled panel predicate; it still
-uses `response_panel_excerpt` for timeout diagnostics. Prefer text-wait on
-those ids for new Send → response readiness when matching display text is
-enough; keep these helpers for panel walks, cardinality locks, and excerpts.
+Golden (PYPOST-920) and sibling Send modules (PYPOST-948) settle readiness
+with `wait_for_text` on `RESPONSE_STATUS` / `RESPONSE_BODY` (siblings via
+[Send settle helper](agent_e2e_send_settle.md)). These panel helpers remain
+for post-settle walks, cardinality locks, joined-value asserts, and timeout
+excerpts — not for Send readiness predicates.
 
 ## Architecture
 
@@ -24,13 +24,16 @@ enough; keep these helpers for panel walks, cardinality locks, and excerpts.
 ```mermaid
 flowchart LR
   Snap[ui_snapshot dict] --> RP[agent_e2e_response_panel]
-  RP --> Wait[wait_for_snapshot ready]
-  RP --> Assert[status / body asserts]
+  RP --> Assert[cardinality / joined asserts]
   RP --> Diag[timeout response_excerpt]
+  Send[Send settle] --> TextWait[agent_e2e_send_settle]
+  TextWait --> Diag
 ```
 
-Scenario-specific expected tokens (status label, body string) stay in each
-test module. Only tree walk / panel extract / join / excerpt are shared.
+Send readiness uses identity text waits (see
+[agent_e2e_send_settle.md](agent_e2e_send_settle.md)). Scenario-specific
+expected tokens stay in each test module; only tree walk / panel extract /
+join / excerpt are shared here.
 
 ## API / Usage
 
@@ -43,11 +46,9 @@ from tests.helpers.agent_e2e_response_panel import (
 )
 from pypost.ui.widget_ids import RESPONSE_PANEL
 
-def _response_ready(snap: dict) -> bool:
-    joined = joined_panel_values(snap)
-    return "Status: 200" in joined and '{"ok": true}' in joined
-
 panel = subtree_by_name(snap, RESPONSE_PANEL)
+joined = joined_panel_values(snap)
+assert joined.count("pypost-887-lock-body-once") == 1
 excerpt = response_panel_excerpt(snap)  # truncated " | "-join for messages
 ```
 
@@ -89,6 +90,7 @@ make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -v"
 
 ## See also
 
+- [Agent E2E Send Settle Helpers](agent_e2e_send_settle.md)
 - [Agent UI E2E](agent_e2e.md)
 - [Agent Golden E2E](agent_golden_e2e.md)
 - [Agent E2E HTTP Fixture Layer](agent_e2e_http.md)

@@ -93,6 +93,7 @@ set up your development environment, and contribute to the project.
 1. [Agent E2E Seed Inventory (PYPOST-857)](agent_e2e_seed.md)
 1. [Agent E2E HTTP Fixture Layer (PYPOST-859)](agent_e2e_http.md)
 1. [Agent E2E Response-Panel Helpers (PYPOST-869)](agent_e2e_response_panel.md)
+1. [Agent E2E Send Settle Helpers (PYPOST-948)](agent_e2e_send_settle.md)
 1. [Agent App Lifecycle (PYPOST-833)](agent_lifecycle.md)
 1. [UI Widget Identity (PYPOST-834)](ui_identity.md)
 1. [UI State Snapshot (PYPOST-835)](ui_snapshot.md)

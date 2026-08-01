@@ -160,7 +160,8 @@ Expected status/body tokens are **test-local** in
 `response_panel_excerpt` from shared
 [response-panel helpers](agent_e2e_response_panel.md)
 (`tests/helpers/agent_e2e_response_panel.py`) — not a production agent API.
-Sibling locks/matrix scenarios may still settle via panel snapshot helpers.
+Sibling locks/matrix/env scenarios settle via
+[send settle helper](agent_e2e_send_settle.md) (PYPOST-948).
 
 ## Configuration
 
@@ -191,9 +192,10 @@ HTTP is stubbed via the shared layer at
 `ResponseView` pretty-prints JSON in the body widget (`indent_size=2` by
 default). Golden `wait_for_text` matches that **display** form
 (`FIXTURE_BODY_DISPLAY`), not the compact JSON that `sanitize_text` produces
-in snapshot values. Sibling scenarios that still join panel snapshot values
-must keep matching the sanitize/compact shape — see
-[ui_snapshot.md](ui_snapshot.md) and
+in snapshot values. **Readiness waits** use display form; **post-settle**
+panel joins may still use compact snapshot tokens — see
+[ui_snapshot.md](ui_snapshot.md),
+[send settle helper](agent_e2e_send_settle.md), and
 [response-panel helpers](agent_e2e_response_panel.md).
 
 ### Timeouts

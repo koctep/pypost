@@ -238,8 +238,10 @@ After the session is ready, each packaging fixture logs INFO
 | Drive UI | `session.ui_fill` / `ui_select` / `ui_click` / … |
 | Observe | `session.ui_snapshot()` |
 | Settle | `session.wait_for_text` / `wait_for_snapshot` / `wait_until` / … |
-| | (golden prefers text-wait on status/body — [golden](agent_golden_e2e.md)) |
+| | (Send → response: text-wait on status/body — [golden](agent_golden_e2e.md), |
+| | [send settle helper](agent_e2e_send_settle.md)) |
 | Failure dump | Auto on fixture **or** direct-session assert fail — [failure artifacts](agent_e2e_failure_artifacts.md) |
+| Send settle (siblings) | `tests.helpers.agent_e2e_send_settle` — [send settle doc](agent_e2e_send_settle.md) |
 | Response-panel snapshot helpers | `tests.helpers.agent_e2e_response_panel` — [helpers doc](agent_e2e_response_panel.md) |
 
 ### Identity convention
@@ -254,8 +256,9 @@ One intentional flow: blank request → set URL/method → Send (shared HTTP
 stub 200) → `wait_for_text` on `RESPONSE_STATUS` / `RESPONSE_BODY`
 (display-form body; PYPOST-920). Full steps:
 [agent_golden_e2e.md](agent_golden_e2e.md). Shared HTTP catalog:
-[agent_e2e_http.md](agent_e2e_http.md). Panel snapshot helpers remain for
-sibling walks / excerpts:
+[agent_e2e_http.md](agent_e2e_http.md). Sibling Send modules use the
+shared [send settle helper](agent_e2e_send_settle.md) (PYPOST-948); panel
+snapshot helpers remain for post-settle walks / excerpts:
 [agent_e2e_response_panel.md](agent_e2e_response_panel.md).
 
 ### Double-body regression lock

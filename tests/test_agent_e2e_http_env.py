@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from pypost.agent import AgentAppSession, UiWaitTimeoutError, find_widget
+from pypost.agent import AgentAppSession, find_widget
 from pypost.fixtures.agent_e2e_http import (
     CANNED_SEED_GET_OK,
     SEED_GET_OK_BODY,
@@ -21,11 +21,13 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
-from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
 from tests.helpers.agent_e2e_response_panel import (
     joined_panel_values,
-    response_panel_excerpt,
     subtree_by_name,
+)
+from tests.helpers.agent_e2e_send_settle import (
+    json_response_body_display,
+    wait_response_after_send,
 )
 
 pytestmark = [
@@ -37,13 +39,9 @@ _HTTP_LOGGER = "pypost.fixtures.agent_e2e_http"
 _STUB_INSTALLED_SEED_GET = "agent_e2e_http_stub_installed name=seed_get_ok"
 
 _STATUS_LABEL = "Status: 200"
-_BODY_IN_SNAPSHOT = json.dumps(
-    json.loads(SEED_GET_OK_BODY), ensure_ascii=False
-)
-
-def _response_ready(snap: dict[str, Any]) -> bool:
-    joined = joined_panel_values(snap)
-    return _STATUS_LABEL in joined and _BODY_IN_SNAPSHOT in joined
+_BODY_DISPLAY = json_response_body_display(SEED_GET_OK_BODY)
+# Snapshot join still carries compact JSON from sanitize; post-settle only.
+_BODY_IN_SNAPSHOT = json.dumps(json.loads(SEED_GET_OK_BODY), ensure_ascii=False)
 
 
 def test_seeded_env_send_uses_shared_http_stub(
@@ -63,25 +61,14 @@ def test_seeded_env_send_uses_shared_http_stub(
     # Prefer fixture entry; equivalent to stub_agent_e2e_http(...).
     with agent_e2e_http_stub(CANNED_SEED_GET_OK):
         session.ui_click(SEND_BUTTON)
-        try:
-            snap = session.wait_for_snapshot(
-                _response_ready,
-                timeout=SEND_SETTLE_TIMEOUT_S,
-            )
-        except UiWaitTimeoutError as exc:
-            last = session.ui_snapshot()
-            excerpt = response_panel_excerpt(last)
-            raise UiWaitTimeoutError(
-                f"env seed Send settle failed: {exc}; "
-                f"response_excerpt={excerpt!r}",
-                timeout_s=exc.timeout_s,
-                condition=exc.condition,
-                diagnostics={
-                    **exc.diagnostics,
-                    "step": "wait_response_after_seed_send",
-                    "response_excerpt": excerpt,
-                },
-            ) from exc
+        wait_response_after_send(
+            session,
+            status_label=_STATUS_LABEL,
+            body_text=_BODY_DISPLAY,
+            step="wait_response_after_seed_send",
+            message_prefix="env seed Send settle failed",
+        )
+        snap = session.ui_snapshot()
 
     panel = subtree_by_name(snap, RESPONSE_PANEL)
     assert panel is not None
@@ -107,24 +94,12 @@ def test_seeded_env_send_logs_http_stub_installed(
     with caplog.at_level(logging.INFO, logger=_HTTP_LOGGER):
         with agent_e2e_http_stub(CANNED_SEED_GET_OK):
             session.ui_click(SEND_BUTTON)
-            try:
-                session.wait_for_snapshot(
-                    _response_ready,
-                    timeout=SEND_SETTLE_TIMEOUT_S,
-                )
-            except UiWaitTimeoutError as exc:
-                last = session.ui_snapshot()
-                excerpt = response_panel_excerpt(last)
-                raise UiWaitTimeoutError(
-                    f"env seed Send caplog smoke settle failed: {exc}; "
-                    f"response_excerpt={excerpt!r}",
-                    timeout_s=exc.timeout_s,
-                    condition=exc.condition,
-                    diagnostics={
-                        **exc.diagnostics,
-                        "step": "wait_response_after_seed_send_caplog_smoke",
-                        "response_excerpt": excerpt,
-                    },
-                ) from exc
+            wait_response_after_send(
+                session,
+                status_label=_STATUS_LABEL,
+                body_text=_BODY_DISPLAY,
+                step="wait_response_after_seed_send_caplog_smoke",
+                message_prefix="env seed Send caplog smoke settle failed",
+            )
 
     assert _STUB_INSTALLED_SEED_GET in caplog.text

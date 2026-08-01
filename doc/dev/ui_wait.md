@@ -80,7 +80,8 @@ text API**, fails immediately with `UiWaitTimeoutError`
 Golden Send → response settle prefers `wait_for_text` on
 `RESPONSE_STATUS` / `RESPONSE_BODY` (display-form body; PYPOST-920) over a
 panel-wide `wait_for_snapshot` predicate — see
-[agent_golden_e2e.md](agent_golden_e2e.md).
+[agent_golden_e2e.md](agent_golden_e2e.md). Sibling Send modules use
+[agent_e2e_send_settle.md](agent_e2e_send_settle.md) (`wait_response_after_send`).
 
 ### `wait_for_snapshot(root, predicate, *, timeout=…) -> dict`
 

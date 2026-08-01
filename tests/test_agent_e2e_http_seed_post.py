@@ -34,10 +34,12 @@ from pypost.ui.widget_ids import (
 )
 from tests.helpers.agent_e2e_response_panel import (
     joined_panel_values,
-    response_panel_excerpt,
     subtree_by_name,
 )
-from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
+from tests.helpers.agent_e2e_send_settle import (
+    json_response_body_display,
+    wait_response_after_send,
+)
 from tests.helpers.agent_e2e_tree import click_tree_row_by_text
 
 pytestmark = [
@@ -46,18 +48,13 @@ pytestmark = [
 ]
 
 _STATUS_LABEL = "Status: 200"
-_BODY_IN_SNAPSHOT = json.dumps(
-    json.loads(SEED_POST_OK_BODY), ensure_ascii=False
-)
+_BODY_DISPLAY = json_response_body_display(SEED_POST_OK_BODY)
+# Snapshot join still carries compact JSON from sanitize; post-settle only.
+_BODY_IN_SNAPSHOT = json.dumps(json.loads(SEED_POST_OK_BODY), ensure_ascii=False)
 _TREE_POST_LABEL = f"POST {SEED_POST_REQUEST_NAME}"
 
 
-def _response_ready(snap: dict[str, Any]) -> bool:
-    joined = joined_panel_values(snap)
-    return _STATUS_LABEL in joined and _BODY_IN_SNAPSHOT in joined
-
-
-def _snapshot_value(snap: dict[str, Any], widget_id: str) -> str | None:
+def _snapshot_value(snap: dict, widget_id: str) -> str | None:
     node = subtree_by_name(snap, widget_id)
     if node is None:
         return None
@@ -65,7 +62,7 @@ def _snapshot_value(snap: dict[str, Any], widget_id: str) -> str | None:
     return value if isinstance(value, str) else None
 
 
-def _seed_post_editor_ready(snap: dict[str, Any]) -> bool:
+def _seed_post_editor_ready(snap: dict) -> bool:
     return (
         _snapshot_value(snap, METHOD_COMBO) == "POST"
         and _snapshot_value(snap, URL_INPUT) == SEED_POST_URL
@@ -91,25 +88,14 @@ def test_seed_post_send_uses_shared_http_stub(
 
     with agent_e2e_http_stub(CANNED_SEED_POST_OK):
         session.ui_click(SEND_BUTTON)
-        try:
-            snap = session.wait_for_snapshot(
-                _response_ready,
-                timeout=SEND_SETTLE_TIMEOUT_S,
-            )
-        except UiWaitTimeoutError as exc:
-            last = session.ui_snapshot()
-            excerpt = response_panel_excerpt(last)
-            raise UiWaitTimeoutError(
-                f"seed POST Send settle failed: {exc}; "
-                f"response_excerpt={excerpt!r}",
-                timeout_s=exc.timeout_s,
-                condition=exc.condition,
-                diagnostics={
-                    **exc.diagnostics,
-                    "step": "wait_response_after_seed_post_send",
-                    "response_excerpt": excerpt,
-                },
-            ) from exc
+        wait_response_after_send(
+            session,
+            status_label=_STATUS_LABEL,
+            body_text=_BODY_DISPLAY,
+            step="wait_response_after_seed_post_send",
+            message_prefix="seed POST Send settle failed",
+        )
+        snap = session.ui_snapshot()
 
     panel = subtree_by_name(snap, RESPONSE_PANEL)
     assert panel is not None
@@ -149,25 +135,15 @@ def test_seed_post_open_from_collection_tree_then_send(
     with agent_e2e_http_stub(CANNED_SEED_POST_OK):
         # Tree open adds a tab; window-scoped find hits the blank tab's Send.
         session.ui_click(SEND_BUTTON, in_current_tab=True)
-        try:
-            snap = session.wait_for_snapshot(
-                _response_ready,
-                timeout=SEND_SETTLE_TIMEOUT_S,
-            )
-        except UiWaitTimeoutError as exc:
-            last = session.ui_snapshot()
-            excerpt = response_panel_excerpt(last)
-            raise UiWaitTimeoutError(
-                f"seed POST tree Send settle failed: {exc}; "
-                f"response_excerpt={excerpt!r}",
-                timeout_s=exc.timeout_s,
-                condition=exc.condition,
-                diagnostics={
-                    **exc.diagnostics,
-                    "step": "wait_response_after_seed_post_tree_send",
-                    "response_excerpt": excerpt,
-                },
-            ) from exc
+        wait_response_after_send(
+            session,
+            status_label=_STATUS_LABEL,
+            body_text=_BODY_DISPLAY,
+            step="wait_response_after_seed_post_tree_send",
+            message_prefix="seed POST tree Send settle failed",
+            in_current_tab=True,
+        )
+        snap = session.ui_snapshot()
 
     joined = joined_panel_values(snap)
     assert _STATUS_LABEL in joined

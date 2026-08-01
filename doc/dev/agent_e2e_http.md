@@ -82,7 +82,25 @@ from pypost.fixtures.agent_e2e_http import (
     CANNED_GOLDEN_OK,
     stub_agent_e2e_http,
 )
+from tests.helpers.agent_e2e_send_settle import (
+    json_response_body_display,
+    wait_response_after_send,
+)
 
+with stub_agent_e2e_http(CANNED_GOLDEN_OK):
+    session.ui_click(SEND_BUTTON)
+    wait_response_after_send(
+        session,
+        status_label="Status: 200",
+        body_text=json_response_body_display(CANNED_GOLDEN_OK.body),
+        step="wait_response_after_send",
+    )
+```
+
+Prefer [send settle helper](agent_e2e_send_settle.md) for sibling scenarios;
+golden may use inline `session.wait_for_text`. Legacy panel predicate example:
+
+```python
 with stub_agent_e2e_http(CANNED_GOLDEN_OK):
     session.ui_click(SEND_BUTTON)
     snap = session.wait_for_snapshot(predicate, timeout=15.0)
