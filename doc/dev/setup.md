@@ -68,7 +68,24 @@ make check-lock
 ```
 
 CI runs the same check in the `check-lock` job (`.github/workflows/test.yml`) on every
-push and pull request (PYPOST-927).
+push and pull request (PYPOST-927). That job pins its `uv` version via the `version:` input
+on the `astral-sh/setup-uv` step so `check-lock` cannot go red from resolver-version drift
+alone (PYPOST-984); install the same `uv` version locally for CI/local parity — see the
+workflow YAML for the currently pinned value.
+
+`make check-lock` (shared by CI and local devs) retries a failing `uv pip compile` up to 3
+times with a short backoff (1s, 2s) before giving up, so a one-off network/PyPI blip does not
+fail the gate (PYPOST-984). It reports one of two distinct `stderr` messages so a failure's
+cause is diagnosable from the log alone:
+
+- `check-lock: uv pip compile failed after N attempts (network or tool issue)` — the compile
+  step itself never succeeded after retries (tool/network problem, not a lock mismatch).
+- `check-lock: requirements.txt is stale relative to requirements.in (run 'make lock' and
+  commit)` — the compile succeeded but its output genuinely differs from the committed lock
+  (real drift; regenerate with `make lock`).
+
+Both failure paths clean up the `requirements.txt.check`/`.body` scratch files they create, so a
+failed run never leaves stray files in the working tree.
 
 ### Development dependency lock file (PYPOST-780)
 

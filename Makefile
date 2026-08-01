@@ -44,10 +44,32 @@ lock: ## Regenerate requirements.txt transitive lock from requirements.in
 	$(UV) pip compile requirements.in -o requirements.txt --python-version $(LOCK_PYTHON_VERSION)
 
 check-lock: ## Verify requirements.txt matches requirements.in (needs uv on PATH)
-	$(UV) pip compile requirements.in -o requirements.txt.check --python-version $(LOCK_PYTHON_VERSION)
+	@attempt=1; max_attempts=3; delay=1; \
+	while [ $$attempt -le $$max_attempts ]; do \
+		if $(UV) pip compile requirements.in -o requirements.txt.check \
+			--python-version $(LOCK_PYTHON_VERSION); then \
+			break; \
+		fi; \
+		if [ $$attempt -eq $$max_attempts ]; then \
+			echo "check-lock: uv pip compile failed after" \
+				"$$max_attempts attempts (network or tool issue)" >&2; \
+			rm -f requirements.txt.check requirements.txt.body requirements.txt.check.body; \
+			exit 2; \
+		fi; \
+		echo "check-lock: uv pip compile attempt $$attempt/$$max_attempts failed," \
+			"retrying in $${delay}s..." >&2; \
+		sleep $$delay; \
+		attempt=$$((attempt + 1)); \
+		delay=$$((delay * 2)); \
+	done
 	tail -n +3 requirements.txt > requirements.txt.body
 	tail -n +3 requirements.txt.check > requirements.txt.check.body
-	diff -q requirements.txt.body requirements.txt.check.body
+	@if ! diff -q requirements.txt.body requirements.txt.check.body > /dev/null; then \
+		echo "check-lock: requirements.txt is stale relative to requirements.in" \
+			"(run 'make lock' and commit)" >&2; \
+		rm -f requirements.txt.check requirements.txt.body requirements.txt.check.body; \
+		exit 1; \
+	fi
 	rm -f requirements.txt.check requirements.txt.body requirements.txt.check.body
 
 lock-dev: ## Regenerate requirements-dev.txt transitive lock from requirements-dev.in

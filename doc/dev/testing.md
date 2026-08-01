@@ -927,10 +927,13 @@ Verify cache behavior in the GitHub Actions log for the `setup-python` step (`Ca
 
 ## CI lock verification (PYPOST-804, PYPOST-927)
 
-The `check-lock` job in `.github/workflows/test.yml` installs [uv](https://docs.astral.sh/uv/)
-and runs `make check-lock` once per workflow. It fails when `requirements.txt` is stale
-relative to `requirements.in` (same check as local maintainer workflow in
-[setup.md](setup.md) § Dependency lock file).
+The `check-lock` job in `.github/workflows/test.yml` installs a **pinned**
+[uv](https://docs.astral.sh/uv/) version (`version:` input on `astral-sh/setup-uv`, PYPOST-984 —
+the sibling `check-lock-dev` job below installs whatever `uv` release is latest at run time) and
+runs `make check-lock` once per workflow. `make check-lock` retries a failing `uv pip compile` up
+to 3 times before failing with a distinct message, so the job fails only on a genuinely stale
+`requirements.txt` or a persistent compile error (never on resolver-version drift alone; same
+check as local maintainer workflow in [setup.md](setup.md) § Dependency lock file, PYPOST-984).
 
 The `check-lock-dev` job installs [uv](https://docs.astral.sh/uv/)
 and runs `make check-lock-dev` once per workflow. It fails when `requirements-dev.txt` is stale
