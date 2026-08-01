@@ -199,7 +199,8 @@ Capture a structured visible-UI tree (roles, names, values, hierarchy) with
 [UI state snapshot](ui_snapshot.md). Gate: `tests/test_ui_snapshot.py`.
 
 Drive named controls with click / fill / select / send key — see
-[UI action tools](ui_actions.md). Gate: `tests/test_ui_actions.py`.
+[UI action tools](ui_actions.md) (in-process; out-of-process MCP packaging
+path: PYPOST-918). Gate: `tests/test_ui_actions.py`.
 
 Wait for post-action settle conditions (exists / enabled / text / snapshot) —
 see [UI settle / wait helpers](ui_wait.md). Gate: `tests/test_ui_wait.py`.
@@ -233,7 +234,7 @@ documented separately — see Related. The composed golden product flow is
 | [gui_testing.md](gui_testing.md) | Offscreen Qt, `wait_until`, GUI test patterns |
 | [ui_identity.md](ui_identity.md) | Stable `objectName` catalog for key controls |
 | [ui_snapshot.md](ui_snapshot.md) | Visible-UI tree for agents after ready |
-| [ui_actions.md](ui_actions.md) | Click / fill / select / send key by id |
+| [ui_actions.md](ui_actions.md) | Click / fill / select / key; out-of-process MCP packaging (918) |
 | [ui_wait.md](ui_wait.md) | Settle waits after actions |
 | [agent_golden_e2e.md](agent_golden_e2e.md) | Golden request/response product flow (838) |
 | [logging.md](logging.md) | Event catalog including agent session events |

@@ -73,6 +73,7 @@ set up your development environment, and contribute to the project.
 1. [MCP Integration](mcp_integration.md)
 1. [Inbound MCP Trust Model (PYPOST-705)](mcp_trust_model.md)
 1. [MCP Secrets Policy](mcp_secrets_policy.md)
+1. [UI Action Tools — out-of-process packaging (PYPOST-918)](ui_actions.md)
 
 ### UI and settings
 
@@ -95,7 +96,7 @@ set up your development environment, and contribute to the project.
 1. [Agent App Lifecycle (PYPOST-833)](agent_lifecycle.md)
 1. [UI Widget Identity (PYPOST-834)](ui_identity.md)
 1. [UI State Snapshot (PYPOST-835)](ui_snapshot.md)
-1. [UI Action Tools (PYPOST-836)](ui_actions.md)
+1. [UI Action Tools (PYPOST-836; out-of-process packaging PYPOST-918)](ui_actions.md)
 1. [UI Settle / Wait Helpers (PYPOST-837)](ui_wait.md)
 1. [Agent Golden E2E (PYPOST-838)](agent_golden_e2e.md)
 1. [Agent E2E Product Dialog Settle (PYPOST-919)](agent_dialog_settle.md)

@@ -16,6 +16,24 @@ This is an **in-process Python agent API**, not a network MCP tool on
 [UI settle / wait helpers](ui_wait.md) after Send, dialog open, or other async
 updates.
 
+## Out-of-process MCP packaging path (PYPOST-918)
+
+Today UI actions are **in-process only**. When out-of-process MCP for these
+primitives is prioritized, the documented **packaging path** is:
+
+1. Ship a **dedicated** agent-UI MCP entry (stdio sidecar and/or separate
+   loopback Streamable HTTP) that wraps `pypost.agent.ui_actions` (or a thin
+   façade over the same primitives).
+2. **Never mount** UI-action tools on product `MCPServerImpl`. Collection HTTP
+   request tools stay solely on that server; clients that need both compose
+   **two** MCP servers.
+3. Do **not** implement a live bridge in this debt — PYPOST-918 closes the
+   packaging answer only. Live delivery follows this path when prioritized.
+
+Product MCP docs: [mcp_integration.md](mcp_integration.md),
+[mcp_trust_model.md](mcp_trust_model.md). In-process agent e2e packaging
+(`make test-agent-e2e`) is separate — see [agent_e2e.md](agent_e2e.md).
+
 ## Architecture
 
 | Component | Role |

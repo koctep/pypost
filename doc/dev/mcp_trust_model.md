@@ -7,6 +7,11 @@ PyPost exposes two inbound MCP surfaces when enabled:
 | Request tools (`MCPServerImpl`) | `127.0.0.1:1080` | Execute collection HTTP requests as MCP tools |
 | Metrics (`MetricsServer`) | `127.0.0.1:9080` | Prometheus scrape + observability MCP resources |
 
+Agent UI drive (`pypost.agent.ui_actions`) is **not** a product inbound MCP
+surface. Out-of-process agent-UI MCP (when built) is a separate trust
+boundary; packaging path is documented in [ui_actions.md](ui_actions.md)
+(PYPOST-918). Do not expand request-tool blast radius with UI automation.
+
 ## Trust boundary
 
 **Default posture: local trust.** Both servers default to loopback (`127.0.0.1`). Any process

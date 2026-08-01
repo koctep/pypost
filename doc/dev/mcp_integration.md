@@ -14,6 +14,11 @@ PyPost implements an **MCP Server** using the official Python SDK (`mcp`). This 
 [agent_e2e.md](agent_e2e.md). MCP below assumes a running PyPost with the MCP
 server enabled.
 
+**UI actions are not product MCP tools:** click / fill / select / send key
+live in `pypost.agent.ui_actions` (in-process). Out-of-process packaging must
+use a dedicated agent-UI MCP entry — never register on `MCPServerImpl`. See
+the documented packaging path in [ui_actions.md](ui_actions.md) (PYPOST-918).
+
 **Security:** Inbound MCP has no client authentication. Default bind is loopback-only; see
 [mcp_trust_model.md](mcp_trust_model.md) before exposing MCP on a network.
 
