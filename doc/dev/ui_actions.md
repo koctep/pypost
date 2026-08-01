@@ -4,7 +4,8 @@
 
 Agents and automated harnesses drive named PyPost controls after `is_ui_ready`
 via `pypost.agent.ui_actions`. Primitives address widgets by stable
-`objectName` values ([UI widget identity](ui_identity.md)): click, fill, select
+`objectName` values ([UI widget identity](ui_identity.md)): click, fill
+(default setters or opt-in keyClicks — PYPOST-917), select
 (combo / list / tree — PYPOST-916), and send key/hotkey. Missing or
 non-interactable targets raise actionable exceptions.
 
@@ -22,7 +23,7 @@ updates.
 | `pypost/agent/ui_actions.py` | Lookup, interactable checks, primitives, errors |
 | `AgentAppSession.ui_*` | Convenience after `start()`; root = main window
   (or current tab when `in_current_tab=True` — PYPOST-851) |
-| `QTest.mouseClick` / `keyClick` | Click and key delivery (matches GUI tests) |
+| `QTest.mouseClick` / `keyClick` / `keyClicks` | Click, single-key, and opt-in fill typing |
 | Gate | `tests/test_ui_actions.py` under `make test` |
 
 ```mermaid
@@ -33,6 +34,9 @@ flowchart LR
   Check -->|ok| QTest[QTest / setters]
   Check -->|fail| Err[UiTarget*Error]
 ```
+
+Fill branches on `via_key_clicks` (PYPOST-917): default clear + setters;
+opt-in clear + focus + `QTest.keyClicks`.
 
 Production UI must not import `pypost.agent`. Actions operate on widgets that
 already exist; they do not change ready semantics or the identity catalog.
@@ -58,10 +62,23 @@ itself). Raises `UiTargetNotFoundError` if absent.
 
 Left-click via `QTest.mouseClick`. Requires visible + enabled.
 
-### `ui_fill(root, widget_id, text)`
+### `ui_fill(root, widget_id, text, *, via_key_clicks=False)`
 
-Replace text on `QLineEdit` / `QPlainTextEdit` / `QTextEdit` (clear + set).
-Wrong widget types raise `UiTargetNotInteractableError`.
+Replace text on `QLineEdit` / `QPlainTextEdit` / `QTextEdit`. Wrong widget
+types raise `UiTargetNotInteractableError`.
+
+| Mode | Behaviour |
+| --- | --- |
+| `via_key_clicks=False` (default) | Clear + `setText` / `setPlainText` (one-shot) |
+| `via_key_clicks=True` | Clear + focus + `QTest.keyClicks(widget, text)` |
+
+Use the default for golden / seed / CI speed and stability. Opt into
+keystroke fill when you need per-key validation, IME-style realism, or
+typing-driven UI. For a **single** key or hotkey, use `ui_send_key` instead
+(do not loop `ui_send_key` for whole-string typing).
+
+Successful fills emit DEBUG `ui_action_applied` with scalar
+`via_key_clicks=true|false` (lowercase); fill **text is never logged**.
 
 ### `ui_select(root, widget_id, option)`
 
@@ -107,11 +124,16 @@ with AgentAppSession(offscreen=True) as session:
     session.ui_select(METHOD_COMBO, 1)  # same combo by index (PYPOST-916)
     # Prefer current-tab scope for per-tab role ids (PYPOST-851):
     session.ui_fill(URL_INPUT, "https://example.com", in_current_tab=True)
+    # Opt-in keystroke fill (PYPOST-917); same keyword on module ui_fill:
+    session.ui_fill(URL_INPUT, "typed", via_key_clicks=True)
     session.find_in_current_tab(URL_INPUT)
     session.ui_send_key(
         URL_INPUT, "a", modifiers=Qt.KeyboardModifier.ControlModifier
     )
 ```
+
+`AgentAppSession.ui_fill` mirrors `via_key_clicks` (and `in_current_tab`)
+onto the module API.
 
 Module-level functions accept any root. Session helpers default to the main
 window; pass `in_current_tab=True` (or use `current_request_tab` /
@@ -136,8 +158,10 @@ widgets that already have `objectName` set via `set_widget_id`.
 - **Tree select did not open the request** — By design; `ui_select` sets
   current index. Use `click_tree_row_by_text` when the product needs a
   viewport click to open/activate.
-- **Fill did not type character-by-character** — By design; use `ui_send_key`
-  for keystroke delivery.
+- **Fill did not type character-by-character** — Default fill uses setters
+  (`via_key_clicks=False`). For whole-string keystroke realism, call
+  `ui_fill(..., via_key_clicks=True)`. Use `ui_send_key` only for a single
+  key or hotkey, not to type an entire string.
 - **Wrong tab’s URL/Send changed** — Default session helpers search from the
   main window; use `in_current_tab=True` or `find_in_current_tab` for multi-tab
   flows (PYPOST-851).

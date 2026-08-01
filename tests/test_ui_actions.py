@@ -126,6 +126,18 @@ def test_ui_fill_on_fixture(qapp: QApplication) -> None:
         root.close()
 
 
+def test_ui_fill_via_key_clicks_on_fixture(qapp: QApplication) -> None:
+    """PYPOST-917: ui_fill opt-in keyClicks leaves fixture QLineEdit text set."""
+    root, _ = _make_fixture(qapp)
+    try:
+        ui_fill(root, _INPUT, "typed-via-keys", via_key_clicks=True)
+        line = find_widget(root, _INPUT)
+        assert isinstance(line, QLineEdit)
+        assert line.text() == "typed-via-keys"
+    finally:
+        root.close()
+
+
 def test_ui_select_on_fixture(qapp: QApplication) -> None:
     root, _ = _make_fixture(qapp)
     try:
@@ -295,6 +307,22 @@ def test_main_window_fill_url_and_select_method(
     assert method.currentText() == "POST"
 
 
+def test_ui_fill_via_key_clicks_session(
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-917: session.ui_fill accepts via_key_clicks and fills URL field."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready
+    session.ui_fill(
+        URL_INPUT,
+        "https://typed-via-keys.example/",
+        via_key_clicks=True,
+    )
+    url = find_widget(session.window, URL_INPUT)
+    assert isinstance(url, QLineEdit)
+    assert url.text() == "https://typed-via-keys.example/"
+
+
 def test_current_tab_scoped_fill(agent_e2e_session: AgentAppSession) -> None:
     """PYPOST-851: in_current_tab resolves per-tab role ids under active tab."""
     session = agent_e2e_session
@@ -327,6 +355,7 @@ def test_ui_action_applied_caplog(qapp: QApplication, caplog: pytest.LogCaptureF
         assert f"widget_id={_INPUT}" in msg
         assert "outcome=ok" in msg
         assert "duration_ms=" in msg
+        assert "via_key_clicks=false" in msg
         assert secret not in msg
         assert secret not in caplog.text
     finally:

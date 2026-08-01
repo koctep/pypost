@@ -96,7 +96,7 @@ different call sites.
 | `agent_session_temp_cleanup_failed` | ERROR | exception | `agent/lifecycle` |
 | `agent_session_failure_dump_hook_failed` | WARNING | `error` | `agent/lifecycle` |
 | `ui_snapshot_captured` | DEBUG | `node_count`, `named_count`, `duration_ms` | `agent/ui_snapshot` |
-| `ui_action_applied` | DEBUG | `primitive`, `widget_id`, `outcome`, `duration_ms` | `agent/ui_actions` |
+| `ui_action_applied` | DEBUG | `primitive`, `widget_id`, `outcome`, `duration_ms` (+ `via_key_clicks` for fill) | `agent/ui_actions` |
 | `ui_wait_settled` | DEBUG | `condition`, `waited_ms`, `timeout_s` | `agent/ui_wait` |
 | `ui_wait_timeout` | DEBUG | `condition`, `waited_ms`, `timeout_s` | `agent/ui_wait` |
 | `agent_e2e_seed_completed` | INFO | `data_dir`, ids, counts | `fixtures/agent_e2e_seed` |

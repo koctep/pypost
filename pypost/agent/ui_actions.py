@@ -121,28 +121,45 @@ def ui_click(root: QWidget, widget_id: str) -> None:
     )
 
 
-def ui_fill(root: QWidget, widget_id: str, text: str) -> None:
-    """Replace the editable text of the named widget with ``text``."""
+def ui_fill(
+    root: QWidget,
+    widget_id: str,
+    text: str,
+    *,
+    via_key_clicks: bool = False,
+) -> None:
+    """Replace the editable text of the named widget with ``text``.
+
+    When ``via_key_clicks`` is True, clear and focus the field, then deliver
+    ``text`` via ``QTest.keyClicks`` for keystroke-level realism.
+    """
     started = time.monotonic()
     widget = find_widget(root, widget_id)
     _require_interactable(widget, widget_id)
-    if isinstance(widget, QLineEdit):
-        widget.clear()
-        widget.setText(text)
-    elif isinstance(widget, (QPlainTextEdit, QTextEdit)):
-        widget.clear()
-        widget.setPlainText(text)
-    else:
+    if not isinstance(widget, (QLineEdit, QPlainTextEdit, QTextEdit)):
         raise UiTargetNotInteractableError(
             widget_id,
             f"not a text input (type={type(widget).__name__})",
         )
+    if via_key_clicks:
+        widget.clear()
+        widget.setFocus(Qt.FocusReason.OtherFocusReason)
+        _pump()
+        QTest.keyClicks(widget, text)
+    elif isinstance(widget, QLineEdit):
+        widget.clear()
+        widget.setText(text)
+    else:
+        widget.clear()
+        widget.setPlainText(text)
     _pump()
     duration_ms = int((time.monotonic() - started) * 1000)
     logger.debug(
-        "ui_action_applied primitive=fill widget_id=%s outcome=ok duration_ms=%s",
+        "ui_action_applied primitive=fill widget_id=%s outcome=ok "
+        "duration_ms=%s via_key_clicks=%s",
         widget_id,
         duration_ms,
+        str(via_key_clicks).lower(),
     )
 
 
