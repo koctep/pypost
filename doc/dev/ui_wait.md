@@ -22,7 +22,7 @@ Production code must **not** import `tests.helpers`. The historic test helper
 | Component | Role |
 | --- | --- |
 | `pypost/agent/ui_wait.py` | Poll loop, condition helpers, defaults, timeout error |
-| `AgentAppSession.wait_*` | Convenience after `start()`; root = main window |
+| `AgentAppSession.wait_*` | Convenience after `start()`; root = main window (or current tab when `in_current_tab=True` — PYPOST-949) |
 | `capture_ui_snapshot` | Used by `wait_for_snapshot` |
 | `find_widget` | Used by widget/enabled/text waits |
 | Gate | `tests/test_ui_wait.py` under `make test` |
@@ -91,23 +91,46 @@ snapshot polls re-walk the full visible tree each interval (PYPOST-852).
 
 ### Session helpers
 
+`wait_for_widget`, `wait_for_enabled`, and `wait_for_text` accept optional
+`in_current_tab=False`. When `True`, the search root is `current_request_tab()`
+(same as [UI action tools](ui_actions.md) — PYPOST-851 / PYPOST-949). Default
+window root preserves first-match behaviour for single-tab flows.
+
 ```python
 from pypost.agent import AgentAppSession
-from pypost.ui.widget_ids import SEND_BUTTON, URL_INPUT
+from pypost.ui.widget_ids import (
+    RESPONSE_BODY,
+    RESPONSE_STATUS,
+    SEND_BUTTON,
+    URL_INPUT,
+)
 
 with AgentAppSession(offscreen=True) as session:
     session.ui_fill(URL_INPUT, "https://example.com")
     session.wait_for_text(URL_INPUT, "https://example.com")
     session.ui_click(SEND_BUTTON)
     session.wait_for_enabled(SEND_BUTTON)  # example settle
+    # Multi-tab Send on active tab:
+    session.wait_for_text(
+        RESPONSE_STATUS,
+        "Status: 200",
+        in_current_tab=True,
+        timeout=15.0,
+    )
+    session.wait_for_text(
+        RESPONSE_BODY,
+        '{"ok": true}',
+        in_current_tab=True,
+        timeout=15.0,
+    )
     session.wait_for_snapshot(
         lambda snap: snap.get("role") == "window",
         timeout=15.0,
     )
 ```
 
-Module-level helpers accept any root — pass the current tab when resolving
-per-tab ids.
+Module-level helpers accept any root — pass `current_request_tab()` or the tab
+widget when calling free functions directly (golden e2e pattern).
 
 ## Configuration
 
@@ -117,7 +140,7 @@ No environment variables. Requires a started Qt app / `AgentAppSession`.
 
 | Symptom | Likely cause |
 | --- | --- |
-| `UiWaitTimeoutError` with `found=False` | Wrong id, wrong root, or widget never created |
+| `UiWaitTimeoutError` with `found=False` | Wrong id, wrong root (try `in_current_tab=True` for multi-tab), or widget never created |
 | `visible=False` / `enabled=False` | Widget exists but not interactable yet (or ever) |
 | `actual_text=…` mismatch | Expected string/predicate wrong; text not updated |
 | Snapshot wait slow / times out | Predicate too strict; prefer `wait_for_widget`/`text` |

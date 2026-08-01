@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -15,6 +17,14 @@ from PySide6.QtWidgets import (
 
 from pypost.agent.lifecycle import AgentAppSession
 from pypost.agent.ui_actions import ui_fill
+from pypost.fixtures.agent_e2e_http import (
+    CANNED_GOLDEN_OK,
+    GOLDEN_BODY,
+    GOLDEN_METHOD,
+    GOLDEN_STATUS,
+    GOLDEN_URL,
+    stub_agent_e2e_http,
+)
 from pypost.agent.ui_wait import (
     UiWaitTimeoutError,
     wait_for_enabled,
@@ -23,7 +33,15 @@ from pypost.agent.ui_wait import (
     wait_for_widget,
     wait_until,
 )
-from pypost.ui.widget_ids import URL_INPUT, set_widget_id
+from pypost.ui.presenters.tabs_presenter import RequestTab
+from pypost.ui.widget_ids import (
+    METHOD_COMBO,
+    RESPONSE_BODY,
+    RESPONSE_STATUS,
+    SEND_BUTTON,
+    URL_INPUT,
+    set_widget_id,
+)
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -156,6 +174,50 @@ def test_wait_for_widget_timeout_includes_widget_id(qapp: QApplication) -> None:
         assert "missing_id" in str(exc_info.value)
     finally:
         root.close()
+
+
+def test_session_wait_for_text_in_current_tab_after_multi_tab_send(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-949: tab-scoped session text wait targets active tab after Send."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready
+
+    first_tab = session.current_request_tab()
+    assert isinstance(first_tab, RequestTab)
+
+    session.window.tabs.add_new_tab(save_state=False)
+    qapp.processEvents()
+    second_tab = session.current_request_tab()
+    assert second_tab is not first_tab
+
+    status_label = f"Status: {GOLDEN_STATUS}"
+    body_display = json.dumps(json.loads(GOLDEN_BODY), indent=2)
+
+    session.ui_fill(URL_INPUT, GOLDEN_URL, in_current_tab=True)
+    session.ui_select(METHOD_COMBO, GOLDEN_METHOD, in_current_tab=True)
+
+    with stub_agent_e2e_http(CANNED_GOLDEN_OK):
+        session.ui_click(SEND_BUTTON, in_current_tab=True)
+
+        with pytest.raises(UiWaitTimeoutError):
+            session.wait_for_text(RESPONSE_STATUS, status_label, timeout=0.5)
+
+        status_widget = session.wait_for_text(
+            RESPONSE_STATUS,
+            status_label,
+            in_current_tab=True,
+            timeout=5.0,
+        )
+        assert status_widget.objectName() == RESPONSE_STATUS
+        body_widget = session.wait_for_text(
+            RESPONSE_BODY,
+            body_display,
+            in_current_tab=True,
+            timeout=5.0,
+        )
+        assert body_widget.objectName() == RESPONSE_BODY
 
 
 def test_session_wait_for_text_after_fill(

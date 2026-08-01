@@ -6,7 +6,6 @@ import json
 from typing import Any
 
 from pypost.agent import AgentAppSession, UiWaitTimeoutError
-from pypost.agent.ui_wait import wait_for_text
 from pypost.ui.widget_ids import RESPONSE_BODY, RESPONSE_STATUS
 from tests.helpers.agent_e2e_response_panel import response_panel_excerpt
 from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
@@ -34,10 +33,19 @@ def wait_response_after_send(
     in_current_tab: bool = False,
 ) -> None:
     """Wait for status then body on ``RESPONSE_STATUS`` / ``RESPONSE_BODY``."""
-    root = session.current_request_tab() if in_current_tab else session.window
     try:
-        wait_for_text(root, RESPONSE_STATUS, status_label, timeout=timeout)
-        wait_for_text(root, RESPONSE_BODY, body_text, timeout=timeout)
+        session.wait_for_text(
+            RESPONSE_STATUS,
+            status_label,
+            timeout=timeout,
+            in_current_tab=in_current_tab,
+        )
+        session.wait_for_text(
+            RESPONSE_BODY,
+            body_text,
+            timeout=timeout,
+            in_current_tab=in_current_tab,
+        )
     except UiWaitTimeoutError as exc:
         excerpt = response_panel_excerpt(session.ui_snapshot())
         raise UiWaitTimeoutError(

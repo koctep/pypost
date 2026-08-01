@@ -365,20 +365,30 @@ class AgentAppSession:
         widget_id: str,
         *,
         timeout: float = DEFAULT_UI_WAIT_TIMEOUT_S,
+        in_current_tab: bool = False,
     ) -> QWidget:
-        """Wait until a named widget exists under the main window."""
+        """Wait until a named widget exists under the main window (or current tab)."""
         self._require_started()
-        return wait_for_widget(self.window, widget_id, timeout=timeout)
+        return wait_for_widget(
+            self._action_root(in_current_tab=in_current_tab),
+            widget_id,
+            timeout=timeout,
+        )
 
     def wait_for_enabled(
         self,
         widget_id: str,
         *,
         timeout: float = DEFAULT_UI_WAIT_TIMEOUT_S,
+        in_current_tab: bool = False,
     ) -> QWidget:
         """Wait until a named widget is visible and enabled."""
         self._require_started()
-        return wait_for_enabled(self.window, widget_id, timeout=timeout)
+        return wait_for_enabled(
+            self._action_root(in_current_tab=in_current_tab),
+            widget_id,
+            timeout=timeout,
+        )
 
     def wait_for_text(
         self,
@@ -386,10 +396,16 @@ class AgentAppSession:
         expected: str | Callable[[str], bool],
         *,
         timeout: float = DEFAULT_UI_WAIT_TIMEOUT_S,
+        in_current_tab: bool = False,
     ) -> QWidget:
         """Wait until a named widget's text matches ``expected``."""
         self._require_started()
-        return wait_for_text(self.window, widget_id, expected, timeout=timeout)
+        return wait_for_text(
+            self._action_root(in_current_tab=in_current_tab),
+            widget_id,
+            expected,
+            timeout=timeout,
+        )
 
     def wait_for_snapshot(
         self,

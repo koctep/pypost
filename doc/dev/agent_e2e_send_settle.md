@@ -37,7 +37,7 @@ Mandatory modules guarded by
 - `test_agent_e2e_http_env.py`
 
 Optional: `test_agent_e2e_http_seed_post.py` (tree-open Send uses
-`in_current_tab=True` until [PYPOST-949](https://pypost.atlassian.net/browse/PYPOST-949)).
+`in_current_tab=True` on helper and session waits — PYPOST-949).
 
 ## API / Usage
 
@@ -67,9 +67,10 @@ snapshot tokens may still differ for post-settle joins.
 
 ### `wait_response_after_send(session, *, status_label, body_text, step, …)`
 
-Wait for status label then body text on catalog ids. Roots at
-`session.window` by default; pass `in_current_tab=True` when the active
-request tab differs from window-first match (seed POST tree-open path).
+Wait for status label then body text on catalog ids via
+`session.wait_for_text(..., in_current_tab=…)`. Defaults to window root;
+pass `in_current_tab=True` when the active request tab differs from
+window-first match (seed POST tree-open path).
 
 On `UiWaitTimeoutError`, re-raises with `step`, `response_excerpt`, and merged
 diagnostics (same contract as golden timeout wrapping).
@@ -79,7 +80,7 @@ diagnostics (same contract as golden timeout wrapping).
 | `timeout` | `SEND_SETTLE_TIMEOUT_S` (15 s) | From `tests.helpers.agent_e2e_send` |
 | `message_prefix` | `"Send settle failed"` | Prepended to timeout message |
 | `diagnostics_extra` | `None` | Merged into raised diagnostics |
-| `in_current_tab` | `False` | Root = `session.current_request_tab()` |
+| `in_current_tab` | `False` | Passed to `session.wait_for_text` (PYPOST-949) |
 
 Streaming scenarios (double-body, presentation matrix) may still sleep ~100 ms
 after settle so a late chunk flush does not affect post-settle counts.
@@ -103,7 +104,7 @@ make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py::test_send_modules
 | --- | --- |
 | Convention lock fails on `_response_ready` | Replace `wait_for_snapshot(_response_ready)` with helper or twin `wait_for_text` on status/body ids |
 | Body wait timeout, status ok | Expected body must be **display form** (`json_response_body_display`), not compact snapshot JSON |
-| Wrong tab matched | Multi-tab Send: use `in_current_tab=True` or follow PYPOST-949 tab-scoped session API |
+| Wrong tab matched | Multi-tab Send: pass `in_current_tab=True` on helper or `session.wait_for_text` |
 | Timeout lacks `step` / excerpt | Call via `wait_response_after_send`, not bare `wait_for_text`, when diagnostics matter |
 | Post-settle count wrong | Settle helper does not replace panel walk asserts; confirm chunk-flush delay if streaming stub |
 
