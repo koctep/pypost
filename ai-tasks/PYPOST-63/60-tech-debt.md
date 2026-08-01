@@ -12,9 +12,9 @@ SAFE TO CLOSE. The TD-6 item from PYPOST-41 is resolved. No blockers identified.
 
 ## Follow-ups (non-blocker)
 
-| ID | Priority | Item |
-|----|----------|------|
-| TD-1 | Low | `ResolvedRequestFields` and `MaskedRequestData` share shape — consider a shared type alias in a future cleanup |
-| TD-2 | Low | MCP header rendering for `resolved` adds renders only used for history when headers present — acceptable |
+| ID | Priority | Item | Jira |
+|----|----------|------|------|
+| TD-1 | Low | `ResolvedRequestFields` and `MaskedRequestData` share shape — consider a shared type alias in a future cleanup | [PYPOST-802](https://pypost.atlassian.net/browse/PYPOST-802) |
+| TD-2 | Low | MCP header rendering for `resolved` adds renders only used for history when headers present — acceptable | |
 
 No new Jira issues required.

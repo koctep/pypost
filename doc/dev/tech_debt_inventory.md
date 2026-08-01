@@ -28,12 +28,15 @@ Run after closing a task that adds or updates tech-debt artifacts.
 
 | Artifact | Purpose |
 | --- | --- |
-| `ai-tasks/PYPOST-*/60-tech-debt.md` | Step 6 output for a single task |
+| `ai-tasks/PYPOST-*/60-tech-debt.md` | Per-task debt source of truth (ticket links live here) |
 | `ai-tasks/PYPOST-*/60-review.md` | Detailed review (older naming) |
 | `ai-tasks/00-tech-debt-consolidated.md` | Cross-task index of Jira-linked debt |
+| `doc/dev/tech_debt_jira_sync.md` | How to ticket unticketed follow-ups (PYPOST-1016) |
 | `doc/dev/tech-debt/PYPOST-*.md` | Developer-facing summaries for major audits |
 
 The inventory does **not** replace per-task debt files; it indexes their Jira links.
+Ticket new unticketed rows via [Tech Debt → Jira Sync](tech_debt_jira_sync.md),
+not by editing this rollup by hand.
 
 ## Markdown and Jira Hygiene
 
@@ -73,5 +76,10 @@ python3 scripts/consolidate_tech_debt.py --json scripts/debt_inventory.json
 
 ## Related
 
+- [Tech Debt → Jira Sync](tech_debt_jira_sync.md) — ticket unticketed
+  `60-tech-debt.md` follow-ups and write browse links back
+  ([PYPOST-1016](https://pypost.atlassian.net/browse/PYPOST-1016);
+  skill
+  [tech-debt-jira-sync](../../.claude/skills/tech-debt-jira-sync/SKILL.md)).
 - Sprint 502 executes linked UI polish and cleanup debt items.
 - Follow-ups: PYPOST-581 (bulk Jira summary cleanup), PYPOST-582 (markdown standardization).

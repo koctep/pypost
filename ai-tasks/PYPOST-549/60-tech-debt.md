@@ -24,9 +24,9 @@
 
 | ID | Priority | Item | Jira / owner |
 | --- | --- | --- | --- |
-| TD-1 | Low | Dual SSE + Streamable HTTP maintenance | PYPOST-551 — remove legacy `/sse` when ecosystem allows |
+| TD-1 | Low | Dual SSE + Streamable HTTP maintenance | PYPOST-551 — remove legacy `/sse` when ecosystem allows. [PYPOST-653](https://pypost.atlassian.net/browse/PYPOST-653) |
 | TD-2 | Low | User-facing `doc/mcp_integration.md` still SSE URLs | [PYPOST-552](https://pypost.atlassian.net/browse/PYPOST-552) |
-| TD-3 | Low | `HTTPClient` SSE URL heuristic | Pre-existing debt (PYPOST-430) | [PYPOST-652](https://pypost.atlassian.net/browse/PYPOST-652) |
+| TD-3 | Low | `HTTPClient` SSE URL heuristic | Pre-existing debt (PYPOST-430). [PYPOST-652](https://pypost.atlassian.net/browse/PYPOST-652) |
 | TD-4 | Low | Hardcoded legacy route paths in `MCPServerImpl` | [PYPOST-152](https://pypost.atlassian.net/browse/PYPOST-152) |
 | TD-5 | Low | Port-busy error UX | [PYPOST-154](https://pypost.atlassian.net/browse/PYPOST-154), PYPOST-556 |
 

@@ -1,0 +1,67 @@
+[
+  {
+    "key": "PYPOST-799",
+    "file": "ai-tasks/PYPOST-75/60-tech-debt.md",
+    "line": 29,
+    "parent": "PYPOST-75",
+    "summary": "Introduce MetricsProtocol + NullMetrics for metrics is None guards",
+    "story_points": null,
+    "note": "Partial sync residue; verified linked in source"
+  },
+  {
+    "key": "PYPOST-800",
+    "file": "ai-tasks/PYPOST-794/60-tech-debt.md",
+    "line": 26,
+    "parent": "PYPOST-794",
+    "summary": "Add pytest smoke for make help non-empty output",
+    "story_points": null,
+    "note": "Partial sync residue; verified linked in source"
+  },
+  {
+    "key": "PYPOST-801",
+    "file": "ai-tasks/PYPOST-747/60-tech-debt.md",
+    "line": 18,
+    "parent": "PYPOST-747",
+    "summary": "Migrate startup/shutdown legacy log strings in main.py",
+    "story_points": null,
+    "note": "Partial sync residue; verified linked in source"
+  },
+  {
+    "key": "PYPOST-802",
+    "file": "ai-tasks/PYPOST-63/60-tech-debt.md",
+    "line": 17,
+    "parent": "PYPOST-63",
+    "summary": "Shared type alias for ResolvedRequestFields and MaskedRequestData",
+    "story_points": null,
+    "note": "Partial sync residue; verified linked in source"
+  },
+  {
+    "key": "PYPOST-803",
+    "file": "ai-tasks/PYPOST-68/60-tech-debt.md",
+    "line": 15,
+    "parent": "PYPOST-68",
+    "summary": "Collections/Tabs presenter apply_font (PYPOST-43 TD-1)",
+    "story_points": null,
+    "note": "Partial sync residue; verified linked in source"
+  },
+  {
+    "key": "PYPOST-1018",
+    "file": "ai-tasks/PYPOST-542/60-tech-debt.md",
+    "line": 11,
+    "parent": "PYPOST-542",
+    "summary": "[PYPOST-542] Default runtime encrypt to v2",
+    "story_points": 3,
+    "priority": "Low",
+    "created_by": "PYPOST-1016 Step 4"
+  },
+  {
+    "key": "PYPOST-1019",
+    "file": "ai-tasks/PYPOST-542/60-tech-debt.md",
+    "line": 12,
+    "parent": "PYPOST-542",
+    "summary": "[PYPOST-542] Settings UI for upgrade-v2",
+    "story_points": 3,
+    "priority": "Low",
+    "created_by": "PYPOST-1016 Step 4"
+  }
+]

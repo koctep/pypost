@@ -37,9 +37,9 @@ Jira: [PYPOST-854](https://pypost.atlassian.net/browse/PYPOST-854)
 
 | ID | Priority | Summary | Notes |
 | --- | --- | --- | --- |
-| TD-1 | Low | Optional `@pytest.mark.agent_e2e` + marker-based make target | Reduces manual Makefile list maintenance |
-| TD-2 | Low | Optional `test_makefile.py` smoke for `test-agent-e2e` help/prereqs | Parity with other make target tests |
-| TD-3 | Low | Optional CI job/step that runs `make test-agent-e2e` alone | Faster signal when only agent stack changes; not required for AC |
+| TD-1 | Low | Optional `@pytest.mark.agent_e2e` + marker-based make target | Absorbed by [PYPOST-858](https://pypost.atlassian.net/browse/PYPOST-858) |
+| TD-2 | Low | Optional `test_makefile.py` smoke for `test-agent-e2e` help/prereqs | Absorbed by [PYPOST-861](https://pypost.atlassian.net/browse/PYPOST-861) |
+| TD-3 | Low | Optional CI job/step that runs `make test-agent-e2e` alone | Absorbed by [PYPOST-861](https://pypost.atlassian.net/browse/PYPOST-861); not required for AC |
 
 No blockers relative to acceptance criteria. Packaging (umbrella doc + make
 target + cross-links) is complete; debt is optional ergonomics.

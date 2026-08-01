@@ -23,7 +23,7 @@ None. Help target runs grep/awk once; negligible.
 
 | Priority | Task | Rationale | Jira |
 | --- | --- | --- | --- |
-| Low | Add pytest smoke for `make help` non-empty output | Would catch accidental removal of `##` annotations | — |
+| Low | Add pytest smoke for `make help` non-empty output | Would catch accidental removal of `##` annotations | [PYPOST-800](https://pypost.atlassian.net/browse/PYPOST-800) |
 
 No blockers for close.
 

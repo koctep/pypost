@@ -10,7 +10,7 @@
 | ID | Priority | Item | Notes |
 | --- | --- | --- | --- |
 | TD-1 | Medium | Live MCP execution using collection tools | [PYPOST-181](https://pypost.atlassian.net/browse/PYPOST-181) |
-| TD-2 | Low | No pytest fixture in `conftest.py` yet | Add when PYPOST-181 needs session-scoped collection |
+| TD-2 | Low | No pytest fixture in `conftest.py` yet | Add when PYPOST-181 needs session-scoped collection. [PYPOST-593](https://pypost.atlassian.net/browse/PYPOST-593) |
 | TD-3 | Low | SSE probe URLs still `/sse` | By design — HTTPClient SSE-probe heuristic (PYPOST-430/552) |
 
 ## Blocker review

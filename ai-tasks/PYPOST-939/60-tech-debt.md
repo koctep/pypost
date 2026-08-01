@@ -50,8 +50,8 @@ None material.
 
 | ID | Priority | Item | Notes |
 | --- | --- | --- | --- |
-| TD-1 | Low | Share flat DisplayRole scan between item view and tree helpers | Only if drift grows |
-| TD-2 | Low | Dedicated `item view has no model` test | Mirror tree no-model coverage |
+| TD-1 | Low | Share flat DisplayRole scan between item view and tree helpers | Only if drift grows. [PYPOST-971](https://pypost.atlassian.net/browse/PYPOST-971) |
+| TD-2 | Low | Dedicated `item view has no model` test | Mirror tree no-model coverage. [PYPOST-972](https://pypost.atlassian.net/browse/PYPOST-972) |
 
 ### Accepted / out of scope (do not ticket)
 

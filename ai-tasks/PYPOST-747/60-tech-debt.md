@@ -15,7 +15,7 @@ None. Documentation meets acceptance criteria.
 | Item | Notes | Jira |
 | --- | --- | --- |
 | Bulk legacy log migration | ~30 legacy patterns remain; migrate on touch | [PYPOST-751](https://pypost.atlassian.net/browse/PYPOST-751) |
-| Startup/shutdown legacy strings | `PyPost starting up` in `main.py` — low priority | — |
+| Startup/shutdown legacy strings | `PyPost starting up` in `main.py` — low priority | [PYPOST-801](https://pypost.atlassian.net/browse/PYPOST-801) |
 
 No new follow-ups introduced by this task.
 

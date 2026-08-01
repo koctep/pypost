@@ -1,6 +1,6 @@
 # Consolidated Technical Debt Inventory
 
-Generated for [PYPOST-57](https://pypost.atlassian.net/browse/PYPOST-57) on 2026-06-12.
+Generated for [PYPOST-57](https://pypost.atlassian.net/browse/PYPOST-57) on 2026-08-02.
 
 Aggregated from `ai-tasks/**/60-review.md`, `ai-tasks/**/40-tech-debt.md`, and
 `ai-tasks/**/60-tech-debt.md`. Each row links a source task artifact to its Jira
@@ -12,11 +12,11 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 
 | Metric | Count |
 | --- | ---: |
-| Source files scanned | 502 |
-| Total Jira link references | 824 |
-| Unique linked Jira issues | 577 |
-| Source tasks with linked debt | 166 |
-| Debt files without Jira links | 281 |
+| Source files scanned | 818 |
+| Total Jira link references | 1460 |
+| Unique linked Jira issues | 874 |
+| Source tasks with linked debt | 270 |
+| Debt files without Jira links | 445 |
 
 ## Key Source Tasks
 
@@ -570,6 +570,12 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-581](https://pypost.atlassian.net/browse/PYPOST-581) | Medium \| Bulk-fix truncated Jira summaries for all 480 linked debt issues \| | `PYPOST-57/60-tech-debt.md` |
 | [PYPOST-582](https://pypost.atlassian.net/browse/PYPOST-582) | Low \| Standardize debt bullet format (PYPOST-53 table style) across legacy files \| | `PYPOST-57/60-tech-debt.md` |
 
+### PYPOST-63 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-802](https://pypost.atlassian.net/browse/PYPOST-802) | TD-1 \| Low \| `ResolvedRequestFields` and `MaskedRequestData` share shape | `PYPOST-63/60-tech-debt.md` |
+
 ### PYPOST-66 (2 items)
 
 | Jira | Summary (from artifact) | File |
@@ -582,6 +588,12 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
 | [PYPOST-68](https://pypost.atlassian.net/browse/PYPOST-68) | TD-3 \| MEDIUM \| `EnvPresenter` exposes internal widgets via properties \| | `PYPOST-67/60-tech-debt.md` |
+
+### PYPOST-68 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-803](https://pypost.atlassian.net/browse/PYPOST-803) | PYPOST-43 TD-1 Collections/Tabs presenter `apply_font` \| **Resolved | `PYPOST-68/60-tech-debt.md` |
 
 ### PYPOST-73 (2 items)
 
@@ -601,7 +613,7 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
 | [PYPOST-676](https://pypost.atlassian.net/browse/PYPOST-676) | Facade still bundles registry + server at type level \| Low \| Call sites that only need counters s... | `PYPOST-75/60-tech-debt.md` |
-| [PYPOST-677](https://pypost.atlassian.net/browse/PYPOST-677) | \| Low \| — \| Introduce `MetricsProtocol` + `NullMetrics` to replace `metrics is None` guards (PYPO... | `PYPOST-75/60-tech-debt.md` |
+| [PYPOST-799](https://pypost.atlassian.net/browse/PYPOST-799) | PYPOST-44 TD-2 \| Optional `MetricsProtocol` / `NullMetrics` / `None` guards at call sites \| Close... | `PYPOST-75/60-tech-debt.md` |
 
 ### PYPOST-102 (1 items)
 
@@ -679,12 +691,23 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | --- | --- | --- |
 | [PYPOST-591](https://pypost.atlassian.net/browse/PYPOST-591) | Facade-only coverage in `test_metrics_manager.py` \| Low \| Complements new component tests \| | `PYPOST-177/60-tech-debt.md` |
 
-### PYPOST-181 (2 items)
+### PYPOST-179 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-679](https://pypost.atlassian.net/browse/PYPOST-679) | TD-1 \| Low \| Makefile `generate-mcp-fixtures` target \| Convenience wrapper around the script \| Jira | `PYPOST-179/60-tech-debt.md` |
+
+### PYPOST-180 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-593](https://pypost.atlassian.net/browse/PYPOST-593) | TD-2 \| Low \| No pytest fixture in `conftest.py` yet \| Add when PYPOST-181 needs session-scoped co... | `PYPOST-180/60-tech-debt.md` |
+
+### PYPOST-181 (1 items)
 
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
 | [PYPOST-592](https://pypost.atlassian.net/browse/PYPOST-592) | TD-1 \| Low \| Duplicate live-server harness \| Extract shared `tests/helpers/mcp_live_server.py` fr... | `PYPOST-181/60-tech-debt.md` |
-| [PYPOST-593](https://pypost.atlassian.net/browse/PYPOST-593) | TD-2 \| Low \| No `conftest.py` fixture \| Session-scoped collection server if more collection tests... | `PYPOST-181/60-tech-debt.md` |
 
 ### PYPOST-225 (2 items)
 
@@ -737,12 +760,11 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-303](https://pypost.atlassian.net/browse/PYPOST-303) | Technical debt follow-up | `PYPOST-302/60-tech-debt.md` |
 | [PYPOST-304](https://pypost.atlassian.net/browse/PYPOST-304) | Technical debt follow-up | `PYPOST-302/60-tech-debt.md` |
 
-### PYPOST-310 (2 items)
+### PYPOST-310 (1 items)
 
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
 | [PYPOST-312](https://pypost.atlassian.net/browse/PYPOST-312) | Pytest exit code 5 policy** — existing debt | `PYPOST-310/60-tech-debt.md` |
-| [PYPOST-559](https://pypost.atlassian.net/browse/PYPOST-559) | Full install smoke in CI** — existing debt | `PYPOST-310/60-tech-debt.md` |
 
 ### PYPOST-312 (1 items)
 
@@ -821,12 +843,6 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | --- | --- | --- |
 | [PYPOST-368](https://pypost.atlassian.net/browse/PYPOST-368) | Live MCP client integration (tool list + call over SSE) | `PYPOST-367/60-tech-debt.md` |
 
-### PYPOST-368 (1 items)
-
-| Jira | Summary (from artifact) | File |
-| --- | --- | --- |
-| [PYPOST-560](https://pypost.atlassian.net/browse/PYPOST-560) | SSE servers | `PYPOST-368/60-tech-debt.md` |
-
 ### PYPOST-370 (2 items)
 
 | Jira | Summary (from artifact) | File |
@@ -834,15 +850,13 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-563](https://pypost.atlassian.net/browse/PYPOST-563) | Technical debt follow-up | `PYPOST-370/60-tech-debt.md` |
 | [PYPOST-564](https://pypost.atlassian.net/browse/PYPOST-564) | Technical debt follow-up | `PYPOST-370/60-tech-debt.md` |
 
-### PYPOST-374 (5 items)
+### PYPOST-374 (3 items)
 
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
 | [PYPOST-598](https://pypost.atlassian.net/browse/PYPOST-598) | D1 \| `SettingsDialog` multi-domain SRP violation (423 LOC) \| High \| | `PYPOST-374/60-tech-debt.md` |
 | [PYPOST-599](https://pypost.atlassian.net/browse/PYPOST-599) | D2 \| `HotkeysDialog` hardcoded shortcuts vs app actions \| Medium \| | `PYPOST-374/60-tech-debt.md` |
-| [PYPOST-600](https://pypost.atlassian.net/browse/PYPOST-600) | D3 \| Duplicated encryption mode parsing in `SettingsDialog` \| Medium \| | `PYPOST-374/60-tech-debt.md` |
 | [PYPOST-601](https://pypost.atlassian.net/browse/PYPOST-601) | D4 \| Hardcoded About version \| Low \| | `PYPOST-374/60-tech-debt.md` |
-| [PYPOST-602](https://pypost.atlassian.net/browse/PYPOST-602) | D5 \| `EncryptionMigrationService` constructed inside dialog \| Low \| | `PYPOST-374/60-tech-debt.md` |
 
 ### PYPOST-382 (3 items)
 
@@ -1267,12 +1281,11 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-639](https://pypost.atlassian.net/browse/PYPOST-639) | TD-3 \| Low \| Skip bulk re-encrypt when inventory shows no ciphertext to rotate \| PYPOST-487 debt \| | `PYPOST-525/60-tech-debt.md` |
 | [PYPOST-678](https://pypost.atlassian.net/browse/PYPOST-678) | Technical debt follow-up | `PYPOST-525/60-tech-debt.md` |
 
-### PYPOST-527 (3 items)
+### PYPOST-527 (2 items)
 
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
 | [PYPOST-640](https://pypost.atlassian.net/browse/PYPOST-640) | TD-1 \| Low \| Add Settings action for encrypt-plaintext \| Parity with CLI M4 scenario \| | `PYPOST-527/60-tech-debt.md` |
-| [PYPOST-641](https://pypost.atlassian.net/browse/PYPOST-641) | TD-2 \| Low \| Extract shared migration report text formatter \| DRY with CLI \| | `PYPOST-527/60-tech-debt.md` |
 | [PYPOST-642](https://pypost.atlassian.net/browse/PYPOST-642) | TD-3 \| Low \| Background worker for bulk re-encrypt from UI \| Avoid UI freeze on large files \| | `PYPOST-527/60-tech-debt.md` |
 
 ### PYPOST-530 (4 items)
@@ -1323,11 +1336,19 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-649](https://pypost.atlassian.net/browse/PYPOST-649) | TD-12 \| Low \| v2 encrypt in `EnvironmentSecretsCodec` \| `encrypt()` still emits v1; add when migr... | `PYPOST-541/60-tech-debt.md` |
 | [PYPOST-650](https://pypost.atlassian.net/browse/PYPOST-650) | TD-13 \| Low \| Bulk v1→v2 re-encrypt CLI option \| Depends on v2 encrypt; extend `encryption_migrat... | `PYPOST-541/60-tech-debt.md` |
 
-### PYPOST-544 (1 items)
+### PYPOST-542 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-1018](https://pypost.atlassian.net/browse/PYPOST-1018) | TD-14 \| Low \| Default runtime encrypt to v2 \| Separate product decision; desktop saves still v1. | `PYPOST-542/60-tech-debt.md` |
+| [PYPOST-1019](https://pypost.atlassian.net/browse/PYPOST-1019) | TD-15 \| Low \| Settings UI for upgrade-v2 \| CLI-only for now. | `PYPOST-542/60-tech-debt.md` |
+
+### PYPOST-544 (2 items)
 
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
 | [PYPOST-545](https://pypost.atlassian.net/browse/PYPOST-545) | TD-1 \| Low \| Dry-run projected reuse counts in CLI and Settings \| | `PYPOST-544/60-tech-debt.md` |
+| [PYPOST-641](https://pypost.atlassian.net/browse/PYPOST-641) | TD-2 \| Low \| Extract shared migration report formatting for CLI and Settings \| Optional DRY; labe... | `PYPOST-544/60-tech-debt.md` |
 
 ### PYPOST-548 (1 items)
 
@@ -1342,7 +1363,7 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-550](https://pypost.atlassian.net/browse/PYPOST-550) | Technical debt follow-up | `PYPOST-549/60-tech-debt.md` |
 | [PYPOST-551](https://pypost.atlassian.net/browse/PYPOST-551) | Technical debt follow-up | `PYPOST-549/60-tech-debt.md` |
 | [PYPOST-552](https://pypost.atlassian.net/browse/PYPOST-552) | TD-2 \| Low \| User-facing `doc/mcp_integration.md` still SSE URLs \| | `PYPOST-549/60-tech-debt.md` |
-| [PYPOST-652](https://pypost.atlassian.net/browse/PYPOST-652) | TD-3 \| Low \| `HTTPClient` SSE URL heuristic \| Pre-existing debt (PYPOST-430) \| | `PYPOST-549/60-tech-debt.md` |
+| [PYPOST-652](https://pypost.atlassian.net/browse/PYPOST-652) | TD-3 \| Low \| `HTTPClient` SSE URL heuristic \| Pre-existing debt (PYPOST-430). | `PYPOST-549/60-tech-debt.md` |
 
 ### PYPOST-550 (3 items)
 
@@ -1352,10 +1373,12 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-576](https://pypost.atlassian.net/browse/PYPOST-576) | Manager supplier propagation \| Add unit test in `tests/test_mcp_server.py` (or existing manager t... | `PYPOST-550/60-tech-debt.md` |
 | [PYPOST-577](https://pypost.atlassian.net/browse/PYPOST-577) | Shared env snapshot \| Optional refactor: extract env-variable cache from `EnvPresenter`/`TabsPres... | `PYPOST-550/60-tech-debt.md` |
 
-### PYPOST-551 (3 items)
+### PYPOST-551 (5 items)
 
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
+| [PYPOST-430](https://pypost.atlassian.net/browse/PYPOST-430) | TD-2 \| Low \| `HTTPClient` SSE probe uses `"/sse" in url` heuristic \| Resolved in | `PYPOST-551/60-tech-debt.md` |
+| [PYPOST-560](https://pypost.atlassian.net/browse/PYPOST-560) | TD-3 \| Low \| `MCPClientService.run` uses `asyncio.run` \| Pre-existing (PYPOST-368); `anyio.run` m... | `PYPOST-551/60-tech-debt.md` |
 | [PYPOST-578](https://pypost.atlassian.net/browse/PYPOST-578) | TD-4 \| Low \| User-facing `doc/mcp_integration.md` still describes SSE URL \| | `PYPOST-551/60-tech-debt.md` |
 | [PYPOST-653](https://pypost.atlassian.net/browse/PYPOST-653) | TD-1 \| Low \| Dual SSE + Streamable HTTP maintenance \| Legacy `/sse` mounts kept for transition; r... | `PYPOST-551/60-tech-debt.md` |
 | [PYPOST-654](https://pypost.atlassian.net/browse/PYPOST-654) | TD-5 \| Low \| `config/test/README.md` example URLs still reference `/sse` \| Update when refreshing... | `PYPOST-551/60-tech-debt.md` |
@@ -1375,10 +1398,11 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-658](https://pypost.atlassian.net/browse/PYPOST-658) | TD-2 \| Low \| Support `array` / `object` types in UI type combo (model already allows) \| | `PYPOST-553/60-tech-debt.md` |
 | [PYPOST-659](https://pypost.atlassian.net/browse/PYPOST-659) | TD-3 \| Low \| Operator contract preview panel (PYPOST-555) \| | `PYPOST-553/60-tech-debt.md` |
 
-### PYPOST-555 (1 items)
+### PYPOST-555 (2 items)
 
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
+| [PYPOST-556](https://pypost.atlassian.net/browse/PYPOST-556) | TD-2 \| Low \| Global tools overview (PYPOST-556) \| Complements per-request preview. | `PYPOST-555/60-tech-debt.md` |
 | [PYPOST-660](https://pypost.atlassian.net/browse/PYPOST-660) | TD-1 \| Low \| Refresh preview on MCP param type combo change \| `McpParamsTable` type `QComboBox` c... | `PYPOST-555/60-tech-debt.md` |
 
 ### PYPOST-556 (3 items)
@@ -1389,11 +1413,13 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-662](https://pypost.atlassian.net/browse/PYPOST-662) | TD-2 \| Low \| Link overview rows to open request tab \| | `PYPOST-556/60-tech-debt.md` |
 | [PYPOST-663](https://pypost.atlassian.net/browse/PYPOST-663) | TD-3 \| Low \| Metrics MCP server same reliable status pattern \| | `PYPOST-556/60-tech-debt.md` |
 
-### PYPOST-557 (1 items)
+### PYPOST-557 (3 items)
 
 | Jira | Summary (from artifact) | File |
 | --- | --- | --- |
 | [PYPOST-664](https://pypost.atlassian.net/browse/PYPOST-664) | UI tool preview structured result \| Low \| PYPOST-555 may show envelope preview \| | `PYPOST-557/60-tech-debt.md` |
+| [PYPOST-680](https://pypost.atlassian.net/browse/PYPOST-680) | Agents must parse JSON TextContent \| Low \| Documented in `doc/dev/mcp_integration.md`; breaking c... | `PYPOST-557/60-tech-debt.md` |
+| [PYPOST-681](https://pypost.atlassian.net/browse/PYPOST-681) | `error_message` omits `detail` field \| Low \| Agents can parse `body` for synthetic errors; option... | `PYPOST-557/60-tech-debt.md` |
 
 ### PYPOST-567 (1 items)
 
@@ -1437,9 +1463,800 @@ Regenerate: `python scripts/consolidate_tech_debt.py`
 | [PYPOST-583](https://pypost.atlassian.net/browse/PYPOST-583) | TD-1 \| Low \| Wire OTel adapter in production composition root \| Requires operator OTLP config; de... | `PYPOST-579/60-tech-debt.md` |
 | [PYPOST-584](https://pypost.atlassian.net/browse/PYPOST-584) | TD-2 \| Low \| Shared instrument definition table \| `MetricsRegistry` and `OtelMetricsTracker` dupl... | `PYPOST-579/60-tech-debt.md` |
 
+### PYPOST-598 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-600](https://pypost.atlassian.net/browse/PYPOST-600) | D3 \| Duplicated encryption form-state between `accept()` and migration handlers \| Medium \| | `PYPOST-598/60-tech-debt.md` |
+| [PYPOST-602](https://pypost.atlassian.net/browse/PYPOST-602) | D5 \| `EncryptionMigrationService` constructed inside dialog when storage provided \| Low \| | `PYPOST-598/60-tech-debt.md` |
+
+### PYPOST-621 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-682](https://pypost.atlassian.net/browse/PYPOST-682) | E2E: emit alert after settings save uses new log path \| Low \| Unit tests cover reload wiring; ful... | `PYPOST-621/60-tech-debt.md` |
+
+### PYPOST-659 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-555](https://pypost.atlassian.net/browse/PYPOST-555) | Technical debt follow-up | `PYPOST-659/60-tech-debt.md` |
+
+### PYPOST-684 (9 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-692](https://pypost.atlassian.net/browse/PYPOST-692) | import. Remove `ui/` import from `core/`. | `PYPOST-684/60-tech-debt.md` |
+| [PYPOST-693](https://pypost.atlassian.net/browse/PYPOST-693) | HTTP/templating/history in Qt-free modules. | `PYPOST-684/60-tech-debt.md` |
+| [PYPOST-694](https://pypost.atlassian.net/browse/PYPOST-694) | `testability.md` table. | `PYPOST-684/60-tech-debt.md` |
+| [PYPOST-697](https://pypost.atlassian.net/browse/PYPOST-697) | setup instead of module singleton (or document explicit acceptance). | `PYPOST-684/60-tech-debt.md` |
+| [PYPOST-698](https://pypost.atlassian.net/browse/PYPOST-698) | `RequestWorker` for narrower integration tests. | `PYPOST-684/60-tech-debt.md` |
+| [PYPOST-699](https://pypost.atlassian.net/browse/PYPOST-699) | Remediation:** Remove from docs or add shared helpers when needed. | `PYPOST-684/60-tech-debt.md` |
+| [PYPOST-700](https://pypost.atlassian.net/browse/PYPOST-700) | Remediation:** Split expression helpers if growth continues. | `PYPOST-684/60-tech-debt.md` |
+| [PYPOST-701](https://pypost.atlassian.net/browse/PYPOST-701) | parity with GUI. | `PYPOST-684/60-tech-debt.md` |
+| [PYPOST-702](https://pypost.atlassian.net/browse/PYPOST-702) | (depends on R-P1-001). | `PYPOST-684/60-tech-debt.md` |
+
+### PYPOST-685 (13 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-703](https://pypost.atlassian.net/browse/PYPOST-703) | size limits; document that agents see full upstream responses today. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-704](https://pypost.atlassian.net/browse/PYPOST-704) | binding beyond localhost. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-705](https://pypost.atlassian.net/browse/PYPOST-705) | non-localhost bind. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-706](https://pypost.atlassian.net/browse/PYPOST-706) | UX for the hidden flag. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-707](https://pypost.atlassian.net/browse/PYPOST-707) | (product decision). | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-708](https://pypost.atlassian.net/browse/PYPOST-708) | Remediation:** Encrypt or externalize secret storage for webhook credentials. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-709](https://pypost.atlassian.net/browse/PYPOST-709) | Remediation:** Log template URL or redact query parameters containing tokens. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-710](https://pypost.atlassian.net/browse/PYPOST-710) | Remediation:** Sanitize or omit `logs` field for agent responses. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-711](https://pypost.atlassian.net/browse/PYPOST-711) | UI/docs on global tool catalog scope. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-712](https://pypost.atlassian.net/browse/PYPOST-712) | Remediation:** Bind default to localhost (see R-P1-002) plus optional auth for metrics MCP. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-713](https://pypost.atlassian.net/browse/PYPOST-713) | Remediation:** Operator documentation; expected for a local API client. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-714](https://pypost.atlassian.net/browse/PYPOST-714) | Remediation:** Forward `hidden_keys` when wiring MCP history. | `PYPOST-685/60-tech-debt.md` |
+| [PYPOST-715](https://pypost.atlassian.net/browse/PYPOST-715) | Remediation:** Set `debug=False` for production MCP app. | `PYPOST-685/60-tech-debt.md` |
+
+### PYPOST-687 (9 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-728](https://pypost.atlassian.net/browse/PYPOST-728) | from `template_service` if refactor preferred. | `PYPOST-687/60-tech-debt.md` |
+| [PYPOST-730](https://pypost.atlassian.net/browse/PYPOST-730) | tests per step. | `PYPOST-687/60-tech-debt.md` |
+| [PYPOST-731](https://pypost.atlassian.net/browse/PYPOST-731) | 785 with headroom. | `PYPOST-687/60-tech-debt.md` |
+| [PYPOST-732](https://pypost.atlassian.net/browse/PYPOST-732) | parsers. | `PYPOST-687/60-tech-debt.md` |
+| [PYPOST-735](https://pypost.atlassian.net/browse/PYPOST-735) | breach. | `PYPOST-687/60-tech-debt.md` |
+| [PYPOST-737](https://pypost.atlassian.net/browse/PYPOST-737) | Remediation:** Delete unused `error_prefix` branch variable and import. | `PYPOST-687/60-tech-debt.md` |
+| [PYPOST-738](https://pypost.atlassian.net/browse/PYPOST-738) | Remediation:** Adopt when touching files; no big-bang migration required. | `PYPOST-687/60-tech-debt.md` |
+| [PYPOST-739](https://pypost.atlassian.net/browse/PYPOST-739) | Remediation:** Add section to `doc/dev/maintainability_audit.md` or `architecture.md`. | `PYPOST-687/60-tech-debt.md` |
+| [PYPOST-740](https://pypost.atlassian.net/browse/PYPOST-740) | Remediation:** Rename to `tab_dirty_state.py` or move to `ui/presenters/`. | `PYPOST-687/60-tech-debt.md` |
+
+### PYPOST-688 (11 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741) | change. | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-742](https://pypost.atlassian.net/browse/PYPOST-742) | Debt item (line 61) | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-743](https://pypost.atlassian.net/browse/PYPOST-743) | docs. Default INFO; allow DEBUG for support sessions. | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-744](https://pypost.atlassian.net/browse/PYPOST-744) | required for operators (document file sensitivity). | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-745](https://pypost.atlassian.net/browse/PYPOST-745) | Remediation:** Log scheme + host + path prefix; omit auth query params if present. | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-746](https://pypost.atlassian.net/browse/PYPOST-746) | `_init_encryption_metrics` helpers; no behavior change. | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-747](https://pypost.atlassian.net/browse/PYPOST-747) | event catalog and migration guidance for legacy modules. | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-748](https://pypost.atlassian.net/browse/PYPOST-748) | Debt item (line 120) | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-749](https://pypost.atlassian.net/browse/PYPOST-749) | Remediation:** Add reciprocal links between `observability_audit.md` and `testing.md`. | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-750](https://pypost.atlassian.net/browse/PYPOST-750) | `metric_rename_migration.md`. | `PYPOST-688/60-tech-debt.md` |
+| [PYPOST-752](https://pypost.atlassian.net/browse/PYPOST-752) | Remediation:** Enable flake8-print (T201) for `pypost/` or extend audit script. | `PYPOST-688/60-tech-debt.md` |
+
+### PYPOST-689 (12 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-753](https://pypost.atlassian.net/browse/PYPOST-753) | Emit counter `response_body_truncated_total`. Update tests with mocked oversized stream. | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-754](https://pypost.atlassian.net/browse/PYPOST-754) | Debt item (line 63) | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-755](https://pypost.atlassian.net/browse/PYPOST-755) | `test_response_view_search.py` large-doc cases. | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-756](https://pypost.atlassian.net/browse/PYPOST-756) | `resolved` is provided; fall back to re-render only when resolved unavailable (MCP edge cases). | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-757](https://pypost.atlassian.net/browse/PYPOST-757) | busy; incremental `refresh_tree` diff if cheap. | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-758](https://pypost.atlassian.net/browse/PYPOST-758) | file changes; full rebuild only on explicit "Reload all". | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-759](https://pypost.atlassian.net/browse/PYPOST-759) | configurable max concurrent tool executions; metric for queue depth if limited. | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-760](https://pypost.atlassian.net/browse/PYPOST-760) | Debt item (line 126) | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-761](https://pypost.atlassian.net/browse/PYPOST-761) | `render_path`; optional high-cardinality guard. | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-762](https://pypost.atlassian.net/browse/PYPOST-762) | panel until ready. Low priority if files stay small. | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-763](https://pypost.atlassian.net/browse/PYPOST-763) | Remediation:** Skip JSON reformat when `len(text) > LARGE_DOC_CHAR_THRESHOLD`. | `PYPOST-689/60-tech-debt.md` |
+| [PYPOST-764](https://pypost.atlassian.net/browse/PYPOST-764) | from `architecture.md`. | `PYPOST-689/60-tech-debt.md` |
+
+### PYPOST-690 (12 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-765](https://pypost.atlassian.net/browse/PYPOST-765) | Tech Debt). Re-run inventory script until gap is zero for capability docs. | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-766](https://pypost.atlassian.net/browse/PYPOST-766) | Debt item (line 57) | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-767](https://pypost.atlassian.net/browse/PYPOST-767) | Add "Related Audits" footer to each `*_audit.md` linking siblings. | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-768](https://pypost.atlassian.net/browse/PYPOST-768) | `baseline-metrics.md` current caps (383 file / 343 class LOC). Mark PYPOST-43 complete. | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-769](https://pypost.atlassian.net/browse/PYPOST-769) | Jira from `doc/dev/*_audit.md` when debt is ticketed separately. | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-770](https://pypost.atlassian.net/browse/PYPOST-770) | Remediation:** Add bullet: "Developer documentation — [doc/dev/README.md](doc/dev/README.md)." | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-771](https://pypost.atlassian.net/browse/PYPOST-771) | Remediation:** Add "Technical Debt" section with inventory link and major audit debt pages. | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-772](https://pypost.atlassian.net/browse/PYPOST-772) | Debt item (line 113) | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-773](https://pypost.atlassian.net/browse/PYPOST-773) | Remediation:** Add cross-link under Observability in dev README (or move to `doc/dev/`). | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-774](https://pypost.atlassian.net/browse/PYPOST-774) | Remediation:** Add "See also" sections at top of each file. | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-775](https://pypost.atlassian.net/browse/PYPOST-775) | Remediation:** Add Related Audits section (security, observability, maintainability). | `PYPOST-690/60-tech-debt.md` |
+| [PYPOST-776](https://pypost.atlassian.net/browse/PYPOST-776) | Remediation:** Run `scripts/audit_baseline_metrics.py --markdown` and commit if caps change. | `PYPOST-690/60-tech-debt.md` |
+
+### PYPOST-691 (11 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-777](https://pypost.atlassian.net/browse/PYPOST-777) | as the single source of truth. | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-778](https://pypost.atlassian.net/browse/PYPOST-778) | Debt item (line 68) | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-779](https://pypost.atlassian.net/browse/PYPOST-779) | CI installs from lock; document upgrade workflow in `doc/dev/setup.md`. | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-781](https://pypost.atlassian.net/browse/PYPOST-781) | `github-actions` ecosystem on `test.yml`. | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-782](https://pypost.atlassian.net/browse/PYPOST-782) | models on lower bound. | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-783](https://pypost.atlassian.net/browse/PYPOST-783) | combo. | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-784](https://pypost.atlassian.net/browse/PYPOST-784) | Debt item (line 132) | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-785](https://pypost.atlassian.net/browse/PYPOST-785) | dev` and `otel`, pytest `pythonpath` if desired. | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-786](https://pypost.atlassian.net/browse/PYPOST-786) | when obligations apply. | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-787](https://pypost.atlassian.net/browse/PYPOST-787) | file; keep OTel tests installing extra in CI matrix. | `PYPOST-691/60-tech-debt.md` |
+| [PYPOST-788](https://pypost.atlassian.net/browse/PYPOST-788) | and encryption packages. | `PYPOST-691/60-tech-debt.md` |
+
+### PYPOST-694 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-695](https://pypost.atlassian.net/browse/PYPOST-695) | Medium \| Elevate `StorageManager`, `RequestManager`, `MCPServerManager` to composition root \| | `PYPOST-694/60-tech-debt.md` |
+
+### PYPOST-734 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-813](https://pypost.atlassian.net/browse/PYPOST-813) | Remediation:** Annotate `send_request` / `execute` optional callbacks and variables. | `PYPOST-734/60-tech-debt.md` |
+| [PYPOST-814](https://pypost.atlassian.net/browse/PYPOST-814) | `# type: ignore` only as last resort. | `PYPOST-734/60-tech-debt.md` |
+
+### PYPOST-737 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-729](https://pypost.atlassian.net/browse/PYPOST-729) | Remaining W391/E501 from PYPOST-687 audit \| Low \| Closed in | `PYPOST-737/60-tech-debt.md` |
+| [PYPOST-736](https://pypost.atlassian.net/browse/PYPOST-736) | Wire `make lint` into CI pipeline \| Medium \| | `PYPOST-737/60-tech-debt.md` |
+
+### PYPOST-738 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-817](https://pypost.atlassian.net/browse/PYPOST-817) | \| Expand postponed annotations to `pypost/ui/` \| P3 \| ~60 UI modules remain \| | `PYPOST-738/60-tech-debt.md` |
+
+### PYPOST-739 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-733](https://pypost.atlassian.net/browse/PYPOST-733) | R-P2-004 \| P2 \| Narrow `except Exception` in storage/request_manager \| | `PYPOST-739/60-tech-debt.md` |
+
+### PYPOST-740 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-696](https://pypost.atlassian.net/browse/PYPOST-696) | Relocate `is_tab_dirty` to UI layer \| | `PYPOST-740/60-tech-debt.md` |
+
+### PYPOST-747 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-751](https://pypost.atlassian.net/browse/PYPOST-751) | Bulk legacy log migration \| ~30 legacy patterns remain; migrate on touch \| | `PYPOST-747/60-tech-debt.md` |
+| [PYPOST-801](https://pypost.atlassian.net/browse/PYPOST-801) | Startup/shutdown legacy strings \| `PyPost starting up` in `main.py` | `PYPOST-747/60-tech-debt.md` |
+
+### PYPOST-772 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-816](https://pypost.atlassian.net/browse/PYPOST-816) | Remediation:** Implement `scripts/verify_ai_task_artifacts.py` and wire into Makefile. | `PYPOST-772/60-tech-debt.md` |
+
+### PYPOST-779 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-780](https://pypost.atlassian.net/browse/PYPOST-780) | Remediation:** `requirements-dev.txt` with pins; `make install-dev`. | `PYPOST-779/60-tech-debt.md` |
+
+### PYPOST-780 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-434](https://pypost.atlassian.net/browse/PYPOST-434) | Remediation | `PYPOST-780/60-tech-debt.md` |
+| [PYPOST-804](https://pypost.atlassian.net/browse/PYPOST-804) | Remediation:** Add lightweight job with `uv` setup when CI uv adoption is standardized. | `PYPOST-780/60-tech-debt.md` |
+| [PYPOST-805](https://pypost.atlassian.net/browse/PYPOST-805) | Remediation:** Add to `requirements-dev.in` if security tooling should share the dev lock. | `PYPOST-780/60-tech-debt.md` |
+
+### PYPOST-785 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-806](https://pypost.atlassian.net/browse/PYPOST-806) | Remediation:** Add editable install target and migrate install docs when sibling ticket lands. | `PYPOST-785/60-tech-debt.md` |
+| [PYPOST-807](https://pypost.atlassian.net/browse/PYPOST-807) | `pyproject.toml`. | `PYPOST-785/60-tech-debt.md` |
+
+### PYPOST-786 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-809](https://pypost.atlassian.net/browse/PYPOST-809) | `LICENSES/` or document generation in CI. | `PYPOST-786/60-tech-debt.md` |
+| [PYPOST-810](https://pypost.atlassian.net/browse/PYPOST-810) | `doc/dev/licensing.md` with any platform-specific notes. | `PYPOST-786/60-tech-debt.md` |
+
+### PYPOST-787 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-811](https://pypost.atlassian.net/browse/PYPOST-811) | unconditionally. | `PYPOST-787/60-tech-debt.md` |
+| [PYPOST-812](https://pypost.atlassian.net/browse/PYPOST-812) | Remediation:** Consider consolidating when editable install is wired (PYPOST-806). | `PYPOST-787/60-tech-debt.md` |
+
+### PYPOST-792 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-688](https://pypost.atlassian.net/browse/PYPOST-688) | Low \| **Pre-existing: replace `print()` in `config_manager.py`** with structured logging \| PYPOST... | `PYPOST-792/60-tech-debt.md` |
+| [PYPOST-793](https://pypost.atlassian.net/browse/PYPOST-793) | Medium \| **Consolidate style bootstrapping | `PYPOST-792/60-tech-debt.md` |
+| [PYPOST-795](https://pypost.atlassian.net/browse/PYPOST-795) | Low \| **Evaluate removing `set_close_button_size`** if no caller materializes | `PYPOST-792/60-tech-debt.md` |
+
+### PYPOST-793 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-794](https://pypost.atlassian.net/browse/PYPOST-794) | Low \| **Add Makefile `help` target** \| Workspace Makefile rule compliance \| | `PYPOST-793/60-tech-debt.md` |
+| [PYPOST-796](https://pypost.atlassian.net/browse/PYPOST-796) | Medium \| **Improve `close.svg` contrast on dark tab chrome** \| Accessibility / polish; unrelated ... | `PYPOST-793/60-tech-debt.md` |
+
+### PYPOST-794 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-800](https://pypost.atlassian.net/browse/PYPOST-800) | Low \| Add pytest smoke for `make help` non-empty output \| Would catch accidental removal of `##` ... | `PYPOST-794/60-tech-debt.md` |
+
+### PYPOST-797 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-798](https://pypost.atlassian.net/browse/PYPOST-798) | Low \| **Add regression test for `tabBarClicked` fallback | `PYPOST-797/60-tech-debt.md` |
+
+### PYPOST-799 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-677](https://pypost.atlassian.net/browse/PYPOST-677) | Composition root inject `MetricsServer` separately | `PYPOST-799/60-tech-debt.md` |
+
+### PYPOST-813 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-734](https://pypost.atlassian.net/browse/PYPOST-734) | Remaining baseline work is ticketed under parent | `PYPOST-813/60-tech-debt.md` |
+| [PYPOST-815](https://pypost.atlassian.net/browse/PYPOST-815) | \| R-P2-005b — Align ExecuteRequestProtocol with RequestService \| [PYPOST-814](https://pypost.atla... | `PYPOST-813/60-tech-debt.md` |
+
+### PYPOST-823 (7 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-824](https://pypost.atlassian.net/browse/PYPOST-824) | Fix tabs-presenter close-focus failures (land-on-plus assertions) \| Medium \| Out of scope here; | `PYPOST-823/60-tech-debt.md` |
+| [PYPOST-825](https://pypost.atlassian.net/browse/PYPOST-825) | Fix tabs-presenter close-focus failures (land-on-plus assertions) \| Medium \| Out of scope here; [... | `PYPOST-823/60-tech-debt.md` |
+| [PYPOST-826](https://pypost.atlassian.net/browse/PYPOST-826) | Fix tabs-presenter close-focus failures (land-on-plus assertions) \| Medium \| Out of scope here; [... | `PYPOST-823/60-tech-debt.md` |
+| [PYPOST-827](https://pypost.atlassian.net/browse/PYPOST-827) | Port hardened `_process_until` (or extract shared helper) to sibling gateway/worker tests \| Mediu... | `PYPOST-823/60-tech-debt.md` |
+| [PYPOST-828](https://pypost.atlassian.net/browse/PYPOST-828) | Richer timeout diagnostics (busy/pending, optional worker state) in wait helper \| Low \| Architect... | `PYPOST-823/60-tech-debt.md` |
+| [PYPOST-829](https://pypost.atlassian.net/browse/PYPOST-829) | Gateway worker `deleteLater` / short `wait` on finish (H3) \| Low \| Only if suite shows stranded `... | `PYPOST-823/60-tech-debt.md` |
+| [PYPOST-830](https://pypost.atlassian.net/browse/PYPOST-830) | Align remaining gateway tests on shared `qapp` fixture \| Low \| Consistency with responsiveness mo... | `PYPOST-823/60-tech-debt.md` |
+
+### PYPOST-824 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-831](https://pypost.atlassian.net/browse/PYPOST-831) | Apply same navigable reselect after `close_tabs_for_request_ids` \| Low \| Same Qt `removeTab` trap... | `PYPOST-824/60-tech-debt.md` |
+
+### PYPOST-827 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-877](https://pypost.atlassian.net/browse/PYPOST-877) | Port `process_until` into env-presenter async-load nested wait \| Medium \| **NEW | `PYPOST-827/60-tech-debt.md` |
+
+### PYPOST-828 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-878](https://pypost.atlassian.net/browse/PYPOST-878) | TD-1 \| Low \| Wire `worker_operation` into env gateway timeout detail \| Read env worker `_operatio... | `PYPOST-828/60-tech-debt.md` |
+| [PYPOST-879](https://pypost.atlassian.net/browse/PYPOST-879) | TD-2 \| Lowest \| Optional shared `worker_timeout_detail` helper \| Extract from `test_collection_st... | `PYPOST-828/60-tech-debt.md` |
+| [PYPOST-880](https://pypost.atlassian.net/browse/PYPOST-880) | TD-3 \| Low \| Run full `make check` when sibling noise is clear \| Deferred scoped gate; not a DoD ... | `PYPOST-828/60-tech-debt.md` |
+
+### PYPOST-829 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-881](https://pypost.atlassian.net/browse/PYPOST-881) | TD-1 \| Lowest \| Optional shared finish-teardown helper for both gateways \| Extract only if a thir... | `PYPOST-829/60-tech-debt.md` |
+| [PYPOST-882](https://pypost.atlassian.net/browse/PYPOST-882) | TD-2 \| Low \| Run full `make check` when sibling suite noise is clear \| Deferred scoped gate; not ... | `PYPOST-829/60-tech-debt.md` |
+
+### PYPOST-830 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-883](https://pypost.atlassian.net/browse/PYPOST-883) | TD-1 \| Medium \| Investigate intermittent full-suite hang on `test_save_async_emits_save_completed... | `PYPOST-830/60-tech-debt.md` |
+| [PYPOST-884](https://pypost.atlassian.net/browse/PYPOST-884) | TD-2 \| Low \| Align `test_collection_storage_worker.py` onto shared `qapp` \| Closest remaining sto... | `PYPOST-830/60-tech-debt.md` |
+| [PYPOST-885](https://pypost.atlassian.net/browse/PYPOST-885) | TD-3 \| Lowest \| Optional: convert gateway `TestCase` modules to free functions with `qapp` param ... | `PYPOST-830/60-tech-debt.md` |
+| [PYPOST-886](https://pypost.atlassian.net/browse/PYPOST-886) | TD-4 \| Low \| Suite-wide migrate remaining `setUpClass` / local `qapp` modules onto conftest `qapp... | `PYPOST-830/60-tech-debt.md` |
+
+### PYPOST-833 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-840](https://pypost.atlassian.net/browse/PYPOST-840) | TD-1 \| Low \| Deduplicate `_wait_until` with a production-safe shared helper \| Keep `pypost.agent`... | `PYPOST-833/60-tech-debt.md` |
+| [PYPOST-841](https://pypost.atlassian.net/browse/PYPOST-841) | TD-2 \| Low \| Harden mid-start failure cleanup (try/finally transactional shutdown) \| Best-effort ... | `PYPOST-833/60-tech-debt.md` |
+| [PYPOST-842](https://pypost.atlassian.net/browse/PYPOST-842) | TD-3 \| Low \| Strengthen FR6 smoke: assert previous metrics port is free \| Soft relaunch coverage ... | `PYPOST-833/60-tech-debt.md` |
+| [PYPOST-843](https://pypost.atlassian.net/browse/PYPOST-843) | TD-4 \| Low \| Run full `make check` after sibling noise is clear \| Deferred in Step 4 cleanup; not... | `PYPOST-833/60-tech-debt.md` |
+
+### PYPOST-834 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-844](https://pypost.atlassian.net/browse/PYPOST-844) | TD-1 \| Low \| Optional assert: theme apply leaves key objectNames \| Low risk today \| | `PYPOST-834/60-tech-debt.md` |
+| [PYPOST-845](https://pypost.atlassian.net/browse/PYPOST-845) | TD-2 \| Low \| Align `plus_tab_placeholder` to `pypost_` prefix \| Not an AC surface \| | `PYPOST-834/60-tech-debt.md` |
+| [PYPOST-846](https://pypost.atlassian.net/browse/PYPOST-846) | TD-3 \| Low \| Multi-tab spot-check for role ids \| Implicit via constructors \| | `PYPOST-834/60-tech-debt.md` |
+| [PYPOST-847](https://pypost.atlassian.net/browse/PYPOST-847) | TD-4 \| Low \| Run full `make check` when sibling noise is clear \| Deferred gate \| | `PYPOST-834/60-tech-debt.md` |
+
+### PYPOST-835 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-848](https://pypost.atlassian.net/browse/PYPOST-848) | TD-1 \| Low \| Document or name the item-view selection cap (or raise it) \| `indexes[:5]` magic \| | `PYPOST-835/60-tech-debt.md` |
+| [PYPOST-849](https://pypost.atlassian.net/browse/PYPOST-849) | TD-2 \| Low \| Truncation marker (e.g. ellipsis) when slicing values \| Agents can detect clip \| | `PYPOST-835/60-tech-debt.md` |
+| [PYPOST-850](https://pypost.atlassian.net/browse/PYPOST-850) | TD-6 \| Low \| Optional richer roles (checkbox, spin, table) if agents need them \| Beyond v1 FR sur... | `PYPOST-835/60-tech-debt.md` |
+
+### PYPOST-836 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-851](https://pypost.atlassian.net/browse/PYPOST-851) | Debt item (line 37) | `PYPOST-836/60-tech-debt.md` |
+
+### PYPOST-837 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852) | TD-2 \| Low \| Optional “no text API” fast-fail when widget exists but text cannot be read \| Delive... | `PYPOST-837/60-tech-debt.md` |
+
+### PYPOST-838 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-853](https://pypost.atlassian.net/browse/PYPOST-853) | TD-3 \| Medium \| Failure-path golden (forced settle timeout) \| Delivered in | `PYPOST-838/60-tech-debt.md` |
+| [PYPOST-920](https://pypost.atlassian.net/browse/PYPOST-920) | TD-1 \| Low \| Optional `pypost_response_status` / `pypost_response_body` ids \| | `PYPOST-838/60-tech-debt.md` |
+| [PYPOST-921](https://pypost.atlassian.net/browse/PYPOST-921) | TD-4 \| Low \| Plus-tab create path when blank restore changes \| | `PYPOST-838/60-tech-debt.md` |
+| [PYPOST-922](https://pypost.atlassian.net/browse/PYPOST-922) | TD-5 \| Medium \| Broader agent-e2e packaging / `make` entry \| | `PYPOST-838/60-tech-debt.md` |
+
+### PYPOST-839 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-858](https://pypost.atlassian.net/browse/PYPOST-858) | TD-1 \| Low \| Optional `@pytest.mark.agent_e2e` + marker-based make target \| Absorbed by | `PYPOST-839/60-tech-debt.md` |
+| [PYPOST-861](https://pypost.atlassian.net/browse/PYPOST-861) | TD-2 \| Low \| Optional `test_makefile.py` smoke for `test-agent-e2e` help/prereqs \| Absorbed by | `PYPOST-839/60-tech-debt.md` |
+
+### PYPOST-851 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-916](https://pypost.atlassian.net/browse/PYPOST-916) | TD-1 \| Low \| Extend `ui_select` beyond QComboBox \| | `PYPOST-851/60-tech-debt.md` |
+| [PYPOST-917](https://pypost.atlassian.net/browse/PYPOST-917) | TD-2 \| Low \| Optional fill-via-keyClicks mode \| | `PYPOST-851/60-tech-debt.md` |
+| [PYPOST-918](https://pypost.atlassian.net/browse/PYPOST-918) | TD-3 \| Lowest \| Out-of-process MCP packaging for actions \| | `PYPOST-851/60-tech-debt.md` |
+
+### PYPOST-856 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-857](https://pypost.atlassian.net/browse/PYPOST-857) | Workspace seed fixtures \| | `PYPOST-856/60-tech-debt.md` |
+| [PYPOST-860](https://pypost.atlassian.net/browse/PYPOST-860) | Failure artifacts (+ secret-safe dumps) \| | `PYPOST-856/60-tech-debt.md` |
+
+### PYPOST-857 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-862](https://pypost.atlassian.net/browse/PYPOST-862) | `tests/test_agent_e2e_seed.py`. | `PYPOST-857/60-tech-debt.md` |
+| [PYPOST-863](https://pypost.atlassian.net/browse/PYPOST-863) | active-env or open-request guarantees; otherwise leave to consumers. | `PYPOST-857/60-tech-debt.md` |
+
+### PYPOST-858 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-865](https://pypost.atlassian.net/browse/PYPOST-865) | existing marks, or document intentional deferral in testing.md. | `PYPOST-858/60-tech-debt.md` |
+| [PYPOST-866](https://pypost.atlassian.net/browse/PYPOST-866) | table). | `PYPOST-858/60-tech-debt.md` |
+| [PYPOST-867](https://pypost.atlassian.net/browse/PYPOST-867) | `caplog.at_level(INFO, logger="tests._pytest_plugins.agent_e2e")`. | `PYPOST-858/60-tech-debt.md` |
+
+### PYPOST-859 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-868](https://pypost.atlassian.net/browse/PYPOST-868) | overload to `stub_agent_e2e_http` with documented match rules. | `PYPOST-859/60-tech-debt.md` |
+| [PYPOST-870](https://pypost.atlassian.net/browse/PYPOST-870) | `caplog.at_level(INFO, logger="pypost.fixtures.agent_e2e_http")`. | `PYPOST-859/60-tech-debt.md` |
+| [PYPOST-871](https://pypost.atlassian.net/browse/PYPOST-871) | (blank or seeded), asserting body/status. | `PYPOST-859/60-tech-debt.md` |
+
+### PYPOST-860 (5 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-835](https://pypost.atlassian.net/browse/PYPOST-835) | Snapshot API / masking \| | `PYPOST-860/60-tech-debt.md` |
+| [PYPOST-856](https://pypost.atlassian.net/browse/PYPOST-856) | Env contract model \| | `PYPOST-860/60-tech-debt.md` |
+| [PYPOST-874](https://pypost.atlassian.net/browse/PYPOST-874) | `doc/dev/agent_e2e_failure_artifacts.md` | `PYPOST-860/60-tech-debt.md` |
+| [PYPOST-875](https://pypost.atlassian.net/browse/PYPOST-875) | `pypost/fixtures/agent_e2e_failure.py` | `PYPOST-860/60-tech-debt.md` |
+| [PYPOST-876](https://pypost.atlassian.net/browse/PYPOST-876) | Files:** `pypost/fixtures/agent_e2e_failure.py` | `PYPOST-860/60-tech-debt.md` |
+
+### PYPOST-861 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-854](https://pypost.atlassian.net/browse/PYPOST-854) | Link 854 → 861 and close debt once make smoke + CI job are on main. | `PYPOST-861/60-tech-debt.md` |
+| [PYPOST-872](https://pypost.atlassian.net/browse/PYPOST-872) | documenting the install-first contract in one place. | `PYPOST-861/60-tech-debt.md` |
+| [PYPOST-873](https://pypost.atlassian.net/browse/PYPOST-873) | Only if double-run minutes become painful; keep dual coverage until then. | `PYPOST-861/60-tech-debt.md` |
+
+### PYPOST-862 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-864](https://pypost.atlassian.net/browse/PYPOST-864) | Inventory drift guard (code ↔ doc) \| | `PYPOST-862/60-tech-debt.md` |
+
+### PYPOST-867 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-899](https://pypost.atlassian.net/browse/PYPOST-899) | lifecycle smoke with caplog (cost: Qt session time). | `PYPOST-867/60-tech-debt.md` |
+| [PYPOST-900](https://pypost.atlassian.net/browse/PYPOST-900) | Remediation:** `tests/helpers/` helper used by packaging log tests. | `PYPOST-867/60-tech-debt.md` |
+
+### PYPOST-869 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-895](https://pypost.atlassian.net/browse/PYPOST-895) | `agent_e2e_timeouts.py`) and import in Send modules. | `PYPOST-869/60-tech-debt.md` |
+| [PYPOST-896](https://pypost.atlassian.net/browse/PYPOST-896) | `response_panel_excerpt(last)` + diagnostics key. | `PYPOST-869/60-tech-debt.md` |
+
+### PYPOST-870 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-859](https://pypost.atlassian.net/browse/PYPOST-859) | None specific to this HTTP-stub install caplog debt beyond the closed | `PYPOST-870/60-tech-debt.md` |
+| [PYPOST-903](https://pypost.atlassian.net/browse/PYPOST-903) | `tests/test_agent_e2e_http_stub_logs.py`. | `PYPOST-870/60-tech-debt.md` |
+
+### PYPOST-871 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-897](https://pypost.atlassian.net/browse/PYPOST-897) | for env). | `PYPOST-871/60-tech-debt.md` |
+| [PYPOST-898](https://pypost.atlassian.net/browse/PYPOST-898) | POST item via tree identities, then Sends under the shared stub. | `PYPOST-871/60-tech-debt.md` |
+
+### PYPOST-872 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-905](https://pypost.atlassian.net/browse/PYPOST-905) | reduce repeated editable install cost on every test target. | `PYPOST-872/60-tech-debt.md` |
+| [PYPOST-906](https://pypost.atlassian.net/browse/PYPOST-906) | Same DX argument as pytest targets; out of PYPOST-872 title scope. | `PYPOST-872/60-tech-debt.md` |
+
+### PYPOST-873 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-907](https://pypost.atlassian.net/browse/PYPOST-907) | `tests/test_agent_e2e_ci_double_run_doc.py` and docs. | `PYPOST-873/60-tech-debt.md` |
+| [PYPOST-908](https://pypost.atlassian.net/browse/PYPOST-908) | the next ENABLE/DEFER call with numbers. | `PYPOST-873/60-tech-debt.md` |
+
+### PYPOST-874 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-909](https://pypost.atlassian.net/browse/PYPOST-909) | Files: `.github/workflows/test.yml`, docs, lock test | `PYPOST-874/60-tech-debt.md` |
+| [PYPOST-910](https://pypost.atlassian.net/browse/PYPOST-910) | Files: `.github/workflows/test.yml` | `PYPOST-874/60-tech-debt.md` |
+
+### PYPOST-875 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-912](https://pypost.atlassian.net/browse/PYPOST-912) | `pypost/agent/lifecycle.py` | `PYPOST-875/60-tech-debt.md` |
+| [PYPOST-913](https://pypost.atlassian.net/browse/PYPOST-913) | `doc/dev/agent_e2e_failure_artifacts.md`, tests | `PYPOST-875/60-tech-debt.md` |
+
+### PYPOST-876 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-914](https://pypost.atlassian.net/browse/PYPOST-914) | `doc/dev/agent_e2e_failure_artifacts.md` | `PYPOST-876/60-tech-debt.md` |
+| [PYPOST-915](https://pypost.atlassian.net/browse/PYPOST-915) | Files:** `tests/test_agent_e2e_failure_artifacts.py` | `PYPOST-876/60-tech-debt.md` |
+
+### PYPOST-889 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-887](https://pypost.atlassian.net/browse/PYPOST-887) | Product double-body discard fix \| | `PYPOST-889/60-tech-debt.md` |
+| [PYPOST-888](https://pypost.atlassian.net/browse/PYPOST-888) | Broader Send/response presentation matrix \| Epic | `PYPOST-889/60-tech-debt.md` |
+| [PYPOST-892](https://pypost.atlassian.net/browse/PYPOST-892) | TD-1 \| Low \| Automate FR5 red-path proof \| Optional second test (or marked variant) that monkeypa... | `PYPOST-889/60-tech-debt.md` |
+| [PYPOST-893](https://pypost.atlassian.net/browse/PYPOST-893) | TD-2 \| Lowest \| Improve stub catalog naming for streaming helpers \| When `stub_agent_e2e_http` re... | `PYPOST-889/60-tech-debt.md` |
+
+### PYPOST-890 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-869](https://pypost.atlassian.net/browse/PYPOST-869) | extracting a shared helper (architecture: share later). Already tracked | `PYPOST-890/60-tech-debt.md` |
+| [PYPOST-891](https://pypost.atlassian.net/browse/PYPOST-891) | Triage findings / file Bugs from matrix \| | `PYPOST-890/60-tech-debt.md` |
+| [PYPOST-894](https://pypost.atlassian.net/browse/PYPOST-894) | TD-2 \| Lowest \| Spot-check / KEY list for `REQUEST_DETAIL_TABS` \| Optionally add to `KEY_WIDGET_I... | `PYPOST-890/60-tech-debt.md` |
+
+### PYPOST-891 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-889](https://pypost.atlassian.net/browse/PYPOST-889) | Focused double-body lock \| | `PYPOST-891/60-tech-debt.md` |
+| [PYPOST-890](https://pypost.atlassian.net/browse/PYPOST-890) | Presentation matrix + findings \| | `PYPOST-891/60-tech-debt.md` |
+
+### PYPOST-901 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-902](https://pypost.atlassian.net/browse/PYPOST-902) | method+URL compound map keys \| Out of scope | `PYPOST-901/60-tech-debt.md` |
+| [PYPOST-955](https://pypost.atlassian.net/browse/PYPOST-955) | TD-1 \| Medium \| Agent e2e timeout companion for mapping settle diagnostics \| Mirror `test_agent_g... | `PYPOST-901/60-tech-debt.md` |
+| [PYPOST-956](https://pypost.atlassian.net/browse/PYPOST-956) | TD-2 \| Low \| Shared Send settle + timeout rewrap helper \| Extract `_wait_response` pattern from m... | `PYPOST-901/60-tech-debt.md` |
+| [PYPOST-957](https://pypost.atlassian.net/browse/PYPOST-957) | TD-3 \| Low \| Caplog proof for `name=url_router` in mapping GUI module \| Optional sibling to PYPOS... | `PYPOST-901/60-tech-debt.md` |
+
+### PYPOST-902 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-958](https://pypost.atlassian.net/browse/PYPOST-958) | GUI scenario: same URL, GET+POST under compound-key map \| Lowest \| Optional confidence raise; uni... | `PYPOST-902/60-tech-debt.md` |
+| [PYPOST-959](https://pypost.atlassian.net/browse/PYPOST-959) | HTTP method case normalization in router \| Lowest \| Only if scenarios send inconsistent casing \| | `PYPOST-902/60-tech-debt.md` |
+
+### PYPOST-903 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-904](https://pypost.atlassian.net/browse/PYPOST-904) | Technical debt follow-up | `PYPOST-903/60-tech-debt.md` |
+
+### PYPOST-905 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-929](https://pypost.atlassian.net/browse/PYPOST-929) | pip). | `PYPOST-905/60-tech-debt.md` |
+
+### PYPOST-906 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-932](https://pypost.atlassian.net/browse/PYPOST-932) | the Step 7 review. Historical ai-tasks prose left as point-in-time. | `PYPOST-906/60-tech-debt.md` |
+
+### PYPOST-907 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-930](https://pypost.atlassian.net/browse/PYPOST-930) | a 3.13 coverage plan; update lock + docs for ENABLE. | `PYPOST-907/60-tech-debt.md` |
+
+### PYPOST-908 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-931](https://pypost.atlassian.net/browse/PYPOST-931) | Already ticketed — may absorb any residual “refresh” work from 908. | `PYPOST-908/60-tech-debt.md` |
+
+### PYPOST-909 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-911](https://pypost.atlassian.net/browse/PYPOST-911) | Files: `doc/dev/agent_e2e_failure_artifacts.md` (optional note) | `PYPOST-909/60-tech-debt.md` |
+
+### PYPOST-911 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-933](https://pypost.atlassian.net/browse/PYPOST-933) | `doc/dev/agent_e2e_failure_artifacts.md` | `PYPOST-911/60-tech-debt.md` |
+
+### PYPOST-915 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-960](https://pypost.atlassian.net/browse/PYPOST-960) | Shared exception tuple module \| | `PYPOST-915/60-tech-debt.md` |
+| [PYPOST-962](https://pypost.atlassian.net/browse/PYPOST-962) | Priority:** Lowest | `PYPOST-915/60-tech-debt.md` |
+
+### PYPOST-916 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-939](https://pypost.atlassian.net/browse/PYPOST-939) | TD-1 \| Low \| Support `QListView` / generic `QAbstractItemView` in `ui_select` \| Only if a golden ... | `PYPOST-916/60-tech-debt.md` |
+| [PYPOST-940](https://pypost.atlassian.net/browse/PYPOST-940) | TD-2 \| Low \| Harden fixture teardown for Qt item views \| Documented `setModel(None)` pattern; con... | `PYPOST-916/60-tech-debt.md` |
+| [PYPOST-941](https://pypost.atlassian.net/browse/PYPOST-941) | TD-3 \| Low \| Share tree text walk with `agent_e2e_tree` \| Avoid duplication if both keep growing;... | `PYPOST-916/60-tech-debt.md` |
+| [PYPOST-942](https://pypost.atlassian.net/browse/PYPOST-942) | TD-4 \| Low \| Dedicated out-of-range / missing-option tests for list and tree \| Mirror combo `opti... | `PYPOST-916/60-tech-debt.md` |
+
+### PYPOST-917 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-944](https://pypost.atlassian.net/browse/PYPOST-944) | TD-1 \| Low \| Caplog assert for `via_key_clicks=true` \| Mirror false-path scalar check; optional h... | `PYPOST-917/60-tech-debt.md` |
+| [PYPOST-945](https://pypost.atlassian.net/browse/PYPOST-945) | TD-2 \| Low \| Fixture keyClicks coverage for plain/rich text edits \| Line-edit proof + type guard ... | `PYPOST-917/60-tech-debt.md` |
+| [PYPOST-946](https://pypost.atlassian.net/browse/PYPOST-946) | TD-3 \| Lowest \| Optional `textChanged` multi-emit assert for keyClicks \| Proves per-key delivery ... | `PYPOST-917/60-tech-debt.md` |
+| [PYPOST-947](https://pypost.atlassian.net/browse/PYPOST-947) | TD-4 \| Lowest \| Optional `delay` kwarg on keyClicks fill \| Architecture deliberately omitted; exp... | `PYPOST-917/60-tech-debt.md` |
+
+### PYPOST-918 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-952](https://pypost.atlassian.net/browse/PYPOST-952) | Files (future): new agent-UI MCP entry + docs; not this debt’s surface | `PYPOST-918/60-tech-debt.md` |
+| [PYPOST-953](https://pypost.atlassian.net/browse/PYPOST-953) | Files: `tests/test_mcp_server_impl.py` (or sibling) when prioritized | `PYPOST-918/60-tech-debt.md` |
+| [PYPOST-954](https://pypost.atlassian.net/browse/PYPOST-954) | Files: `tests/test_ui_actions_mcp_packaging_doc.py` | `PYPOST-918/60-tech-debt.md` |
+
+### PYPOST-919 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-934](https://pypost.atlassian.net/browse/PYPOST-934) | TD-1 \| Medium \| Agent e2e timeout companion for dialog settle diagnostics \| Mirror golden `test_a... | `PYPOST-919/60-tech-debt.md` |
+| [PYPOST-935](https://pypost.atlassian.net/browse/PYPOST-935) | TD-2 \| Low \| `SETTINGS_DIALOG` widget id on `SettingsDialog` \| Set `objectName` via `widget_ids` ... | `PYPOST-919/60-tech-debt.md` |
+| [PYPOST-936](https://pypost.atlassian.net/browse/PYPOST-936) | TD-3 \| Low \| Shared modal settle helper for agent e2e \| Extract timer + `wait_until` + fail-close... | `PYPOST-919/60-tech-debt.md` |
+
+### PYPOST-920 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-948](https://pypost.atlassian.net/browse/PYPOST-948) | TD-1 \| Medium \| Migrate sibling agent e2e off panel-walk settle onto `wait_for_text` (`RESPONSE_S... | `PYPOST-920/60-tech-debt.md` |
+| [PYPOST-949](https://pypost.atlassian.net/browse/PYPOST-949) | TD-2 \| Low \| Add `in_current_tab` (or root override) to `AgentAppSession.wait_for_text` / related... | `PYPOST-920/60-tech-debt.md` |
+| [PYPOST-950](https://pypost.atlassian.net/browse/PYPOST-950) | TD-3 \| Low \| Align golden timeout-diagnostics lock with text-wait settle \| Force a short `wait_fo... | `PYPOST-920/60-tech-debt.md` |
+
+### PYPOST-921 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-951](https://pypost.atlassian.net/browse/PYPOST-951) | TD-2 \| Low \| Document `removeTab` orphan hazard for agent authors \| Partially covered in golden d... | `PYPOST-921/60-tech-debt.md` |
+
+### PYPOST-922 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-937](https://pypost.atlassian.net/browse/PYPOST-937) | Files: `tests/test_makefile.py` (or a small test helper module) | `PYPOST-922/60-tech-debt.md` |
+| [PYPOST-938](https://pypost.atlassian.net/browse/PYPOST-938) | Files: `tests/test_agent_e2e_broader_packaging_doc.py` | `PYPOST-922/60-tech-debt.md` |
+
+### PYPOST-923 (5 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-924](https://pypost.atlassian.net/browse/PYPOST-924) | TD-1 \| Low \| Extract shared Qt/EGL apt install into a composite action (or reusable workflow step... | `PYPOST-923/60-tech-debt.md` |
+| [PYPOST-925](https://pypost.atlassian.net/browse/PYPOST-925) | TD-2 \| Low \| Strengthen smoke Qt contract: derive expected package set from peer job YAML (and/or... | `PYPOST-923/60-tech-debt.md` |
+| [PYPOST-926](https://pypost.atlassian.net/browse/PYPOST-926) | TD-3 \| Lowest \| Optionally defer `PySide6` import in `tests/conftest.py` so non-GUI collection pa... | `PYPOST-923/60-tech-debt.md` |
+| [PYPOST-927](https://pypost.atlassian.net/browse/PYPOST-927) | TD-4 \| Low \| Add CI `check-lock` job for production `requirements.txt` (sibling of `check-lock-de... | `PYPOST-923/60-tech-debt.md` |
+| [PYPOST-928](https://pypost.atlassian.net/browse/PYPOST-928) | TD-5 \| Lowest \| Harden workflow YAML parsing helpers shared by CI contract tests (or adopt a tiny... | `PYPOST-923/60-tech-debt.md` |
+
+### PYPOST-924 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-923](https://pypost.atlassian.net/browse/PYPOST-923) | `test`, `make-install-smoke`, and `agent-e2e`. Resolves | `PYPOST-924/60-tech-debt.md` |
+
+### PYPOST-934 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-429](https://pypost.atlassian.net/browse/PYPOST-429) | function; avoids known multi-session-after-modal segfault risk | `PYPOST-934/60-tech-debt.md` |
+| [PYPOST-919](https://pypost.atlassian.net/browse/PYPOST-919) | \| TD-1 \| Medium \| Agent e2e timeout companion for dialog settle diagnostics \| **Done** — `test_ag... | `PYPOST-934/60-tech-debt.md` |
+| [PYPOST-968](https://pypost.atlassian.net/browse/PYPOST-968) | TD-3 \| Low \| `caplog` assert on `ui_wait_timeout` for forced path \| Only if DEBUG log regression ... | `PYPOST-934/60-tech-debt.md` |
+
+### PYPOST-939 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-971](https://pypost.atlassian.net/browse/PYPOST-971) | TD-1 \| Low \| Share flat DisplayRole scan between item view and tree helpers \| Only if drift grows. | `PYPOST-939/60-tech-debt.md` |
+| [PYPOST-972](https://pypost.atlassian.net/browse/PYPOST-972) | TD-2 \| Low \| Dedicated `item view has no model` test \| Mirror tree no-model coverage. | `PYPOST-939/60-tech-debt.md` |
+
+### PYPOST-942 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-974](https://pypost.atlassian.net/browse/PYPOST-974) | TD-1 \| Low \| Combo out-of-range index contract test \| `_select_combo` raises the same `option ind... | `PYPOST-942/60-tech-debt.md` |
+| [PYPOST-975](https://pypost.atlassian.net/browse/PYPOST-975) | TD-2 \| Low \| Live collection-tree negative select via `agent_e2e_session` \| Optional hardening; f... | `PYPOST-942/60-tech-debt.md` |
+
+### PYPOST-943 (7 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-559](https://pypost.atlassian.net/browse/PYPOST-559) | Slow smoke job design + pydantic import sanity \| | `PYPOST-943/60-tech-debt.md` |
+| [PYPOST-808](https://pypost.atlassian.net/browse/PYPOST-808) | Dynamic version attr trigger \| | `PYPOST-943/60-tech-debt.md` |
+| [PYPOST-963](https://pypost.atlassian.net/browse/PYPOST-963) | TD-1 \| Low \| Document or assert minimum `pypost/` tree policy for slow-smoke seed (stub `__init__... | `PYPOST-943/60-tech-debt.md` |
+| [PYPOST-964](https://pypost.atlassian.net/browse/PYPOST-964) | TD-2 \| Low \| Extend `_required_seed_paths_from_pyproject` when `pyproject.toml` gains additional ... | `PYPOST-943/60-tech-debt.md` |
+| [PYPOST-965](https://pypost.atlassian.net/browse/PYPOST-965) | TD-3 \| Low \| Deduplicate slow-smoke workspace assembly: share one helper between `make_workspace_... | `PYPOST-943/60-tech-debt.md` |
+| [PYPOST-966](https://pypost.atlassian.net/browse/PYPOST-966) | TD-4 \| Lowest \| Optionally add post-install `import pypost` (or version attr read) to slow smoke ... | `PYPOST-943/60-tech-debt.md` |
+| [PYPOST-967](https://pypost.atlassian.net/browse/PYPOST-967) | TD-5 \| Low \| Refresh `test_verify_ai_task_artifacts` baseline after Step 8 dev docs land \| Expect... | `PYPOST-943/60-tech-debt.md` |
+
+### PYPOST-945 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-976](https://pypost.atlassian.net/browse/PYPOST-976) | UT-1 \| Lowest \| Session body-editor keyClicks smoke \| `agent_e2e_session` fills request body via ... | `PYPOST-945/60-tech-debt.md` |
+| [PYPOST-977](https://pypost.atlassian.net/browse/PYPOST-977) | UT-2 \| Lowest \| Caplog keyClicks on plain/rich fixtures \| Extend or sibling caplog test using pla... | `PYPOST-945/60-tech-debt.md` |
+
+### PYPOST-946 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-980](https://pypost.atlassian.net/browse/PYPOST-980) | UT-1 \| Lowest \| Plain/rich `textChanged` multi-emit \| Sibling tests on plain/rich fixtures with d... | `PYPOST-946/60-tech-debt.md` |
+| [PYPOST-981](https://pypost.atlassian.net/browse/PYPOST-981) | UT-2 \| Lowest \| Default setter single-emit contrast \| Optional test: default `ui_fill` emits one ... | `PYPOST-946/60-tech-debt.md` |
+
+### PYPOST-948 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-969](https://pypost.atlassian.net/browse/PYPOST-969) | TD-3 \| Low \| Extend Send settle convention lock to seed POST \| Optional module migrated but not i... | `PYPOST-948/60-tech-debt.md` |
+| [PYPOST-970](https://pypost.atlassian.net/browse/PYPOST-970) | TD-4 \| Low \| Golden adopt `wait_response_after_send` for DRY settle \| Reduces duplicate timeout w... | `PYPOST-948/60-tech-debt.md` |
+
+### PYPOST-949 (2 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-978](https://pypost.atlassian.net/browse/PYPOST-978) | TD-1 \| Low \| Optional golden migration to `session.wait_for_text(..., in_current_tab=True)` \| Gol... | `PYPOST-949/60-tech-debt.md` |
+| [PYPOST-979](https://pypost.atlassian.net/browse/PYPOST-979) | TD-2 \| Low \| Explicit tests for tab-scoped `wait_for_widget` / `wait_for_enabled` \| Multi-tab fix... | `PYPOST-949/60-tech-debt.md` |
+
+### PYPOST-952 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-990](https://pypost.atlassian.net/browse/PYPOST-990) | Files: `pypost/agent/ui_actions_mcp.py`, docs | `PYPOST-952/60-tech-debt.md` |
+| [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991) | Files: new IPC layer + sidecar lifecycle | `PYPOST-952/60-tech-debt.md` |
+| [PYPOST-992](https://pypost.atlassian.net/browse/PYPOST-992) | Files: `tests/test_agent_ui_actions_mcp.py` | `PYPOST-952/60-tech-debt.md` |
+| [PYPOST-993](https://pypost.atlassian.net/browse/PYPOST-993) | Files: `ui_actions_mcp.py` CLI flags, agent_e2e helpers | `PYPOST-952/60-tech-debt.md` |
+
+### PYPOST-953 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-994](https://pypost.atlassian.net/browse/PYPOST-994) | Files: `tests/test_mcp_server_impl.py`, `tests/test_agent_ui_actions_mcp.py` | `PYPOST-953/60-tech-debt.md` |
+
+### PYPOST-955 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-901](https://pypost.atlassian.net/browse/PYPOST-901) | Parent mapping multi-URL happy path \| | `PYPOST-955/60-tech-debt.md` |
+| [PYPOST-982](https://pypost.atlassian.net/browse/PYPOST-982) | TD-1 \| Low \| Optional POST-path timeout companion \| Force near-zero settle after POST Send; asser... | `PYPOST-955/60-tech-debt.md` |
+| [PYPOST-983](https://pypost.atlassian.net/browse/PYPOST-983) | TD-2 \| Low \| Centralize `FORCED_SETTLE_TIMEOUT_S` \| Same 0.05 s constant appears in golden, dialo... | `PYPOST-955/60-tech-debt.md` |
+
+### PYPOST-956 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-985](https://pypost.atlassian.net/browse/PYPOST-985) | TD-3 \| Low \| Extract private `_rewrap_send_settle_timeout` if third consumer appears \| Must prese... | `PYPOST-956/60-tech-debt.md` |
+
+### PYPOST-960 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-961](https://pypost.atlassian.net/browse/PYPOST-961) | Dedicated hook best-effort units per type \| | `PYPOST-960/60-tech-debt.md` |
+
+### PYPOST-966 (1 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-1014](https://pypost.atlassian.net/browse/PYPOST-1014) | TD-1 \| Low \| Revisit post-install snippet if `pypost/__init__.py` gains eager UI imports \| Versio... | `PYPOST-966/60-tech-debt.md` |
+
+### PYPOST-984 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-995](https://pypost.atlassian.net/browse/PYPOST-995) | Debt item (line 47) | `PYPOST-984/60-tech-debt.md` |
+| [PYPOST-996](https://pypost.atlassian.net/browse/PYPOST-996) | Debt item (line 64) | `PYPOST-984/60-tech-debt.md` |
+| [PYPOST-997](https://pypost.atlassian.net/browse/PYPOST-997) | Debt item (line 80) | `PYPOST-984/60-tech-debt.md` |
+| [PYPOST-998](https://pypost.atlassian.net/browse/PYPOST-998) | Debt item (line 93) | `PYPOST-984/60-tech-debt.md` |
+
+### PYPOST-986 (4 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-999](https://pypost.atlassian.net/browse/PYPOST-999) | verified one for this specific new caller. | `PYPOST-986/60-tech-debt.md` |
+| [PYPOST-1000](https://pypost.atlassian.net/browse/PYPOST-1000) | functions work in isolation. | `PYPOST-986/60-tech-debt.md` |
+| [PYPOST-1001](https://pypost.atlassian.net/browse/PYPOST-1001) | complementing the existing direct-call tests. | `PYPOST-986/60-tech-debt.md` |
+| [PYPOST-1002](https://pypost.atlassian.net/browse/PYPOST-1002) | reaches `(3)`, closing the two small combinatorial test gaps noted above. | `PYPOST-986/60-tech-debt.md` |
+
+### PYPOST-987 (5 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-1003](https://pypost.atlassian.net/browse/PYPOST-1003) | names, and add a regression test on each side. | `PYPOST-987/60-tech-debt.md` |
+| [PYPOST-1004](https://pypost.atlassian.net/browse/PYPOST-1004) | "reload from disk" recovery offered in the failure dialog. | `PYPOST-987/60-tech-debt.md` |
+| [PYPOST-1005](https://pypost.atlassian.net/browse/PYPOST-1005) | cannot freeze the window. Include a large-file test. | `PYPOST-987/60-tech-debt.md` |
+| [PYPOST-1006](https://pypost.atlassian.net/browse/PYPOST-1006) | collection side. | `PYPOST-987/60-tech-debt.md` |
+| [PYPOST-1007](https://pypost.atlassian.net/browse/PYPOST-1007) | false positives. | `PYPOST-987/60-tech-debt.md` |
+
+### PYPOST-988 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-1008](https://pypost.atlassian.net/browse/PYPOST-1008) | Priority: Low | `PYPOST-988/60-tech-debt.md` |
+| [PYPOST-1009](https://pypost.atlassian.net/browse/PYPOST-1009) | Priority: Low | `PYPOST-988/60-tech-debt.md` |
+| [PYPOST-1010](https://pypost.atlassian.net/browse/PYPOST-1010) | Priority: Low | `PYPOST-988/60-tech-debt.md` |
+
+### PYPOST-989 (3 items)
+
+| Jira | Summary (from artifact) | File |
+| --- | --- | --- |
+| [PYPOST-1011](https://pypost.atlassian.net/browse/PYPOST-1011) | Priority: Low | `PYPOST-989/60-tech-debt.md` |
+| [PYPOST-1012](https://pypost.atlassian.net/browse/PYPOST-1012) | Priority: Low | `PYPOST-989/60-tech-debt.md` |
+| [PYPOST-1013](https://pypost.atlassian.net/browse/PYPOST-1013) | Priority: Low | `PYPOST-989/60-tech-debt.md` |
+
 ## Debt Files Without Jira Links
 
-These files document debt but contain no `PYPOST-*` Jira links yet (281 files):
+These files document debt but contain no `PYPOST-*` Jira links yet (445 files):
 
 - `PYPOST-101/60-tech-debt.md`
 - `PYPOST-105/60-tech-debt.md`
@@ -1481,7 +2298,7 @@ These files document debt but contain no `PYPOST-*` Jira links yet (281 files):
 - `PYPOST-173/60-tech-debt.md`
 - `PYPOST-174/60-tech-debt.md`
 - `PYPOST-175/60-tech-debt.md`
-- … and 241 more
+- … and 405 more
 
 ## Remediation Notes
 

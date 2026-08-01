@@ -36,10 +36,10 @@ Jira: [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852)
 
 | ID | Priority | Summary | Notes |
 | --- | --- | --- | --- |
-| TD-1 | Low | Share snapshot node-count helper between `ui_snapshot` and `ui_wait` | Avoid private import; optional small util |
-| TD-2 | Low | Optional “no text API” fast-fail when widget exists but text cannot be read | Clearer than waiting until timeout |
-| TD-3 | Medium | Product dialog settle coverage in golden flow | After Send / settings open — sibling story |
-| TD-4 | Low | Document recommend prefer widget/text waits over snapshot polls for hot paths | Docs only if golden flow hits cost |
+| TD-1 | Low | Share snapshot node-count helper between `ui_snapshot` and `ui_wait` | Delivered in [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852) |
+| TD-2 | Low | Optional “no text API” fast-fail when widget exists but text cannot be read | Delivered in [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852) |
+| TD-3 | Medium | Product dialog settle coverage in golden flow | Sibling story [PYPOST-919](https://pypost.atlassian.net/browse/PYPOST-919) |
+| TD-4 | Low | Document recommend prefer widget/text waits over snapshot polls for hot paths | Delivered in [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852) |
 
 No blockers relative to acceptance criteria. Prior lifecycle wait duplication
 (with `tests.helpers`) is resolved by production `ui_wait` + thin test re-export.

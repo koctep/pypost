@@ -47,11 +47,11 @@ Jira: [PYPOST-853](https://pypost.atlassian.net/browse/PYPOST-853)
 
 | ID | Priority | Summary | Notes |
 | --- | --- | --- | --- |
-| TD-1 | Low | Optional `pypost_response_status` / `pypost_response_body` ids | Enables `wait_for_text`; reduces sanitize coupling |
-| TD-2 | Low | Share panel subtree / value-walk helpers | If a second golden appears; avoid private snapshot APIs |
-| TD-3 | Medium | Failure-path golden (forced settle timeout) | Asserts FR10 excerpt / step without manual failure |
-| TD-4 | Low | Plus-tab create path when blank restore changes | Guard against lifecycle restore behavior shifts |
-| TD-5 | Medium | Broader agent-e2e packaging / `make` entry | Owned by epic packaging story — not this file’s scope |
+| TD-1 | Low | Optional `pypost_response_status` / `pypost_response_body` ids | [PYPOST-920](https://pypost.atlassian.net/browse/PYPOST-920) |
+| TD-2 | Low | Share panel subtree / value-walk helpers | Delivered in [PYPOST-853](https://pypost.atlassian.net/browse/PYPOST-853) |
+| TD-3 | Medium | Failure-path golden (forced settle timeout) | Delivered in [PYPOST-853](https://pypost.atlassian.net/browse/PYPOST-853) |
+| TD-4 | Low | Plus-tab create path when blank restore changes | [PYPOST-921](https://pypost.atlassian.net/browse/PYPOST-921) |
+| TD-5 | Medium | Broader agent-e2e packaging / `make` entry | [PYPOST-922](https://pypost.atlassian.net/browse/PYPOST-922) |
 
 No blockers relative to acceptance criteria. Composition proof (lifecycle +
 identity + actions + wait + snapshot + mocked HTTP → response UI) is complete;
