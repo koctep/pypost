@@ -561,6 +561,7 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 | [PYPOST-861] | Smoke for `make test-agent-e2e` (deps, help, recipe, marker selection) |
 | [PYPOST-872] | `venv-test` prerequisite on `test` / `test-slow` / `test-agent-e2e` |
 | [PYPOST-873] | Deferred CI cost trim; dual-run docs + workflow lock |
+| [PYPOST-907] | Evidence revisit; continued DEFER after CI duration evidence |
 | [PYPOST-874] | ENABLE agent-e2e failure artifact upload + doc/workflow lock |
 | [PYPOST-905] | Stamp/cache `venv-test` / `venv-otel`; skip pip when extras current |
 
@@ -573,7 +574,10 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 [PYPOST-800]: https://pypost.atlassian.net/browse/PYPOST-800
 [PYPOST-861]: https://pypost.atlassian.net/browse/PYPOST-861
 [PYPOST-872]: https://pypost.atlassian.net/browse/PYPOST-872
+[PYPOST-873]: https://pypost.atlassian.net/browse/PYPOST-873
+[PYPOST-874]: https://pypost.atlassian.net/browse/PYPOST-874
 [PYPOST-905]: https://pypost.atlassian.net/browse/PYPOST-905
+[PYPOST-907]: https://pypost.atlassian.net/browse/PYPOST-907
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -621,20 +625,38 @@ PYPOST-923). Parity is locked by
 Job `agent-e2e` runs `make install && make test-agent-e2e` on Python 3.11
 (PYPOST-861 env-pack make gate; see [agent_e2e.md](agent_e2e.md)).
 
-### Agent e2e CI double-run (PYPOST-873) — DEFER
+### Agent e2e CI double-run (PYPOST-873 / PYPOST-907) — DEFER
 
 On Python **3.11**, agent e2e / env-pack tests run in both the main `test`
 matrix (`-m "not slow"`) and the dedicated `agent-e2e` job. That
 **intentional double-run** is kept: the dedicated job proves
 `make test-agent-e2e`; the matrix keeps multi-version coverage (3.11 +
-3.13). **DEFER** excluding `agent_e2e` from the main matrix until CI
-minutes hurt.
+3.13). [PYPOST-873](https://pypost.atlassian.net/browse/PYPOST-873)
+**DEFER**red a cost trim; [PYPOST-907](https://pypost.atlassian.net/browse/PYPOST-907)
+reviewed **CI duration evidence** and chose **DEFER after evidence** —
+overlap is measurable but not wall-clock painful (see below).
 
-**Revisit when** the pack grows enough that main-job wall time or billable
-minutes are clearly dominated by the overlap, or maintainers report painful
-double failures / queue time. An ENABLE trim must also preserve 3.13 agent
-e2e coverage (for example expand `agent-e2e` to a matrix) and update
-`tests/test_agent_e2e_ci_double_run_doc.py`.
+#### CI duration evidence (Actions, 2026-08-01)
+
+From completed `Tests` workflow runs on `koctep/pypost` that include job
+`agent-e2e` (n=2 in a 15-run window):
+
+| Run | Main `test` 3.11 | Job `agent-e2e` |
+| --- | --- | --- |
+| #21 | ~11.8m total; pytest step ~670s | ~3.6m total; `make test-agent-e2e` ~172s |
+| #20 | ~7.4m | ~1.6m |
+
+Wall clock is dominated by the main matrix; `agent-e2e` finishes in
+parallel (~1.6–3.6m), so a trim would not shorten PR feedback in these
+samples. Pack collect size locally: 64 tests (`agent_e2e and not slow`).
+Related: [PYPOST-908](https://pypost.atlassian.net/browse/PYPOST-908).
+
+**Revisit when** (ENABLE threshold): dedicated `make test-agent-e2e` step
+sustained ≥ 6 minutes across ≥3 recent green runs; or maintainers report
+painful double failures / queue cost; or pack collect size sustained ≥ 120
+**and** main pytest is clearly pack-dominated. An ENABLE trim must preserve
+3.13 agent e2e coverage (for example expand `agent-e2e` to a matrix) and
+update `tests/test_agent_e2e_ci_double_run_doc.py`.
 
 ### Agent e2e failure artifact CI upload (PYPOST-874) — ENABLE
 
