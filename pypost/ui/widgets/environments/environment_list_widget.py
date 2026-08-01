@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import List
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QInputDialog,
     QListWidget,
     QListWidgetItem,
@@ -16,24 +18,38 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.environment_import import (
+    EnvironmentImportFileError,
+    ImportConflictDecision,
+    find_conflicts,
+    format_import_result,
+    plan_import,
+)
 from pypost.core.environment_messages import (
     ACTION_COPY,
     ACTION_DELETE,
     ACTION_RENAME,
     BUTTON_ADD,
+    BUTTON_IMPORT,
     DIALOG_TITLE_COPY_ENVIRONMENT,
     DIALOG_TITLE_NEW_ENVIRONMENT,
     INPUT_LABEL_NAME,
+    MSG_IMPORT_NO_VALID_ENVIRONMENTS,
     format_copy_of_name,
 )
 from pypost.core.environment_ops import clone_environment, validate_environment_rename
 from pypost.models.models import Environment
 from pypost.ui.collection_item_dialogs import (
     confirm_delete_environment,
+    prompt_import_conflict,
+    prompt_import_environments_file,
     show_copy_environment_duplicate_name_error,
     show_copy_environment_empty_name_error,
+    show_import_invalid_file_error,
+    show_import_result,
 )
 from pypost.ui.delegates import EnvironmentNameDelegate
+from pypost.ui.widget_ids import ENV_IMPORT_BUTTON, set_widget_id
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +67,7 @@ class EnvironmentListWidget(QWidget):
         current_env_name: str | None = None,
         get_current_env_name: Callable[[], str | None] | None = None,
         set_current_env_name: Callable[[str | None], None] | None = None,
+        read_import_file: Callable[[Path], tuple[list[Environment], list[str]]] | None = None,
     ) -> None:
         super().__init__(parent)
         self.environments = environments
@@ -59,6 +76,7 @@ class EnvironmentListWidget(QWidget):
         self._set_current_env_name = set_current_env_name or (
             lambda name: setattr(self, "_initial_current_env_name", name)
         )
+        self._read_import_file = read_import_file
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -82,8 +100,16 @@ class EnvironmentListWidget(QWidget):
         add_btn = QPushButton(BUTTON_ADD)
         add_btn.clicked.connect(self.add_environment)
 
+        import_btn = QPushButton(BUTTON_IMPORT)
+        set_widget_id(import_btn, ENV_IMPORT_BUTTON)
+        import_btn.clicked.connect(self.import_environments)
+
+        buttons_row = QHBoxLayout()
+        buttons_row.addWidget(add_btn)
+        buttons_row.addWidget(import_btn)
+
         layout.addWidget(self.env_list)
-        layout.addWidget(add_btn)
+        layout.addLayout(buttons_row)
 
         self.load_list()
 
@@ -244,3 +270,66 @@ class EnvironmentListWidget(QWidget):
         self.environments.insert(insert_at, new_env)
         self.load_list()
         self.env_list.setCurrentRow(insert_at)
+
+    def import_environments(self) -> None:
+        """Pick a file, resolve name conflicts, and merge into the working list."""
+        if self._read_import_file is None:
+            return
+
+        path = prompt_import_environments_file(self)
+        if path is None:
+            return
+
+        try:
+            candidates, parse_errors = self._read_import_file(path)
+        except EnvironmentImportFileError as exc:
+            logger.warning("environment_import_file_invalid reason=%s", exc)
+            show_import_invalid_file_error(self, str(exc))
+            return
+
+        if not candidates:
+            logger.warning("environment_import_file_invalid reason=no_valid_environments")
+            message = MSG_IMPORT_NO_VALID_ENVIRONMENTS
+            if parse_errors:
+                message = "\n".join([message, ""] + parse_errors)
+            show_import_invalid_file_error(self, message)
+            return
+
+        decisions = self._resolve_import_conflicts(candidates)
+        result = plan_import(self.environments, candidates, decisions)
+        result.parse_errors.extend(parse_errors)
+
+        self.environments[:] = result.environments
+        self.load_list()
+
+        logger.info(
+            "environment_import_completed added_count=%d updated_count=%d "
+            "skipped_count=%d renamed_count=%d error_count=%d",
+            len(result.added),
+            len(result.updated),
+            len(result.skipped),
+            len(result.renamed),
+            len(result.parse_errors),
+        )
+        summary_text = format_import_result(result)
+        success = bool(result.added or result.updated or result.renamed)
+        show_import_result(self, summary_text, success=success)
+
+    def _resolve_import_conflicts(
+        self, candidates: list[Environment]
+    ) -> dict[str, ImportConflictDecision]:
+        conflicts = find_conflicts(self.environments, candidates)
+        decisions: dict[str, ImportConflictDecision] = {}
+        apply_to_all: ImportConflictDecision | None = None
+        for i, name in enumerate(conflicts):
+            if apply_to_all is not None:
+                decisions[name] = apply_to_all
+                continue
+            remaining_count = len(conflicts) - i - 1
+            decision, use_for_all = prompt_import_conflict(
+                self, name, remaining_count=remaining_count
+            )
+            decisions[name] = decision
+            if use_for_all:
+                apply_to_all = decision
+        return decisions

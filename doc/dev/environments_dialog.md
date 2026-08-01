@@ -87,6 +87,67 @@ through `_sync_env_variables_from_table`.
 Widget-focused tests: `tests/test_environment_variables_widget.py`. Full dialog regression:
 `tests/test_env_dialog.py`.
 
+## Import environments (PYPOST-986)
+
+`EnvironmentListWidget` gains an **Import…** button (`BUTTON_IMPORT`,
+`ENV_IMPORT_BUTTON` widget id) next to **Add**, wired to
+`import_environments()`. All decision logic is pure and lives outside Qt in
+`pypost/core/environment_import.py`:
+
+- `load_import_candidates(path, storage)` — reads a JSON file (single object
+  or list of objects), delegates per-record decrypt/validate to the existing
+  `StorageManager.deserialize_environment_records`, and returns
+  `(candidates, parse_errors)`. Raises `EnvironmentImportFileError` only for
+  file-level problems (unreadable, malformed JSON, wrong root shape); a
+  per-record failure (e.g. an undecryptable Hidden value) is reported via
+  `parse_errors` instead, so one bad entry never blocks the rest of the file.
+- `find_conflicts(existing, incoming)` — names present in both lists.
+- `generate_import_copy_name(name, existing_names)` — `"Copy of X"`, then
+  `"Copy of X (2)"`, `"(3)"`, ... extending `format_copy_of_name` to the
+  no-prompt case.
+- `plan_import(existing, incoming, decisions)` — pure function returning an
+  `ImportPlanResult` (`environments`, `added`, `updated`, `skipped`,
+  `renamed`, `parse_errors`). `OVERWRITE` preserves the existing
+  environment's `id` and list position (adopts incoming
+  `variables`/`hidden_keys`/`enable_mcp`) so `settings.last_environment_id`
+  and the encryption-envelope reuse cache
+  (`EnvironmentVariablesAdapter._persisted_variables`, keyed by `id`) are not
+  invalidated. `KEEP_BOTH` appends a renamed clone (fresh id) via
+  `clone_environment`. Duplicate names *within* the incoming file itself are
+  always treated like `KEEP_BOTH`, with no prompt.
+- `format_import_result(result)` — pure formatter for the summary dialog,
+  mirroring `format_migration_report` in `encryption_migration.py`.
+
+`EnvironmentListWidget.import_environments()` orchestrates: file picker
+(`prompt_import_environments_file`) → `read_import_file` callable (injected
+by `EnvPresenter`, not a direct `StorageInterface` dependency — same pattern
+as the existing `get_current_env_name`/`set_current_env_name` callables) →
+zero-candidates guard (treated identically to a hard parse failure) →
+`_resolve_import_conflicts()` prompts `prompt_import_conflict` per
+conflicting name (with an "apply to all remaining conflicts" shortcut) →
+`plan_import` → `self.environments[:] = result.environments` → `load_list()`
+→ `format_import_result` → `show_import_result`. New dialogs
+(`prompt_import_environments_file`, `show_import_invalid_file_error`,
+`prompt_import_conflict`, `show_import_result`) follow the existing
+`confirm_*`/`show_*` conventions in `collection_item_dialogs.py`; their
+strings live in `environment_messages.py` (`BUTTON_IMPORT`,
+`IMPORT_FILE_DIALOG_CAPTION`/`FILTER`, `MSG_IMPORT_*`).
+
+No change to `StorageInterface`, the on-disk `environments.json` shape, or
+encryption behavior: import only needs to carry `hidden_keys` through
+correctly, and the unchanged `save_environments()` re-encrypts per the
+installation's current encryption setting on the next save, exactly as it
+does for hand-entered values. See `ai-tasks/PYPOST-986/20-architecture.md`
+for the full design and Q&A, and `doc/user/environments.md` § Import
+environments for the end-user-facing description of the file format and
+conflict policy.
+
+Tests: `tests/test_environment_import.py` (pure logic, no Qt) and
+`tests/test_environment_list_widget.py::TestImportEnvironments` (Qt-level,
+happy path, cancel, invalid file, zero-candidates, single conflict, "apply
+to all", partial-parse success, no-op without `read_import_file`, and the
+`environment_import_completed` log line).
+
 ## Configuration
 N/A
 

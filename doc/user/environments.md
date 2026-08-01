@@ -1,0 +1,97 @@
+# Environments
+
+Environments store named sets of variables (hosts, tokens, API keys) so you can switch
+between configurations such as `Local`, `Dev`, and `Prod` without editing every request.
+
+## Manage environments
+
+1. Click **Manage** in the top bar, or press `Ctrl+E`.
+2. Add an environment with **+**.
+3. Select it in the list.
+4. Edit the variables table: **Variable**, **Value**, **Hidden**.
+5. Optionally check **Enable MCP Server** for this environment.
+6. Save.
+
+You can rename (for example with F2 or the context menu), copy, and delete environments
+from the list.
+
+## Import environments
+
+Instead of retyping every host, token, and API key by hand, you can bring in one or more
+environments from a file:
+
+1. In **Manage Environments**, click **Import…** next to **Add**.
+2. Pick a JSON file. It can contain:
+   - A single environment as one JSON object, or
+   - Several environments as a JSON list of objects.
+
+   The expected shape is the same as PyPost's own `environments.json` — for example, a file
+   exported by copying it from another PyPost installation, or shared by a teammate:
+
+   ```json
+   [
+     {
+       "name": "Staging",
+       "variables": { "host": "https://staging.example.com", "token": "abc123" },
+       "hidden_keys": ["token"],
+       "enable_mcp": false
+     }
+   ]
+   ```
+
+   `name` and `variables` are required; `hidden_keys` (which variable names are **Hidden**)
+   and `enable_mcp` are optional and default to none/off. `id` is optional — PyPost assigns
+   a new one if it is missing.
+3. If an imported environment's name matches one you already have, you are asked, per
+   name, to **Overwrite** the existing one, **Keep Both** (the import is added as
+   `Copy of <name>`, disambiguated further if that name is also taken), or **Skip** it.
+   Check **Apply to all remaining conflicts** to use the same choice for every later
+   conflict in the same import instead of being asked again.
+4. When it finishes, a summary dialog shows how many environments were added, updated,
+   skipped, or renamed, plus details for any entries that could not be imported.
+
+Notes:
+
+- Variables marked **Hidden** in the file stay **Hidden** after import, and are protected
+  by your current [encryption at rest](#encryption-at-rest-optional) setting exactly like
+  any other Hidden variable — importing never exposes or downgrades a secret.
+- If the file contains a Hidden value that was encrypted by a *different* installation
+  (a different encryption key), that specific entry fails with a clear error naming the
+  environment; the rest of the file still imports normally.
+- If the file cannot be read at all, or contains no usable environments, your existing
+  environments are left completely unchanged.
+- Import only reads a file — it does not change anything until you see the summary
+  dialog. There is no "Export environments" action yet; use a copy of your own
+  `environments.json`, or one shared by a teammate, as the file to import.
+
+## Activate an environment
+
+Choose it in the top dropdown. All `{{ variable }}` placeholders and MCP tool calls use
+the **currently selected** environment.
+
+If you switch environments while an AI agent is connected, the next tool call uses the
+new variables. Keep one environment selected for a stable agent session.
+
+## Hidden variables
+
+Mark sensitive keys (tokens, passwords) as **Hidden**:
+
+- Values show as `********` in the UI and hover previews
+- Real values are still used when sending requests and when MCP tools run
+- Hidden-derived values are masked in history storage
+
+Right-click a variable row to delete it when needed.
+
+## Encryption at rest (optional)
+
+In **Settings**, you can enable encryption for environment data on disk. Only variables
+marked **Hidden** are encrypted in `environments.json`; non-hidden values remain
+plaintext.
+
+Configure key source (environment variable, OS keyring, or secret store) and use the
+migration actions in Settings if you change encryption mode. See [Settings](settings.md).
+
+## Using variables in requests
+
+See [Templating](templating.md). Example: set `host` = `https://api.example.com`, then use
+`{{ host }}/users` in the URL field.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List
+from pathlib import Path
+from typing import Callable, List
 
 from PySide6.QtWidgets import QDialog, QHBoxLayout
 
@@ -20,6 +21,7 @@ class EnvironmentDialog(QDialog):
         parent=None,
         current_env_name: str = None,
         log_hidden_key_names: bool = False,
+        read_import_file: Callable[[Path], tuple[list[Environment], list[str]]] | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle(DIALOG_TITLE_MANAGE_ENVIRONMENTS)
@@ -32,6 +34,7 @@ class EnvironmentDialog(QDialog):
             current_env_name=current_env_name,
             get_current_env_name=lambda: self.current_env_name,
             set_current_env_name=lambda name: setattr(self, "current_env_name", name),
+            read_import_file=read_import_file,
         )
         self._vars_widget = EnvironmentVariablesWidget(
             log_hidden_key_names=log_hidden_key_names,
@@ -75,6 +78,9 @@ class EnvironmentDialog(QDialog):
 
     def add_environment(self) -> None:
         self._env_list_widget.add_environment()
+
+    def import_environments(self) -> None:
+        self._env_list_widget.import_environments()
 
     def delete_environment(self, row: int | None = None) -> None:
         self._env_list_widget.delete_environment(row)

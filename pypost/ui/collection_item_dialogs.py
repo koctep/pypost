@@ -2,14 +2,26 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QMessageBox, QWidget
+from pathlib import Path
 
+from PySide6.QtWidgets import QCheckBox, QFileDialog, QMessageBox, QWidget
+
+from pypost.core.environment_import import ImportConflictDecision
 from pypost.core.environment_messages import (
+    BUTTON_KEEP_BOTH,
+    BUTTON_OVERWRITE,
+    BUTTON_SKIP,
+    CHECKBOX_APPLY_TO_ALL_CONFLICTS,
     DIALOG_TITLE_COPY_ENVIRONMENT,
     DIALOG_TITLE_DELETE_ENVIRONMENT,
+    DIALOG_TITLE_IMPORT_CONFLICT,
+    DIALOG_TITLE_IMPORT_ENVIRONMENTS,
+    IMPORT_FILE_DIALOG_CAPTION,
+    IMPORT_FILE_DIALOG_FILTER,
     MSG_EMPTY_NAME,
     format_delete_environment_confirm,
     format_duplicate_environment_name,
+    format_import_conflict_message,
 )
 
 _RENAME_TITLE = "Rename Error"
@@ -213,6 +225,65 @@ def confirm_encrypt_plaintext_hidden(parent: QWidget) -> bool:
         QMessageBox.StandardButton.No,
     )
     return reply == QMessageBox.StandardButton.Yes
+
+
+def prompt_import_environments_file(parent: QWidget) -> Path | None:
+    """Open a file picker for an environment import file; None on Cancel."""
+    path_str, _selected_filter = QFileDialog.getOpenFileName(
+        parent,
+        IMPORT_FILE_DIALOG_CAPTION,
+        "",
+        IMPORT_FILE_DIALOG_FILTER,
+    )
+    if not path_str:
+        return None
+    return Path(path_str)
+
+
+def show_import_invalid_file_error(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, DIALOG_TITLE_IMPORT_ENVIRONMENTS, message)
+
+
+def prompt_import_conflict(
+    parent: QWidget, name: str, *, remaining_count: int
+) -> tuple[ImportConflictDecision, bool]:
+    """Ask how to resolve a single name conflict during import.
+
+    Returns the chosen decision and whether it should apply to all remaining
+    conflicts in this import (via the "apply to all" checkbox).
+    """
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Question)
+    box.setWindowTitle(DIALOG_TITLE_IMPORT_CONFLICT)
+    box.setText(format_import_conflict_message(name))
+    overwrite_btn = box.addButton(BUTTON_OVERWRITE, QMessageBox.ButtonRole.DestructiveRole)
+    keep_both_btn = box.addButton(BUTTON_KEEP_BOTH, QMessageBox.ButtonRole.AcceptRole)
+    box.addButton(BUTTON_SKIP, QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(keep_both_btn)
+
+    apply_to_all_checkbox: QCheckBox | None = None
+    if remaining_count > 0:
+        apply_to_all_checkbox = QCheckBox(CHECKBOX_APPLY_TO_ALL_CONFLICTS)
+        box.setCheckBox(apply_to_all_checkbox)
+
+    box.exec()
+    clicked = box.clickedButton()
+    if clicked is overwrite_btn:
+        decision = ImportConflictDecision.OVERWRITE
+    elif clicked is keep_both_btn:
+        decision = ImportConflictDecision.KEEP_BOTH
+    else:
+        decision = ImportConflictDecision.SKIP
+
+    apply_to_all = apply_to_all_checkbox is not None and apply_to_all_checkbox.isChecked()
+    return decision, apply_to_all
+
+
+def show_import_result(parent: QWidget, summary_text: str, *, success: bool) -> None:
+    if success:
+        QMessageBox.information(parent, DIALOG_TITLE_IMPORT_ENVIRONMENTS, summary_text)
+    else:
+        QMessageBox.warning(parent, DIALOG_TITLE_IMPORT_ENVIRONMENTS, summary_text)
 
 
 def show_invalid_retryable_status_codes(parent: QWidget, message: str) -> None:

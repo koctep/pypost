@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.env_variable_snapshot import EnvVariableSnapshot
+from pypost.core.environment_import import load_import_candidates
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
 from pypost.core.qt.mcp_server import MCPServerManager
@@ -446,6 +447,7 @@ class EnvPresenter(QObject):
             self._widget,
             current_env_name,
             log_hidden_key_names=self._settings.log_hidden_key_names,
+            read_import_file=lambda path: load_import_candidates(path, self._storage),
         )
         dialog.exec()
         logger.info("env_manager_dialog_closed")
