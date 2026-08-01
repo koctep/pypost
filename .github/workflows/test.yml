@@ -304,6 +304,26 @@ jobs:
             "\`pip-licenses\` from editable \`[dev]\` extra." \
             >> "$GITHUB_STEP_SUMMARY"
 
+  check-lock:
+    name: "check-lock (requirements.txt)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+
+      - name: Verify production lock file matches source
+        run: make check-lock
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## Production dependency lock check (PYPOST-927)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified \`requirements.txt\` matches \`requirements.in\` via \`make check-lock\`." \
+            >> "$GITHUB_STEP_SUMMARY"
+
   check-lock-dev:
     name: "check-lock-dev (requirements-dev.txt)"
     runs-on: ubuntu-latest

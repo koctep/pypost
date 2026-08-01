@@ -67,6 +67,9 @@ Verify the committed lock matches the source file:
 make check-lock
 ```
 
+CI runs the same check in the `check-lock` job (`.github/workflows/test.yml`) on every
+push and pull request (PYPOST-927).
+
 ### Development dependency lock file (PYPOST-780)
 
 Test and lint tooling uses the same **two-file** layout as production:
