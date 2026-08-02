@@ -164,6 +164,59 @@ def test_jira_cloud_environment_imports_with_placeholders(tmp_path, monkeypatch)
     assert environment.enable_mcp is True
 
 
+def test_jira_project_default_is_wired_as_soft_guidance(tmp_path, monkeypatch):
+    """PYPOST-1032: Jira examples guide normal work without enforcing scope."""
+    storage = _make_storage(tmp_path, monkeypatch)
+    environments, parse_errors = load_import_candidates(JIRA_ENV_PATH, storage)
+
+    assert parse_errors == []
+    assert len(environments) == 1
+    environment = environments[0]
+    assert environment.variables["jira_project_key"] == "YOUR_PROJECT_KEY"
+    assert "jira_project_key" not in environment.hidden_keys
+    assert environment.hidden_keys == {"jira_credentials"}
+
+    collection = _load_jira_mcp_collection()
+    requests_by_id = {request.id: request for request in collection.requests}
+
+    boards = requests_by_id["jira-list-boards"]
+    assert boards.params["projectKeyOrId"] == "{{ jira_project_key }}"
+    assert "jira_project_key" in boards.mcp_description
+    assert "project-scoped" in boards.mcp_description
+
+    for request_id, payload_name in (
+        ("jira-search-issues-jql", "search_payload"),
+        ("jira-create-issue", "issue_payload"),
+    ):
+        request = requests_by_id[request_id]
+        guidance = " ".join(
+            [
+                request.mcp_description,
+                request.mcp_params[payload_name].description,
+            ]
+        ).lower()
+        assert "jira_project_key" in guidance
+        assert "normal" in guidance
+        assert "explicit" in guidance
+        assert "permitted" in guidance
+
+    for request_id, selected_scope in (
+        ("jira-list-board-sprints", "selected board"),
+        ("jira-get-sprint-issues", "selected sprint"),
+    ):
+        guidance = requests_by_id[request_id].mcp_description.lower()
+        assert selected_scope in guidance
+        assert "not automatically project-scoped" in guidance
+
+    readme = (
+        REPO_ROOT / "examples" / "README.md"
+    ).read_text(encoding="utf-8").lower()
+    assert "jira_project_key" in readme
+    assert "set" in readme
+    assert "not an authorization" in readme
+    assert "not a security boundary" in readme
+
+
 def test_mcp_probe_collection_still_imports():
     collections, parse_errors = load_collection_import_candidates(MCP_PROBE_PATH)
 

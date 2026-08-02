@@ -4,6 +4,7 @@
     "name": "Jira Cloud MCP",
     "variables": {
       "jira_base_url": "https://your-team.atlassian.net",
+      "jira_project_key": "YOUR_PROJECT_KEY",
       "jira_credentials": "you@example.com:your-api-token"
     },
     "hidden_keys": [

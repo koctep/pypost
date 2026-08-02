@@ -19,7 +19,7 @@ For step-by-step import UI details, see the User Guide:
   sprints (list/create/update/delete/membership), backlog, and
   assignable-user search.
 - [`environments/jira_cloud.json`](environments/jira_cloud.json) — **End users.**
-  Companion environment: `jira_base_url`, hidden `jira_credentials`,
+  Companion environment: `jira_base_url`, visible `jira_project_key`, hidden `jira_credentials`,
   `enable_mcp: true`.
 - [`collections/mcp.json`](collections/mcp.json) — **Contributors / local
   probing.** Local MCP/SSE probe against PyPost ports (`127.0.0.1:1080` /
@@ -32,6 +32,8 @@ For step-by-step import UI details, see the User Guide:
 2. **Replace placeholders locally** (do not commit real secrets):
    - `jira_base_url` — your site, for example
      `https://your-company.atlassian.net`
+   - `jira_project_key` — set this to the Jira project key or ID that should
+     guide normal issue search, issue creation, and board discovery
    - `jira_credentials` — `email:api_token` (Atlassian account email and an
      API token from Atlassian account settings); keep the key **Hidden**
 3. **Import the collection** — **Import Collection…** and choose
@@ -42,6 +44,12 @@ For step-by-step import UI details, see the User Guide:
 
 Auth in the collection matches Atlassian Cloud basic auth for REST APIs:
 `Authorization: Basic {{ base64(jira_credentials) }}`.
+
+`jira_project_key` is a soft default for normal work. It is not an authorization
+and not a security boundary or permission control. A user may deliberately work
+in a different project when their Jira permissions allow it. Board discovery uses
+the project-aware Jira parameter; board and sprint follow-up tools keep the
+scope of the selected board or sprint rather than simulating a project lock.
 
 ## Coverage vs gaps
 
