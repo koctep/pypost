@@ -138,7 +138,7 @@ typing-inspection==0.4.2
     #   pydantic-settings
 urllib3==2.7.0
     # via requests
-uvicorn==0.52.0
+uvicorn==0.52.1
     # via mcp
 zipp==4.1.0
     # via importlib-metadata
