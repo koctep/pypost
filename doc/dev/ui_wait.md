@@ -129,8 +129,12 @@ with AgentAppSession(offscreen=True) as session:
     )
 ```
 
-Module-level helpers accept any root — pass `current_request_tab()` or the tab
-widget when calling free functions directly (golden e2e pattern).
+Golden Send → response flows prefer session helpers with
+`in_current_tab=True`: `wait_response_after_send` for success settle, and
+`session.wait_for_text(..., in_current_tab=True)` for direct text waits
+(including the golden timeout companion). Module-level free functions still
+accept any root for unit proofs or low-level harnesses — pass
+`current_request_tab()` when you need a tab root without the session API.
 
 ## Configuration
 

@@ -149,8 +149,9 @@ window-scoped finds even though the tab bar looks empty.
 ### After tab manipulation
 
 - Prefer **current-tab scoped** actions: `in_current_tab=True` on session
-  helpers, or root `wait_for_text` / `find_widget` at
-  `session.current_request_tab()`.
+  helpers (`ui_*`, `wait_for_text`, `wait_response_after_send`). Free-function
+  waits may still take `session.current_request_tab()` as root when not using
+  the session API.
 - Do not rely on window-scoped finds when multiple tabs (including orphans) may
   share per-tab role ids. See [ui_identity.md](ui_identity.md) and
   [ui_actions.md](ui_actions.md).
@@ -248,8 +249,9 @@ with stub_agent_e2e_http(CANNED_GOLDEN_OK):
 Expected status/body tokens are **test-local** in
 `tests/test_agent_golden_e2e.py`. Successful paths use the shared settle helper.
 The PYPOST-950 forced-timeout companion intentionally remains separate: it
-calls `wait_for_text` on `RESPONSE_STATUS` with an impossible label and 50 ms
-budget, then wraps the miss with `response_panel_excerpt` from shared
+calls `session.wait_for_text(..., in_current_tab=True)` on `RESPONSE_STATUS`
+with an impossible label and 50 ms budget, then wraps the miss with
+`response_panel_excerpt` from shared
 [response-panel helpers](agent_e2e_response_panel.md)
 (`tests/helpers/agent_e2e_response_panel.py`). That companion directly proves
 the preserved step, excerpt, and inner wait evidence and is not an alternative

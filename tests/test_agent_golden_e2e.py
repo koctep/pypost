@@ -11,7 +11,6 @@ from pypost.agent import (
     AgentAppSession,
     UiWaitTimeoutError,
     find_widget,
-    wait_for_text,
 )
 from pypost.fixtures.agent_e2e_http import (
     CANNED_GOLDEN_OK,
@@ -127,7 +126,6 @@ def test_agent_golden_settle_timeout_includes_step_and_excerpt(
     """PYPOST-950: forced text-wait settle timeout carries step + excerpt."""
     session = agent_e2e_session
     assert session.window.is_ui_ready is True
-    tab = session.current_request_tab()
     session.ui_fill(URL_INPUT, FIXTURE_URL)
     session.ui_select(METHOD_COMBO, FIXTURE_METHOD)
 
@@ -135,11 +133,11 @@ def test_agent_golden_settle_timeout_includes_step_and_excerpt(
         session.ui_click(SEND_BUTTON)
         with pytest.raises(UiWaitTimeoutError) as exc_info:
             try:
-                wait_for_text(
-                    tab,
+                session.wait_for_text(
                     RESPONSE_STATUS,
                     "Status: 999",
                     timeout=0.05,
+                    in_current_tab=True,
                 )
             except UiWaitTimeoutError as exc:
                 last = session.ui_snapshot()

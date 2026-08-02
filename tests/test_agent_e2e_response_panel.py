@@ -10,6 +10,9 @@ instead of ``wait_for_snapshot(_response_ready)`` panel-walk readiness.
 
 PYPOST-956: mapping snapshot Send settle must use shared
 ``wait_response_after_snapshot``; no module-local ``_wait_response``.
+
+PYPOST-978: golden text waits must use ``session.wait_for_text`` with
+``in_current_tab=True``; no free-function ``wait_for_text`` import.
 """
 
 from __future__ import annotations
@@ -149,6 +152,88 @@ def test_golden_success_send_uses_shared_settle_helper() -> None:
         "tests.helpers.agent_e2e_send_settle.wait_response_after_send; "
         f"imported={helper_imported}, called_in_success_helper={helper_called}"
     )
+
+
+def _is_free_wait_for_text_import(node: ast.AST) -> bool:
+    """True if node imports free-function wait_for_text from agent/ui_wait."""
+    if not isinstance(node, ast.ImportFrom):
+        return False
+    if node.module not in {"pypost.agent", "pypost.agent.ui_wait"}:
+        return False
+    return any(alias.name == "wait_for_text" for alias in node.names)
+
+
+def _wait_for_text_calls(tree: ast.AST) -> list[ast.Call]:
+    """Return every Call whose callee name is wait_for_text (Name or Attribute)."""
+    calls: list[ast.Call] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Name) and func.id == "wait_for_text":
+            calls.append(node)
+        elif (
+            isinstance(func, ast.Attribute)
+            and func.attr == "wait_for_text"
+        ):
+            calls.append(node)
+    return calls
+
+
+def _is_session_wait_for_text_call(call: ast.Call) -> bool:
+    """True if call is session.wait_for_text(...)."""
+    func = call.func
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr == "wait_for_text"
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "session"
+    )
+
+
+def _has_in_current_tab_true(call: ast.Call) -> bool:
+    """True if call passes keyword in_current_tab=True."""
+    for keyword in call.keywords:
+        if keyword.arg != "in_current_tab":
+            continue
+        return (
+            isinstance(keyword.value, ast.Constant)
+            and keyword.value.value is True
+        )
+    return False
+
+
+def test_golden_text_waits_use_session_api_not_free_function() -> None:
+    """PYPOST-978: Golden text waits use session API, not free wait_for_text."""
+    path = _TESTS_DIR / "test_agent_golden_e2e.py"
+    tree = ast.parse(_module_source(path), filename=str(path))
+
+    free_imports = [
+        node for node in tree.body if _is_free_wait_for_text_import(node)
+    ]
+    assert not free_imports, (
+        "Golden must not import free-function wait_for_text from "
+        "pypost.agent or pypost.agent.ui_wait; use session.wait_for_text"
+    )
+
+    calls = _wait_for_text_calls(tree)
+    bare_name_calls = [
+        call
+        for call in calls
+        if isinstance(call.func, ast.Name)
+    ]
+    assert not bare_name_calls, (
+        "Golden wait_for_text calls must be session.wait_for_text "
+        f"(Attribute), not bare Name; found {len(bare_name_calls)} bare call(s)"
+    )
+
+    for call in calls:
+        assert _is_session_wait_for_text_call(call), (
+            "Golden wait_for_text must be session.wait_for_text only"
+        )
+        assert _has_in_current_tab_true(call), (
+            "session.wait_for_text must pass in_current_tab=True"
+        )
 
 
 def test_shared_response_panel_helpers_api_and_behavior() -> None:

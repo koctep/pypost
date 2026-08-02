@@ -255,8 +255,9 @@ geometry. Details and catalog: [ui_identity.md](ui_identity.md).
 ### Golden scenario
 
 One intentional flow: blank request → set URL/method → Send (shared HTTP
-stub 200) → `wait_for_text` on `RESPONSE_STATUS` / `RESPONSE_BODY`
-(display-form body; PYPOST-920). Full steps:
+stub 200) → `wait_response_after_send(..., in_current_tab=True)` (session
+text waits on `RESPONSE_STATUS` / `RESPONSE_BODY`; display-form body;
+PYPOST-920). Full steps:
 [agent_golden_e2e.md](agent_golden_e2e.md). Shared HTTP catalog:
 [agent_e2e_http.md](agent_e2e_http.md). Sibling Send modules use the
 shared [send settle helper](agent_e2e_send_settle.md) (PYPOST-948); panel
