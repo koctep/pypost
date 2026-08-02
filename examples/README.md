@@ -14,9 +14,10 @@ For step-by-step import UI details, see the User Guide:
 ## Inventory
 
 - [`collections/jira_mcp.json`](collections/jira_mcp.json) — **End users.**
-  Curated Jira Cloud MCP collection (21 REST tools): issue search/CRUD,
+  Curated Jira Cloud MCP collection (22 REST tools): issue search/CRUD,
   transitions, worklog, fields, comments, assign, epic/parent link, boards,
-  sprints (list/create/update/membership), backlog, and assignable-user search.
+  sprints (list/create/update/delete/membership), backlog, and
+  assignable-user search.
 - [`environments/jira_cloud.json`](environments/jira_cloud.json) — **End users.**
   Companion environment: `jira_base_url`, hidden `jira_credentials`,
   `enable_mcp: true`.
@@ -60,8 +61,11 @@ Cloud or Atlassian MCP tool.
 | Worklog | `jira-add-worklog`, `jira-get-worklog` |
 | Epic / parent | `jira-link-issue-parent` (uses `fields.parent`) |
 | Boards / sprint read | `jira-list-boards`, `jira-list-board-sprints`, `jira-get-sprint` |
-| Sprint write | `jira-create-sprint`, `jira-update-sprint`, `jira-get-sprint-issues` |
+| Sprint write | `jira-create-sprint`, `jira-update-sprint`, `jira-delete-sprint` |
+| Sprint issues | `jira-get-sprint-issues` |
 | Sprint membership | `jira-add-issues-to-sprint`, `jira-move-issues-to-backlog` |
+
+`jira-move-issues-to-backlog` is the supported remove-from-sprint path.
 
 **Explicit gaps** (out of scope unless added later):
 

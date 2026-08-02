@@ -1,4 +1,4 @@
-"""Contract tests for shipped examples/ fixtures (PYPOST-1017 / PYPOST-1026)."""
+"""Contract tests for shipped examples/ fixtures (PYPOST-1017 / 1026 / 1047)."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ MCP_PROBE_PATH = REPO_ROOT / "examples" / "collections" / "mcp.json"
 PLACEHOLDER_BASE_URL = "https://your-team.atlassian.net"
 PLACEHOLDER_CREDENTIALS = "you@example.com:your-api-token"
 
-# PYPOST-1026: floor after expanding the 12-request starter with 6 must-haves.
-JIRA_MCP_MIN_EXPOSED_REQUESTS = 18
+# PYPOST-1047: floor after adding delete-sprint (21 → 22 MCP-exposed requests).
+JIRA_MCP_MIN_EXPOSED_REQUESTS = 22
 
 # Locked required capabilities (no stretch-swap escape hatch).
 REQUIRED_JIRA_MCP_REQUEST_IDS = frozenset(
@@ -33,6 +33,9 @@ REQUIRED_JIRA_MCP_REQUEST_IDS = frozenset(
         "jira-link-issue-parent",
         "jira-add-comment",
         "jira-assign-issue",
+        # PYPOST-1047: delete sprint + lock remove-from-sprint (backlog move).
+        "jira-delete-sprint",
+        "jira-move-issues-to-backlog",
     }
 )
 
@@ -85,7 +88,7 @@ def test_jira_mcp_collection_imports_via_native_loader():
 
 
 def test_jira_mcp_collection_covers_required_skill_capabilities():
-    """PYPOST-1026: curated analog must cover locked skill/workflow gaps."""
+    """PYPOST-1026/1047: curated analog must cover locked skill/workflow gaps."""
     collection = _load_jira_mcp_collection()
     requests = collection.requests
     request_ids = {request.id for request in requests}
@@ -131,6 +134,19 @@ def test_jira_mcp_collection_covers_required_skill_capabilities():
         method="PUT",
         url_contains=("/assignee",),
     ), "assign issue must PUT .../assignee"
+    # PYPOST-1047: delete sprint + lock backlog move as remove-from-sprint.
+    assert _has_request(
+        requests,
+        request_id="jira-delete-sprint",
+        method="DELETE",
+        url_contains=("/rest/agile/1.0/sprint/",),
+    ), "delete sprint must DELETE .../sprint/{id}"
+    assert _has_request(
+        requests,
+        request_id="jira-move-issues-to-backlog",
+        method="POST",
+        url_contains=("/rest/agile/1.0/backlog/issue",),
+    ), "remove from sprint must POST .../backlog/issue"
 
 
 def test_jira_cloud_environment_imports_with_placeholders(tmp_path, monkeypatch):

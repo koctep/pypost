@@ -335,6 +335,31 @@
       "retry_policy": null
     },
     {
+      "id": "jira-delete-sprint",
+      "name": "Jira Delete Sprint",
+      "method": "DELETE",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Permanently delete a Jira Software sprint by numeric ID. Irreversible; open issues in the sprint move to the backlog.",
+      "mcp_params": {
+        "sprint_id": {
+          "type": "integer",
+          "description": "Numeric Jira Software sprint ID.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
       "id": "jira-create-sprint",
       "name": "Jira Create Sprint",
       "method": "POST",
@@ -552,7 +577,7 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "Move issues to the backlog (remove from active/future sprint membership). issues_payload must be serialized JSON, for example {\"issues\":[\"DEMO-1\"]}.",
+      "mcp_description": "Remove issues from sprint membership by moving them to the backlog (clears active/future sprint assignment). Supported remove-from-sprint path; issues_payload must be serialized JSON, for example {\"issues\":[\"DEMO-1\"]}.",
       "mcp_params": {
         "issues_payload": {
           "type": "string",
