@@ -17,7 +17,7 @@ asserts still walk `RESPONSE_PANEL` via
 | Piece | Role |
 | --- | --- |
 | `tests/helpers/agent_e2e_send_settle.py` | `wait_response_after_send`, `wait_response_after_snapshot`, `json_response_body_display` |
-| `tests/test_agent_e2e_response_panel.py` | Convention lock on mandatory Send modules |
+| `tests/test_agent_e2e_response_panel.py` | Convention locks for Send settle modules |
 | Sibling Send modules | Call text-wait or snapshot helper after `ui_click(SEND_BUTTON)` |
 
 ```mermaid
@@ -32,20 +32,35 @@ flowchart LR
   Assert[post-settle asserts] --> Panel[agent_e2e_response_panel]
 ```
 
-Mandatory modules guarded by
+Identity-text modules guarded by
 `test_send_modules_use_identity_scoped_text_wait_settle`:
 
 - `test_agent_e2e_double_response_body.py`
 - `test_agent_e2e_presentation_matrix.py`
 - `test_agent_e2e_http_env.py`
-
-Optional: `test_agent_e2e_http_seed_post.py` (tree-open Send uses
-`in_current_tab=True` on helper and session waits — PYPOST-949).
+- `test_agent_e2e_http_seed_post.py` (added to the inventory by PYPOST-969;
+  tree-open Send uses `in_current_tab=True` on the helper).
 
 Snapshot Send settle (mapping multi-URL, PYPOST-956):
 
 - `test_agent_e2e_http_mapping_multi_url.py` — guarded by
   `test_snapshot_send_settle_modules_use_shared_helper`.
+
+### Convention guard behavior
+
+`_SEND_SETTLE_MODULES` is the authoritative identity-text inventory. The
+parameterized guard reads each named module and accepts either:
+
+- an imported and called `wait_response_after_send`; or
+- direct `wait_for_text` calls for both `RESPONSE_STATUS` and `RESPONSE_BODY`.
+
+It rejects the established legacy `_response_ready` definition and
+`wait_for_snapshot(_response_ready)` Send settle. The guard is a fast local
+source-policy check; it does not launch Qt or make network requests.
+
+Seed POST's `_seed_post_editor_ready` snapshot wait remains valid because it
+settles the request editor before Send. Both response-settle paths after Send
+call `wait_response_after_send` and are covered by the same module parameter.
 
 ## API / Usage
 
@@ -148,7 +163,9 @@ None beyond shared agent e2e timeouts. Import paths:
 ## Running the convention lock
 
 ```bash
-make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py::test_send_modules_use_identity_scoped_text_wait_settle -v"
+make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -k identity_scoped -v"
+make test \
+  PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -k 'seed_post and identity_scoped' -q"
 make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -k snapshot_send_settle -v"
 ```
 
@@ -163,6 +180,11 @@ make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -k snapshot_send_s
 | Snapshot settle convention lock fails | Remove local `_wait_response`; import `wait_response_after_snapshot` |
 | Mapping message missing `(step)` | Snapshot helper embeds step in message; text-wait helper does not |
 | Post-settle count wrong | Settle helper does not replace panel walk asserts; confirm chunk-flush delay if streaming stub |
+
+If the seed POST parameter is not collected, confirm
+`test_agent_e2e_http_seed_post.py` remains in `_SEND_SETTLE_MODULES`. If its
+guard case fails after a tree-open edit, preserve the pre-Send editor snapshot
+wait and restore `wait_response_after_send` for response settle after Send.
 
 ## See also
 

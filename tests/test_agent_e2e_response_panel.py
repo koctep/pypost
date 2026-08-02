@@ -33,6 +33,7 @@ _SEND_SETTLE_MODULES = (
     "test_agent_e2e_double_response_body.py",
     "test_agent_e2e_presentation_matrix.py",
     "test_agent_e2e_http_env.py",
+    "test_agent_e2e_http_seed_post.py",
 )
 _SNAPSHOT_SEND_SETTLE_MODULES = ("test_agent_e2e_http_mapping_multi_url.py",)
 _JSON_BODY_MODULES = frozenset({"test_agent_e2e_http_env.py"})
