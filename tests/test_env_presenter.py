@@ -35,6 +35,15 @@ class FakeStorage:
     def save_environments(self, envs):
         self.saved.append(list(envs))
 
+    def serialize_environment_records(
+        self,
+        environments,
+        *,
+        target_envelope_version=None,
+    ):
+        return [env.model_dump(mode="json") for env in environments]
+
+
 class FakeConfigManager:
     def __init__(self):
         self.saved = []
@@ -579,6 +588,20 @@ class TestEnvPresenter(unittest.TestCase):
         p.apply_settings(new_settings)
         self.assertIs(p._settings, new_settings)
         self.assertTrue(p._settings.log_hidden_key_names)
+
+    @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
+    def test_open_env_manager_passes_storage_serializer_directly(self, mock_dialog):
+        p = self._make_presenter([])
+        mock_dialog.return_value.environments = []
+
+        p._open_env_manager()
+
+        serializer = mock_dialog.call_args.kwargs["serialize_export_records"]
+        self.assertIs(serializer.__self__, p._storage)
+        self.assertIs(
+            serializer.__func__,
+            p._storage.serialize_environment_records.__func__,
+        )
 
     def test_widget_properties_removed(self):
         p = self._make_presenter([])

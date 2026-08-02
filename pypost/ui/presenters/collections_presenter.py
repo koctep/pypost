@@ -6,11 +6,10 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QHBoxLayout, QPushButton, QTreeView, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QTreeView, QWidget
 
-from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.collection_export import build_export_payload
-from pypost.core.collection_messages import BUTTON_EXPORT_COLLECTION, BUTTON_IMPORT_COLLECTION
+from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
@@ -25,12 +24,8 @@ from pypost.ui.presenters.collection_tree_incremental import (
     try_incremental_tree_refresh,
 )
 from pypost.ui.presenters.collections_async_loader import CollectionsAsyncLoader
-from pypost.ui.widget_ids import (
-    COLLECTION_EXPORT_BUTTON,
-    COLLECTION_IMPORT_BUTTON,
-    COLLECTION_TREE,
-    set_widget_id,
-)
+from pypost.ui.presenters.collections_panel import build_collections_panel
+from pypost.ui.widget_ids import COLLECTION_TREE, set_widget_id
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +111,11 @@ class CollectionsPresenter(QObject):
             )
         )
         self._view.customContextMenuRequested.connect(self._tree_actions.show_context_menu)
-        self._panel = self._build_panel()
+        self._panel = build_collections_panel(
+            self._view,
+            import_collection=self.import_collections,
+            export_collection=self.export_collection,
+        )
         self._import_actions = CollectionImportActions(
             self._panel,
             self._request_manager,
@@ -132,29 +131,6 @@ class CollectionsPresenter(QObject):
             self._request_manager,
             serialize_collection=serialize_collection,
         )
-
-    def _build_panel(self) -> QWidget:
-        """Wrap the tree with the sidebar action row that hosts Import Collection."""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        import_btn = QPushButton(BUTTON_IMPORT_COLLECTION)
-        set_widget_id(import_btn, COLLECTION_IMPORT_BUTTON)
-        import_btn.clicked.connect(self.import_collections)
-
-        export_btn = QPushButton(BUTTON_EXPORT_COLLECTION)
-        set_widget_id(export_btn, COLLECTION_EXPORT_BUTTON)
-        export_btn.clicked.connect(self.export_collection)
-
-        buttons_row = QHBoxLayout()
-        buttons_row.addWidget(import_btn)
-        buttons_row.addWidget(export_btn)
-        buttons_row.addStretch(1)
-
-        layout.addWidget(self._view)
-        layout.addLayout(buttons_row)
-        return panel
 
     @property
     def widget(self) -> QTreeView:

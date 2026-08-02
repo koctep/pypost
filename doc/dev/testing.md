@@ -1257,13 +1257,18 @@ PYPOST-376 records LOC baselines and caps for audit-scoped modules (especially
 # Fail if any cap exceeded
 .venv/bin/python scripts/audit_baseline_metrics.py --check
 
-# CI regression tests
-pytest tests/test_solid_audit_baseline.py -v
+# Focused regression tests through the standard Makefile target
+make test PYTEST_ARGS='tests/test_solid_audit_baseline.py -v'
 ```
+
+The regression test checks both module caps and exact equality between the committed
+snapshot and the canonical generated report. Regenerate the snapshot whenever measured
+values or caps intentionally change. For cap policy, component ownership, and drift
+troubleshooting, see
+[solid_audit.md](solid_audit.md#regression-baseline-metrics-pypost-376).
 
 Baseline date: **2026-06-11**. Audit-era vs current vs cap table:
 [ai-tasks/PYPOST-376/baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
-See also [solid_audit.md](solid_audit.md#regression-baseline-metrics-pypost-376).
 
 ## Dialog audit inventory (PYPOST-374)
 

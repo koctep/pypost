@@ -36,12 +36,34 @@ Full report: [ai-tasks/PYPOST-40/30-audit-report.md](../../ai-tasks/PYPOST-40/30
 The audit report recorded qualitative findings but no numeric regression anchors. PYPOST-376 adds
 LOC baselines and caps so god-object regressions (especially `MainWindow` growth) fail CI.
 
+### Architecture and sources of truth
+
+| Component | Responsibility |
+| --- | --- |
+| `scripts/audit_baseline_metrics.py` | Define monitored paths and caps; measure and render |
+| `ai-tasks/PYPOST-376/baseline-metrics.md` | Store the canonical generated snapshot |
+| `tests/test_solid_audit_baseline.py` | Enforce caps and exact snapshot equality |
+| `doc/dev/solid_audit.md` | Explain policy, maintenance, and summary values |
+
+`measure_all()` reads the configured modules, counts physical file lines, and uses the Python
+AST for top-level class spans. `format_markdown()` is the only snapshot renderer. The
+regression test compares its output exactly with the committed UTF-8 text, including the final
+newline.
+
+PYPOST-1025 kept application behavior unchanged while restoring the guards. Collection sidebar
+layout is built by the stateless `collections_panel` factory; `CollectionsPresenter` retains
+tree and workflow coordination. `EnvPresenter` passes the storage serializer directly to the
+existing environment dialog boundary.
+
 | Metric | Audit era (PYPOST-40) | Baseline (2026-06-11) | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 416 | 435 |
-| `MainWindow` class LOC | 1040 | 375 | 390 |
+| `main_window.py` file LOC | 1040 | 429 | 435 |
+| `MainWindow` class LOC | 1040 | 385 | 390 |
 
-Authoritative snapshot (all module caps): [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md)
+Authoritative generated snapshot (all module caps):
+[baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
+
+### Usage
 
 **Regenerate snapshot:**
 
@@ -54,11 +76,44 @@ Authoritative snapshot (all module caps): [baseline-metrics.md](../../ai-tasks/P
 
 ```bash
 .venv/bin/python scripts/audit_baseline_metrics.py --check
-pytest tests/test_solid_audit_baseline.py -v
+make test PYTEST_ARGS='tests/test_solid_audit_baseline.py -v'
 ```
 
-Caps live in `scripts/audit_baseline_metrics.py`. After intentional module growth, remeasure,
-update caps with ~10% headroom, and refresh the snapshot.
+Use `--json PATH` when a machine-readable measurement report is needed. With no output flag,
+the command prints the canonical Markdown to stdout.
+
+### Configuration and maintenance
+
+- `FILE_CAPS` defines monitored file limits; `MAIN_WINDOW_CLASS_CAP` separately guards the
+  `MainWindow` class span.
+- `AUDIT_ERA_LOC` provides historical comparisons. A dash in the generated table means that
+  the module was added after the audit-era inventory.
+- `BASELINE_DATE` is the policy provenance date, not the latest regeneration timestamp.
+- Prefer behavior-preserving extraction before raising a cap. If growth is intentional,
+  document the rationale beside the cap, normally retain about 10% headroom, regenerate the
+  snapshot, and update summary values in this document.
+- Commit the generator or cap change and regenerated snapshot together.
+
+### Troubleshooting
+
+- **`--check` prints `lines exceeds cap`:** reduce the module, or justify and update its cap,
+  then regenerate the snapshot.
+- **Caps pass but snapshot equality fails:** regenerate the snapshot and inspect its diff;
+  do not hand-edit generated values.
+- **Snapshot changes unexpectedly:** check the listed source-module diffs before accepting
+  the regenerated measurements.
+- **Summary values disagree:** copy current values from the generated snapshot into this
+  document.
+- **A monitored file was renamed or removed:** update `FILE_CAPS` and, when applicable,
+  `AUDIT_ERA_LOC` in the same change.
+
+Always run both `--check` and the pytest module after reconciliation. A green cap check alone
+does not prove that the committed snapshot is fresh.
+
+**PYPOST-1025 (2026-08-02):** Reconciled baseline drift without raising caps — extracted
+collection panel assembly (`collections_presenter.py` 328/330) and simplified environment
+serializer wiring (`env_presenter.py` 470/470). Regenerated the canonical snapshot and added
+an exact snapshot-freshness regression guard.
 
 **PYPOST-728 (2026-07-14):** Verified R-P1-001 compliance — `main_window.py` (393/425),
 `MainWindow` class (353/380), and `template_service.py` (204/225) all within refreshed caps.

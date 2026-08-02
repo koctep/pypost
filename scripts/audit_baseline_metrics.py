@@ -28,9 +28,8 @@ AUDIT_ERA_LOC: dict[str, int] = {
 # Regression caps: measured 2026-06-11 + ~10% headroom (see baseline-metrics.md).
 FILE_CAPS: dict[str, int] = {
     "pypost/ui/main_window.py": 435,
-    # PYPOST-987: +46 lines for the Import Collection panel and its wiring. The
-    # flow itself was extracted to collection_import_actions.py; what remains is
-    # presenter-level layout and delegation.
+    # PYPOST-987/PYPOST-989: import/export workflows remain delegated to action
+    # objects; PYPOST-1025 extracted their panel assembly to collections_panel.py.
     "pypost/ui/presenters/collections_presenter.py": 330,
     "pypost/ui/presenters/tabs_presenter.py": 785,
     "pypost/ui/presenters/env_presenter.py": 470,

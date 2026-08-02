@@ -11,6 +11,7 @@ import pytest
 pytestmark = pytest.mark.timeout(30)
 
 _SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+_BASELINE_SNAPSHOT = _SCRIPTS.parent / "ai-tasks" / "PYPOST-376" / "baseline-metrics.md"
 _spec = importlib.util.spec_from_file_location(
     "audit_baseline_metrics",
     _SCRIPTS / "audit_baseline_metrics.py",
@@ -22,6 +23,12 @@ _spec.loader.exec_module(_baseline)
 
 
 class TestSolidAuditBaseline(unittest.TestCase):
+    def test_markdown_snapshot_matches_current_metrics(self):
+        expected = _baseline.format_markdown(_baseline.measure_all())
+        actual = _BASELINE_SNAPSHOT.read_text(encoding="utf-8")
+
+        self.assertEqual(actual, expected)
+
     def test_main_window_file_loc_within_cap(self):
         metrics = _baseline.measure_file("pypost/ui/main_window.py")
         self.assertLessEqual(
