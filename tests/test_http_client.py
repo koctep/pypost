@@ -6,7 +6,13 @@ import unittest
 from unittest.mock import MagicMock
 import requests as requests_lib
 
-from pypost.core.http_client import DEFAULT_REQUEST_TIMEOUT, HTTPClient, HTTPRequestResult, ResolvedRequestFields
+from pypost.core.http_client import (
+    DEFAULT_REQUEST_TIMEOUT,
+    ERROR_LOG_URL_MAX_LENGTH,
+    HTTPClient,
+    HTTPRequestResult,
+    ResolvedRequestFields,
+)
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -197,7 +203,11 @@ class TestHTTPClientFunctionExpressions(unittest.TestCase):
     """Integration: function expressions through HTTPClient → TemplateService render path."""
 
     def setUp(self):
-        self.client = HTTPClient(metrics=MagicMock(), template_service=TemplateService())
+        self.template_metrics = MagicMock()
+        self.client = HTTPClient(
+            metrics=MagicMock(),
+            template_service=TemplateService(metrics=self.template_metrics),
+        )
         self.mock_session = MagicMock()
         self.client.session = self.mock_session
         self.mock_session.request.return_value = _make_response(status=200)
@@ -245,6 +255,262 @@ class TestHTTPClientFunctionExpressions(unittest.TestCase):
         self.client.send_request(req, variables=self.variables)
         params = self.mock_session.request.call_args[1]["params"]
         self.assertEqual({literal_key: literal_val}, params)
+
+    def test_to_int_expression_sends_native_integer_json_body(self):
+        req = RequestData(
+            method="POST",
+            url="http://x",
+            body='{"id": {{to_int(issue_id)}}}',
+            body_type="json",
+        )
+        self.client.send_request(req, variables={"issue_id": "42"})
+        self.assertEqual(
+            {"id": 42},
+            self.mock_session.request.call_args.kwargs["json"],
+        )
+
+    def test_to_int_expression_substituted_in_url_and_params(self):
+        req = RequestData(
+            method="GET",
+            url="http://x/items/{{to_int(issue_id)}}",
+            params={"id": "{{to_int(issue_id)}}"},
+        )
+        self.client.send_request(req, variables={"issue_id": "42"})
+        call_kwargs = self.mock_session.request.call_args.kwargs
+        self.assertEqual("http://x/items/42", call_kwargs["url"])
+        self.assertEqual({"id": "42"}, call_kwargs["params"])
+
+    def test_invalid_to_int_expression_blocks_http_dispatch_in_all_request_contexts(self):
+        invalid_expressions = {
+            "non_numeric_value": ("{{to_int(issue_id)}}", {"issue_id": "not-an-int"}),
+            "empty_value": ("{{to_int(issue_id)}}", {"issue_id": ""}),
+            "invalid_arity_none": ("{{to_int()}}", {}),
+            "invalid_arity_many": ("{{to_int(issue_id, value)}}", {
+                "issue_id": "42", "value": "43",
+            }),
+            "malformed_call": ("{{to_int(issue_id}}", {"issue_id": "42"}),
+            "unclosed_placeholder": ("{{to_int(issue_id)", {"issue_id": "42"}),
+            "nested_unknown_call": ("{{to_int(unknown(value))}}", {"value": "42"}),
+        }
+        for context in ("url", "headers", "params", "body"):
+            for label, (expression, variables) in invalid_expressions.items():
+                with self.subTest(context=context, invalid_expression=label):
+                    self.mock_session.request.reset_mock()
+                    self.template_metrics.reset_mock()
+                    if context == "url":
+                        req = RequestData(method="GET", url=f"http://x/items/{expression}")
+                    elif context == "headers":
+                        req = RequestData(
+                            method="GET",
+                            url="http://x",
+                            headers={"X-Issue-Id": expression},
+                        )
+                    elif context == "params":
+                        req = RequestData(
+                            method="GET",
+                            url="http://x",
+                            params={"id": expression},
+                        )
+                    else:
+                        req = RequestData(
+                            method="POST",
+                            url="http://x",
+                            body='{"id": ' + expression + "}",
+                            body_type="json",
+                        )
+
+                    with self.assertRaises(ExecutionError) as ctx:
+                        self.client.send_request(req, variables=variables)
+
+                    self.assertEqual(ErrorCategory.TEMPLATE, ctx.exception.category)
+                    self.template_metrics.track_template_expression_render_attempt.assert_called()
+                    self.mock_session.request.assert_not_called()
+
+    def test_invalid_to_int_logs_safe_http_context_and_tracks_render_error(self):
+        request = RequestData(
+            method="GET",
+            url="http://example.test/items/{{to_int(issue_id)}}",
+        )
+
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError) as ctx:
+                self.client.send_request(request, variables={"issue_id": "not-an-int"})
+
+        self.assertEqual(ErrorCategory.TEMPLATE, ctx.exception.category)
+        self.assertIn("template_integer_conversion_failed method=GET", "\n".join(logs.output))
+        self.assertNotIn("not-an-int", "\n".join(logs.output))
+        self.template_metrics.track_template_expression_render_attempt.assert_called_with(
+            render_path="http", outcome="render_error"
+        )
+        self.mock_session.request.assert_not_called()
+
+    def test_invalid_to_int_log_omits_sensitive_url_parts_and_bounds_origin(self):
+        long_host = "a" * (ERROR_LOG_URL_MAX_LENGTH + 100) + ".test"
+        request = RequestData(
+            method="GET",
+            url=(
+                f"https://username:password@{long_host}/account-owner-123"
+                "?email=person@example.test&tracking=private-value"
+                "&item={{to_int(issue_id)}}#session-private"
+            ),
+        )
+
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError):
+                self.client.send_request(request, variables={"issue_id": "not-an-int"})
+
+        joined = "\n".join(logs.output)
+        self.assertIn("template_integer_conversion_failed", joined)
+        self.assertNotIn("username:password", joined)
+        self.assertNotIn("account-owner-123", joined)
+        self.assertNotIn("person@example.test", joined)
+        self.assertNotIn("private-value", joined)
+        self.assertNotIn("session-private", joined)
+        self.assertNotIn("?email=", joined)
+        self.assertLessEqual(
+            len(HTTPClient._template_error_log_url(request.url, {})),
+            ERROR_LOG_URL_MAX_LENGTH,
+        )
+        self.mock_session.request.assert_not_called()
+
+    def test_invalid_to_int_log_uses_placeholder_for_malformed_url(self):
+        self.assertEqual(
+            "[invalid-url]",
+            HTTPClient._template_error_log_url("https://[broken/path?secret=value#private", {}),
+        )
+
+    def test_non_call_to_int_text_retains_ordinary_http_template_behavior(self):
+        cases = {
+            "bare_variable": (RequestData(method="GET", url="http://x/{{to_int}}"), {}),
+            "attribute_call": (
+                RequestData(method="GET", url="http://x/{{foo.to_int(value)}}"),
+                {"value": "42"},
+            ),
+            "plain_text_outside_placeholder": (
+                RequestData(method="GET", url="http://x/to_int({{not_allowed(value)}}"),
+                {"value": "42"},
+            ),
+        }
+        for label, (req, variables) in cases.items():
+            with self.subTest(case=label):
+                self.mock_session.request.reset_mock()
+                self.client.send_request(req, variables=variables)
+                self.mock_session.request.assert_called_once()
+
+    def test_identifier_suffix_to_int_retains_literal_fallback_and_dispatches(self):
+        expression = "{{not_to_int(issue_id)}}"
+        self.client.send_request(
+            RequestData(method="GET", url=f"http://x/items/{expression}"),
+            variables={"issue_id": "42"},
+        )
+
+        self.assertEqual(
+            f"http://x/items/{expression}",
+            self.mock_session.request.call_args.kwargs["url"],
+        )
+
+    def test_valid_to_int_with_unrelated_invalid_token_uses_literal_fallback_and_dispatches(self):
+        valid_token = "{{to_int(issue_id)}}"
+        invalid_token = "{{not_allowed(value)}}"
+        cases = {
+            "url": (
+                RequestData(method="GET", url=f"http://x/{valid_token}/{invalid_token}"),
+                lambda kwargs: kwargs["url"],
+                f"http://x/{valid_token}/{invalid_token}",
+            ),
+            "header": (
+                RequestData(
+                    method="GET",
+                    url="http://x",
+                    headers={"X-Template": f"{valid_token}/{invalid_token}"},
+                ),
+                lambda kwargs: kwargs["headers"]["X-Template"],
+                f"{valid_token}/{invalid_token}",
+            ),
+            "params": (
+                RequestData(
+                    method="GET",
+                    url="http://x",
+                    params={"template": f"{valid_token}/{invalid_token}"},
+                ),
+                lambda kwargs: kwargs["params"]["template"],
+                f"{valid_token}/{invalid_token}",
+            ),
+            "json_body": (
+                RequestData(
+                    method="POST",
+                    url="http://x",
+                    body=(
+                        '{"issue_id": "'
+                        + valid_token
+                        + '", "template": "'
+                        + invalid_token
+                        + '"}'
+                    ),
+                    body_type="json",
+                ),
+                lambda kwargs: kwargs["json"],
+                {"issue_id": valid_token, "template": invalid_token},
+            ),
+        }
+        variables = {"issue_id": "42", "value": "ignored"}
+
+        for context, (request, resolved, expected) in cases.items():
+            with self.subTest(context=context):
+                self.mock_session.request.reset_mock()
+                self.client.send_request(request, variables=variables)
+                self.mock_session.request.assert_called_once()
+                self.assertEqual(expected, resolved(self.mock_session.request.call_args.kwargs))
+
+    def test_invalid_to_int_after_unrelated_invalid_token_blocks_dispatch_in_all_contexts(self):
+        unrelated_invalid = "{{not_allowed(value)}}"
+        invalid_to_int_cases = {
+            "conversion": ("{{to_int(issue_id)}}", {"issue_id": "not-an-int"}),
+            "validation": ("{{to_int()}}", {}),
+        }
+
+        for invalid_kind, (invalid_to_int, variables) in invalid_to_int_cases.items():
+            cases = {
+                "url": RequestData(
+                    method="GET",
+                    url=f"http://x/{unrelated_invalid}/{invalid_to_int}",
+                ),
+                "headers": RequestData(
+                    method="GET",
+                    url="http://x",
+                    headers={"X-Template": f"{unrelated_invalid}/{invalid_to_int}"},
+                ),
+                "params": RequestData(
+                    method="GET",
+                    url="http://x",
+                    params={"template": f"{unrelated_invalid}/{invalid_to_int}"},
+                ),
+                "json_body": RequestData(
+                    method="POST",
+                    url="http://x",
+                    body=(
+                        '{"first": "'
+                        + unrelated_invalid
+                        + '", "issue_id": "'
+                        + invalid_to_int
+                        + '"}'
+                    ),
+                    body_type="json",
+                ),
+            }
+
+            for context, request in cases.items():
+                with self.subTest(context=context, invalid_kind=invalid_kind):
+                    self.mock_session.request.reset_mock()
+
+                    with self.assertRaises(ExecutionError) as ctx:
+                        self.client.send_request(
+                            request,
+                            variables={"value": "ignored", **variables},
+                        )
+
+                    self.assertEqual(ErrorCategory.TEMPLATE, ctx.exception.category)
+                    self.mock_session.request.assert_not_called()
 
 
 class TestHTTPClientResolvedFields(unittest.TestCase):
@@ -478,6 +744,23 @@ class TestHTTPClientInjection(unittest.TestCase):
         req = RequestData(method="GET", url="http://x/{{ path }}")
         client.send_request(req, variables={"path": "items"})
         mock_ts.render_string.assert_called()
+
+    def test_template_service_subclass_render_override_is_used_for_http_requests(self):
+        class OverridingTemplateService(TemplateService):
+            def render_string(self, content, variables):
+                rendered = super().render_string(content, variables)
+                return rendered + "?rendered-by-override"
+
+        client = HTTPClient(template_service=OverridingTemplateService())
+        client.session = MagicMock()
+        client.session.request.return_value = _make_response(200, chunks=[b"ok"])
+
+        client.send_request(RequestData(method="GET", url="http://x/{{path}}"), {"path": "items"})
+
+        self.assertEqual(
+            "http://x/items?rendered-by-override",
+            client.session.request.call_args.kwargs["url"],
+        )
 
     def test_no_injection_creates_default_template_service(self):
         """HTTPClient() with no template_service creates a default TemplateService instance."""

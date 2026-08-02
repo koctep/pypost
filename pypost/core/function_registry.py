@@ -6,10 +6,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import re
 from typing import Any, Callable
 from urllib.parse import quote
 
 from jinja2 import Environment
+
+from pypost.core.template_expression_types import IntegerConversionError
 
 
 def _urlencode(value: object) -> str:
@@ -29,10 +32,18 @@ def _base64_encode(value: object) -> str:
     return base64.b64encode(raw).decode("utf-8")
 
 
+def _to_int(value: object) -> int:
+    """Convert an ASCII decimal string to an integer without coercing other values."""
+    if not isinstance(value, str) or not re.fullmatch(r"[+-]?[0-9]+", value):
+        raise IntegerConversionError("to_int requires an ASCII decimal string")
+    return int(value)
+
+
 _DEFAULT_CATALOG: dict[str, Callable[..., Any]] = {
     "urlencode": _urlencode,
     "md5": _md5,
     "base64": _base64_encode,
+    "to_int": _to_int,
 }
 
 

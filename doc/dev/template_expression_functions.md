@@ -1,4 +1,4 @@
-# Template Expression Functions (PYPOST-450–PYPOST-454)
+# Template Expression Functions (PYPOST-450–PYPOST-454, PYPOST-1037)
 
 ## Overview
 
@@ -31,12 +31,23 @@ tool-argument substitution when execution variables include a nested
 `mcp.request` dict. Underscore-leading attribute segments (for example
 `{{ db.__class__ }}`) remain `invalid_syntax`.
 
-Implemented behavior is backward compatible:
+PYPOST-1037 adds `to_int(value)`: an allow-listed conversion for the common
+case where an MCP or other template caller supplies an integer identifier as
+text.  It is deliberately narrow: only a single ASCII decimal string, with an
+optional leading `+` or `-`, is accepted.  The special failure handling applies
+only while an `HTTPClient` prepares an outbound request; it prevents an invalid
+direct `to_int(...)` expression from being sent as a literal value.
+
+Outside the narrow strict HTTP conversion boundary described below, implemented
+behavior is backward compatible:
 
 - Valid expressions are rendered through `TemplateService`.
 - Invalid expressions fall back to original content (no hard request-time failure).
 - Plain variable placeholders like `{{host}}` continue to work unchanged.
 - Safe dotted paths are accepted; unsafe attribute-style paths stay rejected.
+- Ordinary invalid expressions retain their literal-fallback behavior.  Invalid
+  direct `to_int(...)` expressions are the narrow exception during HTTP request
+  preparation, where dispatch is blocked before `session.request`.
 
 ## Architecture
 
@@ -44,7 +55,7 @@ Main components:
 
 - `pypost/core/function_registry.py` (`FunctionRegistry`)
   - Single source of truth for allow-listed template-callable names and implementations:
-    `urlencode`, `md5`, `base64`.
+    `urlencode`, `md5`, `base64`, `to_int`.
   - Exposes `allowed_names()`, `is_allowed()`, `get()`, and `register_into_env(env)` to bind
     those callables onto `jinja2.Environment.globals` (catalog keys only).
 - `pypost/core/template_expression_types.py` (`ValidationResult`)
@@ -72,6 +83,9 @@ Main components:
 - `pypost/core/http_client.py` (`HTTPClient`)
   - Renders URL, header keys/values, param keys/values, and body via
     `TemplateService.render_string` before outbound requests.
+  - Uses the strict conversion render path for request preparation. A failed
+    direct `to_int(...)` is mapped to `ExecutionError(TEMPLATE)` and stops the
+    request before `session.request`.
 - `pypost/core/request_service.py` (`RequestService`)
   - MCP/history paths render URL and body only (headers/params are not in the MCP model).
 
@@ -170,6 +184,82 @@ Supported functions:
 - `urlencode(var)` -> URL-encoded string
 - `md5(var)` -> hex MD5 digest
 - `base64(var)` -> Base64-encoded string
+- `to_int(var)` -> integer from one ASCII decimal string (PYPOST-1037)
+
+### Integer conversion for HTTP templates (PYPOST-1037)
+
+Use `to_int(...)` only when the source value is text and the destination
+operation requires a whole-number value.  The expression is available wherever
+request templates are rendered: URLs, header names and values, parameter names
+and values, and request bodies.
+
+The one argument must resolve to a `str` matching `[+-]?[0-9]+`. Whitespace,
+decimal points, exponent notation, underscores, booleans, other non-string
+values, empty strings, and non-ASCII digits are rejected. The result is a
+Python `int`; string-oriented HTTP fields render its decimal text, while an
+unquoted expression in a JSON body is parsed as a native JSON integer.
+
+| Request field | Template and supplied variables | Prepared value |
+| --- | --- | --- |
+| URL | `/items/{{to_int(issue_id)}}`, `{"issue_id": "42"}` | `/items/42` |
+| Query parameter | `{"id": "{{to_int(issue_id)}}"}`, `{"issue_id": "42"}` | `{"id": "42"}` |
+| JSON body | `{"id": {{to_int(issue_id)}}}`, `{"issue_id": "42"}` | `{"id": 42}` as the JSON request body |
+
+Do not quote the expression in a JSON body when the API expects an integer:
+`{"id": "{{to_int(issue_id)}}"}` intentionally produces a JSON string.
+`to_int` does not change an external MCP schema or make every schema accept
+strings; it lets a collection template create the required integer-shaped
+request value.
+
+#### Strict HTTP failure boundary
+
+`TemplateService.render_string()` and hover callers retain the established
+backward-compatible fallback: an invalid expression returns the complete
+original field content. `HTTPClient` instead uses
+`render_string_strict_conversion()` during request preparation. If a direct
+`{{to_int(...)` expression fails because of an invalid value, wrong arity,
+malformed/unclosed syntax, or a nested-expression failure, it raises
+`ExecutionError` with `ErrorCategory.TEMPLATE`; `session.request` is not
+called. This applies to URL, headers, parameters, and JSON bodies.
+
+The boundary is intentionally precise, not a general change to template error
+handling:
+
+- `{{not_to_int(issue_id)}}`, `{{foo.to_int(issue_id)}}`, and text merely
+  containing `to_int(` keep ordinary fallback behavior.
+- A valid `{{to_int(issue_id)}}` in the same field as an unrelated invalid
+  expression also keeps the ordinary complete-field literal fallback and may
+  dispatch. The strict path blocks only when the `to_int` expression itself
+  has failed.
+- A `TemplateService` subclass that overrides `render_string(content,
+  variables)` remains supported; the strict preflight protects conversion
+  failures without changing that established injection seam.
+
+#### Failure diagnostics and testing
+
+On strict rejection, `pypost.core.http_client` logs the ERROR event
+`template_integer_conversion_failed`. It includes the HTTP method and a
+bounded, sanitized origin only. It never includes the failed input, headers,
+parameters, body, URL user info, path, query, or fragment; malformed URLs use
+`[invalid-url]`.
+
+No new metric was added. Existing template metrics distinguish the path:
+
+- Runtime conversion errors increment
+  `template_expression_render_attempts_total{render_path="http",outcome="render_error"}`.
+- Malformed or wrong-arity calls rejected during validation use
+  `template_expression_validation_failures_total` and the existing
+  `validation_error` outcome.
+
+The regression suite in `tests/test_template_service.py` covers accepted and
+rejected decimal grammar plus strict/fallback behavior. The `HTTPClient` suite
+in `tests/test_http_client.py` covers native JSON integers, URL and parameter
+rendering, every protected request context, no-dispatch assertions, safe logs,
+metric outcomes, and legacy compatibility cases. Run the focused checks with:
+
+```bash
+PYTEST_ARGS='tests/test_template_service.py tests/test_http_client.py' make test
+```
 
 Examples:
 
@@ -195,12 +285,14 @@ Invalid examples (kept as original text due fallback behavior):
 
 On validation or render failure, `render_string` returns the **original field content**
 unchanged. This is intentional backward-compatible behavior — one bad expression must not
-break unrelated fields or plain `{{var}}` placeholders.
+break unrelated fields or plain `{{var}}` placeholders. `HTTPClient` makes one
+targeted exception for a failed direct `to_int(...)`; see [Strict HTTP failure
+boundary](#strict-http-failure-boundary).
 
 | Path | User-visible outcome | Diagnostics |
 | --- | --- | --- |
-| Runtime (send) | Entire field kept as typed literal | `INFO` validation + `WARNING` fallback logs;
-  `validation_error` metric |
+| Runtime / hover outside strict HTTP conversion | Entire field kept as typed literal | `INFO` validation + `WARNING` fallback logs; `validation_error` metric |
+| Strict HTTP direct `to_int(...)` failure | `ExecutionError(TEMPLATE)` and no outbound dispatch | `WARNING` template fallback plus safe HTTP `ERROR` event; existing template metrics |
 | Hover preview | Tooltip shows original `{{...}}` token | Same render path with `render_path="hover"` |
 | Render exception | Original content returned | `WARNING` fallback log; `render_error` metric (non-`ValueError` only) |
 

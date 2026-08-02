@@ -18,7 +18,7 @@ conventions.
 1. [Architecture Decision Records (ADR) index](../adr/README.md)
 1. [Request Execution](request_execution.md)
 1. [TemplateService — central variable substitution](template_service.md)
-1. [Template Expression Functions (PYPOST-450)](template_expression_functions.md)
+1. [Template Expression Functions and Integer Conversion (PYPOST-450, PYPOST-1037)](template_expression_functions.md)
 1. [Variable Propagation](variable_propagation.md)
 1. [Variable Validation](variable_validation.md)
 1. [Sensitive Data Masking Policy (PYPOST-446)](sensitive_data_masking_policy.md)

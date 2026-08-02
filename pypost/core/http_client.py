@@ -5,6 +5,7 @@ import logging
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List
+from urllib.parse import urlsplit
 
 import requests
 
@@ -12,6 +13,7 @@ from pypost.core.http_response_body_reader import read_streamed_body
 from pypost.core.sensitive_text_sanitizer import sanitize_text
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_service import TemplateService
+from pypost.core.template_expression_types import IntegerConversionError
 from pypost.core.yaml_json_converter import (
     YamlBodyConversionError,
     convert_yaml_body_to_object,
@@ -29,6 +31,8 @@ SSE_PROBE_MAX_EVENTS = 5
 DEFAULT_REQUEST_TIMEOUT = 30.0
 DEFAULT_MAX_RESPONSE_BYTES = 52_428_800  # 50 MiB
 TRUNCATION_NOTICE = "\n\n[Response body truncated: exceeded max_response_bytes limit]"
+ERROR_LOG_URL_MAX_LENGTH = 512
+TEMPLATE_ERROR_LOG_URL_PLACEHOLDER = "[invalid-url]"
 
 
 def _is_sse_content_type(content_type: str) -> bool:
@@ -76,9 +80,32 @@ class HTTPClient:
 
     @staticmethod
     def _error_log_url(url: str, variables: Dict[str, str]) -> str:
-        """Return a URL safe for ERROR logs (heuristic + env-value redaction)."""
+        """Return a URL safe for ordinary ERROR logs."""
         env_vars = {key: str(value) for key, value in variables.items()}
         return sanitize_text(url, env_vars=env_vars)
+
+    @staticmethod
+    def _template_error_log_url(url: str, variables: Dict[str, str]) -> str:
+        """Return a bounded origin-only template URL for ERROR logs."""
+        sanitized_url = HTTPClient._error_log_url(url, variables)
+        try:
+            parsed = urlsplit(sanitized_url)
+            hostname = parsed.hostname
+            port = parsed.port
+        except ValueError:
+            return TEMPLATE_ERROR_LOG_URL_PLACEHOLDER
+
+        if not parsed.scheme or not hostname or port == 0:
+            return TEMPLATE_ERROR_LOG_URL_PLACEHOLDER
+
+        host = f"[{hostname}]" if ":" in hostname else hostname
+        safe_url = f"{parsed.scheme}://{host}"
+        if port is not None:
+            safe_url += f":{port}"
+
+        if len(safe_url) > ERROR_LOG_URL_MAX_LENGTH:
+            return safe_url[: ERROR_LOG_URL_MAX_LENGTH - 3] + "..."
+        return safe_url
 
     def _prepare_request_kwargs(
         self,
@@ -90,22 +117,22 @@ class HTTPClient:
         url = (
             rendered_url
             if rendered_url is not None
-            else self._template_service.render_string(request_data.url, variables)
+            else self._render_request_field(request_data.url, variables)
         )
 
         headers = {}
         for k, v in request_data.headers.items():
-            rendered_k = self._template_service.render_string(k, variables)
-            rendered_v = self._template_service.render_string(v, variables)
+            rendered_k = self._render_request_field(k, variables)
+            rendered_v = self._render_request_field(v, variables)
             headers[rendered_k] = rendered_v
 
         params = {}
         for k, v in request_data.params.items():
-            rendered_k = self._template_service.render_string(k, variables)
-            rendered_v = self._template_service.render_string(v, variables)
+            rendered_k = self._render_request_field(k, variables)
+            rendered_v = self._render_request_field(v, variables)
             params[rendered_k] = rendered_v
 
-        body = self._template_service.render_string(request_data.body, variables)
+        body = self._render_request_field(request_data.body, variables)
         stripped_body = body.strip()
 
         # Prepare kwargs
@@ -144,6 +171,17 @@ class HTTPClient:
 
         resolved = ResolvedRequestFields(url=url, headers=dict(headers), body=body)
         return kwargs, resolved
+
+    def _render_request_field(self, content: str, variables: Dict[str, str]) -> str:
+        """Render an outbound field, rejecting an invalid integer conversion."""
+        # Preserve the longstanding lightweight injected-service seam used by
+        # callers that supply a render_string(content, variables) double.
+        if not isinstance(self._template_service, TemplateService):
+            return self._template_service.render_string(content, variables)
+        return self._template_service.render_string_strict_conversion(
+            content,
+            variables,
+        )
 
     def _handle_sse_response(
         self, response, request_data: RequestData, start_time: float
@@ -228,9 +266,8 @@ class HTTPClient:
         start_time = time.time()
         self._metrics.track_request_sent(request_data.method)
 
-        url = self._template_service.render_string(request_data.url, variables)
-
         try:
+            url = self._render_request_field(request_data.url, variables)
             kwargs, resolved = self._prepare_request_kwargs(
                 request_data, variables, rendered_url=url
             )
@@ -242,6 +279,17 @@ class HTTPClient:
                 headers.setdefault("Accept", "text/event-stream")
                 kwargs["headers"] = headers
             response = self.session.request(**kwargs)
+        except IntegerConversionError as exc:
+            logger.error(
+                "template_integer_conversion_failed method=%s url=%r",
+                request_data.method,
+                self._template_error_log_url(request_data.url, variables),
+            )
+            raise ExecutionError(
+                category=ErrorCategory.TEMPLATE,
+                message="Could not render integer template expression.",
+                detail=str(exc),
+            ) from exc
         except requests.Timeout as exc:
             logger.error(
                 "http_request_timed_out method=%s url=%r",

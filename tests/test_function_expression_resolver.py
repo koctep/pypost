@@ -206,6 +206,14 @@ class TestFunctionExpressionResolver(unittest.TestCase):
                 self.assertEqual(expected_code, r.code)
                 self.assertEqual(expected_fn, r.function_name)
 
+    def test_validation_result_identifies_the_failed_expression(self):
+        r = self.resolver.validate_content(
+            "{{ to_int(issue_id) }} {{ not_allowed(value) }}"
+        )
+
+        self.assertFalse(r.is_valid)
+        self.assertEqual("not_allowed(value)", r.expression)
+
     def test_validate_accepts_safe_mcp_request_path(self):
         """PYPOST-1033: dotted mcp.request.* must validate as a safe path."""
         r = self.resolver.validate_content("{{ mcp.request.issue_key }}")

@@ -37,7 +37,11 @@ class FunctionExpressionResolver:
         for expression in expressions:
             validation_error = self._validate_expression(expression.strip())
             if validation_error:
-                return validation_error
+                return ValidationResult.error(
+                    validation_error.code or "invalid_syntax",
+                    validation_error.function_name,
+                    expression,
+                )
 
         return ValidationResult.valid()
 

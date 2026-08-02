@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, call, patch
 import jinja2.nodes
 
 from pypost.core.template_service import TemplateService
+from pypost.core.template_expression_types import IntegerConversionError
 from pypost.core.template_service_render import (
     fallback_content_after_render_exception,
     render_with_jinja,
@@ -46,6 +47,67 @@ class TestTemplateServiceRenderString(unittest.TestCase):
     def test_render_base64_function_with_variable_argument(self):
         result = self.svc.render_string("{{base64(db)}}", {"db": "hello"})
         self.assertEqual("aGVsbG8=", result)
+
+    def test_render_to_int_function_with_single_value_argument(self):
+        content = "{{to_int(value)}}"
+        validation = self.svc.validate_function_expressions(content)
+        self.assertTrue(validation.is_valid)
+        self.assertEqual("42", self.svc.render_string(content, {"value": "42"}))
+
+    def test_render_to_int_valid_decimal_grammar(self):
+        cases = {
+            "plain": ("42", "42"),
+            "positive": ("+42", "42"),
+            "negative": ("-42", "-42"),
+        }
+        for label, (value, expected) in cases.items():
+            with self.subTest(label=label):
+                self.assertEqual(
+                    expected,
+                    self.svc.render_string("{{to_int(value)}}", {"value": value}),
+                )
+
+    def test_render_to_int_rejects_invalid_input_grammar(self):
+        cases = {
+            "empty": "",
+            "leading_whitespace": " 42",
+            "trailing_whitespace": "42 ",
+            "decimal": "42.0",
+            "exponent": "1e2",
+            "underscore": "1_000",
+            "boolean_like": "true",
+            "integer_object": 42,
+            "boolean_object": True,
+            "none": None,
+            "object": {"id": "42"},
+        }
+        content = "{{to_int(value)}}"
+        for label, value in cases.items():
+            with self.subTest(label=label):
+                self.assertEqual(content, self.svc.render_string(content, {"value": value}))
+
+    def test_strict_conversion_keeps_literal_fallback_for_unrelated_failed_token(self):
+        content = "{{to_int(issue_id)}}/{{not_allowed(value)}}"
+
+        self.assertEqual(
+            content,
+            self.svc.render_string_strict_conversion(
+                content,
+                {"issue_id": "42", "value": "ignored"},
+            ),
+        )
+
+    def test_strict_conversion_checks_later_direct_to_int_after_unrelated_failure(self):
+        content = "{{not_allowed(value)}}/{{to_int(issue_id)}}"
+
+        with self.assertRaisesRegex(
+            IntegerConversionError,
+            "Invalid to_int template expression",
+        ):
+            self.svc.render_string_strict_conversion(
+                content,
+                {"value": "ignored", "issue_id": "not-an-int"},
+            )
 
     def test_render_mixed_variant_b_functions(self):
         result = self.svc.render_string(

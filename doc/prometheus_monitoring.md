@@ -74,9 +74,15 @@ rg 'Counter\(|Histogram\(|Gauge\(' pypost/core/metrics_registry.py | wc -l
 | `hidden_value_masks_applied_total` | Counter | `surface` | Hidden environment variable masked before persistence (`history`, …) |
 | `request_retries_total` | Counter | `method`, `status_category` | Outbound retry attempt (`status_category` matches error category, e.g. `timeout`) |
 | `request_retry_exhaustions_total` | Counter | `endpoint` | All configured retries exhausted for a URL |
-| `template_expression_render_attempts_total` | Counter | `render_path`, `outcome` | `{{…}}` function placeholder render attempt (`render_path`: `runtime`, `hover`, `curl`; `outcome`: `success`, `empty_content`, `validation_error`, `render_error`) |
+| `template_expression_render_attempts_total` | Counter | `render_path`, `outcome` | `{{…}}` function placeholder render attempt (`render_path`: `runtime`, `hover`, `curl`, `http`; `outcome`: `success`, `empty_content`, `validation_error`, `render_error`) |
 | `template_expression_validation_failures_total` | Counter | `render_path`, `code`, `function_name` | Template function validation failure (`code`: `unknown_function`, `invalid_arity`, …) |
-| `template_expression_render_duration_seconds` | Histogram | `render_path` | Jinja compile+render wall time in seconds (`render_path`: `runtime`, `hover`, `curl`) |
+| `template_expression_render_duration_seconds` | Histogram | `render_path` | Jinja compile+render wall time in seconds (`render_path`: `runtime`, `hover`, `curl`, `http`) |
+
+For strict HTTP integer-conversion failures, use
+`template_expression_render_attempts_total{render_path="http",outcome="render_error"}`
+to monitor blocked requests. PyPost also emits the bounded ERROR event
+`template_integer_conversion_failed`; it contains the HTTP method and a
+sanitized request origin only, never the rejected value or request data.
 
 ### MCP server
 
