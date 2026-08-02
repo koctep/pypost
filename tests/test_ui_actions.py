@@ -31,7 +31,7 @@ from pypost.agent.ui_actions import (
     ui_select,
     ui_send_key,
 )
-from pypost.ui.widget_ids import METHOD_COMBO, URL_INPUT, set_widget_id
+from pypost.ui.widget_ids import COLLECTION_TREE, METHOD_COMBO, URL_INPUT, set_widget_id
 from tests.helpers.qt_item_view import close_item_view_fixture
 
 pytestmark = [
@@ -503,6 +503,35 @@ def test_select_tree_index_out_of_range_raises(
         assert "option index out of range" in str(exc_info.value)
     finally:
         close_item_view_fixture(root, qapp, _TREE, view_type=QTreeView)
+
+
+def test_live_collection_tree_missing_option_raises(
+    seeded_agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-975: live COLLECTION_TREE missing label raises option not found."""
+    session = seeded_agent_e2e_session
+    assert session.window.is_ui_ready
+    with pytest.raises(UiTargetNotInteractableError) as exc_info:
+        session.ui_select(COLLECTION_TREE, "__no_such_collection_tree_option__")
+    assert "option not found" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("index_factory", ["neg", "count"])
+def test_live_collection_tree_index_out_of_range_raises(
+    seeded_agent_e2e_session: AgentAppSession,
+    index_factory: str,
+) -> None:
+    """PYPOST-975: live COLLECTION_TREE OOR index raises option index out of range."""
+    session = seeded_agent_e2e_session
+    assert session.window.is_ui_ready
+    tree = find_widget(session.window, COLLECTION_TREE)
+    assert isinstance(tree, QTreeView)
+    model = tree.model()
+    assert model is not None
+    index = -1 if index_factory == "neg" else model.rowCount()
+    with pytest.raises(UiTargetNotInteractableError) as exc_info:
+        session.ui_select(COLLECTION_TREE, index)
+    assert "option index out of range" in str(exc_info.value)
 
 
 def test_main_window_fill_url_and_select_method(

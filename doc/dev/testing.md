@@ -192,8 +192,12 @@ are locked in `tests/test_ui_actions.py`
 `test_select_list_index_out_of_range_raises`,
 `test_select_tree_missing_option_raises`,
 `test_select_tree_index_out_of_range_raises`; PYPOST-942), mirroring combo
-`test_select_missing_option_raises`. Model-backed `QListView` with no model is
-locked by `test_select_list_view_no_model_raises` (PYPOST-972;
+`test_select_missing_option_raises`. Live product `COLLECTION_TREE` negatives
+use the same error substrings via `seeded_agent_e2e_session`:
+`test_live_collection_tree_missing_option_raises` and
+`test_live_collection_tree_index_out_of_range_raises` (PYPOST-975).
+Model-backed `QListView` with no model is locked by
+`test_select_list_view_no_model_raises` (PYPOST-972;
 `item view has no model`).
 
 Fill DEBUG `ui_action_applied` scalars for default and opt-in keyClicks modes

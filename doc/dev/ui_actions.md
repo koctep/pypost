@@ -172,10 +172,14 @@ PYPOST-974); list/tree missing option and out-of-range index
 (`test_select_list_missing_option_raises`,
 `test_select_list_index_out_of_range_raises`,
 `test_select_tree_missing_option_raises`,
-`test_select_tree_index_out_of_range_raises`; PYPOST-942). Model-backed list
-view without a model is locked by `test_select_list_view_no_model_raises`
-(PYPOST-972; `reason=item view has no model`, distinct from
-`tree has no model`).
+`test_select_tree_index_out_of_range_raises`; PYPOST-942). Live product
+`COLLECTION_TREE` negatives (same substrings via `session.ui_select` on
+`seeded_agent_e2e_session`) are locked by
+`test_live_collection_tree_missing_option_raises` and
+`test_live_collection_tree_index_out_of_range_raises` (PYPOST-975).
+Model-backed list view without a model is locked by
+`test_select_list_view_no_model_raises` (PYPOST-972;
+`reason=item view has no model`, distinct from `tree has no model`).
 
 ```python
 ui_select(root, METHOD_COMBO, "POST")   # combo by text
@@ -246,7 +250,10 @@ widgets that already have `objectName` set via `set_widget_id`.
   (case-sensitive exact DisplayRole via `display_role_equals`) or index
   outside the control’s range. Flat list views scan root rows only; trees
   walk depth-first for nested labels. Tree **index** selection is top-level
-  only; use text for nested rows.
+  only; use text for nested rows. Fixture proofs: list/tree select negatives
+  (PYPOST-942). Live `COLLECTION_TREE` proofs:
+  `test_live_collection_tree_missing_option_raises` /
+  `test_live_collection_tree_index_out_of_range_raises` (PYPOST-975).
 - **Tree select did not open the request** — By design; `ui_select` sets
   current index. Use `click_tree_row_by_text` when the product needs a
   viewport click to open/activate.

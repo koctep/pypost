@@ -82,7 +82,7 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_e2e_session_ready_logs.py` | Live ready-log caplog smoke (899) |
 | `tests/test_agent_lifecycle_mid_start_cleanup.py` | Mid-start cleanup (841) |
 | `tests/test_ui_identity_spotcheck.py` | Identity spot-check |
-| `tests/test_ui_actions.py` | Action primitives |
+| `tests/test_ui_actions.py` | Action primitives; live `COLLECTION_TREE` negative select (975) |
 | `tests/test_ui_snapshot.py` | Snapshot capture |
 | `tests/test_ui_wait.py` | Settle / wait |
 | `tests/test_agent_golden_e2e.py` | Golden product flow |
