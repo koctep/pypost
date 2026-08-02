@@ -165,14 +165,17 @@ e2e click both use `find_tree_index_by_display_text`; e2e helpers raise
 `AssertionError` on miss, while `ui_select` raises
 `UiTargetNotInteractableError` (PYPOST-941).
 
-Fixture contract tests in `tests/test_ui_actions.py` lock list/tree negative
-paths (`test_select_list_missing_option_raises`,
+Fixture contract tests in `tests/test_ui_actions.py` lock select negative
+paths: combo missing option (`test_select_missing_option_raises`) and
+combo out-of-range index (`test_select_combo_index_out_of_range_raises`;
+PYPOST-974); list/tree missing option and out-of-range index
+(`test_select_list_missing_option_raises`,
 `test_select_list_index_out_of_range_raises`,
 `test_select_tree_missing_option_raises`,
-`test_select_tree_index_out_of_range_raises`; PYPOST-942), mirroring combo
-`test_select_missing_option_raises`. Model-backed list view without a model is
-locked by `test_select_list_view_no_model_raises` (PYPOST-972;
-`reason=item view has no model`, distinct from `tree has no model`).
+`test_select_tree_index_out_of_range_raises`; PYPOST-942). Model-backed list
+view without a model is locked by `test_select_list_view_no_model_raises`
+(PYPOST-972; `reason=item view has no model`, distinct from
+`tree has no model`).
 
 ```python
 ui_select(root, METHOD_COMBO, "POST")   # combo by text

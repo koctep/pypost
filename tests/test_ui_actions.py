@@ -438,6 +438,21 @@ def test_select_missing_option_raises(qapp: QApplication) -> None:
         root.close()
 
 
+@pytest.mark.parametrize("index", [-1, 3])
+def test_select_combo_index_out_of_range_raises(
+    qapp: QApplication,
+    index: int,
+) -> None:
+    """PYPOST-974: out-of-range combo index raises option index out of range."""
+    root, _ = _make_fixture(qapp)
+    try:
+        with pytest.raises(UiTargetNotInteractableError) as exc_info:
+            ui_select(root, _COMBO, index)
+        assert "option index out of range" in str(exc_info.value)
+    finally:
+        root.close()
+
+
 def test_select_list_missing_option_raises(qapp: QApplication) -> None:
     """PYPOST-942: missing list label raises option not found."""
     root, _ = _make_fixture(qapp)
