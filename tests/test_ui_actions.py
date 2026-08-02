@@ -305,6 +305,25 @@ def test_ui_select_list_view_by_index(qapp: QApplication) -> None:
         close_item_view_fixture(root, qapp, _LIST_VIEW, view_type=QListView)
 
 
+def test_select_list_view_no_model_raises(qapp: QApplication) -> None:
+    """PYPOST-972: QListView with no model raises item view has no model."""
+    root = QWidget()
+    layout = QHBoxLayout(root)
+    view = QListView()
+    set_widget_id(view, _LIST_VIEW)
+    layout.addWidget(view)
+    root.show()
+    qapp.processEvents()
+    try:
+        with pytest.raises(UiTargetNotInteractableError) as exc_info:
+            ui_select(root, _LIST_VIEW, "Alpha")
+        message = str(exc_info.value)
+        assert "item view has no model" in message
+        assert "tree has no model" not in message
+    finally:
+        close_item_view_fixture(root, qapp, _LIST_VIEW, view_type=QListView)
+
+
 def test_ui_select_tree_by_text(qapp: QApplication) -> None:
     """PYPOST-916: ui_select selects a nested QTreeView row by display text."""
     root = _make_tree_fixture(qapp)

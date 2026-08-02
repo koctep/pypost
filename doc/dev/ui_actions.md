@@ -170,7 +170,9 @@ paths (`test_select_list_missing_option_raises`,
 `test_select_list_index_out_of_range_raises`,
 `test_select_tree_missing_option_raises`,
 `test_select_tree_index_out_of_range_raises`; PYPOST-942), mirroring combo
-`test_select_missing_option_raises`.
+`test_select_missing_option_raises`. Model-backed list view without a model is
+locked by `test_select_list_view_no_model_raises` (PYPOST-972;
+`reason=item view has no model`, distinct from `tree has no model`).
 
 ```python
 ui_select(root, METHOD_COMBO, "POST")   # combo by text
@@ -233,7 +235,10 @@ widgets that already have `objectName` set via `set_widget_id`.
 - **`not a text input` / `not a selectable list/combo/tree`** — Primitive does
   not match the widget type; use click/key or a different id.
 - **`item view has no model`** — Model-backed list view has no model attached;
-  set a model before selecting.
+  set a model before selecting. Fixture proof:
+  `test_select_list_view_no_model_raises` (PYPOST-972).
+- **`tree has no model`** — `QTreeView` has no model attached; set a model
+  before selecting (distinct from the item-view reason above).
 - **`option not found` / `option index out of range`** — Display text mismatch
   (case-sensitive exact DisplayRole via `display_role_equals`) or index
   outside the control’s range. Flat list views scan root rows only; trees
