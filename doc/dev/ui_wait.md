@@ -25,7 +25,9 @@ Production code must **not** import `tests.helpers`. The historic test helper
 | `AgentAppSession.wait_*` | Convenience after `start()`; root = main window (or current tab when `in_current_tab=True` — PYPOST-949) |
 | `capture_ui_snapshot` | Used by `wait_for_snapshot` |
 | `find_widget` | Used by widget/enabled/text waits |
-| Gate | `tests/test_ui_wait.py` under `make test` |
+| Gate | `tests/test_ui_wait.py` under `make test` (multi-tab |
+| | `in_current_tab` locks: text PYPOST-949; widget/enabled |
+| | PYPOST-979) |
 | Product dialog settle | [agent_dialog_settle.md](agent_dialog_settle.md) |
 | | (`test_agent_dialog_settle_e2e`, PYPOST-919) |
 
@@ -94,7 +96,11 @@ snapshot polls re-walk the full visible tree each interval (PYPOST-852).
 `wait_for_widget`, `wait_for_enabled`, and `wait_for_text` accept optional
 `in_current_tab=False`. When `True`, the search root is `current_request_tab()`
 (same as [UI action tools](ui_actions.md) — PYPOST-851 / PYPOST-949). Default
-window root preserves first-match behaviour for single-tab flows.
+window root preserves first-match behaviour for single-tab flows. Multi-tab
+regression proofs:
+`test_session_wait_for_text_in_current_tab_after_multi_tab_send` (PYPOST-949),
+`test_session_wait_for_widget_in_current_tab_multi_tab` and
+`test_session_wait_for_enabled_in_current_tab_multi_tab` (PYPOST-979).
 
 ```python
 from pypost.agent import AgentAppSession

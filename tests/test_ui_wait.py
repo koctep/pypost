@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.agent.lifecycle import AgentAppSession
-from pypost.agent.ui_actions import ui_fill
+from pypost.agent.ui_actions import find_widget, ui_fill
 from pypost.fixtures.agent_e2e_http import (
     CANNED_GOLDEN_OK,
     GOLDEN_BODY,
@@ -218,6 +218,85 @@ def test_session_wait_for_text_in_current_tab_after_multi_tab_send(
             timeout=5.0,
         )
         assert body_widget.objectName() == RESPONSE_BODY
+
+
+def test_session_wait_for_widget_in_current_tab_multi_tab(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-979: tab-scoped wait_for_widget identity + isolation."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready
+
+    first_tab = session.current_request_tab()
+    assert isinstance(first_tab, RequestTab)
+    session.window.tabs.add_new_tab(save_state=False)
+    qapp.processEvents()
+    second_tab = session.current_request_tab()
+    assert second_tab is not first_tab
+
+    url_first = find_widget(first_tab, URL_INPUT)
+    url_active = find_widget(second_tab, URL_INPUT)
+    assert url_first is not url_active
+
+    found = session.wait_for_widget(URL_INPUT, in_current_tab=True, timeout=5.0)
+    assert found is url_active
+    assert found is not url_first
+
+    original_name = url_active.objectName()
+    try:
+        url_active.setObjectName("")
+        qapp.processEvents()
+
+        with pytest.raises(UiWaitTimeoutError):
+            session.wait_for_widget(URL_INPUT, in_current_tab=True, timeout=0.5)
+
+        window_hit = session.wait_for_widget(URL_INPUT, timeout=0.5)
+        assert window_hit is url_first
+    finally:
+        set_widget_id(url_active, original_name or URL_INPUT)
+        qapp.processEvents()
+
+
+def test_session_wait_for_enabled_in_current_tab_multi_tab(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-979: tab-scoped wait_for_enabled isolation + active identity."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready
+
+    first_tab = session.current_request_tab()
+    assert isinstance(first_tab, RequestTab)
+    session.window.tabs.add_new_tab(save_state=False)
+    qapp.processEvents()
+    second_tab = session.current_request_tab()
+    assert second_tab is not first_tab
+
+    url_first = find_widget(first_tab, URL_INPUT)
+    url_active = find_widget(second_tab, URL_INPUT)
+    assert url_first is not url_active
+    assert url_first.isEnabled()
+
+    try:
+        url_active.setEnabled(False)
+        qapp.processEvents()
+
+        with pytest.raises(UiWaitTimeoutError):
+            session.wait_for_enabled(URL_INPUT, in_current_tab=True, timeout=0.5)
+
+        url_active.setEnabled(True)
+        qapp.processEvents()
+        enabled = session.wait_for_enabled(
+            URL_INPUT,
+            in_current_tab=True,
+            timeout=5.0,
+        )
+        assert enabled is url_active
+        assert enabled.isEnabled()
+    finally:
+        url_active.setEnabled(True)
+        qapp.processEvents()
 
 
 def test_session_wait_for_text_after_fill(
