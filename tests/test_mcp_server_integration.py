@@ -34,6 +34,39 @@ pytestmark = pytest.mark.timeout(120)
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _JIRA_MCP_COLLECTION_PATH = _REPO_ROOT / "examples" / "collections" / "jira_mcp.json"
 
+_JIRA_NUMERIC_PATH_CASES = (
+    (
+        "jira-list-board-sprints",
+        "jira_list_board_sprints",
+        "board_id",
+        "/rest/agile/1.0/board/42/sprint",
+        {"state": "active"},
+    ),
+    ("jira-get-sprint", "jira_get_sprint", "sprint_id", "/rest/agile/1.0/sprint/42", {}),
+    (
+        "jira-update-sprint",
+        "jira_update_sprint",
+        "sprint_id",
+        "/rest/agile/1.0/sprint/42",
+        {"sprint_payload": '{"name":"Renamed"}'},
+    ),
+    ("jira-delete-sprint", "jira_delete_sprint", "sprint_id", "/rest/agile/1.0/sprint/42", {}),
+    (
+        "jira-add-issues-to-sprint",
+        "jira_add_issues_to_sprint",
+        "sprint_id",
+        "/rest/agile/1.0/sprint/42/issue",
+        {"issues_payload": '{"issues":["DEMO-1"]}'},
+    ),
+    (
+        "jira-get-sprint-issues",
+        "jira_get_sprint_issues",
+        "sprint_id",
+        "/rest/agile/1.0/sprint/42/issue",
+        {},
+    ),
+)
+
 
 def _jira_mcp_request_with_local_url(request_id: str, url: str) -> RequestData:
     """Import one shipped Jira MCP request and isolate only its destination."""
@@ -42,6 +75,17 @@ def _jira_mcp_request_with_local_url(request_id: str, url: str) -> RequestData:
     assert len(collections) == 1
     request = next(request for request in collections[0].requests if request.id == request_id)
     return request.model_copy(update={"url": url}, deep=True)
+
+
+def _jira_mcp_request_with_local_base_url(request_id: str, base_url: str) -> RequestData:
+    """Import one shipped Jira request while preserving its path template."""
+    collections, parse_errors = load_collection_import_candidates(_JIRA_MCP_COLLECTION_PATH)
+    assert parse_errors == []
+    assert len(collections) == 1
+    request = next(request for request in collections[0].requests if request.id == request_id)
+    return request.model_copy(
+        update={"url": request.url.replace("{{ jira_base_url }}", base_url)}, deep=True
+    )
 
 
 def _exec_result(body: str = "ok") -> ExecutionResult:
@@ -73,6 +117,11 @@ async def _mcp_list_tools(mcp_url: str) -> list[str]:
 
 
 async def _mcp_call_tool(mcp_url: str, name: str, arguments: dict | None = None) -> dict:
+    result = await _mcp_call_tool_result(mcp_url, name, arguments)
+    return json.loads(result.content[0].text)
+
+
+async def _mcp_call_tool_result(mcp_url: str, name: str, arguments: dict | None = None):
     async with create_mcp_http_client() as http_client:
         async with streamable_http_client(mcp_url, http_client=http_client) as (
             read,
@@ -81,11 +130,122 @@ async def _mcp_call_tool(mcp_url: str, name: str, arguments: dict | None = None)
         ):
             async with ClientSession(read, write) as session:
                 await session.initialize()
-                result = await session.call_tool(name, arguments or {})
-                return json.loads(result.content[0].text)
+                return await session.call_tool(name, arguments or {})
 
 
 class TestMCPServerIntegration(unittest.TestCase):
+    def test_jira_numeric_path_identifiers_accept_decimal_strings_and_native_integers(self):
+        """PYPOST-1038 R4: every published numeric path accepts both forms end-to-end."""
+        for (
+            request_id,
+            tool_name,
+            identifier_name,
+            path_fragment,
+            extra_arguments,
+        ) in _JIRA_NUMERIC_PATH_CASES:
+            for identifier_value in ("42", 42):
+                with self.subTest(request_id=request_id, identifier_value=identifier_value):
+                    stub_port = free_port()
+                    captured_paths: list[str] = []
+
+                    class _StubHandler(BaseHTTPRequestHandler):
+                        def _respond(self):
+                            captured_paths.append(self.path)
+                            payload = b"{}"
+                            self.send_response(200)
+                            self.send_header("Content-Type", "application/json")
+                            self.send_header("Content-Length", str(len(payload)))
+                            self.end_headers()
+                            self.wfile.write(payload)
+
+                        do_GET = _respond
+                        do_POST = _respond
+                        do_PUT = _respond
+                        do_DELETE = _respond
+
+                        def log_message(self, _format, *_args):
+                            return
+
+                    httpd = ThreadingHTTPServer(("127.0.0.1", stub_port), _StubHandler)
+                    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                    server_thread.start()
+                    try:
+                        tool = _jira_mcp_request_with_local_base_url(
+                            request_id,
+                            f"http://127.0.0.1:{stub_port}",
+                        )
+                        arguments = {identifier_name: identifier_value, **extra_arguments}
+                        with live_mcp_server([tool]) as mcp_server:
+                            mcp_server.impl.set_variable_supplier(
+                                lambda: {"jira_credentials": "user:token"}
+                            )
+                            result = anyio.run(
+                                _mcp_call_tool_result,
+                                mcp_server.mcp_url,
+                                tool_name,
+                                arguments,
+                            )
+                        self.assertFalse(result.isError)
+                        payload = json.loads(result.content[0].text)
+                        self.assertFalse(payload["error"])
+                        self.assertEqual(payload["status"], 200)
+                        self.assertEqual(
+                            [urlsplit(path).path for path in captured_paths], [path_fragment]
+                        )
+                    finally:
+                        httpd.shutdown()
+                        server_thread.join(timeout=2.0)
+
+    def test_jira_non_integral_identifier_never_dispatches_to_http(self):
+        """PYPOST-1038 R5: to_int fails closed before HTTP dispatch."""
+        for request_id, tool_name, identifier_name, path_fragment, extra_arguments in (
+            _JIRA_NUMERIC_PATH_CASES[0],
+            _JIRA_NUMERIC_PATH_CASES[1],
+        ):
+            for identifier_value in ("not-an-id", 42.0):
+                with self.subTest(request_id=request_id, identifier_value=identifier_value):
+                    stub_port = free_port()
+                    captured_paths: list[str] = []
+
+                    class _StubHandler(BaseHTTPRequestHandler):
+                        def do_GET(self):
+                            captured_paths.append(self.path)
+                            self.send_response(200)
+                            self.end_headers()
+
+                        def log_message(self, _format, *_args):
+                            return
+
+                    httpd = ThreadingHTTPServer(("127.0.0.1", stub_port), _StubHandler)
+                    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                    server_thread.start()
+                    try:
+                        tool = _jira_mcp_request_with_local_base_url(
+                            request_id,
+                            f"http://127.0.0.1:{stub_port}",
+                        )
+                        arguments = {identifier_name: identifier_value, **extra_arguments}
+                        with live_mcp_server([tool]) as mcp_server:
+                            mcp_server.impl.set_variable_supplier(
+                                lambda: {"jira_credentials": "user:token"}
+                            )
+                            result = anyio.run(
+                                _mcp_call_tool_result,
+                                mcp_server.mcp_url,
+                                tool_name,
+                                arguments,
+                            )
+                        if identifier_value == "not-an-id":
+                            self.assertTrue(result.isError)
+                        else:
+                            payload = json.loads(result.content[0].text)
+                            self.assertTrue(payload["error"])
+                            self.assertEqual(payload["error_category"], "template")
+                        self.assertEqual(captured_paths, [])
+                    finally:
+                        httpd.shutdown()
+                        server_thread.join(timeout=2.0)
+
     def test_mcp_client_service_list_tools_over_live_streamable_http(self):
         """MCPClientService sync wrapper works against live server (PYPOST-560)."""
         tool = RequestData(

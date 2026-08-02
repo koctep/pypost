@@ -51,6 +51,27 @@ in a different project when their Jira permissions allow it. Board discovery use
 the project-aware Jira parameter; board and sprint follow-up tools keep the
 scope of the selected board or sprint rather than simulating a project lock.
 
+## Board and sprint identifier input (PYPOST-1038)
+
+The Jira MCP tools below accept their board or sprint ID in either normal JSON
+form: a native integer such as `42` or a decimal string such as `"42"`. This
+helps agents and clients that naturally serialize numeric identifiers as
+strings, without changing existing native-number clients.
+
+| MCP tool | Argument |
+| --- | --- |
+| `jira_list_board_sprints` | `board_id` |
+| `jira_get_sprint` | `sprint_id` |
+| `jira_update_sprint` | `sprint_id` |
+| `jira_delete_sprint` | `sprint_id` |
+| `jira_add_issues_to_sprint` | `sprint_id` |
+| `jira_get_sprint_issues` | `sprint_id` |
+
+Use only a decimal integer representation. Booleans, floats, whitespace-padded
+or exponent-form values, and nonnumeric strings are invalid and are rejected
+before a Jira HTTP request is sent. This applies only to the listed path IDs;
+JSON payload arguments such as `issues_payload` remain serialized JSON strings.
+
 ## Coverage vs gaps
 
 This collection is a **practical analog** of the Atlassian MCP Jira surface

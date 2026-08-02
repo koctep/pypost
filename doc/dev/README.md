@@ -18,7 +18,7 @@ conventions.
 1. [Architecture Decision Records (ADR) index](../adr/README.md)
 1. [Request Execution](request_execution.md)
 1. [TemplateService — central variable substitution](template_service.md)
-1. [Template Expression Functions and Integer Conversion (PYPOST-450, PYPOST-1037)](template_expression_functions.md)
+1. [Template Expression Functions and Integer Conversion (PYPOST-450, PYPOST-1037, PYPOST-1038)](template_expression_functions.md)
 1. [Variable Propagation](variable_propagation.md)
 1. [Variable Validation](variable_validation.md)
 1. [Sensitive Data Masking Policy (PYPOST-446)](sensitive_data_masking_policy.md)
@@ -79,6 +79,7 @@ conventions.
 
 1. [MCP Integration](mcp_integration.md)
 1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
+1. [Jira numeric identifier MCP contract (PYPOST-1038)](mcp_integration.md#jira-numeric-path-identifiers-pypost-1038)
 1. [Jira MCP Example Project Default (PYPOST-1032)](jira_mcp_project_default.md)
 1. [Inbound MCP Trust Model (PYPOST-705)](mcp_trust_model.md)
 1. [MCP Secrets Policy](mcp_secrets_policy.md)

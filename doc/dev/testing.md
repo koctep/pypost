@@ -307,10 +307,13 @@ the server on an ephemeral port. Most scenarios mock `RequestService.execute` fo
 output. PYPOST-1034 additionally exercises the real request/template/HTTP path against a local
 loopback server: it imports the shipped Jira MCP request shapes and asserts MCP arguments render
 into the outbound query parameter and JSON body without contacting Jira.
+PYPOST-1038 extends that boundary for all six Jira board/sprint identifier
+paths: each accepts both decimal strings and native integers, while invalid
+string or float identifiers never dispatch.
 
 | Class | Scope |
 | --- | --- |
-| `TestMCPServerIntegration` | `list_tools`, `call_tool`, MCP argument forwarding, query/body template-to-wire regressions for the Jira fixture (PYPOST-1034), and `MCPClientService` sync wrapper (PYPOST-560) |
+| `TestMCPServerIntegration` | `list_tools`, `call_tool`, MCP argument forwarding, Jira query/body template-to-wire regressions (PYPOST-1034), six-row numeric identifier schema/template/loopback coverage (PYPOST-1038), and `MCPClientService` sync wrapper (PYPOST-560) |
 | `TestMCPServerManagerIntegration` | `MCPServerManager` thread + uvicorn lifecycle |
 
 Focused run:
@@ -323,6 +326,12 @@ Run just the query/body substitution regressions with:
 
 ```bash
 PYTEST_ARGS="tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_substitutes_jira_mcp_query_parameter tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_substitutes_jira_mcp_json_body" make test
+```
+
+Run the numeric-identifier regressions with:
+
+```bash
+PYTEST_ARGS="tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_jira_numeric_path_identifiers_accept_decimal_strings_and_native_integers tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_jira_non_integral_identifier_never_dispatches_to_http" make test
 ```
 
 ## MCP test fixture generator (PYPOST-179)

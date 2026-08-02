@@ -68,6 +68,23 @@ def _make_request(req_id: str, name: str = "Req") -> RequestData:
 
 
 class TestLoadCandidates:
+    def test_import_accepts_integer_or_string_mcp_param_type(self, tmp_path):
+        request = _request_record(
+            mcp_params={
+                "sprint_id": {
+                    "type": "integer_or_string",
+                    "description": "Native integer or decimal string.",
+                    "required": True,
+                }
+            }
+        )
+        path = _write(tmp_path, [_collection_record(requests=[request])])
+
+        collections, parse_errors = load_collection_import_candidates(path)
+
+        assert parse_errors == []
+        assert collections[0].requests[0].mcp_params["sprint_id"].type == "integer_or_string"
+
     def test_happy_path_list_returns_both_collections(self, tmp_path):
         path = _write(
             tmp_path,

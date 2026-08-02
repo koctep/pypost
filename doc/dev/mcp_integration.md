@@ -409,6 +409,39 @@ Run the focused regression pair with the project test target:
 PYTEST_ARGS="tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_substitutes_jira_mcp_query_parameter tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_substitutes_jira_mcp_json_body" make test
 ```
 
+### Jira numeric path identifiers (PYPOST-1038)
+
+The shipped Jira MCP collection has a deliberately narrow dual-form identifier
+contract for its board/sprint path arguments. Collection authors declare these
+arguments as `integer_or_string`; the published MCP JSON Schema is an `anyOf`
+of a native JSON `integer` and a decimal JSON `string` matching
+`^[+-]?[0-9]+$`. This is not a general coercion rule for MCP parameters.
+
+| Request id | MCP argument | Jira path |
+| --- | --- | --- |
+| `jira-list-board-sprints` | `board_id` | `/rest/agile/1.0/board/{boardId}/sprint` |
+| `jira-get-sprint` | `sprint_id` | `/rest/agile/1.0/sprint/{sprintId}` |
+| `jira-update-sprint` | `sprint_id` | `/rest/agile/1.0/sprint/{sprintId}` |
+| `jira-delete-sprint` | `sprint_id` | `/rest/agile/1.0/sprint/{sprintId}` |
+| `jira-add-issues-to-sprint` | `sprint_id` | `/rest/agile/1.0/sprint/{sprintId}/issue` |
+| `jira-get-sprint-issues` | `sprint_id` | `/rest/agile/1.0/sprint/{sprintId}/issue` |
+
+Each path uses `{{ to_int(mcp.request.<argument>) }}`. Thus both `"42"` and
+`42` render as `/42`; booleans, floats, and non-decimal strings fail during
+HTTP request preparation and no request is dispatched. The union only widens
+these six client-facing input schemas; it does not change tool names,
+argument names, Jira endpoints, or serialized payload arguments.
+
+`tests/test_example_fixtures.py` locks the complete six-row mapping and the
+published descriptions/templates. The real Streamable HTTP tests in
+`tests/test_mcp_server_integration.py` invoke every row with both valid forms
+against a local loopback server and assert invalid string/float identifiers
+never reach it. Run that focused coverage with:
+
+```bash
+PYTEST_ARGS="tests/test_example_fixtures.py tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_jira_numeric_path_identifiers_accept_decimal_strings_and_native_integers tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_jira_non_integral_identifier_never_dispatches_to_http" make test
+```
+
 ### Active environment binding (PYPOST-137)
 
 PyPost binds MCP variable resolution to the **currently selected environment** in the UI.

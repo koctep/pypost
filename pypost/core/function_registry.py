@@ -33,10 +33,12 @@ def _base64_encode(value: object) -> str:
 
 
 def _to_int(value: object) -> int:
-    """Convert an ASCII decimal string to an integer without coercing other values."""
-    if not isinstance(value, str) or not re.fullmatch(r"[+-]?[0-9]+", value):
-        raise IntegerConversionError("to_int requires an ASCII decimal string")
-    return int(value)
+    """Accept a true integer or convert an ASCII decimal string without coercion."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str) and re.fullmatch(r"[+-]?[0-9]+", value):
+        return int(value)
+    raise IntegerConversionError("to_int requires a native integer or ASCII decimal string")
 
 
 _DEFAULT_CATALOG: dict[str, Callable[..., Any]] = {

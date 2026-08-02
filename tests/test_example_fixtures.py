@@ -39,6 +39,15 @@ REQUIRED_JIRA_MCP_REQUEST_IDS = frozenset(
     }
 )
 
+JIRA_NUMERIC_IDENTIFIER_MAPPINGS = {
+    "jira-list-board-sprints": "board_id",
+    "jira-get-sprint": "sprint_id",
+    "jira-update-sprint": "sprint_id",
+    "jira-delete-sprint": "sprint_id",
+    "jira-add-issues-to-sprint": "sprint_id",
+    "jira-get-sprint-issues": "sprint_id",
+}
+
 
 def _make_storage(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -147,6 +156,30 @@ def test_jira_mcp_collection_covers_required_skill_capabilities():
         method="POST",
         url_contains=("/rest/agile/1.0/backlog/issue",),
     ), "remove from sprint must POST .../backlog/issue"
+
+
+def test_jira_mcp_numeric_identifier_paths_accept_decimal_strings_and_integers():
+    """PYPOST-1038 R3: all and only path IDs use the dual-form contract."""
+    collection = _load_jira_mcp_collection()
+    request_by_id = {request.id: request for request in collection.requests}
+
+    union_rows = {
+        (request.id, name)
+        for request in collection.requests
+        for name, parameter in request.mcp_params.items()
+        if parameter.type == "integer_or_string"
+    }
+    assert union_rows == set(JIRA_NUMERIC_IDENTIFIER_MAPPINGS.items())
+
+    for request_id, parameter_name in JIRA_NUMERIC_IDENTIFIER_MAPPINGS.items():
+        request = request_by_id[request_id]
+        parameter = request.mcp_params[parameter_name]
+        description = parameter.description.lower()
+        assert parameter.type == "integer_or_string"
+        assert "decimal" in description
+        assert "string" in description
+        assert "integer" in description
+        assert f"{{{{ to_int(mcp.request.{parameter_name}) }}}}" in request.url
 
 
 def test_jira_cloud_environment_imports_with_placeholders(tmp_path, monkeypatch):

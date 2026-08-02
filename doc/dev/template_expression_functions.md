@@ -184,26 +184,30 @@ Supported functions:
 - `urlencode(var)` -> URL-encoded string
 - `md5(var)` -> hex MD5 digest
 - `base64(var)` -> Base64-encoded string
-- `to_int(var)` -> integer from one ASCII decimal string (PYPOST-1037)
+- `to_int(var)` -> integer from a native Python `int` or one ASCII decimal string
+  (PYPOST-1037, PYPOST-1038)
 
-### Integer conversion for HTTP templates (PYPOST-1037)
+### Integer conversion for HTTP templates (PYPOST-1037, PYPOST-1038)
 
-Use `to_int(...)` only when the source value is text and the destination
-operation requires a whole-number value.  The expression is available wherever
-request templates are rendered: URLs, header names and values, parameter names
-and values, and request bodies.
+Use `to_int(...)` when the destination operation requires a whole-number value
+and its source is either a native Python `int` or decimal text. The expression
+is available wherever request templates are rendered: URLs, header names and
+values, parameter names and values, and request bodies.
 
-The one argument must resolve to a `str` matching `[+-]?[0-9]+`. Whitespace,
-decimal points, exponent notation, underscores, booleans, other non-string
-values, empty strings, and non-ASCII digits are rejected. The result is a
-Python `int`; string-oriented HTTP fields render its decimal text, while an
-unquoted expression in a JSON body is parsed as a native JSON integer.
+The one argument must resolve to a true `int` (not `bool`) or to a `str`
+matching `[+-]?[0-9]+`. Native integers pass through unchanged. Whitespace,
+decimal points, exponent notation, underscores, booleans, floats, `None`,
+containers, other non-string values, empty strings, and non-ASCII digits are
+rejected. The result is a Python `int`; string-oriented HTTP fields render its
+decimal text, while an unquoted expression in a JSON body is parsed as a native
+JSON integer.
 
 | Request field | Template and supplied variables | Prepared value |
 | --- | --- | --- |
 | URL | `/items/{{to_int(issue_id)}}`, `{"issue_id": "42"}` | `/items/42` |
 | Query parameter | `{"id": "{{to_int(issue_id)}}"}`, `{"issue_id": "42"}` | `{"id": "42"}` |
 | JSON body | `{"id": {{to_int(issue_id)}}}`, `{"issue_id": "42"}` | `{"id": 42}` as the JSON request body |
+| URL, native integer | `/items/{{to_int(issue_id)}}`, `{"issue_id": 42}` | `/items/42` |
 
 Do not quote the expression in a JSON body when the API expects an integer:
 `{"id": "{{to_int(issue_id)}}"}` intentionally produces a JSON string.

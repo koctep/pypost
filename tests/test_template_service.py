@@ -67,6 +67,18 @@ class TestTemplateServiceRenderString(unittest.TestCase):
                     self.svc.render_string("{{to_int(value)}}", {"value": value}),
                 )
 
+    def test_render_to_int_accepts_native_integer_but_not_bool_or_float(self):
+        """PYPOST-1038 R2: match the MCP integer-or-decimal-string union exactly."""
+        content = "{{to_int(value)}}"
+
+        self.assertEqual("42", self.svc.render_string(content, {"value": 42}))
+        for invalid_value in (True, 42.0):
+            with self.subTest(value=invalid_value):
+                self.assertEqual(
+                    content,
+                    self.svc.render_string(content, {"value": invalid_value}),
+                )
+
     def test_render_to_int_rejects_invalid_input_grammar(self):
         cases = {
             "empty": "",
@@ -76,7 +88,6 @@ class TestTemplateServiceRenderString(unittest.TestCase):
             "exponent": "1e2",
             "underscore": "1_000",
             "boolean_like": "true",
-            "integer_object": 42,
             "boolean_object": True,
             "none": None,
             "object": {"id": "42"},

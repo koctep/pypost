@@ -43,7 +43,15 @@ def build_tool_input_schema(specs: dict[str, McpToolParam]) -> dict:
     required: list[str] = []
     for name in sorted(specs):
         spec = specs[name]
-        prop: dict[str, Any] = {"type": spec.type}
+        if spec.type == "integer_or_string":
+            prop: dict[str, Any] = {
+                "anyOf": [
+                    {"type": "integer"},
+                    {"type": "string", "pattern": "^[+-]?[0-9]+$"},
+                ]
+            }
+        else:
+            prop = {"type": spec.type}
         if spec.description:
             prop["description"] = spec.description
         properties[name] = prop

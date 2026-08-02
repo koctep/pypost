@@ -55,6 +55,28 @@ The project key is a normal environment variable, so the existing active-
 environment behavior applies: a later edit or environment change is used for
 subsequent MCP calls. It is not exposed as an `mcp.request.*` argument.
 
+## Numeric board and sprint identifiers (PYPOST-1038)
+
+The six Jira board/sprint path arguments below accept either a native JSON
+integer such as `42` or a decimal JSON string such as `"42"`. Their collection
+parameter type is `integer_or_string`, which publishes an integer-or-decimal-
+string JSON Schema union to MCP clients. This preserves native-number clients
+while supporting the common agent/client string representation.
+
+| Request id | Argument |
+| --- | --- |
+| `jira-list-board-sprints` | `board_id` |
+| `jira-get-sprint` | `sprint_id` |
+| `jira-update-sprint` | `sprint_id` |
+| `jira-delete-sprint` | `sprint_id` |
+| `jira-add-issues-to-sprint` | `sprint_id` |
+| `jira-get-sprint-issues` | `sprint_id` |
+
+The request templates validate these values with `to_int` immediately before
+building the Jira path. Non-decimal strings, floats, and booleans are invalid;
+the request fails before any outbound HTTP dispatch. This input tolerance
+changes neither the selected project behavior above nor Jira authorization.
+
 ## Security boundary
 
 `jira_project_key` is guidance, not an authorization, permission, or security
@@ -79,3 +101,4 @@ network access:
 | Board or sprint follow-up results are broader than expected | These endpoints follow the explicitly selected board or sprint. Do not claim that the project default filters them. |
 | Project key is hidden or importer tests fail | Keep only `jira_credentials` in `hidden_keys` and use the obvious placeholder in the committed fixture. |
 | Cross-project work is rejected or allowed unexpectedly | Diagnose Jira Cloud permissions and the target project; this example default does not grant or revoke access. |
+| A board or sprint call rejects its identifier | Supply `42` or `"42"`; do not supply a boolean, float, whitespace-padded value, exponent notation, or a nonnumeric string. |

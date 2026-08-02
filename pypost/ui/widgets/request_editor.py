@@ -464,6 +464,7 @@ class McpParamsTable(QTableWidget):
     _TYPE_OPTIONS = (
         "string",
         "integer",
+        "integer_or_string",
         "number",
         "boolean",
         "array",

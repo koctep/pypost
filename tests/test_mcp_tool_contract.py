@@ -7,6 +7,7 @@ import json
 import unittest
 
 from pypost.core.mcp_tool_contract import (
+    build_tool_input_schema,
     build_mcp_tool_contract_preview,
     format_mcp_tool_contract_preview,
     normalize_mcp_tool_name,
@@ -16,6 +17,34 @@ from pypost.models.models import McpToolParam, RequestData
 
 
 class TestMcpToolContract(unittest.TestCase):
+    def test_integer_or_string_schema_is_an_explicit_decimal_union(self):
+        """PYPOST-1038 R1: publish both native and decimal-string identifiers."""
+        schema = build_tool_input_schema(
+            {
+                "identifier": McpToolParam(
+                    type="integer_or_string",
+                    description="A Jira identifier.",
+                    required=True,
+                ),
+                "legacy_count": McpToolParam(type="integer", required=False),
+                "legacy_name": McpToolParam(type="string", required=False),
+            }
+        )
+
+        self.assertEqual(
+            schema["properties"]["identifier"],
+            {
+                "anyOf": [
+                    {"type": "integer"},
+                    {"type": "string", "pattern": "^[+-]?[0-9]+$"},
+                ],
+                "description": "A Jira identifier.",
+            },
+        )
+        self.assertEqual(schema["properties"]["legacy_count"], {"type": "integer"})
+        self.assertEqual(schema["properties"]["legacy_name"], {"type": "string"})
+        self.assertEqual(schema["required"], ["identifier"])
+
     def test_normalize_mcp_tool_name(self):
         self.assertEqual(normalize_mcp_tool_name("Fetch User"), "fetch_user")
 

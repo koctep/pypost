@@ -250,7 +250,7 @@
       "id": "jira-list-board-sprints",
       "name": "Jira List Board Sprints",
       "method": "GET",
-      "url": "{{ jira_base_url }}/rest/agile/1.0/board/{{ mcp.request.board_id }}/sprint",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/board/{{ to_int(mcp.request.board_id) }}/sprint",
       "headers": {
         "Accept": "application/json",
         "Authorization": "Basic {{ base64(jira_credentials) }}"
@@ -267,8 +267,8 @@
       "mcp_description": "List sprints on the selected board filtered by state (future, active, or closed). This is not automatically project-scoped by jira_project_key; the selected board controls the scope.",
       "mcp_params": {
         "board_id": {
-          "type": "integer",
-          "description": "Numeric Jira Software board ID.",
+          "type": "integer_or_string",
+          "description": "Jira Software board ID accepted as a native integer or decimal string.",
           "required": true
         },
         "state": {
@@ -283,7 +283,7 @@
       "id": "jira-get-sprint",
       "name": "Jira Get Sprint",
       "method": "GET",
-      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ to_int(mcp.request.sprint_id) }}",
       "headers": {
         "Accept": "application/json",
         "Authorization": "Basic {{ base64(jira_credentials) }}"
@@ -297,8 +297,8 @@
       "mcp_description": "Return a Jira Software sprint by numeric ID.",
       "mcp_params": {
         "sprint_id": {
-          "type": "integer",
-          "description": "Numeric Jira Software sprint ID.",
+          "type": "integer_or_string",
+          "description": "Jira Software sprint ID accepted as a native integer or decimal string.",
           "required": true
         }
       },
@@ -308,7 +308,7 @@
       "id": "jira-update-sprint",
       "name": "Jira Update Sprint",
       "method": "PUT",
-      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ to_int(mcp.request.sprint_id) }}",
       "headers": {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -323,8 +323,8 @@
       "mcp_description": "Update a Jira Software sprint, including activating or closing it. sprint_payload must be serialized JSON, for example {\"state\":\"active\"}.",
       "mcp_params": {
         "sprint_id": {
-          "type": "integer",
-          "description": "Numeric Jira Software sprint ID.",
+          "type": "integer_or_string",
+          "description": "Jira Software sprint ID accepted as a native integer or decimal string.",
           "required": true
         },
         "sprint_payload": {
@@ -339,7 +339,7 @@
       "id": "jira-delete-sprint",
       "name": "Jira Delete Sprint",
       "method": "DELETE",
-      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ to_int(mcp.request.sprint_id) }}",
       "headers": {
         "Accept": "application/json",
         "Authorization": "Basic {{ base64(jira_credentials) }}"
@@ -353,8 +353,8 @@
       "mcp_description": "Permanently delete a Jira Software sprint by numeric ID. Irreversible; open issues in the sprint move to the backlog.",
       "mcp_params": {
         "sprint_id": {
-          "type": "integer",
-          "description": "Numeric Jira Software sprint ID.",
+          "type": "integer_or_string",
+          "description": "Jira Software sprint ID accepted as a native integer or decimal string.",
           "required": true
         }
       },
@@ -390,7 +390,7 @@
       "id": "jira-add-issues-to-sprint",
       "name": "Jira Add Issues To Sprint",
       "method": "POST",
-      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}/issue",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ to_int(mcp.request.sprint_id) }}/issue",
       "headers": {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -405,8 +405,8 @@
       "mcp_description": "Move issues into a Jira Software sprint. issues_payload must be serialized JSON, for example {\"issues\":[\"DEMO-1\",\"DEMO-2\"]}.",
       "mcp_params": {
         "sprint_id": {
-          "type": "integer",
-          "description": "Numeric Jira Software sprint ID.",
+          "type": "integer_or_string",
+          "description": "Jira Software sprint ID accepted as a native integer or decimal string.",
           "required": true
         },
         "issues_payload": {
@@ -421,7 +421,7 @@
       "id": "jira-get-sprint-issues",
       "name": "Jira Get Sprint Issues",
       "method": "GET",
-      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}/issue",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ to_int(mcp.request.sprint_id) }}/issue",
       "headers": {
         "Accept": "application/json",
         "Authorization": "Basic {{ base64(jira_credentials) }}"
@@ -437,8 +437,8 @@
       "mcp_description": "List issues in the selected sprint. Prefer JQL search when filtering across boards; use this for a direct sprint membership listing. This is not automatically project-scoped by jira_project_key; the selected sprint controls the scope.",
       "mcp_params": {
         "sprint_id": {
-          "type": "integer",
-          "description": "Numeric Jira Software sprint ID.",
+          "type": "integer_or_string",
+          "description": "Jira Software sprint ID accepted as a native integer or decimal string.",
           "required": true
         }
       },

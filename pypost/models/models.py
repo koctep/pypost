@@ -7,7 +7,9 @@ from pydantic import BaseModel, Field
 
 from pypost.models.retry import RetryPolicy
 
-_MCP_PARAM_TYPES = frozenset({"string", "integer", "number", "boolean", "array", "object"})
+_MCP_PARAM_TYPES = frozenset(
+    {"string", "integer", "integer_or_string", "number", "boolean", "array", "object"}
+)
 
 
 class McpToolParam(BaseModel):
