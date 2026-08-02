@@ -211,6 +211,10 @@ locked by `test_ui_fill_via_key_clicks_emits_text_changed_per_keystroke`
 (PYPOST-946; empty-start `QLineEdit` expects one emit per character).
 Opt-in `delay` forwarding on the keyClicks path is locked by
 `test_ui_fill_via_key_clicks_forwards_delay_kwarg` (PYPOST-947).
+Session agent e2e keyClicks smokes in the same module:
+`test_ui_fill_via_key_clicks_session` (URL field; PYPOST-917) and
+`test_ui_fill_via_key_clicks_session_request_body` (request body editor;
+PYPOST-976).
 
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a

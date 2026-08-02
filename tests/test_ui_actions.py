@@ -31,7 +31,13 @@ from pypost.agent.ui_actions import (
     ui_select,
     ui_send_key,
 )
-from pypost.ui.widget_ids import COLLECTION_TREE, METHOD_COMBO, URL_INPUT, set_widget_id
+from pypost.ui.widget_ids import (
+    COLLECTION_TREE,
+    METHOD_COMBO,
+    REQUEST_BODY_EDIT,
+    URL_INPUT,
+    set_widget_id,
+)
 from tests.helpers.qt_item_view import close_item_view_fixture
 
 pytestmark = [
@@ -564,6 +570,20 @@ def test_ui_fill_via_key_clicks_session(
     url = find_widget(session.window, URL_INPUT)
     assert isinstance(url, QLineEdit)
     assert url.text() == "https://typed-via-keys.example/"
+
+
+def test_ui_fill_via_key_clicks_session_request_body(
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """PYPOST-976: opt-in keyClicks fill on live request body editor."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready
+    fill_text = "body-via-keys"
+    session.ui_select(METHOD_COMBO, "POST")
+    session.ui_fill(REQUEST_BODY_EDIT, fill_text, via_key_clicks=True)
+    body = find_widget(session.window, REQUEST_BODY_EDIT)
+    assert isinstance(body, QPlainTextEdit)
+    assert body.toPlainText() == fill_text
 
 
 def test_current_tab_scoped_fill(agent_e2e_session: AgentAppSession) -> None:

@@ -114,6 +114,10 @@ in logs (PYPOST-851/944). Behavioral keyClicks proofs:
 `textChanged` count on line edit — PYPOST-946),
 `test_ui_fill_via_key_clicks_on_plain_text_fixture`, and
 `test_ui_fill_via_key_clicks_on_rich_text_fixture` (PYPOST-945).
+Session agent e2e smokes: `test_ui_fill_via_key_clicks_session` (URL
+`QLineEdit`; PYPOST-917) and
+`test_ui_fill_via_key_clicks_session_request_body` (live `REQUEST_BODY_EDIT`
+`CodeEditor` after POST method select; PYPOST-976).
 Opt-in `delay` forwarding to `QTest.keyClicks` is locked by
 `test_ui_fill_via_key_clicks_forwards_delay_kwarg` (PYPOST-947).
 
