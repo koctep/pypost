@@ -370,6 +370,45 @@ Freshness: the supplier is invoked on **every** `call_tool`, so edits to environ
 variables take effect on the next agent call without restarting MCP (existing restart-on-env
 change behavior is unchanged).
 
+### MCP argument substitution coverage (PYPOST-1034)
+
+MCP tool arguments are available to request templates below the protected
+`mcp.request` namespace.  The normal request-rendering path applies those values
+to the URL, headers, query parameters, and a request body before HTTP transport.
+For example, the shipped Jira MCP collection uses:
+
+| Jira MCP request | Request location | Template | MCP tool argument |
+| --- | --- | --- | --- |
+| `jira-search-fields` | Query parameter `query` | `{{ mcp.request.query }}` | `query` |
+| `jira-search-issues-jql` | Complete JSON body | `{{ mcp.request.search_payload }}` | `search_payload` |
+
+`search_payload` is a string because it occupies the complete JSON request-body
+template; callers supply serialized JSON, such as
+`json.dumps({"jql": "project = DEMO", "maxResults": 1})`.  The HTTP client
+renders the string first and then parses/sends it as JSON.  Tool and argument
+names, collection content, and production APIs are unchanged by this coverage.
+
+#### Regression test boundary
+
+`tests/test_mcp_server_integration.py` contains two live Streamable HTTP MCP
+round trips for the table above.  Each test imports `examples/collections/jira_mcp.json`,
+deep-copies the selected request, and replaces only its URL with a local
+`ThreadingHTTPServer`.  This keeps the published Jira request shape as the source
+of truth while avoiding Jira credentials, network access, and real-project mutation.
+
+The loopback handler records the outbound request, and the test asserts both the
+normal MCP success envelope (`error: false`, `status: 200`) and rendered wire
+data.  The query scenario verifies the decoded `query` value is `Story Point`;
+the JSON-body scenario verifies the decoded body equals the client-provided object.  Literal
+`mcp.request` or template braces therefore fail the tests rather than silently
+reaching an upstream service.
+
+Run the focused regression pair with the project test target:
+
+```bash
+PYTEST_ARGS="tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_substitutes_jira_mcp_query_parameter tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_substitutes_jira_mcp_json_body" make test
+```
+
 ### Active environment binding (PYPOST-137)
 
 PyPost binds MCP variable resolution to the **currently selected environment** in the UI.

@@ -78,6 +78,7 @@ conventions.
 ### MCP
 
 1. [MCP Integration](mcp_integration.md)
+1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
 1. [Jira MCP Example Project Default (PYPOST-1032)](jira_mcp_project_default.md)
 1. [Inbound MCP Trust Model (PYPOST-705)](mcp_trust_model.md)
 1. [MCP Secrets Policy](mcp_secrets_policy.md)

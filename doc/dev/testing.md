@@ -302,18 +302,27 @@ Focused run:
 
 Live Streamable HTTP round-trip coverage (tool list + call against a running uvicorn server)
 lives in `tests/test_mcp_server_integration.py` (PYPOST-368, PYPOST-551). Tests use the
-official MCP Python SDK (`streamable_http_client`, `ClientSession`) with `anyio.run`, start
-the server on an ephemeral port, and mock `RequestService.execute` for deterministic output.
+official MCP Python SDK (`streamable_http_client`, `ClientSession`) with `anyio.run` and start
+the server on an ephemeral port. Most scenarios mock `RequestService.execute` for deterministic
+output. PYPOST-1034 additionally exercises the real request/template/HTTP path against a local
+loopback server: it imports the shipped Jira MCP request shapes and asserts MCP arguments render
+into the outbound query parameter and JSON body without contacting Jira.
 
 | Class | Scope |
 | --- | --- |
-| `TestMCPServerIntegration` | `list_tools`, `call_tool`, MCP argument forwarding, and `MCPClientService` sync wrapper (PYPOST-560) |
+| `TestMCPServerIntegration` | `list_tools`, `call_tool`, MCP argument forwarding, query/body template-to-wire regressions for the Jira fixture (PYPOST-1034), and `MCPClientService` sync wrapper (PYPOST-560) |
 | `TestMCPServerManagerIntegration` | `MCPServerManager` thread + uvicorn lifecycle |
 
 Focused run:
 
 ```bash
 .venv/bin/python -m pytest tests/test_mcp_server_integration.py -v
+```
+
+Run just the query/body substitution regressions with:
+
+```bash
+PYTEST_ARGS="tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_substitutes_jira_mcp_query_parameter tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_call_tool_substitutes_jira_mcp_json_body" make test
 ```
 
 ## MCP test fixture generator (PYPOST-179)

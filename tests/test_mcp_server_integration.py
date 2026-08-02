@@ -1,13 +1,13 @@
 """Integration tests: live MCP server over Streamable HTTP round-trip (PYPOST-368/551)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from unittest.mock import MagicMock
+from urllib.parse import parse_qs, urlsplit
 
 import anyio
 from mcp.client.session import ClientSession
@@ -15,6 +15,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
 from pypost.core.mcp_client_service import MCPClientService
+from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.request_service import ExecutionResult
 from pypost.models.models import RequestData
@@ -25,6 +26,22 @@ from tests.helpers.mcp_live_server import (
     live_mcp_server,
     wait_for_port,
 )
+
+
+pytestmark = pytest.mark.timeout(120)
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_JIRA_MCP_COLLECTION_PATH = _REPO_ROOT / "examples" / "collections" / "jira_mcp.json"
+
+
+def _jira_mcp_request_with_local_url(request_id: str, url: str) -> RequestData:
+    """Import one shipped Jira MCP request and isolate only its destination."""
+    collections, parse_errors = load_collection_import_candidates(_JIRA_MCP_COLLECTION_PATH)
+    assert parse_errors == []
+    assert len(collections) == 1
+    request = next(request for request in collections[0].requests if request.id == request_id)
+    return request.model_copy(update={"url": url}, deep=True)
 
 
 def _exec_result(body: str = "ok") -> ExecutionResult:
@@ -226,6 +243,102 @@ class TestMCPServerIntegration(unittest.TestCase):
             self.assertEqual("/issue/PROJ-1", path)
             self.assertNotIn("mcp.request", path)
             self.assertNotIn("%7B%7B", path)
+        finally:
+            httpd.shutdown()
+            server_thread.join(timeout=2.0)
+
+    def test_call_tool_substitutes_jira_mcp_query_parameter(self):
+        """PYPOST-1034: Jira MCP query placeholders reach the wire rendered."""
+        stub_port = free_port()
+        captured_paths: list[str] = []
+
+        class _StubHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                captured_paths.append(self.path)
+                payload = b"{}"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, _format, *_args):
+                return
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", stub_port), _StubHandler)
+        server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        server_thread.start()
+        try:
+            tool = _jira_mcp_request_with_local_url(
+                "jira-search-fields",
+                f"http://127.0.0.1:{stub_port}/rest/api/3/field/search",
+            )
+            with live_mcp_server([tool]) as mcp_server:
+                mcp_server.impl.set_variable_supplier(
+                    lambda: {"jira_credentials": "user:token"}
+                )
+                payload = anyio.run(
+                    _mcp_call_tool,
+                    mcp_server.mcp_url,
+                    "jira_search_fields",
+                    {"query": "Story Point"},
+                )
+            self.assertFalse(payload["error"])
+            self.assertEqual(payload["status"], 200)
+            self.assertEqual(len(captured_paths), 1)
+            path = captured_paths[0]
+            self.assertEqual(parse_qs(urlsplit(path).query), {"query": ["Story Point"]})
+            self.assertNotIn("mcp.request", path)
+            self.assertNotIn("%7B", path)
+        finally:
+            httpd.shutdown()
+            server_thread.join(timeout=2.0)
+
+    def test_call_tool_substitutes_jira_mcp_json_body(self):
+        """PYPOST-1034: Jira MCP JSON-body placeholders reach the wire rendered."""
+        stub_port = free_port()
+        captured_bodies: list[bytes] = []
+
+        class _StubHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers["Content-Length"])
+                captured_bodies.append(self.rfile.read(length))
+                payload = b'{"issues": []}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, _format, *_args):
+                return
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", stub_port), _StubHandler)
+        server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        server_thread.start()
+        try:
+            tool = _jira_mcp_request_with_local_url(
+                "jira-search-issues-jql",
+                f"http://127.0.0.1:{stub_port}/rest/api/3/search/jql",
+            )
+            search_payload = {"jql": "project = DEMO", "maxResults": 1}
+            with live_mcp_server([tool]) as mcp_server:
+                mcp_server.impl.set_variable_supplier(
+                    lambda: {"jira_credentials": "user:token"}
+                )
+                payload = anyio.run(
+                    _mcp_call_tool,
+                    mcp_server.mcp_url,
+                    "jira_search_issues_jql",
+                    {"search_payload": json.dumps(search_payload)},
+                )
+            self.assertFalse(payload["error"])
+            self.assertEqual(payload["status"], 200)
+            self.assertEqual(len(captured_bodies), 1)
+            body = captured_bodies[0].decode("utf-8")
+            self.assertEqual(json.loads(body), search_payload)
+            self.assertNotIn("mcp.request", body)
+            self.assertNotIn("{{", body)
         finally:
             httpd.shutdown()
             server_thread.join(timeout=2.0)
