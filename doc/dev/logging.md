@@ -133,7 +133,10 @@ never the tree or values). UI action contract:
 [ui_actions.md](ui_actions.md) (`ui_action_applied` logs scalars only — never
 fill text, option labels, or key payloads). Settle waits:
 [ui_wait.md](ui_wait.md) (`ui_wait_settled` / `ui_wait_timeout` — timing
-scalars only; diagnostics live on `UiWaitTimeoutError`).
+scalars only; diagnostics live on `UiWaitTimeoutError`). The forced
+product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
+`pypost.agent.ui_wait` with stable `condition=forced_dialog_settle_timeout`; see
+[agent_dialog_settle.md](agent_dialog_settle.md#forced-timeout-debug-contract-pypost-968).
 
 ### Configuration and settings
 

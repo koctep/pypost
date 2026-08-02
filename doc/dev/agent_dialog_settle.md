@@ -5,6 +5,8 @@
 One `agent_e2e` module (`tests/test_agent_dialog_settle_e2e.py`) includes a
 **happy-path** proof and a **forced-timeout companion** (PYPOST-934) that
 asserts `step` plus modal scalar keys on `UiWaitTimeoutError.diagnostics`.
+PYPOST-968 also makes that companion enforce the existing DEBUG timeout-event
+contract without changing the production wait or dialog behavior.
 
 The happy-path scenario proves that the shared settle/wait stack can wait for
 a **real product dialog** after a UI action — not only synthetic delayed
@@ -28,7 +30,7 @@ Source debt: [PYPOST-852](https://pypost.atlassian.net/browse/PYPOST-852) TD-1
 | `tests/helpers/agent_e2e_dialog_settle.py` | Shared `run_product_dialog_settle` helper (PYPOST-936) |
 | `tests/test_agent_dialog_settle_convention.py` | Convention lock on helper adoption |
 | `test_agent_dialog_settle_after_settings_open` | Happy-path modal settle + dismiss |
-| `…timeout_includes_step_and_modal_diag` | Forced settle timeout companion (934) |
+| `…timeout_includes_step_and_modal_diag` | Forced timeout diagnostics + DEBUG proof (934/968) |
 | `SETTINGS_BUTTON` | Stable open control ([ui_identity](ui_identity.md)) |
 | `session.ui_click` | Drives `MainWindow.open_settings` → `exec()` |
 | `session.wait_until` | Bounded poll ([ui_wait](ui_wait.md)) |
@@ -79,6 +81,8 @@ Harness table row: [agent_e2e.md](agent_e2e.md).
 ```bash
 make test-agent-e2e
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_dialog_settle_e2e.py -v"
+make test-agent-e2e \
+  PYTEST_ARGS="tests/test_agent_dialog_settle_e2e.py -k timeout_includes -v"
 ```
 
 ### Scenario steps
@@ -110,6 +114,37 @@ golden Send timeout companion
    `UiWaitTimeoutError`, `diagnostics["step"] == SETTLE_STEP`, and keys
    `dialog_title` / `dialog_object_name` / `active_modal_type` are present
    (values may be `None`).
+
+### Forced-timeout DEBUG contract (PYPOST-968)
+
+The same companion captures DEBUG records only while
+`run_product_dialog_settle(...)` executes, including its nested Qt event loop:
+
+```python
+with caplog.at_level(logging.DEBUG, logger="pypost.agent.ui_wait"):
+    _settle_ok, settle_error = run_product_dialog_settle(...)
+```
+
+A matching `LogRecord` must have all of these stable properties:
+
+- `record.name == "pypost.agent.ui_wait"`;
+- `record.levelno == logging.DEBUG`;
+- `record.getMessage()` starts with `ui_wait_timeout `;
+- the message contains `condition=forced_dialog_settle_timeout`.
+
+This is a presence contract, not a scheduler contract. Do not assert an exact
+`waited_ms`, timestamp, record position, relative event ordering, or record
+count. The stable logger, numeric level, event name, and condition identify the
+forced path; the existing exception assertions remain the primary failure
+diagnostics. Do not rely on `--log-cli-level=DEBUG` or terminal output for this
+proof because CI must enforce it directly through `caplog.records`.
+
+The scenario remains bounded at three layers: `lambda: False` deterministically
+forces the 0.05-second wait budget, the helper rejects the active modal in
+`finally`, and the module-level `pytest.mark.timeout(60)` stops a wider harness
+hang. Keep the capture around the helper call so records emitted inside the
+nested modal loop are included, and keep modal dismissal independent of later
+assertions.
 
 ### Pattern sketch (shared helper)
 
@@ -186,9 +221,17 @@ No extra environment variables. Prefer `make test-agent-e2e` for
 | | `_modal_diag()` keys. Near-zero budget may leave |
 | | `dialog_title` / `active_modal_type` as `None`; asserts |
 | | check key **presence**, not values. |
+| DEBUG contract assertion failure | Confirm logger `pypost.agent.ui_wait`, DEBUG |
+| | event `ui_wait_timeout`, and condition |
+| | `forced_dialog_settle_timeout`; do not substitute live CLI logs. |
+| Native crash after tests report PASS | Re-run the module in a fresh process and |
+| | retain the crash output. Intermittent post-PASS Qt teardown is tracked by |
+| | [PYPOST-1040](https://pypost.atlassian.net/browse/PYPOST-1040); it does not |
+| | relax the bounded modal cleanup contract. |
 
-Observability reuses DEBUG `ui_wait_settled` / `ui_wait_timeout` with
-`condition=settings_dialog_present`. Failure context is primarily the
+Observability reuses DEBUG `ui_wait_settled` / `ui_wait_timeout`. The happy
+path uses `condition=settings_dialog_present`; the forced proof locks
+`condition=forced_dialog_settle_timeout`. Failure context is primarily the
 exception path (`step` + modal scalars), not new production metrics. Catalog:
 [logging.md](logging.md).
 

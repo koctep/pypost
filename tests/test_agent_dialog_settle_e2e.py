@@ -8,6 +8,8 @@ proof only — not Settings functional coverage.
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from pypost.agent import AgentAppSession, UiWaitTimeoutError, find_widget
@@ -22,6 +24,7 @@ pytestmark = [
 DIALOG_SETTLE_TIMEOUT_S = 10.0
 FORCED_SETTLE_TIMEOUT_S = 0.05
 SETTLE_STEP = "wait_dialog_after_settings_open"
+_UI_WAIT_LOGGER = "pypost.agent.ui_wait"
 
 
 def _settings_dialog_present() -> bool:
@@ -58,21 +61,23 @@ def test_agent_dialog_settle_after_settings_open(
 
 def test_agent_dialog_settle_timeout_includes_step_and_modal_diag(
     agent_e2e_session: AgentAppSession,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """PYPOST-934: forced dialog-settle timeout carries step + modal scalars."""
     session = agent_e2e_session
     assert session.window.is_ui_ready is True
     find_widget(session.window, SETTINGS_BUTTON)
 
-    _settle_ok, settle_error = run_product_dialog_settle(
-        session,
-        click_widget_id=SETTINGS_BUTTON,
-        wait_condition=lambda: False,
-        timeout=FORCED_SETTLE_TIMEOUT_S,
-        message="forced dialog settle timeout",
-        condition_name="forced_dialog_settle_timeout",
-        step=SETTLE_STEP,
-    )
+    with caplog.at_level(logging.DEBUG, logger=_UI_WAIT_LOGGER):
+        _settle_ok, settle_error = run_product_dialog_settle(
+            session,
+            click_widget_id=SETTINGS_BUTTON,
+            wait_condition=lambda: False,
+            timeout=FORCED_SETTLE_TIMEOUT_S,
+            message="forced dialog settle timeout",
+            condition_name="forced_dialog_settle_timeout",
+            step=SETTLE_STEP,
+        )
 
     assert len(settle_error) == 1
     assert isinstance(settle_error[0], UiWaitTimeoutError)
@@ -81,3 +86,12 @@ def test_agent_dialog_settle_timeout_includes_step_and_modal_diag(
     assert "dialog_title" in diagnostics
     assert "dialog_object_name" in diagnostics
     assert "active_modal_type" in diagnostics
+    matching_records = [
+        record
+        for record in caplog.records
+        if record.name == _UI_WAIT_LOGGER
+        and record.levelno == logging.DEBUG
+        and record.getMessage().startswith("ui_wait_timeout ")
+        and "condition=forced_dialog_settle_timeout" in record.getMessage()
+    ]
+    assert matching_records, "expected forced dialog-settle ui_wait_timeout DEBUG log"
