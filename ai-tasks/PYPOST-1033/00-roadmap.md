@@ -61,3 +61,7 @@
 
 - `doc/dev/template_expression_functions.md` (safe dotted paths, PYPOST-1033)
 - `doc/dev/template_service.md` (cross-links / troubleshooting)
+
+## Suggested branch name
+
+`fix/PYPOST-1033-safe-dotted-mcp-request-paths`
