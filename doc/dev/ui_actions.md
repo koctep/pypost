@@ -42,6 +42,8 @@ Product MCP docs: [mcp_integration.md](mcp_integration.md),
 | Component | Role |
 | --- | --- |
 | `pypost/agent/ui_actions.py` | Lookup, interactable checks, primitives, errors |
+| `pypost/agent/tree_index.py` | Shared DisplayRole match + flat/tree index lookup
+  (PYPOST-941 / PYPOST-971) |
 | `AgentAppSession.ui_*` | Convenience after `start()`; root = main window
   (or current tab when `in_current_tab=True` — PYPOST-851) |
 | `QTest.mouseClick` / `keyClick` / `keyClicks` | Click, single-key, and opt-in fill typing |
@@ -123,20 +125,44 @@ Select an item by **display text** (`str`) or **zero-based index** (`int`) on:
 | --- | --- | --- |
 | `QComboBox` | `findText` + `setCurrentIndex` | `setCurrentIndex` |
 | `QListWidget` | `findItems(MatchExactly)` + current item | `setCurrentRow` |
-| `QTreeView` | Depth-first DisplayRole match via `pypost.agent.tree_index` (expands parent) | Top-level row only |
-| `QListView` / flat `QAbstractItemView` | Column 0 DisplayRole scan + `setCurrentIndex` | Row index on root model |
+| `QTreeView` | Recursive DFS via `find_tree_index_by_display_text`
+  (expands parent) | Top-level row only |
+| `QListView` / flat `QAbstractItemView` | Flat root scan via
+  `find_child_index_by_display_text` + `setCurrentIndex` | Row index on root model |
 
-`QListWidget` is handled before generic item views. Plain `QListView` and other
-flat model-backed views use the last row; they require a model on column 0.
+`QListWidget` is handled before generic item views and stays on the widget-item
+API (not the shared model DisplayRole helpers). Plain `QListView` and other
+flat model-backed views require a model on column 0.
+
+#### Shared DisplayRole matching (PYPOST-971)
+
+Exact column-0 DisplayRole equality lives once in
+`pypost.agent.tree_index`:
+
+| Helper | Semantics |
+| --- | --- |
+| `display_role_equals(index, text)` | Shared predicate:
+  `str(index.data(DisplayRole)) == text` |
+| `find_child_index_by_display_text(model, text, parent=None)` | **Flat** —
+  first match among **direct children** of `parent` (root when omitted);
+  does **not** recurse |
+| `find_tree_index_by_display_text(tree, text)` | **Recursive** —
+  depth-first walk; compares each visited index via `display_role_equals` |
+
+Flat item-view text selection calls the flat helper only (root siblings).
+Tree text selection keeps DFS order and shares only the match predicate — it
+does **not** call `find_child_index_by_display_text` at each level (that would
+become siblings-first and change duplicate-label first-match). Ownership is
+locked by `tests/test_display_role_scan_ownership.py`.
 
 Missing option/index or unsupported widget type →
 `UiTargetNotInteractableError` with `reason=option not found` or
 `reason=option index out of range` (same strings for combo, list, and tree).
 Selection sets the current item; it does **not** replace viewport *click*
 helpers used to open a collection request
-(`tests/helpers/agent_e2e_tree.click_tree_row_by_text`). Both paths share
-`find_tree_index_by_display_text` in `pypost/agent/tree_index.py`; e2e
-helpers raise `AssertionError` on miss, while `ui_select` raises
+(`tests/helpers/agent_e2e_tree.click_tree_row_by_text`). Tree `ui_select` and
+e2e click both use `find_tree_index_by_display_text`; e2e helpers raise
+`AssertionError` on miss, while `ui_select` raises
 `UiTargetNotInteractableError` (PYPOST-941).
 
 Fixture contract tests in `tests/test_ui_actions.py` lock list/tree negative
@@ -209,8 +235,10 @@ widgets that already have `objectName` set via `set_widget_id`.
 - **`item view has no model`** — Model-backed list view has no model attached;
   set a model before selecting.
 - **`option not found` / `option index out of range`** — Display text mismatch
-  (case-sensitive) or index outside the control’s range. Tree index is
-  top-level only; use text for nested rows.
+  (case-sensitive exact DisplayRole via `display_role_equals`) or index
+  outside the control’s range. Flat list views scan root rows only; trees
+  walk depth-first for nested labels. Tree **index** selection is top-level
+  only; use text for nested rows.
 - **Tree select did not open the request** — By design; `ui_select` sets
   current index. Use `click_tree_row_by_text` when the product needs a
   viewport click to open/activate.

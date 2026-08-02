@@ -172,10 +172,15 @@ agent e2e sessions. Use `tests/helpers/qt_item_view.py` (`detach_item_view_model
 `close_item_view_fixture`; PYPOST-940). Consumer: `tests/test_ui_actions.py` tree and
 list-view ui_select fixtures; unit proofs in `tests/test_qt_item_view_teardown.py`.
 
-Tree DisplayRole lookup for `ui_select` and `agent_e2e_tree` shares
-`pypost/agent/tree_index.py` (`find_tree_index_by_display_text`; PYPOST-941).
-Unit proofs in `tests/test_tree_index_walk.py` (deep nested row + error-type
-boundaries).
+DisplayRole matching for flat item views and trees shares
+`pypost/agent/tree_index.py` (PYPOST-941 / PYPOST-971):
+`display_role_equals` (exact match predicate),
+`find_child_index_by_display_text` (flat direct-child scan for model-backed
+list views), and `find_tree_index_by_display_text` (recursive DFS for trees /
+`agent_e2e_tree`). Flat and recursive semantics stay distinct. Ownership AST
+marker: `tests/test_display_role_scan_ownership.py`. Runtime proofs:
+`tests/test_tree_index_walk.py` (deep nested row + error-type boundaries) and
+list/tree coverage in `tests/test_ui_actions.py`.
 
 List/tree negative `ui_select` paths (missing display text, out-of-range index)
 are locked in `tests/test_ui_actions.py`

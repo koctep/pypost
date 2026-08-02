@@ -24,7 +24,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pypost.agent.tree_index import find_tree_index_by_display_text
+from pypost.agent.tree_index import (
+    find_child_index_by_display_text,
+    find_tree_index_by_display_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -227,14 +230,10 @@ def _select_item_view(
             )
         widget.setCurrentIndex(index)
         return
-    rows = model.rowCount()
-    for row in range(rows):
-        index = model.index(row, 0)
-        if not index.isValid():
-            continue
-        if str(index.data(Qt.ItemDataRole.DisplayRole)) == option:
-            widget.setCurrentIndex(index)
-            return
+    index = find_child_index_by_display_text(model, option)
+    if index is not None and index.isValid():
+        widget.setCurrentIndex(index)
+        return
     raise UiTargetNotInteractableError(
         widget_id,
         f"option not found: {option!r}",
