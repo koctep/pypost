@@ -206,6 +206,23 @@ class TestFunctionExpressionResolver(unittest.TestCase):
                 self.assertEqual(expected_code, r.code)
                 self.assertEqual(expected_fn, r.function_name)
 
+    def test_validate_accepts_safe_mcp_request_path(self):
+        """PYPOST-1033: dotted mcp.request.* must validate as a safe path."""
+        r = self.resolver.validate_content("{{ mcp.request.issue_key }}")
+        self.assertTrue(r.is_valid)
+
+    def test_validate_rejects_unsafe_underscore_attribute_segments(self):
+        """PYPOST-1033: underscore-leading attribute segments stay invalid."""
+        cases = [
+            ("A1", "{{ db.__class__ }}"),
+            ("A2", "{{ mcp.request.__class__ }}"),
+        ]
+        for label, content in cases:
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertFalse(r.is_valid)
+                self.assertEqual("invalid_syntax", r.code)
+
 
 if __name__ == "__main__":
     unittest.main()

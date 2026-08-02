@@ -42,7 +42,7 @@ flowchart LR
 | Module | Role |
 | --- | --- |
 | `function_registry.py` | Allow-listed callable names (`urlencode`, `md5`, `base64`) |
-| `function_expression_resolver.py` | Validates `{{func(...)}}` before render |
+| `function_expression_resolver.py` | Validates `{{func(...)}}` and safe dotted paths before render (PYPOST-1033) |
 | `template_expression_tokenizer.py` | Shared `{{...}}` token patterns |
 | `template_service_render.py` | Private render stages, metrics, and logging helpers (PYPOST-700) |
 
@@ -141,9 +141,13 @@ Function-style placeholders (`{{urlencode(db)}}`, nested calls) delegate to
 Validation-first render:
 
 1. Tokenize `{{...}}` placeholders
-2. Validate function expressions via `FunctionExpressionResolver`
+2. Validate expressions via `FunctionExpressionResolver` (catalog functions, nested
+   calls, and safe dotted variable paths such as `mcp.request.issue_key`)
 3. Render with shared `jinja2.Environment`
 4. On validation or render failure: log, emit metrics, return **original content**
+
+Safe-path grammar and MCP substitution details:
+[template_expression_functions.md](template_expression_functions.md) (PYPOST-1033).
 
 ### `parse(content) -> AST`
 
@@ -159,6 +163,7 @@ Exposes resolver validation without rendering. Used by tests and future authorin
 | Symptom | Check |
 | --- | --- |
 | Placeholder not substituted at send time | Confirm caller uses `TemplateService.render_string`, not manual string replace |
+| `{{ mcp.request.* }}` left literal | Path must match safe-path grammar; variables must nest `mcp.request`; see expression docs |
 | Hover differs from sent request for plain vars | Expected when chain depth/cycle limits apply in hover only |
 | Function hover matches send but send fails | Compare `render_path` metrics; validation runs on both paths |
 | Multiple `Environment` instances | Each fallback `TemplateService()` owns its own env — prefer injection from `main.py` |

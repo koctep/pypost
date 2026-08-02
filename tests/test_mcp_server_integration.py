@@ -3,7 +3,6 @@ import pytest
 
 pytestmark = pytest.mark.timeout(120)
 
-import asyncio
 import json
 import threading
 import unittest
@@ -178,6 +177,55 @@ class TestMCPServerIntegration(unittest.TestCase):
             self.assertFalse(payload["error"])
             self.assertEqual(payload["status"], 200)
             self.assertEqual(payload["body"], stub_body)
+        finally:
+            httpd.shutdown()
+            server_thread.join(timeout=2.0)
+
+    def test_call_tool_substitutes_mcp_request_path_placeholder(self):
+        """PYPOST-1033: call_tool must not leave literal {{ mcp.request... }}."""
+        stub_port = free_port()
+        captured_paths: list[str] = []
+
+        class _StubHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                captured_paths.append(self.path)
+                payload = b"ok"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, _format, *_args):
+                return
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", stub_port), _StubHandler)
+        server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        server_thread.start()
+        try:
+            tool = RequestData(
+                name="Get Issue",
+                expose_as_mcp=True,
+                method="GET",
+                url=(
+                    f"http://127.0.0.1:{stub_port}/issue/"
+                    "{{ mcp.request.issue_key }}"
+                ),
+            )
+            with live_mcp_server([tool]) as mcp_server:
+                payload = anyio.run(
+                    _mcp_call_tool,
+                    mcp_server.mcp_url,
+                    "get_issue",
+                    {"issue_key": "PROJ-1"},
+                )
+            self.assertFalse(payload["error"])
+            self.assertEqual(payload["status"], 200)
+            self.assertEqual(1, len(captured_paths))
+            path = captured_paths[0]
+            self.assertEqual("/issue/PROJ-1", path)
+            self.assertNotIn("mcp.request", path)
+            self.assertNotIn("%7B%7B", path)
         finally:
             httpd.shutdown()
             server_thread.join(timeout=2.0)

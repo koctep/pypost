@@ -25,11 +25,18 @@ PYPOST-454 adds acceptance tests for malformed nested expressions, whitespace-he
 variants, and runtime/hover parity for those forms. Delivery is tests-only; observed
 validation codes and fallback behavior are documented in the edge-case section below.
 
+PYPOST-1033 extends plain-expression validation so **safe dotted variable paths**
+(for example `{{ mcp.request.issue_key }}`) validate and render. This unblocks MCP
+tool-argument substitution when execution variables include a nested
+`mcp.request` dict. Underscore-leading attribute segments (for example
+`{{ db.__class__ }}`) remain `invalid_syntax`.
+
 Implemented behavior is backward compatible:
 
 - Valid expressions are rendered through `TemplateService`.
 - Invalid expressions fall back to original content (no hard request-time failure).
 - Plain variable placeholders like `{{host}}` continue to work unchanged.
+- Safe dotted paths are accepted; unsafe attribute-style paths stay rejected.
 
 ## Architecture
 
@@ -45,6 +52,8 @@ Main components:
   - Factory methods: `ValidationResult.valid()` and `ValidationResult.error(...)`.
 - `pypost/core/function_expression_resolver.py` (`FunctionExpressionResolver`)
   - Parses and validates expressions inside `{{...}}`.
+  - Accepts plain identifiers and **safe dotted variable paths** via `_SAFE_PATH_RE`
+    (PYPOST-1033); same rule applies to function arguments.
   - Uses `FunctionRegistry` for allow-list checks at every call node, including nested chains.
   - Exposes `NESTED_FUNCTION_CALLS_ALLOWED` as the declarative nested-call policy constant.
   - Returns `ValidationResult` and does not emit logs or metrics.
@@ -126,9 +135,35 @@ Supported validation result codes:
 Supported patterns:
 
 - Plain variable: `{{host}}`
+- Safe dotted variable path (PYPOST-1033): `{{ mcp.request.issue_key }}`
 - Function call: `{{urlencode(db)}}`
+- Function call with safe path argument: `{{urlencode(mcp.request.query)}}`
 - Nested function call: `{{md5(urlencode(db))}}`
 - Deep chain (no fixed depth limit): `{{base64(md5(urlencode(db)))}}`
+
+### Safe variable path grammar (PYPOST-1033)
+
+`FunctionExpressionResolver` accepts a plain expression (or function argument) when it
+matches `_SAFE_PATH_RE`:
+
+| Segment | Pattern | Notes |
+| --- | --- | --- |
+| First | `[a-zA-Z_][a-zA-Z0-9_]*` | Same as a plain identifier; may start with `_` |
+| Later (each `.` segment) | `[a-zA-Z][a-zA-Z0-9_]*` | Must **not** start with `_` |
+
+Rules:
+
+- One or more segments separated by `.` (no empty, leading, or trailing dots).
+- Depth is not specially capped; product MCP paths are typically `mcp.request.<param>`.
+- The resolver stays MCP-agnostic: any nested dict path that matches the grammar is valid.
+
+| Expression | Result |
+| --- | --- |
+| `mcp.request.issue_key` | valid → Jinja renders nested dict access |
+| `urlencode(mcp.request.query)` | valid (same path rule for arguments) |
+| `db.__class__` | `invalid_syntax` (underscore attribute segment) |
+| `mcp.request.__class__` | `invalid_syntax` |
+| `db\|md5` / filter forms | `invalid_syntax` |
 
 Supported functions:
 
@@ -139,6 +174,8 @@ Supported functions:
 Examples:
 
 - URL field: `/{{host}}/{{urlencode(db)}}`
+- MCP tool args (nested context): `{{ mcp.request.issue_key }}` with
+  `variables={"mcp": {"request": {"issue_key": "PROJ-1"}}}` → `PROJ-1`
 - Header/param/body values: `{{md5(secret)}}`, `{{base64(path)}}`
 - Hover tooltip resolution uses the same render rules as runtime for function placeholders.
 - Nested chain: `{{md5(urlencode(db))}}` with `db="a b"` → MD5 of URL-encoded value.
@@ -152,6 +189,7 @@ Invalid examples (kept as original text due fallback behavior):
 - Literal argument: `{{urlencode('db')}}`
 - Literal inside nested call: `{{md5(urlencode('db'))}}`
 - Malformed signature: `{{urlencode(db}}`
+- Unsafe attribute path: `{{ db.__class__ }}`, `{{ mcp.request.__class__ }}`
 
 ### Invalid expression fallback
 
@@ -189,20 +227,28 @@ Function execution is restricted to the catalog in `FunctionRegistry`. Enforceme
 Rejected non-catalog Jinja constructs (original content returned):
 
 - Jinja filters: `{{ db|md5 }}`
-- Attribute access: `{{ db.__class__ }}`
+- Unsafe attribute paths with underscore-leading segments: `{{ db.__class__ }}`,
+  `{{ mcp.request.__class__ }}`
 
-Negative tests in `tests/test_template_service.py`:
+Safe dotted paths (no underscore-leading attribute segments) are allow-listed and
+rendered by Jinja against nested dicts — for example MCP
+`{"mcp": {"request": {...}}}` from `_merge_execution_variables`. This is intentional
+(PYPOST-1033); it does not open private-attribute access.
 
-- `test_validate_rejects_jinja_filter_form`
-- `test_validate_rejects_attribute_access_form`
-- `test_render_jinja_filter_form_returns_original_content`
-- `test_render_attribute_access_form_returns_original_content`
+Negative / acceptance tests:
+
+- `tests/test_template_service.py`: filter/attribute rejection; nested MCP render
+  (`test_render_nested_mcp_request_variable`)
+- `tests/test_function_expression_resolver.py`: safe MCP path acceptance; underscore
+  segment locks (`test_validate_accepts_safe_mcp_request_path`)
+- `tests/test_mcp_server_integration.py`:
+  `test_call_tool_substitutes_mcp_request_path_placeholder`
 
 ## Nested Function Call Policy (PYPOST-453)
 
 | Rule | Behavior |
 |------|----------|
-| Nested allow-listed calls | **Allowed** — argument is identifier or nested allow-listed call |
+| Nested allow-listed calls | **Allowed** — argument is safe variable path or nested allow-listed call |
 | Depth limit | **None** — each level must satisfy catalog + single-argument rules |
 | Catalog check | `FunctionRegistry.is_allowed` at every call node, recursively |
 | Multi-argument at any level | Rejected (`invalid_arity`; outer may see `invalid_argument`) |
@@ -457,7 +503,8 @@ hardening — not release blockers.
 | Registry vs `env.globals` parity test | — | Done in PYPOST-457 (`test_function_registry`, `test_template_service`) |
 | Shared tokenization dedup | — | Done in PYPOST-460 (`template_expression_tokenizer`) |
 | Empty-arg / multi-placeholder / closing-paren edge cases | — | Done in PYPOST-461 (see PYPOST-461 section) |
-| Hover regex vs resolver identifier rules | — | `PLAIN_VARIABLE_PATTERN` allows digit-leading names; resolver `_IDENTIFIER_RE` does not |
+| Hover regex vs resolver identifier rules | — | `PLAIN_VARIABLE_PATTERN` allows digit-leading names; resolver `_SAFE_PATH_RE` does not |
+| Hover fast-path for dotted paths | — | `PLAIN_VARIABLE_PATTERN` is undotted; `{{ mcp.request.* }}` uses full `render_string` path |
 | Plain variable pattern centralization | — | Done in PYPOST-113 (`PLAIN_VARIABLE_PATTERN` + helpers in tokenizer) |
 | Hover expression pattern vs tokenizer | — | Done in PYPOST-536 (`EXPRESSION_PATTERN` aliases `TEMPLATE_PLACEHOLDER_PATTERN`) |
 | HTTPClient body / header-name integration | — | Optional; shared `render_string` path already proven |
@@ -468,7 +515,8 @@ Completed follow-ups referenced in this doc: PYPOST-451 (registry), PYPOST-452 (
 PYPOST-453 (nested policy), PYPOST-454 (edge-case tests), PYPOST-456 (doc polish),
 PYPOST-457 (registry/globals parity test), PYPOST-459 (orchestration stage helpers in
 `TemplateService`), PYPOST-460 (shared tokenization), PYPOST-461 (empty-arg / first-failure
-tests), PYPOST-455 (caching evaluation).
+tests), PYPOST-455 (caching evaluation), PYPOST-1033 (safe dotted variable paths for MCP
+request substitution).
 
 ## Caching evaluation (PYPOST-455)
 
@@ -512,7 +560,10 @@ Expression does not render and stays unchanged:
 - Check expression uses the canonical form: function name and argument inside `{{...}}`.
 - Confirm function is allow-listed (`urlencode`, `md5`, `base64`) via `FunctionRegistry`.
 - Confirm only one top-level argument is passed.
-- Confirm argument is an identifier or a nested allow-listed function expression.
+- Confirm argument is a safe variable path (plain identifier or dotted path per
+  `_SAFE_PATH_RE`) or a nested allow-listed function expression.
+- For MCP placeholders, confirm the path is `mcp.request.<param>` (no underscore-leading
+  segments) and that execution variables include the nested `mcp.request` dict.
 
 Hover tooltip differs from expectation:
 

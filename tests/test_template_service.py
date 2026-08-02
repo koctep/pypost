@@ -184,6 +184,14 @@ class TestTemplateServiceRenderString(unittest.TestCase):
         result = self.svc.render_string(content, {"db": "secret"})
         self.assertEqual(content, result)
 
+    def test_render_nested_mcp_request_variable(self):
+        """PYPOST-1033: nested mcp.request dict must substitute placeholders."""
+        result = self.svc.render_string(
+            "{{ mcp.request.issue_key }}",
+            {"mcp": {"request": {"issue_key": "PROJ-1"}}},
+        )
+        self.assertEqual("PROJ-1", result)
+
 
 class TestTemplateServiceVariableTypes(unittest.TestCase):
     """PYPOST-145: render_string with non-string variable values."""

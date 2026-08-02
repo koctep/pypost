@@ -13,12 +13,16 @@ class FunctionExpressionResolver:
     """Validates ``{{...}}`` expressions.
 
     Nested policy: when ``NESTED_FUNCTION_CALLS_ALLOWED`` is True, a function argument may be
-    a plain identifier or another allow-listed single-argument function call, validated
+    a safe variable path or another allow-listed single-argument function call, validated
     recursively via ``FunctionRegistry``. There is no fixed depth limit as long as each call
     satisfies catalog membership and single-argument rules.
     """
 
-    _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+    # Safe path: first segment may start with `_`; later segments must not
+    # (blocks ``db.__class__`` / ``mcp.request.__class__``).
+    _SAFE_PATH_RE = re.compile(
+        r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$"
+    )
     _FUNCTION_SIGNATURE_RE = re.compile(r"^(?P<func>[a-zA-Z_][a-zA-Z0-9_]*)\((?P<args>.*)\)$")
 
     def __init__(self, registry: FunctionRegistry) -> None:
@@ -38,7 +42,7 @@ class FunctionExpressionResolver:
         return ValidationResult.valid()
 
     def _validate_expression(self, expression: str) -> ValidationResult | None:
-        if self._IDENTIFIER_RE.fullmatch(expression):
+        if self._SAFE_PATH_RE.fullmatch(expression):
             return None
 
         parsed_expression = self._parse_function_expression(expression)
@@ -71,7 +75,7 @@ class FunctionExpressionResolver:
         if argument is None:
             return ValidationResult.error("invalid_arity", function_name)
 
-        if self._IDENTIFIER_RE.fullmatch(argument):
+        if self._SAFE_PATH_RE.fullmatch(argument):
             return None
 
         if not self._FUNCTION_SIGNATURE_RE.fullmatch(argument):
