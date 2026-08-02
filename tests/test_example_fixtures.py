@@ -1,4 +1,4 @@
-"""Contract tests for shipped examples/ fixtures (PYPOST-1017)."""
+"""Contract tests for shipped examples/ fixtures (PYPOST-1017 / PYPOST-1026)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import pytest
 from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.environment_import import load_import_candidates
 from pypost.core.storage import StorageManager
+from pypost.models.models import Collection, RequestData
 
 pytestmark = pytest.mark.timeout(30)
 
@@ -20,6 +21,21 @@ MCP_PROBE_PATH = REPO_ROOT / "examples" / "collections" / "mcp.json"
 PLACEHOLDER_BASE_URL = "https://your-team.atlassian.net"
 PLACEHOLDER_CREDENTIALS = "you@example.com:your-api-token"
 
+# PYPOST-1026: floor after expanding the 12-request starter with 6 must-haves.
+JIRA_MCP_MIN_EXPOSED_REQUESTS = 18
+
+# Locked required capabilities (no stretch-swap escape hatch).
+REQUIRED_JIRA_MCP_REQUEST_IDS = frozenset(
+    {
+        "jira-create-sprint",
+        "jira-add-issues-to-sprint",
+        "jira-get-sprint-issues",
+        "jira-link-issue-parent",
+        "jira-add-comment",
+        "jira-assign-issue",
+    }
+)
+
 
 def _make_storage(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -29,21 +45,92 @@ def _make_storage(
     return StorageManager(data_dir=tmp_path / "pypost-data")
 
 
-def test_jira_mcp_collection_imports_via_native_loader():
+def _load_jira_mcp_collection() -> Collection:
     collections, parse_errors = load_collection_import_candidates(JIRA_COLLECTION_PATH)
-
     assert parse_errors == []
     assert len(collections) == 1
     collection = collections[0]
     assert collection.id == "jira-cloud-mcp"
+    return collection
+
+
+def _has_request(
+    requests: list[RequestData],
+    *,
+    request_id: str | None = None,
+    method: str | None = None,
+    url_contains: tuple[str, ...] = (),
+) -> bool:
+    for request in requests:
+        if request_id is not None and request.id != request_id:
+            continue
+        if method is not None and request.method.upper() != method.upper():
+            continue
+        if any(fragment not in request.url for fragment in url_contains):
+            continue
+        return True
+    return False
+
+
+def test_jira_mcp_collection_imports_via_native_loader():
+    collection = _load_jira_mcp_collection()
     assert collection.name == "Jira Cloud MCP"
-    assert len(collection.requests) == 12
+    assert len(collection.requests) >= JIRA_MCP_MIN_EXPOSED_REQUESTS
     assert all(request.expose_as_mcp for request in collection.requests)
 
     text = JIRA_COLLECTION_PATH.read_text(encoding="utf-8")
     assert "{{ jira_base_url }}" in text
     assert "base64(jira_credentials)" in text
     assert PLACEHOLDER_CREDENTIALS not in text
+
+
+def test_jira_mcp_collection_covers_required_skill_capabilities():
+    """PYPOST-1026: curated analog must cover locked skill/workflow gaps."""
+    collection = _load_jira_mcp_collection()
+    requests = collection.requests
+    request_ids = {request.id for request in requests}
+
+    missing_ids = sorted(REQUIRED_JIRA_MCP_REQUEST_IDS - request_ids)
+    assert not missing_ids, (
+        "jira_mcp.json missing required MCP request ids: " + ", ".join(missing_ids)
+    )
+
+    assert _has_request(
+        requests,
+        request_id="jira-create-sprint",
+        method="POST",
+        url_contains=("/rest/agile/1.0/sprint",),
+    ), "create sprint must POST /rest/agile/1.0/sprint"
+    assert _has_request(
+        requests,
+        request_id="jira-add-issues-to-sprint",
+        method="POST",
+        url_contains=("/rest/agile/1.0/sprint/", "/issue"),
+    ), "sprint membership must POST .../sprint/{id}/issue"
+    assert _has_request(
+        requests,
+        request_id="jira-get-sprint-issues",
+        method="GET",
+        url_contains=("/rest/agile/1.0/sprint/", "/issue"),
+    ), "get sprint issues must GET .../sprint/{id}/issue"
+    assert _has_request(
+        requests,
+        request_id="jira-link-issue-parent",
+        method="PUT",
+        url_contains=("/rest/api/3/issue/",),
+    ), "epic/parent link must be a dedicated PUT issue request"
+    assert _has_request(
+        requests,
+        request_id="jira-add-comment",
+        method="POST",
+        url_contains=("/comment",),
+    ), "add comment must POST .../comment"
+    assert _has_request(
+        requests,
+        request_id="jira-assign-issue",
+        method="PUT",
+        url_contains=("/assignee",),
+    ), "assign issue must PUT .../assignee"
 
 
 def test_jira_cloud_environment_imports_with_placeholders(tmp_path, monkeypatch):

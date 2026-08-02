@@ -333,6 +333,267 @@
         }
       },
       "retry_policy": null
+    },
+    {
+      "id": "jira-create-sprint",
+      "name": "Jira Create Sprint",
+      "method": "POST",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.sprint_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Create a future Jira Software sprint on a board. sprint_payload must be serialized JSON, for example {\"name\":\"Sprint 12\",\"originBoardId\":1,\"startDate\":\"2026-08-03T09:00:00.000Z\",\"endDate\":\"2026-08-17T17:00:00.000Z\"}.",
+      "mcp_params": {
+        "sprint_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for POST /rest/agile/1.0/sprint.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-add-issues-to-sprint",
+      "name": "Jira Add Issues To Sprint",
+      "method": "POST",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}/issue",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.issues_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Move issues into a Jira Software sprint. issues_payload must be serialized JSON, for example {\"issues\":[\"DEMO-1\",\"DEMO-2\"]}.",
+      "mcp_params": {
+        "sprint_id": {
+          "type": "integer",
+          "description": "Numeric Jira Software sprint ID.",
+          "required": true
+        },
+        "issues_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for POST /rest/agile/1.0/sprint/{sprintId}/issue.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-get-sprint-issues",
+      "name": "Jira Get Sprint Issues",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/sprint/{{ mcp.request.sprint_id }}/issue",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {
+        "maxResults": "50"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List issues in a Jira Software sprint. Prefer JQL search when filtering across boards; use this for a direct sprint membership listing.",
+      "mcp_params": {
+        "sprint_id": {
+          "type": "integer",
+          "description": "Numeric Jira Software sprint ID.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-link-issue-parent",
+      "name": "Jira Link Issue Parent",
+      "method": "PUT",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.parent_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Link a Jira issue to an epic or parent via the parent field (preferred over deprecated Epic Link). parent_payload must be serialized JSON, for example {\"fields\":{\"parent\":{\"key\":\"DEMO-1\"}}}.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Child issue key or numeric ID to reparent.",
+          "required": true
+        },
+        "parent_payload": {
+          "type": "string",
+          "description": "Serialized JSON body with fields.parent for PUT /rest/api/3/issue/{issueIdOrKey}.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-add-comment",
+      "name": "Jira Add Comment",
+      "method": "POST",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}/comment",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.comment_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Add a comment to a Jira issue. comment_payload must be serialized JSON; Jira Cloud bodies commonly use Atlassian Document Format under body.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Jira issue key or numeric ID.",
+          "required": true
+        },
+        "comment_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for POST /rest/api/3/issue/{issueIdOrKey}/comment.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-assign-issue",
+      "name": "Jira Assign Issue",
+      "method": "PUT",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}/assignee",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.assignee_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Assign a Jira issue via the dedicated assignee endpoint (more reliable than setting assignee through generic update). assignee_payload must be serialized JSON, for example {\"accountId\":\"5b10a2844c20165700ede21g\"} or {\"accountId\":null} to unassign.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Jira issue key or numeric ID.",
+          "required": true
+        },
+        "assignee_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for PUT /rest/api/3/issue/{issueIdOrKey}/assignee.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-get-worklog",
+      "name": "Jira Get Worklog",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/api/3/issue/{{ mcp.request.issue_key }}/worklog",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List worklogs for a Jira issue.",
+      "mcp_params": {
+        "issue_key": {
+          "type": "string",
+          "description": "Jira issue key or numeric ID.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-move-issues-to-backlog",
+      "name": "Jira Move Issues To Backlog",
+      "method": "POST",
+      "url": "{{ jira_base_url }}/rest/agile/1.0/backlog/issue",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "{{ mcp.request.issues_payload }}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Move issues to the backlog (remove from active/future sprint membership). issues_payload must be serialized JSON, for example {\"issues\":[\"DEMO-1\"]}.",
+      "mcp_params": {
+        "issues_payload": {
+          "type": "string",
+          "description": "Serialized JSON body for POST /rest/agile/1.0/backlog/issue.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "jira-search-assignable-users",
+      "name": "Jira Search Assignable Users",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/api/3/user/assignable/search",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {
+        "query": "{{ mcp.request.query }}",
+        "issueKey": "{{ mcp.request.issue_key }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Search users assignable to a Jira issue; use accountId from results with jira-assign-issue.",
+      "mcp_params": {
+        "query": {
+          "type": "string",
+          "description": "Text to match display name or email.",
+          "required": true
+        },
+        "issue_key": {
+          "type": "string",
+          "description": "Issue key that scopes assignable-user search.",
+          "required": true
+        }
+      },
+      "retry_policy": null
     }
   ]
 }

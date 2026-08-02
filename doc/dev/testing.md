@@ -319,7 +319,8 @@ Shared loaders live in `tests/helpers/mcp_test_collection.py` for reuse by
 [PYPOST-181](https://pypost.atlassian.net/browse/PYPOST-181) integration tests.
 `mcp.json` is the local MCP/SSE probe fixture; the curated end-user Jira Cloud
 pair and its import contract are covered separately under
-[Example fixtures contract (PYPOST-1017)](#example-fixtures-contract-pypost-1017).
+[Example fixtures contract (PYPOST-1017 /
+PYPOST-1026)](#example-fixtures-contract-pypost-1017--pypost-1026).
 
 | Module | Scope |
 | --- | --- |
@@ -336,27 +337,82 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_test_collection.py -v
 ```
 
-## Example fixtures contract (PYPOST-1017)
+## Example fixtures contract (PYPOST-1017 / PYPOST-1026)
 
 ### Overview
 
 Shipped importable fixtures under `examples/` are end-user / probe JSON only —
-no application runtime change. A green contract test loads them through the
-native import parsers and asserts parse success, placeholder markers, and
-`hidden_keys`. Fixture inventory and import order for readers live in
-[`examples/README.md`](../../examples/README.md).
+no application runtime change. PYPOST-1017 shipped the Jira Cloud starter pair;
+PYPOST-1026 expanded `jira_mcp.json` to a **practical analog** of the Atlassian
+MCP Jira surface used by in-repo agent skills (21 MCP-exposed requests; contract
+floor ≥ 18).
+
+Offline contract tests load fixtures through the native import parsers and
+assert parse success, MCP exposure, required skill capabilities, placeholders,
+and `hidden_keys`. Reader-facing inventory, import order, and the full
+**Coverage vs gaps** table live in [`examples/README.md`](../../examples/README.md).
+Runtime MCP wiring is unchanged — see [MCP Integration](mcp_integration.md).
 
 ### Architecture
 
 | Artifact | Role |
-| --- | --- |
-| `examples/collections/jira_mcp.json` | Curated end-user Jira Cloud MCP collection |
-| `examples/environments/jira_cloud.json` | Companion env (placeholders, hidden, MCP) |
-| `examples/collections/mcp.json` | Local MCP/SSE probe (also PYPOST-180 helpers) |
-| `tests/test_example_fixtures.py` | Import-parse + placeholder + `hidden_keys` |
+| -------- | ---- |
+| `examples/collections/jira_mcp.json` | Curated Jira Cloud MCP collection |
+| `examples/environments/jira_cloud.json` | Companion env (placeholders, MCP) |
+| `examples/collections/mcp.json` | Local MCP/SSE probe (PYPOST-180) |
+| `examples/README.md` | Import order, secrets, coverage map |
+| `tests/test_example_fixtures.py` | Offline import + coverage contracts |
 
-Keep roles distinct: Jira pair for end users; `mcp.json` for contributors /
-local probing.
+Keep roles distinct: Jira pair for end users / agent demos; `mcp.json` for
+contributors / local probing.
+
+```text
+Skill / workflow Jira needs  →  curated jira_mcp.json (expose_as_mcp)
+        ↕ paired
+jira_cloud.json (placeholders + enable_mcp)
+        →  Import env → fill placeholders → Import collection → Select env
+        →  Manual Send  or  PyPost MCP tools (analog surface)
+```
+
+External Atlassian MCP may still be configured for agents; these fixtures do
+**not** replace that server. They ship a PyPost-native analog for the in-scope
+capability set.
+
+### MCP exposure and environment pairing
+
+- Every request in `jira_mcp.json` has `expose_as_mcp: true` with agent-facing
+  `mcp_description` / `mcp_params`. Nested Cloud payloads stay serialized JSON
+  string params (`search_payload`, `issue_payload`, …), matching the starter.
+- Auth is shared: `Authorization: Basic {{ base64(jira_credentials) }}` and
+  host `{{ jira_base_url }}`. MCP inputs use `{{ mcp.request.* }}`.
+- Companion env `jira_cloud.json` keeps `jira_base_url` /
+  `jira_credentials` (placeholder), `jira_credentials` in `hidden_keys`, and
+  `enable_mcp: true`. No new shared env keys were required for the expansion.
+- After import, select **Jira Cloud MCP** so MCP starts and tools resolve env
+  variables. See
+  [Active environment binding](mcp_integration.md#active-environment-binding-pypost-137).
+
+### Coverage vs gaps (developer summary)
+
+**In scope (shipped):** issue search/CRUD, transitions, worklog add/get, field
+search, comments, assign, assignable-user search, epic/parent link
+(`fields.parent`), boards, sprint list/get/create/update, sprint issues,
+sprint membership, move to backlog.
+
+**Contract-locked must-haves** (ids asserted in tests):
+
+- `jira-create-sprint`, `jira-add-issues-to-sprint`, `jira-get-sprint-issues`
+- `jira-link-issue-parent`, `jira-add-comment`, `jira-assign-issue`
+
+**Stretch included but not id-locked** (floor can stay green if dropped while
+count ≥ 18): `jira-get-worklog`, `jira-move-issues-to-backlog`,
+`jira-search-assignable-users`. Follow-up: PYPOST-1027.
+
+**Explicit gaps** (document only; not fixtures): Service Desk / JSM, ProForma,
+watchers, attachments, delete issue, remote/issue-link CRUD beyond parent,
+versions/components batch, SLA, development info, cross-project deps,
+`jira_batch_create_issues`. Full reader table:
+[`examples/README.md` — Coverage vs gaps](../../examples/README.md#coverage-vs-gaps).
 
 ### Usage
 
@@ -366,20 +422,44 @@ Focused contract run:
 .venv/bin/python -m pytest tests/test_example_fixtures.py -v
 ```
 
+- `test_jira_mcp_collection_imports_via_native_loader` — native load;
+  `len(requests) >= 18`; all `expose_as_mcp`; template markers; no credential
+  placeholder string in collection JSON.
+- `test_jira_mcp_collection_covers_required_skill_capabilities` — locked
+  request ids plus REST path/method markers.
+- `test_jira_cloud_environment_imports_with_placeholders` — env id/name;
+  placeholder values; `hidden_keys`; `enable_mcp`.
+- `test_mcp_probe_collection_still_imports` — `mcp.json` probe still parses
+  (3 requests).
+
+Module timeout: `pytestmark = pytest.mark.timeout(30)`.
+
 ### Configuration
 
-No new env vars or settings. Committed fixtures must keep placeholders only
-(sample site URL and `you@example.com:your-api-token`); never commit real
-secrets. After import, substitute values locally and keep credential keys in
-`hidden_keys`.
+No new application settings. Committed fixtures must keep placeholders only
+(sample site URL `https://your-team.atlassian.net` and
+`you@example.com:your-api-token`); never commit real secrets. After import,
+substitute values locally and keep credential keys in `hidden_keys`.
+
+When editing the curated surface:
+
+1. Prefer expanding `jira_mcp.json` in place (same companion env).
+2. Keep every curated request MCP-exposed unless intentionally demoted.
+3. Update [`examples/README.md`](../../examples/README.md) coverage vs gaps.
+4. Extend `tests/test_example_fixtures.py` when adding must-have capabilities
+   (ids and path markers), not only the count floor.
 
 ### Troubleshooting
 
 | Issue | Resolution |
-| --- | --- |
-| Contract fails on placeholders | Keep sample URL/credentials in JSON; do not commit real tokens |
-| Wrong fixture for a workflow | Use Jira pair for end users; `mcp.json` for local MCP/SSE probing |
-| Import order unclear | See [`examples/README.md`](../../examples/README.md) (env first) |
+| ----- | ---------- |
+| Count / `expose_as_mcp` fail | Keep ≥ 18 MCP-exposed requests |
+| Required ids / paths fail | Restore locked sprint/parent/comment/assign |
+| Placeholder contract fail | Sample URL/creds only; no real tokens |
+| Agent lacks Jira tools | Select companion env; keep `expose_as_mcp` |
+| Wrong fixture for workflow | Jira pair for users; `mcp.json` for probes |
+| Import order unclear | [`examples/README.md`](../../examples/README.md) |
+| Expecting full MCP parity | Read coverage vs gaps (skill-scoped analog) |
 
 ## MCP test collection integration (PYPOST-181)
 
