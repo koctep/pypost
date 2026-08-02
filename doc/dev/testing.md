@@ -169,8 +169,12 @@ there so upgrades touch one module. Consumer: `tests/test_agent_e2e_packaging_lo
 Model-backed item views (`QTreeView`, `QListView`, etc.) must call `setModel(None)` before
 closing isolated fixtures; otherwise Qt can emit teardown warnings or destabilize later
 agent e2e sessions. Use `tests/helpers/qt_item_view.py` (`detach_item_view_model`,
-`close_item_view_fixture`; PYPOST-940). Consumer: `tests/test_ui_actions.py` tree and
+`close_item_view_fixture`; PYPOST-940). Consumers: `tests/test_ui_actions.py` tree and
 list-view ui_select fixtures; unit proofs in `tests/test_qt_item_view_teardown.py`.
+Collections-tree isolated harnesses use the same detach via
+`close_isolated_tree_actions` / `isolated_tree_actions` in
+`tests/helpers/collections_tree.py` (PYPOST-973); unittest callers register
+`self.addCleanup(close_isolated_tree_actions, harness)`.
 
 DisplayRole matching for flat item views and trees shares
 `pypost/agent/tree_index.py` (PYPOST-941 / PYPOST-971):

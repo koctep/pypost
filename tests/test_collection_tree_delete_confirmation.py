@@ -11,6 +11,7 @@ from PySide6.QtCore import QPoint
 
 from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
+    close_isolated_tree_actions,
     make_collection,
     make_request,
     patch_delete_context_menu,
@@ -23,6 +24,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
     def test_collection_delete_no_records_cancelled_metric(self, mock_confirm_delete):
         col = make_collection("c1", "My API")
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = False
         item = harness.model.item(0)
         with patch_delete_context_menu(harness.view, item.index(), action_count=2):
@@ -38,6 +40,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
     def test_collection_delete_yes_records_succeeded_metric(self, mock_confirm_delete):
         col = make_collection("c1", "My API")
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = True
         item = harness.model.item(0)
         with patch_delete_context_menu(harness.view, item.index(), action_count=2):
@@ -52,6 +55,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         req = make_request("r1", "Get users")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = False
         req_item = harness.model.item(0).child(0)
         with patch_delete_context_menu(harness.view, req_item.index(), action_count=3):
@@ -66,6 +70,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         req = make_request("r1", "Get users")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = True
         req_item = harness.model.item(0).child(0)
         with patch_delete_context_menu(harness.view, req_item.index(), action_count=3):
@@ -82,6 +87,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
     def test_delete_no_skips_handle_delete(self, mock_confirm_delete, mock_handle_delete):
         col = make_collection("c1", "My API")
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = False
         item = harness.model.item(0)
         with patch_delete_context_menu(harness.view, item.index(), action_count=2):

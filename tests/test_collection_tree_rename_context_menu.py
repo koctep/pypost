@@ -11,6 +11,7 @@ from PySide6.QtCore import QPoint
 
 from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
+    close_isolated_tree_actions,
     make_collection,
     make_request,
     patch_rename_context_menu,
@@ -22,6 +23,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
     def test_collection_rename_selected_records_selected_metric(self):
         col = make_collection("c1", "My API")
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         item = harness.model.item(0)
         with patch.object(harness.view, "edit") as mock_edit:
             with patch_rename_context_menu(harness.view, item.index(), action_count=2):
@@ -36,6 +38,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
         req = make_request("r1", "Get users")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         req_item = harness.model.item(0).child(0)
         with patch.object(harness.view, "edit") as mock_edit:
             with patch_rename_context_menu(harness.view, req_item.index(), action_count=3):
@@ -49,6 +52,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
     def test_collection_rename_cancel_records_cancelled_metric(self):
         col = make_collection("c1", "My API")
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "c1", "item_type": "collection"}
         harness.actions.handle_rename_cancelled()
         harness.metrics.track_gui_collection_rename_action.assert_called_once_with(
@@ -61,6 +65,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
         req = make_request("r1", "Get users")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
         harness.actions.handle_rename_cancelled()
         harness.metrics.track_gui_collection_rename_action.assert_called_once_with(
@@ -72,6 +77,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
     def test_collection_rename_commit_records_succeeded_metric(self):
         col = make_collection("c1", "Old Collection")
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "c1", "item_type": "collection"}
         harness.actions.handle_rename_committed("New Collection")
         harness.metrics.track_gui_collection_rename_action.assert_called_once_with(
@@ -83,6 +89,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
         req = make_request("r1", "Old Name")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
         harness.actions.handle_rename_committed("New Name")
         harness.metrics.track_gui_collection_rename_action.assert_called_once_with(
@@ -95,6 +102,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
         req = make_request("r1", "Old Name")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
         harness.actions.handle_rename_rejected_empty()
         harness.metrics.track_gui_collection_rename_action.assert_called_once_with(
@@ -105,6 +113,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
     def test_rename_selected_does_not_emit_succeeded_metric(self):
         col = make_collection("c1", "My API")
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         item = harness.model.item(0)
         with patch.object(harness.view, "edit"):
             with patch_rename_context_menu(harness.view, item.index(), action_count=2):

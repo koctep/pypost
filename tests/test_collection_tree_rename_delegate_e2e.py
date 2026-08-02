@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QApplication
 from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
     cancel_inline_rename,
+    close_isolated_tree_actions,
     commit_inline_rename,
     make_collection,
     make_request,
@@ -25,6 +26,7 @@ from tests.helpers.collections_tree import (
 class TestCollectionTreeRenameDelegateE2E(unittest.TestCase):
     def _prepare_harness(self, collections):
         harness = build_isolated_tree_actions(collections, with_rename_delegate=True)
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.view.resize(400, 300)
         harness.view.show()
         QApplication.processEvents()

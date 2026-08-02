@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QAbstractItemDelegate, QApplication, QLineEdit, QT
 from pypost.models.models import Collection, RequestData
 from pypost.ui.delegates.collection_item_rename_delegate import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
+from tests.helpers.qt_item_view import detach_item_view_model
 
 _QMENU_PATCH = "pypost.ui.presenters.collection_tree_actions.QMenu"
 
@@ -269,3 +270,27 @@ def build_isolated_tree_actions(
     if collections:
         harness.load_collections()
     return harness
+
+
+def close_isolated_tree_actions(harness: IsolatedTreeActions) -> None:
+    """Detach the model via shared qt_item_view helper, then close the view."""
+    detach_item_view_model(harness.view)
+    harness.view.close()
+    QApplication.processEvents()
+
+
+@contextmanager
+def isolated_tree_actions(
+    collections=None,
+    *,
+    with_rename_delegate: bool = False,
+) -> Iterator[IsolatedTreeActions]:
+    """Build an isolated tree harness and tear it down with shared detach."""
+    harness = build_isolated_tree_actions(
+        collections,
+        with_rename_delegate=with_rename_delegate,
+    )
+    try:
+        yield harness
+    finally:
+        close_isolated_tree_actions(harness)

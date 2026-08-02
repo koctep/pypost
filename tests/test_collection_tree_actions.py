@@ -11,6 +11,7 @@ from PySide6.QtCore import QPoint, QModelIndex
 
 from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
+    close_isolated_tree_actions,
     make_collection,
     make_request,
     patch_view_context_menu,
@@ -21,6 +22,7 @@ from tests.helpers.collections_tree import (
 class TestCollectionTreeActionsIsolated(unittest.TestCase):
     def test_invalid_index_skips_context_menu(self):
         harness = build_isolated_tree_actions([make_collection("c1", "My API")])
+        self.addCleanup(close_isolated_tree_actions, harness)
         invalid = QModelIndex()
         with patch.object(harness.view, "indexAt", return_value=invalid):
             with patch("pypost.ui.presenters.collection_tree_actions.QMenu") as mock_menu_class:
@@ -29,6 +31,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
 
     def test_collection_menu_offers_rename_and_delete(self):
         harness = build_isolated_tree_actions([make_collection("c1", "My API")])
+        self.addCleanup(close_isolated_tree_actions, harness)
         item = harness.model.item(0)
         with patch_view_context_menu(
             harness.view, item.index(), [MagicMock(), MagicMock()], None
@@ -42,6 +45,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         req = make_request("r1", "Get users")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         req_item = harness.model.item(0).child(0)
         with patch_view_context_menu(
             harness.view, req_item.index(), [MagicMock(), MagicMock(), MagicMock()], None
@@ -54,6 +58,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         req = make_request("r1", "Get users")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         req_item = harness.model.item(0).child(0)
         rename_action = MagicMock()
         delete_action = MagicMock()
@@ -75,6 +80,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         mock_copy.return_value = copied
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         req_item = harness.model.item(0).child(0)
         new_tab_action = MagicMock()
         rename_action = MagicMock()
@@ -92,6 +98,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
     @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
     def test_delete_cancelled_skips_persistence(self, mock_confirm_delete):
         harness = build_isolated_tree_actions([make_collection("c1", "My API")])
+        self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = False
         item = harness.model.item(0)
         rename_action = MagicMock()
@@ -107,6 +114,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         req = make_request("r1", "Get users")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = True
         req_item = harness.model.item(0).child(0)
         new_tab_action = MagicMock()
@@ -125,6 +133,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         req = make_request("r1", "Old Name")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
         harness.actions.handle_rename_cancelled()
         self.assertIsNone(harness.actions.pending_rename)
@@ -135,6 +144,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         req = make_request("r1", "Old Name")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
         harness.actions.handle_rename_committed("New Name")
         self.assertEqual(harness.model.item(0).child(0).text(), "GET New Name")
@@ -146,6 +156,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
     def test_rename_commit_updates_collection_tree(self):
         col = make_collection("c1", "Old Collection")
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "c1", "item_type": "collection"}
         harness.actions.handle_rename_committed("New Collection")
         self.assertEqual(harness.model.item(0).text(), "New Collection")
@@ -158,6 +169,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         req = make_request("r1", "Old Name")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
         harness.actions._pending_rename = {"item_id": "r1", "item_type": "request"}
         harness.actions.handle_rename_rejected_empty()
         mock_warning.assert_called_once_with(harness.view)
