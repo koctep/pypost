@@ -7,9 +7,9 @@ One intentional golden product flow proves that the agent UI stack composes:
 lifecycle → identity → actions → wait → snapshot → assert.
 
 The scenario opens a blank request tab, sets URL and method, sends a request
-with a **shared** HTTP canned 200 (PYPOST-859), and settles with
-`wait_for_text` on `RESPONSE_STATUS` / `RESPONSE_BODY` (display-form body;
-PYPOST-920).
+with a **shared** HTTP canned 200 (PYPOST-859), and settles through the shared
+`wait_response_after_send` helper (PYPOST-970). The helper observes
+`RESPONSE_STATUS` first and `RESPONSE_BODY` second using display-form body text.
 
 The golden scenario **is** a documented pytest
 (`tests/test_agent_golden_e2e.py`) that imports the same `pypost.agent` APIs
@@ -27,7 +27,7 @@ this Send → response golden. Full pattern (timer-before-`exec`,
 `activeModalWidget`, diagnostics):
 [agent_dialog_settle.md](agent_dialog_settle.md).
 
-Golden asserts status + body via identity-scoped text waits. For the
+Golden asserts status + body through shared identity-scoped text waits. For the
 PYPOST-887 **exactly-once** cardinality lock (PUT + malformed body), see
 [agent_e2e_double_response_body.md](agent_e2e_double_response_body.md) — do
 not overload this module.
@@ -40,7 +40,7 @@ not overload this module.
 | `AgentAppSession` / `agent_e2e_session` | Launch → ready → shutdown (858) |
 | `pypost.ui.widget_ids` | Stable control ids (PYPOST-834) |
 | `ui_fill` / `ui_select` / `ui_click` | Drive URL / method / Send (PYPOST-836) |
-| `wait_for_text` | Settle after Send on status/body ids (PYPOST-920) |
+| `wait_response_after_send` | Shared status-before-body settle (PYPOST-970) |
 | Panel excerpt | Timeout diagnostics from `RESPONSE_PANEL` (PYPOST-835/869) |
 | `stub_agent_e2e_http(CANNED_GOLDEN_OK)` | Deterministic OK (PYPOST-859) |
 
@@ -49,8 +49,10 @@ flowchart LR
   Session[agent_e2e_session] --> Fill[ui_fill / ui_select]
   Fill --> Mock[stub_agent_e2e_http]
   Mock --> Send[ui_click SEND]
-  Send --> Wait[wait_for_text status/body]
-  Wait --> Assert[canned status]
+  Send --> Wait[wait_response_after_send]
+  Wait --> Status[wait_for_text status]
+  Status --> Body[wait_for_text body]
+  Body --> Assert[canned status]
 ```
 
 Composition at a glance:
@@ -62,17 +64,19 @@ Composition at a glance:
 | | `RESPONSE_STATUS`, `RESPONSE_BODY` |
 | | (`PLUS_TAB_BUTTON` for no-blank create) |
 | Actions | `session.ui_fill` / `ui_select` / `ui_click` |
-| Wait | `wait_for_text` on status then body after Send |
-| | (current-tab root after plus-tab create) |
+| Wait | `wait_response_after_send` on status then body after Send |
+| | (`in_current_tab=True` for both Golden success flows) |
 | Snapshot | Failure excerpt only (`response_panel_excerpt`) |
 | HTTP | `stub_agent_e2e_http(CANNED_GOLDEN_OK)` |
 
 Fresh agent sessions restore one blank request tab — the primary golden
 scenario needs no plus-tab click. Status and body surfaces under
 `ResponseView` have dedicated ids (`RESPONSE_STATUS`, `RESPONSE_BODY`;
-PYPOST-920). Golden settles with `wait_for_text` on those widgets
+PYPOST-920). Golden settles with the shared helper on those widgets
 (display-form body text), not a sanitize-coupled `wait_for_snapshot`
-predicate. Sibling Send scenarios may still walk the panel snapshot — see
+predicate. The helper is current-tab scoped for Golden so stale or orphaned
+per-tab role ids cannot satisfy either wait. Sibling Send scenarios may still
+walk the panel snapshot — see
 [response-panel helpers](agent_e2e_response_panel.md).
 
 **Plus-tab create (PYPOST-921):** when restore does not leave a blank request
@@ -80,7 +84,7 @@ tab, agents click `PLUS_TAB_BUTTON` (`pypost_plus_tab_button`, the embedded
 `+` on the trailing plus chrome — not `PLUS_TAB_PLACEHOLDER`). Covered by
 `test_agent_golden_plus_tab_create_when_no_blank_tab`: strip request tabs
 without presenter close, then `ui_click(PLUS_TAB_BUTTON)`, then the same fill /
-Send / status+body settle. The strip step must follow the
+Send / shared status+body settle. The strip step must follow the
 [removeTab orphan hazard](#tab-strip-hazards-removetab-orphans) pattern; prefer
 current-tab roots for fill/click/wait after create (shared role ids across tabs).
 
@@ -168,15 +172,25 @@ Golden-only narrow via `PYTEST_ARGS` under the project offscreen GUI env
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_golden_e2e.py -v"
 ```
 
+Focused helper-adoption and timeout-diagnostic checks with explicit test
+budgets:
+
+```bash
+make test-agent-e2e \
+  PYTEST_ARGS="tests/test_agent_e2e_response_panel.py::test_golden_success_send_uses_shared_settle_helper --timeout=10 -q"
+make test-agent-e2e \
+  PYTEST_ARGS="tests/test_agent_golden_e2e.py::test_agent_golden_settle_timeout_includes_step_and_excerpt --timeout=60 -q"
+```
+
 Or as part of the fast suite:
 
 ```bash
 make test
 ```
 
-Module timeout is 60s (`pytest.mark.timeout(60)`). Send settle uses a 15s
-`wait_for_text` budget per status/body wait; lifecycle ready uses
-`ready_timeout=30.0`.
+Module timeout is 60s (`pytest.mark.timeout(60)`). Send settle inherits the
+shared 15s `SEND_SETTLE_TIMEOUT_S` default per status/body wait; lifecycle
+ready uses `ready_timeout=30.0`.
 
 ### Scenario steps
 
@@ -186,11 +200,11 @@ Primary (blank restore):
 2. Pre-flight: `find_widget` for `URL_INPUT`, `METHOD_COMBO`, `SEND_BUTTON`.
 3. `ui_fill(URL_INPUT, GOLDEN_URL)` and `ui_select(METHOD_COMBO, GOLDEN_METHOD)`.
 4. `with stub_agent_e2e_http(CANNED_GOLDEN_OK):` then `ui_click(SEND_BUTTON)`.
-5. `wait_for_text(RESPONSE_STATUS, FIXTURE_STATUS_LABEL)`.
-6. `wait_for_text(RESPONSE_BODY, FIXTURE_BODY_DISPLAY)` (pretty-printed JSON).
-7. On wait timeout, force a text-wait miss on `RESPONSE_STATUS` (companion test)
-   or rewrap happy-path `wait_for_text` failures with `response_excerpt` from
-   the panel snapshot.
+5. Call `wait_response_after_send(..., in_current_tab=True)`, which waits for
+   `FIXTURE_STATUS_LABEL` first and `FIXTURE_BODY_DISPLAY` second.
+6. On a successful-path timeout, the helper preserves the underlying wait
+   evidence and re-raises with prefix `golden Send settle failed`, step
+   `wait_response_after_send`, and a response-panel excerpt.
 
 Plus-tab create when no blank tab (PYPOST-921):
 
@@ -198,8 +212,8 @@ Plus-tab create when no blank tab (PYPOST-921):
    [safe strip pattern](#tab-strip-hazards-removetab-orphans) so only the plus
    placeholder remains.
 2. `ui_click(PLUS_TAB_BUTTON)` — creates a blank request tab via plus chrome.
-3. Continue with fill / Send / status+body settle as above (current-tab
-   scoped actions and `wait_for_text` root).
+3. Continue with fill / Send / status+body settle as above; all successful
+   fill, Send, and wait actions remain current-tab scoped.
 
 ### Public APIs consumed (do not redefine)
 
@@ -211,30 +225,35 @@ from pypost.fixtures.agent_e2e_http import (
 )
 from pypost.ui.widget_ids import (
     METHOD_COMBO,
-    RESPONSE_BODY,
-    RESPONSE_STATUS,
     SEND_BUTTON,
     URL_INPUT,
 )
+from tests.helpers.agent_e2e_send_settle import wait_response_after_send
 
 # via fixture agent_e2e_session:
-session.ui_fill(URL_INPUT, FIXTURE_URL)
-session.ui_select(METHOD_COMBO, FIXTURE_METHOD)
+session.ui_fill(URL_INPUT, FIXTURE_URL, in_current_tab=True)
+session.ui_select(METHOD_COMBO, FIXTURE_METHOD, in_current_tab=True)
 with stub_agent_e2e_http(CANNED_GOLDEN_OK):
-    session.ui_click(SEND_BUTTON)
-    session.wait_for_text(RESPONSE_STATUS, FIXTURE_STATUS_LABEL, timeout=15.0)
-    session.wait_for_text(RESPONSE_BODY, FIXTURE_BODY_DISPLAY, timeout=15.0)
+    session.ui_click(SEND_BUTTON, in_current_tab=True)
+    wait_response_after_send(
+        session,
+        status_label=FIXTURE_STATUS_LABEL,
+        body_text=FIXTURE_BODY_DISPLAY,
+        step="wait_response_after_send",
+        message_prefix="golden Send settle failed",
+        in_current_tab=True,
+    )
 ```
 
 Expected status/body tokens are **test-local** in
-`tests/test_agent_golden_e2e.py`. Timeout diagnostics use the same
-text-wait miss path as Send settle (`wait_for_text` on `RESPONSE_STATUS` with
-an impossible label and short budget), then wrap with
-`response_panel_excerpt` from shared
+`tests/test_agent_golden_e2e.py`. Successful paths use the shared settle helper.
+The PYPOST-950 forced-timeout companion intentionally remains separate: it
+calls `wait_for_text` on `RESPONSE_STATUS` with an impossible label and 50 ms
+budget, then wraps the miss with `response_panel_excerpt` from shared
 [response-panel helpers](agent_e2e_response_panel.md)
-(`tests/helpers/agent_e2e_response_panel.py`) — not a production agent API.
-Sibling locks/matrix/env scenarios settle via
-[send settle helper](agent_e2e_send_settle.md) (PYPOST-948).
+(`tests/helpers/agent_e2e_response_panel.py`). That companion directly proves
+the preserved step, excerpt, and inner wait evidence and is not an alternative
+successful settle implementation. Neither helper is a production agent API.
 
 ## Configuration
 
@@ -277,7 +296,7 @@ panel joins may still use compact snapshot tokens — see
 | --- | --- | --- |
 | Module pytest timeout | 60s | `pytestmark` |
 | Lifecycle ready | 30s | `AgentAppSession(ready_timeout=…)` |
-| Send settle | 15s | `wait_for_text(timeout=…)` per status/body |
+| Send settle | 15s | Shared `SEND_SETTLE_TIMEOUT_S` per status/body |
 
 Offscreen is set by `make test-agent-e2e` / `make test` and by
 `AgentAppSession(offscreen=True)`.
@@ -287,8 +306,13 @@ Offscreen is set by `make test-agent-e2e` / `make test` and by
 | Failure | What you see / what to do |
 | --- | --- |
 | Wait timeout after Send | `UiWaitTimeoutError` with |
-| | `step=wait_response_after_send` and a short `response_excerpt`. |
+| | prefix `golden Send settle failed`, `step=wait_response_after_send`, |
+| | the inner wait evidence, and a short `response_excerpt`. |
 | | Grep `agent_e2e_http_stub_installed`; confirm shared stub wraps click. |
+| Helper waits on wrong tab | Keep `in_current_tab=True`; inspect direct tab |
+| | removal for orphan widgets before changing the helper default. |
+| Forced-timeout companion stops failing | Keep its impossible status and |
+| | 50 ms budget; it intentionally does not call the success helper. |
 | Wrong status/body | Timeout / diagnostics include `response_excerpt`. Match |
 | | display-form body (`indent=2`), not compact snapshot JSON. |
 | Missing control | `UiTargetNotFoundError` / interactable errors from actions. |

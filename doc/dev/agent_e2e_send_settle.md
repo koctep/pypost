@@ -1,14 +1,14 @@
-# Agent E2E Send Settle Helpers (PYPOST-948)
+# Agent E2E Send Settle Helpers (PYPOST-948/970)
 
 ## Overview
 
-Shared helpers for **Send → response readiness** in sibling agent UI e2e
-scenarios. After Click Send, tests wait for status and body text on catalog
-widget ids (`RESPONSE_STATUS` / `RESPONSE_BODY`) instead of polling a
-sanitize-coupled panel snapshot predicate.
+Shared helpers for **Send → response readiness** in agent UI e2e scenarios.
+After Click Send, tests wait for status and then body text on catalog widget ids
+(`RESPONSE_STATUS` / `RESPONSE_BODY`) instead of polling a sanitize-coupled
+panel snapshot predicate.
 
-Golden e2e (PYPOST-920) still uses inline tab-scoped `wait_for_text`; sibling
-modules import this helper for DRY timeout diagnostics. Post-settle cardinality
+Golden successful Send flows use `wait_response_after_send` with current-tab
+scoping (PYPOST-970), as do applicable sibling modules. Post-settle cardinality
 asserts still walk `RESPONSE_PANEL` via
 [response-panel helpers](agent_e2e_response_panel.md).
 
@@ -18,14 +18,14 @@ asserts still walk `RESPONSE_PANEL` via
 | --- | --- |
 | `tests/helpers/agent_e2e_send_settle.py` | `wait_response_after_send`, `wait_response_after_snapshot`, `json_response_body_display` |
 | `tests/test_agent_e2e_response_panel.py` | Convention locks for Send settle modules |
-| Sibling Send modules | Call text-wait or snapshot helper after `ui_click(SEND_BUTTON)` |
+| Golden and sibling Send modules | Call a settle helper after `ui_click(SEND_BUTTON)` |
 
 ```mermaid
 flowchart LR
   Send[ui_click SEND_BUTTON] --> Text[wait_response_after_send]
   Send --> Snap[wait_response_after_snapshot]
   Text --> Status[wait_for_text RESPONSE_STATUS]
-  Text --> Body[wait_for_text RESPONSE_BODY]
+  Status --> Body[wait_for_text RESPONSE_BODY]
   Snap --> Snapshot[wait_for_snapshot ready predicate]
   Text --> Diag[response_panel_excerpt on timeout]
   Snap --> Diag
@@ -40,6 +40,11 @@ Identity-text modules guarded by
 - `test_agent_e2e_http_env.py`
 - `test_agent_e2e_http_seed_post.py` (added to the inventory by PYPOST-969;
   tree-open Send uses `in_current_tab=True` on the helper).
+
+Golden uses the same identity-text helper for both successful journeys and is
+guarded separately by `test_golden_success_send_uses_shared_settle_helper`.
+The guard scopes its AST check to `_golden_fill_send_and_settle`, so the
+PYPOST-950 intentional failure-path companion does not count as adoption.
 
 Snapshot Send settle (mapping multi-URL, PYPOST-956):
 
@@ -91,10 +96,10 @@ snapshot tokens may still differ for post-settle joins.
 
 ### `wait_response_after_send(session, *, status_label, body_text, step, …)`
 
-Wait for status label then body text on catalog ids via
-`session.wait_for_text(..., in_current_tab=…)`. Defaults to window root;
-pass `in_current_tab=True` when the active request tab differs from
-window-first match (seed POST tree-open path).
+Wait for the status label first and the body text second on catalog ids via
+`session.wait_for_text(..., in_current_tab=…)`. Defaults to window root. Pass
+`in_current_tab=True` for multi-tab flows and after direct tab manipulation so
+an orphan or another request tab cannot satisfy the wait.
 
 On `UiWaitTimeoutError`, re-raises with `step`, `response_excerpt`, and merged
 diagnostics (same contract as golden timeout wrapping).
@@ -105,6 +110,29 @@ diagnostics (same contract as golden timeout wrapping).
 | `message_prefix` | `"Send settle failed"` | Prepended to timeout message |
 | `diagnostics_extra` | `None` | Merged into raised diagnostics |
 | `in_current_tab` | `False` | Passed to `session.wait_for_text` (PYPOST-949) |
+
+Golden binds the shared helper as follows:
+
+```python
+wait_response_after_send(
+    session,
+    status_label=FIXTURE_STATUS_LABEL,
+    body_text=FIXTURE_BODY_DISPLAY,
+    step="wait_response_after_send",
+    message_prefix="golden Send settle failed",
+    in_current_tab=True,
+)
+```
+
+It deliberately omits `timeout`, retaining the shared
+`SEND_SETTLE_TIMEOUT_S` default (15 seconds). A timeout keeps the original
+condition, timeout, diagnostics, and exception chain, and adds the Golden
+prefix, `step`, and bounded `response_excerpt`.
+
+The PYPOST-950 Golden forced-timeout companion remains an inline
+`wait_for_text` miss with a 50 ms budget. It proves the failure wrapper and is
+not a successful Send-settle consumer; do not migrate it merely to satisfy the
+success-path convention.
 
 Streaming scenarios (double-body, presentation matrix) may still sleep ~100 ms
 after settle so a late chunk flush does not affect post-settle counts.
@@ -163,10 +191,15 @@ None beyond shared agent e2e timeouts. Import paths:
 ## Running the convention lock
 
 ```bash
+make test-agent-e2e \
+  PYTEST_ARGS="tests/test_agent_e2e_response_panel.py::test_golden_success_send_uses_shared_settle_helper --timeout=10 -q"
+make test-agent-e2e \
+  PYTEST_ARGS="tests/test_agent_golden_e2e.py::test_agent_golden_settle_timeout_includes_step_and_excerpt --timeout=60 -q"
 make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -k identity_scoped -v"
 make test \
   PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -k 'seed_post and identity_scoped' -q"
 make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -k snapshot_send_settle -v"
+make test-agent-e2e
 ```
 
 ## Troubleshooting
@@ -177,6 +210,8 @@ make test PYTEST_ARGS="tests/test_agent_e2e_response_panel.py -k snapshot_send_s
 | Body wait timeout, status ok | Expected body must be **display form** (`json_response_body_display`), not compact snapshot JSON |
 | Wrong tab matched | Multi-tab Send: pass `in_current_tab=True` on helper or `session.wait_for_text` |
 | Timeout lacks `step` / excerpt | Call via `wait_response_after_send` or `wait_response_after_snapshot`, not bare waits, when diagnostics matter |
+| Golden timeout prefix changed | Pass `message_prefix="golden Send settle failed"` and `step="wait_response_after_send"` |
+| Golden timeout test no longer forces a miss | Keep the PYPOST-950 companion inline with impossible status and 50 ms budget |
 | Snapshot settle convention lock fails | Remove local `_wait_response`; import `wait_response_after_snapshot` |
 | Mapping message missing `(step)` | Snapshot helper embeds step in message; text-wait helper does not |
 | Post-settle count wrong | Settle helper does not replace panel walk asserts; confirm chunk-flush delay if streaming stub |

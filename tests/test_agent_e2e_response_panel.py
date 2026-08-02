@@ -114,6 +114,43 @@ def _uses_wait_response_after_snapshot(source: str) -> bool:
     return bool(_WAIT_RESPONSE_AFTER_SNAPSHOT.search(source))
 
 
+def test_golden_success_send_uses_shared_settle_helper() -> None:
+    """PYPOST-970: Golden success settle imports and calls the shared helper."""
+    path = _TESTS_DIR / "test_agent_golden_e2e.py"
+    tree = ast.parse(_module_source(path), filename=str(path))
+
+    helper_imported = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "tests.helpers.agent_e2e_send_settle"
+        and any(
+            alias.name == "wait_response_after_send" for alias in node.names
+        )
+        for node in tree.body
+    )
+    success_helper = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+            and node.name == "_golden_fill_send_and_settle"
+        ),
+        None,
+    )
+    assert success_helper is not None, "missing _golden_fill_send_and_settle"
+    helper_called = any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "wait_response_after_send"
+        for node in ast.walk(success_helper)
+    )
+
+    assert helper_imported and helper_called, (
+        "Golden successful Send settle must import and call "
+        "tests.helpers.agent_e2e_send_settle.wait_response_after_send; "
+        f"imported={helper_imported}, called_in_success_helper={helper_called}"
+    )
+
+
 def test_shared_response_panel_helpers_api_and_behavior() -> None:
     """FR1/FR3/FR4: import shared helpers; walk / subtree / excerpt / join."""
     from tests.helpers.agent_e2e_response_panel import (

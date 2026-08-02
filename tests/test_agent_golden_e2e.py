@@ -26,13 +26,12 @@ from pypost.ui.widget_ids import (
     METHOD_COMBO,
     PLUS_TAB_BUTTON,
     REQUEST_TABS,
-    RESPONSE_BODY,
     RESPONSE_STATUS,
     SEND_BUTTON,
     URL_INPUT,
 )
-from tests.helpers.agent_e2e_send import SEND_SETTLE_TIMEOUT_S
 from tests.helpers.agent_e2e_response_panel import response_panel_excerpt
+from tests.helpers.agent_e2e_send_settle import wait_response_after_send
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -85,33 +84,14 @@ def _golden_fill_send_and_settle(session: AgentAppSession) -> None:
 
     with stub_agent_e2e_http(CANNED_GOLDEN_OK):
         session.ui_click(SEND_BUTTON, in_current_tab=True)
-        try:
-            wait_for_text(
-                tab,
-                RESPONSE_STATUS,
-                FIXTURE_STATUS_LABEL,
-                timeout=SEND_SETTLE_TIMEOUT_S,
-            )
-            wait_for_text(
-                tab,
-                RESPONSE_BODY,
-                FIXTURE_BODY_DISPLAY,
-                timeout=SEND_SETTLE_TIMEOUT_S,
-            )
-        except UiWaitTimeoutError as exc:
-            last = session.ui_snapshot()
-            excerpt = response_panel_excerpt(last)
-            raise UiWaitTimeoutError(
-                f"golden Send settle failed: {exc}; "
-                f"response_excerpt={excerpt!r}",
-                timeout_s=exc.timeout_s,
-                condition=exc.condition,
-                diagnostics={
-                    **exc.diagnostics,
-                    "step": "wait_response_after_send",
-                    "response_excerpt": excerpt,
-                },
-            ) from exc
+        wait_response_after_send(
+            session,
+            status_label=FIXTURE_STATUS_LABEL,
+            body_text=FIXTURE_BODY_DISPLAY,
+            step="wait_response_after_send",
+            message_prefix="golden Send settle failed",
+            in_current_tab=True,
+        )
 
     assert CANNED_GOLDEN_OK.response.status_code == FIXTURE_STATUS
 
