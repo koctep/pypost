@@ -18,6 +18,11 @@ For step-by-step import UI details, see the User Guide:
   transitions, worklog, fields, comments, assign, epic/parent link, boards,
   sprints (list/create/update/delete/membership), backlog, and
   assignable-user search.
+- [`collections/jira_mcp_critical_rest_paths.json`](collections/jira_mcp_critical_rest_paths.json)
+  — **Contributors.** Locked critical REST path catalog for offline freshness
+  checks (`make check-jira-mcp-path-freshness`; see
+  [doc/dev/jira_mcp_path_freshness.md](../doc/dev/jira_mcp_path_freshness.md)).
+  Not an importable collection.
 - [`environments/jira_cloud.json`](environments/jira_cloud.json) — **End users.**
   Companion environment: `jira_base_url`, visible `jira_project_key`, hidden `jira_credentials`.
   Its retained `enable_mcp: true` field is legacy migration input.

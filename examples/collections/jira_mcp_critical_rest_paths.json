@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "description": "Locked critical REST path markers for examples/collections/jira_mcp.json (PYPOST-1030). CI compares the collection to this catalog offline; refresh after reviewing Atlassian docs — no live credentials.",
+  "reviewed_on": "2026-08-03",
+  "doc_refs": [
+    "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/",
+    "https://confluence.atlassian.com/jirakb/run-jql-search-query-using-jira-cloud-rest-api-1289424308.html",
+    "https://developer.atlassian.com/cloud/jira/software/rest/api-group-sprint/",
+    "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/"
+  ],
+  "critical_paths": [
+    {
+      "id": "jira-search-issues-jql",
+      "capability": "enhanced_jql_search",
+      "method": "POST",
+      "url_contains": ["/rest/api/3/search/jql"],
+      "notes": "Legacy /rest/api/3/search is removed on Jira Cloud; use /search/jql."
+    },
+    {
+      "id": "jira-create-sprint",
+      "capability": "sprint_create",
+      "method": "POST",
+      "url_contains": ["/rest/agile/1.0/sprint"],
+      "url_excludes": ["/sprint/"],
+      "notes": "POST create uses /sprint without a path id segment."
+    },
+    {
+      "id": "jira-add-issues-to-sprint",
+      "capability": "sprint_membership_add",
+      "method": "POST",
+      "url_contains": ["/rest/agile/1.0/sprint/", "/issue"],
+      "notes": "Membership add is POST .../sprint/{sprintId}/issue."
+    },
+    {
+      "id": "jira-link-issue-parent",
+      "capability": "parent_epic_link",
+      "method": "PUT",
+      "url_contains": ["/rest/api/3/issue/"],
+      "mcp_param": "parent_payload",
+      "notes": "Prefer fields.parent over deprecated Epic Link custom field."
+    },
+    {
+      "id": "jira-assign-issue",
+      "capability": "assignee",
+      "method": "PUT",
+      "url_contains": ["/assignee"],
+      "notes": "Dedicated assignee endpoint vs generic issue update."
+    }
+  ]
+}

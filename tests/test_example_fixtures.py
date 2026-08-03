@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -20,6 +22,9 @@ pytestmark = pytest.mark.timeout(30)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 JIRA_COLLECTION_PATH = REPO_ROOT / "examples" / "collections" / "jira_mcp.json"
+JIRA_CRITICAL_REST_PATHS_CATALOG = (
+    REPO_ROOT / "examples" / "collections" / "jira_mcp_critical_rest_paths.json"
+)
 JIRA_ENV_PATH = REPO_ROOT / "examples" / "environments" / "jira_cloud.json"
 MCP_PROBE_PATH = REPO_ROOT / "examples" / "collections" / "mcp.json"
 
@@ -208,6 +213,79 @@ def test_jira_mcp_collection_covers_protected_stretch_operations(
         method=method,
         url_contains=url_contains,
     ), f"Jira MCP request {request_id} must remain {operation}"
+
+
+def _load_jira_mcp_critical_rest_paths_catalog() -> dict[str, Any]:
+    """PYPOST-1030: locked offline catalog of critical REST path markers."""
+    assert JIRA_CRITICAL_REST_PATHS_CATALOG.is_file(), (
+        "Missing critical REST path catalog: "
+        f"{JIRA_CRITICAL_REST_PATHS_CATALOG.relative_to(REPO_ROOT)}. "
+        "Add examples/collections/jira_mcp_critical_rest_paths.json after "
+        "reviewing Atlassian REST docs (no live credentials required)."
+    )
+    payload = json.loads(
+        JIRA_CRITICAL_REST_PATHS_CATALOG.read_text(encoding="utf-8")
+    )
+    assert isinstance(payload, dict)
+    entries = payload.get("critical_paths")
+    assert isinstance(entries, list) and entries, (
+        "critical_paths must be a non-empty list in "
+        f"{JIRA_CRITICAL_REST_PATHS_CATALOG.name}"
+    )
+    return payload
+
+
+def assert_jira_mcp_critical_rest_paths_match_catalog(
+    collection: Collection, catalog: dict[str, Any]
+) -> None:
+    """Fail when curated collection drifts from the locked critical catalog."""
+    requests_by_id = {request.id: request for request in collection.requests}
+    for entry in catalog["critical_paths"]:
+        request_id = entry["id"]
+        method = entry["method"]
+        url_contains = tuple(entry["url_contains"])
+        assert request_id in requests_by_id, (
+            f"jira_mcp.json missing critical request id {request_id}"
+        )
+        request = requests_by_id[request_id]
+        assert request.method.upper() == method.upper(), (
+            f"{request_id} method drifted: expected {method}, got {request.method}"
+        )
+        for fragment in url_contains:
+            assert fragment in request.url, (
+                f"{request_id} URL missing locked fragment {fragment!r}: "
+                f"{request.url}"
+            )
+        for fragment in entry.get("url_excludes", []):
+            assert fragment not in request.url, (
+                f"{request_id} URL unexpectedly contains {fragment!r}: "
+                f"{request.url}"
+            )
+        mcp_param = entry.get("mcp_param")
+        if mcp_param:
+            assert mcp_param in request.mcp_params, (
+                f"{request_id} missing locked mcp_params key {mcp_param!r}"
+            )
+
+
+def test_jira_mcp_critical_rest_paths_match_locked_catalog():
+    """PYPOST-1030: critical paths stay aligned with the offline catalog."""
+    catalog = _load_jira_mcp_critical_rest_paths_catalog()
+    collection = _load_jira_mcp_collection()
+    assert_jira_mcp_critical_rest_paths_match_catalog(collection, catalog)
+
+    locked_ids = {entry["id"] for entry in catalog["critical_paths"]}
+    required = {
+        "jira-search-issues-jql",
+        "jira-create-sprint",
+        "jira-add-issues-to-sprint",
+        "jira-link-issue-parent",
+        "jira-assign-issue",
+    }
+    missing = sorted(required - locked_ids)
+    assert not missing, (
+        "critical REST path catalog must lock: " + ", ".join(missing)
+    )
 
 
 def test_jira_mcp_numeric_identifier_paths_accept_decimal_strings_and_integers():

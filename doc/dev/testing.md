@@ -16,6 +16,7 @@ make test-cov        # with coverage report
 make test-slow       # network-heavy Makefile smoke
 make test-agent-e2e  # broader agent e2e beyond golden (primary packaging)
 make test-jira-mcp-live  # protected, explicit opt-in Jira MCP smoke (maintainers only)
+make check-jira-mcp-path-freshness  # offline jira_mcp critical REST paths vs catalog
 ```
 
 `make test-agent-e2e` is the **primary packaging** path for the **broader**
@@ -441,11 +442,13 @@ is documented in
 | Artifact | Role |
 | -------- | ---- |
 | `examples/collections/jira_mcp.json` | Curated Jira Cloud MCP collection |
+| `examples/collections/jira_mcp_critical_rest_paths.json` | Locked critical REST path catalog (PYPOST-1030) |
 | `examples/environments/jira_cloud.json` | Companion env (placeholders, MCP) |
 | `examples/collections/mcp.json` | Local MCP/SSE probe (PYPOST-180) |
 | `examples/README.md` | Import order, secrets, coverage map |
 | `tests/test_example_fixtures.py` | Offline import + coverage contracts |
 | `FIXED_INPUT_JIRA_MCP_REQUEST_IDS` | Sole escape hatch for empty `mcp_params` |
+| `make check-jira-mcp-path-freshness` | Offline critical-path ↔ catalog gate |
 
 Keep roles distinct: Jira pair for end users / agent demos; `mcp.json` for
 contributors / local probing.
@@ -622,6 +625,11 @@ make test PYTEST_ARGS='tests/test_example_fixtures.py -v'
 - `test_jira_mcp_list_boards_leaves_fixed_input_allowlist` — empty
   `mcp_params` freeze is current-user only after list-boards pagination
   (PYPOST-1029).
+- `test_jira_mcp_critical_rest_paths_match_locked_catalog` — collection
+  matches `jira_mcp_critical_rest_paths.json` for `/search/jql`, sprint
+  create/membership, parent epic link, and assignee (PYPOST-1030).
+  Maintainer ritual: `make check-jira-mcp-path-freshness` and
+  [Jira MCP path freshness](jira_mcp_path_freshness.md).
 - Matching `*_rejects_*` mutation tests pin diagnostics for each checker.
 
 Module timeout: `pytestmark = pytest.mark.timeout(30)`.

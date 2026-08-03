@@ -1,4 +1,4 @@
-.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run run-agent-ui-mcp clean test test-slow test-jira-mcp-live test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures generate-license-inventory check-license-inventory
+.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run run-agent-ui-mcp clean test test-slow test-jira-mcp-live check-jira-mcp-path-freshness test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures generate-license-inventory check-license-inventory
 
 .DEFAULT_GOAL := help
 
@@ -108,6 +108,10 @@ test-slow: $(VENV_MARKER) venv-test venv-otel ## Run slow integration tests only
 
 test-jira-mcp-live: $(VENV_MARKER) venv-test venv-otel ## Run the explicitly opted-in read-only Jira MCP smoke
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/test_jira_mcp_live_smoke.py -m live_jira
+
+check-jira-mcp-path-freshness: $(VENV_MARKER) venv-test venv-otel ## Offline jira_mcp critical REST paths vs locked catalog (PYPOST-1030)
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
+		tests/test_example_fixtures.py::test_jira_mcp_critical_rest_paths_match_locked_catalog -q
 
 test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage report
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
