@@ -92,8 +92,13 @@ Run the fixture contract without Jira credentials, a running MCP listener, or
 network access:
 
 ```bash
-.venv/bin/python -m pytest tests/test_example_fixtures.py -v
+make test PYTEST_ARGS='tests/test_example_fixtures.py -v'
 ```
+
+That module also locks companion-env coverage, Basic auth convention,
+`mcp.request.*` ↔ `mcp_params`, and the fixed-input allowlist (PYPOST-1028).
+See
+[Env / auth / MCP params contracts](testing.md#env--auth--mcp-params-contracts-pypost-1028).
 
 | Symptom | Check |
 | --- | --- |
@@ -103,3 +108,4 @@ network access:
 | Project key is hidden or importer tests fail | Keep only `jira_credentials` in `hidden_keys` and use the obvious placeholder in the committed fixture. |
 | Cross-project work is rejected or allowed unexpectedly | Diagnose Jira Cloud permissions and the target project; this example default does not grant or revoke access. |
 | A board or sprint call rejects its identifier | Supply `42` or `"42"`; do not supply a boolean, float, whitespace-padded value, exponent notation, or a nonnumeric string. |
+| Env/auth/`mcp_params` fail | Fix companion key, auth, or `mcp_params`; empty only on allowlist. |

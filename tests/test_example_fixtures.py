@@ -1,16 +1,20 @@
-"""Contract tests for shipped examples/ fixtures (PYPOST-1017 / 1026 / 1047)."""
+"""Contract tests for shipped examples/ fixtures (PYPOST-1017 / 1026 / 1047 / 1028)."""
 
 from __future__ import annotations
 
+import re
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
 
 from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.environment_import import load_import_candidates
+from pypost.core.mcp_secrets_policy import McpSecretsPolicy
 from pypost.core.mcp_tool_contract import normalize_mcp_tool_name
 from pypost.core.storage import StorageManager
-from pypost.models.models import Collection, RequestData
+from pypost.core.template_service import TemplateService
+from pypost.models.models import Collection, Environment, RequestData
 
 pytestmark = pytest.mark.timeout(30)
 
@@ -72,6 +76,20 @@ def _load_jira_mcp_collection() -> Collection:
     collection = collections[0]
     assert collection.id == "jira-cloud-mcp"
     return collection
+
+
+def _load_jira_cloud_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Environment:
+    storage = _make_storage(tmp_path, monkeypatch)
+    environments, parse_errors = load_import_candidates(JIRA_ENV_PATH, storage)
+    assert parse_errors == []
+    assert len(environments) == 1
+    return environments[0]
+
+
+def _request_by_id(collection: Collection, request_id: str) -> RequestData:
+    return next(request for request in collection.requests if request.id == request_id)
 
 
 def _has_request(
@@ -217,12 +235,7 @@ def test_jira_mcp_numeric_identifier_paths_accept_decimal_strings_and_integers()
 
 
 def test_jira_cloud_environment_imports_with_placeholders(tmp_path, monkeypatch):
-    storage = _make_storage(tmp_path, monkeypatch)
-    environments, parse_errors = load_import_candidates(JIRA_ENV_PATH, storage)
-
-    assert parse_errors == []
-    assert len(environments) == 1
-    environment = environments[0]
+    environment = _load_jira_cloud_environment(tmp_path, monkeypatch)
     assert environment.id == "jira-cloud-mcp-environment"
     assert environment.name == "Jira Cloud MCP"
     assert environment.variables["jira_base_url"] == PLACEHOLDER_BASE_URL
@@ -233,12 +246,7 @@ def test_jira_cloud_environment_imports_with_placeholders(tmp_path, monkeypatch)
 
 def test_jira_project_default_is_wired_as_soft_guidance(tmp_path, monkeypatch):
     """PYPOST-1032: Jira examples guide normal work without enforcing scope."""
-    storage = _make_storage(tmp_path, monkeypatch)
-    environments, parse_errors = load_import_candidates(JIRA_ENV_PATH, storage)
-
-    assert parse_errors == []
-    assert len(environments) == 1
-    environment = environments[0]
+    environment = _load_jira_cloud_environment(tmp_path, monkeypatch)
     assert environment.variables["jira_project_key"] == "YOUR_PROJECT_KEY"
     assert "jira_project_key" not in environment.hidden_keys
     assert environment.hidden_keys == {"jira_credentials"}
@@ -292,3 +300,224 @@ def test_mcp_probe_collection_still_imports():
     assert collections[0].id == "test-collection-mcp"
     assert collections[0].name == "MCP"
     assert len(collections[0].requests) == 3
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1028: Jira MCP fixture contracts (env / auth / mcp_params / allowlist)
+#
+# Shared checkers + fixed-input allowlist (Option A: test-module only).
+# ---------------------------------------------------------------------------
+
+_JIRA_MCP_AUTH_HEADER = "Basic {{ base64(jira_credentials) }}"
+_NON_ALLOWLISTED_JIRA_MCP_REQUEST_ID = "jira-get-issue"
+
+# Sole escape hatch for empty mcp_params (PYPOST-1029 may drop jira-list-boards).
+FIXED_INPUT_JIRA_MCP_REQUEST_IDS = frozenset(
+    {
+        "jira-get-current-user",
+        "jira-list-boards",
+    }
+)
+
+# Broader than McpSecretsPolicy: also matches to_int(mcp.request.*), etc.
+_MCP_REQUEST_NAME_PATTERN = re.compile(r"mcp\.request\.([a-zA-Z0-9_]+)")
+
+
+def _jira_mcp_template_fields(request: RequestData) -> list[str]:
+    fields: list[str] = [request.url, request.body]
+    fields.extend(request.headers.values())
+    fields.extend(request.params.values())
+    return [field for field in fields if field]
+
+
+def _extract_mcp_request_names(request: RequestData) -> set[str]:
+    found: set[str] = set()
+    for content in _jira_mcp_template_fields(request):
+        found.update(_MCP_REQUEST_NAME_PATTERN.findall(content))
+    return found
+
+
+def _is_agent_driven_query_or_body(request: RequestData) -> bool:
+    texts: list[str] = [request.body, *request.params.values()]
+    return any("mcp.request." in text for text in texts if text)
+
+
+def assert_jira_mcp_companion_env_coverage(
+    collection: Collection, environment: Environment
+) -> None:
+    """Referenced env template names must be ⊆ companion environment.variables."""
+    template_service = TemplateService()
+    referenced: set[str] = set()
+    for request in collection.requests:
+        referenced.update(
+            McpSecretsPolicy.extract_environment_variable_names(
+                request, template_service
+            )
+        )
+    missing = referenced - set(environment.variables)
+    assert not missing, f"Missing companion key(s): {sorted(missing)}"
+
+
+def assert_jira_mcp_auth_convention(requests: Sequence[RequestData]) -> None:
+    """Every request must use Basic {{ base64(jira_credentials) }}."""
+    for request in requests:
+        auth = request.headers.get("Authorization", "")
+        assert auth == _JIRA_MCP_AUTH_HEADER, (
+            f"Request {request.id} auth convention breach "
+            f"(expected Basic base64(jira_credentials))"
+        )
+
+
+def assert_jira_mcp_params_declared(request: RequestData) -> None:
+    """Every mcp.request.<name> (incl. wrappers) must be in mcp_params."""
+    missing = sorted(
+        name
+        for name in _extract_mcp_request_names(request)
+        if name not in request.mcp_params
+    )
+    assert not missing, (
+        f"Request {request.id} missing mcp_params key(s): {missing}"
+    )
+
+
+def assert_jira_mcp_fixed_input_allowlist(
+    requests: Sequence[RequestData],
+) -> None:
+    """Empty mcp_params ids must equal FIXED_INPUT_JIRA_MCP_REQUEST_IDS."""
+    empty_ids = {request.id for request in requests if not request.mcp_params}
+    assert empty_ids == FIXED_INPUT_JIRA_MCP_REQUEST_IDS, (
+        f"empty mcp_params ids {sorted(empty_ids)} != "
+        f"FIXED_INPUT_JIRA_MCP_REQUEST_IDS "
+        f"{sorted(FIXED_INPUT_JIRA_MCP_REQUEST_IDS)}"
+    )
+
+
+def assert_jira_mcp_agent_driven_declares_inputs(request: RequestData) -> None:
+    """Agent-driven params/body require mcp_params unless allowlisted."""
+    if not _is_agent_driven_query_or_body(request):
+        return
+    if request.mcp_params:
+        return
+    assert request.id in FIXED_INPUT_JIRA_MCP_REQUEST_IDS, (
+        f"Request {request.id} is agent-driven without mcp_params "
+        f"and outside FIXED_INPUT_JIRA_MCP_REQUEST_IDS"
+    )
+
+
+def test_jira_mcp_companion_env_covers_referenced_template_names(
+    tmp_path, monkeypatch
+):
+    """Shipped collection env refs must be ⊆ companion environment variables."""
+    collection = _load_jira_mcp_collection()
+    environment = _load_jira_cloud_environment(tmp_path, monkeypatch)
+    assert_jira_mcp_companion_env_coverage(collection, environment)
+
+
+def test_jira_mcp_companion_env_coverage_rejects_missing_base_url(
+    tmp_path, monkeypatch
+):
+    """Mutation: drop jira_base_url → checker names the missing companion key."""
+    collection = _load_jira_mcp_collection()
+    environment = _load_jira_cloud_environment(tmp_path, monkeypatch).model_copy(
+        deep=True
+    )
+    del environment.variables["jira_base_url"]
+
+    with pytest.raises(AssertionError, match=r"jira_base_url"):
+        assert_jira_mcp_companion_env_coverage(collection, environment)
+
+
+def test_jira_mcp_requests_use_basic_auth_convention():
+    """Every shipped request must use Basic {{ base64(jira_credentials) }}."""
+    collection = _load_jira_mcp_collection()
+    assert_jira_mcp_auth_convention(collection.requests)
+
+
+def test_jira_mcp_auth_convention_rejects_altered_authorization():
+    """Mutation: alter Authorization → checker names the request id."""
+    collection = _load_jira_mcp_collection()
+    request = _request_by_id(collection, _NON_ALLOWLISTED_JIRA_MCP_REQUEST_ID)
+    mutated = request.model_copy(deep=True)
+    mutated.headers["Authorization"] = "Bearer not-the-jira-convention"
+    assert mutated.headers["Authorization"] != _JIRA_MCP_AUTH_HEADER
+
+    with pytest.raises(AssertionError, match=r"jira-get-issue"):
+        assert_jira_mcp_auth_convention([mutated])
+
+
+def test_jira_mcp_params_declare_all_mcp_request_names():
+    """Every mcp.request.<name> (incl. wrappers) must appear in mcp_params."""
+    collection = _load_jira_mcp_collection()
+    for request in collection.requests:
+        assert_jira_mcp_params_declared(request)
+
+
+def test_jira_mcp_params_declared_rejects_dropped_issue_key():
+    """Mutation: drop issue_key from mcp_params while URL still references it."""
+    collection = _load_jira_mcp_collection()
+    request = _request_by_id(collection, "jira-get-issue")
+    mutated = request.model_copy(deep=True)
+    assert "issue_key" in mutated.mcp_params
+    assert "mcp.request.issue_key" in mutated.url
+    del mutated.mcp_params["issue_key"]
+
+    with pytest.raises(AssertionError, match=r"jira-get-issue.*issue_key|issue_key"):
+        assert_jira_mcp_params_declared(mutated)
+
+
+def test_jira_mcp_empty_mcp_params_match_fixed_input_allowlist():
+    """Empty mcp_params request ids must equal FIXED_INPUT_JIRA_MCP_REQUEST_IDS."""
+    collection = _load_jira_mcp_collection()
+    assert_jira_mcp_fixed_input_allowlist(collection.requests)
+
+
+def test_jira_mcp_fixed_input_allowlist_rejects_empty_outside_allowlist():
+    """Mutation: clear mcp_params on a non-allowlisted id → outside allowlist."""
+    collection = _load_jira_mcp_collection()
+    request = _request_by_id(collection, _NON_ALLOWLISTED_JIRA_MCP_REQUEST_ID)
+    mutated = request.model_copy(deep=True)
+    assert mutated.mcp_params
+    mutated.mcp_params = {}
+
+    requests = [
+        mutated if item.id == mutated.id else item for item in collection.requests
+    ]
+    with pytest.raises(AssertionError, match=r"jira-get-issue"):
+        assert_jira_mcp_fixed_input_allowlist(requests)
+
+
+def test_jira_mcp_fixed_input_allowlist_rejects_empty_set_drift():
+    """Mutation: empty-mcp_params set drifts from FIXED_INPUT allowlist."""
+    collection = _load_jira_mcp_collection()
+    request = _request_by_id(collection, "jira-search-fields")
+    mutated = request.model_copy(deep=True)
+    assert mutated.mcp_params
+    mutated.mcp_params = {}
+
+    requests = [
+        mutated if item.id == mutated.id else item for item in collection.requests
+    ]
+    with pytest.raises(
+        AssertionError, match=r"FIXED_INPUT_JIRA_MCP_REQUEST_IDS|jira-search-fields"
+    ):
+        assert_jira_mcp_fixed_input_allowlist(requests)
+
+
+def test_jira_mcp_agent_driven_query_body_requires_mcp_params():
+    """Agent-driven params/body imply non-empty mcp_params unless allowlisted."""
+    collection = _load_jira_mcp_collection()
+    for request in collection.requests:
+        assert_jira_mcp_agent_driven_declares_inputs(request)
+
+
+def test_jira_mcp_agent_driven_rejects_body_without_mcp_params():
+    """Mutation: agent-driven body + empty mcp_params on non-allowlisted id."""
+    collection = _load_jira_mcp_collection()
+    request = _request_by_id(collection, _NON_ALLOWLISTED_JIRA_MCP_REQUEST_ID)
+    mutated = request.model_copy(deep=True)
+    mutated.mcp_params = {}
+    mutated.body = '{"value": "{{ mcp.request.x }}"}'
+    mutated.params = {}
+
+    with pytest.raises(AssertionError, match=r"jira-get-issue"):
+        assert_jira_mcp_agent_driven_declares_inputs(mutated)

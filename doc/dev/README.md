@@ -87,8 +87,9 @@ conventions.
 1. [MCP Secrets Policy](mcp_secrets_policy.md)
 1. [UI Action Tools — out-of-process packaging (PYPOST-918)](ui_actions.md)
 1. [jira-mcp example fixtures](
-   testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047)
-   (including protected stretch-operation contracts, PYPOST-1027)
+   testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028)
+   (including protected stretch-operation contracts, PYPOST-1027, and
+   env/auth/`mcp_params` contracts, PYPOST-1028)
 
 ### UI and settings
 

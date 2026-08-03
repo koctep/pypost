@@ -375,8 +375,8 @@ Shared loaders live in `tests/helpers/mcp_test_collection.py` for reuse by
 [PYPOST-181](https://pypost.atlassian.net/browse/PYPOST-181) integration tests.
 `mcp.json` is the local MCP/SSE probe fixture; the curated end-user Jira Cloud
 pair and its import contract are covered separately under
-[Example fixtures contract (PYPOST-1017 /
-PYPOST-1026 / PYPOST-1047)](#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047).
+[Env / auth / MCP params contracts](#env--auth--mcp-params-contracts-pypost-1028)
+and the parent example fixtures section (PYPOST-1017 through PYPOST-1028).
 
 | Module | Scope |
 | --- | --- |
@@ -394,7 +394,7 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_test_collection.py -v
 ```
 
-## Example fixtures contract (PYPOST-1017 / PYPOST-1026 / PYPOST-1047)
+## Example fixtures contract (PYPOST-1017 / PYPOST-1026 / PYPOST-1047 / PYPOST-1028)
 
 ### Overview
 
@@ -404,13 +404,19 @@ PYPOST-1026 expanded `jira_mcp.json` to a **practical analog** of the Atlassian
 MCP Jira surface used by in-repo agent skills. PYPOST-1047 added sprint delete
 and locked move-to-backlog as the remove-from-sprint path. PYPOST-1027 makes
 the three established stretch workflows explicit fixture contracts (**23**
-MCP-exposed requests; contract floor ≥ 23).
+MCP-exposed requests; contract floor ≥ 23). PYPOST-1028 hardens the offline
+agreements between the curated collection and its companion environment:
+shared env keys, Basic auth convention, `mcp.request.*` ↔ `mcp_params`, and
+an explicit fixed-input allowlist for empty `mcp_params`.
 
 Offline contract tests load fixtures through the native import parsers and
 assert parse success, MCP exposure, required skill capabilities, placeholders,
-and `hidden_keys`. Reader-facing inventory, import order, and the full
-**Coverage vs gaps** table live in [`examples/README.md`](../../examples/README.md).
-Runtime MCP wiring is unchanged — see [MCP Integration](mcp_integration.md).
+`hidden_keys`, and the PYPOST-1028 env/auth/MCP-input contracts. Reader-facing
+inventory, import order, and the full **Coverage vs gaps** table live in
+[`examples/README.md`](../../examples/README.md). Runtime MCP wiring is
+unchanged — see [MCP Integration](mcp_integration.md). Soft project guidance
+is documented in
+[Jira MCP Example Project Default](jira_mcp_project_default.md).
 
 ### Architecture
 
@@ -421,6 +427,7 @@ Runtime MCP wiring is unchanged — see [MCP Integration](mcp_integration.md).
 | `examples/collections/mcp.json` | Local MCP/SSE probe (PYPOST-180) |
 | `examples/README.md` | Import order, secrets, coverage map |
 | `tests/test_example_fixtures.py` | Offline import + coverage contracts |
+| `FIXED_INPUT_JIRA_MCP_REQUEST_IDS` | Sole escape hatch for empty `mcp_params` |
 
 Keep roles distinct: Jira pair for end users / agent demos; `mcp.json` for
 contributors / local probing.
@@ -444,13 +451,51 @@ capability set.
   string params (`search_payload`, `issue_payload`, …), matching the starter.
 - Auth is shared: `Authorization: Basic {{ base64(jira_credentials) }}` and
   host `{{ jira_base_url }}`. MCP inputs use `{{ mcp.request.* }}`.
-- Companion env `jira_cloud.json` keeps `jira_base_url` /
-  `jira_credentials` (placeholder), `jira_credentials` in `hidden_keys`, and
-  `enable_mcp: true` as legacy migration input. No new shared env keys were required for the
-  expansion.
-- After import, create an **MCP Servers…** row selecting the Jira collection and **Jira Cloud
-  MCP** environment, then start it so tools resolve that environment's variables. See
-  [Multiple MCP Servers](mcp_server_registry.md).
+- Companion env `jira_cloud.json` keeps `jira_base_url`,
+  `jira_project_key`, and `jira_credentials` (placeholder), with only
+  `jira_credentials` in `hidden_keys`, plus `enable_mcp: true` as legacy
+  migration input.
+- After import, create an **MCP Servers…** row selecting the Jira collection
+  and **Jira Cloud MCP** environment, then start it so tools resolve that
+  environment's variables. See [Multiple MCP Servers](mcp_server_registry.md).
+
+### Env / auth / MCP params contracts (PYPOST-1028)
+
+Import success alone does not prove the curated pair stays usable for agents.
+`tests/test_example_fixtures.py` owns four offline agreements via shared
+checkers (`assert_jira_mcp_*`). Fixture JSON is expected to stay unchanged;
+failures name the missing companion key or `request.id`.
+
+1. **Companion env coverage**
+   (`assert_jira_mcp_companion_env_coverage`) — Env template names referenced
+   by every request must be ⊆ companion `environment.variables`.
+2. **Credential convention** (`assert_jira_mcp_auth_convention`) — Every
+   request header equals `Basic {{ base64(jira_credentials) }}`.
+3. **MCP input declaration** (`assert_jira_mcp_params_declared`) — Every
+   `mcp.request.<name>` in URL/headers/params/body (including `to_int(...)`
+   wrappers) must be a key in `mcp_params`.
+4. **Fixed-input allowlist** (`assert_jira_mcp_fixed_input_allowlist` and
+   `assert_jira_mcp_agent_driven_declares_inputs`) — Empty `mcp_params` ids
+   must equal `FIXED_INPUT_JIRA_MCP_REQUEST_IDS`. Agent-driven query/body
+   requires non-empty `mcp_params` unless the id is that same allowlist.
+
+`FIXED_INPUT_JIRA_MCP_REQUEST_IDS` currently freezes:
+
+| Request id | Why empty `mcp_params` is intentional |
+| ---------- | ------------------------------------- |
+| `jira-get-current-user` | Read-only `/myself` smoke; no agent inputs |
+| `jira-list-boards` | Env `jira_project_key` + fixed `maxResults` (PYPOST-1029) |
+
+The allowlist is the **only** escape hatch for empty `mcp_params`. Do not add
+ids casually; review any change like a fixture behavior change. The contract
+scan for `mcp.request.<name>` is deliberately broader than production
+`McpSecretsPolicy.extract_mcp_request_variables`, which misses function-wrapped
+forms such as `{{ to_int(mcp.request.board_id) }}`. Explicit `mcp_params`
+entries still publish those inputs at `list_tools` time.
+
+Positive tests load the shipped pair; mutation tests `deepcopy` a request or
+env, break one agreement, and assert the diagnostic. No Jira tenant, network,
+MCP listener, or real secrets are required.
 
 ### Coverage vs gaps (developer summary)
 
@@ -523,7 +568,7 @@ Reader inventory:
 Focused contract run:
 
 ```bash
-.venv/bin/python -m pytest tests/test_example_fixtures.py -v
+make test PYTEST_ARGS='tests/test_example_fixtures.py -v'
 ```
 
 - `test_jira_mcp_collection_imports_via_native_loader` — native load;
@@ -538,6 +583,17 @@ Focused contract run:
   placeholder values; `hidden_keys`; `enable_mcp`.
 - `test_mcp_probe_collection_still_imports` — `mcp.json` probe still parses
   (3 requests).
+- `test_jira_mcp_companion_env_covers_referenced_template_names` — companion
+  env covers every referenced template name (PYPOST-1028).
+- `test_jira_mcp_requests_use_basic_auth_convention` — per-request Basic
+  `base64(jira_credentials)` header (PYPOST-1028).
+- `test_jira_mcp_params_declare_all_mcp_request_names` — broad
+  `mcp.request.*` ⊆ `mcp_params` keys, including wrappers (PYPOST-1028).
+- `test_jira_mcp_empty_mcp_params_match_fixed_input_allowlist` — empty
+  `mcp_params` ids == `FIXED_INPUT_JIRA_MCP_REQUEST_IDS` (PYPOST-1028).
+- `test_jira_mcp_agent_driven_query_body_requires_mcp_params` —
+  agent-driven query/body ⇒ `mcp_params` or allowlist (PYPOST-1028).
+- Matching `*_rejects_*` mutation tests pin diagnostics for each checker.
 
 Module timeout: `pytestmark = pytest.mark.timeout(30)`.
 
@@ -557,6 +613,14 @@ When editing the curated surface:
    `tests/test_example_fixtures.py` only when a newly approved protected
    workflow needs the same ID-and-operation guarantee; do not rely on the
    count floor alone.
+5. Keep companion env keys complete for every `{{ … }}` env reference; retain
+   `Authorization: Basic {{ base64(jira_credentials) }}` on every request.
+6. Declare every `mcp.request.<name>` (including inside `to_int(...)`) in
+   `mcp_params`, unless the request id belongs in
+   `FIXED_INPUT_JIRA_MCP_REQUEST_IDS` and intentionally has empty
+   `mcp_params`.
+7. Change `FIXED_INPUT_JIRA_MCP_REQUEST_IDS` only with an explicit review
+   (PYPOST-1029 may later remove `jira-list-boards`).
 
 ### Troubleshooting
 
@@ -566,6 +630,11 @@ When editing the curated surface:
 | Protected stretch operation fails | Restore the named request ID, HTTP method, and route markers in the curated fixture; do not substitute an unrelated request. |
 | Required ids / paths fail | Restore the locked Jira capability named by the diagnostic. |
 | Placeholder contract fail | Sample URL/creds only; no real tokens |
+| Missing companion key | Add the named key to `jira_cloud.json`, or drop the collection reference |
+| Auth convention breach | Restore `Authorization: Basic {{ base64(jira_credentials) }}` |
+| Missing `mcp_params` key | Add the named agent input to that request's `mcp_params` |
+| Empty `mcp_params` outside allowlist | Declare inputs, or review-add the id to the allowlist |
+| Agent-driven without inputs | Same as empty-`mcp_params` outside allowlist; see `request.id` |
 | Agent lacks Jira tools | Select companion env; keep `expose_as_mcp` |
 | No remove-from-sprint tool | Call `jira_move_issues_to_backlog` |
 | Delete tool name unknown | MCP name is `jira_delete_sprint` |
