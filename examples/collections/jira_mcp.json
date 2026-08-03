@@ -3,6 +3,25 @@
   "name": "Jira Cloud MCP",
   "requests": [
     {
+      "id": "jira-get-current-user",
+      "name": "Jira Get Current User",
+      "method": "GET",
+      "url": "{{ jira_base_url }}/rest/api/3/myself",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Basic {{ base64(jira_credentials) }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Return the authenticated Jira user.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
       "id": "jira-search-issues-jql",
       "name": "Jira Search Issues JQL",
       "method": "POST",

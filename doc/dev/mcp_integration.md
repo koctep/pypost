@@ -442,6 +442,28 @@ never reach it. Run that focused coverage with:
 PYTEST_ARGS="tests/test_example_fixtures.py tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_jira_numeric_path_identifiers_accept_decimal_strings_and_native_integers tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_jira_non_integral_identifier_never_dispatches_to_http" make test
 ```
 
+### Optional protected Jira live smoke (PYPOST-1039)
+
+The shipped Jira MCP example also has a narrowly scoped **opt-in** live smoke
+for authorized maintainers. It runs only through `make test-jira-mcp-live` and
+uses the explicit process-environment gate `PYPOST_LIVE_JIRA_SMOKE=1` plus the
+protected configuration labels `JIRA_BASE_URL`, `JIRA_CREDENTIALS`, and
+`JIRA_PROJECT_KEY`.
+
+This is not routine MCP integration coverage: normal local tests and push/PR
+CI remain offline and do not receive Jira configuration. An absent opt-in is a
+successful intentional skip. In contrast, an explicitly enabled run with
+missing, placeholder, malformed, or non-HTTPS configuration fails without
+revealing values. The smoke permits exactly four read-only tools: current-user
+lookup, bounded JQL issue search, retrieval of the returned issue, and board
+listing.
+
+The protected CI entry is dispatch-only on `master`, under GitHub Environment
+`jira-live-smoke`; it reports only passed, failed, or intentionally skipped.
+Do not place protected values in commands, files, logs, docs, artifacts, or job
+summaries. Complete setup, safety, and offline-contract guidance is in
+[Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md).
+
 ### Active environment binding (PYPOST-137)
 
 PyPost binds MCP variable resolution to the **currently selected environment** in the UI.

@@ -8,6 +8,7 @@ import pytest
 
 from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.environment_import import load_import_candidates
+from pypost.core.mcp_tool_contract import normalize_mcp_tool_name
 from pypost.core.storage import StorageManager
 from pypost.models.models import Collection, RequestData
 
@@ -21,12 +22,13 @@ MCP_PROBE_PATH = REPO_ROOT / "examples" / "collections" / "mcp.json"
 PLACEHOLDER_BASE_URL = "https://your-team.atlassian.net"
 PLACEHOLDER_CREDENTIALS = "you@example.com:your-api-token"
 
-# PYPOST-1047: floor after adding delete-sprint (21 → 22 MCP-exposed requests).
-JIRA_MCP_MIN_EXPOSED_REQUESTS = 22
+# PYPOST-1039: the read-only current-user smoke tool raises the published floor.
+JIRA_MCP_MIN_EXPOSED_REQUESTS = 23
 
 # Locked required capabilities (no stretch-swap escape hatch).
 REQUIRED_JIRA_MCP_REQUEST_IDS = frozenset(
     {
+        "jira-get-current-user",
         "jira-create-sprint",
         "jira-add-issues-to-sprint",
         "jira-get-sprint-issues",
@@ -106,6 +108,20 @@ def test_jira_mcp_collection_covers_required_skill_capabilities():
     assert not missing_ids, (
         "jira_mcp.json missing required MCP request ids: " + ", ".join(missing_ids)
     )
+
+    assert _has_request(
+        requests,
+        request_id="jira-get-current-user",
+        method="GET",
+        url_contains=("{{ jira_base_url }}", "/rest/api/3/myself"),
+    ), "current-user lookup must GET /rest/api/3/myself"
+    current_user = next(request for request in requests if request.id == "jira-get-current-user")
+    assert current_user.expose_as_mcp is True
+    assert normalize_mcp_tool_name(current_user.name) == "jira_get_current_user"
+    assert current_user.params == {}
+    assert current_user.body == ""
+    assert "base64(jira_credentials)" in current_user.headers.get("Authorization", "")
+    assert current_user.headers.get("Accept") == "application/json"
 
     assert _has_request(
         requests,

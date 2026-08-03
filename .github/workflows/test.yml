@@ -5,8 +5,93 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["**"]
+  workflow_dispatch:
 
 jobs:
+  jira-mcp-live-smoke:
+    name: "Jira MCP live smoke (protected)"
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: jira-live-smoke
+    permissions:
+      contents: read
+    env:
+      PYPOST_LIVE_JIRA_SMOKE: "1"
+      JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+      JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
+      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/install-qt-egl-runtime
+
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.in
+            requirements.txt
+            requirements-dev.in
+            requirements-dev.txt
+            requirements-otel.in
+            requirements-otel.txt
+
+      - name: Install test tooling
+        run: python -m pip install -e ".[dev,otel]"
+
+      - name: Run protected read-only smoke
+        id: protected-live-smoke
+        env:
+          PYTEST_ADDOPTS: --junitxml=jira-live-smoke-junit.xml
+        run: make test-jira-mcp-live
+
+      - name: Write job summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" != "success" ]; then
+            echo "Jira MCP live smoke: failed" >> "$GITHUB_STEP_SUMMARY"
+          elif [ ! -f jira-live-smoke-junit.xml ]; then
+            echo "Jira MCP live smoke: failed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            LIVE_SMOKE_SUMMARY="$(python -c '
+          import sys
+          from xml.etree import ElementTree
+
+          expected_skip = "live Jira MCP smoke intentionally skipped: opt-in is not enabled"
+          try:
+              root = ElementTree.parse(sys.argv[1]).getroot()
+              cases = root.findall(".//testcase")
+              skipped = [case.find("skipped") for case in cases]
+              if (
+                  len(cases) == 1
+                  and len(skipped) == 1
+                  and skipped[0] is not None
+                  and skipped[0].get("message") == expected_skip
+              ):
+                  print("intentionally skipped")
+              elif len(cases) == 1 and skipped == [None]:
+                  print("passed")
+              else:
+                  print("failed")
+          except Exception:
+              print("failed")
+          ' jira-live-smoke-junit.xml)"
+            case "$LIVE_SMOKE_SUMMARY" in
+              "intentionally skipped")
+                echo "Jira MCP live smoke: intentionally skipped" >> "$GITHUB_STEP_SUMMARY"
+                ;;
+              "passed")
+            echo "Jira MCP live smoke: passed" >> "$GITHUB_STEP_SUMMARY"
+                ;;
+              *)
+            echo "Jira MCP live smoke: failed" >> "$GITHUB_STEP_SUMMARY"
+                ;;
+            esac
+          fi
+
   test:
     name: "pytest (Python ${{ matrix.python-version }})"
     runs-on: ubuntu-latest

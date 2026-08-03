@@ -15,6 +15,7 @@ make test            # fast suite (excludes -m slow)
 make test-cov        # with coverage report
 make test-slow       # network-heavy Makefile smoke
 make test-agent-e2e  # broader agent e2e beyond golden (primary packaging)
+make test-jira-mcp-live  # protected, explicit opt-in Jira MCP smoke (maintainers only)
 ```
 
 `make test-agent-e2e` is the **primary packaging** path for the **broader**
@@ -333,6 +334,22 @@ Run the numeric-identifier regressions with:
 ```bash
 PYTEST_ARGS="tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_jira_numeric_path_identifiers_accept_decimal_strings_and_native_integers tests/test_mcp_server_integration.py::TestMCPServerIntegration::test_jira_non_integral_identifier_never_dispatches_to_http" make test
 ```
+
+### Optional protected Jira MCP smoke (PYPOST-1039)
+
+`make test-jira-mcp-live` is separate from the fast suite, `test-slow`, and
+ordinary PR CI. It is a maintainer-only live check, explicitly enabled by
+`PYPOST_LIVE_JIRA_SMOKE=1`; it requires protected `JIRA_BASE_URL`,
+`JIRA_CREDENTIALS`, and `JIRA_PROJECT_KEY` process-environment configuration.
+The base URL must be HTTPS and must not contain credentials.
+
+With no opt-in, the target succeeds with an intentional skip. With opt-in but
+invalid protected configuration, it fails rather than skips. An authorized run
+uses only four sequential read-only Jira MCP calls: current-user lookup,
+bounded JQL search, retrieval of the returned issue, and board listing. Never
+put protected values on a command line or in test output. See
+[Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md) for the protected CI
+dispatch, secrecy rules, and deterministic offline contract tests.
 
 ## MCP test fixture generator (PYPOST-179)
 
