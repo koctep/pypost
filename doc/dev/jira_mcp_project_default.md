@@ -23,9 +23,11 @@ collection, and their offline import contract:
 | `tests/test_example_fixtures.py` | Loads both JSON files through native importers and locks the placeholder, template binding, guidance, and security wording. |
 
 `jira-list-boards` is the one existing list request whose REST endpoint accepts
-the selected project directly. Board-sprint and sprint-issue calls retain their
-native selected-board or selected-sprint scope; they must not be described as
-automatically project-scoped.
+the selected project directly. Its page size and offset are agent inputs
+(`maxResults`, `startAt`; PYPOST-1029). Board-sprint and sprint-issue calls
+retain their native selected-board or selected-sprint scope; they must not be
+described as automatically project-scoped, but they share the same required
+pagination pair.
 
 ## Usage
 
@@ -78,6 +80,20 @@ building the Jira path. Non-decimal strings, floats, and booleans are invalid;
 the request fails before any outbound HTTP dispatch. This input tolerance
 changes neither the selected project behavior above nor Jira authorization.
 
+## List pagination (PYPOST-1029)
+
+These curated list tools require agent-facing `maxResults` and `startAt`
+(`integer_or_string`, rendered with `to_int` into the Agile query string):
+
+| Request id | Notes |
+| --- | --- |
+| `jira-list-boards` | Still project-scoped via env `jira_project_key`; no longer on the empty-`mcp_params` allowlist |
+| `jira-list-board-sprints` | Alongside required `board_id` and `state` |
+| `jira-get-sprint-issues` | Alongside required `sprint_id` |
+
+Use `50` / `0` for the previous curated first page. Omitting either argument
+fails closed at template render (`to_int`), not with a silent default.
+
 ## Security boundary
 
 `jira_project_key` is guidance, not an authorization, permission, or security
@@ -109,3 +125,4 @@ See
 | Cross-project work is rejected or allowed unexpectedly | Diagnose Jira Cloud permissions and the target project; this example default does not grant or revoke access. |
 | A board or sprint call rejects its identifier | Supply `42` or `"42"`; do not supply a boolean, float, whitespace-padded value, exponent notation, or a nonnumeric string. |
 | Env/auth/`mcp_params` fail | Fix companion key, auth, or `mcp_params`; empty only on allowlist. |
+| List boards/sprints/issues omit page size | Pass required `maxResults` and `startAt` (e.g. `50` and `0`); there is no template default when omitted (PYPOST-1029). |

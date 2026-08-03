@@ -253,7 +253,8 @@
         "Authorization": "Basic {{ base64(jira_credentials) }}"
       },
       "params": {
-        "maxResults": "50",
+        "maxResults": "{{ to_int(mcp.request.maxResults) }}",
+        "startAt": "{{ to_int(mcp.request.startAt) }}",
         "projectKeyOrId": "{{ jira_project_key }}"
       },
       "body": "",
@@ -262,7 +263,18 @@
       "post_script": "",
       "expose_as_mcp": true,
       "mcp_description": "List Jira Software boards project-scoped to this endpoint's selected environment jira_project_key. This is a normal default, not an authorization or permission restriction.",
-      "mcp_params": {},
+      "mcp_params": {
+        "maxResults": {
+          "type": "integer_or_string",
+          "description": "Maximum boards per page (Agile maxResults). Use 50 to match the previous curated default. Accepted as a native integer or decimal string.",
+          "required": true
+        },
+        "startAt": {
+          "type": "integer_or_string",
+          "description": "0-based offset into the board list (Agile startAt). Use 0 for the first page. Accepted as a native integer or decimal string.",
+          "required": true
+        }
+      },
       "retry_policy": null
     },
     {
@@ -276,7 +288,8 @@
       },
       "params": {
         "state": "{{ mcp.request.state }}",
-        "maxResults": "50"
+        "maxResults": "{{ to_int(mcp.request.maxResults) }}",
+        "startAt": "{{ to_int(mcp.request.startAt) }}"
       },
       "body": "",
       "body_type": "json",
@@ -293,6 +306,16 @@
         "state": {
           "type": "string",
           "description": "Sprint state: future, active, or closed.",
+          "required": true
+        },
+        "maxResults": {
+          "type": "integer_or_string",
+          "description": "Maximum sprints per page (Agile maxResults). Use 50 to match the previous curated default. Accepted as a native integer or decimal string.",
+          "required": true
+        },
+        "startAt": {
+          "type": "integer_or_string",
+          "description": "0-based offset into the sprint list (Agile startAt). Use 0 for the first page. Accepted as a native integer or decimal string.",
           "required": true
         }
       },
@@ -446,7 +469,8 @@
         "Authorization": "Basic {{ base64(jira_credentials) }}"
       },
       "params": {
-        "maxResults": "50"
+        "maxResults": "{{ to_int(mcp.request.maxResults) }}",
+        "startAt": "{{ to_int(mcp.request.startAt) }}"
       },
       "body": "",
       "body_type": "json",
@@ -458,6 +482,16 @@
         "sprint_id": {
           "type": "integer_or_string",
           "description": "Jira Software sprint ID accepted as a native integer or decimal string.",
+          "required": true
+        },
+        "maxResults": {
+          "type": "integer_or_string",
+          "description": "Maximum issues per page (Agile maxResults). Use 50 to match the previous curated default. Accepted as a native integer or decimal string.",
+          "required": true
+        },
+        "startAt": {
+          "type": "integer_or_string",
+          "description": "0-based offset into the sprint issue list (Agile startAt). Use 0 for the first page. Accepted as a native integer or decimal string.",
           "required": true
         }
       },

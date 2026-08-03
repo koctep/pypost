@@ -40,7 +40,7 @@ _JIRA_NUMERIC_PATH_CASES = (
         "jira_list_board_sprints",
         "board_id",
         "/rest/agile/1.0/board/42/sprint",
-        {"state": "active"},
+        {"state": "active", "maxResults": 50, "startAt": 0},
     ),
     ("jira-get-sprint", "jira_get_sprint", "sprint_id", "/rest/agile/1.0/sprint/42", {}),
     (
@@ -63,7 +63,7 @@ _JIRA_NUMERIC_PATH_CASES = (
         "jira_get_sprint_issues",
         "sprint_id",
         "/rest/agile/1.0/sprint/42/issue",
-        {},
+        {"maxResults": 50, "startAt": 0},
     ),
 )
 

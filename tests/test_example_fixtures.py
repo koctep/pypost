@@ -215,11 +215,13 @@ def test_jira_mcp_numeric_identifier_paths_accept_decimal_strings_and_integers()
     collection = _load_jira_mcp_collection()
     request_by_id = {request.id: request for request in collection.requests}
 
+    # Path identifiers only (to_int in URL). Query pagination ints are PYPOST-1029.
     union_rows = {
         (request.id, name)
         for request in collection.requests
         for name, parameter in request.mcp_params.items()
         if parameter.type == "integer_or_string"
+        and f"to_int(mcp.request.{name})" in request.url
     }
     assert union_rows == set(JIRA_NUMERIC_IDENTIFIER_MAPPINGS.items())
 
@@ -311,11 +313,10 @@ def test_mcp_probe_collection_still_imports():
 _JIRA_MCP_AUTH_HEADER = "Basic {{ base64(jira_credentials) }}"
 _NON_ALLOWLISTED_JIRA_MCP_REQUEST_ID = "jira-get-issue"
 
-# Sole escape hatch for empty mcp_params (PYPOST-1029 may drop jira-list-boards).
+# Sole escape hatch for empty mcp_params (PYPOST-1029 removed jira-list-boards).
 FIXED_INPUT_JIRA_MCP_REQUEST_IDS = frozenset(
     {
         "jira-get-current-user",
-        "jira-list-boards",
     }
 )
 
@@ -521,3 +522,52 @@ def test_jira_mcp_agent_driven_rejects_body_without_mcp_params():
 
     with pytest.raises(AssertionError, match=r"jira-get-issue"):
         assert_jira_mcp_agent_driven_declares_inputs(mutated)
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1029: Pagination mcp_params on board/sprint list requests
+# ---------------------------------------------------------------------------
+
+PAGINATED_JIRA_MCP_LIST_REQUEST_IDS = (
+    "jira-list-boards",
+    "jira-list-board-sprints",
+    "jira-get-sprint-issues",
+)
+
+_PAGINATION_MCP_PARAM_NAMES = ("maxResults", "startAt")
+
+
+def assert_jira_mcp_list_pagination_params(request: RequestData) -> None:
+    """List tools must declare and bind maxResults + startAt via mcp.request."""
+    for name in _PAGINATION_MCP_PARAM_NAMES:
+        assert name in request.mcp_params, (
+            f"Request {request.id} missing mcp_params key {name!r}"
+        )
+        spec = request.mcp_params[name]
+        assert spec.type == "integer_or_string", (
+            f"Request {request.id} {name} type must be integer_or_string"
+        )
+        assert spec.required is True, (
+            f"Request {request.id} {name} must be required"
+        )
+        expected = f"{{{{ to_int(mcp.request.{name}) }}}}"
+        assert request.params.get(name) == expected, (
+            f"Request {request.id} params[{name!r}] must be {expected!r}"
+        )
+
+
+def test_jira_mcp_list_requests_expose_pagination_mcp_params():
+    """PYPOST-1029: board/sprint list tools expose maxResults and startAt."""
+    collection = _load_jira_mcp_collection()
+    for request_id in PAGINATED_JIRA_MCP_LIST_REQUEST_IDS:
+        assert_jira_mcp_list_pagination_params(_request_by_id(collection, request_id))
+
+
+def test_jira_mcp_list_boards_leaves_fixed_input_allowlist():
+    """PYPOST-1029: empty mcp_params freeze is current-user only after pagination."""
+    collection = _load_jira_mcp_collection()
+    empty_ids = {request.id for request in collection.requests if not request.mcp_params}
+    assert empty_ids == frozenset({"jira-get-current-user"}), (
+        f"empty mcp_params ids {sorted(empty_ids)} must be "
+        f"jira-get-current-user only after list-boards pagination"
+    )
