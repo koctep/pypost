@@ -25,6 +25,13 @@ PLACEHOLDER_CREDENTIALS = "you@example.com:your-api-token"
 # PYPOST-1039: the read-only current-user smoke tool raises the published floor.
 JIRA_MCP_MIN_EXPOSED_REQUESTS = 23
 
+# PYPOST-1027: preserve the three accepted stretch operations as one contract.
+PROTECTED_STRETCH_JIRA_MCP_OPERATIONS = (
+    ("jira-get-worklog", "GET", ("/rest/api/3/issue/", "/worklog")),
+    ("jira-move-issues-to-backlog", "POST", ("/rest/agile/1.0/backlog/issue",)),
+    ("jira-search-assignable-users", "GET", ("/rest/api/3/user/assignable/search",)),
+)
+
 # Locked required capabilities (no stretch-swap escape hatch).
 REQUIRED_JIRA_MCP_REQUEST_IDS = frozenset(
     {
@@ -35,11 +42,10 @@ REQUIRED_JIRA_MCP_REQUEST_IDS = frozenset(
         "jira-link-issue-parent",
         "jira-add-comment",
         "jira-assign-issue",
-        # PYPOST-1047: delete sprint + lock remove-from-sprint (backlog move).
+        # PYPOST-1047: delete sprint.
         "jira-delete-sprint",
-        "jira-move-issues-to-backlog",
     }
-)
+) | frozenset(request_id for request_id, _, _ in PROTECTED_STRETCH_JIRA_MCP_OPERATIONS)
 
 JIRA_NUMERIC_IDENTIFIER_MAPPINGS = {
     "jira-list-board-sprints": "board_id",
@@ -159,19 +165,31 @@ def test_jira_mcp_collection_covers_required_skill_capabilities():
         method="PUT",
         url_contains=("/assignee",),
     ), "assign issue must PUT .../assignee"
-    # PYPOST-1047: delete sprint + lock backlog move as remove-from-sprint.
+    # PYPOST-1047: delete sprint.
     assert _has_request(
         requests,
         request_id="jira-delete-sprint",
         method="DELETE",
         url_contains=("/rest/agile/1.0/sprint/",),
     ), "delete sprint must DELETE .../sprint/{id}"
+
+
+@pytest.mark.parametrize(
+    ("request_id", "method", "url_contains"),
+    PROTECTED_STRETCH_JIRA_MCP_OPERATIONS,
+)
+def test_jira_mcp_collection_covers_protected_stretch_operations(
+    request_id: str, method: str, url_contains: tuple[str, ...]
+):
+    """PYPOST-1027: each protected stretch ID keeps its intended operation."""
+    requests = _load_jira_mcp_collection().requests
+    operation = f"{method} {' '.join(url_contains)}"
     assert _has_request(
         requests,
-        request_id="jira-move-issues-to-backlog",
-        method="POST",
-        url_contains=("/rest/agile/1.0/backlog/issue",),
-    ), "remove from sprint must POST .../backlog/issue"
+        request_id=request_id,
+        method=method,
+        url_contains=url_contains,
+    ), f"Jira MCP request {request_id} must remain {operation}"
 
 
 def test_jira_mcp_numeric_identifier_paths_accept_decimal_strings_and_integers():

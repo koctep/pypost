@@ -402,8 +402,9 @@ Shipped importable fixtures under `examples/` are end-user / probe JSON only —
 no application runtime change. PYPOST-1017 shipped the Jira Cloud starter pair;
 PYPOST-1026 expanded `jira_mcp.json` to a **practical analog** of the Atlassian
 MCP Jira surface used by in-repo agent skills. PYPOST-1047 added sprint delete
-and locked move-to-backlog as the remove-from-sprint path (**22** MCP-exposed
-requests; contract floor ≥ 22).
+and locked move-to-backlog as the remove-from-sprint path. PYPOST-1027 makes
+the three established stretch workflows explicit fixture contracts (**23**
+MCP-exposed requests; contract floor ≥ 23).
 
 Offline contract tests load fixtures through the native import parsers and
 assert parse success, MCP exposure, required skill capabilities, placeholders,
@@ -462,11 +463,14 @@ sprint membership (add + move-to-backlog as remove-from-sprint).
 
 - `jira-create-sprint`, `jira-add-issues-to-sprint`, `jira-get-sprint-issues`
 - `jira-link-issue-parent`, `jira-add-comment`, `jira-assign-issue`
-- `jira-delete-sprint`, `jira-move-issues-to-backlog` (PYPOST-1047)
+- `jira-delete-sprint` (PYPOST-1047)
+- `jira-get-worklog`, `jira-move-issues-to-backlog`, and
+  `jira-search-assignable-users` (PYPOST-1027): each locks its request ID,
+  HTTP method, and Jira route markers.
 
-**Stretch included but not id-locked** (floor can stay green if dropped while
-count ≥ 22): `jira-get-worklog`, `jira-search-assignable-users`.
-Follow-up: PYPOST-1027.
+The count floor is only a broad guard. The protected-stretch table is the
+source of truth for the three agent workflows, so an unrelated replacement
+cannot keep this part of the contract green.
 
 **Explicit gaps** (document only; not fixtures): Service Desk / JSM, ProForma,
 watchers, attachments, delete issue, remote/issue-link CRUD beyond parent,
@@ -474,7 +478,7 @@ versions/components batch, SLA, development info, cross-project deps,
 `jira_batch_create_issues`. Full reader table:
 [`examples/README.md` — Coverage vs gaps](../../examples/README.md#coverage-vs-gaps).
 
-### Agent-facing API (PYPOST-1047 sprint hygiene)
+### Agent-facing API (PYPOST-1027 protected stretch operations)
 
 MCP tool names come from request **display names** via
 `normalize_mcp_tool_name` (not from request ids). After import and selecting
@@ -496,6 +500,21 @@ the companion env, agents call:
   active/future sprint membership. Official Agile API caps batches at ≤50
   issues.
 
+#### `jira_get_worklog` (request id `jira-get-worklog`)
+
+- **Method / path**: `GET .../rest/api/3/issue/{issueIdOrKey}/worklog`
+- **Purpose**: reads the worklogs for one Jira issue.
+- **Contract boundary**: the offline fixture test intentionally checks the
+  stable route markers `/rest/api/3/issue/` and `/worklog`, rather than a
+  host, credentials, or a live Jira response.
+
+#### `jira_search_assignable_users` (request id `jira-search-assignable-users`)
+
+- **Method / path**: `GET .../rest/api/3/user/assignable/search`
+- **Purpose**: finds users eligible for assignment according to Jira.
+- **Contract boundary**: the test protects the request identity and route,
+  but does not assert live authorization, tenant data, or full API parity.
+
 Reader inventory:
 [`examples/README.md` — Coverage vs gaps](../../examples/README.md#coverage-vs-gaps).
 
@@ -508,11 +527,13 @@ Focused contract run:
 ```
 
 - `test_jira_mcp_collection_imports_via_native_loader` — native load;
-  `len(requests) >= 22`; all `expose_as_mcp`; template markers; no credential
+  `len(requests) >= 23`; all `expose_as_mcp`; template markers; no credential
   placeholder string in collection JSON.
 - `test_jira_mcp_collection_covers_required_skill_capabilities` — locked
-  request ids plus REST path/method markers (includes delete sprint + backlog
-  remove-from-sprint).
+  request ids, including the protected-stretch IDs.
+- `test_jira_mcp_collection_covers_protected_stretch_operations` — one
+  parametrized offline check per protected workflow: ID, HTTP method, and
+  Jira route markers.
 - `test_jira_cloud_environment_imports_with_placeholders` — env id/name;
   placeholder values; `hidden_keys`; `enable_mcp`.
 - `test_mcp_probe_collection_still_imports` — `mcp.json` probe still parses
@@ -532,15 +553,18 @@ When editing the curated surface:
 1. Prefer expanding `jira_mcp.json` in place (same companion env).
 2. Keep every curated request MCP-exposed unless intentionally demoted.
 3. Update [`examples/README.md`](../../examples/README.md) coverage vs gaps.
-4. Extend `tests/test_example_fixtures.py` when adding must-have capabilities
-   (ids and path markers), not only the count floor.
+4. Extend `PROTECTED_STRETCH_JIRA_MCP_OPERATIONS` in
+   `tests/test_example_fixtures.py` only when a newly approved protected
+   workflow needs the same ID-and-operation guarantee; do not rely on the
+   count floor alone.
 
 ### Troubleshooting
 
 | Issue | Resolution |
 | ----- | ---------- |
-| Count / `expose_as_mcp` fail | Keep ≥ 22 MCP-exposed requests |
-| Required ids / paths fail | Restore locked sprint/delete/backlog ids |
+| Count / `expose_as_mcp` fail | Keep ≥ 23 MCP-exposed requests |
+| Protected stretch operation fails | Restore the named request ID, HTTP method, and route markers in the curated fixture; do not substitute an unrelated request. |
+| Required ids / paths fail | Restore the locked Jira capability named by the diagnostic. |
 | Placeholder contract fail | Sample URL/creds only; no real tokens |
 | Agent lacks Jira tools | Select companion env; keep `expose_as_mcp` |
 | No remove-from-sprint tool | Call `jira_move_issues_to_backlog` |
