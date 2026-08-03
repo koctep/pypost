@@ -478,6 +478,10 @@ Do not place protected values in commands, files, logs, docs, artifacts, or job
 summaries. Complete setup, safety, and offline-contract guidance is in
 [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md).
 
+A **CI-safe** curated-collection MCP e2e path against a controlled loopback
+HTTP stand-in is recommended (PYPOST-1045) but **not shipped** yet; see
+[Planned CI-safe collection MCP e2e](testing.md#planned-ci-safe-collection-mcp-e2e-pypost-1045).
+
 ### Endpoint environment binding (PYPOST-1044)
 
 Each registry endpoint binds MCP variable resolution to its configured

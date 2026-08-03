@@ -27,7 +27,10 @@ timing notes in [testing.md](testing.md)).
 
 This is **not** live MCP verification against a running PyPost. For MCP tools
 and Prometheus checks, see [testing.md](testing.md) and
-[mcp_integration.md](mcp_integration.md).
+[mcp_integration.md](mcp_integration.md). Agent e2e HTTP stubs patch
+`send_request` for UI Send; they are **not** the planned curated-collection
+MCP e2e stand-in (PYPOST-1045 recommends a separate loopback HTTP pack —
+[planned CI-safe collection MCP e2e](testing.md#planned-ci-safe-collection-mcp-e2e-pypost-1045)).
 
 ## Architecture
 

@@ -83,6 +83,8 @@ conventions.
 1. [Jira numeric identifier MCP contract (PYPOST-1038)](mcp_integration.md#jira-numeric-path-identifiers-pypost-1038)
 1. [Jira MCP Example Project Default (PYPOST-1032)](jira_mcp_project_default.md)
 1. [Optional protected Jira MCP live smoke (PYPOST-1039)](jira_mcp_live_smoke.md)
+1. [Planned CI-safe collection MCP e2e (PYPOST-1045)](
+   testing.md#planned-ci-safe-collection-mcp-e2e-pypost-1045)
 1. [Inbound MCP Trust Model (PYPOST-705)](mcp_trust_model.md)
 1. [MCP Secrets Policy](mcp_secrets_policy.md)
 1. [UI Action Tools — out-of-process packaging (PYPOST-918)](ui_actions.md)

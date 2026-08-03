@@ -95,6 +95,16 @@ PYTEST_ARGS='tests/test_jira_mcp_live_smoke.py tests/test_example_fixtures.py -m
 This focused command deliberately excludes the `live_jira`-marked operation.
 Use the dedicated target only for the authorized live check above.
 
+## Relation to planned CI-safe collection e2e (PYPOST-1045)
+
+Live smoke remains the **opt-in** SaaS complementary proof. PYPOST-1045
+recommends a separate **default-CI** pack against an in-process loopback HTTP
+stand-in (`make test-mcp-collection-e2e`, same four read-only tool ids) so
+collection MCP confidence does not depend on live Jira. That harness is
+**planned, not shipped** — see
+[Planned CI-safe collection MCP e2e](testing.md#planned-ci-safe-collection-mcp-e2e-pypost-1045)
+and `ai-tasks/PYPOST-1045/20-architecture.md`.
+
 See also [MCP Integration](mcp_integration.md),
 [MCP Secrets Policy](mcp_secrets_policy.md), and
 [Testing via MCP and Prometheus](testing.md).

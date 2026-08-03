@@ -353,6 +353,24 @@ put protected values on a command line or in test output. See
 [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md) for the protected CI
 dispatch, secrecy rules, and deterministic offline contract tests.
 
+### Planned CI-safe collection MCP e2e (PYPOST-1045)
+
+A controlled stand-in for the external HTTP backend is **recommended** for
+reliable curated-collection MCP e2e in default CI (secret-free, deterministic).
+PYPOST-1045 recorded the decision and architecture only: prefer an in-process
+loopback HTTP stand-in (not agent e2e `send_request` patches as primary, not
+live-only). The four-tool minimum slice matches live smoke
+(`jira_get_current_user`, `jira_search_issues_jql`, `jira_get_issue`,
+`jira_list_boards`). Proposed packaging: `make test-mcp-collection-e2e`.
+
+**Not shipped yet** — no harness, Makefile target, or runtime pack exists in
+this tree until a follow-up implements the sketch in
+`ai-tasks/PYPOST-1045/20-architecture.md`. Until then, contributors still rely
+on offline contracts, MCP integration loopbacks, agent UI e2e stubs, and
+optional live smoke. See also [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md)
+and [Agent UI E2E](agent_e2e.md) (UI Send stubs are a sibling path, not the
+collection MCP stand-in).
+
 ## MCP test fixture generator (PYPOST-179)
 
 Committed MCP test artifacts are defined in code and written by
