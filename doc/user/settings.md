@@ -27,16 +27,19 @@ When retries are exhausted you can:
 
 | Setting | Default |
 | ------- | ------- |
-| MCP host / port | `127.0.0.1` : `1080` |
+| MCP host / port | `127.0.0.1` : `1080` conversion defaults for legacy MCP settings |
 | Metrics host / port | `127.0.0.1` : `9080` |
 
-After save, servers restart with the new bind settings. Invalid host/port values block
-saving until corrected.
+Request-tool endpoint host and port are configured per **MCP Servers…** row, together with its
+collection and environment. Saving Settings does not rebind those endpoints; their rows stay
+unchanged. The global MCP host/port are retained only to prefill an explicit legacy-conversion
+row. Metrics settings are separate; changing metrics host or port restarts the metrics server.
 
-Prefer `127.0.0.1` for MCP. Binding `0.0.0.0` exposes unauthenticated tool execution on
-the network.
+Prefer `127.0.0.1` for every MCP Servers row. Binding `0.0.0.0` exposes unauthenticated tool
+execution on the network.
 
-- Agent URL: `http://127.0.0.1:1080/mcp` — see [MCP Tools](mcp-tools.md)
+- Agent URL: `http://<endpoint-host>:<endpoint-port>/mcp` — create/start the row in
+  **MCP Servers…**; see [MCP Tools](mcp-tools.md)
 - Prometheus scrape: `http://127.0.0.1:9080/metrics` — see
   [Prometheus Monitoring](../prometheus_monitoring.md)
 

@@ -25,15 +25,19 @@ Use placeholders for values the agent should supply:
 ```
 
 Put them in URL, headers, params, or body. The parameters table syncs from these
-placeholders. Environment variables (for example `{{ host }}` or `{{ token }}`) stay
-resolved from the active environment and are **not** listed as agent-visible secrets.
+placeholders. Environment variables (for example `{{ host }}` or `{{ token }}`) are
+resolved from that endpoint's selected environment and are **not** listed as agent-visible
+secrets.
 
-### 3. Enable the MCP server on an environment
+### 3. Create and start an MCP endpoint
 
-1. Open **Manage Environments** (`Ctrl+E`).
-2. Select the environment the agent should use.
-3. Check **Enable MCP (Model Context Protocol)**.
-4. Save. The top bar should show **MCP: ON** with the configured host and port.
+1. Select **MCP Servers…** in the top bar, then **Add…**.
+2. Choose the collection that contains the requests the agent may use.
+3. Choose the environment that supplies this endpoint's variables and hidden keys.
+4. Choose a unique host and port, save the row, select it, and click **Start**.
+
+The top bar shows aggregate server state. Use **MCP Servers…** to see the state,
+collection, environment, tools, and activity for one endpoint.
 
 Default URL for agents (Streamable HTTP):
 
@@ -41,7 +45,7 @@ Default URL for agents (Streamable HTTP):
 http://127.0.0.1:1080/mcp
 ```
 
-Host and port are configurable in **Settings**. Prefer `127.0.0.1` — binding `0.0.0.0`
+Host and port are configured per MCP Servers row. Prefer `127.0.0.1` — binding `0.0.0.0`
 exposes unauthenticated tool execution on the network.
 
 ### 4. Connect the agent
@@ -60,10 +64,11 @@ Example Cursor config (`.cursor/mcp.json` or MCP settings):
 
 Use **Streamable HTTP** (not legacy SSE-only). Prefer `/mcp` over deprecated `/sse/`.
 
-## Active environment
+## Endpoint isolation
 
-Tool calls always use the environment selected in PyPost's top bar. Switching environments
-mid-session changes hosts and credentials without notifying the agent.
+Each endpoint uses only its selected collection and selected environment. Switching the
+top-bar environment does not change a running endpoint. Use **Edit…** in **MCP Servers…**
+to change a row; choose a different unique port for a separate agent workflow.
 
 ## What the agent receives
 
@@ -73,13 +78,19 @@ before reading the upstream response. See [MCP Integration](../mcp_integration.m
 
 ## In-app helpers
 
-- **MCP Tools** — list of exposed tools for the active environment
-- **MCP Activity** — recent `list_tools` / `call_tool` events
+- **MCP Servers…** — add, edit, start, stop, remove, inspect tools, and inspect activity
+  for each endpoint
+- **MCP Server Tools…** — opens the server manager so tool inspection stays scoped to the
+  selected endpoint
 
 ## Safety reminders
 
 - Keep MCP on localhost unless you fully understand the risk
 - Hidden env vars are used at execution time but not exposed in tool schemas
 - Test each tool with **Send** in the GUI before relying on the agent
+
+If you used the old environment-level **Enable MCP** option, open **MCP Servers…** and
+select **Convert current legacy MCP setting…**. It copies the selected legacy environment
+and legacy host/port into a new row; choose its collection and save before starting it.
 
 Metrics for operators are separate: [Prometheus Monitoring](../prometheus_monitoring.md).

@@ -110,10 +110,12 @@ Prometheus metrics when validating UI flows manually.
 ## Prerequisites
 
 - **PyPost running** — `make run` or `python -m pypost.main`
-- **MCP enabled** — in Manage Environments, check "Enable MCP Server"
-- **Cursor connected** — add MCP server URL `http://<host>:1080/mcp` (Streamable HTTP).
+- **MCP endpoint started** — in **MCP Servers…**, add a row selecting a collection and
+  environment, then start it.
+- **Cursor connected** — add that row's MCP URL `http://<host>:<port>/mcp` (Streamable HTTP).
   Legacy SSE clients may still use `http://<host>:1080/sse/`.
-- **Host** — use the host from PyPost settings (e.g. `localhost`, `dev.int`)
+- **Host/port** — use the host and port from the selected MCP Servers row (for example,
+  `localhost:1080` or `dev.int:1081`).
 
 ## Testing via MCP
 
@@ -382,7 +384,8 @@ PYPOST-1026 / PYPOST-1047)](#example-fixtures-contract-pypost-1017--pypost-1026-
 | `tests/test_mcp_test_collection.py` | Model parse, MCP tool overview, contract previews, env flags |
 
 Assertions include expected exposed tools (`sse_probe_metrics`, `sse_probe_main`), List Tools
-not exposed as an MCP tool, and MCP Test environment `enable_mcp: true`. Doc URL consistency
+not exposed as an MCP tool. The retained `enable_mcp: true` fixture field is legacy migration
+input; a manual multi-server run must create an explicit endpoint row. Doc URL consistency
 remains in `tests/test_mcp_user_docs.py` (PYPOST-552).
 
 Focused run:
@@ -424,9 +427,9 @@ contributors / local probing.
 ```text
 Skill / workflow Jira needs  →  curated jira_mcp.json (expose_as_mcp)
         ↕ paired
-jira_cloud.json (placeholders + enable_mcp)
-        →  Import env → fill placeholders → Import collection → Select env
-        →  Manual Send  or  PyPost MCP tools (analog surface)
+jira_cloud.json (placeholders + legacy migration field)
+        →  Import env → fill placeholders → Import collection → Create MCP Servers row
+        →  Select its collection/environment → Start → PyPost MCP tools (analog surface)
 ```
 
 External Atlassian MCP may still be configured for agents; these fixtures do
@@ -442,10 +445,11 @@ capability set.
   host `{{ jira_base_url }}`. MCP inputs use `{{ mcp.request.* }}`.
 - Companion env `jira_cloud.json` keeps `jira_base_url` /
   `jira_credentials` (placeholder), `jira_credentials` in `hidden_keys`, and
-  `enable_mcp: true`. No new shared env keys were required for the expansion.
-- After import, select **Jira Cloud MCP** so MCP starts and tools resolve env
-  variables. See
-  [Active environment binding](mcp_integration.md#active-environment-binding-pypost-137).
+  `enable_mcp: true` as legacy migration input. No new shared env keys were required for the
+  expansion.
+- After import, create an **MCP Servers…** row selecting the Jira collection and **Jira Cloud
+  MCP** environment, then start it so tools resolve that environment's variables. See
+  [Multiple MCP Servers](mcp_server_registry.md).
 
 ### Coverage vs gaps (developer summary)
 

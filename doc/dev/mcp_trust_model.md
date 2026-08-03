@@ -4,7 +4,7 @@ PyPost exposes two inbound MCP surfaces when enabled:
 
 | Surface | Default bind | Purpose |
 | --- | --- | --- |
-| Request tools (`MCPServerImpl`) | `127.0.0.1:1080` | Execute collection HTTP requests as MCP tools |
+| Request tools (`MCPServerImpl`) | Per MCP Servers row (default conversion values: `127.0.0.1:1080`) | Execute one selected collection's HTTP requests as MCP tools |
 | Metrics (`MetricsServer`) | `127.0.0.1:9080` | Prometheus scrape + observability MCP resources |
 
 Agent UI drive (`pypost.agent.ui_actions`) is **not** a product inbound MCP
@@ -25,7 +25,8 @@ Operators are expected to treat network MCP like a **local privilege boundary**:
   unauthenticated** tool execution and (for metrics) unauthenticated `/metrics` scraping.
 
 When metrics bind outside loopback, PyPost logs `metrics_server_non_localhost_bind` (WARNING).
-Request MCP has no equivalent runtime warning — use Settings → Server bind fields deliberately.
+Request MCP has no equivalent runtime warning — choose each MCP Servers row's bind address
+deliberately.
 
 ## Metrics MCP surface (PYPOST-712)
 
@@ -51,8 +52,8 @@ With network access to the MCP endpoint, a client can:
 
 1. Discover all `expose_as_mcp` tools (`list_tools`).
 2. Invoke any tool with agent-supplied `mcp.request.*` arguments (`call_tool`).
-3. Trigger real HTTP requests using the **active environment** (including hidden env values
-   merged at execution — see [mcp_secrets_policy.md](mcp_secrets_policy.md)).
+3. Trigger real HTTP requests using the endpoint's selected environment snapshot (including
+   hidden env values merged at execution — see [mcp_secrets_policy.md](mcp_secrets_policy.md)).
 4. Receive **sanitized** upstream response bodies and script logs (PYPOST-703).
 
 Agents **cannot** read hidden env key names/values from `list_tools` schemas. They **can**
@@ -69,8 +70,8 @@ still cause PyPost to **use** hidden values when executing tools.
 
 ## Future authentication (not implemented)
 
-A future enhancement may add optional bearer-token validation on inbound MCP HTTP when
-`mcp_host` or `metrics_host` is not loopback. Until then, **network exposure = full trust**
-for anyone who can reach the bind address.
+A future enhancement may add optional bearer-token validation on inbound MCP HTTP when an
+MCP Servers row's `host`, or `metrics_host`, is not loopback. Until then, **network exposure
+= full trust** for anyone who can reach the bind address.
 
 Related: [security_audit.md](security_audit.md) (T-004), [mcp_integration.md](mcp_integration.md).

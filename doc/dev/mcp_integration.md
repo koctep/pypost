@@ -96,32 +96,41 @@ This class contains the actual business logic of the MCP server.
     (PYPOST-138). Synchronous work runs in Starlette's threadpool via
     `run_in_threadpool`, capped at **4** concurrent `call_tool` executions per server
     instance (`asyncio.Semaphore` in `MCPServerImpl`, PYPOST-759).
-*   **Environment variables (PYPOST-550)**: At `call_tool` time, snapshots active
-    environment variables via an injected `variable_supplier`, merges them with MCP tool
-    arguments, and passes the combined dict to `RequestService.execute()` (GUI parity).
+*   **Environment variables (PYPOST-550)**: At `call_tool` time, reads the endpoint's
+    configured environment snapshot via an injected `variable_supplier`, merges it with MCP
+    tool arguments, and passes the combined dict to `RequestService.execute()` (GUI parity).
 
-### 3. `EnvPresenter` (`pypost/ui/presenters/env_presenter.py`)
+### 3. Multiple-endpoint registry (`pypost/core/mcp_server_registry.py`, PYPOST-1044)
 
-The environment selector owns MCP lifecycle and the active-variable cache used by MCP tools.
+The application-level lifecycle owner is `MCPServerRegistry`: it maps every
+persisted `McpServerConfiguration` to its own `MCPServerManager` /
+`MCPServerImpl` runtime. Each row selects one collection, environment, host,
+and globally unique port. Requests and environment/hidden-key values are
+copied into that runtime, preventing UI selection from retargeting another
+endpoint. See [Multiple MCP Servers](mcp_server_registry.md) for the API,
+persistence, migration, observability, and troubleshooting details.
 
-*   **Responsibility**: Load environments, emit variable changes to the UI, start/stop MCP
-    when `enable_mcp` is set on the selected environment.
+### 4. `EnvPresenter` (`pypost/ui/presenters/env_presenter.py`)
+
+The environment selector opens the registry-backed MCP Servers dialog and
+continues to own the legacy single-server adapter used in focused compatibility
+tests. It no longer owns lifecycle or variable context for persisted
+multi-server endpoints.
+
+*   **Responsibility**: Load environments, emit variable changes to the UI, and route
+    endpoint management to the registry-backed MCP Servers dialog.
 *   **Variable cache**: `EnvVariableSnapshot` is updated on the main thread in
     `_on_env_changed` whenever the user selects or edits an environment.
 *   **Supplier registration**: On init, calls
     `MCPServerManager.set_variable_supplier(self._env_snapshot.snapshot_variables)`.
     The snapshot returns a **copy** so MCP threadpool workers never observe partial writes.
-*   **MCP tools overview (PYPOST-556)**: Top-bar **MCP Tools (N)** opens
-    `McpToolsOverviewDialog` with all `expose_as_mcp` requests across collections (MCP name,
-    collection, method, description). Count refreshes on environment change.
-*   **MCP activity log (PYPOST-141)**: Top-bar **MCP Activity (N)** opens
-    `McpActivityDialog` with recent inbound `list_tools` and `call_tool` operations. Count
-    reflects session entries; dialog live-refreshes while open via `activity_recorded`.
-*   **Status label**: Shows `MCP: Starting (host:port)...` after `start_server` until
-    `status_changed(True)`; `MCP: ON` only when listening; `start_failed` shows a warning
-    dialog and resets to `MCP: OFF`.
+*   **MCP tools overview**: With a registry, top-bar **MCP Server Tools…** opens
+    the MCP Servers dialog; **Tools…** is scoped to the selected row's collection.
+*   **MCP activity log**: The registry dialog exposes activity for the selected endpoint.
+*   **Status label**: With a registry it shows aggregate running/failed counts, not a
+    potentially misleading endpoint. Row-specific state and errors live in the dialog.
 
-### 4. Metrics observability stack (`pypost/core/metrics*.py`)
+### 5. Metrics observability stack (`pypost/core/metrics*.py`)
 
 PyPost also exposes a separate MCP server dedicated to observability. PYPOST-75 split the
 former monolithic `MetricsManager` into focused modules:
@@ -151,14 +160,19 @@ former monolithic `MetricsManager` into focused modules:
 
 ### Server Startup
 
-1.  User selects an Environment with `enable_mcp=True`.
-2.  `MainWindow` calls `MCPServerManager.start_server(port, tools, host)`.
-3.  `MCPServerManager` creates a new thread.
-4.  Inside the thread, a new `asyncio` event loop is created.
-5.  `MCPServerImpl.create_app()` builds the Starlette app.
-6.  `uvicorn.Server.serve()` is called to start listening on the specified host and port.
-7.  After `startup()` completes, `MCPServerManager` emits `status_changed(True)`.
-8.  On bind failure, `start_failed` carries a user-visible message; UI stays OFF.
+1.  `MainWindow` loads every persisted `AppSettings.mcp_servers` row into
+    `MCPServerRegistry`.
+2.  After collections and environments are both loaded, `start_enabled()` starts
+    each enabled row independently.
+3.  `start(id)` resolves the row's collection and environment by ID, then copies
+    its requests, variables, and hidden keys into that endpoint's manager.
+4.  The endpoint's `MCPServerManager` creates a new thread; its
+    `MCPServerImpl.create_app()` builds the Starlette app and
+    `uvicorn.Server.serve()` binds the row's host/port.
+5.  After `startup()` completes, the manager's signal updates only the matching
+    registry row to `running`.
+6.  A missing reference or bind failure marks only that row `failed`; other
+    enabled endpoints continue starting and running.
 
 ### Server shutdown (PYPOST-726)
 
@@ -201,21 +215,19 @@ delegates lifecycle calls without adding its own lock.
 sorted `McpToolOverviewEntry` rows. `EnvPresenter` opens `McpToolsOverviewDialog` from the
 top bar. Overview is read-only and does not require MCP to be running.
 
-### Tool list refresh (PYPOST-136)
+### Scoped tool list refresh
 
 When the user saves a request or edits collections while MCP is running, PyPost must expose an
 up-to-date tool catalog to connected agents.
 
-1.  `MainWindow` connects `request_saved`, `collections_changed`, and `requests_deleted` to
-    `EnvPresenter.refresh_mcp_tools()`.
-2.  `refresh_mcp_tools()` recomputes exposed tools via `_get_mcp_tools()` and updates the
-    **MCP Tools (N)** button count.
-3.  If the current environment has `enable_mcp` and the server is running,
-    `MCPServerManager.update_tools()` compares `mcp_tools_signature(tools)` (sorted exposed
-    `(id, name)` pairs). When the signature changed, it logs `mcp_tools_changed` and restarts
-    uvicorn so `list_tools` reflects the new catalog.
-4.  Unchanged signatures skip restart (e.g. saving a non-MCP field on an already-exposed
-    request).
+1.  `MainWindow` connects collection changes to `EnvPresenter.refresh_mcp_tools()`.
+2.  With a registry, the presenter first reconciles missing collection/environment
+    references and then calls `refresh_collection(id)` for each current collection.
+3.  The registry updates only managers whose configuration selected that collection.
+    `MCPServerManager.update_tools()` compares its local tool signature and restarts
+    only that endpoint when the signature changed.
+4.  The top-bar action becomes **MCP Server Tools…**, which opens a row-specific
+    tools view rather than an aggregate catalog.
 
 ### MCP activity inspection (PYPOST-141)
 
@@ -234,8 +246,10 @@ up-to-date tool catalog to connected agents.
 | `outcome` | `success` | `success` or `error` |
 | `detail` | — | short error message when applicable |
 
-`MCPServerManager.activity_recorded` emits each new entry for UI refresh. `EnvPresenter`
-opens `McpActivityDialog` from **MCP Activity (N)** in the top bar.
+Each registry-owned manager has its own activity log. `McpServersDialog` opens
+`McpActivityDialog` for the selected endpoint through `MainWindow.mcp_server_activity()`.
+The top-bar **MCP Activity (N)** remains the legacy single-manager view and is not an
+aggregate registry activity feed.
 
 ### Tool Execution
 
@@ -243,7 +257,7 @@ opens `McpActivityDialog` from **MCP Activity (N)** in the top bar.
 2.  `MCPServerImpl.call_tool` is invoked (async).
 3.  **Context Switching**: Since `RequestService` is synchronous, execution is offloaded to a thread pool using `starlette.concurrency.run_in_threadpool`.
 4.  `_execute_request_sync` builds the variables dict:
-    -   Calls `variable_supplier()` for a snapshot of the active environment's flat keys
+    -   Calls `variable_supplier()` for the endpoint's flat environment snapshot
         (e.g. `base_url`, `api_key`).
     -   Merges with MCP tool arguments via `_merge_execution_variables` (see below).
 5.  `_create_request_service()` builds a new `RequestService` (and `HTTPClient`) for this call.
@@ -341,7 +355,7 @@ unchanged.
 
 | Placeholder | Dict path | Source |
 | --- | --- | --- |
-| `{{ base_url }}` | top-level key | Active environment |
+| `{{ base_url }}` | top-level key | Configured endpoint environment snapshot |
 | `{{ mcp.request.user_id }}` | `mcp.request.user_id` | Agent `call_tool` arguments |
 
 Merge contract (module-level helper in `mcp_server_impl.py`):
@@ -357,18 +371,18 @@ The `mcp` namespace **always wins**: an environment variable named `mcp` cannot 
 #### Wiring
 
 ```
-EnvPresenter._current_variables  (main thread, updated in _on_env_changed)
-        │
-        ▼  set_variable_supplier(λ: dict(_current_variables))
+MCPServerRegistry._runtime_inputs(configuration)
+        │  copies variables from configuration.environment_id
+        ▼  set_variable_supplier(λ: dict(snapshot))
 MCPServerManager ──► MCPServerImpl._variable_supplier
         │
         ▼  per call_tool (threadpool worker)
 _build_execution_variables(mcp_args) ──► RequestService.execute(request, merged)
 ```
 
-Freshness: the supplier is invoked on **every** `call_tool`, so edits to environment
-variables take effect on the next agent call without restarting MCP (existing restart-on-env
-change behavior is unchanged).
+Freshness: the supplier is invoked on **every** `call_tool`. `refresh_environment(id)` replaces
+the snapshot only for endpoints selecting that environment; a top-bar selection change has no
+effect. The legacy `EnvPresenter` cache wiring remains compatibility-only.
 
 ### MCP argument substitution coverage (PYPOST-1034)
 
@@ -464,29 +478,25 @@ Do not place protected values in commands, files, logs, docs, artifacts, or job
 summaries. Complete setup, safety, and offline-contract guidance is in
 [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md).
 
-### Active environment binding (PYPOST-137)
+### Endpoint environment binding (PYPOST-1044)
 
-PyPost binds MCP variable resolution to the **currently selected environment** in the UI.
-There is no per-session or per-agent environment lock — the MCP server process stays up while
-the user works, but each `call_tool` reads a fresh snapshot from the active environment.
+Each registry endpoint binds MCP variable resolution to its configured
+`environment_id`, not to the environment currently selected in the top bar.
+The registry passes copies of variables and hidden keys to that endpoint's
+manager. Editing an environment refreshes only rows that selected its ID;
+switching the UI selection does not affect MCP clients.
 
 | User action | Effect on connected agents |
 | --- | --- |
-| Switch to another environment | Subsequent `call_tool` calls resolve `{{ var }}` from the new environment. Tool names stay the same; URLs, headers, and auth values may change. |
-| Edit variables in the active environment | Next `call_tool` uses updated values (supplier runs per call). |
-| Deselect environment ("No Environment") | MCP stops; in-flight sessions lose tool access. |
-| Switch between two MCP-enabled environments | Server may restart; `list_tools` may refresh. Variable context always follows the new selection. |
+| Switch top-bar environment | No effect on configured MCP endpoints. |
+| Edit an endpoint's selected environment | Matching endpoints receive replacement snapshots; other endpoints keep theirs. |
+| Delete a selected collection or environment | The matching endpoint stops and becomes `failed`; peers stay available. |
+| Edit a running endpoint row | A replacement must bind before the persisted configuration changes; a failed replacement retains the previous endpoint. |
 
-**Agent implication:** Long-running agent sessions should not assume environment variables
-stay constant if the PyPost operator may switch environments. Operators who need stable agent
-context should avoid changing the active environment while agents are calling tools, or use
-separate PyPost instances per environment.
-
-When the active environment **identity** changes while MCP is already running, PyPost logs
-`mcp_active_env_changed` (INFO) with previous and new env ids and increments
-`mcp_active_env_changes_total` for monitoring.
-
-Per-call freshness is covered by `tests/test_mcp_server_impl.py` (`test_call_tool_invokes_variable_supplier_per_call`) and supplier wiring in `tests/test_env_presenter.py`.
+The legacy `mcp_active_env_changes_total` metric continues to represent
+top-bar selection changes for compatibility; it is not a signal that a
+registry endpoint changed credentials. Per-endpoint lifecycle is captured by
+the aggregate `mcp_server_instances{state}` metric.
 
 #### GUI parity
 
@@ -532,8 +542,9 @@ DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
 *   **Worker Thread (`RequestWorker`)**: Used for GUI-initiated requests.
 *   **MCP Thread (`MCPServerManager`)**: Runs the `uvicorn` loop.
     *   **Thread Pool**: Used inside MCP Thread for blocking I/O (Request execution).
-    *   **Variable supplier**: Must not call Qt APIs. `EnvPresenter` reads only
-        `EnvVariableSnapshot` (main-thread cache); supplier returns `dict(...)` snapshot.
+    *   **Variable supplier**: Must not call Qt APIs. For registry-owned endpoints,
+        `MCPServerRegistry` installs copied configuration-environment snapshots; the
+        `EnvPresenter` cache is used only by the legacy single-manager adapter.
 *   **Metrics Thread (`MetricsServer` via `MetricsManager`)**: Runs its own isolated
     `uvicorn` loop for metrics and observability. Bind failures emit `start_failed(str)` on
     `MetricsManager` (PYPOST-153) with the same message style as MCP. `MainWindow` connects
@@ -544,14 +555,16 @@ DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
 
 ### `MCPServerManager.set_variable_supplier(supplier)`
 
-Register a callable that returns the current active environment variables as `dict[str, str]`.
-Called by `EnvPresenter` at init. Forwarded to `MCPServerImpl`. Pass `None` to reset to an
-empty dict.
+Register a callable returning a copy of variables for one endpoint. The registry creates
+this supplier from the configuration's environment snapshot before starting that endpoint.
+The legacy `EnvPresenter` also wires a supplier for compatibility-only single-manager paths.
+Pass `None` to reset to an empty dict.
 
 ### `MCPServerManager.set_hidden_keys_supplier(supplier)`
 
-Register a callable returning the active environment's `hidden_keys` set. Called by
-`EnvPresenter` at init. Used by `McpSecretsPolicy` during `list_tools` schema generation.
+Register a callable returning one endpoint's `hidden_keys` snapshot. The registry sets it
+from the configuration's selected environment before start. It is used by `McpSecretsPolicy`
+during `list_tools` schema generation.
 
 ### `MCPServerImpl._build_execution_variables(mcp_args)`
 
@@ -573,21 +586,18 @@ Internal. Returns `true` when `execution_error` is set or `response.status_code 
 
 ## Configuration
 
-No new settings. MCP tools use variables from the **currently selected environment** when
-`enable_mcp=True`. Port and host remain in `AppSettings` (`mcp_port`, `mcp_host`).
+`AppSettings.mcp_servers` persists `McpServerConfiguration` rows, with stable `id`, optional
+`name`, `host`, `port`, `collection_id`, `environment_id`, and `enabled`. Ports are globally
+unique across rows. The legacy `mcp_host`, `mcp_port`, and `Environment.enable_mcp` values are
+only explicit migration inputs; see [Multiple MCP Servers](mcp_server_registry.md).
 
 ### Collection exposure model (PYPOST-711)
 
-MCP tool registration is **global across all loaded collections** when the active environment
-has `enable_mcp=True`. Each request with `expose_as_mcp=True` becomes a tool — there is no
-per-collection ACL. Operators control exposure by:
-
-- Unchecking **Enable MCP** on the environment (disables the server for that env).
-- Unchecking **Expose as MCP** on individual requests they do not want agents to call.
-- Using separate PyPost instances or environments for untrusted tool sets.
-
-The **MCP Tools (N)** overview dialog lists every exposed tool with its source collection for
-review before enabling MCP on a shared workstation.
+MCP tool registration is **per configured collection**. Each endpoint exposes only
+`expose_as_mcp=True` requests from its `collection_id`; it does not aggregate all loaded
+collections. Operators control exposure by selecting the correct collection for a row,
+unchecking **Expose as MCP** on requests, and stopping/removing an endpoint when it is no
+longer needed. The **Tools…** action in MCP Servers shows the selected row's collection only.
 
 ### Agent connection URL
 
@@ -604,14 +614,14 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 
 | Symptom | Likely cause | Resolution |
 | --- | --- | --- |
-| MCP tool URL still has `{{ base_url }}` unresolved | No environment selected, or supplier not registered | Select an environment with the variable defined; verify `EnvPresenter` wired the supplier |
-| Stale env values after editing variables | Supplier not invoked or cache not updated | `_on_env_changed` must refresh `_env_snapshot`; supplier runs per `call_tool` |
-| Agent sees different hosts/auth mid-session | User switched active environment while MCP was running | Expected — see **Active environment binding**; watch `mcp_active_env_changed` logs |
-| `{{ mcp.request.x }}` works but env vars do not | Custom MCP setup without supplier | Call `set_variable_supplier` before `start_server`, or use default `EnvPresenter` wiring |
+| MCP tool URL still has `{{ base_url }}` unresolved | Selected endpoint environment has no value, or supplier was not installed | Verify the row's environment and registry start wiring |
+| Stale env values after editing variables | The row did not select the edited environment | Refresh/reopen the row and verify its `environment_id`; only matching rows refresh |
+| Agent sees different hosts/auth mid-session | Endpoint was reconfigured or the client uses a different endpoint URL | Inspect the named row; top-bar environment switching is not the cause |
+| `{{ mcp.request.x }}` works but env vars do not | Custom endpoint setup without supplier | Set both suppliers before `start_server`, or use registry startup |
 | Env var named `mcp` ignored for nested keys | By design — merge preserves `mcp.request.*` | Rename the environment variable |
-| DEBUG shows `env_var_count=0` | "No Environment" selected or empty env | Expected when no env is active; only MCP args resolve |
-| UI shows MCP ON but agent cannot connect | Status used to flip before bind (fixed PYPOST-556) or wrong port | Wait for ON after Starting; check Settings port; read `start_failed` dialog |
-| Port busy on MCP start | Another process on `mcp_port` | Dialog explains conflict; free port or change Settings |
+| DEBUG shows `env_var_count=0` | Endpoint's selected environment is empty | Expected when its configured environment has no values; only MCP args resolve |
+| Agent cannot connect | Row is stopped, failed, or client uses the wrong host/port | Inspect the row-specific status/error in MCP Servers |
+| Port busy on MCP start | Another process or configured row owns the port | Choose a globally unique endpoint port; a failed row does not stop peers |
 | Port busy on metrics start | Another process on `metrics_port` (default 9080) | Dialog on main window open; free port or change Settings |
 
 ### Tool metadata authoring (PYPOST-553)

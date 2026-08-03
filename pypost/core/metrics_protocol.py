@@ -1,6 +1,7 @@
 """Protocol for metrics tracking consumed by services, workers, and UI."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Protocol, runtime_checkable
 
 from pypost.models.errors import ErrorCategory
@@ -39,6 +40,8 @@ class MetricsTrackerProtocol(Protocol):
     def track_mcp_response_sent(self, method: str, status: str) -> None: ...
 
     def set_mcp_server_up(self, ready: bool) -> None: ...
+
+    def set_mcp_server_instance_counts(self, counts: Mapping[str, int]) -> None: ...
 
     def track_mcp_tool_call_duration(
         self, method: str, status: str, duration_seconds: float
@@ -138,6 +141,9 @@ class NullMetrics:
         return None
 
     def set_mcp_server_up(self, ready: bool) -> None:
+        return None
+
+    def set_mcp_server_instance_counts(self, counts: Mapping[str, int]) -> None:
         return None
 
     def track_mcp_tool_call_duration(

@@ -37,7 +37,7 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "Search Jira issues with JQL. Start normal searches with the active environment's jira_project_key, for example project = <jira_project_key>. Use another permitted project only when explicitly requested. search_payload must be a JSON object accepted by POST /rest/api/3/search/jql.",
+      "mcp_description": "Search Jira issues with JQL. Start normal searches with this endpoint's selected environment jira_project_key, for example project = <jira_project_key>. Use another permitted project only when explicitly requested. search_payload must be a JSON object accepted by POST /rest/api/3/search/jql.",
       "mcp_params": {
         "search_payload": {
           "type": "string",
@@ -88,7 +88,7 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "Create a Jira issue. Use the active environment's jira_project_key as the normal fields.project.key; use another permitted project only when explicitly requested. issue_payload must be a serialized Jira Create issue JSON body; Jira Cloud rich-text descriptions use Atlassian Document Format.",
+      "mcp_description": "Create a Jira issue. Use this endpoint's selected environment jira_project_key as the normal fields.project.key; use another permitted project only when explicitly requested. issue_payload must be a serialized Jira Create issue JSON body; Jira Cloud rich-text descriptions use Atlassian Document Format.",
       "mcp_params": {
         "issue_payload": {
           "type": "string",
@@ -261,7 +261,7 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "List Jira Software boards project-scoped to the active environment's jira_project_key. This is a normal default, not an authorization or permission restriction.",
+      "mcp_description": "List Jira Software boards project-scoped to this endpoint's selected environment jira_project_key. This is a normal default, not an authorization or permission restriction.",
       "mcp_params": {},
       "retry_policy": null
     },

@@ -1,6 +1,8 @@
 """Metrics facade composing registry (counters) and server (uvicorn/MCP)."""
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from PySide6.QtCore import QObject, Signal
 
 from pypost.core.metrics_registry import MetricsRegistry
@@ -99,6 +101,9 @@ class MetricsManager(QObject):
 
     def set_mcp_server_up(self, ready: bool) -> None:
         self._registry.set_mcp_server_up(ready)
+
+    def set_mcp_server_instance_counts(self, counts: Mapping[str, int]) -> None:
+        self._registry.set_mcp_server_instance_counts(counts)
 
     def track_mcp_tool_call_duration(
         self, method: str, status: str, duration_seconds: float

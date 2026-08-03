@@ -40,7 +40,7 @@ DEFAULT_MAX_CONCURRENT_MCP_CALLS = 4
 def _merge_execution_variables(
     env_vars: dict[str, str], mcp_args: dict[str, Any]
 ) -> dict[str, Any]:
-    """Merge active env snapshot with mcp.request namespace."""
+    """Merge one endpoint's environment snapshot with mcp.request namespace."""
     return {**env_vars, "mcp": {"request": mcp_args}}
 
 
@@ -256,7 +256,6 @@ class MCPServerImpl:
             if req.expose_as_mcp:
                 tool_name = normalize_mcp_tool_name(req.name)
                 self.tools_map[tool_name] = req
-        self._metrics.set_mcp_server_up(bool(self.tools_map))
 
     def _generate_schema(self, req: RequestData) -> dict:
         hidden_keys = self._hidden_keys_supplier()

@@ -10,6 +10,7 @@ from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.history_manager import HistoryManager
 from pypost.core.qt.mcp_server import MCPServerManager
+from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
 from pypost.core.storage import StorageManager
@@ -44,6 +45,7 @@ class ComposedApp:
     window: MainWindow
     metrics: MetricsManager
     mcp_manager: MCPServerManager
+    mcp_registry: MCPServerRegistry
     config_manager: ConfigManager
     settings: AppSettings
 
@@ -131,6 +133,7 @@ def compose_app(
         window=window,
         metrics=metrics_manager,
         mcp_manager=mcp_manager,
+        mcp_registry=window.mcp_registry,
         config_manager=config_manager,
         settings=settings,
     )
@@ -147,6 +150,7 @@ def main() -> None:
     exit_code = app.exec()
 
     logger.info("app_shutdown")
+    composed.mcp_registry.stop_all()
     composed.metrics.stop_server()
 
     sys.exit(exit_code)

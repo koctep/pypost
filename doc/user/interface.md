@@ -10,13 +10,14 @@ The main window is divided into these areas:
 
 ## Environment panel (top bar)
 
-- **Environment dropdown** — selects the active environment used for variable substitution
-  and for MCP tool execution
+- **Environment dropdown** — selects the active environment used for GUI request variable
+  substitution; it does not retarget a configured MCP endpoint
 - **Manage** (`Ctrl+E`) — open the environment manager
-- **MCP status** — shows **MCP: ON (host:port)** when the MCP server is listening for
-  the active environment (otherwise **MCP: OFF**)
-- **MCP Tools** — overview of requests exposed as tools (count in the button label)
-- **MCP Activity** — recent agent activity (`list_tools` / `call_tool`)
+- **MCP Servers…** — create and manage independent endpoints, each with its own collection,
+  environment, host, port, status, tools, and activity
+- **MCP status** — aggregate running/failed server count; open **MCP Servers…** for a
+  row's endpoint and error details
+- **MCP Server Tools…** — opens the manager so tools are inspected for one selected server
 
 ## Sidebar (left)
 

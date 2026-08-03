@@ -117,6 +117,20 @@ def test_set_mcp_server_up_updates_internal_state(otel_reader):
     assert observations[0].value == 0
 
 
+def test_mcp_server_instance_counts_are_exported_without_instance_labels(otel_reader):
+    _reader, provider = otel_reader
+    tracker = OtelMetricsTracker(meter=provider.get_meter("instance-counts-test"))
+    tracker.set_mcp_server_instance_counts({"running": 2, "failed": 1})
+    observations = list(tracker._observe_mcp_server_instance_counts(None))
+    assert {(item.attributes["state"], item.value) for item in observations} == {
+        ("stopped", 0),
+        ("starting", 0),
+        ("running", 2),
+        ("failed", 1),
+    }
+    assert tracker._mcp_server_ready == 1
+
+
 def test_track_request_error_uses_category_value(otel_reader):
     reader, provider = otel_reader
     tracker = OtelMetricsTracker(meter=provider.get_meter("error-test"))

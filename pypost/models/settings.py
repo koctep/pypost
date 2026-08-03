@@ -2,11 +2,23 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from pypost.models.retry import RetryPolicy
 
 ThemeSetting = Literal["system", "light", "dark"]
+
+
+class McpServerConfiguration(BaseModel):
+    """One independently managed, persisted MCP endpoint."""
+
+    id: str
+    name: Optional[str] = None
+    host: str = "127.0.0.1"
+    port: int = Field(ge=1024, le=65535)
+    collection_id: str
+    environment_id: str
+    enabled: bool = False
 
 
 class AppSettings(BaseModel):
@@ -22,6 +34,7 @@ class AppSettings(BaseModel):
     confirm_overwrite_request: bool = False
     mcp_port: int = 1080
     mcp_host: str = "127.0.0.1"
+    mcp_servers: List[McpServerConfiguration] = []
     metrics_port: int = 9080
     metrics_host: str = "127.0.0.1"
     default_retry_policy: Optional[RetryPolicy] = None
@@ -34,3 +47,11 @@ class AppSettings(BaseModel):
     env_encryption_key_source: Optional[str] = None
     env_encryption_key_source_fallback: Optional[List[str]] = None
     max_response_bytes: int = 52_428_800
+
+    @model_validator(mode="after")
+    def validate_mcp_server_ports(self) -> "AppSettings":
+        """Ports identify MCP endpoints globally, irrespective of bind host."""
+        ports = [server.port for server in self.mcp_servers]
+        if len(ports) != len(set(ports)):
+            raise ValueError("MCP server configurations must use unique ports")
+        return self

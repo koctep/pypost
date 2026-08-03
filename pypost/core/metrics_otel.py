@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 try:
@@ -39,6 +39,12 @@ class OtelMetricsTracker:
         _ensure_otel_available()
         self._meter = meter or metrics.get_meter(__name__)
         self._mcp_server_ready = 0
+        self._mcp_server_instance_counts = {
+            "stopped": 0,
+            "starting": 0,
+            "running": 0,
+            "failed": 0,
+        }
         self._init_instruments()
         self._meter.create_observable_gauge(
             "mcp_server_up",
@@ -47,9 +53,18 @@ class OtelMetricsTracker:
                 "Whether the MCP tool server has registered tools (1=ready, 0=idle)"
             ),
         )
+        self._meter.create_observable_gauge(
+            "mcp_server_instances",
+            callbacks=[self._observe_mcp_server_instance_counts],
+            description="Number of configured MCP server instances by lifecycle state",
+        )
 
     def _observe_mcp_server_up(self, options) -> Iterator[Observation]:
         yield Observation(self._mcp_server_ready)
+
+    def _observe_mcp_server_instance_counts(self, options) -> Iterator[Observation]:
+        for state, count in self._mcp_server_instance_counts.items():
+            yield Observation(count, attributes={"state": state})
 
     def _init_instruments(self) -> None:
         meter = self._meter
@@ -246,6 +261,13 @@ class OtelMetricsTracker:
 
     def set_mcp_server_up(self, ready: bool) -> None:
         self._mcp_server_ready = 1 if ready else 0
+
+    def set_mcp_server_instance_counts(self, counts: Mapping[str, int]) -> None:
+        self._mcp_server_instance_counts = {
+            state: counts.get(state, 0)
+            for state in ("stopped", "starting", "running", "failed")
+        }
+        self.set_mcp_server_up(self._mcp_server_instance_counts["running"] > 0)
 
     def track_mcp_tool_call_duration(
         self, method: str, status: str, duration_seconds: float

@@ -69,7 +69,8 @@ paths depend on your OS.
 If you want Cursor or another agent to call your saved requests:
 
 1. Mark a request as **MCP Tool** and save it.
-2. Check **Enable MCP (Model Context Protocol)** on the active environment.
-3. Point the agent at `http://127.0.0.1:1080/mcp`.
+2. Open **MCP Servers…**, add a row selecting the request's collection and intended
+   environment, then save and start it.
+3. Point the agent at that row's `http://<host>:<port>/mcp` URL.
 
 See [MCP Tools for AI Agents](mcp-tools.md).

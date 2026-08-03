@@ -61,11 +61,22 @@ class MCPServerManager(QObject):
         self._variable_supplier: Callable[[], dict[str, str]] | None = None
         self._hidden_keys_supplier: Callable[[], set[str]] | None = None
         self._startup_notified = False
+        self._start_error: str | None = None
         self._tools_signature: tuple[tuple[str, str], ...] = ()
 
     @property
     def activity_log(self) -> McpActivityLog:
         return self._activity_log
+
+    @property
+    def last_start_error(self) -> str | None:
+        """Latest asynchronous startup failure, if this manager could not bind."""
+        return self._start_error
+
+    @property
+    def is_listening(self) -> bool:
+        """Whether the server completed startup and is accepting connections."""
+        return self._startup_notified
 
     def _emit_activity(self, entry: McpActivityEntry) -> None:
         self.activity_recorded.emit(entry)
@@ -92,6 +103,7 @@ class MCPServerManager(QObject):
         self._impl.register_tools(tools)
         self._stop_event.clear()
         self._startup_notified = False
+        self._start_error = None
 
         self._server_thread = threading.Thread(target=self._run_uvicorn, daemon=True)
         self._server_thread.start()
@@ -142,6 +154,7 @@ class MCPServerManager(QObject):
         self.status_changed.emit(True)
 
     def _notify_start_failed(self, message: str) -> None:
+        self._start_error = message
         logger.error(
             "mcp_server_start_failed host=%s port=%d message=%s",
             self._current_host,

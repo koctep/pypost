@@ -150,6 +150,18 @@ class TestMetricsManagerRetryExhaustion(unittest.TestCase):
             out,
         )
 
+    def test_mcp_server_instance_counts_are_aggregate_and_identity_free(self):
+        mm = MetricsManager()
+        mm.set_mcp_server_instance_counts(
+            {"stopped": 1, "starting": 1, "running": 2, "failed": 3}
+        )
+        out = _scrape(mm)
+        self.assertIn('mcp_server_instances{state="stopped"} 1.0', out)
+        self.assertIn('mcp_server_instances{state="starting"} 1.0', out)
+        self.assertIn('mcp_server_instances{state="running"} 2.0', out)
+        self.assertIn('mcp_server_instances{state="failed"} 3.0', out)
+        self.assertIn("mcp_server_up 1.0", out)
+
     def test_track_template_expression_render_duration(self):
         mm = MetricsManager()
         mm.track_template_expression_render_duration("runtime", 0.001)

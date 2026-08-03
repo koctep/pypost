@@ -141,6 +141,17 @@ class CollectionsPresenter(QObject):
         """Sidebar container: the collections tree plus its action row."""
         return self._panel
 
+    def collection_by_id(self, collection_id: str) -> Collection | None:
+        """Resolve a persisted collection ID from the in-memory collection cache."""
+        return next(
+            (
+                collection
+                for collection in self._request_manager.get_collections()
+                if collection.id == collection_id
+            ),
+            None,
+        )
+
     @property
     def _pending_rename(self) -> dict | None:
         return self._tree_actions.pending_rename

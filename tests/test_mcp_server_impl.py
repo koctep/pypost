@@ -88,14 +88,13 @@ class TestMCPServerImpl(unittest.TestCase):
         impl.register_tools([second])
         self.assertEqual(list(impl.tools_map.keys()), ["b"])
 
-    def test_register_tools_sets_mcp_server_up_metric(self):
+    def test_register_tools_does_not_set_aggregate_server_lifecycle_metric(self):
         metrics = MagicMock()
         impl = MCPServerImpl(metrics=metrics)
         req = RequestData(name="Tool", expose_as_mcp=True, method="GET", url="http://u")
         impl.register_tools([req])
-        metrics.set_mcp_server_up.assert_called_once_with(True)
         impl.register_tools([])
-        metrics.set_mcp_server_up.assert_called_with(False)
+        metrics.set_mcp_server_up.assert_not_called()
 
     def test_list_tools_uses_mcp_description_when_set(self):
         impl = MCPServerImpl()

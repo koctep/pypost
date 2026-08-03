@@ -3,15 +3,50 @@ import pytest
 pytestmark = pytest.mark.timeout(60)
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from PySide6.QtWidgets import QTabWidget, QWidget
 
-from pypost.models.settings import AppSettings
+from pypost.models.settings import AppSettings, McpServerConfiguration
 from pypost.ui.main_window import MainWindow
 
 @pytest.mark.usefixtures("qapp")
 
 class TestMainWindow(unittest.TestCase):
+    def test_running_mcp_edit_persists_only_after_registry_commits(self):
+        previous = McpServerConfiguration(
+            id="server", port=1081, collection_id="collection", environment_id="environment"
+        )
+        replacement = previous.model_copy(update={"port": 1082})
+        registry = MagicMock()
+        registry.is_running.return_value = True
+        window = SimpleNamespace(
+            settings=AppSettings(mcp_servers=[previous]),
+            mcp_registry=registry,
+            config_manager=MagicMock(),
+        )
+        window._mcp_server_configuration = lambda instance_id: MainWindow._mcp_server_configuration(
+            window, instance_id
+        )
+        window._replace_mcp_server_configuration = lambda configuration: (
+            MainWindow._replace_mcp_server_configuration(window, configuration)
+        )
+        window._save_mcp_server_configurations = lambda: (
+            MainWindow._save_mcp_server_configurations(window)
+        )
+
+        MainWindow.upsert_mcp_server(window, replacement)
+
+        registry.reconfigure.assert_called_once_with("server", replacement)
+        self.assertEqual(window.settings.mcp_servers, [previous])
+        window.config_manager.save_config.assert_not_called()
+
+        registry.list_configurations.return_value = [replacement]
+        MainWindow._on_mcp_server_reconfiguration_finished(window, "server", True)
+
+        self.assertEqual(window.settings.mcp_servers, [replacement])
+        window.config_manager.save_config.assert_called_once_with(window.settings)
+
     def test_main_window_has_no_collection_delete_flow_methods(self):
         """PYPOST-326: delete flow lives in CollectionTreeActions, not MainWindow."""
         delete_flow_names = {
@@ -58,6 +93,41 @@ class TestMainWindow(unittest.TestCase):
         mock_collections.load_collections_async.assert_called_once()
         mock_collections.refresh_tree.assert_not_called()
         mock_collections.load_collections.assert_not_called()
+
+    def test_post_load_starts_enabled_mcp_servers_only_after_both_sources_load(self):
+        collections = SimpleNamespace(
+            collections_loaded=MagicMock(), restore_tree_state=MagicMock()
+        )
+        environments = SimpleNamespace(environments_loaded=MagicMock())
+        registry = MagicMock()
+        window = SimpleNamespace(
+            collections=collections,
+            env=environments,
+            tabs=SimpleNamespace(restore_tabs=MagicMock()),
+            mcp_registry=registry,
+            _startup_collections_ready=False,
+            _startup_env_ready=False,
+            _ui_ready=False,
+        )
+        window._maybe_complete_startup_restore = lambda: MainWindow._maybe_complete_startup_restore(
+            window
+        )
+        window._on_startup_collections_loaded = lambda: MainWindow._on_startup_collections_loaded(
+            window
+        )
+        window._on_startup_environments_loaded = lambda: MainWindow._on_startup_environments_loaded(
+            window
+        )
+
+        MainWindow._on_startup_collections_loaded(window)
+
+        registry.start_enabled.assert_not_called()
+        MainWindow._on_startup_environments_loaded(window)
+
+        registry.start_enabled.assert_called_once()
+        collections.restore_tree_state.assert_called_once()
+        window.tabs.restore_tabs.assert_called_once()
+        assert window._ui_ready is True
 
     def test_constructor_stores_injected_dependencies(self):
         """PYPOST-382 / PYPOST-695: metrics, template_service, config_manager, alert_manager,

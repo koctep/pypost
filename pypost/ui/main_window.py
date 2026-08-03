@@ -20,6 +20,7 @@ from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.history_manager import HistoryManager
+from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
@@ -27,7 +28,7 @@ from pypost.core.qt.state_manager import StateManager
 from pypost.core.storage import StorageManager
 from pypost.ui.styles.style_manager import StyleManager
 from pypost.core.template_service import TemplateService
-from pypost.models.settings import AppSettings
+from pypost.models.settings import AppSettings, McpServerConfiguration
 from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow):
         storage: StorageManager | None = None,
         request_manager: RequestManager | None = None,
         mcp_manager: MCPServerManager | None = None,
+        mcp_registry: MCPServerRegistry | None = None,
     ) -> None:
         super().__init__()
         set_widget_id(self, MAIN_WINDOW)
@@ -109,6 +111,17 @@ class MainWindow(QMainWindow):
             self.icons,
             storage=self.storage,
         )
+        self.mcp_registry = mcp_registry or MCPServerRegistry(
+            collection_lookup=self._collection_by_id,
+            environment_lookup=lambda environment_id: self.env.environment_by_id(
+                environment_id
+            ),
+            metrics=self.metrics,
+            template_service=self.template_service,
+        )
+        self.mcp_registry.reconfiguration_finished.connect(
+            self._on_mcp_server_reconfiguration_finished
+        )
         self.tabs = TabsPresenter(
             self.request_manager,
             self.state_manager,
@@ -125,7 +138,10 @@ class MainWindow(QMainWindow):
             self.settings,
             self.request_manager.get_collections,
             self.metrics,
+            mcp_registry=self.mcp_registry,
         )
+        self.env.set_mcp_server_controller(self)
+        self._load_persisted_mcp_servers()
         self._build_layout()
         wire_presenter_signals(self)
         self._create_menu_bar()
@@ -161,6 +177,9 @@ class MainWindow(QMainWindow):
             return
         self.tabs.restore_tabs()
         self.collections.restore_tree_state()
+        # The registry intentionally starts only after both stable ID sources
+        # are populated.  A missing row fails independently in start_enabled.
+        self.mcp_registry.start_enabled()
         self._ui_ready = True
         logger.info("main_window_ui_ready")
 
@@ -360,6 +379,122 @@ class MainWindow(QMainWindow):
         self.tabs.apply_settings(settings)
         self.env.apply_settings(settings)
 
+    def mcp_server_configurations(self) -> list[McpServerConfiguration]:
+        """Return independent server rows from persisted application settings."""
+        return [configuration.model_copy(deep=True) for configuration in self.settings.mcp_servers]
+
+    def mcp_server_status(self, instance_id: str):
+        """Return the current status for one configured endpoint."""
+        return self.mcp_registry.status(instance_id)
+
+    def mcp_server_activity(self, instance_id: str) -> list:
+        """Return activity for only the requested instance, if it has started."""
+        try:
+            manager = self.mcp_registry.manager_for(instance_id)
+        except KeyError:
+            return []
+        return manager.activity_log.get_entries()
+
+    def _collection_by_id(self, collection_id: str):
+        """Use the collection presenter lookup, with a test-double-safe fallback."""
+        lookup = getattr(self.collections, "collection_by_id", None)
+        if callable(lookup):
+            return lookup(collection_id)
+        return next(
+            (
+                collection
+                for collection in self.request_manager.get_collections()
+                if collection.id == collection_id
+            ),
+            None,
+        )
+
+    def upsert_mcp_server(self, configuration: McpServerConfiguration) -> None:
+        """Save one endpoint configuration without disturbing other endpoints."""
+        try:
+            previous = self._mcp_server_configuration(configuration.id)
+        except KeyError:
+            previous = None
+        if previous is not None and self.mcp_registry.is_running(configuration.id):
+            # A running row must use the registry's transactional replacement
+            # path; merely persisting it would leave the old endpoint live.
+            self.mcp_registry.reconfigure(configuration.id, configuration)
+            return
+        else:
+            self.mcp_registry.upsert(configuration)
+        configurations = {
+            existing.id: existing.model_copy(deep=True)
+            for existing in self.settings.mcp_servers
+        }
+        configurations[configuration.id] = configuration.model_copy(deep=True)
+        self.settings.mcp_servers = list(configurations.values())
+        self._save_mcp_server_configurations()
+
+    def _on_mcp_server_reconfiguration_finished(
+        self, instance_id: str, committed: bool
+    ) -> None:
+        """Persist a running-row edit only after its replacement endpoint binds."""
+        if not committed:
+            return
+        configuration = next(
+            (
+                item
+                for item in self.mcp_registry.list_configurations()
+                if item.id == instance_id
+            ),
+            None,
+        )
+        if configuration is not None:
+            self._replace_mcp_server_configuration(configuration)
+
+    def remove_mcp_server(self, instance_id: str) -> None:
+        """Stop and remove exactly one persisted endpoint."""
+        self.mcp_registry.remove(instance_id)
+        self.settings.mcp_servers = [
+            configuration
+            for configuration in self.settings.mcp_servers
+            if configuration.id != instance_id
+        ]
+        self._save_mcp_server_configurations()
+
+    def start_mcp_server(self, instance_id: str) -> None:
+        """Explicitly enable and launch one endpoint for this and future sessions."""
+        configuration = self._mcp_server_configuration(instance_id)
+        enabled = configuration.model_copy(update={"enabled": True})
+        self.mcp_registry.upsert(enabled)
+        self._replace_mcp_server_configuration(enabled)
+        self.mcp_registry.start(instance_id)
+
+    def stop_mcp_server(self, instance_id: str) -> None:
+        """Explicitly disable and stop one endpoint without touching its peers."""
+        configuration = self._mcp_server_configuration(instance_id)
+        disabled = configuration.model_copy(update={"enabled": False})
+        self.mcp_registry.upsert(disabled)
+        self._replace_mcp_server_configuration(disabled)
+        self.mcp_registry.stop(instance_id)
+
+    def _load_persisted_mcp_servers(self) -> None:
+        for configuration in self.settings.mcp_servers:
+            self.mcp_registry.upsert(configuration)
+
+    def _mcp_server_configuration(self, instance_id: str) -> McpServerConfiguration:
+        for configuration in self.settings.mcp_servers:
+            if configuration.id == instance_id:
+                return configuration
+        raise KeyError(f"Unknown MCP server instance: {instance_id}")
+
+    def _replace_mcp_server_configuration(
+        self, configuration: McpServerConfiguration
+    ) -> None:
+        self.settings.mcp_servers = [
+            configuration if existing.id == configuration.id else existing
+            for existing in self.settings.mcp_servers
+        ]
+        self._save_mcp_server_configurations()
+
+    def _save_mcp_server_configurations(self) -> None:
+        self.config_manager.save_config(self.settings)
+
     def open_settings(self) -> None:
         dialog = SettingsDialog(self.settings, self, storage=self.storage)
         if not dialog.exec():
@@ -412,6 +547,7 @@ class MainWindow(QMainWindow):
         if resolve_encryption_enabled(self.settings):
             idle = self.env.wait_storage_idle()
             logger.info("main_window_exit_storage_idle completed=%s", idle)
+        self.mcp_registry.stop_all()
         QApplication.instance().quit()
 
     def handle_show_hotkeys(self) -> None:

@@ -29,16 +29,17 @@ chain.
 
 **Residual exposure concentrates in four areas:**
 
-1. **Agent-visible MCP tool results** — full upstream HTTP response bodies (and post-script logs)
-   are returned to external MCP clients without sanitization.
+1. **Agent-visible MCP tool results** — upstream response bodies and post-script logs are
+   returned to external MCP clients after `McpResponseSanitizer` redacts hidden values and
+   common credential patterns; operators must still treat response content as sensitive.
 2. **Inbound network exposure** — metrics server now defaults to `127.0.0.1` and logs a warning
    when bound to a non-loopback address; neither MCP server surface authenticates clients.
 3. **History and log scope** — masking applies only to `Environment.hidden_keys`; non-hidden env
    values and hardcoded credentials persist resolved in `history.json`; several DEBUG/ERROR log
    lines emit fully resolved URLs.
-4. **Collection exposure model** — any request with `expose_as_mcp=True` in **any** loaded
-   collection is registered when the active environment has `enable_mcp`; there is no
-   collection-level ACL beyond the per-request checkbox.
+4. **Collection exposure model** — before PYPOST-1044, one server aggregated every loaded
+   collection. Registry endpoints now expose only their selected collection, but inbound MCP
+   remains unauthenticated and request-level `expose_as_mcp` still controls inclusion.
 
 Findings use **P1** (critical/high exposure), **P2** (policy gap or secondary surface),
 **P3** (documented behavior, low likelihood, or operator-assumption risk).
@@ -108,8 +109,8 @@ Findings use **P1** (critical/high exposure), **P2** (policy gap or secondary su
 
 | ID | Finding | Severity |
 | --- | --- | --- |
-| C-001 | MCP tools span all loaded collections | P2 |
-| C-002 | `enable_mcp` is environment-level server gate, not collection ACL | PASS (document) |
+| C-001 | MCP tools span all loaded collections | Remediated by PYPOST-1044: each endpoint selects one collection |
+| C-002 | `enable_mcp` is environment-level server gate, not collection ACL | Superseded by explicit endpoint configuration; retained only for migration |
 | C-003 | No role-based or multi-user ACL | OUT OF SCOPE |
 
 ## Follow-up Work

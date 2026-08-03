@@ -19,7 +19,7 @@ collection, and their offline import contract:
 | --- | --- |
 | `examples/environments/jira_cloud.json` | Exposes the visible, non-secret `jira_project_key` placeholder beside the hidden credentials. |
 | `examples/collections/jira_mcp.json` | Renders `jira_project_key` in the Jira Software board-list `projectKeyOrId` parameter and gives agents precise default-project guidance for search and create payloads. |
-| Active environment + `MCPServerImpl` | Existing code resolves `{{ jira_project_key }}` at tool-call time with other environment values; it does not inspect or merge JSON payload fields. |
+| Endpoint environment + `MCPServerImpl` | A registry endpoint resolves `{{ jira_project_key }}` from its configured environment snapshot at tool-call time; it does not inspect or merge JSON payload fields. |
 | `tests/test_example_fixtures.py` | Loads both JSON files through native importers and locks the placeholder, template binding, guidance, and security wording. |
 
 `jira-list-boards` is the one existing list request whose REST endpoint accepts
@@ -29,10 +29,11 @@ automatically project-scoped.
 
 ## Usage
 
-After importing the Jira environment, select **Jira Cloud MCP** as the active
-environment and replace `jira_project_key` with the normal Jira project key or
-ID. The selected value is used directly by `jira-list-boards` on the next GUI
-send or MCP tool call.
+After importing the Jira environment, select **Jira Cloud MCP** in the top bar
+for GUI sends and replace `jira_project_key` with the normal Jira project key
+or ID. For MCP, create an **MCP Servers…** row that selects the Jira collection
+and Jira Cloud MCP environment. That endpoint uses the selected value directly
+for `jira-list-boards`; changing the top-bar selection does not retarget it.
 
 For `jira-search-issues-jql` and `jira-create-issue`, callers supply a
 serialized Jira JSON payload. The collection's `mcp_description` and
@@ -51,9 +52,9 @@ For the import steps and end-user-facing safety notes, see
 | `jira_project_key` | `YOUR_PROJECT_KEY` | Replace locally with the normal project key or ID. It is visible and must not be in `hidden_keys`. |
 | `jira_credentials` | `you@example.com:your-api-token` | Replace locally and keep it as the only hidden key. Never commit a real value. |
 
-The project key is a normal environment variable, so the existing active-
-environment behavior applies: a later edit or environment change is used for
-subsequent MCP calls. It is not exposed as an `mcp.request.*` argument.
+The project key is a normal environment variable. Editing the environment
+refreshes endpoint snapshots that selected it; changing the top-bar environment
+does not alter MCP calls. It is not exposed as an `mcp.request.*` argument.
 
 ## Numeric board and sprint identifiers (PYPOST-1038)
 
@@ -96,7 +97,7 @@ network access:
 
 | Symptom | Check |
 | --- | --- |
-| Board listing ignores the expected project | Ensure the active environment is Jira Cloud MCP and `jira_project_key` is set; confirm the request retains `projectKeyOrId: {{ jira_project_key }}`. |
+| Board listing ignores the expected project | Ensure the endpoint selected Jira Cloud MCP as its environment and `jira_project_key` is set; confirm the request retains `projectKeyOrId: {{ jira_project_key }}`. |
 | An agent creates or searches in the wrong project | Inspect the supplied serialized payload. The project key is guidance only; the payload remains caller controlled. |
 | Board or sprint follow-up results are broader than expected | These endpoints follow the explicitly selected board or sprint. Do not claim that the project default filters them. |
 | Project key is hidden or importer tests fail | Keep only `jira_credentials` in `hidden_keys` and use the obvious placeholder in the committed fixture. |

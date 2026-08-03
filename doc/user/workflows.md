@@ -14,7 +14,8 @@
 1. Create two environments with the same variable names (`host`, `token`, …) but different
    values.
 2. Write requests only with placeholders, never hard-coded hosts.
-3. Switch the top dropdown before sending or before an MCP agent session.
+3. Switch the top dropdown before GUI sends. For an MCP agent session, create
+   a dedicated MCP Servers row that selects the intended environment.
 
 ## Capture an auth token
 
@@ -36,18 +37,19 @@ To start from a shipped example instead of building requests from scratch, impor
 1. Build and test the request in the GUI until **Send** succeeds.
 2. Check **MCP Tool**, fill the **MCP** tab, add `{{ mcp.request.* }}` for agent inputs.
 3. Save the request.
-4. Check **Enable MCP (Model Context Protocol)** on the environment the agent should use.
-5. Confirm **MCP: ON (host:port)** in the top bar.
-6. Point Cursor at `http://127.0.0.1:1080/mcp` (Streamable HTTP).
+4. Open **MCP Servers… → Add…** and select that request's collection, the intended
+   environment, and a unique host/port.
+5. Save the row, select it, and click **Start**; verify its row-specific state is running.
+6. Point Cursor at that row's `http://<host>:<port>/mcp` URL (Streamable HTTP).
 7. Ask the agent to list tools and call one; verify it parses the JSON envelope.
 
 Full reference: [MCP Tools](mcp-tools.md) and [MCP Integration](../mcp_integration.md).
 
 ## Debug agent usage
 
-1. Keep a single environment selected.
-2. Open **MCP Tools** to confirm names and count.
-3. Watch **MCP Activity** for `list_tools` / `call_tool`.
+1. Open **MCP Servers…** and select the endpoint the agent is using.
+2. Open **Tools…** to confirm the endpoint-specific names and count.
+3. Open **Activity…** for that row to inspect `list_tools` / `call_tool`.
 4. Re-run the same request with **Send** in PyPost if a tool call fails.
 
 ## Reuse from the shell

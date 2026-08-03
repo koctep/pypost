@@ -1,6 +1,8 @@
 """Prometheus counter registry and tracking methods (no I/O)."""
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
 from pypost.models.errors import ErrorCategory
@@ -214,6 +216,12 @@ class MetricsRegistry:
             "Whether the MCP tool server has registered tools (1=ready, 0=idle)",
             registry=self.registry,
         )
+        self.mcp_server_instances = Gauge(
+            "mcp_server_instances",
+            "Number of configured MCP server instances by lifecycle state",
+            ["state"],
+            registry=self.registry,
+        )
 
         self.mcp_tool_call_duration_seconds = Histogram(
             "mcp_tool_call_duration_seconds",
@@ -294,6 +302,12 @@ class MetricsRegistry:
 
     def set_mcp_server_up(self, ready: bool) -> None:
         self.mcp_server_up.set(1 if ready else 0)
+
+    def set_mcp_server_instance_counts(self, counts: Mapping[str, int]) -> None:
+        """Publish aggregate MCP endpoint state without identity-bearing labels."""
+        for state in ("stopped", "starting", "running", "failed"):
+            self.mcp_server_instances.labels(state=state).set(counts.get(state, 0))
+        self.set_mcp_server_up(counts.get("running", 0) > 0)
 
     def track_mcp_tool_call_duration(
         self, method: str, status: str, duration_seconds: float

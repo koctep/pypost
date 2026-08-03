@@ -196,7 +196,7 @@ line logs the collection id, not its name. See
 | Import succeeded but the result dialog says it was unsuccessful | At least one `save_collection` write failed (disk full, permissions, read-only data directory) | Read the `collection_import_save_failed` ERROR lines for the failing ids; in-memory state is ahead of disk for those collections until the next successful save |
 | Imported requests do not send correctly | `{{placeholders}}` are imported verbatim and need their environment | Select the matching environment — see [Environments Dialog](environments_dialog.md) |
 | An imported collection appears as `Copy of X` without a prompt | Two entries in the same file shared that name | Expected: in-file duplicates are always renamed, since neither is a collection you already had |
-| Agents suddenly see new MCP tools | Imported requests had `expose_as_mcp: true`; the flow emits `collections_changed`, which re-registers tools without a restart | Review a shared collection's MCP flags before importing — see [MCP Integration](mcp_integration.md) |
+| Agents suddenly see new MCP tools | Imported requests had `expose_as_mcp: true` and a running endpoint selected that collection; `collections_changed` refreshes only those endpoint(s) | Review that collection's MCP flags and endpoint selection before importing — see [MCP Integration](mcp_integration.md) |
 
 ## Related
 

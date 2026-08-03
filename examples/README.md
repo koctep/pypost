@@ -19,8 +19,8 @@ For step-by-step import UI details, see the User Guide:
   sprints (list/create/update/delete/membership), backlog, and
   assignable-user search.
 - [`environments/jira_cloud.json`](environments/jira_cloud.json) — **End users.**
-  Companion environment: `jira_base_url`, visible `jira_project_key`, hidden `jira_credentials`,
-  `enable_mcp: true`.
+  Companion environment: `jira_base_url`, visible `jira_project_key`, hidden `jira_credentials`.
+  Its retained `enable_mcp: true` field is legacy migration input.
 - [`collections/mcp.json`](collections/mcp.json) — **Contributors / local
   probing.** Local MCP/SSE probe against PyPost ports (`127.0.0.1:1080` /
   `9080`); used by test helpers. Not the primary “learn Jira + MCP” starter.
@@ -38,9 +38,11 @@ For step-by-step import UI details, see the User Guide:
      API token from Atlassian account settings); keep the key **Hidden**
 3. **Import the collection** — **Import Collection…** and choose
    `examples/collections/jira_mcp.json`.
-4. **Select** the **Jira Cloud MCP** environment in the top dropdown.
-5. **Send** a request manually, or use an agent while MCP is enabled on that
-   environment (already `enable_mcp: true` in the example).
+4. **Select** the **Jira Cloud MCP** environment in the top dropdown for manual GUI sends.
+5. **Create and start an endpoint** — open **MCP Servers…**, add a row selecting the Jira
+   collection and Jira Cloud MCP environment, choose a unique host/port, then click **Start**.
+   Point the agent at that row's `/mcp` URL. The example's `enable_mcp: true` is migration
+   input only.
 
 Auth in the collection matches Atlassian Cloud basic auth for REST APIs:
 `Authorization: Basic {{ base64(jira_credentials) }}`.

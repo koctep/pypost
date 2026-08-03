@@ -14,7 +14,8 @@ agents such as Cursor — without writing an MCP server.
 - Run Python scripts after a response (for example, save an auth token)
 - Browse request history and copy requests as cURL
 - Mark requests as MCP tools and let a local AI agent call them
-- Tune timeouts, retries, themes, encryption, and local MCP/metrics ports in Settings
+- Tune timeouts, retries, themes, encryption, and metrics ports in Settings; configure
+  each MCP endpoint's host and port in **MCP Servers…**
 
 ## Guide contents
 

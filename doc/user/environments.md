@@ -9,7 +9,9 @@ between configurations such as `Local`, `Dev`, and `Prod` without editing every 
 2. Add an environment with **+**.
 3. Select it in the list.
 4. Edit the variables table: **Variable**, **Value**, **Hidden**.
-5. Optionally check **Enable MCP Server** for this environment.
+5. The **Enable MCP Server** toggle is retained only for legacy migration. To expose
+   requests now, use **MCP Servers…** to create a row that selects this environment
+   and one collection.
 6. Save.
 
 You can rename (for example with F2 or the context menu), copy, and delete environments
@@ -98,11 +100,12 @@ Treat exported files like credential backups: store and share them carefully.
 
 ## Activate an environment
 
-Choose it in the top dropdown. All `{{ variable }}` placeholders and MCP tool calls use
-the **currently selected** environment.
+Choose it in the top dropdown. GUI request `{{ variable }}` placeholders use the
+**currently selected** environment.
 
-If you switch environments while an AI agent is connected, the next tool call uses the
-new variables. Keep one environment selected for a stable agent session.
+MCP tool calls use the environment selected in their own **MCP Servers…** row. Switching
+the top-bar selection does not retarget a running endpoint. Edit the endpoint row when an
+agent should use a different environment.
 
 ## Hidden variables
 

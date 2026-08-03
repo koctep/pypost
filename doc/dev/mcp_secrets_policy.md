@@ -11,19 +11,21 @@ hidden keys) are still merged at `call_tool` — same as GUI sends.
 
 - **Policy**: `pypost.core.mcp_secrets_policy.McpSecretsPolicy`
 - **Enforcement**: `MCPServerImpl._generate_schema` filters param specs before schema build
-- **Hidden keys source**: `EnvPresenter._current_hidden_keys` via `hidden_keys_supplier`
-- **Env values source**: `EnvPresenter._current_variables` via `variable_supplier` (PYPOST-550)
+- **Hidden keys source**: `MCPServerRegistry` copies the selected environment's hidden keys
+  into each endpoint's `hidden_keys_supplier`.
+- **Env values source**: `MCPServerRegistry` copies the selected environment's values into
+  each endpoint's `variable_supplier`.
 
 ```mermaid
 flowchart TB
-    EP[EnvPresenter]
+    Registry[MCPServerRegistry]
     Mgr[MCPServerManager]
     Impl[MCPServerImpl]
     Pol[McpSecretsPolicy]
     Agent[MCP Client]
 
-    EP -->|hidden_keys_supplier| Mgr
-    EP -->|variable_supplier| Mgr
+    Registry -->|endpoint hidden_keys_supplier| Mgr
+    Registry -->|endpoint variable_supplier| Mgr
     Mgr --> Impl
     Impl -->|list_tools| Pol
     Pol -->|filtered inputSchema| Agent
@@ -35,8 +37,8 @@ flowchart TB
 | Data | Agent-visible (`list_tools`) | Execution (`call_tool`) |
 | --- | --- | --- |
 | `{{ mcp.request.* }}` placeholders | Yes — tool input parameters | From agent arguments |
-| Environment `{{ var }}` placeholders | No | Real values from active env |
-| Hidden env keys (`Environment.hidden_keys`) | No — stripped from schema | Real values |
+| Environment `{{ var }}` placeholders | No | Real values from the endpoint's selected environment |
+| Hidden env keys (`Environment.hidden_keys`) | No — stripped from schema | Real values from the endpoint's selected environment |
 | Explicit `mcp_params` for hidden keys | No — filtered | N/A |
 
 ## API / Usage
@@ -62,27 +64,31 @@ Returns count-only dict for DEBUG logging.
 ### Wiring
 
 ```python
-# EnvPresenter (init)
-self._mcp_manager.set_hidden_keys_supplier(
-    lambda: set(self._current_hidden_keys)
-)
+# MCPServerRegistry._start_manager(...)
+tools, variables, hidden_keys = runtime
+manager.set_variable_supplier(lambda: dict(variables))
+manager.set_hidden_keys_supplier(lambda: set(hidden_keys))
 
 # MCPServerManager
 def set_hidden_keys_supplier(self, supplier):
     self._impl.set_hidden_keys_supplier(supplier)
 ```
 
+`EnvPresenter` supplies its active-environment cache only to the retained
+compatibility single-manager adapter, never to registry-owned endpoints.
+
 ## Configuration
 
-No new settings. Policy uses `Environment.hidden_keys` from the active environment when MCP
-is enabled.
+For registry-owned endpoints, the policy uses `Environment.hidden_keys` from the endpoint's
+configured environment snapshot. It does not follow the top-bar environment selection. The
+legacy single-manager path still receives its supplier from `EnvPresenter`.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Resolution |
 | --- | --- | --- |
 | Agent schema missing expected param | Key matches hidden env var name | Rename env var or use `mcp.request.*` placeholder |
-| Tool auth fails | Hidden var not in active environment | Define variable in environment; execution still uses real value |
+| Tool auth fails | Hidden var not in the endpoint environment | Define the variable in the endpoint's configured environment; execution still uses the real value |
 | Schema shows env var name | Var is `mcp.request.*`, not env-only | Expected — agent supplies that argument |
 
 ## Related tests

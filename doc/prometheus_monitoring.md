@@ -90,9 +90,10 @@ sanitized request origin only, never the rejected value or request data.
 | --- | --- | --- | --- |
 | `mcp_requests_received_total` | Counter | `method` | MCP operation received on the request-tool server (e.g. `list_tools`, `call_tool`) or observability server (`read_resource:metrics`) |
 | `mcp_responses_sent_total` | Counter | `method`, `status` | MCP response sent (`status`: `success`, `error`) |
-| `mcp_server_up` | Gauge | — | Request-tool MCP server readiness (`1` = tools registered, `0` = idle) |
+| `mcp_server_up` | Gauge | — | Request-tool MCP readiness (`1` while at least one configured endpoint is running, `0` otherwise) |
+| `mcp_server_instances` | Gauge | `state` | Aggregate configured MCP endpoints by lifecycle state (`stopped`, `starting`, `running`, `failed`); intentionally has no instance, port, collection, or environment label |
 | `mcp_tool_call_duration_seconds` | Histogram | `method`, `status` | MCP tool call wall time in seconds |
-| `mcp_active_env_changes_total` | Counter | — | Active environment changed while MCP server was running |
+| `mcp_active_env_changes_total` | Counter | — | Top-bar active environment changed; retained for compatibility and does not retarget configured MCP endpoints |
 
 The observability server on port 9080 increments `mcp_requests_received_total` and
 `mcp_responses_sent_total` when agents read the `metrics://all` resource.

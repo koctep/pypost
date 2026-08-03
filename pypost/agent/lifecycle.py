@@ -200,8 +200,7 @@ class AgentAppSession:
         composed = self._composed
         if composed is not None:
             try:
-                if composed.mcp_manager.is_running():
-                    composed.mcp_manager.stop_server()
+                composed.mcp_registry.stop_all()
             except Exception:
                 logger.exception("agent_session_mcp_stop_failed")
             try:

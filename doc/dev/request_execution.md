@@ -25,9 +25,9 @@ already perform.
 MCP requests render URL and body once each in `RequestService._execute_mcp()`.
 
 **Inbound MCP tools (PYPOST-550):** When an external agent calls `call_tool`, `MCPServerImpl`
-merges the active environment's variables with `mcp.request` tool arguments before calling
-`RequestService.execute()`. Template rendering and HTTP execution then follow the same path as
-GUI sends. See [MCP Integration](mcp_integration.md#environment-variable-injection-pypost-550).
+merges the configured endpoint environment's snapshot with `mcp.request` tool arguments before
+calling `RequestService.execute()`. Template rendering and HTTP execution then follow the same
+path as GUI sends. See [Multiple MCP Servers](mcp_server_registry.md).
 
 History entries use `SensitiveDataMaskingPolicy` with resolved fields from transport
 (PYPOST-63). Recording is orchestrated by private helpers (PYPOST-463):

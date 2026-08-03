@@ -14,9 +14,10 @@ from PySide6.QtWidgets import QApplication, QWidget, QInputDialog
 
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
+from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.models.models import Environment, Collection, RequestData
-from pypost.models.settings import AppSettings
+from pypost.models.settings import AppSettings, McpServerConfiguration
 from tests.helpers.process_until import process_until
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -115,6 +116,35 @@ class TestEnvPresenter(unittest.TestCase):
     def test_widget_is_qwidget(self):
         p = self._make_presenter()
         self.assertIsInstance(p.widget, QWidget)
+
+    def test_registry_status_summary_reports_running_and_failed_instances(self):
+        registry = MCPServerRegistry(
+            collection_lookup=lambda _id: None,
+            environment_lookup=lambda _id: None,
+        )
+        p = EnvPresenter(
+            FakeStorage(),
+            FakeConfigManager(),
+            _make_mcp_manager(),
+            AppSettings(),
+            lambda: [],
+            MagicMock(),
+            mcp_registry=registry,
+        )
+        registry.upsert(
+            McpServerConfiguration(
+                id="first", port=1081, collection_id="collection", environment_id="environment"
+            )
+        )
+        registry.upsert(
+            McpServerConfiguration(
+                id="second", port=1082, collection_id="collection", environment_id="environment"
+            )
+        )
+        registry._set_status("first", "running")
+        registry._set_status("second", "failed", "port unavailable")
+
+        self.assertEqual(p.mcp_status_text(), "MCP Servers: 1 running; 1 failed")
 
     def test_load_environments_populates_combo(self):
         envs = [_make_env("e1", "Production"), _make_env("e2", "Staging")]

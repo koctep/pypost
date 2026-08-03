@@ -18,13 +18,13 @@ these requests directly from the chat interface.
    - Check the **"MCP Tool"** checkbox (next to the URL bar).
    - Open **Actions** (right of **Send**) and click **Save** (or press `Ctrl+S`).
 
-2. **Enable Server**:
-   - Go to **Manage Environments**.
-   - Select your environment.
-   - Check **"Enable MCP Server"**.
-   - (Optional) Change port (default 1080) or host in **Settings**.
-   - Click **Save**.
-   - You should see "MCP: ON" in the top bar.
+2. **Create an endpoint**:
+   - In the top bar, select **MCP Servers…**, then **Add…**.
+   - Choose the collection whose MCP-enabled requests should be exposed and the
+     environment whose variables should be used.
+   - Choose a unique host/port (the default port is 1080) and save.
+   - Select the row and click **Start**. The top bar shows the aggregate number
+     of running MCP servers; the dialog shows each endpoint's exact state.
 
 3. **Connect Agent**:
    - Use the **Streamable HTTP** MCP URL (current MCP spec). This is the recommended
@@ -36,7 +36,7 @@ these requests directly from the chat interface.
 
    `http://localhost:1080/mcp` is equivalent when PyPost listens on localhost.
 
-   Replace host/port if you changed MCP settings. The observability MCP server (metrics
+   Replace host/port with the endpoint row you created. The observability MCP server (metrics
    resources) uses port **9080** by default: `http://127.0.0.1:9080/mcp`. See
    [Prometheus Monitoring](prometheus_monitoring.md) for the `/metrics` scrape endpoint.
 
@@ -60,15 +60,20 @@ In the Cursor UI (**Settings → Features → MCP**):
 2. Type: **Streamable HTTP** (or remote URL, depending on Cursor version).
 3. URL: `http://127.0.0.1:1080/mcp`.
 
-After connecting, open Cursor chat with MCP enabled. The agent should **list tools** exposed
-from your active PyPost environment and **call tools** on your behalf.
+After connecting, open Cursor chat with MCP enabled. The agent should **list tools** from
+that endpoint's selected collection and **call tools** using that endpoint's selected
+environment.
 
-## Active environment
+## Endpoint-specific collection and environment
 
-MCP tools always use the **environment currently selected** in PyPost's top bar. If you
-switch environments while an agent is connected, the next tool call resolves variables from
-the new environment — the agent is not notified automatically. Keep one environment selected
-for the duration of an agent session when you need stable URLs or credentials.
+Each MCP endpoint has its own selected collection and environment. Switching the top-bar
+environment does not change a running endpoint's tool catalog or credentials. To change an
+endpoint, open **MCP Servers…**, edit its row, and reconnect the agent if its host or port
+changed. Ports must be unique across configured endpoints.
+
+For an existing environment that still has **Enable MCP Server** selected, use **MCP
+Servers… → Convert current legacy MCP setting…**. It preselects that environment and legacy
+host/port, but you must choose a collection; conversion does not alter the legacy setting.
 
 ## Tool call responses (JSON envelope)
 
@@ -140,26 +145,22 @@ ecosystem transition. New setups should use `/mcp`. Legacy URL example:
 http://127.0.0.1:1080/sse/
 ```
 
-## Server Settings
+## Server settings
 
-You can change MCP server settings in global settings (**Settings**):
-
-- **MCP Server Port**: default `1080`.
-- **MCP Server Host**: default `127.0.0.1`. Change to `0.0.0.0` to make the server available
-  from external network.
-
-If the port is busy or host is unavailable, the server will not start (check console/logs for
-errors).
+Host and port are configured per **MCP Servers…** row. Every configured row must have a
+unique port. If a running-row edit cannot bind, PyPost retains the previous endpoint and
+reports the error in that row; other endpoints remain available. Prefer `127.0.0.1` — binding
+`0.0.0.0` makes unauthenticated tool execution available on the network.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | What to try |
 | --- | --- | --- |
 | Cursor shows disconnected / transport error | Wrong URL or type (SSE instead of Streamable HTTP) | Use `http://127.0.0.1:1080/mcp` and Streamable HTTP |
-| No tools listed | MCP off, wrong environment, or no requests marked MCP Tool | Enable MCP on environment; check "MCP Tool" on requests |
-| Tool call fails | Missing env vars or bad request template | Define variables in active environment; test send in GUI first |
+| No tools listed | Wrong endpoint collection or no requests marked MCP Tool | Open **MCP Servers… → Tools…** for that row; check the collection and "MCP Tool" on requests |
+| Tool call fails | Missing env vars or bad request template | Define variables in the endpoint's selected environment; test send in GUI first |
 | Agent misreads HTTP status | Treating `TextContent.text` as raw body | Parse JSON envelope; read `status` and `error` fields |
-| Wrong host or credentials mid-session | Active environment switched while agent connected | Reselect intended environment; avoid switching during agent use |
-| Connection refused | PyPost not running or MCP not started | Select environment with MCP enabled; check "MCP: ON" in top bar |
+| Wrong host or credentials mid-session | Endpoint was edited or client uses the wrong URL | Verify the selected MCP Servers row and reconnect to its host/port |
+| Connection refused | PyPost not running, row not started, or port unavailable | Start the selected MCP Servers row and inspect its row-specific error |
 
 Automated `list_tools` / `call_tool` coverage lives in `tests/test_mcp_server_integration.py`.
