@@ -272,7 +272,7 @@ class TestPlanKeepBoth(unittest.TestCase):
         self.assertEqual([req.id for req in untouched.requests], ["old-req"])
         added = result.collections[1]
         self.assertEqual(added.name, "Copy of My API")
-        self.assertEqual(result.renamed, {"My API": "Copy of My API"})
+        self.assertEqual(result.renamed, [("My API", "Copy of My API")])
         self.assertEqual([col.name for col in result.persisted], ["Copy of My API"])
 
 
@@ -351,7 +351,27 @@ class TestPlanDuplicateNamesWithinFile(unittest.TestCase):
             [col.name for col in result.collections], ["Billing", "Copy of Billing"]
         )
         self.assertEqual(result.added, ["Billing"])
-        self.assertEqual(result.renamed, {"Billing": "Copy of Billing"})
+        self.assertEqual(result.renamed, [("Billing", "Copy of Billing")])
+
+    def test_three_duplicate_names_report_two_renames_each(self) -> None:
+        existing: list[Collection] = []
+        incoming = [
+            _make_collection("i1", "API"),
+            _make_collection("i2", "API"),
+            _make_collection("i3", "API"),
+        ]
+
+        result = plan_collection_import(existing, incoming, {})
+
+        self.assertEqual(
+            [col.name for col in result.collections],
+            ["API", "Copy of API", "Copy of API (2)"],
+        )
+        self.assertEqual(result.added, ["API"])
+        self.assertEqual(
+            result.renamed, [("API", "Copy of API"), ("API", "Copy of API (2)")]
+        )
+        self.assertEqual(len(result.renamed), 2)
 
 
 class TestFormatResult(unittest.TestCase):

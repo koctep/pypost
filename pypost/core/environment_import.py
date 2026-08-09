@@ -43,7 +43,7 @@ class ImportPlanResult:
     added: list[str]
     updated: list[str]
     skipped: list[str]
-    renamed: dict[str, str]
+    renamed: list[tuple[str, str]]
     parse_errors: list[str]
 
 
@@ -127,7 +127,7 @@ def plan_import(
     added: list[str] = []
     updated: list[str] = []
     skipped: list[str] = []
-    renamed: dict[str, str] = {}
+    renamed: list[tuple[str, str]] = []
     seen_incoming_names: set[str] = set()
 
     def current_names() -> set[str]:
@@ -138,7 +138,7 @@ def plan_import(
         if name in seen_incoming_names:
             new_name = generate_import_copy_name(name, current_names())
             result_environments.append(clone_environment(env, new_name))
-            renamed[name] = new_name
+            renamed.append((name, new_name))
             continue
         seen_incoming_names.add(name)
 
@@ -164,7 +164,7 @@ def plan_import(
         elif decision is ImportConflictDecision.KEEP_BOTH:
             new_name = generate_import_copy_name(name, current_names())
             result_environments.append(clone_environment(env, new_name))
-            renamed[name] = new_name
+            renamed.append((name, new_name))
 
     return ImportPlanResult(
         environments=result_environments,
@@ -187,7 +187,7 @@ def format_import_result(result: ImportPlanResult) -> str:
     if result.renamed:
         lines.append("")
         lines.append("Renamed on import:")
-        for original, new_name in result.renamed.items():
+        for original, new_name in result.renamed:
             lines.append(f'  "{original}" -> "{new_name}"')
     if result.parse_errors:
         lines.append("")

@@ -82,6 +82,8 @@ remaining conflicts" checkbox:
 
 Duplicate names *within the imported file itself* are always renamed like Keep Both, with
 no prompt: neither duplicate is a collection the user already had locally to protect.
+Each such rename is recorded as one `(original, new_name)` pair on the plan result (see
+`renamed` below), so three same-named entries report two renames, not one.
 
 **Id** collisions are resolved silently, because they are data-integrity repairs rather
 than user decisions:
@@ -134,10 +136,17 @@ input list is mutated. A name absent from `decisions` defaults to `SKIP`.
 (the subset to write), `added` / `updated` / `skipped` / `renamed`, `request_count`, and
 `parse_errors`.
 
+`renamed` is `list[tuple[str, str]]` — one `(original_name, new_name)` pair per rename
+event (Keep Both or in-file duplicate), in plan order. It is intentionally not a
+`dict[str, str]`: several incoming records can share the same original name, and a dict
+keyed by that name would keep only the last pair (PYPOST-1003). Downstream UI only uses
+`len(result.renamed)` and truthiness; formatters iterate the pairs directly.
+
 ### `format_collection_import_result(result) -> str`
 
-Human-readable summary for the result dialog: counts, the original → new name mapping for
-renames, and any per-entry failures.
+Human-readable summary for the result dialog: counts (`len(result.renamed)` for the
+Renamed line), every `"original" -> "new_name"` pair from `result.renamed`, and any
+per-entry failures.
 
 ### `apply_imported_collections(manager, collections, persisted) -> list[str]`
 
@@ -196,6 +205,7 @@ line logs the collection id, not its name. See
 | Import succeeded but the result dialog says it was unsuccessful | At least one `save_collection` write failed (disk full, permissions, read-only data directory) | Read the `collection_import_save_failed` ERROR lines for the failing ids; in-memory state is ahead of disk for those collections until the next successful save |
 | Imported requests do not send correctly | `{{placeholders}}` are imported verbatim and need their environment | Select the matching environment — see [Environments Dialog](environments_dialog.md) |
 | An imported collection appears as `Copy of X` without a prompt | Two entries in the same file shared that name | Expected: in-file duplicates are always renamed, since neither is a collection you already had |
+| Result dialog "Renamed" count is lower than the number of `Copy of …` names in the tree | `renamed` was stored as a dict keyed by original name (fixed in PYPOST-1003) | Confirm you are on a build where `CollectionImportPlanResult.renamed` is `list[tuple[str, str]]`; n same-named duplicates should report n−1 renames |
 | Agents suddenly see new MCP tools | Imported requests had `expose_as_mcp: true` and a running endpoint selected that collection; `collections_changed` refreshes only those endpoint(s) | Review that collection's MCP flags and endpoint selection before importing — see [MCP Integration](mcp_integration.md) |
 
 ## Related

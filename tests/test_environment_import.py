@@ -191,7 +191,29 @@ class TestPlanImportKeepBoth(unittest.TestCase):
         new_env = result.environments[1]
         self.assertEqual(new_env.name, "Copy of Dev")
         self.assertNotEqual(new_env.id, existing_dev.id)
-        self.assertEqual(result.renamed, {"Dev": "Copy of Dev"})
+        self.assertEqual(result.renamed, [("Dev", "Copy of Dev")])
+
+
+class TestPlanImportDuplicateNamesWithinFile(unittest.TestCase):
+    def test_three_duplicate_names_report_two_renames_each(self) -> None:
+        existing: list[Environment] = []
+        incoming = [
+            Environment(name="Dev"),
+            Environment(name="Dev"),
+            Environment(name="Dev"),
+        ]
+
+        result = plan_import(existing, incoming, {})
+
+        self.assertEqual(
+            [env.name for env in result.environments],
+            ["Dev", "Copy of Dev", "Copy of Dev (2)"],
+        )
+        self.assertEqual(result.added, ["Dev"])
+        self.assertEqual(
+            result.renamed, [("Dev", "Copy of Dev"), ("Dev", "Copy of Dev (2)")]
+        )
+        self.assertEqual(len(result.renamed), 2)
 
 
 class TestPlanImportSkip(unittest.TestCase):

@@ -107,15 +107,19 @@ Widget-focused tests: `tests/test_environment_variables_widget.py`. Full dialog 
   no-prompt case.
 - `plan_import(existing, incoming, decisions)` — pure function returning an
   `ImportPlanResult` (`environments`, `added`, `updated`, `skipped`,
-  `renamed`, `parse_errors`). `OVERWRITE` preserves the existing
-  environment's `id` and list position (adopts incoming
-  `variables`/`hidden_keys`/`enable_mcp`) so `settings.last_environment_id`
-  and the encryption-envelope reuse cache
+  `renamed`, `parse_errors`). `renamed` is `list[tuple[str, str]]` — one
+  `(original_name, new_name)` pair per rename event (Keep Both or in-file
+  duplicate), in plan order — not a `dict[str, str]`, so several incoming
+  records that share a name all appear in the summary (PYPOST-1003).
+  `OVERWRITE` preserves the existing environment's `id` and list position
+  (adopts incoming `variables`/`hidden_keys`/`enable_mcp`) so
+  `settings.last_environment_id` and the encryption-envelope reuse cache
   (`EnvironmentVariablesAdapter._persisted_variables`, keyed by `id`) are not
   invalidated. `KEEP_BOTH` appends a renamed clone (fresh id) via
   `clone_environment`. Duplicate names *within* the incoming file itself are
   always treated like `KEEP_BOTH`, with no prompt.
-- `format_import_result(result)` — pure formatter for the summary dialog,
+- `format_import_result(result)` — pure formatter for the summary dialog
+  (`len(result.renamed)` for the Renamed count; iterates every pair),
   mirroring `format_migration_report` in `encryption_migration.py`.
 
 `EnvironmentListWidget.import_environments()` orchestrates: file picker
@@ -195,6 +199,9 @@ N/A
 ## Troubleshooting
 - **Hidden Values Losing Data**: Ensure that when `HIDDEN_MASK` is displayed, the real value is stored in `Qt.ItemDataRole.UserRole`. Check `_extract_real_value` and `_make_value_item` for details on how the value is preserved.
 - **Duplicate Environment Names**: When copying an environment, the UI validates that the new name is not empty and does not already exist, prompting the user again if invalid.
+- **Import "Renamed" undercount**: If the summary Renamed count is lower than the
+  number of `Copy of …` names after import, confirm `ImportPlanResult.renamed` is
+  `list[tuple[str, str]]` (PYPOST-1003). n same-named duplicates report n−1 renames.
 
 ## Testing
 

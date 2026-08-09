@@ -61,7 +61,7 @@ class CollectionImportPlanResult:
     added: list[str]
     updated: list[str]
     skipped: list[str]
-    renamed: dict[str, str]
+    renamed: list[tuple[str, str]]
     request_count: int
     parse_errors: list[str]
 
@@ -228,7 +228,7 @@ def plan_collection_import(
     added: list[str] = []
     updated: list[str] = []
     skipped: list[str] = []
-    renamed: dict[str, str] = {}
+    renamed: list[tuple[str, str]] = []
     persisted: list[Collection] = []
     request_count = 0
     seen_incoming_names: set[str] = set()
@@ -239,7 +239,7 @@ def plan_collection_import(
         new_col = _materialize(source, new_name, taken_collection_ids, taken_request_ids)
         result.append(new_col)
         persisted.append(new_col)
-        renamed[name] = new_name
+        renamed.append((name, new_name))
         request_count += len(new_col.requests)
 
     for source in incoming:
@@ -300,7 +300,7 @@ def format_collection_import_result(result: CollectionImportPlanResult) -> str:
     if result.renamed:
         lines.append("")
         lines.append(SUMMARY_RENAMED_HEADER)
-        for original, new_name in result.renamed.items():
+        for original, new_name in result.renamed:
             lines.append(f'  "{original}" -> "{new_name}"')
     if result.parse_errors:
         lines.append("")
