@@ -14,7 +14,7 @@ would refuse.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from pypost.core.collection_messages import format_collection_entry_error
 from pypost.models.models import Collection
@@ -29,10 +29,14 @@ MSG_SAVE_FAILED = "could not be saved ({reason})"
 
 def apply_imported_collections(
     manager: "RequestManager",
-    collections: List[Collection],
-    persisted: List[Collection],
+    collections: list[Collection],
+    persisted: list[Collection],
 ) -> list[str]:
     """Swap in the imported collection list and persist the changed subset.
+
+    On any ``OSError`` during persist, reloads collections from durable storage
+    so in-memory state matches disk before returning (PYPOST-1004). Happy path
+    does not reload.
 
     Args:
         manager: The request manager owning the live collection list.
@@ -59,6 +63,16 @@ def apply_imported_collections(
             failures.append(
                 format_collection_entry_error(col.name, MSG_SAVE_FAILED.format(reason=exc))
             )
+
+    if failures:
+        # Durable storage is source of truth after any mid-write save failure
+        # (PYPOST-1004 approach C): align memory before callers refresh the tree.
+        manager.reload_collections()
+        logger.warning(
+            "collection_import_reconciled failed_count=%d collection_count=%d",
+            len(failures),
+            len(manager.get_collections()),
+        )
 
     logger.info(
         "collection_import_applied collection_count=%d persisted_count=%d failed_count=%d",

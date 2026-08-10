@@ -155,9 +155,25 @@ Swaps in the planned list via `RequestManager.apply_loaded_collections` (which r
 per collection that could not be written; the loop continues past a failure so one bad
 write cannot strand the rest.
 
+If any write raises `OSError`, the function calls `manager.reload_collections()` before
+returning so in-memory collections and `_request_index` match durable storage
+(PYPOST-1004). Successful sibling writes stay on disk and remain visible after reload;
+failed ones are absent or revert to the previous on-disk file. When every write succeeds,
+there is no reload.
+
 Deliberately **not** routed through `RequestManager.create_collection`, which rejects
 duplicate names: an import resolves name conflicts through an explicit user decision and
 may legitimately produce a name `create_collection` would refuse.
+
+### Result dialog after save failure (contract B)
+
+After apply returns with save failures (and memory has been reconciled),
+`CollectionImportActions` still formats the result from the **plan** (`added` /
+`updated` / `skipped` / `renamed` / `request_count`), appends the save-failure lines,
+sets `success=False`, refreshes the tree (now durable-aligned), and shows the
+unsuccessful dialog. Plan counts describe the attempted import; they are **not**
+recomputed against the post-reload durable set. The tree shows what is on disk; the
+dialog shows what was attempted plus which saves failed.
 
 ### Testing seam
 
@@ -188,13 +204,25 @@ In `collection_import_actions.py`:
 In `collection_import_apply.py`:
 
 - **INFO** `collection_import_applied collection_count=… persisted_count=…
-  failed_count=…`
-- **ERROR** `collection_import_save_failed collection_id=… error=…`
+  failed_count=…` — `collection_count` is the **planned** list length passed into
+  apply (pre-reconcile), not the post-reload size
+- **ERROR** `collection_import_save_failed collection_id=… error=…` — one per
+  failed write
+- **WARNING** `collection_import_reconciled failed_count=… collection_count=…` —
+  emitted only after `reload_collections()` when save failures are non-empty;
+  `collection_count` is the post-reload in-memory size (durable-aligned). Absent
+  on the happy path
+
+Operator reading order on mid-write failure: ERROR `collection_import_save_failed`
+(one or more), then WARNING `collection_import_reconciled`, then INFO
+`collection_import_applied` with `failed_count > 0`, then INFO
+`collection_import_completed` with `error_count > 0` (UI).
 
 Collection and request **names**, URLs, headers, bodies, and scripts are never logged — an
 imported collection routinely carries credentials in a header template. The failed-write
 line logs the collection id, not its name. See
-`ai-tasks/PYPOST-987/50-observability.md`.
+`ai-tasks/PYPOST-987/50-observability.md` and
+`ai-tasks/PYPOST-1004/50-observability.md`.
 
 ## Troubleshooting
 
@@ -202,7 +230,7 @@ line logs the collection id, not its name. See
 | --- | --- | --- |
 | "No valid collections found in this file." | The file parsed, but every entry was rejected — most often a foreign format whose root object has no top-level `name` | Check the per-entry reasons listed below the message in the same dialog; export from PyPost or hand-write the documented shape |
 | An entry is listed as `Entry 3: missing or empty "name" field` | That record had no usable `name`, so it could not be labelled | `name` is the one required field on a collection record |
-| Import succeeded but the result dialog says it was unsuccessful | At least one `save_collection` write failed (disk full, permissions, read-only data directory) | Read the `collection_import_save_failed` ERROR lines for the failing ids; in-memory state is ahead of disk for those collections until the next successful save |
+| Result dialog is unsuccessful and plan counts look higher than the tree | At least one `save_collection` write failed (disk full, permissions, read-only data directory); apply reloaded memory from disk (PYPOST-1004) | Read ERROR `collection_import_save_failed` for failing ids, then WARNING `collection_import_reconciled`; the tree matches durable storage; dialog counts are plan attempts (contract B), not a post-reload recount |
 | Imported requests do not send correctly | `{{placeholders}}` are imported verbatim and need their environment | Select the matching environment — see [Environments Dialog](environments_dialog.md) |
 | An imported collection appears as `Copy of X` without a prompt | Two entries in the same file shared that name | Expected: in-file duplicates are always renamed, since neither is a collection you already had |
 | Result dialog "Renamed" count is lower than the number of `Copy of …` names in the tree | `renamed` was stored as a dict keyed by original name (fixed in PYPOST-1003) | Confirm you are on a build where `CollectionImportPlanResult.renamed` is `list[tuple[str, str]]`; n same-named duplicates should report n−1 renames |
