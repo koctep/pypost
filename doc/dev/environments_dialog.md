@@ -156,7 +156,12 @@ to all", partial-parse success, no-op without `read_import_file`, and the
 → on-disk envelope equality for unchanged Hidden / fresh envelope for
 changed Hidden → `load_environments` (see also
 `doc/dev/environment_encryption_at_rest.md` § Overwrite import × selective
-re-encrypt).
+re-encrypt). PYPOST-1000 locks presenter wiring in
+`tests/test_env_presenter.py::test_open_env_manager_passes_working_read_import_file`:
+`_open_env_manager` must pass a `read_import_file` that, against a
+`FakeStorageManager` subclass with working deserialize, loads candidates
+from a temp JSON file (same patch-`EnvironmentDialog` style as the export
+serializer wiring test).
 
 ## Export environments (PYPOST-988)
 

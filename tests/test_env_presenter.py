@@ -2,10 +2,12 @@ import pytest
 
 pytestmark = pytest.mark.timeout(60)
 
+import json
 import logging
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -18,6 +20,7 @@ from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.models.models import Environment, Collection, RequestData
 from pypost.models.settings import AppSettings, McpServerConfiguration
+from tests.helpers import FakeStorageManager
 from tests.helpers.process_until import process_until
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -632,6 +635,52 @@ class TestEnvPresenter(unittest.TestCase):
             serializer.__func__,
             p._storage.serialize_environment_records.__func__,
         )
+
+    @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
+    def test_open_env_manager_passes_working_read_import_file(self, mock_dialog):
+        """PYPOST-1000: presenter wires a storage-backed read_import_file."""
+
+        class ImportFakeStorage(FakeStorageManager):
+            def deserialize_environment_records(self, records):
+                environments = [
+                    Environment.model_validate(record) for record in records
+                ]
+                return environments, ()
+
+        storage = ImportFakeStorage()
+        config = FakeConfigManager()
+        mcp = _make_mcp_manager()
+        presenter = EnvPresenter(
+            storage, config, mcp, AppSettings(), lambda: [], MagicMock()
+        )
+        mock_dialog.return_value.environments = []
+
+        presenter._open_env_manager()
+
+        read_import_file = mock_dialog.call_args.kwargs["read_import_file"]
+        self.assertIsNotNone(read_import_file)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            import_path = Path(tmp) / "import.json"
+            import_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "name": "Imported",
+                            "variables": {"HOST": "imported.example.com"},
+                            "hidden_keys": [],
+                            "enable_mcp": False,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            environments, parse_errors = read_import_file(import_path)
+
+        self.assertEqual(parse_errors, [])
+        self.assertEqual(len(environments), 1)
+        self.assertEqual(environments[0].name, "Imported")
+        self.assertEqual(environments[0].variables["HOST"], "imported.example.com")
 
     def test_widget_properties_removed(self):
         p = self._make_presenter([])
