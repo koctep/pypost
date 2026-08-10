@@ -150,7 +150,13 @@ Tests: `tests/test_environment_import.py` (pure logic, no Qt) and
 `tests/test_environment_list_widget.py::TestImportEnvironments` (Qt-level,
 happy path, cancel, invalid file, zero-candidates, single conflict, "apply
 to all", partial-parse success, no-op without `read_import_file`, and the
-`environment_import_completed` log line).
+`environment_import_completed` log line). PYPOST-999 adds
+`test_overwrite_import_reuses_unchanged_and_reencrypts_changed_hidden` in
+`test_environment_import.py`: Overwrite `plan_import` → `save_environments`
+→ on-disk envelope equality for unchanged Hidden / fresh envelope for
+changed Hidden → `load_environments` (see also
+`doc/dev/environment_encryption_at_rest.md` § Overwrite import × selective
+re-encrypt).
 
 ## Export environments (PYPOST-988)
 

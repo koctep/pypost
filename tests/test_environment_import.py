@@ -1,8 +1,8 @@
-"""Failing repro tests for pypost.core.environment_import (PYPOST-986).
+"""Tests for pypost.core.environment_import (PYPOST-986 / PYPOST-999).
 
-RED by design: pypost.core.environment_import does not exist yet, so every test
-in this module fails at collection with ModuleNotFoundError until Step 4
-implements the module per ai-tasks/PYPOST-986/20-architecture.md.
+Covers pure plan/conflict helpers and the Overwrite × ciphertext-reuse
+round-trip lock
+(`test_overwrite_import_reuses_unchanged_and_reencrypts_changed_hidden`).
 """
 
 import pytest
@@ -174,6 +174,74 @@ class TestPlanImportOverwrite(unittest.TestCase):
         self.assertEqual(updated.hidden_keys, {"A"})
         self.assertTrue(updated.enable_mcp)
         self.assertEqual(result.updated, ["Dev"])
+
+
+def test_overwrite_import_reuses_unchanged_and_reencrypts_changed_hidden(
+    tmp_path, monkeypatch
+):
+    """PYPOST-999: Overwrite import × save × reload locks ciphertext reuse.
+
+    Verification debt: expected green against current production (no product
+    change intended). Proves unchanged Hidden keeps the same on-disk envelope
+    after Overwrite; changed Hidden gets a new envelope and reloads correctly.
+    """
+    fernet = pytest.importorskip("cryptography.fernet")
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_ENABLED", "true")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+
+    storage = StorageManager(data_dir=tmp_path / "pypost-data")
+    settings = AppSettings(env_encryption_enabled=True)
+    storage.apply_encryption_settings(settings)
+
+    initial = Environment(
+        id="existing-dev-id",
+        name="Dev",
+        variables={"KEEP": "same-secret", "CHANGE": "old-secret"},
+        hidden_keys={"KEEP", "CHANGE"},
+    )
+    storage.save_environments([initial])
+
+    with open(storage.environments_file, "r", encoding="utf-8") as handle:
+        pre_payload = json.load(handle)
+    pre_vars = pre_payload[0]["variables"]
+    keep_envelope_before = pre_vars["KEEP"]
+    change_envelope_before = pre_vars["CHANGE"]
+    assert isinstance(keep_envelope_before, dict) and keep_envelope_before.get("enc") is True
+    assert (
+        isinstance(change_envelope_before, dict) and change_envelope_before.get("enc") is True
+    )
+
+    incoming = [
+        Environment(
+            name="Dev",
+            variables={"KEEP": "same-secret", "CHANGE": "new-secret"},
+            hidden_keys={"KEEP", "CHANGE"},
+        )
+    ]
+    result = plan_import([initial], incoming, {"Dev": ImportConflictDecision.OVERWRITE})
+    planned = result.environments[0]
+    assert planned.id == "existing-dev-id"
+
+    stats = storage.save_environments(result.environments)
+    assert stats.reused_count >= 1
+    assert stats.encrypted_count >= 1
+
+    with open(storage.environments_file, "r", encoding="utf-8") as handle:
+        post_payload = json.load(handle)
+    post_vars = post_payload[0]["variables"]
+    keep_envelope_after = post_vars["KEEP"]
+    change_envelope_after = post_vars["CHANGE"]
+
+    assert keep_envelope_after == keep_envelope_before
+    assert change_envelope_after != change_envelope_before
+    assert isinstance(change_envelope_after, dict) and change_envelope_after.get("enc") is True
+
+    reloaded = storage.load_environments()
+    assert len(reloaded) == 1
+    assert reloaded[0].id == "existing-dev-id"
+    assert reloaded[0].variables["KEEP"] == "same-secret"
+    assert reloaded[0].variables["CHANGE"] == "new-secret"
 
 
 class TestPlanImportKeepBoth(unittest.TestCase):

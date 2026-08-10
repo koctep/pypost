@@ -134,6 +134,29 @@ Example output fields: `first_save_ms`, `reuse_second_save_ms`, `full_reencrypt_
 `speedup_full_over_reuse`. Requires `cryptography` and `PYPOST_ENV_ENCRYPTION_ENABLED=true`; the
 script generates a temporary key when `PYPOST_ENV_ENCRYPTION_KEY` is unset.
 
+### Overwrite import × selective re-encrypt (PYPOST-999)
+
+Import **Overwrite** preserves the existing environment `id`, so the next
+save still hits the adapter reuse cache for that id. Adapter unit tests and
+the selective-re-encrypt benchmark do not call `plan_import`; CI locks the
+combination here:
+
+```bash
+# Node id: test_overwrite_import_reuses_unchanged_and_reencrypts_changed_hidden
+.venv/bin/python -m pytest tests/test_environment_import.py -k \
+  test_overwrite_import_reuses_unchanged -v
+```
+
+| Guard | Assertion |
+| --- | --- |
+| Identity | Planned env keeps pre-import `id` after Overwrite |
+| Unchanged Hidden | On-disk envelope equal to pre-import (reuse) |
+| Changed Hidden | Envelope differs; still encrypted; reload is new plaintext |
+| Stats | `reused_count >= 1` and `encrypted_count >= 1` after import save |
+
+Uses a local Fernet key and `tmp_path` `StorageManager` — no live key
+services.
+
 ### Environment load contracts (PYPOST-525)
 
 Two public load methods coexist on `StorageManager`:
