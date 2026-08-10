@@ -1,4 +1,5 @@
 """User-visible strings for the collection import and export UI."""
+
 from __future__ import annotations
 
 DIALOG_TITLE_IMPORT_COLLECTION = "Import Collection"
@@ -24,6 +25,7 @@ MSG_IMPORT_COLLECTION_CONFLICT = (
     "the imported version?"
 )
 MSG_IMPORT_NO_VALID_COLLECTIONS = "No valid collections found in this file."
+MSG_IMPORT_PREPARING = "Preparing collection import…"
 
 MSG_FILE_UNREADABLE = "Could not read file: {reason}"
 MSG_FILE_NOT_JSON = "File is not valid JSON: {reason}"

@@ -67,6 +67,10 @@ with all of its requests — in from a file:
 
 Notes:
 
+- Large files keep the main window responsive while PyPost prepares the import. The status
+  bar shows **Preparing collection import…** and **Import Collection…** stays disabled
+  until prepare finishes; you can still use the rest of the app. Conflict prompts and the
+  summary dialog appear afterward, as before.
 - **Overwrite replaces a collection's requests wholesale** — it is not a per-request
   merge. The existing collection keeps its identity and position in the tree, but any
   request in it that is not in the imported file is gone. Choose **Keep Both** if you want

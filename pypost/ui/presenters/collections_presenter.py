@@ -123,6 +123,9 @@ class CollectionsPresenter(QObject):
             refresh_tree=self.refresh_tree,
             restore_tree_state=self.restore_tree_state,
             emit_collections_changed=self.collections_changed.emit,
+            show_status=self._show_import_status,
+            clear_status=self._clear_import_status,
+            parent=self,
         )
         self._export_actions = CollectionExportActions(
             self._panel,
@@ -257,6 +260,20 @@ class CollectionsPresenter(QObject):
     def import_collections(self) -> None:
         """Run the Import Collection flow (delegated to CollectionImportActions)."""
         self._import_actions.import_collections()
+
+    def _show_import_status(self, message: str) -> None:
+        """Show a non-modal preparing cue on the main window status bar if present."""
+        window = self._panel.window()
+        status_bar = getattr(window, "statusBar", None)
+        if callable(status_bar):
+            status_bar().showMessage(message)
+
+    def _clear_import_status(self) -> None:
+        """Clear the import preparing status message when the cue ends."""
+        window = self._panel.window()
+        status_bar = getattr(window, "statusBar", None)
+        if callable(status_bar):
+            status_bar().clearMessage()
 
     def export_collection(self) -> None:
         """Run the Export Collection flow (delegated to CollectionExportActions)."""

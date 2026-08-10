@@ -2,17 +2,21 @@
 
 Split out of ``CollectionsPresenter`` the same way ``CollectionTreeActions`` and
 ``CollectionsAsyncLoader`` are: the presenter owns the tree and the panel, this
-owns the picker → prompt → plan → persist → refresh flow. All decision logic
-lives in the Qt-free ``pypost.core.collection_import``; this module only
-sequences it against dialogs and app state.
+owns the picker → async parse → prompt → plan → persist → refresh flow. Parse
+runs on a ``QThread`` (PYPOST-1005); conflict prompts and apply stay on the GUI
+thread. All decision logic lives in the Qt-free
+``pypost.core.collection_import``; this module only sequences it against dialogs
+and app state.
 """
+
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QObject
+from PySide6.QtWidgets import QPushButton, QWidget
 
 from pypost.core.collection_import import (
     CollectionImportFileError,
@@ -21,8 +25,15 @@ from pypost.core.collection_import import (
     plan_collection_import,
 )
 from pypost.core.collection_import_apply import apply_imported_collections
-from pypost.core.collection_messages import MSG_IMPORT_NO_VALID_COLLECTIONS
+from pypost.core.collection_messages import (
+    MSG_IMPORT_NO_VALID_COLLECTIONS,
+    MSG_IMPORT_PREPARING,
+)
 from pypost.core.import_conflicts import ImportConflictDecision
+from pypost.core.qt.collection_import_parse_worker import (
+    CollectionImportParseWorker,
+    ReadImportFile,
+)
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import Collection
 from pypost.ui.collection_item_dialogs import (
@@ -31,43 +42,111 @@ from pypost.ui.collection_item_dialogs import (
     show_collection_import_invalid_file_error,
     show_collection_import_result,
 )
+from pypost.ui.widget_ids import COLLECTION_IMPORT_BUTTON
 
 logger = logging.getLogger(__name__)
 
-ReadImportFile = Callable[[Path], "tuple[list[Collection], list[str]]"]
+# Short join after QThread.finished so native cleanup completes before GC/delete
+# (PYPOST-829 H3). Bound must stay small — slot runs on the GUI thread.
+_WORKER_FINISH_WAIT_MS = 100
 
 
-class CollectionImportActions:
+class CollectionImportActions(QObject):
     """Runs one Import Collection interaction end to end."""
 
     def __init__(
         self,
-        parent: QWidget,
+        parent_widget: QWidget,
         request_manager: RequestManager,
         *,
         read_import_file: ReadImportFile,
         refresh_tree: Callable[[], None],
         restore_tree_state: Callable[[], None],
         emit_collections_changed: Callable[[], None],
+        show_status: Callable[[str], None] | None = None,
+        clear_status: Callable[[], None] | None = None,
+        parent: QObject | None = None,
     ) -> None:
-        self._parent = parent
+        super().__init__(parent)
+        self._parent = parent_widget
         self._request_manager = request_manager
         self._read_import_file = read_import_file
         self._refresh_tree = refresh_tree
         self._restore_tree_state = restore_tree_state
         self._emit_collections_changed = emit_collections_changed
+        self._show_status = show_status
+        self._clear_status = clear_status
+        self._worker: CollectionImportParseWorker | None = None
+        self._preparing = False
+
+    def is_busy(self) -> bool:
+        """True while a parse worker is in flight (busy cue / re-entry guard)."""
+        if self._preparing:
+            return True
+        return self._worker is not None and self._worker.isRunning()
 
     def import_collections(self) -> None:
-        """Pick a file, resolve name conflicts, persist, and refresh the tree."""
+        """Pick a file, parse off-thread, then finish import on the GUI thread."""
+        if self.is_busy():
+            logger.info("collection_import_skipped reason=busy")
+            return
+
         path = prompt_import_collection_file(self._parent)
         if path is None:
             return
 
-        candidates = self._load(path)
-        if candidates is None:
-            return
-        collections, parse_errors = candidates
+        self._start_parse(path)
 
+    def _start_parse(self, path: Path) -> None:
+        self._set_preparing(True)
+        worker = CollectionImportParseWorker(path, self._read_import_file)
+        worker.parse_completed.connect(self._on_parse_completed)
+        worker.parse_failed.connect(self._on_parse_failed)
+        worker.finished.connect(self._on_worker_finished)
+        self._worker = worker
+        worker.start()
+        logger.info("collection_import_parse_started path=%s", path)
+
+    def _on_parse_completed(
+        self,
+        collections: list[Collection],
+        parse_errors: list[str],
+    ) -> None:
+        self._set_preparing(False)
+        if not collections:
+            logger.warning("collection_import_file_invalid reason=no_valid_collections")
+            message = MSG_IMPORT_NO_VALID_COLLECTIONS
+            if parse_errors:
+                message = "\n".join([message, ""] + parse_errors)
+            show_collection_import_invalid_file_error(self._parent, message)
+            return
+        self._finish_import(collections, parse_errors)
+
+    def _on_parse_failed(self, error: object) -> None:
+        self._set_preparing(False)
+        if isinstance(error, CollectionImportFileError):
+            logger.warning("collection_import_file_invalid reason=%s", error)
+            show_collection_import_invalid_file_error(self._parent, str(error))
+            return
+        logger.error("collection_import_parse_unexpected error=%s", error)
+        show_collection_import_invalid_file_error(self._parent, str(error))
+
+    def _on_worker_finished(self) -> None:
+        finished = self._worker
+        self._worker = None
+        if finished is not None:
+            finished.deleteLater()
+            if not finished.wait(_WORKER_FINISH_WAIT_MS):
+                logger.warning(
+                    "collection_import_worker_finish_wait_timeout wait_ms=%d",
+                    _WORKER_FINISH_WAIT_MS,
+                )
+
+    def _finish_import(
+        self,
+        collections: list[Collection],
+        parse_errors: list[str],
+    ) -> None:
         existing = self._request_manager.get_collections()
         decisions = self._resolve_conflicts(existing, collections)
         result = plan_collection_import(existing, collections, decisions)
@@ -101,29 +180,19 @@ class CollectionImportActions:
             success=success,
         )
 
-    def _load(self, path: Path) -> tuple[list[Collection], list[str]] | None:
-        """Parse the picked file, or report why nothing can be imported from it.
-
-        A file that cannot be read at all and a file that yields no usable
-        collection get the same "nothing changed" treatment, so app state is
-        never touched on either path.
-        """
-        try:
-            collections, parse_errors = self._read_import_file(path)
-        except CollectionImportFileError as exc:
-            logger.warning("collection_import_file_invalid reason=%s", exc)
-            show_collection_import_invalid_file_error(self._parent, str(exc))
-            return None
-
-        if not collections:
-            logger.warning("collection_import_file_invalid reason=no_valid_collections")
-            message = MSG_IMPORT_NO_VALID_COLLECTIONS
-            if parse_errors:
-                message = "\n".join([message, ""] + parse_errors)
-            show_collection_import_invalid_file_error(self._parent, message)
-            return None
-
-        return collections, parse_errors
+    def _set_preparing(self, active: bool) -> None:
+        self._preparing = active
+        button = self._parent.findChild(QPushButton, COLLECTION_IMPORT_BUTTON)
+        if button is not None:
+            button.setEnabled(not active)
+        if active:
+            if self._show_status is not None:
+                self._show_status(MSG_IMPORT_PREPARING)
+            logger.debug("collection_import_busy_cue_shown")
+        else:
+            if self._clear_status is not None:
+                self._clear_status()
+            logger.debug("collection_import_busy_cue_cleared")
 
     def _resolve_conflicts(
         self,

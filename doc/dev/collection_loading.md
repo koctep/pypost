@@ -151,7 +151,8 @@ For a full vs incremental tree refresh inventory (audit closure
 
 ## Related
 
-- [Collection Import](collection_import.md) — user-triggered file import; shares
+- [Collection Import](collection_import.md) — user-triggered file import; async parse
+  worker (PYPOST-1005) shares finish-teardown hygiene; apply still uses
   `apply_loaded_collections` for the in-memory swap
 - [Collection Tree Performance](collection_tree_performance.md)
 - [Collection Storage](collection_storage.md)
