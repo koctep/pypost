@@ -37,7 +37,7 @@ class TestCollectionTreeRenameDelegateE2E(unittest.TestCase):
         col = make_collection("c1", "My API", [req])
         harness = self._prepare_harness([col])
         req_item = harness.model.item(0).child(0)
-        with patch_rename_context_menu(harness.view, req_item.index(), action_count=3):
+        with patch_rename_context_menu(harness.view, req_item.index(), action_count=4):
             harness.actions.show_context_menu(QPoint(0, 0))
         editor = wait_for_rename_editor(harness.view)
         self.assertEqual(editor.text(), "Old Name")
@@ -58,7 +58,7 @@ class TestCollectionTreeRenameDelegateE2E(unittest.TestCase):
         col = make_collection("c1", "Old Collection")
         harness = self._prepare_harness([col])
         item = harness.model.item(0)
-        with patch_rename_context_menu(harness.view, item.index(), action_count=2):
+        with patch_rename_context_menu(harness.view, item.index(), action_count=3):
             harness.actions.show_context_menu(QPoint(0, 0))
         editor = wait_for_rename_editor(harness.view)
         commit_inline_rename(harness.view, editor, "New Collection")
@@ -77,7 +77,7 @@ class TestCollectionTreeRenameDelegateE2E(unittest.TestCase):
         col = make_collection("c1", "My API", [req])
         harness = self._prepare_harness([col])
         req_item = harness.model.item(0).child(0)
-        with patch_rename_context_menu(harness.view, req_item.index(), action_count=3):
+        with patch_rename_context_menu(harness.view, req_item.index(), action_count=4):
             harness.actions.show_context_menu(QPoint(0, 0))
         editor = wait_for_rename_editor(harness.view)
         editor.setText("Changed But Not Saved")
@@ -101,7 +101,7 @@ class TestCollectionTreeRenameDelegateE2E(unittest.TestCase):
         col = make_collection("c1", "My API", [req])
         harness = self._prepare_harness([col])
         req_item = harness.model.item(0).child(0)
-        with patch_rename_context_menu(harness.view, req_item.index(), action_count=3):
+        with patch_rename_context_menu(harness.view, req_item.index(), action_count=4):
             harness.actions.show_context_menu(QPoint(0, 0))
         editor = wait_for_rename_editor(harness.view)
         commit_inline_rename(harness.view, editor, "   ")

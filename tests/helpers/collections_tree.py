@@ -112,16 +112,23 @@ def patch_view_context_menu(view, item_index, actions, selected) -> Iterator[Mag
 
 
 def make_delete_menu_actions(action_count: int) -> tuple[list[MagicMock], MagicMock]:
+    """Build mocked menu actions for delete flows.
+
+    ``action_count`` is the full menu size after PYPOST-1013:
+    - 3: collection row [Export, Rename, Delete]
+    - 4: request row [New tab, Export, Rename, Delete]
+    """
+    export_action = MagicMock()
     rename_action = MagicMock()
     delete_action = MagicMock()
-    if action_count == 2:
-        return [rename_action, delete_action], delete_action
+    if action_count == 3:
+        return [export_action, rename_action, delete_action], delete_action
     new_tab_action = MagicMock()
-    return [new_tab_action, rename_action, delete_action], delete_action
+    return [new_tab_action, export_action, rename_action, delete_action], delete_action
 
 
 @contextmanager
-def patch_delete_context_menu(view, item_index, *, action_count: int = 2) -> Iterator[MagicMock]:
+def patch_delete_context_menu(view, item_index, *, action_count: int = 3) -> Iterator[MagicMock]:
     """Patch view and QMenu for delete-selected context-menu flows."""
     actions, delete_action = make_delete_menu_actions(action_count)
     with patch_view_context_menu(view, item_index, actions, delete_action):
@@ -129,15 +136,21 @@ def patch_delete_context_menu(view, item_index, *, action_count: int = 2) -> Ite
 
 
 @contextmanager
-def patch_rename_context_menu(view, item_index, *, action_count: int = 2) -> Iterator[MagicMock]:
-    """Patch view and QMenu for rename-selected context-menu flows."""
+def patch_rename_context_menu(view, item_index, *, action_count: int = 3) -> Iterator[MagicMock]:
+    """Patch view and QMenu for rename-selected context-menu flows.
+
+    ``action_count`` is the full menu size after PYPOST-1013:
+    - 3: collection row [Export, Rename, Delete]
+    - 4: request row [New tab, Export, Rename, Delete]
+    """
+    export_action = MagicMock()
     rename_action = MagicMock()
     delete_action = MagicMock()
-    if action_count == 2:
-        actions = [rename_action, delete_action]
+    if action_count == 3:
+        actions = [export_action, rename_action, delete_action]
     else:
         new_tab_action = MagicMock()
-        actions = [new_tab_action, rename_action, delete_action]
+        actions = [new_tab_action, export_action, rename_action, delete_action]
     with patch_view_context_menu(view, item_index, actions, rename_action):
         yield rename_action
 
@@ -153,6 +166,7 @@ class IsolatedTreeActions:
     emit_request_renamed: MagicMock = field(default_factory=MagicMock)
     emit_requests_deleted: MagicMock = field(default_factory=MagicMock)
     emit_open_isolated_tab: MagicMock = field(default_factory=MagicMock)
+    export_collection: MagicMock = field(default_factory=MagicMock)
     refresh_tree: MagicMock = field(default_factory=MagicMock)
     restore_tree_state: MagicMock = field(default_factory=MagicMock)
     _collection_items_by_id: dict[str, QStandardItem] = field(default_factory=dict)
@@ -264,6 +278,7 @@ def build_isolated_tree_actions(
         emit_request_renamed=harness.emit_request_renamed,
         emit_requests_deleted=harness.emit_requests_deleted,
         emit_open_isolated_tab=harness.emit_open_isolated_tab,
+        export_collection=harness.export_collection,
     )
     if with_rename_delegate:
         wire_rename_delegate(harness)

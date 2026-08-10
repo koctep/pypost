@@ -26,7 +26,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
         self.addCleanup(close_isolated_tree_actions, harness)
         item = harness.model.item(0)
         with patch.object(harness.view, "edit") as mock_edit:
-            with patch_rename_context_menu(harness.view, item.index(), action_count=2):
+            with patch_rename_context_menu(harness.view, item.index(), action_count=3):
                 harness.actions.show_context_menu(QPoint(0, 0))
         harness.metrics.track_gui_collection_rename_action.assert_called_once_with(
             "collection", "selected"
@@ -41,7 +41,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
         self.addCleanup(close_isolated_tree_actions, harness)
         req_item = harness.model.item(0).child(0)
         with patch.object(harness.view, "edit") as mock_edit:
-            with patch_rename_context_menu(harness.view, req_item.index(), action_count=3):
+            with patch_rename_context_menu(harness.view, req_item.index(), action_count=4):
                 harness.actions.show_context_menu(QPoint(0, 0))
         harness.metrics.track_gui_collection_rename_action.assert_called_once_with(
             "request", "selected"
@@ -116,7 +116,7 @@ class TestCollectionTreeRenameContextMenu(unittest.TestCase):
         self.addCleanup(close_isolated_tree_actions, harness)
         item = harness.model.item(0)
         with patch.object(harness.view, "edit"):
-            with patch_rename_context_menu(harness.view, item.index(), action_count=2):
+            with patch_rename_context_menu(harness.view, item.index(), action_count=3):
                 harness.actions.show_context_menu(QPoint(0, 0))
         harness.metrics.track_gui_collection_rename_action.assert_has_calls(
             [call("collection", "selected")],

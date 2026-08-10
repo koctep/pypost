@@ -45,6 +45,7 @@ conventions.
 1. [Collection Loading](collection_loading.md)
 1. [Collection Storage](collection_storage.md)
 1. [Collection Import](collection_import.md)
+1. [Collection Export](collection_export.md)
 1. [Collection Tree Actions](collection_tree_actions.md)
 1. [Collection Tree Performance](collection_tree_performance.md)
 1. [Collection Item Delete](collection_item_delete.md)

@@ -41,7 +41,8 @@ The goal is to allow direct cleanup from the tree without extra navigation.
 
 Entry point for right-click actions on collection tree items.
 
-- Builds a `QMenu` with optional **New tab**, `Rename`, and `Delete`.
+- Builds a `QMenu` with optional **New tab**, **Export Collection…**, `Rename`, and
+  `Delete`.
 - Emits telemetry for selected/cancelled/succeeded/not-found/error outcomes.
 - Delegates deletion to `handle_delete` after confirmation.
 

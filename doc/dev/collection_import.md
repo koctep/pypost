@@ -354,7 +354,8 @@ the collection id, not its name.
 
 ## Related
 
-- [Collection Export](collection_export.md) — write a collection to the same JSON shape (PYPOST-989)
+- [Collection Export](collection_export.md) — write a collection to the same JSON shape
+  (PYPOST-989; context-menu entry point PYPOST-1013)
 - [Collection Storage](collection_storage.md) — the on-disk format this feature reads
 - [Collection Loading](collection_loading.md) — the async startup path that shares
   `apply_loaded_collections` and the worker finish-teardown pattern

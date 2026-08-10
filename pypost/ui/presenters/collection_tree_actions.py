@@ -5,11 +5,15 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QMenu, QTreeView
 
+from pypost.core.collection_messages import BUTTON_EXPORT_COLLECTION
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.request_manager import RequestManager
+from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
+from pypost.models.models import RequestData
 from pypost.ui.collection_item_dialogs import (
     confirm_delete,
     show_delete_failure,
@@ -18,9 +22,6 @@ from pypost.ui.collection_item_dialogs import (
     show_rename_failure,
     show_rename_not_found,
 )
-from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
-from pypost.core.request_manager import RequestManager
-from pypost.models.models import RequestData
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class CollectionTreeActions:
         emit_request_renamed: Callable[[str, str], None],
         emit_requests_deleted: Callable[[list], None],
         emit_open_isolated_tab: Callable[[RequestData], None],
+        export_collection: Callable[[QModelIndex], None] | None = None,
     ) -> None:
         self._view = view
         self._model = model
@@ -56,6 +58,7 @@ class CollectionTreeActions:
         self._emit_request_renamed = emit_request_renamed
         self._emit_requests_deleted = emit_requests_deleted
         self._emit_open_isolated_tab = emit_open_isolated_tab
+        self._export_collection = export_collection
         self._pending_rename: dict | None = None
 
     @property
@@ -81,6 +84,11 @@ class CollectionTreeActions:
                 "Open a separate copy of this request; edits in other tabs won't apply here."
             )
 
+        export_action = None
+        export_collection = self._export_collection
+        if export_collection is not None:
+            export_action = menu.addAction(BUTTON_EXPORT_COLLECTION)
+
         rename_action = menu.addAction("Rename")
         delete_action = menu.addAction("Delete")
         selected_action = menu.exec(self._view.viewport().mapToGlobal(pos))
@@ -93,6 +101,19 @@ class CollectionTreeActions:
             )
             self._metrics.track_gui_new_tab_action("collections_context")
             self._emit_open_isolated_tab(copy_request_for_isolated_tab(data))
+            return
+
+        if (
+            export_action is not None
+            and selected_action == export_action
+            and export_collection is not None
+        ):
+            logger.info(
+                "collection_export_selected item_type=%s item_id=%s",
+                item_type,
+                item_id,
+            )
+            export_collection(index)
             return
 
         if selected_action == rename_action:

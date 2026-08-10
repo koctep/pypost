@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QModelIndex, QObject, Qt, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QTreeView, QWidget
 
@@ -100,6 +100,7 @@ class CollectionsPresenter(QObject):
             emit_request_renamed=self.request_renamed.emit,
             emit_requests_deleted=self.requests_deleted.emit,
             emit_open_isolated_tab=self.open_request_in_isolated_tab.emit,
+            export_collection=self._export_collection_at_index,
         )
         self._view.setItemDelegate(
             CollectionItemRenameDelegate(
@@ -278,6 +279,10 @@ class CollectionsPresenter(QObject):
     def export_collection(self) -> None:
         """Run the Export Collection flow (delegated to CollectionExportActions)."""
         self._export_actions.export_collection()
+
+    def _export_collection_at_index(self, source_index: QModelIndex) -> None:
+        """Export using a clicked tree index (context-menu entry point)."""
+        self._export_actions.export_collection(source_index=source_index)
 
     def restore_tree_state(self) -> None:
         """Re-expands nodes from StateManager state."""

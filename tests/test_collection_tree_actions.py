@@ -1,14 +1,13 @@
 """Direct unit tests for CollectionTreeActions (menu dispatch, rename flows)."""
 
-import pytest
-
-pytestmark = pytest.mark.timeout(60)
-
+import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtCore import QPoint, QModelIndex
+import pytest
+from PySide6.QtCore import QModelIndex, QPoint
 
+from pypost.core.collection_messages import BUTTON_EXPORT_COLLECTION
 from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
     close_isolated_tree_actions,
@@ -17,8 +16,10 @@ from tests.helpers.collections_tree import (
     patch_view_context_menu,
 )
 
-@pytest.mark.usefixtures("qapp")
+pytestmark = pytest.mark.timeout(60)
 
+
+@pytest.mark.usefixtures("qapp")
 class TestCollectionTreeActionsIsolated(unittest.TestCase):
     def test_invalid_index_skips_context_menu(self):
         harness = build_isolated_tree_actions([make_collection("c1", "My API")])
@@ -29,30 +30,107 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
                 harness.actions.show_context_menu(QPoint(0, 0))
         mock_menu_class.assert_not_called()
 
-    def test_collection_menu_offers_rename_and_delete(self):
+    def test_collection_menu_offers_export_collection(self):
+        """PYPOST-1013: collection row menu offers Export Collection…, Rename, Delete."""
         harness = build_isolated_tree_actions([make_collection("c1", "My API")])
         self.addCleanup(close_isolated_tree_actions, harness)
         item = harness.model.item(0)
         with patch_view_context_menu(
-            harness.view, item.index(), [MagicMock(), MagicMock()], None
+            harness.view,
+            item.index(),
+            [MagicMock(), MagicMock(), MagicMock()],
+            None,
         ) as mock_menu:
             harness.actions.show_context_menu(QPoint(0, 0))
-        self.assertEqual(mock_menu.addAction.call_count, 2)
+        self.assertEqual(mock_menu.addAction.call_count, 3)
         labels = [call.args[0] for call in mock_menu.addAction.call_args_list]
-        self.assertEqual(labels, ["Rename", "Delete"])
+        self.assertEqual(labels, [BUTTON_EXPORT_COLLECTION, "Rename", "Delete"])
 
-    def test_request_menu_offers_new_tab_rename_delete(self):
+    def test_request_menu_offers_export_collection(self):
+        """PYPOST-1013: request row menu offers New tab, Export Collection…, Rename, Delete."""
         req = make_request("r1", "Get users")
         col = make_collection("c1", "My API", [req])
         harness = build_isolated_tree_actions([col])
         self.addCleanup(close_isolated_tree_actions, harness)
         req_item = harness.model.item(0).child(0)
         with patch_view_context_menu(
-            harness.view, req_item.index(), [MagicMock(), MagicMock(), MagicMock()], None
+            harness.view,
+            req_item.index(),
+            [MagicMock(), MagicMock(), MagicMock(), MagicMock()],
+            None,
         ) as mock_menu:
             harness.actions.show_context_menu(QPoint(0, 0))
         labels = [call.args[0] for call in mock_menu.addAction.call_args_list]
-        self.assertEqual(labels, ["New tab", "Rename", "Delete"])
+        self.assertEqual(
+            labels,
+            ["New tab", BUTTON_EXPORT_COLLECTION, "Rename", "Delete"],
+        )
+
+    def test_collection_export_menu_dispatches_clicked_index(self):
+        """PYPOST-1013: choosing Export Collection… passes the clicked index."""
+        harness = build_isolated_tree_actions([make_collection("c1", "My API")])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        item = harness.model.item(0)
+        export_action = MagicMock()
+        with patch_view_context_menu(
+            harness.view,
+            item.index(),
+            [export_action, MagicMock(), MagicMock()],
+            export_action,
+        ):
+            harness.actions.show_context_menu(QPoint(0, 0))
+        harness.export_collection.assert_called_once()
+        self.assertEqual(
+            harness.export_collection.call_args.args[0],
+            item.index(),
+        )
+
+    def test_request_export_menu_dispatches_clicked_index(self):
+        """PYPOST-1013: request-row Export Collection… passes the clicked index."""
+        req = make_request("r1", "Get users")
+        col = make_collection("c1", "My API", [req])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        req_item = harness.model.item(0).child(0)
+        export_action = MagicMock()
+        with patch_view_context_menu(
+            harness.view,
+            req_item.index(),
+            [MagicMock(), export_action, MagicMock(), MagicMock()],
+            export_action,
+        ):
+            harness.actions.show_context_menu(QPoint(0, 0))
+        harness.export_collection.assert_called_once()
+        self.assertEqual(
+            harness.export_collection.call_args.args[0],
+            req_item.index(),
+        )
+
+    def test_collection_export_menu_logs_selected(self):
+        """PYPOST-1013: menu Export logs collection_export_selected before dispatch."""
+        harness = build_isolated_tree_actions([make_collection("c1", "My API")])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        item = harness.model.item(0)
+        export_action = MagicMock()
+        with self.assertLogs(
+            "pypost.ui.presenters.collection_tree_actions",
+            level=logging.INFO,
+        ) as captured:
+            with patch_view_context_menu(
+                harness.view,
+                item.index(),
+                [export_action, MagicMock(), MagicMock()],
+                export_action,
+            ):
+                harness.actions.show_context_menu(QPoint(0, 0))
+        self.assertTrue(
+            any(
+                "collection_export_selected item_type=collection item_id=c1"
+                in message
+                for message in captured.output
+            )
+        )
+        harness.export_collection.assert_called_once()
 
     def test_rename_selected_starts_inline_edit(self):
         req = make_request("r1", "Get users")
@@ -66,7 +144,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
             with patch_view_context_menu(
                 harness.view,
                 req_item.index(),
-                [MagicMock(), rename_action, delete_action],
+                [MagicMock(), MagicMock(), rename_action, delete_action],
                 rename_action,
             ):
                 harness.actions.show_context_menu(QPoint(0, 0))
@@ -88,7 +166,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         with patch_view_context_menu(
             harness.view,
             req_item.index(),
-            [new_tab_action, rename_action, delete_action],
+            [new_tab_action, MagicMock(), rename_action, delete_action],
             new_tab_action,
         ):
             harness.actions.show_context_menu(QPoint(0, 0))
@@ -104,7 +182,10 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         rename_action = MagicMock()
         delete_action = MagicMock()
         with patch_view_context_menu(
-            harness.view, item.index(), [rename_action, delete_action], delete_action
+            harness.view,
+            item.index(),
+            [MagicMock(), rename_action, delete_action],
+            delete_action,
         ):
             harness.actions.show_context_menu(QPoint(0, 0))
         self.assertEqual(harness.model.rowCount(), 1)
@@ -123,7 +204,7 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         with patch_view_context_menu(
             harness.view,
             req_item.index(),
-            [new_tab_action, rename_action, delete_action],
+            [new_tab_action, MagicMock(), rename_action, delete_action],
             delete_action,
         ):
             harness.actions.show_context_menu(QPoint(0, 0))

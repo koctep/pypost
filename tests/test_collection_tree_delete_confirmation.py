@@ -27,7 +27,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = False
         item = harness.model.item(0)
-        with patch_delete_context_menu(harness.view, item.index(), action_count=2):
+        with patch_delete_context_menu(harness.view, item.index(), action_count=3):
             harness.actions.show_context_menu(QPoint(0, 0))
         mock_confirm_delete.assert_called_once()
         self.assertEqual("My API", mock_confirm_delete.call_args.args[1])
@@ -43,7 +43,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = True
         item = harness.model.item(0)
-        with patch_delete_context_menu(harness.view, item.index(), action_count=2):
+        with patch_delete_context_menu(harness.view, item.index(), action_count=3):
             harness.actions.show_context_menu(QPoint(0, 0))
         harness.metrics.track_gui_collection_delete_action.assert_has_calls(
             [call("collection", "selected"), call("collection", "succeeded")]
@@ -58,7 +58,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = False
         req_item = harness.model.item(0).child(0)
-        with patch_delete_context_menu(harness.view, req_item.index(), action_count=3):
+        with patch_delete_context_menu(harness.view, req_item.index(), action_count=4):
             harness.actions.show_context_menu(QPoint(0, 0))
         harness.metrics.track_gui_collection_delete_action.assert_has_calls(
             [call("request", "selected"), call("request", "cancelled")]
@@ -73,7 +73,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = True
         req_item = harness.model.item(0).child(0)
-        with patch_delete_context_menu(harness.view, req_item.index(), action_count=3):
+        with patch_delete_context_menu(harness.view, req_item.index(), action_count=4):
             harness.actions.show_context_menu(QPoint(0, 0))
         harness.metrics.track_gui_collection_delete_action.assert_has_calls(
             [call("request", "selected"), call("request", "succeeded")]
@@ -90,7 +90,7 @@ class TestCollectionTreeDeleteConfirmation(unittest.TestCase):
         self.addCleanup(close_isolated_tree_actions, harness)
         mock_confirm_delete.return_value = False
         item = harness.model.item(0)
-        with patch_delete_context_menu(harness.view, item.index(), action_count=2):
+        with patch_delete_context_menu(harness.view, item.index(), action_count=3):
             harness.actions.show_context_menu(QPoint(0, 0))
         mock_handle_delete.assert_not_called()
 

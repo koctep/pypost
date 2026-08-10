@@ -93,11 +93,12 @@ data directory; PyPost does not currently read Postman, Insomnia, or OpenAPI fil
 
 To share or back up a collection without digging into the data directory:
 
-1. Click a **collection name** in the sidebar tree (or a request inside it — the parent
-   collection is exported).
-2. Click **Export Collection…** below the tree.
-3. Choose where to save the file. The default filename is based on the collection name.
-4. When it finishes, a confirmation dialog shows the path and how many requests were
+1. Select the collection in the sidebar tree (or a request inside it — the parent
+   collection is exported), then either:
+   - Click **Export Collection…** below the tree, or
+   - Right-click the collection or request row and choose **Export Collection…**.
+2. Choose where to save the file. The default filename is based on the collection name.
+3. When it finishes, a confirmation dialog shows the path and how many requests were
    exported.
 
 The file is one JSON object with the same shape as **Import a collection** expects — a
@@ -117,6 +118,8 @@ Notes:
 
 Right-click a collection or request in the tree:
 
+- **Export Collection…** — write the collection (or parent collection for a request) to a
+  JSON file (same flow as the below-tree button)
 - **Rename** — change the display name
 - **Delete** — remove the item (you will be asked to confirm)
 

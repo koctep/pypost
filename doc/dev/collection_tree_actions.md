@@ -4,8 +4,8 @@
 
 `CollectionTreeActions` (`pypost/ui/presenters/collection_tree_actions.py`) owns
 right-click context-menu behavior for the collections tree: **New tab** (requests only),
-**Rename**, and **Delete**. It also handles the inline rename editor lifecycle and delete
-confirmation flow.
+**Export Collection…** (collection or parent of a request; PYPOST-1013), **Rename**, and
+**Delete**. It also handles the inline rename editor lifecycle and delete confirmation flow.
 
 `CollectionsPresenter` wires the tree view to this class and keeps tree loading, navigation,
 and expand/collapse state.
@@ -16,8 +16,11 @@ and expand/collapse state.
 flowchart TB
     CP[CollectionsPresenter]
     CTA[CollectionTreeActions]
+    CEA[CollectionExportActions]
     RM[RequestManager]
     CP -->|callbacks + signals| CTA
+    CTA -->|export_collection clicked index| CP
+    CP --> CEA
     CTA --> RM
     CP --> Model[QStandardItemModel]
     CP --> View[QTreeView]
@@ -26,16 +29,18 @@ flowchart TB
 
 | Component | Role |
 |-----------|------|
-| `CollectionsPresenter` | Builds tree model, left-click open, expand/collapse state |
+| `CollectionsPresenter` | Tree model, open, expand/collapse; injects export |
 | `CollectionItemRenameDelegate` | Inline rename editor lifecycle |
-| `CollectionTreeActions` | Context menu, rename callbacks, delete with confirmation |
-| `collection_item_dialogs` | Shared QMessageBox helpers for collection, tab, env, and history flows |
+| `CollectionTreeActions` | Context menu (New tab / Export / Rename / Delete) |
+| `CollectionExportActions` | Shared export; see [collection_export.md](collection_export.md) |
+| `collection_item_dialogs` | Shared dialogs (collection, tab, env, history) |
 | `RequestManager` | `rename_collection_item`, `delete_collection_item` |
 
 Wiring in `CollectionsPresenter.__init__`:
 
 - `setItemDelegate(CollectionItemRenameDelegate)` — commit/cancel callbacks to tree actions
 - `customContextMenuRequested` → `CollectionTreeActions.show_context_menu`
+- `export_collection=self._export_collection_at_index` — menu export uses clicked index
 
 ## Expand/collapse state (`CollectionsPresenter`)
 
@@ -58,6 +63,17 @@ Request indices are ignored by expand/collapse persistence (unchanged behavior).
 ### `CollectionTreeActions.show_context_menu(pos)`
 
 Resolves the item at `pos`, builds the menu, and dispatches the selected action.
+
+Menu order (PYPOST-1013):
+
+| Row type | Actions |
+|----------|---------|
+| Collection | **Export Collection…**, Rename, Delete |
+| Request | New tab, **Export Collection…**, Rename, Delete |
+
+**Export Collection…** is omitted when the optional `export_collection` callback is
+`None` (isolated rename/delete harnesses). Production always injects it. Choosing export
+logs `collection_export_selected` then calls `export_collection(clicked_index)`.
 
 ### `CollectionTreeActions.handle_rename_committed(new_name)`
 
@@ -124,27 +140,46 @@ main window, save dialog, save orchestrator, and settings dialog helpers.
 | `emit_request_renamed` | After request rename |
 | `emit_requests_deleted` | After delete with affected request IDs |
 | `emit_open_isolated_tab` | After **New tab** on a request |
+| `export_collection` | Optional clicked-index export (PYPOST-1013) |
 
 ## Configuration
 
 No task-specific settings. Metrics use existing `MetricsManager` counters documented in
-`doc/dev/collection_item_rename.md` and `doc/dev/collection_item_delete.md`.
+`doc/dev/collection_item_rename.md` and `doc/dev/collection_item_delete.md`. Export has no
+GUI metrics; menu selection logs `collection_export_selected` (see
+[collection_export.md](collection_export.md#logging)).
 
 ## Automated tests
 
 `tests/helpers/collections_tree.py` provides shared fixtures (`FakeRequestManager`,
-`patch_tree_context_menu`, `patch_rename_context_menu`, `build_isolated_tree_actions()`,
-`wire_rename_delegate`, `wait_for_rename_editor`, `commit_inline_rename`,
-`cancel_inline_rename`, etc.) for presenter integration and isolated `CollectionTreeActions`
-tests. Pass `with_rename_delegate=True` to `build_isolated_tree_actions` for end-to-end rename
-editor tests. The isolated harness builds a minimal
-`QTreeView` + `QStandardItemModel` with `MagicMock` callbacks (no `CollectionsPresenter`).
+`patch_tree_context_menu`, `patch_rename_context_menu`, `patch_delete_context_menu`,
+`build_isolated_tree_actions()`, `wire_rename_delegate`, `wait_for_rename_editor`,
+`commit_inline_rename`, `cancel_inline_rename`, etc.) for presenter integration and
+isolated `CollectionTreeActions` tests. Pass `with_rename_delegate=True` to
+`build_isolated_tree_actions` for end-to-end rename editor tests. The isolated harness
+builds a minimal `QTreeView` + `QStandardItemModel` with `MagicMock` callbacks (no
+`CollectionsPresenter`) and wires a mock `export_collection` by default.
+
+After PYPOST-1013, mocked menu helpers take `action_count` as the **full** menu size:
+
+| `action_count` | Row | Action list |
+|----------------|-----|-------------|
+| `3` (default) | Collection | `[Export, Rename, Delete]` |
+| `4` | Request | `[New tab, Export, Rename, Delete]` |
+
+Rename/delete suites pass `action_count=3` or `4` so they still select Rename/Delete by
+position after Export was inserted.
 
 `tests/test_collection_tree_actions.py` covers menu dispatch and rename callbacks in isolation:
 
 | Test | Behavior |
 |------|----------|
 | `test_invalid_index_skips_context_menu` | Blank click — no menu |
+| `test_collection_menu_offers_export_collection` | Collection menu includes Export (PYPOST-1013) |
+| `test_request_menu_offers_export_collection` | Request menu includes Export (PYPOST-1013) |
+| `test_collection_export_menu_dispatches_clicked_index` | Export dispatch + clicked index |
+| `test_request_export_menu_dispatches_clicked_index` | Request-row export passes clicked index |
+| `test_collection_export_menu_logs_selected` | Logs `collection_export_selected` |
 | `test_collection_menu_offers_rename_and_delete` | Collection node actions |
 | `test_request_menu_offers_new_tab_rename_delete` | Request node actions |
 | `test_rename_selected_starts_inline_edit` | Rename dispatches inline edit |
@@ -219,6 +254,12 @@ coalescing and `flush_pending_save()` durability.
 
 Patch `QMenu` and dialog helpers under `pypost.ui.presenters.collection_tree_actions`,
 not `collections_presenter`.
+
+### Rename/delete tests assert the wrong action after adding Export
+
+Bump `action_count` to `3` (collection) or `4` (request) so mocked action lists include
+the Export slot. See `make_delete_menu_actions` / `patch_rename_context_menu` in
+`tests/helpers/collections_tree.py`.
 
 ### Rename pending state in tests
 

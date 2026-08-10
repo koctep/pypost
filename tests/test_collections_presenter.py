@@ -323,7 +323,10 @@ class TestCollectionsPresenter(unittest.TestCase):
         rename_action = MagicMock()
         delete_action = MagicMock()
         with patch_view_context_menu(
-            presenter._view, item.index(), [rename_action, delete_action], delete_action
+            presenter._view,
+            item.index(),
+            [MagicMock(), rename_action, delete_action],
+            delete_action,
         ):
             presenter._tree_actions.show_context_menu(QPoint(0, 0))
         mock_handle_delete.assert_not_called()
@@ -342,7 +345,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         with patch_view_context_menu(
             presenter._view,
             req_item.index(),
-            [new_tab_action, rename_action, delete_action],
+            [new_tab_action, MagicMock(), rename_action, delete_action],
             delete_action,
         ):
             presenter._tree_actions.show_context_menu(QPoint(0, 0))
@@ -449,7 +452,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         req_item = presenter._model.item(0).child(0)
         with patch.object(presenter._view, "edit") as mock_edit:
             with patch_rename_context_menu(
-                presenter._view, req_item.index(), action_count=3
+                presenter._view, req_item.index(), action_count=4
             ):
                 presenter._tree_actions.show_context_menu(QPoint(0, 0))
         self.assertIsNotNone(presenter._pending_rename)
@@ -467,7 +470,7 @@ class TestCollectionsPresenter(unittest.TestCase):
         presenter.load_collections()
         item = presenter._model.item(0)
         with patch.object(presenter._view, "edit") as mock_edit:
-            with patch_rename_context_menu(presenter._view, item.index(), action_count=2):
+            with patch_rename_context_menu(presenter._view, item.index(), action_count=3):
                 presenter._tree_actions.show_context_menu(QPoint(0, 0))
         self.assertEqual(
             presenter._pending_rename, {"item_id": "c1", "item_type": "collection"}

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import QTreeView, QWidget
 
@@ -55,12 +55,17 @@ class CollectionExportActions:
         self._request_manager = request_manager
         self._serialize_collection = serialize_collection
 
-    def export_collection(self) -> None:
-        """Write the selected collection (with requests) to a user-chosen file."""
+    def export_collection(self, source_index: QModelIndex | None = None) -> None:
+        """Write a collection (with requests) to a user-chosen file.
+
+        When ``source_index`` is omitted, uses the tree's ``currentIndex()``
+        (below-tree button). Context-menu callers pass the clicked index.
+        """
         if self._serialize_collection is None:
             return
 
-        collection_id = _selected_collection_id(self._model, self._tree.currentIndex())
+        index = self._tree.currentIndex() if source_index is None else source_index
+        collection_id = _selected_collection_id(self._model, index)
         target = collection_for_export(
             self._request_manager.get_collections(),
             selected_collection_id=collection_id,
@@ -101,20 +106,22 @@ class CollectionExportActions:
         )
 
 
-def _selected_collection_id(model: QStandardItemModel, index) -> str | None:
+def _selected_collection_id(
+    model: QStandardItemModel, index: QModelIndex
+) -> str | None:
     """Resolve the tree's current index to a collection id, if any."""
     if not index.isValid():
         return None
     item = model.itemFromIndex(index)
     if item is None:
         return None
-    data = item.data(Qt.UserRole)
+    data = item.data(Qt.ItemDataRole.UserRole)
     if isinstance(data, str):
         return data
     if isinstance(data, RequestData):
         parent = item.parent()
         if parent is not None:
-            parent_data = parent.data(Qt.UserRole)
+            parent_data = parent.data(Qt.ItemDataRole.UserRole)
             if isinstance(parent_data, str):
                 return parent_data
     return None

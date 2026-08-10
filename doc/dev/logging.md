@@ -200,6 +200,10 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `rename_collection_succeeded` | INFO | `collection_id`, `new_name` | `request_manager` |
 | `collection_item_delete_*` | INFO/WARNING/ERROR | `item_type`, `item_id`, … | tree actions |
 | `collection_item_rename_*` | INFO/WARNING/ERROR | `item_type`, `item_id`, `new_name`, … | tree actions |
+| `collection_export_selected` | INFO | `item_type`, `item_id` | tree actions (menu only) |
+| `collection_export_no_selection` | WARNING | — | export actions |
+| `collection_export_failed` | WARNING | `reason` | export actions |
+| `collection_export_completed` | INFO | `collection_name`, `request_count`, `path` | export actions |
 | `collection_request_opened` | INFO | `request_id`, `request_name` | collections presenter |
 | `collection_storage_async_load_dispatched` | INFO | — | async loader |
 | `collection_storage_async_load_failed` | ERROR | `error` | async loader |

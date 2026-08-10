@@ -41,7 +41,8 @@ The goal is to allow quick in-place renaming directly in the tree.
 
 Entry point for right-click actions on collection tree items.
 
-- Builds a `QMenu` with optional **New tab** (requests), `Rename`, and `Delete`.
+- Builds a `QMenu` with optional **New tab** (requests), **Export Collection…**,
+  `Rename`, and `Delete`.
 - On `Rename`, records selection telemetry and starts inline editing.
 
 ### `CollectionTreeActions._start_rename(index)` (internal)
