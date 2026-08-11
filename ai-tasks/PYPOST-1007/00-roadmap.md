@@ -1,5 +1,10 @@
 # Roadmap: PYPOST-1007
 
+## Suggested Branch Name
+
+`fix/PYPOST-1007-mypy-baseline-line-churn` (reference only — work was committed directly on the
+current branch per sprint-task-runner convention, no branch was created or switched).
+
 ## Step Status
 
 - [x] **STEP 1: Requirements Gathering and Documentation**
