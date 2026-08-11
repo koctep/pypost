@@ -114,6 +114,22 @@ Notes:
 - Export does not remove or change the collection in your sidebar — it only writes a
   copy to disk.
 
+## Export all collections
+
+To make one complete collection backup:
+
+1. Click **Export All Collections…** below the collection tree. This action does not
+   require selecting a collection or request first.
+2. Choose the destination. The suggested filename is `collections.json`.
+3. The confirmation dialog shows the saved path plus the number of collections and
+   requests included. To restore the backup, use **Import Collection…** and choose this
+   file; import accepts its JSON list directly.
+
+An empty library is still exported successfully as an empty JSON list (`[]`). The backup
+is non-destructive: it does not alter the collections or requests currently in the
+sidebar. As with any collection export, the file can contain saved request values; store
+or share it according to your data-sensitivity requirements.
+
 ## Rename and delete
 
 Right-click a collection or request in the tree:

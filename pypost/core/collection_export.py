@@ -19,8 +19,11 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "CollectionExportError",
     "CollectionExportResult",
+    "CollectionsExportResult",
+    "build_all_export_payload",
     "build_export_payload",
     "collection_for_export",
+    "format_all_export_result",
     "format_export_result",
     "suggested_export_filename",
     "write_export_file",
@@ -36,6 +39,15 @@ class CollectionExportResult:
     """Summary of a completed collection export."""
 
     collection_name: str
+    request_count: int
+    path: Path
+
+
+@dataclass(frozen=True)
+class CollectionsExportResult:
+    """Summary of a completed all-collections export."""
+
+    collection_count: int
     request_count: int
     path: Path
 
@@ -73,13 +85,20 @@ def build_export_payload(collection: Collection) -> dict:
     return payload
 
 
-def write_export_file(path: Path, payload: dict) -> None:
+def build_all_export_payload(collections: list[Collection]) -> list[dict]:
+    """Serialize collections in order into the native JSON-list import shape."""
+    payload = [build_export_payload(collection) for collection in collections]
+    logger.info("collections_export_payload_built collection_count=%d", len(payload))
+    return payload
+
+
+def write_export_file(path: Path, payload: dict | list[dict]) -> None:
     """Write the export payload to ``path`` as indented UTF-8 JSON."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         text = json.dumps(payload, indent=2)
         path.write_text(text + "\n", encoding="utf-8")
-    except OSError as exc:
+    except (OSError, TypeError, ValueError) as exc:
         raise CollectionExportError(f"Could not write file: {exc}") from exc
     logger.info("collection_export_file_written path=%s", path)
 
@@ -88,6 +107,18 @@ def format_export_result(result: CollectionExportResult) -> str:
     """Human-readable summary for the export result dialog."""
     lines = [
         f'Exported collection "{result.collection_name}" ({result.request_count} request(s)) to:',
+        str(result.path),
+    ]
+    return "\n".join(lines)
+
+
+def format_all_export_result(result: CollectionsExportResult) -> str:
+    """Human-readable summary for the all-collections export result dialog."""
+    lines = [
+        (
+            f"Exported {result.collection_count} collection(s) "
+            f"({result.request_count} request(s)) to:"
+        ),
         str(result.path),
     ]
     return "\n".join(lines)

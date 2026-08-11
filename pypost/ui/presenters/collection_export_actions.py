@@ -17,8 +17,10 @@ from PySide6.QtWidgets import QTreeView, QWidget
 from pypost.core.collection_export import (
     CollectionExportError,
     CollectionExportResult,
+    CollectionsExportResult,
     build_export_payload,
     collection_for_export,
+    format_all_export_result,
     format_export_result,
     suggested_export_filename,
     write_export_file,
@@ -26,7 +28,10 @@ from pypost.core.collection_export import (
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import Collection, RequestData
 from pypost.ui.collection_item_dialogs import (
+    prompt_export_all_collections_file,
     prompt_export_collection_file,
+    show_all_collections_export_error,
+    show_all_collections_export_result,
     show_collection_export_error,
     show_collection_export_no_selection_error,
     show_collection_export_result,
@@ -102,6 +107,42 @@ class CollectionExportActions:
         show_collection_export_result(
             self._parent,
             format_export_result(result),
+            success=True,
+        )
+
+    def export_all_collections(self) -> None:
+        """Write every current collection to one user-chosen JSON-list backup."""
+        if self._serialize_collection is None:
+            return
+
+        collections = list(self._request_manager.get_collections())
+        path = prompt_export_all_collections_file(self._parent)
+        if path is None:
+            logger.info("collections_export_cancelled")
+            return
+
+        try:
+            payload = [self._serialize_collection(collection) for collection in collections]
+            write_export_file(path, payload)
+        except (CollectionExportError, TypeError, ValueError) as exc:
+            logger.warning("collections_export_failed reason=%s", exc)
+            show_all_collections_export_error(self._parent, str(exc))
+            return
+
+        result = CollectionsExportResult(
+            collection_count=len(collections),
+            request_count=sum(len(collection.requests) for collection in collections),
+            path=path,
+        )
+        logger.info(
+            "collections_export_completed collection_count=%d request_count=%d path=%s",
+            result.collection_count,
+            result.request_count,
+            result.path,
+        )
+        show_all_collections_export_result(
+            self._parent,
+            format_all_export_result(result),
             success=True,
         )
 

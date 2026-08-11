@@ -116,6 +116,7 @@ class CollectionsPresenter(QObject):
             self._view,
             import_collection=self.import_collections,
             export_collection=self.export_collection,
+            export_all_collections=self.export_all_collections,
         )
         self._import_actions = CollectionImportActions(
             self._panel,
@@ -279,6 +280,10 @@ class CollectionsPresenter(QObject):
     def export_collection(self) -> None:
         """Run the Export Collection flow (delegated to CollectionExportActions)."""
         self._export_actions.export_collection()
+
+    def export_all_collections(self) -> None:
+        """Run the complete collection backup flow without a tree selection."""
+        self._export_actions.export_all_collections()
 
     def _export_collection_at_index(self, source_index: QModelIndex) -> None:
         """Export using a clicked tree index (context-menu entry point)."""

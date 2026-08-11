@@ -1,24 +1,26 @@
 """Tests for pypost.core.collection_export (PYPOST-989)."""
 
 import json
+from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.timeout(60)
-
-from pathlib import Path
 
 from pypost.core.collection_export import (
     CollectionExportError,
     CollectionExportResult,
+    CollectionsExportResult,
+    build_all_export_payload,
     build_export_payload,
     collection_for_export,
+    format_all_export_result,
     format_export_result,
     suggested_export_filename,
     write_export_file,
 )
 from pypost.core.collection_import import load_collection_import_candidates
 from pypost.models.models import Collection, RequestData
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _make_collection(
@@ -97,6 +99,69 @@ def test_write_export_file_round_trips_through_import(tmp_path):
     assert request.expose_as_mcp is True
 
 
+def test_build_all_export_payload_round_trips_ordered_collections(tmp_path):
+    first = _make_collection(
+        col_id="col-1",
+        name="Billing API",
+        requests=[
+            RequestData(
+                id="req-1",
+                name="Create invoice",
+                method="POST",
+                url="https://api.example.com/invoices",
+            )
+        ],
+    )
+    second = _make_collection(
+        col_id="col-2",
+        name="Reporting API",
+        requests=[
+            RequestData(
+                id="req-2",
+                name="Get report",
+                method="GET",
+                url="https://api.example.com/reports/monthly",
+            )
+        ],
+    )
+    export_path = tmp_path / "collections.json"
+
+    write_export_file(export_path, build_all_export_payload([first, second]))
+
+    decoded = json.loads(export_path.read_text(encoding="utf-8"))
+    imported, parse_errors = load_collection_import_candidates(export_path)
+
+    assert isinstance(decoded, list)
+    assert parse_errors == []
+    assert [collection.name for collection in imported] == ["Billing API", "Reporting API"]
+    assert [
+        (request.method, request.url)
+        for collection in imported
+        for request in collection.requests
+    ] == [
+        ("POST", "https://api.example.com/invoices"),
+        ("GET", "https://api.example.com/reports/monthly"),
+    ]
+
+
+def test_build_all_export_payload_empty_library_is_json_list(tmp_path):
+    export_path = tmp_path / "collections.json"
+
+    write_export_file(export_path, build_all_export_payload([]))
+
+    assert json.loads(export_path.read_text(encoding="utf-8")) == []
+
+
+def test_build_all_export_payload_does_not_mutate_source_collections():
+    collection = _make_collection()
+    source_requests = list(collection.requests)
+
+    payload = build_all_export_payload([collection])
+
+    assert collection.requests == source_requests
+    assert payload[0]["requests"][0]["name"] == "Create invoice"
+
+
 def test_write_export_file_raises_on_write_failure(tmp_path, monkeypatch):
     export_path = tmp_path / "export.json"
 
@@ -118,6 +183,18 @@ def test_format_export_result_includes_name_and_path():
     )
     assert 'Exported collection "Billing API" (2 request(s))' in result_text
     assert "/tmp/Billing API.json" in result_text
+
+
+def test_format_all_export_result_includes_counts_and_path():
+    result_text = format_all_export_result(
+        CollectionsExportResult(
+            collection_count=2,
+            request_count=3,
+            path=Path("/tmp/collections.json"),
+        )
+    )
+    assert "Exported 2 collection(s) (3 request(s))" in result_text
+    assert "/tmp/collections.json" in result_text
 
 
 def test_exported_json_is_single_object_shape(tmp_path):

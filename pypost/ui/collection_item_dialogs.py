@@ -7,9 +7,12 @@ from pathlib import Path
 from PySide6.QtWidgets import QCheckBox, QFileDialog, QMessageBox, QWidget
 
 from pypost.core.collection_messages import (
+    DIALOG_TITLE_EXPORT_ALL_COLLECTIONS,
     DIALOG_TITLE_EXPORT_COLLECTION,
     DIALOG_TITLE_IMPORT_COLLECTION,
     DIALOG_TITLE_IMPORT_COLLECTION_CONFLICT,
+    EXPORT_ALL_COLLECTIONS_FILE_DIALOG_CAPTION,
+    EXPORT_ALL_COLLECTIONS_SUGGESTED_FILENAME,
     EXPORT_COLLECTION_FILE_DIALOG_CAPTION,
     EXPORT_COLLECTION_FILE_DIALOG_FILTER,
     IMPORT_COLLECTION_FILE_DIALOG_CAPTION,
@@ -436,6 +439,19 @@ def prompt_export_collection_file(parent: QWidget, *, suggested_name: str) -> Pa
     return Path(path_str)
 
 
+def prompt_export_all_collections_file(parent: QWidget) -> Path | None:
+    """Open a save dialog for a complete collection backup; None on Cancel."""
+    path_str, _selected_filter = QFileDialog.getSaveFileName(
+        parent,
+        EXPORT_ALL_COLLECTIONS_FILE_DIALOG_CAPTION,
+        EXPORT_ALL_COLLECTIONS_SUGGESTED_FILENAME,
+        EXPORT_COLLECTION_FILE_DIALOG_FILTER,
+    )
+    if not path_str:
+        return None
+    return Path(path_str)
+
+
 def show_collection_export_result(
     parent: QWidget, summary_text: str, *, success: bool
 ) -> None:
@@ -447,6 +463,19 @@ def show_collection_export_result(
 
 def show_collection_export_error(parent: QWidget, message: str) -> None:
     QMessageBox.warning(parent, DIALOG_TITLE_EXPORT_COLLECTION, message)
+
+
+def show_all_collections_export_result(
+    parent: QWidget, summary_text: str, *, success: bool
+) -> None:
+    if success:
+        QMessageBox.information(parent, DIALOG_TITLE_EXPORT_ALL_COLLECTIONS, summary_text)
+    else:
+        QMessageBox.warning(parent, DIALOG_TITLE_EXPORT_ALL_COLLECTIONS, summary_text)
+
+
+def show_all_collections_export_error(parent: QWidget, message: str) -> None:
+    QMessageBox.warning(parent, DIALOG_TITLE_EXPORT_ALL_COLLECTIONS, message)
 
 
 def show_invalid_retryable_status_codes(parent: QWidget, message: str) -> None:

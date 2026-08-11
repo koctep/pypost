@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QPushButton
 
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
-from pypost.ui.widget_ids import COLLECTION_EXPORT_BUTTON
+from pypost.ui.widget_ids import COLLECTION_EXPORT_ALL_BUTTON, COLLECTION_EXPORT_BUTTON
 from tests.helpers.collections_tree import (
     FakeMetrics,
     FakeRequestManager,
@@ -24,6 +24,9 @@ _MODULE = "pypost.ui.presenters.collection_export_actions"
 _SAVE = f"{_MODULE}.prompt_export_collection_file"
 _RESULT = f"{_MODULE}.show_collection_export_result"
 _NO_SELECTION = f"{_MODULE}.show_collection_export_no_selection_error"
+_ALL_SAVE = f"{_MODULE}.prompt_export_all_collections_file"
+_ALL_RESULT = f"{_MODULE}.show_all_collections_export_result"
+_ALL_ERROR = f"{_MODULE}.show_all_collections_export_error"
 
 
 def _make_presenter(collections=None, serialize_collection=None):
@@ -63,6 +66,19 @@ class TestExportCollectionEntryPoint:
         finally:
             presenter.panel.close()
 
+    @patch.object(CollectionsPresenter, "export_all_collections")
+    def test_panel_exposes_export_all_button_wired_to_the_flow(
+        self, mock_export_all, qapp
+    ):
+        presenter, _manager = _make_presenter([make_collection("c1", "Billing")])
+        try:
+            button = presenter.panel.findChild(QPushButton, COLLECTION_EXPORT_ALL_BUTTON)
+            assert button is not None
+            button.click()
+            mock_export_all.assert_called_once()
+        finally:
+            presenter.panel.close()
+
 
 class TestExportCollection:
     @patch(_RESULT)
@@ -93,6 +109,110 @@ class TestExportCollection:
             _args, kwargs = mock_result.call_args
             assert kwargs["success"] is True
             assert "Billing API" in _args[1]
+        finally:
+            presenter.panel.close()
+
+
+class TestExportAllCollections:
+    @patch(_ALL_RESULT)
+    @patch(_ALL_SAVE)
+    def test_exports_every_collection_without_a_tree_selection(
+        self, mock_save, mock_result, qapp, tmp_path
+    ):
+        export_path = tmp_path / "collections.json"
+        mock_save.return_value = export_path
+        collections = [
+            make_collection("c1", "Billing", [make_request("r1", "Create")]),
+            make_collection("c2", "Reporting", [make_request("r2", "Report")]),
+        ]
+        presenter, _manager = _make_presenter(
+            collections,
+            serialize_collection=lambda col: col.model_dump(mode="json"),
+        )
+        try:
+            presenter.widget.setCurrentIndex(presenter.widget.model().index(-1, -1))
+            presenter.export_all_collections()
+
+            data = json.loads(export_path.read_text(encoding="utf-8"))
+            assert [record["name"] for record in data] == ["Billing", "Reporting"]
+            mock_result.assert_called_once()
+            assert "2 collection(s)" in mock_result.call_args.args[1]
+            assert "2 request(s)" in mock_result.call_args.args[1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_ALL_RESULT)
+    @patch(_ALL_SAVE)
+    def test_logs_completion_with_safe_all_export_counts(
+        self, mock_save, _mock_result, qapp, tmp_path, caplog
+    ):
+        mock_save.return_value = tmp_path / "collections.json"
+        presenter, _manager = _make_presenter(
+            [make_collection("c1", "Billing", [make_request("r1", "Create")])],
+            serialize_collection=lambda col: col.model_dump(mode="json"),
+        )
+        try:
+            with caplog.at_level(logging.INFO, logger=_MODULE):
+                presenter.export_all_collections()
+            assert any(
+                "collections_export_completed collection_count=1 request_count=1"
+                in record.message
+                for record in caplog.records
+            )
+        finally:
+            presenter.panel.close()
+
+    @patch(_ALL_RESULT)
+    @patch(_ALL_SAVE)
+    def test_empty_library_exports_valid_empty_backup(
+        self, mock_save, mock_result, qapp, tmp_path
+    ):
+        export_path = tmp_path / "collections.json"
+        mock_save.return_value = export_path
+        presenter, _manager = _make_presenter(
+            [], serialize_collection=lambda col: col.model_dump(mode="json")
+        )
+        try:
+            presenter.export_all_collections()
+
+            assert json.loads(export_path.read_text(encoding="utf-8")) == []
+            assert "0 collection(s) (0 request(s))" in mock_result.call_args.args[1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_ALL_SAVE, return_value=None)
+    def test_cancelled_all_export_does_not_serialize_or_write(self, mock_save, qapp):
+        def unexpected_serialize(_collection):
+            raise AssertionError("serialization must not run after cancellation")
+
+        presenter, _manager = _make_presenter(
+            [make_collection("c1", "Billing")], serialize_collection=unexpected_serialize
+        )
+        try:
+            presenter.export_all_collections()
+            mock_save.assert_called_once()
+        finally:
+            presenter.panel.close()
+
+    @patch(_ALL_ERROR)
+    @patch(_ALL_SAVE)
+    def test_all_export_write_failure_shows_error_dialog(
+        self, mock_save, mock_show_error, qapp, tmp_path
+    ):
+        mock_save.return_value = tmp_path / "collections.json"
+
+        def boom(_collection):
+            from pypost.core.collection_export import CollectionExportError
+
+            raise CollectionExportError("Could not write file: disk full")
+
+        presenter, _manager = _make_presenter(
+            [make_collection("c1", "Billing")], serialize_collection=boom
+        )
+        try:
+            presenter.export_all_collections()
+            mock_show_error.assert_called_once()
+            assert "disk full" in mock_show_error.call_args.args[1]
         finally:
             presenter.panel.close()
 
