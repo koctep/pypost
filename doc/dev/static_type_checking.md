@@ -25,16 +25,33 @@ To see raw mypy output (including all known baseline errors):
 | File | Role |
 | --- | --- |
 | `pyproject.toml` `[tool.mypy]` | Checker settings and scoped paths |
-| `mypy-baseline.json` | Frozen `path:line:error-code` signatures (218 as of PYPOST-815) |
+| `mypy-baseline.json` | Frozen `(path, code, message)` error records, `"version": 2` (219 as of PYPOST-1007) |
 | `scripts/check_mypy_baseline.py` | Runs mypy and compares against baseline |
 | `Makefile` `typecheck` | Developer entry point |
 
 ### Baseline gate behavior
 
 1. Run mypy on `pypost/core`, `pypost/models`, and `pypost/ui`.
-2. Parse errors into stable keys (`pypost/core/foo.py:42:arg-type`).
-3. **Pass** when the set equals the committed baseline.
-4. **Fail** when new errors appear or baseline entries disappear without updating the JSON.
+2. Parse errors into `(path, code, message)` keys — **not** `path:line:code`. The line number is
+   parsed too, but only for display in the "new errors" report; it is deliberately excluded from
+   the comparison key because it shifts whenever unrelated code moves above an error (an import
+   added/removed/reordered, a docstring edited), which made line-keyed baselines flag phantom
+   regressions on every reorder. PYPOST-987 hit this directly: ~30 phantom "new"/"fixed" pairs
+   from pure line drift buried the one real regression in that run's mypy diff. Dropping the line
+   removes that churn while keeping enough specificity to tell errors apart, since mypy's message
+   text usually names the specific attribute/argument/variable involved.
+3. Diff current vs. baseline as a `collections.Counter`-based **multiset** difference, not a set
+   difference. Because the key excludes line number, distinct errors on different lines can
+   legitimately share the same `(path, code, message)` — empirically true for roughly half of
+   today's baselined errors. A plain set diff would only track key *presence*, so fixing one of
+   three duplicate-key instances (or introducing a new one) would look like no change at all. The
+   Counter subtraction tracks per-key *counts*, so partial fixes and partial regressions within a
+   duplicate-key group are still detected correctly.
+4. **Pass** when the multiset of current-run keys equals the multiset in the committed baseline.
+5. **Fail** when new errors appear or baseline entries disappear without updating the JSON.
+6. `mypy-baseline.json` missing/wrong `"version"` (i.e. not `2`, including the legacy flat
+   `path:line:code` format) is rejected outright with an error pointing at `--update-baseline` —
+   there is no silent dual-format fallback.
 
 After fixing type errors intentionally:
 
@@ -85,7 +102,11 @@ in `requirements-dev.in`.
 ## Baseline Triage (PYPOST-734 / PYPOST-813 / PYPOST-814 / PYPOST-815)
 
 218 errors total (July 2026 snapshot): 41 in `pypost/core/`, 0 in `pypost/models/`, 177 in
-`pypost/ui/` (29 files).
+`pypost/ui/` (29 files). Per-code breakdown below is this original snapshot; it illustrates
+*typical* fixes rather than a live count. The baseline was regenerated under PYPOST-1007 for the
+key-format change (see [Architecture](#architecture)) and now holds 219 errors — the small drift
+is incidental code churn since July 2026, not a format change; open `mypy-baseline.json` (one
+JSON object per error, with an `error_count` summary field) for the current exact breakdown.
 
 ### Core (`pypost/core/`) — 41 errors in 14 files
 
@@ -147,3 +168,5 @@ CI (`.github/workflows/test.yml`) does not run mypy yet.
 - [setup.md](setup.md) — dev dependency installation
 - [testing.md](testing.md) — primary quality gate (`make check`)
 - [maintainability_audit.md](maintainability_audit.md) — audit context for R-P2-005
+- `ai-tasks/PYPOST-1007/20-architecture.md` — full design rationale for the `(path, code,
+  message)` key and Counter-based multiset diff, including the PYPOST-987 line-shift incident

@@ -1,228 +1,1106 @@
 {
-  "error_count": 218,
+  "error_count": 219,
   "errors": [
-    "pypost/core/alert_manager.py:140:arg-type",
-    "pypost/core/alert_manager.py:147:arg-type",
-    "pypost/core/alert_manager.py:153:arg-type",
-    "pypost/core/alert_manager.py:159:arg-type",
-    "pypost/core/alert_manager.py:165:arg-type",
-    "pypost/core/encryption_config.py:54:return-value",
-    "pypost/core/environment_secrets_codec.py:16:misc",
-    "pypost/core/environment_secrets_codec.py:17:misc",
-    "pypost/core/environment_secrets_codec.py:18:misc",
-    "pypost/core/environment_secrets_codec.py:19:misc",
-    "pypost/core/environment_variables_adapter.py:113:assignment",
-    "pypost/core/key_sources/secret_store.py:193:no-any-return",
-    "pypost/core/mcp_client_service.py:166:assignment",
-    "pypost/core/metrics_server.py:118:assignment",
-    "pypost/core/metrics_server.py:119:attr-defined",
-    "pypost/core/metrics_server.py:175:assignment",
-    "pypost/core/metrics_server.py:176:attr-defined",
-    "pypost/core/metrics_server.py:178:attr-defined",
-    "pypost/core/metrics_server.py:184:attr-defined",
-    "pypost/core/metrics_server.py:186:attr-defined",
-    "pypost/core/metrics_server.py:60:arg-type",
-    "pypost/core/metrics_server.py:88:arg-type",
-    "pypost/core/qt/mcp_server.py:176:attr-defined",
-    "pypost/core/qt/mcp_server.py:184:method-assign",
-    "pypost/core/request_service.py:108:union-attr",
-    "pypost/core/request_service.py:109:union-attr",
-    "pypost/core/request_service.py:111:union-attr",
-    "pypost/core/request_service.py:112:union-attr",
-    "pypost/core/request_service.py:452:var-annotated",
-    "pypost/core/request_service.py:453:var-annotated",
-    "pypost/core/script_executor.py:103:return-value",
-    "pypost/core/script_executor.py:20:var-annotated",
-    "pypost/core/script_executor.py:34:no-any-return",
-    "pypost/core/sensitive_data_masking_policy.py:61:arg-type",
-    "pypost/core/sensitive_data_masking_policy.py:63:arg-type",
-    "pypost/core/sensitive_data_masking_policy.py:64:arg-type",
-    "pypost/core/sensitive_data_masking_policy.py:68:arg-type",
-    "pypost/core/storage.py:139:var-annotated",
-    "pypost/core/template_service_render.py:24:arg-type",
-    "pypost/core/template_service_render.py:76:attr-defined",
-    "pypost/core/template_service_render.py:83:no-any-return",
-    "pypost/ui/collection_item_dialogs.py:122:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:122:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:123:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:125:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:125:no-any-return",
-    "pypost/ui/collection_item_dialogs.py:165:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:165:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:166:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:168:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:168:no-any-return",
-    "pypost/ui/collection_item_dialogs.py:179:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:179:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:180:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:182:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:182:no-any-return",
-    "pypost/ui/collection_item_dialogs.py:26:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:26:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:27:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:29:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:29:no-any-return",
-    "pypost/ui/collection_item_dialogs.py:67:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:70:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:71:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:84:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:87:attr-defined",
-    "pypost/ui/collection_item_dialogs.py:88:attr-defined",
-    "pypost/ui/delegates/collection_item_rename_delegate.py:38:override",
-    "pypost/ui/delegates/collection_item_rename_delegate.py:38:override",
-    "pypost/ui/delegates/collection_item_rename_delegate.py:40:override",
-    "pypost/ui/delegates/collection_item_rename_delegate.py:40:override",
-    "pypost/ui/delegates/collection_item_rename_delegate.py:82:attr-defined",
-    "pypost/ui/delegates/environment_name_delegate.py:29:override",
-    "pypost/ui/delegates/environment_name_delegate.py:29:override",
-    "pypost/ui/dialogs/about_dialog.py:22:attr-defined",
-    "pypost/ui/dialogs/about_dialog.py:26:attr-defined",
-    "pypost/ui/dialogs/about_dialog.py:34:attr-defined",
-    "pypost/ui/dialogs/env_dialog.py:21:assignment",
-    "pypost/ui/dialogs/env_dialog.py:68:no-any-return",
-    "pypost/ui/dialogs/hotkeys_dialog.py:29:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:35:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:37:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:38:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:41:arg-type",
-    "pypost/ui/dialogs/hotkeys_dialog.py:50:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:51:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:52:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:53:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:54:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:62:attr-defined",
-    "pypost/ui/dialogs/hotkeys_dialog.py:62:attr-defined",
-    "pypost/ui/dialogs/save_dialog.py:63:attr-defined",
-    "pypost/ui/dialogs/save_dialog.py:63:attr-defined",
-    "pypost/ui/dialogs/save_dialog.py:91:assignment",
-    "pypost/ui/dialogs/settings_dialog.py:141:attr-defined",
-    "pypost/ui/dialogs/settings_dialog.py:143:attr-defined",
-    "pypost/ui/dialogs/settings_dialog.py:143:attr-defined",
-    "pypost/ui/dialogs/settings_dialog.py:146:attr-defined",
-    "pypost/ui/dialogs/settings_dialog.py:179:assignment",
-    "pypost/ui/dialogs/settings_dialog.py:190:return-value",
-    "pypost/ui/dialogs/settings_dialog.py:65:assignment",
-    "pypost/ui/dialogs/settings_dialog.py:65:method-assign",
-    "pypost/ui/hotkeys.py:94:assignment",
-    "pypost/ui/main_window.py:178:attr-defined",
-    "pypost/ui/main_window.py:259:misc",
-    "pypost/ui/presenters/collection_tree_actions.py:151:no-any-return",
-    "pypost/ui/presenters/collection_tree_actions.py:287:attr-defined",
-    "pypost/ui/presenters/collection_tree_actions.py:318:attr-defined",
-    "pypost/ui/presenters/collection_tree_incremental.py:37:attr-defined",
-    "pypost/ui/presenters/collection_tree_incremental.py:47:attr-defined",
-    "pypost/ui/presenters/collections_presenter.py:111:attr-defined",
-    "pypost/ui/presenters/collections_presenter.py:119:attr-defined",
-    "pypost/ui/presenters/collections_presenter.py:212:attr-defined",
-    "pypost/ui/presenters/collections_presenter.py:249:attr-defined",
-    "pypost/ui/presenters/collections_presenter.py:259:attr-defined",
-    "pypost/ui/presenters/collections_presenter.py:264:attr-defined",
-    "pypost/ui/presenters/collections_presenter.py:273:attr-defined",
-    "pypost/ui/presenters/collections_presenter.py:68:attr-defined",
-    "pypost/ui/presenters/env_presenter.py:424:assignment",
-    "pypost/ui/presenters/tabs_presenter.py:601:arg-type",
-    "pypost/ui/presenters/tabs_presenter.py:604:attr-defined",
-    "pypost/ui/presenters/tabs_presenter.py:608:attr-defined",
-    "pypost/ui/presenters/tabs_presenter.py:64:attr-defined",
-    "pypost/ui/presenters/tabs_presenter.py:66:arg-type",
-    "pypost/ui/presenters/tabs_presenter_worker.py:100:misc",
-    "pypost/ui/presenters/tabs_presenter_worker.py:112:misc",
-    "pypost/ui/presenters/tabs_presenter_worker.py:122:misc",
-    "pypost/ui/presenters/tabs_presenter_worker.py:130:misc",
-    "pypost/ui/presenters/tabs_presenter_worker.py:145:misc",
-    "pypost/ui/presenters/tabs_presenter_worker.py:41:misc",
-    "pypost/ui/presenters/tabs_presenter_worker.py:59:misc",
-    "pypost/ui/presenters/tabs_presenter_worker.py:88:misc",
-    "pypost/ui/presenters/tabs_presenter_worker.py:95:misc",
-    "pypost/ui/styles/custom_style.py:16:attr-defined",
-    "pypost/ui/styles/custom_style.py:17:attr-defined",
-    "pypost/ui/widgets/code_editor.py:227:attr-defined",
-    "pypost/ui/widgets/code_editor.py:227:attr-defined",
-    "pypost/ui/widgets/code_editor.py:259:no-any-return",
-    "pypost/ui/widgets/environments/environment_variables_widget.py:69:attr-defined",
-    "pypost/ui/widgets/environments/environment_variables_widget.py:70:attr-defined",
-    "pypost/ui/widgets/environments/environment_variables_widget.py:71:attr-defined",
-    "pypost/ui/widgets/fold/xml_structure_scanner.py:83:arg-type",
-    "pypost/ui/widgets/history_panel.py:141:attr-defined",
-    "pypost/ui/widgets/history_panel.py:206:attr-defined",
-    "pypost/ui/widgets/history_panel.py:236:attr-defined",
-    "pypost/ui/widgets/history_panel.py:70:attr-defined",
-    "pypost/ui/widgets/history_panel.py:73:attr-defined",
-    "pypost/ui/widgets/history_panel.py:79:attr-defined",
-    "pypost/ui/widgets/history_panel.py:85:attr-defined",
-    "pypost/ui/widgets/json_highlighter.py:54:attr-defined",
-    "pypost/ui/widgets/json_highlighter.py:76:attr-defined",
-    "pypost/ui/widgets/json_highlighter.py:96:assignment",
-    "pypost/ui/widgets/json_highlighter.py:97:attr-defined",
-    "pypost/ui/widgets/json_highlighter.py:97:attr-defined",
-    "pypost/ui/widgets/line_number_area.py:17:attr-defined",
-    "pypost/ui/widgets/line_number_area.py:20:attr-defined",
-    "pypost/ui/widgets/line_number_area.py:23:attr-defined",
-    "pypost/ui/widgets/mixins.py:262:misc",
-    "pypost/ui/widgets/mixins.py:263:attr-defined",
-    "pypost/ui/widgets/mixins.py:264:attr-defined",
-    "pypost/ui/widgets/mixins.py:266:attr-defined",
-    "pypost/ui/widgets/mixins.py:267:attr-defined",
-    "pypost/ui/widgets/mixins.py:268:attr-defined",
-    "pypost/ui/widgets/mixins.py:279:misc",
-    "pypost/ui/widgets/mixins.py:283:misc",
-    "pypost/ui/widgets/mixins.py:285:misc",
-    "pypost/ui/widgets/mixins.py:286:attr-defined",
-    "pypost/ui/widgets/mixins.py:287:attr-defined",
-    "pypost/ui/widgets/mixins.py:288:attr-defined",
-    "pypost/ui/widgets/mixins.py:290:misc",
-    "pypost/ui/widgets/mixins.py:310:misc",
-    "pypost/ui/widgets/mixins.py:316:attr-defined",
-    "pypost/ui/widgets/mixins.py:317:attr-defined",
-    "pypost/ui/widgets/mixins.py:317:no-any-return",
-    "pypost/ui/widgets/mixins.py:320:misc",
-    "pypost/ui/widgets/mixins.py:321:misc",
-    "pypost/ui/widgets/mixins.py:324:attr-defined",
-    "pypost/ui/widgets/mixins.py:331:attr-defined",
-    "pypost/ui/widgets/mixins.py:332:attr-defined",
-    "pypost/ui/widgets/mixins.py:333:attr-defined",
-    "pypost/ui/widgets/mixins.py:341:misc",
-    "pypost/ui/widgets/mixins.py:348:attr-defined",
-    "pypost/ui/widgets/mixins.py:349:attr-defined",
-    "pypost/ui/widgets/mixins.py:349:attr-defined",
-    "pypost/ui/widgets/mixins.py:351:attr-defined",
-    "pypost/ui/widgets/mixins.py:356:attr-defined",
-    "pypost/ui/widgets/mixins.py:357:attr-defined",
-    "pypost/ui/widgets/mixins.py:360:attr-defined",
-    "pypost/ui/widgets/mixins.py:361:attr-defined",
-    "pypost/ui/widgets/mixins.py:362:attr-defined",
-    "pypost/ui/widgets/mixins.py:365:misc",
-    "pypost/ui/widgets/mixins.py:379:attr-defined",
-    "pypost/ui/widgets/mixins.py:380:attr-defined",
-    "pypost/ui/widgets/request_editor.py:189:attr-defined",
-    "pypost/ui/widgets/request_editor.py:463:attr-defined",
-    "pypost/ui/widgets/request_editor.py:499:attr-defined",
-    "pypost/ui/widgets/request_editor.py:499:attr-defined",
-    "pypost/ui/widgets/request_editor.py:499:attr-defined",
-    "pypost/ui/widgets/request_editor.py:502:attr-defined",
-    "pypost/ui/widgets/request_editor.py:502:attr-defined",
-    "pypost/ui/widgets/request_editor.py:523:attr-defined",
-    "pypost/ui/widgets/request_editor.py:539:attr-defined",
-    "pypost/ui/widgets/request_editor.py:69:assignment",
-    "pypost/ui/widgets/request_editor.py:98:attr-defined",
-    "pypost/ui/widgets/response_view.py:218:attr-defined",
-    "pypost/ui/widgets/response_view.py:294:attr-defined",
-    "pypost/ui/widgets/response_view.py:296:attr-defined",
-    "pypost/ui/widgets/response_view.py:92:attr-defined",
-    "pypost/ui/widgets/response_view.py:98:assignment",
-    "pypost/ui/widgets/settings/encryption_migration_section.py:156:arg-type",
-    "pypost/ui/widgets/settings/encryption_migration_section.py:57:assignment",
-    "pypost/ui/widgets/settings/encryption_migration_section.py:88:attr-defined",
-    "pypost/ui/widgets/settings/encryption_migration_section.py:88:no-any-return",
-    "pypost/ui/widgets/settings/encryption_migration_section.py:92:attr-defined",
-    "pypost/ui/widgets/tab_header.py:64:no-any-return",
-    "pypost/ui/widgets/validate/yaml_body_validator.py:21:attr-defined",
-    "pypost/ui/widgets/validate/yaml_body_validator.py:27:attr-defined",
-    "pypost/ui/widgets/validate/yaml_body_validator.py:34:attr-defined"
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"_webhook_log_target\" has incompatible type \"str | None\"; expected \"str\"",
+      "path": "pypost/core/alert_manager.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"_webhook_log_target\" has incompatible type \"str | None\"; expected \"str\"",
+      "path": "pypost/core/alert_manager.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"_webhook_log_target\" has incompatible type \"str | None\"; expected \"str\"",
+      "path": "pypost/core/alert_manager.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"_webhook_log_target\" has incompatible type \"str | None\"; expected \"str\"",
+      "path": "pypost/core/alert_manager.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"post\" has incompatible type \"str | None\"; expected \"str | bytes\"",
+      "path": "pypost/core/alert_manager.py"
+    },
+    {
+      "code": "return-value",
+      "message": "Incompatible return value type (got \"list[Literal['environment', 'keyring', 'secret_store']]\", expected \"list[str]\")",
+      "path": "pypost/core/encryption_config.py"
+    },
+    {
+      "code": "misc",
+      "message": "Cannot assign multiple types to name \"AESGCM\" without an explicit \"type[...]\" annotation",
+      "path": "pypost/core/environment_secrets_codec.py"
+    },
+    {
+      "code": "misc",
+      "message": "Cannot assign to a type",
+      "path": "pypost/core/environment_secrets_codec.py"
+    },
+    {
+      "code": "misc",
+      "message": "Cannot assign to a type",
+      "path": "pypost/core/environment_secrets_codec.py"
+    },
+    {
+      "code": "misc",
+      "message": "Cannot assign to a type",
+      "path": "pypost/core/environment_secrets_codec.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"EncryptedValueEnvelope\", variable has type \"EncryptedValueEnvelopeV2\")",
+      "path": "pypost/core/environment_variables_adapter.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"dict[str, Any] | None\"",
+      "path": "pypost/core/key_sources/secret_store.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"CallToolResult\", variable has type \"ListToolsResult\")",
+      "path": "pypost/core/mcp_client_service.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument \"uri\" to \"Resource\" has incompatible type \"str\"; expected \"AnyUrl\"",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument \"uri\" to \"TextResourceContents\" has incompatible type \"str\"; expected \"AnyUrl\"",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"Server\", variable has type \"None\")",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"Thread\", variable has type \"None\")",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"None\" has no attribute \"install_signal_handlers\"",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"None\" has no attribute \"serve\"",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"None\" has no attribute \"start\"",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"None\" has no attribute \"startup\"",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"None\" has no attribute \"startup\"",
+      "path": "pypost/core/metrics_server.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"Server\" has no attribute \"install_signal_handlers\"",
+      "path": "pypost/core/qt/mcp_server.py"
+    },
+    {
+      "code": "method-assign",
+      "message": "Cannot assign to a method",
+      "path": "pypost/core/qt/mcp_server.py"
+    },
+    {
+      "code": "union-attr",
+      "message": "Item \"None\" of \"TemplateService | None\" has no attribute \"render_string\"",
+      "path": "pypost/core/request_service.py"
+    },
+    {
+      "code": "union-attr",
+      "message": "Item \"None\" of \"TemplateService | None\" has no attribute \"render_string\"",
+      "path": "pypost/core/request_service.py"
+    },
+    {
+      "code": "union-attr",
+      "message": "Item \"None\" of \"TemplateService | None\" has no attribute \"render_string\"",
+      "path": "pypost/core/request_service.py"
+    },
+    {
+      "code": "union-attr",
+      "message": "Item \"None\" of \"TemplateService | None\" has no attribute \"render_string\"",
+      "path": "pypost/core/request_service.py"
+    },
+    {
+      "code": "var-annotated",
+      "message": "Need type annotation for \"script_logs\" (hint: \"script_logs: list[<type>] = ...\")",
+      "path": "pypost/core/request_service.py"
+    },
+    {
+      "code": "var-annotated",
+      "message": "Need type annotation for \"updated_variables\" (hint: \"updated_variables: dict[<type>, <type>] = ...\")",
+      "path": "pypost/core/request_service.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"str | None\"",
+      "path": "pypost/core/script_executor.py"
+    },
+    {
+      "code": "return-value",
+      "message": "Incompatible return value type (got \"tuple[dict[str, str] | None, list[str], str | None]\", expected \"tuple[dict[str, str], list[str], str | None]\")",
+      "path": "pypost/core/script_executor.py"
+    },
+    {
+      "code": "var-annotated",
+      "message": "Need type annotation for \"_logs\" (hint: \"_logs: list[<type>] = ...\")",
+      "path": "pypost/core/script_executor.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 2 to \"render_string\" of \"TemplateService\" has incompatible type \"Mapping[str, Any]\"; expected \"dict[str, Any]\"",
+      "path": "pypost/core/sensitive_data_masking_policy.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 2 to \"render_string\" of \"TemplateService\" has incompatible type \"Mapping[str, Any]\"; expected \"dict[str, Any]\"",
+      "path": "pypost/core/sensitive_data_masking_policy.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 2 to \"render_string\" of \"TemplateService\" has incompatible type \"Mapping[str, Any]\"; expected \"dict[str, Any]\"",
+      "path": "pypost/core/sensitive_data_masking_policy.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 2 to \"render_string\" of \"TemplateService\" has incompatible type \"Mapping[str, Any]\"; expected \"dict[str, Any]\"",
+      "path": "pypost/core/sensitive_data_masking_policy.py"
+    },
+    {
+      "code": "var-annotated",
+      "message": "Need type annotation for \"collections\" (hint: \"collections: list[<type>] = ...\")",
+      "path": "pypost/core/storage.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"get\" of \"dict\" has incompatible type \"str | None\"; expected \"str\"",
+      "path": "pypost/core/template_service_render.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"Callable[[str], Any]\" has no attribute \"cache_info\"",
+      "path": "pypost/core/template_service_render.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"str\"",
+      "path": "pypost/core/template_service_render.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"AcceptRole\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"AcceptRole\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Information\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"No\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"No\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"No\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"No\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"No\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"No\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"No\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"No\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"RejectRole\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"RejectRole\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Warning\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Yes\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Yes\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Yes\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Yes\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Yes\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Yes\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Yes\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QMessageBox]\" has no attribute \"Yes\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"bool\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"bool\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"bool\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"bool\"",
+      "path": "pypost/ui/collection_item_dialogs.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/delegates/collection_item_rename_delegate.py"
+    },
+    {
+      "code": "override",
+      "message": "Argument 1 of \"createEditor\" is incompatible with supertype \"PySide6.QtWidgets.QAbstractItemDelegate\"; supertype defines the argument type as \"QWidget | None\"",
+      "path": "pypost/ui/delegates/collection_item_rename_delegate.py"
+    },
+    {
+      "code": "override",
+      "message": "Argument 1 of \"createEditor\" is incompatible with supertype \"PySide6.QtWidgets.QStyledItemDelegate\"; supertype defines the argument type as \"QWidget | None\"",
+      "path": "pypost/ui/delegates/collection_item_rename_delegate.py"
+    },
+    {
+      "code": "override",
+      "message": "Return type \"QWidget | None\" of \"createEditor\" incompatible with return type \"QWidget\" in supertype \"PySide6.QtWidgets.QAbstractItemDelegate\"",
+      "path": "pypost/ui/delegates/collection_item_rename_delegate.py"
+    },
+    {
+      "code": "override",
+      "message": "Return type \"QWidget | None\" of \"createEditor\" incompatible with return type \"QWidget\" in supertype \"PySide6.QtWidgets.QStyledItemDelegate\"",
+      "path": "pypost/ui/delegates/collection_item_rename_delegate.py"
+    },
+    {
+      "code": "override",
+      "message": "Argument 1 of \"createEditor\" is incompatible with supertype \"PySide6.QtWidgets.QAbstractItemDelegate\"; supertype defines the argument type as \"QWidget | None\"",
+      "path": "pypost/ui/delegates/environment_name_delegate.py"
+    },
+    {
+      "code": "override",
+      "message": "Argument 1 of \"createEditor\" is incompatible with supertype \"PySide6.QtWidgets.QStyledItemDelegate\"; supertype defines the argument type as \"QWidget | None\"",
+      "path": "pypost/ui/delegates/environment_name_delegate.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"AlignCenter\"",
+      "path": "pypost/ui/dialogs/about_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"AlignCenter\"",
+      "path": "pypost/ui/dialogs/about_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"AlignCenter\"",
+      "path": "pypost/ui/dialogs/about_dialog.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible default for parameter \"current_env_name\" (default has type \"None\", parameter has type \"str\")",
+      "path": "pypost/ui/dialogs/env_dialog.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"Environment | None\"",
+      "path": "pypost/ui/dialogs/env_dialog.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"collect_hotkey_rows\" has incompatible type \"QObject\"; expected \"QWidget\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QHeaderView]\" has no attribute \"Stretch\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QTableWidget]\" has no attribute \"NoEditTriggers\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QTableWidget]\" has no attribute \"NoSelection\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"AlignCenter\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"AlignRight\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"AlignVCenter\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"NoItemFlags\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"NoItemFlags\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"black\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"lightGray\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"lightGray\"",
+      "path": "pypost/ui/dialogs/hotkeys_dialog.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"None\", variable has type \"str\")",
+      "path": "pypost/ui/dialogs/save_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QDialogButtonBox]\" has no attribute \"Cancel\"",
+      "path": "pypost/ui/dialogs/save_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QDialogButtonBox]\" has no attribute \"Ok\"",
+      "path": "pypost/ui/dialogs/save_dialog.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"AppSettings\", variable has type \"None\")",
+      "path": "pypost/ui/dialogs/settings_dialog.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"QVBoxLayout\", variable has type \"Callable[[], QLayout | None]\")",
+      "path": "pypost/ui/dialogs/settings_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"Callable[[], QLayout | None]\" has no attribute \"addLayout\"",
+      "path": "pypost/ui/dialogs/settings_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"Callable[[], QLayout | None]\" has no attribute \"addWidget\"",
+      "path": "pypost/ui/dialogs/settings_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QDialogButtonBox]\" has no attribute \"Cancel\"",
+      "path": "pypost/ui/dialogs/settings_dialog.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QDialogButtonBox]\" has no attribute \"Save\"",
+      "path": "pypost/ui/dialogs/settings_dialog.py"
+    },
+    {
+      "code": "method-assign",
+      "message": "Cannot assign to a method",
+      "path": "pypost/ui/dialogs/settings_dialog.py"
+    },
+    {
+      "code": "return-value",
+      "message": "Incompatible return value type (got \"None\", expected \"AppSettings\")",
+      "path": "pypost/ui/dialogs/settings_dialog.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"list[str]\", variable has type \"tuple[str, ...]\")",
+      "path": "pypost/ui/hotkeys.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"Horizontal\"",
+      "path": "pypost/ui/main_window.py"
+    },
+    {
+      "code": "misc",
+      "message": "Cannot infer type of lambda",
+      "path": "pypost/ui/main_window.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collection_tree_actions.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collection_tree_actions.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"bool\"",
+      "path": "pypost/ui/presenters/collection_tree_actions.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collection_tree_incremental.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collection_tree_incremental.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"CustomContextMenu\"",
+      "path": "pypost/ui/presenters/collections_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collections_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collections_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collections_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collections_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collections_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collections_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/presenters/collections_presenter.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"None\", variable has type \"str\")",
+      "path": "pypost/ui/presenters/env_presenter.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"RequestWidget\" has incompatible type \"RequestData | None\"; expected \"RequestData\"",
+      "path": "pypost/ui/presenters/tabs_presenter.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 3 to \"generate\" of \"CurlGenerator\" has incompatible type \"TemplateService | None\"; expected \"TemplateService\"",
+      "path": "pypost/ui/presenters/tabs_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QWidget\" has no attribute \"statusBar\"",
+      "path": "pypost/ui/presenters/tabs_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QWidget\" has no attribute \"statusBar\"",
+      "path": "pypost/ui/presenters/tabs_presenter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"Vertical\"",
+      "path": "pypost/ui/presenters/tabs_presenter.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"pypost.ui.presenters.tabs_presenter.TabsPresenter\" is not a supertype of its class \"pypost.ui.presenters.tabs_presenter_worker.TabsPresenterWorkerHandlers\"",
+      "path": "pypost/ui/presenters/tabs_presenter_worker.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QStyle]\" has no attribute \"PM_TabCloseIndicatorHeight\"",
+      "path": "pypost/ui/styles/custom_style.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QStyle]\" has no attribute \"PM_TabCloseIndicatorWidth\"",
+      "path": "pypost/ui/styles/custom_style.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"Key_Enter\"",
+      "path": "pypost/ui/widgets/code_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"Key_Return\"",
+      "path": "pypost/ui/widgets/code_editor.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"bool\"",
+      "path": "pypost/ui/widgets/code_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QHeaderView]\" has no attribute \"ResizeToContents\"",
+      "path": "pypost/ui/widgets/environments/environment_variables_widget.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QHeaderView]\" has no attribute \"Stretch\"",
+      "path": "pypost/ui/widgets/environments/environment_variables_widget.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QHeaderView]\" has no attribute \"Stretch\"",
+      "path": "pypost/ui/widgets/environments/environment_variables_widget.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 1 to \"path_id\" has incompatible type \"list[str]\"; expected \"list[str | int]\"",
+      "path": "pypost/ui/widgets/fold/xml_structure_scanner.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QFormLayout]\" has no attribute \"ExpandingFieldsGrow\"",
+      "path": "pypost/ui/widgets/history_panel.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QKeySequence]\" has no attribute \"Copy\"",
+      "path": "pypost/ui/widgets/history_panel.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"CustomContextMenu\"",
+      "path": "pypost/ui/widgets/history_panel.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/widgets/history_panel.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/widgets/history_panel.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
+      "path": "pypost/ui/widgets/history_panel.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"Vertical\"",
+      "path": "pypost/ui/widgets/history_panel.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"Match[str]\", variable has type \"QRegularExpressionMatch\")",
+      "path": "pypost/ui/widgets/json_highlighter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QRegularExpressionMatch\" has no attribute \"end\"",
+      "path": "pypost/ui/widgets/json_highlighter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QRegularExpressionMatch\" has no attribute \"start\"",
+      "path": "pypost/ui/widgets/json_highlighter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QFont]\" has no attribute \"Bold\"",
+      "path": "pypost/ui/widgets/json_highlighter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QFont]\" has no attribute \"Bold\"",
+      "path": "pypost/ui/widgets/json_highlighter.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QPlainTextEdit\" has no attribute \"line_number_area_mouse_press\"",
+      "path": "pypost/ui/widgets/line_number_area.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QPlainTextEdit\" has no attribute \"line_number_area_paint_event\"",
+      "path": "pypost/ui/widgets/line_number_area.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QPlainTextEdit\" has no attribute \"line_number_area_width\"",
+      "path": "pypost/ui/widgets/line_number_area.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_find_hover_expression\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_get_text_at_cursor\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hidden_keys\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hidden_keys\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hidden_keys\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_line_scoped_scan\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_expression\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_expression\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_expression\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_expression\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_key\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_key\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_key\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_key\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_resolved\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_resolved\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_resolved\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_hover_scan_cache_resolved\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_prepare_hover_scan_context\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_resolve_hover_at_scan_index\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_show_or_hide_tooltip\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_slice_line_at_index\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_variables\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_variables\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"TWidget\" has no attribute \"_variables\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "\"mouseMoveEvent\" undefined in superclass",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "Invalid self argument \"VariableHoverMixin[TWidget]\" to attribute function \"_clear_hover_scan_cache\" with type \"Callable[[TWidget], None]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "Invalid self argument \"VariableHoverMixin[TWidget]\" to attribute function \"_clear_hover_scan_cache\" with type \"Callable[[TWidget], None]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"PySide6.QtWidgets.QWidget\" is not a supertype of its class \"pypost.ui.widgets.mixins.VariableHoverMixin[TWidget]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"PySide6.QtWidgets.QWidget\" is not a supertype of its class \"pypost.ui.widgets.mixins.VariableHoverMixin[TWidget]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"PySide6.QtWidgets.QWidget\" is not a supertype of its class \"pypost.ui.widgets.mixins.VariableHoverMixin[TWidget]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"PySide6.QtWidgets.QWidget\" is not a supertype of its class \"pypost.ui.widgets.mixins.VariableHoverMixin[TWidget]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"PySide6.QtWidgets.QWidget\" is not a supertype of its class \"pypost.ui.widgets.mixins.VariableHoverMixin[TWidget]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"PySide6.QtWidgets.QWidget\" is not a supertype of its class \"pypost.ui.widgets.mixins.VariableHoverMixin[TWidget]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "misc",
+      "message": "The erased type of self \"PySide6.QtWidgets.QWidget\" is not a supertype of its class \"pypost.ui.widgets.mixins.VariableHoverMixin[TWidget]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"tuple[str, int]\"",
+      "path": "pypost/ui/widgets/mixins.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible default for parameter \"request_data\" (default has type \"None\", parameter has type \"RequestData\")",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QFont]\" has no attribute \"Monospace\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QHeaderView]\" has no attribute \"Stretch\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QHeaderView]\" has no attribute \"Stretch\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QToolButton]\" has no attribute \"InstantPopup\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"Checked\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"Checked\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"ItemIsEnabled\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"ItemIsSelectable\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"ItemIsUserCheckable\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"Unchecked\"",
+      "path": "pypost/ui/widgets/request_editor.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"list[Any] | None\", variable has type \"None\")",
+      "path": "pypost/ui/widgets/response_view.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QTextCursor]\" has no attribute \"End\"",
+      "path": "pypost/ui/widgets/response_view.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QTextCursor]\" has no attribute \"End\"",
+      "path": "pypost/ui/widgets/response_view.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QTextCursor]\" has no attribute \"Start\"",
+      "path": "pypost/ui/widgets/response_view.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[Qt]\" has no attribute \"CustomContextMenu\"",
+      "path": "pypost/ui/widgets/response_view.py"
+    },
+    {
+      "code": "arg-type",
+      "message": "Argument 2 to \"EncryptionMigrationWorker\" has incompatible type \"str\"; expected \"Literal['re_encrypt', 'encrypt_plaintext']\"",
+      "path": "pypost/ui/widgets/settings/encryption_migration_section.py"
+    },
+    {
+      "code": "assignment",
+      "message": "Incompatible types in assignment (expression has type \"None\", variable has type \"EncryptionMigrationService\")",
+      "path": "pypost/ui/widgets/settings/encryption_migration_section.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QWidget\" has no attribute \"_migration_worker\"",
+      "path": "pypost/ui/widgets/settings/encryption_migration_section.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"QWidget\" has no attribute \"_migration_worker\"",
+      "path": "pypost/ui/widgets/settings/encryption_migration_section.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"EncryptionMigrationWorker | None\"",
+      "path": "pypost/ui/widgets/settings/encryption_migration_section.py"
+    },
+    {
+      "code": "no-any-return",
+      "message": "Returning Any from function declared to return \"bool\"",
+      "path": "pypost/ui/widgets/tab_header.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"YAMLError\" has no attribute \"problem\"",
+      "path": "pypost/ui/widgets/validate/yaml_body_validator.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"YAMLError\" has no attribute \"problem\"",
+      "path": "pypost/ui/widgets/validate/yaml_body_validator.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"YAMLError\" has no attribute \"problem_mark\"",
+      "path": "pypost/ui/widgets/validate/yaml_body_validator.py"
+    }
   ],
   "scope": [
     "pypost/core",
     "pypost/models",
     "pypost/ui"
-  ]
+  ],
+  "version": 2
 }
