@@ -15,6 +15,7 @@ make test            # fast suite (excludes -m slow)
 make test-cov        # with coverage report
 make test-slow       # network-heavy Makefile smoke
 make test-agent-e2e  # broader agent e2e beyond golden (primary packaging)
+make test-mcp-collection-e2e  # credential-free Jira MCP collection e2e
 make test-jira-mcp-live  # protected, explicit opt-in Jira MCP smoke (maintainers only)
 make check-jira-mcp-path-freshness  # offline jira_mcp critical REST paths vs catalog
 ```
@@ -354,23 +355,19 @@ put protected values on a command line or in test output. See
 [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md) for the protected CI
 dispatch, secrecy rules, and deterministic offline contract tests.
 
-### Planned CI-safe collection MCP e2e (PYPOST-1045)
+### CI-safe Jira MCP collection e2e (PYPOST-1053)
 
-A controlled stand-in for the external HTTP backend is **recommended** for
-reliable curated-collection MCP e2e in default CI (secret-free, deterministic).
-PYPOST-1045 recorded the decision and architecture only: prefer an in-process
-loopback HTTP stand-in (not agent e2e `send_request` patches as primary, not
-live-only). The four-tool minimum slice matches live smoke
-(`jira_get_current_user`, `jira_search_issues_jql`, `jira_get_issue`,
-`jira_list_boards`). Proposed packaging: `make test-mcp-collection-e2e`.
+`make test-mcp-collection-e2e` runs the shipped, credential-free four-tool
+Jira collection workflow in `tests/test_mcp_collection_e2e.py`. It is not
+marked `slow`, so `make test` and normal CI include it. The pack exercises the
+committed collection through the real MCP, request-service, HTTP-client, and
+socket path, with a deterministic loopback Jira stand-in instead of live SaaS
+access or an agent UI `send_request` patch.
 
-**Not shipped yet** — no harness, Makefile target, or runtime pack exists in
-this tree until a follow-up implements the sketch in
-`ai-tasks/PYPOST-1045/20-architecture.md`. Until then, contributors still rely
-on offline contracts, MCP integration loopbacks, agent UI e2e stubs, and
-optional live smoke. See also [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md)
-and [Agent UI E2E](agent_e2e.md) (UI Send stubs are a sibling path, not the
-collection MCP stand-in).
+It covers current-user lookup, bounded JQL search, retrieval of the returned
+issue, and board listing. See [CI-safe Jira MCP Collection E2E](jira_mcp_collection_e2e.md)
+for architecture, configuration, troubleshooting, and the boundary with the
+optional protected live smoke.
 
 ## MCP test fixture generator (PYPOST-179)
 

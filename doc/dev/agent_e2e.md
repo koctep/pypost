@@ -28,9 +28,9 @@ timing notes in [testing.md](testing.md)).
 This is **not** live MCP verification against a running PyPost. For MCP tools
 and Prometheus checks, see [testing.md](testing.md) and
 [mcp_integration.md](mcp_integration.md). Agent e2e HTTP stubs patch
-`send_request` for UI Send; they are **not** the planned curated-collection
-MCP e2e stand-in (PYPOST-1045 recommends a separate loopback HTTP pack —
-[planned CI-safe collection MCP e2e](testing.md#planned-ci-safe-collection-mcp-e2e-pypost-1045)).
+`send_request` for UI Send; they are **not** the curated-collection MCP e2e
+stand-in. The collection pack uses a separate loopback HTTP server and real
+request dispatch; see [CI-safe Jira MCP Collection E2E](jira_mcp_collection_e2e.md).
 
 ## Architecture
 

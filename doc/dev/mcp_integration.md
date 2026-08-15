@@ -478,9 +478,10 @@ Do not place protected values in commands, files, logs, docs, artifacts, or job
 summaries. Complete setup, safety, and offline-contract guidance is in
 [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md).
 
-A **CI-safe** curated-collection MCP e2e path against a controlled loopback
-HTTP stand-in is recommended (PYPOST-1045) but **not shipped** yet; see
-[Planned CI-safe collection MCP e2e](testing.md#planned-ci-safe-collection-mcp-e2e-pypost-1045).
+The shipped **CI-safe** curated-collection MCP e2e pack (PYPOST-1053) uses a
+controlled loopback HTTP stand-in for the same four workflows and is part of
+the standard fast suite. Run it with `make test-mcp-collection-e2e`; see
+[CI-safe Jira MCP Collection E2E](jira_mcp_collection_e2e.md).
 
 ### Endpoint environment binding (PYPOST-1044)
 

@@ -1,4 +1,9 @@
-.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev lock-otel check-lock-otel run run-agent-ui-mcp clean test test-slow test-jira-mcp-live check-jira-mcp-path-freshness test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit generate-mcp-fixtures check-mcp-fixtures generate-license-inventory check-license-inventory
+.PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev \
+	lock-otel check-lock-otel run run-agent-ui-mcp clean test test-slow \
+	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
+	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
+	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
+	check-license-inventory
 
 .DEFAULT_GOAL := help
 
@@ -105,6 +110,9 @@ test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow i
 test-slow: $(VENV_MARKER) venv-test venv-otel ## Run slow integration tests only (Makefile install smoke)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m slow)
+
+test-mcp-collection-e2e: $(VENV_MARKER) venv-test venv-otel ## Run Jira MCP e2e
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/test_mcp_collection_e2e.py
 
 test-jira-mcp-live: $(VENV_MARKER) venv-test venv-otel ## Run the explicitly opted-in read-only Jira MCP smoke
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/test_jira_mcp_live_smoke.py -m live_jira

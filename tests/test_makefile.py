@@ -739,6 +739,13 @@ class TestFastTestTargetRecipe:
         assert "fast test suite" in help_text.lower()
 
 
+def test_collection_e2e_make_target_selects_the_focused_module() -> None:
+    """PYPOST-1053: CI-safe collection e2e needs a dedicated discoverable target."""
+    text = MAKEFILE.read_text(encoding="utf-8")
+    recipe = makefile_target_recipe_body(text, "test-mcp-collection-e2e")
+    assert "tests/test_mcp_collection_e2e.py" in recipe
+
+
 class TestHelpTarget:
     def test_help_prints_non_empty_output(self, make_workspace: Path) -> None:
         """PYPOST-800: catch accidental removal of Makefile ## annotations."""
