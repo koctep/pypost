@@ -1,12 +1,8 @@
 """Tests for pypost.core.environment_export (PYPOST-988)."""
 
-import json
+from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.timeout(60)
-
-from pathlib import Path
 
 from pypost.core.environment_export import (
     EnvironmentExportError,
@@ -22,6 +18,8 @@ from pypost.core.environment_export import (
 from pypost.core.environment_import import load_import_candidates
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:
@@ -111,6 +109,13 @@ def test_write_export_file_raises_on_write_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "write_text", boom)
     with pytest.raises(EnvironmentExportError, match="Could not write file"):
         write_export_file(export_path, {"name": "Dev", "variables": {}})
+
+
+def test_write_export_file_raises_on_non_serializable_payload(tmp_path):
+    export_path = tmp_path / "export.json"
+
+    with pytest.raises(EnvironmentExportError, match="Could not write file"):
+        write_export_file(export_path, {"name": "Dev", "variables": {"bad": object()}})
 
 
 def test_format_export_result_includes_hidden_note():

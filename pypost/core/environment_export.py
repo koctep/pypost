@@ -7,12 +7,13 @@ directly unit-testable without a QApplication. Qt-facing dialogs live in
 """
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from pypost.core.export_file_writer import write_json_export_file
+from pypost.core.json_export_root import json_root_for_records
 from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Environment
 
@@ -98,19 +99,12 @@ def build_export_payload(
         len(environments),
         export_includes_hidden(environments),
     )
-    if len(records) == 1:
-        return records[0]
-    return records
+    return json_root_for_records(records)
 
 
 def write_export_file(path: Path, payload: list[dict] | dict) -> None:
     """Write the export payload to ``path`` as indented UTF-8 JSON."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        text = json.dumps(payload, indent=2)
-        path.write_text(text + "\n", encoding="utf-8")
-    except OSError as exc:
-        raise EnvironmentExportError(f"Could not write file: {exc}") from exc
+    write_json_export_file(path, payload, error_cls=EnvironmentExportError)
     logger.info("environment_export_file_written path=%s", path)
 
 

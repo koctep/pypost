@@ -35,7 +35,14 @@ CollectionExportActions             selection/snapshot → save dialog → write
 
 - **`pypost/core/collection_export.py`** — pure core. Resolves the single-export target,
   builds JSON-ready object or ordered list payloads via `Collection.model_dump(mode="json")`,
-  writes UTF-8 JSON, and formats the typed success summaries. No Qt or storage dependency.
+  and formats the typed success summaries. Writing delegates to the shared
+  `export_file_writer.write_json_export_file` helper. No Qt or storage dependency.
+- **`pypost/core/export_file_writer.py`** — shared low-level write helper (PYPOST-1011):
+  `write_json_export_file(path, payload, *, error_cls)` creates `path`'s parent
+  directories, writes `json.dumps(payload, indent=2)` with a trailing newline via
+  `write_text`, and wraps any `(OSError, TypeError, ValueError)` into the caller-supplied
+  `error_cls`. Used by both collection and environment export so the write/serialize-error
+  behavior stays identical; no Qt dependency, no cross-domain import.
 - **`pypost/core/collection_messages.py`** — export dialog titles, button label
   (`BUTTON_EXPORT_COLLECTION` / `BUTTON_EXPORT_ALL_COLLECTIONS`), captions, suggested
   filenames, file filter, and the no-selection message (import strings live in the same
@@ -133,7 +140,7 @@ Menu entry: delegates with `source_index=` so the clicked row wins over selectio
 | `build_export_payload(collection)` | JSON-ready `dict` via `model_dump` |
 | `build_all_export_payload(collections)` | Ordered `list[dict]` using the native collection shape |
 | `suggested_export_filename(collection)` | Default save-dialog name |
-| `write_export_file(path, payload)` | Write an object or list as indented UTF-8 JSON; raises `CollectionExportError` |
+| `write_export_file(path, payload)` | Delegates to `export_file_writer.write_json_export_file(path, payload, error_cls=CollectionExportError)` — writes an object or list as indented UTF-8 JSON |
 | `format_export_result(result)` | Success dialog body |
 | `CollectionsExportResult` / `format_all_export_result(result)` | Typed bulk outcome and success-dialog body |
 

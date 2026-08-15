@@ -178,7 +178,11 @@ serializer wiring test).
 - `build_export_payload(environments, storage)` — calls the new
   `StorageManager.serialize_environment_records` (native on-disk JSON shape,
   including encrypted envelopes when encryption is enabled).
-- `write_export_file(path, payload)` — indented UTF-8 JSON; raises
+- `write_export_file(path, payload)` — delegates to the shared
+  `pypost/core/export_file_writer.py::write_json_export_file(path, payload, *,
+  error_cls)` helper (PYPOST-1011, also used by collection export): creates
+  `path`'s parent directories, writes indented UTF-8 JSON with a trailing
+  newline, and wraps any `(OSError, TypeError, ValueError)` as
   `EnvironmentExportError` on write failure.
 - `format_export_result(ExportPlanResult)` — summary dialog text.
 

@@ -7,11 +7,11 @@ without a QApplication. Qt-facing dialogs live in
 """
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from pypost.core.export_file_writer import write_json_export_file
 from pypost.models.models import Collection
 
 logger = logging.getLogger(__name__)
@@ -94,12 +94,7 @@ def build_all_export_payload(collections: list[Collection]) -> list[dict]:
 
 def write_export_file(path: Path, payload: dict | list[dict]) -> None:
     """Write the export payload to ``path`` as indented UTF-8 JSON."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        text = json.dumps(payload, indent=2)
-        path.write_text(text + "\n", encoding="utf-8")
-    except (OSError, TypeError, ValueError) as exc:
-        raise CollectionExportError(f"Could not write file: {exc}") from exc
+    write_json_export_file(path, payload, error_cls=CollectionExportError)
     logger.info("collection_export_file_written path=%s", path)
 
 
