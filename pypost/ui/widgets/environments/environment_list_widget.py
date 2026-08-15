@@ -34,6 +34,7 @@ from pypost.core.environment_import import (
     format_import_result,
     plan_import,
 )
+from pypost.core.json_export_root import json_root_for_records
 from pypost.core.environment_messages import (
     ACTION_COPY,
     ACTION_DELETE,
@@ -390,7 +391,7 @@ class EnvironmentListWidget(QWidget):
 
         try:
             records = self._serialize_export_records(targets)
-            payload = records[0] if len(records) == 1 else records
+            payload = json_root_for_records(records)
             write_export_file(path, payload)
         except EnvironmentExportError as exc:
             logger.warning("environment_export_failed reason=%s", exc)

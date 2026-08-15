@@ -199,10 +199,11 @@ needed) → save dialog (`prompt_export_environments_file`) → injected
 `serialize_export_records=lambda envs:
 self._storage.serialize_environment_records(envs)`.
 
-Export does not mutate the working list or touch disk except for the chosen
-export path. Single-environment exports write one JSON object; multi-
-environment exports write a list — both shapes are accepted by import
-(PYPOST-986).
+Export does not mutate the working list or touch disk except for the chosen export path. The
+[shared JSON root policy](json_export_root.md) selects one JSON object for exactly one environment
+and an array for zero or multiple environments; both shapes are accepted by import (PYPOST-986).
+The injected widget serializer and the core `build_export_payload` path both apply the same helper
+after serialization.
 
 Tests: `tests/test_environment_export.py` (pure logic, round-trip with
 `load_import_candidates`) and `tests/test_environment_export_ui.py`

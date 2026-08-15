@@ -116,6 +116,27 @@ class TestExportCollection:
 class TestExportAllCollections:
     @patch(_ALL_RESULT)
     @patch(_ALL_SAVE)
+    def test_all_export_one_collection_writes_object_root(
+        self, mock_save, _mock_result, qapp, tmp_path
+    ):
+        export_path = tmp_path / "collections.json"
+        mock_save.return_value = export_path
+        collection = make_collection("c1", "Billing", [make_request("r1", "Create")])
+        presenter, _manager = _make_presenter(
+            [collection],
+            serialize_collection=lambda col: col.model_dump(mode="json"),
+        )
+        try:
+            presenter.export_all_collections()
+
+            data = json.loads(export_path.read_text(encoding="utf-8"))
+            assert isinstance(data, dict)
+            assert data["name"] == "Billing"
+        finally:
+            presenter.panel.close()
+
+    @patch(_ALL_RESULT)
+    @patch(_ALL_SAVE)
     def test_exports_every_collection_without_a_tree_selection(
         self, mock_save, mock_result, qapp, tmp_path
     ):

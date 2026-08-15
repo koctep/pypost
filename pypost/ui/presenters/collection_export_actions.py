@@ -25,6 +25,7 @@ from pypost.core.collection_export import (
     suggested_export_filename,
     write_export_file,
 )
+from pypost.core.json_export_root import json_root_for_records
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import Collection, RequestData
 from pypost.ui.collection_item_dialogs import (
@@ -111,7 +112,7 @@ class CollectionExportActions:
         )
 
     def export_all_collections(self) -> None:
-        """Write every current collection to one user-chosen JSON-list backup."""
+        """Write every current collection to one user-chosen JSON backup."""
         if self._serialize_collection is None:
             return
 
@@ -122,7 +123,8 @@ class CollectionExportActions:
             return
 
         try:
-            payload = [self._serialize_collection(collection) for collection in collections]
+            records = [self._serialize_collection(collection) for collection in collections]
+            payload = json_root_for_records(records)
             write_export_file(path, payload)
         except (CollectionExportError, TypeError, ValueError) as exc:
             logger.warning("collections_export_failed reason=%s", exc)

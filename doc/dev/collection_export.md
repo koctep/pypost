@@ -4,9 +4,10 @@
 
 **Export Collection** (PYPOST-989) writes one sidebar collection — with all of its
 requests — to a JSON file the user chooses. **Export All Collections…** (PYPOST-1012)
-writes a snapshot of the complete collection library as one JSON list. Both use PyPost's
-native collection serialization; one collection is a JSON object, while the full backup is
-a list of those objects accepted by [Collection Import](collection_import.md) (PYPOST-987).
+writes a snapshot of the complete collection library. Both use PyPost's native collection
+serialization and the [shared JSON root policy](json_export_root.md): one record is a JSON object,
+while zero or multiple records are an array accepted by [Collection Import](collection_import.md)
+(PYPOST-987).
 
 It mirrors [Export environments](environments_dialog.md) (PYPOST-988) structurally: a
 Qt-free core for payload shaping and file writing, and a thin Qt shell for the save dialog
@@ -52,7 +53,8 @@ CollectionExportActions             selection/snapshot → save dialog → write
   the save dialog, writes through the core, and shows success or error. The below-tree
   button uses `currentIndex()`; the context menu passes the clicked index. Bulk export
   snapshots `RequestManager.get_collections()` once, prompts even for an empty snapshot,
-  applies the injected serializer to each collection in order, and writes one JSON list.
+  applies the injected serializer to each collection in order, passes the resulting records through
+  `json_root_for_records`, and writes one JSON document.
 - **`pypost/ui/presenters/collection_tree_actions.py`** — adds **Export Collection…** to
   collection and request row menus (PYPOST-1013); logs `collection_export_selected`, then
   calls the injected export callback with the clicked index. See
@@ -69,8 +71,9 @@ CollectionExportActions             selection/snapshot → save dialog → write
 
 ### Round-trip with import
 
-Single export produces a JSON object. Bulk export produces one JSON list, including `[]`
-for an empty library. Import (`load_collection_import_candidates`) accepts either shape.
+Single export produces a JSON object. Bulk export produces an object for one collection and an
+array for zero or multiple collections, including `[]` for an empty library. Import
+(`load_collection_import_candidates`) accepts either shape.
 Automated tests in `tests/test_collection_export.py` assert export → import field fidelity
 for multiple collections, including method, URL, headers, params, body, scripts, and MCP
 flags.
@@ -117,9 +120,9 @@ Runs the complete-backup interaction with no tree-selection input.
 1. Takes one ordered snapshot from `RequestManager.get_collections()`.
 2. Opens `prompt_export_all_collections_file`; cancellation returns before serialization or
    writing.
-3. Serializes every snapshot entry through the injected `serialize_collection` callable,
-   writes the resulting `list[dict]`, then displays `CollectionsExportResult` with counts
-   and path.
+3. Serializes every snapshot entry through the injected `serialize_collection` callable, applies
+   `json_root_for_records` to the complete record list, writes the resulting JSON document, then
+   displays `CollectionsExportResult` with counts and path.
 4. Catches serialization/write `CollectionExportError`, `TypeError`, and `ValueError`, logs
    `collections_export_failed`, and displays the all-export error dialog.
 
@@ -212,8 +215,8 @@ injects it; isolated harnesses may pass `None` and omit the action.
 
 **Import rejects an exported file**
 
-Wrong shape or truncated write. Single export is one JSON object; bulk export is one JSON
-list. Compare a single entry with `collections/<id>.json` and check
+Wrong shape or truncated write. A one-record export is one JSON object; zero or multiple records
+are one JSON array. Compare a single entry with `collections/<id>.json` and check
 `collection_export_failed` or `collections_export_failed` logs.
 
 **Bulk backup is unexpectedly empty**
@@ -225,9 +228,10 @@ error.
 
 **Bulk backup does not restore all collections**
 
-Verify the file root is one JSON list, then use **Import Collection…**. Import's existing
-name-conflict policy can overwrite, keep both, or skip individual entries; bulk export does
-not alter that policy. Check `collections_export_failed` if the backup was not written.
+For one collection, verify the file root is a JSON object; for zero or multiple collections,
+verify it is a JSON array. Then use **Import Collection…**. Import's existing name-conflict policy
+can overwrite, keep both, or skip individual entries; bulk export does not alter that policy.
+Check `collections_export_failed` if the backup was not written.
 
 
 ## Related docs
@@ -236,5 +240,6 @@ not alter that policy. Check `collections_export_failed` if the backup was not w
 - User guide: [Collections — Export all collections](../user/collections.md#export-all-collections)
 - Tree menu wiring: [Collection Tree Actions](collection_tree_actions.md)
 - Import counterpart: [Collection Import](collection_import.md)
+- Root policy: [Shared JSON Export Root Policy](json_export_root.md)
 - On-disk format: [Collection Storage](collection_storage.md)
 - Log catalog: [Logging](logging.md)

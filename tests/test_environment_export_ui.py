@@ -26,6 +26,30 @@ class TestExportEnvironments:
     @patch(f"{_MODULE}.show_export_result")
     @patch(f"{_MODULE}.prompt_export_environments_file")
     @patch(f"{_MODULE}.prompt_export_scope", return_value=ExportScope.ALL)
+    def test_single_environment_export_writes_object_root(
+        self, _mock_scope, mock_save_dialog, _mock_show_result, qapp, tmp_path
+    ):
+        export_path = tmp_path / "environment.json"
+        mock_save_dialog.return_value = export_path
+        env = Environment(name="Dev", variables={"HOST": "dev.example.com"})
+        widget = _make_widget(
+            [env],
+            serialize_export_records=lambda envs: [
+                environment.model_dump(mode="json") for environment in envs
+            ],
+        )
+        try:
+            widget.export_environments()
+
+            data = json.loads(export_path.read_text(encoding="utf-8"))
+            assert isinstance(data, dict)
+            assert data["name"] == "Dev"
+        finally:
+            widget.close()
+
+    @patch(f"{_MODULE}.show_export_result")
+    @patch(f"{_MODULE}.prompt_export_environments_file")
+    @patch(f"{_MODULE}.prompt_export_scope", return_value=ExportScope.ALL)
     def test_happy_path_exports_all_and_shows_success(
         self, _mock_scope, mock_save_dialog, mock_show_result, qapp, tmp_path
     ):
