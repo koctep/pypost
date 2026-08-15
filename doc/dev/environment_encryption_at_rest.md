@@ -157,6 +157,30 @@ combination here:
 Uses a local Fernet key and `tmp_path` `StorageManager` — no live key
 services.
 
+### Encrypted export file round-trip (PYPOST-1009)
+
+Export with encryption enabled writes Hidden values as Fernet envelopes (the
+same protection as local `environments.json`). PYPOST-988 locked export →
+import only with encryption **off**. CI now inspects the written file and
+re-imports on the same installation with the same key:
+
+```bash
+# Node id: test_write_encrypted_export_file_round_trips_through_import
+.venv/bin/python -m pytest tests/test_environment_export.py -k \
+  test_write_encrypted_export_file_round_trips -v
+```
+
+| Guard | Assertion |
+| --- | --- |
+| Encryption on | `PYPOST_ENV_ENCRYPTION_ENABLED` plus `AppSettings` enabled |
+| Temp key | Generated Fernet key in `PYPOST_ENV_ENCRYPTION_KEY` |
+| Envelope on disk | Hidden field is v1 Fernet envelope; secret string absent |
+| Non-Hidden | Host remains plaintext in the export file |
+| Same-key re-import | `load_import_candidates` restores name, Hidden flag, plaintext |
+
+Uses `_make_encrypted_storage` and `tmp_path` — no live keyring or
+secret-store services. Different-key / cross-machine import is out of scope.
+
 ### Environment load contracts (PYPOST-525)
 
 Two public load methods coexist on `StorageManager`:
@@ -643,6 +667,7 @@ Primary coverage files:
 - `tests/test_env_storage_responsiveness.py`
 - `tests/test_encryption_migration.py`
 - `tests/test_encryption_migrate_cli.py`
+- `tests/test_environment_export.py`
 
 Async orchestration details: [environment_storage_async.md](environment_storage_async.md).
 Migration procedures: [encryption_key_migration.md](encryption_key_migration.md).

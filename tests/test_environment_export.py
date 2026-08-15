@@ -1,5 +1,6 @@
-"""Tests for pypost.core.environment_export (PYPOST-988)."""
+"""Tests for pypost.core.environment_export (PYPOST-988 / PYPOST-1009)."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -16,8 +17,10 @@ from pypost.core.environment_export import (
     write_export_file,
 )
 from pypost.core.environment_import import load_import_candidates
+from pypost.core.environment_secrets_codec import EncryptedValueEnvelope
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
+from pypost.models.settings import AppSettings
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -26,6 +29,16 @@ def _make_storage(tmp_path, monkeypatch) -> StorageManager:
     monkeypatch.delenv("PYPOST_ENV_ENCRYPTION_ENABLED", raising=False)
     monkeypatch.delenv("PYPOST_ENV_ENCRYPTION_KEY", raising=False)
     return StorageManager(data_dir=tmp_path / "pypost-data")
+
+
+def _make_encrypted_storage(tmp_path, monkeypatch) -> StorageManager:
+    fernet = pytest.importorskip("cryptography.fernet")
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_ENABLED", "true")
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
+    storage = StorageManager(data_dir=tmp_path / "pypost-data")
+    storage.apply_encryption_settings(AppSettings(env_encryption_enabled=True))
+    return storage
 
 
 def test_environments_for_export_all_returns_copy():
@@ -98,6 +111,48 @@ def test_write_export_file_round_trips_through_import(tmp_path, monkeypatch):
     assert imported[0].name == "Staging"
     assert imported[0].variables["token"] == "secret"
     assert imported[0].hidden_keys == {"token"}
+
+
+def test_write_encrypted_export_file_round_trips_through_import(tmp_path, monkeypatch):
+    """PYPOST-1009: Export Hidden values are envelopes when encryption is on.
+
+    Verification debt: expected green if production already encrypts Export
+    Hidden values. Locks write-file envelope inspect plus same-key import.
+    """
+    storage = _make_encrypted_storage(tmp_path, monkeypatch)
+    secret = "rtok-export-roundtrip-s3cr3t"
+    host = "https://export.example.com"
+    env = Environment(
+        name="EncryptedExport",
+        variables={"host": host, "token": secret},
+        hidden_keys={"token"},
+    )
+    export_path = tmp_path / "encrypted-export.json"
+    payload = build_export_payload([env], storage)
+    write_export_file(export_path, payload)
+
+    export_text = export_path.read_text(encoding="utf-8")
+    exported = json.loads(export_text)
+    assert isinstance(exported, dict)
+    hidden_field = exported["variables"]["token"]
+    assert isinstance(hidden_field, dict)
+    envelope = EncryptedValueEnvelope.from_payload(hidden_field)
+    assert envelope.enc is True
+    assert envelope.v == 1
+    assert envelope.alg == "fernet"
+    assert isinstance(envelope.kid, str)
+    assert isinstance(envelope.ct, str)
+    assert secret not in hidden_field.values()
+    assert json.dumps(secret) not in export_text
+    assert exported["variables"]["host"] == host
+
+    imported, parse_errors = load_import_candidates(export_path, storage)
+    assert parse_errors == []
+    assert len(imported) == 1
+    assert imported[0].name == "EncryptedExport"
+    assert imported[0].hidden_keys == {"token"}
+    assert imported[0].variables["token"] == secret
+    assert imported[0].variables["host"] == host
 
 
 def test_write_export_file_raises_on_write_failure(tmp_path, monkeypatch):

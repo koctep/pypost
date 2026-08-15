@@ -207,10 +207,14 @@ environments; both shapes are accepted by import (PYPOST-986). The injected
 widget serializer and the core `build_export_payload` path both apply the
 same helper after serialization.
 
-Tests: `tests/test_environment_export.py` (pure logic, round-trip with
-`load_import_candidates`) and `tests/test_environment_export_ui.py`
-(Qt-level scope/cancel/secrets/no-op/log coverage). PYPOST-1008 locks
-presenter wiring in
+Tests: `tests/test_environment_export.py` (pure logic, encryption-off
+round-trip with `load_import_candidates`) and
+`tests/test_environment_export_ui.py` (Qt-level
+scope/cancel/secrets/no-op/log coverage). PYPOST-1009 adds
+`test_write_encrypted_export_file_round_trips_through_import`: encryption
+on, temp key, envelope on disk, same-key re-import (see also
+`doc/dev/environment_encryption_at_rest.md` § Encrypted export file
+round-trip). PYPOST-1008 locks presenter wiring in
 `tests/test_env_presenter.py::test_open_env_manager_passes_working_serialize_export_records`:
 `_open_env_manager` must pass a `serialize_export_records` captured from the
 patched `EnvironmentDialog` constructor and invoked against
