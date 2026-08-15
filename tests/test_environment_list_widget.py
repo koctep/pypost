@@ -8,8 +8,13 @@ import logging
 from pathlib import Path
 from unittest.mock import patch
 
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QPushButton
+
 from pypost.core.environment_import import EnvironmentImportFileError, ImportConflictDecision
 from pypost.models.models import Environment
+from pypost.ui.widget_ids import ENV_IMPORT_BUTTON
 from pypost.ui.widgets.environments.environment_list_widget import EnvironmentListWidget
 
 _MODULE = "pypost.ui.widgets.environments.environment_list_widget"
@@ -183,5 +188,19 @@ class TestImportEnvironments:
                 "environment_import_completed added_count=1" in r.message
                 for r in caplog.records
             )
+        finally:
+            widget.close()
+
+
+class TestImportButtonWiring:
+    @patch.object(EnvironmentListWidget, "import_environments")
+    def test_mouse_click_on_import_button_starts_import(self, mock_import, qapp):
+        envs = [Environment(name="Dev", variables={})]
+        widget = _make_widget(envs)
+        try:
+            button = widget.findChild(QPushButton, ENV_IMPORT_BUTTON)
+            assert button is not None
+            QTest.mouseClick(button, Qt.MouseButton.LeftButton)
+            mock_import.assert_called_once()
         finally:
             widget.close()

@@ -162,7 +162,15 @@ re-encrypt). PYPOST-1000 locks presenter wiring in
 `FakeStorageManager` subclass with working deserialize, loads candidates
 from a temp JSON file (same patch-`EnvironmentDialog` style as
 PYPOST-1008's invoke lock
-`test_open_env_manager_passes_working_serialize_export_records`).
+`test_open_env_manager_passes_working_serialize_export_records`). PYPOST-1001
+adds a click-level wiring lock, distinct from the direct-call tests above:
+`test_environment_list_widget.py::TestImportButtonWiring::test_mouse_click_on_import_button_starts_import`
+finds the **Import…** button (`findChild(QPushButton, ENV_IMPORT_BUTTON)`),
+simulates a real `QTest.mouseClick`, and asserts the patched
+`import_environments` was invoked — proving the button is actually connected,
+not just that the action works when called directly. Verified against
+current code with zero production changes (the button was already wired
+correctly at `EnvironmentListWidget.__init__`).
 
 ## Export environments (PYPOST-988)
 
