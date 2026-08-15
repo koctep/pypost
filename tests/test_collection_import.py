@@ -275,6 +275,36 @@ class TestPlanKeepBoth(unittest.TestCase):
         self.assertEqual(result.renamed, [("My API", "Copy of My API")])
         self.assertEqual([col.name for col in result.persisted], ["Copy of My API"])
 
+    def test_keep_both_uses_next_numbered_copy_when_copy_and_copy_2_taken(self) -> None:
+        existing = [
+            _make_collection("existing-a", "API"),
+            _make_collection("existing-b", "Copy of API"),
+            _make_collection("existing-c", "Copy of API (2)"),
+        ]
+        incoming = [_make_collection("incoming-a", "API")]
+
+        result = plan_collection_import(
+            existing, incoming, {"API": ImportConflictDecision.KEEP_BOTH}
+        )
+
+        self.assertEqual(
+            [col.name for col in result.collections],
+            ["API", "Copy of API", "Copy of API (2)", "Copy of API (3)"],
+        )
+        self.assertEqual(result.renamed, [("API", "Copy of API (3)")])
+        self.assertEqual(
+            [col.name for col in result.persisted],
+            ["Copy of API (3)"],
+        )
+        self.assertEqual(
+            [col.id for col in result.collections[:3]],
+            ["existing-a", "existing-b", "existing-c"],
+        )
+        self.assertEqual(
+            [col.name for col in result.collections[:3]],
+            ["API", "Copy of API", "Copy of API (2)"],
+        )
+
 
 class TestPlanSkip(unittest.TestCase):
     def test_leaves_collections_identical_and_persists_nothing(self) -> None:

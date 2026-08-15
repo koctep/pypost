@@ -220,6 +220,40 @@ class TestImportCollections:
             presenter.panel.close()
 
     @patch(_RESULT)
+    @patch(_CONFLICT, return_value=(ImportConflictDecision.KEEP_BOTH, True))
+    @patch(_PICKER, return_value=_PATH)
+    def test_apply_to_all_prompts_only_once_for_three_conflicts(
+        self, _mock_picker, mock_conflict, _mock_result, qapp
+    ):
+        existing = [
+            make_collection("c1", "My API"),
+            make_collection("c2", "Billing"),
+            make_collection("c3", "Auth"),
+        ]
+        incoming = [
+            make_collection("i1", "My API"),
+            make_collection("i2", "Billing"),
+            make_collection("i3", "Auth"),
+        ]
+        presenter, manager = _make_presenter(existing, _reader(incoming))
+        try:
+            presenter.import_collections()
+            _wait_import(lambda: _mock_result.call_count >= 1)
+
+            mock_conflict.assert_called_once()
+            assert mock_conflict.call_args.kwargs["remaining_count"] == 2
+            assert [col.name for col in manager.get_collections()] == [
+                "My API",
+                "Billing",
+                "Auth",
+                "Copy of My API",
+                "Copy of Billing",
+                "Copy of Auth",
+            ]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
     @patch(_CONFLICT, return_value=(ImportConflictDecision.KEEP_BOTH, False))
     @patch(_PICKER, return_value=_PATH)
     def test_keep_both_adds_a_renamed_copy_alongside_the_original(
@@ -309,6 +343,69 @@ class TestImportCollections:
             assert any(
                 "collection_import_completed added_count=1" in r.message
                 and "request_count=1" in r.message
+                for r in caplog.records
+            )
+        finally:
+            presenter.panel.close()
+
+    @patch(_INVALID)
+    @patch(_PICKER, return_value=_PATH)
+    def test_logs_file_invalid_on_parse_failure(
+        self, _mock_picker, mock_invalid, qapp, caplog
+    ):
+        def raise_error(path):
+            raise CollectionImportFileError("File is not valid JSON: boom")
+
+        presenter, manager = _make_presenter(
+            [make_collection("c1", "Existing")], raise_error
+        )
+        try:
+            with caplog.at_level(logging.WARNING, logger=_MODULE):
+                presenter.import_collections()
+                _wait_import(lambda: mock_invalid.call_count >= 1)
+
+            mock_invalid.assert_called_once()
+            assert [col.name for col in manager.get_collections()] == ["Existing"]
+            manager.storage.save_collection.assert_not_called()
+            invalid_records = [
+                r
+                for r in caplog.records
+                if r.name == _MODULE
+                and r.levelno == logging.WARNING
+                and "collection_import_file_invalid reason=" in r.message
+            ]
+            assert any(
+                "not valid JSON" in r.message and "boom" in r.message
+                for r in invalid_records
+            )
+            assert not any(
+                "reason=no_valid_collections" in r.message for r in caplog.records
+            )
+        finally:
+            presenter.panel.close()
+
+    @patch(_INVALID)
+    @patch(_PICKER, return_value=_PATH)
+    def test_logs_file_invalid_on_zero_usable_collections(
+        self, _mock_picker, mock_invalid, qapp, caplog
+    ):
+        presenter, manager = _make_presenter(
+            [make_collection("c1", "Existing")],
+            _reader([], ['Entry 1: missing or empty "name" field']),
+        )
+        try:
+            with caplog.at_level(logging.WARNING, logger=_MODULE):
+                presenter.import_collections()
+                _wait_import(lambda: mock_invalid.call_count >= 1)
+
+            mock_invalid.assert_called_once()
+            assert [col.name for col in manager.get_collections()] == ["Existing"]
+            manager.storage.save_collection.assert_not_called()
+            assert any(
+                r.name == _MODULE
+                and r.levelno == logging.WARNING
+                and "collection_import_file_invalid reason=no_valid_collections"
+                in r.message
                 for r in caplog.records
             )
         finally:

@@ -261,6 +261,27 @@ blocking reader and asserts the Qt event loop still fires a `QTimer` during pars
 the busy cue observable. Semantic cases live in `tests/test_collections_import_ui.py`
 with async waiters.
 
+PYPOST-1006 (verification debt; no product change) adds three locks:
+
+- **Invalid-file logs** (`tests/test_collections_import_ui.py`):
+  `test_logs_file_invalid_on_parse_failure` and
+  `test_logs_file_invalid_on_zero_usable_collections`. Both
+  `collection_import_file_invalid` `reason`s via `caplog` on
+  `pypost.ui.presenters.collection_import_actions` (not the worker).
+  Parse failure: `reason=` plus the exception text, and no
+  `reason=no_valid_collections`. Empty candidates: exact token
+  `reason=no_valid_collections`. Same `_wait_import` as the dialog.
+- **Apply-to-all 3+** (`tests/test_collections_import_ui.py`
+  `test_apply_to_all_prompts_only_once_for_three_conflicts`): three
+  distinct conflicting names, KEEP_BOTH + apply-to-all, one prompt
+  (`remaining_count=2`) and three `Copy of …` names. KEEP_BOTH (not
+  SKIP) is required: a missing decision defaults to SKIP, so SKIP cannot
+  prove the loop recorded the third name.
+- **Copy name past `(2)`** (`tests/test_collection_import.py`
+  `test_keep_both_uses_next_numbered_copy_when_copy_and_copy_2_taken`):
+  `plan_collection_import` KEEP_BOTH when `Copy of API` and
+  `Copy of API (2)` are already taken yields unique `Copy of API (3)`.
+
 ## Configuration
 
 None. No new setting, environment variable, on-disk format, `StorageInterface` method, or
@@ -273,8 +294,9 @@ Structured `key=value` lines. Names, URLs, headers, bodies, scripts, full candid
 lists, and the status-bar string itself are never logged — an imported collection
 routinely carries credentials in a header template. Paths are logged for triage
 (user-chosen import file). See `ai-tasks/PYPOST-987/50-observability.md`,
-`ai-tasks/PYPOST-1004/50-observability.md`, and
-`ai-tasks/PYPOST-1005/50-observability.md`.
+`ai-tasks/PYPOST-1004/50-observability.md`,
+`ai-tasks/PYPOST-1005/50-observability.md`, and
+`ai-tasks/PYPOST-1006/50-observability.md`.
 
 ### Async parse lifecycle (PYPOST-1005)
 
@@ -306,6 +328,13 @@ File-level failures are logged twice on purpose: worker WARNING/ERROR confirms
 off-thread failure; orchestrator then emits the terminal
 `collection_import_file_invalid` “nothing changed” event used since PYPOST-987.
 
+PYPOST-1006 asserts both orchestrator `reason`s via `caplog` in
+`tests/test_collections_import_ui.py` (`test_logs_file_invalid_on_parse_failure`
+and `test_logs_file_invalid_on_zero_usable_collections`). Tests must not treat
+worker `collection_import_parse_worker_failed` as the terminal event.
+Zero-usable-collections is not a worker failure: parse returns `[]`, and only
+the orchestrator emits `reason=no_valid_collections`.
+
 ### Parse / apply / completion (PYPOST-987 / PYPOST-1004)
 
 In `collection_import.py`:
@@ -315,7 +344,7 @@ In `collection_import.py`:
 In `collection_import_actions.py`:
 
 - **WARNING** `collection_import_file_invalid reason=…` — the exception message, or the
-  literal `no_valid_collections`
+  literal `no_valid_collections` (both reasons locked via caplog, PYPOST-1006)
 - **INFO** `collection_import_completed added_count=… updated_count=… skipped_count=…
   renamed_count=… request_count=… error_count=…`
 
