@@ -637,6 +637,33 @@ class TestEnvPresenter(unittest.TestCase):
         )
 
     @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
+    def test_open_env_manager_passes_working_serialize_export_records(
+        self, mock_dialog
+    ):
+        """PYPOST-1008: presenter wires a working serialize_export_records."""
+        storage = FakeStorageManager()
+        config = FakeConfigManager()
+        mcp = _make_mcp_manager()
+        presenter = EnvPresenter(
+            storage, config, mcp, AppSettings(), lambda: [], MagicMock()
+        )
+        mock_dialog.return_value.environments = []
+
+        presenter._open_env_manager()
+
+        serializer = mock_dialog.call_args.kwargs["serialize_export_records"]
+        self.assertIsNotNone(serializer)
+
+        environments = [
+            _make_env("e1", "Dev", {"HOST": "dev.example.com"}),
+        ]
+        records = serializer(environments)
+
+        self.assertTrue(records)
+        self.assertEqual(records[0]["name"], "Dev")
+        self.assertEqual(records[0]["variables"]["HOST"], "dev.example.com")
+
+    @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
     def test_open_env_manager_passes_working_read_import_file(self, mock_dialog):
         """PYPOST-1000: presenter wires a storage-backed read_import_file."""
 

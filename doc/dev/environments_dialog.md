@@ -160,8 +160,9 @@ re-encrypt). PYPOST-1000 locks presenter wiring in
 `tests/test_env_presenter.py::test_open_env_manager_passes_working_read_import_file`:
 `_open_env_manager` must pass a `read_import_file` that, against a
 `FakeStorageManager` subclass with working deserialize, loads candidates
-from a temp JSON file (same patch-`EnvironmentDialog` style as the export
-serializer wiring test).
+from a temp JSON file (same patch-`EnvironmentDialog` style as
+PYPOST-1008's invoke lock
+`test_open_env_manager_passes_working_serialize_export_records`).
 
 ## Export environments (PYPOST-988)
 
@@ -196,18 +197,27 @@ values in export files.
 needed) → save dialog (`prompt_export_environments_file`) → injected
 `serialize_export_records` callable → `write_export_file` →
 `show_export_result`. `EnvPresenter._open_env_manager` wires
-`serialize_export_records=lambda envs:
-self._storage.serialize_environment_records(envs)`.
+`serialize_export_records=self._storage.serialize_environment_records`
+(bound method, not a wrapping lambda).
 
-Export does not mutate the working list or touch disk except for the chosen export path. The
-[shared JSON root policy](json_export_root.md) selects one JSON object for exactly one environment
-and an array for zero or multiple environments; both shapes are accepted by import (PYPOST-986).
-The injected widget serializer and the core `build_export_payload` path both apply the same helper
-after serialization.
+Export does not mutate the working list or touch disk except for the chosen
+export path. The [shared JSON root policy](json_export_root.md) selects one
+JSON object for exactly one environment and an array for zero or multiple
+environments; both shapes are accepted by import (PYPOST-986). The injected
+widget serializer and the core `build_export_payload` path both apply the
+same helper after serialization.
 
 Tests: `tests/test_environment_export.py` (pure logic, round-trip with
 `load_import_candidates`) and `tests/test_environment_export_ui.py`
-(Qt-level scope/cancel/secrets/no-op/log coverage).
+(Qt-level scope/cancel/secrets/no-op/log coverage). PYPOST-1008 locks
+presenter wiring in
+`tests/test_env_presenter.py::test_open_env_manager_passes_working_serialize_export_records`:
+`_open_env_manager` must pass a `serialize_export_records` captured from the
+patched `EnvironmentDialog` constructor and invoked against
+`FakeStorageManager` (shared fake; plaintext environments) so it returns
+export records — invoke, not identity only. Bound-method identity remains in
+`test_open_env_manager_passes_storage_serializer_directly` (local
+`FakeStorage`); that sibling does not replace the invoke lock.
 
 ## Configuration
 N/A
