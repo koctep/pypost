@@ -170,7 +170,15 @@ simulates a real `QTest.mouseClick`, and asserts the patched
 `import_environments` was invoked — proving the button is actually connected,
 not just that the action works when called directly. Verified against
 current code with zero production changes (the button was already wired
-correctly at `EnvironmentListWidget.__init__`).
+correctly at `EnvironmentListWidget.__init__`). PYPOST-1002 closes two
+remaining coverage gaps at the 3+-conflict boundary:
+`test_environment_list_widget.py::TestImportEnvironments::test_apply_to_all_conflicts_applies_to_third_and_later_conflicts`
+locks that "apply to all" (once set on the first conflict) carries through a
+third and later conflict, not just a second, and
+`test_environment_import.py::TestGenerateImportCopyName::test_returns_next_numbered_copy_when_first_two_taken`
+locks `generate_import_copy_name` advancing past `"Copy of X (2)"` to
+`"Copy of X (3)"` when both are already taken. Both were verification locks
+against existing, already-correct logic — no production code changed.
 
 ## Export environments (PYPOST-988)
 
