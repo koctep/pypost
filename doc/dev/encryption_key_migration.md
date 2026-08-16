@@ -7,6 +7,10 @@ enabling encryption on existing plaintext hidden values, and optional bulk re-en
 rotation. The migration layer does not change envelope format, codec behavior, or key provider
 contracts — it orchestrates existing `StorageManager` load/save paths.
 
+PYPOST-1072 stabilizes the desktop migration worker lifecycle by separating domain results from
+native thread completion, retaining worker ownership through bounded cleanup, and validating the
+behavior with focused tests and bounded full-suite runs.
+
 For encryption fundamentals (sources, settings, rotation registries), see
 [Environment Encryption at Rest](environment_encryption_at_rest.md). This document focuses on
 staged rollout, scenario procedures, CLI usage, and failure playbooks.
@@ -22,6 +26,7 @@ flowchart TD
   end
 
   subgraph migration [Migration layer]
+    EMW[EncryptionMigrationWorker]
     EMS[EncryptionMigrationService]
     INV[EnvironmentInventory]
     REP[MigrationReport]
@@ -37,7 +42,11 @@ flowchart TD
   end
 
   CLI --> EMS
-  UI --> EMS
+  UI -->|"verify (synchronous)"| EMS
+  UI -->|"bulk action"| EMW
+  EMW --> EMS
+  EMW -->|"succeeded / failed"| UI
+  EMW -->|"QThread.finished"| UI
   EMS --> INV
   EMS --> REP
   EMS -->|"load_environments_with_errors()"| SM
@@ -52,7 +61,8 @@ flowchart TD
 | --- | --- | --- |
 | Migration service | `pypost/core/encryption_migration.py` | Verify, inventory, bulk re-encrypt, encrypt-plaintext |
 | Operator CLI | `scripts/encryption_migrate.py` | Headless subcommands; loads `AppSettings` via `ConfigManager` |
-| Settings UI | `pypost/ui/dialogs/settings_dialog.py` | Verify encryption; re-encrypt all (with confirmation) |
+| Settings UI | `pypost/ui/widgets/settings/encryption_migration_section.py` | Verify encryption; re-encrypt all (with confirmation) |
+| Worker | `pypost/core/qt/encryption_migration_worker.py` | Run bulk actions and emit domain outcomes |
 | Inventory | `EnvironmentInventory` | Per-env and aggregate `kid`/plaintext stats |
 | Report | `MigrationReport` | Structured outcome: counts, errors, dry-run, backup path |
 | Storage | `pypost/core/storage.py` | Atomic I/O; migration uses `load_environments_with_errors()` |
@@ -290,6 +300,40 @@ Use before production cutover or after rotation:
 
 ## API / Usage (developers)
 
+### Desktop worker lifecycle (PYPOST-1072)
+
+`EncryptionMigrationWorker` subclasses `QThread`. It exposes two domain-result signals:
+
+- `succeeded(MigrationReport)` reports a service return value.
+- `failed(str)` reports an exception raised by the service.
+
+Neither signal means that the native thread has terminated. Native termination is represented by
+the inherited, no-argument `QThread.finished()` signal. Do not add a subclass signal named
+`finished`; doing so hides Qt's lifecycle signal in Python and makes a result indistinguishable
+from thread termination.
+
+`EncryptionMigrationSection` owns the worker through the host dialog's `_migration_worker`
+reference. The lifecycle ordering is:
+
+1. Retain the worker, disable all migration buttons, and start the thread.
+2. Handle `succeeded` or `failed` while keeping the worker strongly referenced.
+3. After inherited `QThread.finished()` fires, call `deleteLater()`.
+4. Call `wait(100)` to bound synchronization with any remaining native thread effects.
+5. Clear `_migration_worker` and restore the migration buttons, including when `wait()` returns
+   false.
+
+The 100 millisecond cleanup wait is a code policy in `_WORKER_FINISH_WAIT_MS`; it is not a user
+setting or an environment variable. A timeout emits this warning through
+`pypost.ui.dialogs.settings_dialog`:
+
+```text
+settings_encryption_migration_worker_finish_wait_timeout wait_ms=100 operation=<operation>
+```
+
+The warning means cleanup reached its bound. It does not change the migration result, extend the
+wait, or keep the controls disabled. Avoid `QThread.terminate()` in recovery code because forced
+termination cannot guarantee safe cleanup.
+
 ### `StorageManager.load_environments_with_errors()` (PYPOST-525)
 
 Supported batch load for migration and other operator tooling. Unlike `load_environments()`, it
@@ -452,7 +496,42 @@ cp environments.json.backup.20260611T120000Z environments.json
 **Fix:** Restart shells or re-export env vars; confirm `settings.json` and env overrides. See
 [env var changes ignored](environment_encryption_at_rest.md#env-var-or-registry-file-changes-ignored-while-app-is-running).
 
+### Settings migration cleanup warning appears
+
+**Symptom:** Logs contain
+`settings_encryption_migration_worker_finish_wait_timeout wait_ms=100 operation=...`.
+
+**Cause:** Qt emitted native thread completion, but the worker's bounded `wait(100)` did not
+confirm complete synchronization within the cleanup window.
+
+**Fix:** Check the preceding worker start, completion, and failure events for the same operation.
+Confirm the result dialog was requested, the migration buttons were restored, and no worker
+remains active. Reproduce with the focused lifecycle tests below. Do not increase the bound or
+force termination solely to suppress the warning; investigate repeated warnings as a Qt lifecycle
+or environment issue.
+
 ## Tests
+
+The UI tests use `process_until()` with a 5,000 millisecond inner bound and a module-level
+120-second pytest timeout. The helper waits until `_migration_worker` is `None`, which now occurs
+only after the inherited thread-completion handler runs. An expired inner bound raises an
+assertion with worker state and operation details; test helpers must not silently return at a
+deadline or use domain-result delivery as the completion condition.
+
+Run the focused worker lifecycle and Settings UI coverage from the repository root:
+
+```bash
+make test PYTEST_ARGS="tests/test_encryption_migration_worker.py \
+  tests/test_settings_encryption_migration_ui.py"
+```
+
+Evidenced result: 14 focused tests passed.
+
+This covers service dispatch, domain-result signals, retained ownership through native thread
+completion, the 100 millisecond cleanup warning, control restoration, and the existing migration
+UI scenarios. The deterministic UI seam currently covers success and cleanup-timeout ordering.
+Failure-path lifecycle ordering is tracked by
+[PYPOST-1078](https://pypost.atlassian.net/browse/PYPOST-1078).
 
 Focused suites:
 
@@ -482,3 +561,7 @@ make test
 - [Environment Encryption at Rest](environment_encryption_at_rest.md) — sources, settings, rotation,
   codec format
 - [Async Environment Storage](environment_storage_async.md) — UI threading when encryption is enabled
+- [PYPOST-1072 architecture](../../ai-tasks/PYPOST-1072/20-architecture.md) — signal split,
+  ownership invariants, and design rationale
+- [PYPOST-1072 observability](../../ai-tasks/PYPOST-1072/50-observability.md) — lifecycle log
+  contract

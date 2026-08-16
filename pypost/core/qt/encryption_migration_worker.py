@@ -18,7 +18,7 @@ MigrationOperation = Literal["re_encrypt", "encrypt_plaintext"]
 class EncryptionMigrationWorker(QThread):
     """Runs bulk migration off the Qt UI thread."""
 
-    finished = Signal(object)
+    succeeded = Signal(object)
     failed = Signal(str)
 
     def __init__(
@@ -50,7 +50,7 @@ class EncryptionMigrationWorker(QThread):
                 self._operation,
                 report.success,
             )
-            self.finished.emit(report)
+            self.succeeded.emit(report)
         except Exception as exc:
             logger.error(
                 "encryption_migration_worker_failed operation=%s error=%s",
@@ -59,3 +59,7 @@ class EncryptionMigrationWorker(QThread):
                 exc_info=True,
             )
             self.failed.emit(str(exc))
+
+    @property
+    def operation(self) -> MigrationOperation:
+        return self._operation

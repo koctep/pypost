@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -14,7 +13,10 @@ from pypost.core.encryption_migration import (
     MigrationReport,
     format_migration_report,
 )
-from pypost.core.qt.encryption_migration_worker import EncryptionMigrationWorker
+from pypost.core.qt.encryption_migration_worker import (
+    EncryptionMigrationWorker,
+    MigrationOperation,
+)
 from pypost.core.storage_interface import StorageInterface
 from pypost.models.settings import AppSettings
 from pypost.ui.widgets.settings._common import make_section_header
@@ -25,6 +27,8 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger("pypost.ui.dialogs.settings_dialog")
+
+_WORKER_FINISH_WAIT_MS = 100
 
 
 class EncryptionMigrationSection:
@@ -141,7 +145,7 @@ class EncryptionMigrationSection:
 
     def _start_migration_worker(
         self,
-        operation: str,
+        operation: MigrationOperation,
         *,
         title: str,
         confirm: Callable[[QWidget], bool],
@@ -154,26 +158,25 @@ class EncryptionMigrationSection:
         settings = self.encryption_settings_from_form()
         logger.info("settings_encryption_%s_started", operation)
         worker = EncryptionMigrationWorker(self._migration_service, operation, settings)
-        worker.finished.connect(
-            lambda report, op=operation, result_title=title: self._on_migration_worker_finished(
+        worker.succeeded.connect(
+            lambda report, op=operation, result_title=title: self._on_migration_worker_succeeded(
                 op,
                 result_title,
                 report,
             )
         )
         worker.failed.connect(self._on_migration_worker_failed)
+        worker.finished.connect(self._on_migration_worker_thread_finished)
         self.migration_worker = worker
         self._set_migration_buttons_enabled(False)
         worker.start()
 
-    def _on_migration_worker_finished(
+    def _on_migration_worker_succeeded(
         self,
         operation: str,
         title: str,
         report: MigrationReport,
     ) -> None:
-        self.migration_worker = None
-        self._set_migration_buttons_enabled(True)
         logger.info(
             "settings_encryption_%s_completed success=%s backup=%s error_count=%d",
             operation,
@@ -184,8 +187,6 @@ class EncryptionMigrationSection:
         self._show_migration_result(title, report)
 
     def _on_migration_worker_failed(self, message: str) -> None:
-        self.migration_worker = None
-        self._set_migration_buttons_enabled(True)
         logger.error("settings_encryption_migration_worker_failed error=%s", message)
         self._show_migration_result_fn(
             self._parent,
@@ -193,3 +194,17 @@ class EncryptionMigrationSection:
             f"Migration failed: {message}",
             success=False,
         )
+
+    def _on_migration_worker_thread_finished(self) -> None:
+        finished = self.migration_worker
+        if finished is not None:
+            finished.deleteLater()
+            if not finished.wait(_WORKER_FINISH_WAIT_MS):
+                logger.warning(
+                    "settings_encryption_migration_worker_finish_wait_timeout "
+                    "wait_ms=%d operation=%s",
+                    _WORKER_FINISH_WAIT_MS,
+                    finished.operation,
+                )
+        self.migration_worker = None
+        self._set_migration_buttons_enabled(True)

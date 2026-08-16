@@ -41,41 +41,41 @@ def _empty_report(*, success: bool = True) -> MigrationReport:
 
 
 class TestEncryptionMigrationWorker(unittest.TestCase):
-    def test_re_encrypt_emits_finished_with_report(self) -> None:
+    def test_re_encrypt_emits_succeeded_with_report(self) -> None:
         service = MagicMock()
         report = _empty_report()
         service.bulk_re_encrypt.return_value = report
         settings = AppSettings()
         worker = EncryptionMigrationWorker(service, "re_encrypt", settings)
-        finished: list[MigrationReport] = []
-        worker.finished.connect(finished.append)
+        succeeded: list[MigrationReport] = []
+        worker.succeeded.connect(succeeded.append)
         worker.run()
-        self.assertEqual(finished, [report])
+        self.assertEqual(succeeded, [report])
         service.bulk_re_encrypt.assert_called_once_with(settings, backup=True)
 
-    def test_encrypt_plaintext_emits_finished_with_report(self) -> None:
+    def test_encrypt_plaintext_emits_succeeded_with_report(self) -> None:
         service = MagicMock()
         report = _empty_report()
         service.encrypt_plaintext_hidden.return_value = report
         settings = AppSettings()
         worker = EncryptionMigrationWorker(service, "encrypt_plaintext", settings)
-        finished: list[MigrationReport] = []
-        worker.finished.connect(finished.append)
+        succeeded: list[MigrationReport] = []
+        worker.succeeded.connect(succeeded.append)
         worker.run()
-        self.assertEqual(finished, [report])
+        self.assertEqual(succeeded, [report])
         service.encrypt_plaintext_hidden.assert_called_once_with(settings, backup=True)
 
     def test_run_emits_failed_on_service_exception(self) -> None:
         service = MagicMock()
         service.bulk_re_encrypt.side_effect = RuntimeError("migration failed")
         worker = EncryptionMigrationWorker(service, "re_encrypt", AppSettings())
-        finished: list[MigrationReport] = []
+        succeeded: list[MigrationReport] = []
         failed: list[str] = []
-        worker.finished.connect(finished.append)
+        worker.succeeded.connect(succeeded.append)
         worker.failed.connect(failed.append)
         worker.run()
         self.assertEqual(failed, ["migration failed"])
-        self.assertEqual(finished, [])
+        self.assertEqual(succeeded, [])
 
     def test_run_logs_error_on_failure(self) -> None:
         service = MagicMock()
