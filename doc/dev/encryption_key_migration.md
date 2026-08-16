@@ -533,6 +533,63 @@ UI scenarios. The deterministic UI seam currently covers success and cleanup-tim
 Failure-path lifecycle ordering is tracked by
 [PYPOST-1078](https://pypost.atlassian.net/browse/PYPOST-1078).
 
+### Affected-platform verification (PYPOST-1076)
+
+The lifecycle fix at clean commit `17c20fb9180b05efd16ac04f17dd630efcd16cc1` was verified on
+macOS 15.7.7 arm64 with exact CPython 3.13.13. The focused Makefile run passed all 14 worker and
+Settings UI tests in 0.50 seconds (5.68 seconds wall time).
+
+Two bounded `make test` runs then reached 100% without a bus error, fatal interpreter error,
+hang, or process-level termination. Run 1 completed in 528.34 seconds (531.93 seconds wall time)
+and run 2 in 528.27 seconds (529.90 seconds wall time). Each reported 2,197 passed, 5 failed,
+22 deselected, and 1 warning; the expected baseline-relative Make exit was 2. Every migration
+test passed in both runs. The five exceptions were the existing PYPOST-1071 baseline failures:
+
+- `tests/test_solid_audit_baseline.py::TestSolidAuditBaseline::` +
+  `test_audit_module_inventory_within_caps`
+- `tests/test_solid_audit_baseline.py::TestSolidAuditBaseline::` +
+  `test_main_window_class_loc_within_cap`
+- `tests/test_solid_audit_baseline.py::TestSolidAuditBaseline::` +
+  `test_main_window_file_loc_within_cap`
+- `tests/test_solid_audit_baseline.py::TestSolidAuditBaseline::` +
+  `test_markdown_snapshot_matches_current_metrics`
+- `tests/test_verify_ai_task_artifacts.py::TestCommittedBaseline::` +
+  `test_baseline_matches_current_scan`
+
+To reproduce without disturbing a dirty primary checkout, create a detached throwaway worktree at
+the verified commit, provide the exact interpreter to the Makefile, and run the focused suite and
+two full suites there:
+
+```bash
+verification_root="$(mktemp -d)"
+verification_tree="${verification_root}/pypost-1076"
+python313=/absolute/path/to/cpython-3.13.13
+git worktree add --detach "${verification_tree}" 17c20fb9180b05efd16ac04f17dd630efcd16cc1
+cd "${verification_tree}"
+"${python313}" -VV
+file "${python313}"
+make PYTHON="${python313}" install
+.venv/bin/python -VV
+make PYTHON="${python313}" test PYTEST_ARGS="tests/test_encryption_migration_worker.py \
+  tests/test_settings_encryption_migration_ui.py -v"
+.venv/bin/python -VV
+make PYTHON="${python313}" test
+.venv/bin/python -VV
+make PYTHON="${python313}" test
+```
+
+Confirm `git status --short` is empty before collecting evidence; the ignored `.venv` does not
+invalidate the clean source tree. After recording commands, counts, durations, and exit statuses,
+leave the worktree and remove it with `git worktree remove "${verification_tree}"`.
+
+If `.venv/bin/python -VV` is not exactly 3.13.13, recreate the throwaway worktree and repeat the
+procedure with the correct absolute `python313` path. Keep the command-line
+`PYTHON="${python313}"` assignment on every Make invocation. Treat the five failures above as
+exceptions only when the node IDs and counts match exactly; any difference requires investigation.
+If a native crash or hang recurs, preserve the last pytest node, exit status or signal,
+OS/Python/Qt metadata, stderr, and the matching macOS diagnostic report. Do not increase the
+bounded waits or force thread termination to make the run complete.
+
 Focused suites:
 
 ```bash
