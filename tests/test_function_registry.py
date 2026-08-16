@@ -1,7 +1,4 @@
 import pytest
-
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from jinja2 import Environment
@@ -9,10 +6,16 @@ from jinja2 import Environment
 from pypost.core.function_registry import FunctionRegistry
 
 
+pytestmark = pytest.mark.timeout(30)
+
+
 class TestFunctionRegistry(unittest.TestCase):
     def test_allowed_names_matches_catalog(self):
         reg = FunctionRegistry()
-        self.assertEqual(reg.allowed_names(), frozenset({"urlencode", "md5", "base64"}))
+        self.assertEqual(
+            reg.allowed_names(),
+            frozenset({"urlencode", "md5", "base64", "to_int"}),
+        )
 
     def test_is_allowed(self):
         reg = FunctionRegistry()

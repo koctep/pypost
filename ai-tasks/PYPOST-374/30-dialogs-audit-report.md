@@ -1,23 +1,25 @@
 # PYPOST-374: Individual Dialog SOLID Audit Report
 
-**Date:** 2026-06-11  
-**Scope:** `pypost/ui/dialogs/` (seven modules, 923 LOC total)  
-**Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)  
+**Date:** 2026-06-11
+**Scope:** `pypost/ui/dialogs/` (eight modules, 1,030 LOC total)
+**Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)
 **Baseline comparison:** PYPOST-40 grouped inventory ~400 LOC, five dialogs named
 
 ## Executive Summary
 
-Individual dialog review shows **one high-severity SRP concern** (`SettingsDialog`, 423 LOC)
-combining appearance, MCP/metrics, encryption migration, retry policy, and alerting. Five
-dialogs are read-only or thin form shells with acceptable SOLID posture. **Two MCP read-only
-dialogs** (`mcp_activity_dialog.py`, `mcp_tools_overview_dialog.py`) were absent from the
-original audit and follow a strong data-injection pattern.
+The current individual-dialog inventory contains eight modules. `SettingsDialog` is a thin
+composition root over dedicated settings sections, while `McpServersDialog` manages explicit,
+persisted MCP server configurations. **Three MCP dialogs**
+(`mcp_activity_dialog.py`, `mcp_servers_dialog.py`, and `mcp_tools_overview_dialog.py`) use
+injected data or callbacks rather than direct transport ownership. The activity and tools dialogs
+are read-only; the server manager supports configuration and lifecycle changes. The audit is
+complete for the full current scope.
 
 **Top recommendations:**
 
-1. **P1** — Split `SettingsDialog` into section widgets or a presenter-backed tabbed dialog.
-2. **P2** — Single source of truth for keyboard shortcuts (`HotkeysDialog` vs app actions).
-3. **P3** — Resolve hardcoded About version; add focused unit tests for data-driven dialogs.
+1. **P1** — Continue keeping settings behavior in focused section widgets.
+2. **P2** — Keep the hotkey reference sourced from the shared action registry.
+3. **P3** — Add focused empty-state and validation coverage where dialog behavior grows.
 
 ---
 
@@ -25,15 +27,16 @@ original audit and follow a strong data-injection pattern.
 
 | Module | LOC | Class | Responsibility | Opened from |
 | --- | ---: | --- | --- | --- |
-| `about_dialog.py` | 40 | `AboutDialog` | Static app info | `main_window.py` |
-| `hotkeys_dialog.py` | 91 | `HotkeysDialog` | Shortcut reference table | `main_window.py` |
-| `save_dialog.py` | 91 | `SaveRequestDialog` | Save-as collection picker | `request_save_orchestrator.py` |
-| `env_dialog.py` | 89 | `EnvironmentDialog` | Environment manager shell | `env_presenter.py` |
-| `settings_dialog.py` | 423 | `SettingsDialog` | Global app settings + migration | `main_window.py` |
-| `mcp_activity_dialog.py` | 117 | `McpActivityDialog` | MCP activity log viewer | `env_presenter.py` |
-| `mcp_tools_overview_dialog.py` | 72 | `McpToolsOverviewDialog` | MCP tool catalog viewer | `env_presenter.py` |
+| `about_dialog.py` | 43 | `AboutDialog` | Static app information | `main_window.py` |
+| `env_dialog.py` | 109 | `EnvironmentDialog` | Environment manager shell | env presenter |
+| `hotkeys_dialog.py` | 69 | `HotkeysDialog` | Shared shortcut reference table | `main_window.py` |
+| `mcp_activity_dialog.py` | 117 | `McpActivityDialog` | MCP activity viewer | env presenter |
+| `mcp_servers_dialog.py` | 333 | `McpServersDialog` + editor | MCP server manager | main window |
+| `mcp_tools_overview_dialog.py` | 74 | Tool overview | MCP tools | env |
+| `save_dialog.py` | 93 | `SaveRequestDialog` | Save-as picker | save orchestrator |
+| `settings_dialog.py` | 192 | `SettingsDialog` | Settings composition | main window |
 
-**Total:** 923 LOC (vs PYPOST-40 grouped ~400 LOC — Settings growth + two MCP dialogs).
+**Total:** 1,030 LOC (vs PYPOST-40 grouped ~400 LOC).
 
 Regenerate counts: `scripts/audit_dialogs_inventory.py --markdown`
 
@@ -45,109 +48,107 @@ Regenerate counts: `scripts/audit_dialogs_inventory.py --markdown`
 
 | Principle | Rating | Notes |
 | --- | --- | --- |
-| SRP | OK | Displays static about content only |
+| SRP | OK | Displays static app information only |
 | OCP | OK | No extension points needed |
 | LSP | N/A | No inheritance |
 | ISP | OK | Minimal QWidget surface |
-| DIP | OK | No external services |
+| DIP | OK | Reads the package version only |
 
-**Maintainability:** Hardcoded version string `"Version 0.1.0"` (line 22) — not tied to package
-metadata. **Test coverage:** None (display-only; low risk).
-
----
-
-### `hotkeys_dialog.py` — HotkeysDialog
-
-| Principle | Rating | Notes |
-| --- | --- | --- |
-| SRP | OK | Reference list only; no shortcut registration |
-| OCP | Low | New shortcuts require editing embedded list (lines 39–59) |
-| LSP | N/A | No inheritance |
-| ISP | OK | Self-contained |
-| DIP | OK | No dependencies |
-
-**Maintainability:** Shortcut table is **duplicated knowledge** vs `main_window` / presenter
-`QAction` definitions — drift risk when shortcuts change. **Test coverage:** None.
-
----
-
-### `save_dialog.py` — SaveRequestDialog
-
-| Principle | Rating | Notes |
-| --- | --- | --- |
-| SRP | OK | Save-as name + collection selection |
-| OCP | Low | "New collection" branch is inline (lines 66–89) |
-| LSP | N/A | No inheritance |
-| ISP | OK | Exposes result fields only |
-| DIP | Partial | Receives `collections` list; validation via `collection_item_dialogs` helpers |
-
-**Maintainability:** Validation delegated to shared dialog helpers (good). Mutable result fields
-(`request_name`, `selected_collection_id`) are caller contract — documented by usage in
-`request_save_orchestrator.py`. **Test coverage:** Indirect via orchestrator mocks only.
-
----
+**Maintainability:** The displayed version is sourced from package metadata. **Test coverage:**
+Display-only; low risk.
 
 ### `env_dialog.py` — EnvironmentDialog
 
 | Principle | Rating | Notes |
 | --- | --- | --- |
-| SRP | OK | Thin composition root for list + variables widgets |
-| OCP | OK | Behavior extended via `EnvironmentListWidget` / `EnvironmentVariablesWidget` |
+| SRP | OK | Thin composition root for environment list and variables widgets |
+| OCP | OK | Behavior extends through focused widgets |
 | LSP | N/A | No inheritance |
-| ISP | OK | Delegates to focused widgets |
-| DIP | Good | Injects environments; callbacks for current env name |
+| ISP | OK | Delegates focused operations |
+| DIP | Good | Receives environment data and import/export callbacks |
 
-**Maintainability:** Facade with many one-line delegates (lines 67–89) — acceptable after
-PYPOST-496 widget extraction. **Test coverage:** Strong (`tests/test_env_dialog.py`, e2e).
+**Maintainability:** Widget delegation keeps environment editing separate from dialog layout.
+**Test coverage:** Strong (`tests/test_env_dialog.py`, e2e).
 
----
-
-### `settings_dialog.py` — SettingsDialog
+### `hotkeys_dialog.py` — HotkeysDialog
 
 | Principle | Rating | Notes |
 | --- | --- | --- |
-| SRP | **High violation** | Font, timeout, MCP, metrics, encryption, migration, retry, alerts in one class |
-| OCP | Low | Each new setting modifies `__init__`, form rows, and `accept()` |
+| SRP | OK | Presents shortcut rows only |
+| OCP | OK | Rows come from the shared hotkey collector |
 | LSP | N/A | No inheritance |
-| ISP | Low | Callers get full settings surface; migration buttons optional via `storage` |
-| DIP | Partial | Optional `StorageManager`; creates `EncryptionMigrationService` internally (113–115) |
+| ISP | OK | Self-contained |
+| DIP | Good | Depends on the shared action-derived row collector |
 
-**Maintainability:**
-
-- 423 LOC — largest UI module in scope; `_encryption_settings_from_form` vs `accept()` duplicate
-  encryption mode parsing (lines 307–323 vs 387–393).
-- Structured logging present for encryption verify/re-encrypt and retry validation (good).
-- **Test coverage:** Strong (`test_settings_dialog.py`, encryption/migration UI tests).
-
----
+**Maintainability:** The table no longer duplicates shortcut definitions. **Test coverage:**
+Display behavior is low risk.
 
 ### `mcp_activity_dialog.py` — McpActivityDialog
 
 | Principle | Rating | Notes |
 | --- | --- | --- |
 | SRP | OK | Read-only MCP activity table |
-| OCP | OK | New columns would extend formatters |
+| OCP | OK | New columns extend pure formatters |
 | LSP | N/A | No inheritance |
-| ISP | OK | `set_entries` API |
-| DIP | Good | Entries injected; formatters are pure functions (95–117) |
+| ISP | OK | `set_entries` is focused |
+| DIP | Good | Activity entries are injected |
 
-**Maintainability:** Module-level formatters are unit-test friendly. **Test coverage:** None
-direct; low logic risk.
+**Maintainability:** Module-level formatters are unit-test friendly. **Test coverage:** Low
+logic risk; direct formatter coverage remains a useful follow-up.
 
----
+### `mcp_servers_dialog.py` — McpServersDialog
+
+| Principle | Rating | Notes |
+| --- | --- | --- |
+| SRP | OK | Manages persisted MCP server rows and their editor workflow |
+| OCP | Partial | Table columns and editor fields are local to the configuration model |
+| LSP | N/A | No inheritance |
+| ISP | Good | Receives narrow callbacks for configuration, status, lifecycle, and activity |
+| DIP | Good | Uses injected callbacks and collections/environments rather than transport globals |
+
+**Maintainability:** The 333-LOC dialog separates row management from `_McpServerEditor` input
+validation. It exposes activity and tools as read-only views and keeps legacy conversion explicit.
+**Test coverage:** Direct coverage in `tests/test_mcp_servers_dialog.py`.
 
 ### `mcp_tools_overview_dialog.py` — McpToolsOverviewDialog
 
 | Principle | Rating | Notes |
 | --- | --- | --- |
 | SRP | OK | Read-only MCP tools table |
-| OCP | OK | Same pattern as activity dialog |
+| OCP | OK | New columns extend the presentation mapping |
 | LSP | N/A | No inheritance |
-| ISP | OK | Constructor receives entries |
+| ISP | OK | Constructor receives overview entries |
 | DIP | Good | No service coupling |
 
-**Maintainability:** Parallel to `McpActivityDialog`; could share a small read-only table helper
-(future, not required). **Test coverage:** None direct.
+**Maintainability:** Parallel to `McpActivityDialog`; a shared read-only table helper is optional.
+**Test coverage:** Low logic risk.
+
+### `save_dialog.py` — SaveRequestDialog
+
+| Principle | Rating | Notes |
+| --- | --- | --- |
+| SRP | OK | Captures a save name and collection choice |
+| OCP | Low | New collection handling is local to the dialog |
+| LSP | N/A | No inheritance |
+| ISP | OK | Exposes result fields only |
+| DIP | Partial | Receives collections and delegates validation messages |
+
+**Maintainability:** Caller-facing result fields remain a clear orchestrator contract.
+**Test coverage:** Indirect through orchestrator coverage.
+
+### `settings_dialog.py` — SettingsDialog
+
+| Principle | Rating | Notes |
+| --- | --- | --- |
+| SRP | Good | Coordinates focused editor, request, bind, encryption, retry, and alert sections |
+| OCP | Good | New settings can be added through a dedicated section |
+| LSP | N/A | No inheritance |
+| ISP | Good | Optional storage and migration dependencies stay scoped to encryption |
+| DIP | Good | Receives storage and migration service seams |
+
+**Maintainability:** At 192 LOC, the dialog delegates form construction, validation, and field
+collection to dedicated widgets. **Test coverage:** Strong (`test_settings_dialog.py` and
+encryption/migration UI tests).
 
 ---
 
@@ -157,20 +158,23 @@ direct; low logic risk.
 
 | Dialog | Direct unit tests | Integration / mock coverage |
 | --- | --- | --- |
-| `about_dialog.py` | No | Manual only |
-| `hotkeys_dialog.py` | No | Manual only |
-| `save_dialog.py` | No | Orchestrator mocks |
+| `about_dialog.py` | No | Manual/display-only |
 | `env_dialog.py` | Yes | E2E persistence |
-| `settings_dialog.py` | Yes | Main-window e2e |
-| `mcp_activity_dialog.py` | No | Presenter opens with live log |
-| `mcp_tools_overview_dialog.py` | No | Presenter opens with overview service |
+| `hotkeys_dialog.py` | No | Shared collector coverage |
+| `mcp_activity_dialog.py` | No | Presenter opens with activity data |
+| `mcp_servers_dialog.py` | Yes | Presenter and configuration mocks |
+| `mcp_tools_overview_dialog.py` | No | Presenter opens with overview data |
+| `save_dialog.py` | Indirect | Orchestrator mocks |
+| `settings_dialog.py` | Yes | Main-window and encryption UI tests |
 
 ### Coupling
 
-- Dialogs do **not** import `MetricsManager` or `template_service` globals (unlike core modules).
-- `SettingsDialog` is the only dialog reaching into core services (`EncryptionMigrationService`,
-  `StorageManager`, retry/encryption parsers).
-- Launch sites use modal `exec()` pattern — testable via presenter/orchestrator mocks.
+- Dialogs do not own MCP transport or metrics-manager globals.
+- `SettingsDialog` composes focused settings sections and receives its optional storage/migration
+  seams.
+- MCP dialogs receive data or callback dependencies; the server manager keeps lifecycle work out
+  of their UI tables.
+- Launch sites use modal `exec()` patterns that presenters and orchestrators can mock.
 
 ---
 
@@ -180,40 +184,26 @@ direct; low logic risk.
 
 | ID | Dialog | Recommendation | Impact | Effort |
 | --- | --- | --- | --- | --- |
-| D1 | `settings_dialog.py` | Split into section widgets (General, Servers, Encryption, Retry/Alerts) or tabbed sub-dialogs with a thin coordinator | High | High |
+| D1 | `settings_dialog.py` | Preserve settings-section boundaries | Medium | Low |
 
 ### P2 — Next sprint / backlog
 
 | ID | Dialog | Recommendation | Impact | Effort |
 | --- | --- | --- | --- | --- |
-| D2 | `hotkeys_dialog.py` | Derive shortcut list from a shared registry used by `main_window` / presenters | Medium | Medium |
-| D3 | `settings_dialog.py` | Extract encryption form state builder to remove duplication between `accept()` and migration handlers | Medium | Low |
+| D2 | `mcp_activity_dialog.py` | Add formatter and empty-state tests as it grows | Low | Low |
+| D3 | `mcp_tools_overview_dialog.py` | Share a helper after a third pattern | Low | Low |
 
 ### P3 — Nice-to-have
 
 | ID | Dialog | Recommendation | Impact | Effort |
 | --- | --- | --- | --- | --- |
-| D4 | `about_dialog.py` | Read version from package metadata (`importlib.metadata`) | Low | Low |
-| D5 | `mcp_*_dialog.py` | Optional shared read-only table builder; add unit tests for formatters / empty state | Low | Low |
-| D6 | `save_dialog.py` | Direct unit tests for validation paths (empty name, new collection) | Low | Low |
-
----
-
-## Appendix: Finding References
-
-| ID | File | Lines | Description |
-| --- | --- | --- | --- |
-| D1 | settings_dialog.py | 99–420 | SettingsDialog multi-domain SRP violation |
-| D2 | hotkeys_dialog.py | 39–59 | Hardcoded shortcuts list |
-| D3 | settings_dialog.py | 307–323, 387–393 | Duplicated encryption mode parsing |
-| D4 | about_dialog.py | 22 | Hardcoded version placeholder |
-| D5 | settings_dialog.py | 113–115 | Internal EncryptionMigrationService construction |
-| D6 | — | — | MCP dialogs missing from PYPOST-40 inventory (scope drift) |
+| D4 | `save_dialog.py` | Add direct tests for empty names and new collections | Low | Low |
 
 ---
 
 ## Verdict
 
-Individual audit **complete** for all seven modules. No dialog-level **blockers** for closing
-PYPOST-374; findings are documented refactor and test follow-ups. Primary maintenance risk
-remains `SettingsDialog` size and setting-domain mixing (D1).
+Individual audit **complete** for all eight modules. No dialog-level **blockers** for closing
+PYPOST-374; findings are documented maintenance and test follow-ups. The primary maintenance
+focus is preserving the current settings-section boundaries and callback-injected MCP dialog
+design.

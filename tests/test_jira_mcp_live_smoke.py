@@ -84,7 +84,7 @@ _SMOKE_READ_ONLY_CONTRACTS = (
         "jira_list_boards",
         "GET",
         "{{ jira_base_url }}/rest/agile/1.0/board",
-        frozenset(),
+        frozenset({"maxResults", "startAt"}),
         "",
     ),
 )
@@ -208,7 +208,11 @@ async def _run_live_smoke(mcp_url: str, project_key: str) -> None:
     )
     _successful_response_payload(issue, "issue retrieval")
 
-    boards = await _mcp_call_tool_result(mcp_url, _SMOKE_TOOL_NAMES[3])
+    boards = await _mcp_call_tool_result(
+        mcp_url,
+        _SMOKE_TOOL_NAMES[3],
+        {"maxResults": 50, "startAt": 0},
+    )
     _successful_response_payload(boards, "board listing")
 
 

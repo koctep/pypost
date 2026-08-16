@@ -106,6 +106,7 @@ conventions.
 
 1. [Unit Testability Patterns (PYPOST-382)](testability.md)
 1. [Testing via MCP and Prometheus](testing.md)
+1. [Verification-Artifact Contracts (PYPOST-1077)](verification_artifact_contracts.md)
 1. [Static Type Checking (PYPOST-734)](static_type_checking.md)
 1. [GUI Testing](gui_testing.md)
 1. [Agent UI E2E (PYPOST-839; broader packaging PYPOST-922)](agent_e2e.md)
