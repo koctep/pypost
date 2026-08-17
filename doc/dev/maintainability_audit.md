@@ -140,7 +140,7 @@ must confirm a destructive step.
 | `CollectionTreeActions` rename/delete | `collection_item_rename_failed`, … | `show_rename_failure`, `show_delete_failure` |
 | `EnvPresenter._on_storage_save_failed` | `storage_save_failed` | `show_env_save_failed` |
 | `TabsPresenterWorker._on_request_error` | `request_error` | `show_request_error`, `show_request_failed_error` |
-| `EnvPresenter` MCP start failure | `mcp_server_start_failed_ui` | inline warning (migration candidate) |
+| `McpControlsPresenter` MCP start | `mcp_server_start_failed_ui` | `show_mcp_server_start_failed` |
 
 Helper catalog: [collection_tree_actions.md](collection_tree_actions.md#collection_item_dialogs).
 Structured HTTP/MCP failures use `ExecutionError` / `ErrorCategory` from `models/errors.py` —

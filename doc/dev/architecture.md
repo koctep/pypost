@@ -60,10 +60,12 @@ pypost/
 │   ├── response.py         # HTTP response structure
 │   ├── settings.py         # Application settings
 │   ├── errors.py, retry.py
-├── ui/                     # User Interface — PySide6 (61 modules)
+├── ui/                     # User Interface — PySide6 (65 modules)
 │   ├── main_window.py      # Main application window
 │   ├── main_window_signals.py
-│   ├── presenters/         # CollectionsPresenter, TabsPresenter, EnvPresenter
+│   ├── mcp_server_controller.py  # MCP persistence/lifecycle (PYPOST-1071)
+│   ├── presenters/         # CollectionsPresenter, TabsPresenter, EnvPresenter,
+│   │                       # McpControlsPresenter
 │   ├── dialogs/            # Settings, Save, Env, MCP activity, hotkeys, about
 │   ├── widgets/            # RequestEditor, ResponseView, HistoryPanel, body editor
 │   │   ├── mixins.py       # VariableHoverMixin and shared tooltip logic
@@ -163,9 +165,12 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 Built with **PySide6** (Qt for Python).
 
 - **MainWindow**: The central hub, managing the layout. Delegates orchestration to presenters
-  (`CollectionsPresenter`, `TabsPresenter`, `EnvPresenter`) introduced in PYPOST-43.
-- **Presenters**: Keep collection, tab, and environment/MCP wiring out of widgets. Collection
-  reads go through `RequestManager.get_collections()` only — see
+  (`CollectionsPresenter`, `TabsPresenter`, `EnvPresenter`) introduced in PYPOST-43, and MCP
+  persistence/lifecycle to `McpServerSettingsController` (PYPOST-1071).
+- **Presenters**: Keep collection, tab, and environment wiring out of widgets. MCP status,
+  buttons and dialogs live in `McpControlsPresenter`, whose widgets `EnvPresenter` hosts in
+  the environment bar (PYPOST-1071). Collection reads go through
+  `RequestManager.get_collections()` only — see
   [collection_loading.md](collection_loading.md).
 - **Widgets**: Specialized components like `RequestEditor` for composing requests and `ResponseView`
   for displaying results. `ResponseView` includes a status bar, search bar (plain-text search with

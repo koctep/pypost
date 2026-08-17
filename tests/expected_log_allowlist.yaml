@@ -42,6 +42,13 @@ rules:
   - logger: pypost.core.mcp_client_service
     message_prefix: mcp_operation_timeout
 
+  # pypost.ui.presenters.mcp_controls_presenter
+  # PYPOST-1071: the MCP start-failure ERROR moved here from
+  # pypost.ui.presenters.env_presenter with the controls extraction; registering it
+  # satisfies the do-testing caplog contract (C2) for its new logger name.
+  - logger: pypost.ui.presenters.mcp_controls_presenter
+    message_prefix: mcp_server_start_failed_ui
+
   # pypost.core.http_client (structured key=value events)
   - logger: pypost.core.http_client
     message_prefix: http_connection_failed

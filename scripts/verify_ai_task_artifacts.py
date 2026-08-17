@@ -13,6 +13,11 @@ AI_TASKS_DIR = REPO_ROOT / "ai-tasks"
 BASELINE_PATH = REPO_ROOT / "ai-tasks-artifacts-baseline.json"
 ROADMAP_NAME = "00-roadmap.md"
 
+# PYPOST-1071: `70-dev-docs.md` was retired as a required artifact because Step 8's output is
+# reviewed developer documentation under `doc/dev/` (see td-70-dev-docs), not a task-local
+# summary file. No automated check currently verifies that Step 8 happened: `is_roadmap_completed`
+# below only requires steps 1-7, and this script never inspects `doc/dev/`. Restoring a real
+# Step 8 check is tracked as follow-up work, not compensated for here.
 STANDARD_FILES: tuple[str, ...] = (
     "00-roadmap.md",
     "10-requirements.md",
@@ -20,7 +25,6 @@ STANDARD_FILES: tuple[str, ...] = (
     "40-code-cleanup.md",
     "50-observability.md",
     "60-tech-debt.md",
-    "70-dev-docs.md",
 )
 
 AUDIT_FILES: tuple[str, ...] = (
@@ -31,7 +35,6 @@ AUDIT_FILES: tuple[str, ...] = (
     "40-code-cleanup.md",
     "50-observability.md",
     "60-tech-debt.md",
-    "70-dev-docs.md",
 )
 
 CODE_AUDIT_TASKS = frozenset(f"PYPOST-{number}" for number in range(684, 690))

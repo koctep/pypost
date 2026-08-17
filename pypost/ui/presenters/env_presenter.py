@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Protocol
+from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
@@ -18,9 +18,7 @@ from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.env_variable_snapshot import EnvVariableSnapshot
 from pypost.core.environment_import import load_import_candidates
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
-from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
-from pypost.core.mcp_activity_log import McpActivityEntry
-from pypost.core.mcp_server_registry import MCPServerRegistry, McpServerStatus
+from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.storage_interface import StorageInterface
@@ -29,17 +27,17 @@ from pypost.core.variable_name_validation import (
     validation_failure_reason,
 )
 from pypost.models.models import Environment
-from pypost.models.settings import AppSettings, McpServerConfiguration
+from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import (
     show_env_save_failed,
     show_invalid_variable_name_error,
-    show_mcp_server_start_failed,
     show_no_environment_selected,
 )
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
-from pypost.ui.dialogs.mcp_activity_dialog import McpActivityDialog
-from pypost.ui.dialogs.mcp_servers_dialog import McpServersDialog
-from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
+from pypost.ui.presenters.mcp_controls_presenter import (
+    McpControlsPresenter,
+    McpServerController,
+)
 from pypost.ui.widget_ids import (
     ENV_BAR,
     ENV_MANAGE_BUTTON,
@@ -48,24 +46,6 @@ from pypost.ui.widget_ids import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class McpServerController(Protocol):
-    """Persistence and lifecycle operations supplied by the owning window."""
-
-    def mcp_server_configurations(self) -> list[McpServerConfiguration]: ...
-
-    def mcp_server_status(self, instance_id: str) -> McpServerStatus: ...
-
-    def upsert_mcp_server(self, configuration: McpServerConfiguration) -> None: ...
-
-    def remove_mcp_server(self, instance_id: str) -> None: ...
-
-    def start_mcp_server(self, instance_id: str) -> None: ...
-
-    def stop_mcp_server(self, instance_id: str) -> None: ...
-
-    def mcp_server_activity(self, instance_id: str) -> list[McpActivityEntry]: ...
 
 
 class EnvPresenter(QObject):
@@ -91,12 +71,6 @@ class EnvPresenter(QObject):
         self._storage = storage
         self._config_manager = config_manager
         self._mcp_manager = mcp_manager
-        # ``mcp_manager`` remains available for the legacy single-server
-        # workflow and its focused tests.  A configured registry owns all
-        # endpoint lifecycle instead, so an active editor environment can no
-        # longer retarget a running MCP endpoint.
-        self._mcp_registry = mcp_registry
-        self._mcp_server_controller: McpServerController | None = None
         self._settings = settings
         self._get_collections = get_collections
         self._metrics = metrics
@@ -109,9 +83,6 @@ class EnvPresenter(QObject):
         self._storage_gateway.load_failed.connect(self._on_storage_load_failed)
         self._storage_gateway.save_failed.connect(self._on_storage_save_failed)
 
-        self._mcp_manager.status_changed.connect(self._on_mcp_status_changed)
-        self._mcp_manager.start_failed.connect(self._on_mcp_start_failed)
-        self._mcp_manager.activity_recorded.connect(self._on_mcp_activity_recorded)
         self._mcp_manager.set_variable_supplier(self._env_snapshot.snapshot_variables)
         self._mcp_manager.set_hidden_keys_supplier(self._env_snapshot.snapshot_hidden_keys)
 
@@ -131,35 +102,24 @@ class EnvPresenter(QObject):
         set_widget_id(self._manage_btn, ENV_MANAGE_BUTTON)
         self._manage_btn.clicked.connect(self._open_env_manager)
 
-        self._mcp_status_label = QLabel("MCP: OFF")
-        self._mcp_status_label.setStyleSheet("color: gray;")
-
-        self._mcp_tools_btn = QPushButton("MCP Tools (0)")
-        self._mcp_tools_btn.clicked.connect(self._open_mcp_tools_overview)
-
-        self._mcp_activity_btn = QPushButton("MCP Activity (0)")
-        self._mcp_activity_btn.clicked.connect(self._open_mcp_activity)
-        self._mcp_activity_dialog: McpActivityDialog | None = None
-
-        self._mcp_servers_btn = QPushButton("MCP Servers…")
-        self._mcp_servers_btn.clicked.connect(self._open_mcp_servers)
-
-        if self._mcp_registry is not None:
-            self._mcp_registry.status_changed.connect(
-                self._on_mcp_registry_status_changed
-            )
+        self._mcp_controls = McpControlsPresenter(
+            mcp_manager=mcp_manager,
+            settings_provider=lambda: self._settings,
+            get_collections=get_collections,
+            get_environments=lambda: self._environments,
+            current_environment=self._selected_environment,
+            metrics=metrics,
+            dialog_parent=self._widget,
+            mcp_registry=mcp_registry,
+            parent=self,
+        )
 
         layout.addWidget(self._env_label)
         layout.addWidget(self._env_selector)
         layout.addWidget(self._manage_btn)
-        layout.addWidget(self._mcp_tools_btn)
-        layout.addWidget(self._mcp_activity_btn)
-        layout.addWidget(self._mcp_servers_btn)
-        layout.addWidget(self._mcp_status_label)
+        for mcp_widget in self._mcp_controls.widgets:
+            layout.addWidget(mcp_widget)
         layout.addStretch()
-
-        if self._mcp_registry is not None:
-            self._refresh_mcp_registry_status_summary()
 
     @property
     def widget(self) -> QWidget:
@@ -186,7 +146,11 @@ class EnvPresenter(QObject):
 
     def set_mcp_server_controller(self, controller: McpServerController) -> None:
         """Attach MainWindow's persistence/lifecycle API to the server manager UI."""
-        self._mcp_server_controller = controller
+        self._mcp_controls.set_server_controller(controller)
+
+    def _selected_environment(self) -> Environment | None:
+        selected = self._env_selector.currentData()
+        return selected if isinstance(selected, Environment) else None
 
     def select_environment_index(self, index: int) -> None:
         """Select environment by combo index (0 = No Environment)."""
@@ -212,14 +176,17 @@ class EnvPresenter(QObject):
             None,
         )
 
+    # PYPOST-1071: the four public ``mcp_*`` methods stay as delegating shims —
+    # ``main_window_signals.wire_presenter_signals`` connects ``refresh_mcp_tools`` to
+    # three Qt signals and the focused presenter tests read these texts.
     def mcp_status_text(self) -> str:
-        return self._mcp_status_label.text()
+        return self._mcp_controls.status_text()
 
     def mcp_tools_button_text(self) -> str:
-        return self._mcp_tools_btn.text()
+        return self._mcp_controls.tools_button_text()
 
     def mcp_activity_button_text(self) -> str:
-        return self._mcp_activity_btn.text()
+        return self._mcp_controls.activity_button_text()
 
     def reload_current_env(self) -> None:
         """Re-resolves variables and MCP state for the current combo selection."""
@@ -301,7 +268,7 @@ class EnvPresenter(QObject):
             )
             selected.variables.update(vars)
             self._save_environments()
-            self._refresh_registry_environment(selected.id)
+            self._mcp_controls.refresh_environment(selected.id)
             self._on_env_changed(self._env_selector.currentIndex())
 
     def handle_variable_set_request(self, key, value: str) -> None:
@@ -332,7 +299,7 @@ class EnvPresenter(QObject):
         )
         selected.variables[target_key] = value
         self._save_environments()
-        self._refresh_registry_environment(selected.id)
+        self._mcp_controls.refresh_environment(selected.id)
         self._on_env_changed(self._env_selector.currentIndex())
 
     def _is_valid_variable_name(self, name: str) -> tuple[bool, str]:
@@ -360,9 +327,7 @@ class EnvPresenter(QObject):
     def _on_env_changed(self, index: int) -> None:
         """Resolves vars, starts/stops MCP, saves config, emits signals."""
         previous = self._env_selector.itemData(self._current_env_index)
-        mcp_was_running = (
-            self._mcp_manager.is_running() if self._mcp_registry is None else False
-        )
+        mcp_was_running = self._mcp_controls.legacy_server_running()
         selected = self._env_selector.itemData(index)
         variables: dict = {}
 
@@ -376,22 +341,11 @@ class EnvPresenter(QObject):
             )
             self._settings.last_environment_id = selected.id
             variables = selected.variables
-
-            if self._mcp_registry is None and selected.enable_mcp:
-                tools = self._get_mcp_tools()
-                self._mcp_manager.start_server(
-                    port=self._settings.mcp_port,
-                    tools=tools,
-                    host=self._settings.mcp_host,
-                )
-                self._show_mcp_starting()
-            elif self._mcp_registry is None:
-                self._mcp_manager.stop_server()
+            self._mcp_controls.handle_environment_selected(selected)
         else:
             logger.info("env_deselected index=%d", index)
             self._settings.last_environment_id = None
-            if self._mcp_registry is None:
-                self._mcp_manager.stop_server()
+            self._mcp_controls.handle_environment_selected(None)
 
         self._config_manager.save_config(self._settings)
         self._current_env_index = index
@@ -402,159 +356,13 @@ class EnvPresenter(QObject):
         self.env_variables_changed.emit(variables)
         self.env_keys_changed.emit(keys)
         self.env_hidden_keys_changed.emit(hidden_keys)
-        self._refresh_mcp_tools_button()
+        self._mcp_controls.refresh_tools_button()
         if mcp_was_running:
-            self._track_mcp_active_env_changed(previous, selected)
-
-    def _track_mcp_active_env_changed(
-        self,
-        previous: Environment | None,
-        selected: Environment | None,
-    ) -> None:
-        prev_id = previous.id if isinstance(previous, Environment) else None
-        new_id = selected.id if isinstance(selected, Environment) else None
-        if prev_id == new_id:
-            return
-        self._metrics.track_mcp_active_env_changed()
-        logger.info(
-            "mcp_active_env_changed prev_env_id=%s new_env_id=%s",
-            prev_id or "",
-            new_id or "",
-        )
+            self._mcp_controls.track_active_env_changed(previous, selected)
 
     def refresh_mcp_tools(self) -> None:
-        """Refresh MCP tool list when collections change while server is running."""
-        if self._mcp_registry is not None:
-            self._mcp_registry.reconcile_references()
-            for collection in self._get_collections():
-                self._mcp_registry.refresh_collection(collection.id)
-            self._refresh_mcp_tools_button()
-            return
-        tools = self._get_mcp_tools()
-        self._refresh_mcp_tools_button()
-        selected = self._env_selector.currentData()
-        if not isinstance(selected, Environment) or not selected.enable_mcp:
-            return
-        if self._mcp_manager.update_tools(tools):
-            self._show_mcp_starting()
-
-    def _refresh_mcp_tools_button(self) -> None:
-        if self._mcp_registry is not None:
-            # An aggregate list is misleading once endpoints select different
-            # collections. The manager routes the user to a row-specific view.
-            self._mcp_tools_btn.setText("MCP Server Tools…")
-            self._mcp_tools_btn.setToolTip(
-                "Open MCP Servers and select a server to view its tools."
-            )
-            return
-        count = len(self._get_mcp_tools())
-        self._mcp_tools_btn.setText(f"MCP Tools ({count})")
-
-    def _show_mcp_starting(self) -> None:
-        self._mcp_status_label.setText(
-            f"MCP: Starting ({self._settings.mcp_host}:{self._settings.mcp_port})..."
-        )
-        self._mcp_status_label.setStyleSheet("color: #b8860b; font-weight: bold;")
-
-    def _on_mcp_status_changed(self, is_running: bool) -> None:
-        if is_running:
-            logger.info(
-                "mcp_server_started host=%s port=%d",
-                self._settings.mcp_host,
-                self._settings.mcp_port,
-            )
-            self._mcp_status_label.setText(
-                f"MCP: ON ({self._settings.mcp_host}:{self._settings.mcp_port})"
-            )
-            self._mcp_status_label.setStyleSheet("color: green; font-weight: bold;")
-        else:
-            logger.info("mcp_server_stopped")
-            self._mcp_status_label.setText("MCP: OFF")
-            self._mcp_status_label.setStyleSheet("color: gray;")
-
-    def _on_mcp_start_failed(self, message: str) -> None:
-        logger.error("mcp_server_start_failed_ui message=%s", message)
-        self._mcp_status_label.setText("MCP: OFF")
-        self._mcp_status_label.setStyleSheet("color: gray;")
-        show_mcp_server_start_failed(self._widget, message)
-
-    def _on_mcp_registry_status_changed(
-        self, _instance_id: str, _state: str, _message: str
-    ) -> None:
-        """Render aggregate multi-server state without exposing endpoint details."""
-        self._refresh_mcp_registry_status_summary()
-
-    def _refresh_mcp_registry_status_summary(self) -> None:
-        """Show a concise, non-sensitive summary for independently managed servers."""
-        if self._mcp_registry is None:
-            return
-        statuses = self._mcp_registry.list_statuses()
-        running = sum(status.state == "running" for status in statuses)
-        failed = sum(status.state == "failed" for status in statuses)
-        suffix = f"; {failed} failed" if failed else ""
-        self._mcp_status_label.setText(f"MCP Servers: {running} running{suffix}")
-        color = "#b00020" if failed else ("green" if running else "gray")
-        self._mcp_status_label.setStyleSheet(f"color: {color};")
-
-    def _open_mcp_tools_overview(self) -> None:
-        if self._mcp_registry is not None:
-            self._open_mcp_servers()
-            return
-        entries = collect_mcp_tool_overview(self._get_collections())
-        logger.info("mcp_tools_overview_opened tool_count=%d", len(entries))
-        dialog = McpToolsOverviewDialog(entries, self._widget)
-        dialog.exec()
-
-    def _open_mcp_activity(self) -> None:
-        entries = self._mcp_manager.activity_log.get_entries()
-        logger.info("mcp_activity_dialog_opened entry_count=%d", len(entries))
-        dialog = McpActivityDialog(entries, self._widget)
-        self._mcp_activity_dialog = dialog
-        dialog.finished.connect(self._on_mcp_activity_dialog_closed)
-        dialog.exec()
-
-    def _open_mcp_servers(self) -> None:
-        """Open the explicit multi-server manager from the MCP portion of the bar."""
-        controller = self._mcp_server_controller
-        if controller is None:
-            logger.warning("mcp_servers_dialog_no_controller")
-            return
-        dialog = McpServersDialog(
-            configurations=controller.mcp_server_configurations,
-            status_for=controller.mcp_server_status,
-            save=controller.upsert_mcp_server,
-            remove=controller.remove_mcp_server,
-            start=controller.start_mcp_server,
-            stop=controller.stop_mcp_server,
-            activity=controller.mcp_server_activity,
-            collections=self._get_collections,
-            environments=lambda: list(self._environments),
-            legacy_environment=self._selected_legacy_mcp_environment,
-            legacy_host=self._settings.mcp_host,
-            legacy_port=self._settings.mcp_port,
-            parent=self._widget,
-        )
-        dialog.exec()
-
-    def _selected_legacy_mcp_environment(self) -> Environment | None:
-        selected = self._env_selector.currentData()
-        if isinstance(selected, Environment) and selected.enable_mcp:
-            return selected
-        return None
-
-    def _on_mcp_activity_dialog_closed(self) -> None:
-        self._mcp_activity_dialog = None
-
-    def _on_mcp_activity_recorded(self, _entry: object) -> None:
-        self._refresh_mcp_activity_button()
-        if self._mcp_activity_dialog is not None:
-            self._mcp_activity_dialog.set_entries(
-                self._mcp_manager.activity_log.get_entries()
-            )
-
-    def _refresh_mcp_activity_button(self) -> None:
-        count = self._mcp_manager.activity_log.count()
-        self._mcp_activity_btn.setText(f"MCP Activity ({count})")
+        """Delegating shim: three Qt signals connect to this name (PYPOST-1071)."""
+        self._mcp_controls.refresh_tools()
 
     def _open_env_manager(self) -> None:
         current_env_name = self._env_selector.currentText()
@@ -574,26 +382,11 @@ class EnvPresenter(QObject):
         logger.info("env_manager_dialog_closed")
         self._environments = dialog.environments
         self._save_environments()
-        if self._mcp_registry is not None:
-            self._mcp_registry.reconcile_references()
+        self._mcp_controls.reconcile_references()
         for environment in self._environments:
-            self._refresh_registry_environment(environment.id)
+            self._mcp_controls.refresh_environment(environment.id)
         if self._encryption_enabled():
             self._pending_env_manager_refresh = True
         self.load_environments()
         if not self._encryption_enabled():
             self._on_env_changed(self._env_selector.currentIndex())
-
-    def _get_mcp_tools(self) -> list:
-        """Returns expose_as_mcp requests from current collections."""
-        tools = []
-        for col in self._get_collections():
-            for req in col.requests:
-                if req.expose_as_mcp:
-                    tools.append(req)
-        return tools
-
-    def _refresh_registry_environment(self, environment_id: str) -> None:
-        """Update only endpoints explicitly configured for this environment."""
-        if self._mcp_registry is not None:
-            self._mcp_registry.refresh_environment(environment_id)

@@ -286,7 +286,8 @@ class TestEnvPresenter(unittest.TestCase):
         p._env_selector.addItem(env.name, env)
         p._env_selector.blockSignals(False)
         p._on_env_changed(1)
-        with self.assertLogs("pypost.ui.presenters.env_presenter", level=logging.INFO) as caplog:
+        controls_logger = "pypost.ui.presenters.mcp_controls_presenter"
+        with self.assertLogs(controls_logger, level=logging.INFO) as caplog:
             p._on_env_changed(0)
         p._metrics.track_mcp_active_env_changed.assert_called_once()
         self.assertTrue(any("mcp_active_env_changed" in r.message for r in caplog.records))
@@ -326,7 +327,7 @@ class TestEnvPresenter(unittest.TestCase):
         req_hidden = RequestData(id="r2", name="Hidden", expose_as_mcp=False)
         col = Collection(id="c1", name="API", requests=[req_exposed, req_hidden])
         p = self._make_presenter(collections=[col])
-        tools = p._get_mcp_tools()
+        tools = p._mcp_controls._get_mcp_tools()
         self.assertEqual(len(tools), 1)
         self.assertEqual(tools[0].id, "r1")
 
@@ -368,19 +369,19 @@ class TestEnvPresenter(unittest.TestCase):
 
     def test_mcp_status_label_updated_on_running(self):
         p = self._make_presenter([])
-        p._on_mcp_status_changed(True)
+        p._mcp_controls._on_mcp_status_changed(True)
         self.assertIn("ON", p.mcp_status_text())
 
     def test_mcp_status_label_updated_on_stopped(self):
         p = self._make_presenter([])
-        p._on_mcp_status_changed(False)
+        p._mcp_controls._on_mcp_status_changed(False)
         self.assertEqual(p.mcp_status_text(), "MCP: OFF")
 
     def test_mcp_tools_button_shows_count(self):
         req = RequestData(id="r1", name="Tool", expose_as_mcp=True)
         col = Collection(id="c1", name="API", requests=[req])
         p = self._make_presenter(collections=[col])
-        p._refresh_mcp_tools_button()
+        p._mcp_controls.refresh_tools_button()
         self.assertEqual(p.mcp_tools_button_text(), "MCP Tools (1)")
 
     def test_refresh_mcp_tools_restarts_when_running(self):
@@ -414,13 +415,13 @@ class TestEnvPresenter(unittest.TestCase):
     def test_mcp_activity_button_shows_count(self):
         p = self._make_presenter([])
         p._mcp_manager.activity_log.append(McpActivityEntry.new_list_tools(2))
-        p._refresh_mcp_activity_button()
+        p._mcp_controls._refresh_mcp_activity_button()
         self.assertEqual(p.mcp_activity_button_text(), "MCP Activity (1)")
 
     def test_mcp_activity_recorded_updates_button(self):
         p = self._make_presenter([])
         p._mcp_manager.activity_log.append(McpActivityEntry.new_list_tools(1))
-        p._on_mcp_activity_recorded(McpActivityEntry.new_list_tools(99))
+        p._mcp_controls._on_mcp_activity_recorded(McpActivityEntry.new_list_tools(99))
         self.assertEqual(p.mcp_activity_button_text(), "MCP Activity (1)")
 
     def test_on_env_changed_shows_starting_when_mcp_enabled(self):
@@ -442,14 +443,24 @@ class TestEnvPresenter(unittest.TestCase):
         def capture_warning(parent, message):
             shown.append((parent, message))
 
+        controls_logger = "pypost.ui.presenters.mcp_controls_presenter"
         with patch(
-            "pypost.ui.presenters.env_presenter.show_mcp_server_start_failed",
+            "pypost.ui.presenters.mcp_controls_presenter.show_mcp_server_start_failed",
             side_effect=capture_warning,
         ):
-            p._on_mcp_start_failed("Port is busy")
+            # PYPOST-1071 do-testing C1: this ERROR moved loggers with the extraction,
+            # so pin the new logger name here as well as in the CI allowlist.
+            with self.assertLogs(controls_logger, level=logging.ERROR) as caplog:
+                p._mcp_controls._on_mcp_start_failed("Port is busy")
         self.assertEqual(p.mcp_status_text(), "MCP: OFF")
         self.assertEqual(len(shown), 1)
         self.assertIn("Port is busy", shown[0][1])
+        self.assertTrue(
+            any(
+                "mcp_server_start_failed_ui" in record.message
+                for record in caplog.records
+            )
+        )
 
     def test_valid_variable_name_does_not_emit_debug_log(self):
         p = self._make_presenter()

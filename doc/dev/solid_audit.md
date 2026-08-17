@@ -55,10 +55,10 @@ layout is built by the stateless `collections_panel` factory; `CollectionsPresen
 tree and workflow coordination. `EnvPresenter` passes the storage serializer directly to the
 existing environment dialog boundary.
 
-| Metric | Audit era (PYPOST-40) | Baseline (2026-06-11) | Cap |
+| Metric | Audit era (PYPOST-40) | Baseline | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 429 | 435 |
-| `MainWindow` class LOC | 1040 | 385 | 390 |
+| `main_window.py` file LOC | 1040 | 433 | 477 |
+| `MainWindow` class LOC | 1040 | 387 | 426 |
 
 Authoritative generated snapshot (all module caps):
 [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).
@@ -109,6 +109,25 @@ the command prints the canonical Markdown to stdout.
 
 Always run both `--check` and the pytest module after reconciliation. A green cap check alone
 does not prove that the committed snapshot is fresh.
+
+**PYPOST-1071 (2026-08-16):** Gave each of the five measured violations an explicit
+disposition instead of a blanket cap raise. Extracted PYPOST-1044's misplaced
+responsibilities first: multi-server persistence and lifecycle control moved from
+`MainWindow` to [`pypost/ui/mcp_server_controller.py`](../../pypost/ui/mcp_server_controller.py)
+and MCP status controls, dialogs and scoped refresh routing moved from `EnvPresenter` to
+[`mcp_controls_presenter.py`](../../pypost/ui/presenters/mcp_controls_presenter.py).
+`EnvPresenter` keeps its four public `mcp_*` methods as delegating shims because
+`main_window_signals.py` connects `refresh_mcp_tools` to three Qt signals. Both modules were
+brought back inside their existing caps (`main_window.py` 433/435, `MainWindow` class 387/390,
+`env_presenter.py` 392/470) *before* recalibration, then re-derived at about 10% headroom:
+`main_window.py` 477, `MainWindow` class 426, `env_presenter.py` 432. The remaining two
+violations were accepted transparently rather than decomposed — `http_client.py` 380 → cap 418
+(PYPOST-1037 template-conversion and failure translation are cohesive with outbound transport)
+and `collections_presenter.py` 366 → cap 403 (thin delegation only; import/export/tree
+algorithms stay in their action objects). Both new extraction targets were added to
+`FILE_CAPS` on creation so the relocated lines stay measured — `mcp_server_controller.py`
+269 → cap 296 and `mcp_controls_presenter.py` 329 → cap 362, the same ~10% headroom policy.
+Snapshot regenerated from the generator.
 
 **PYPOST-1025 (2026-08-02):** Reconciled baseline drift without raising caps — extracted
 collection panel assembly (`collections_presenter.py` 328/330) and simplified environment

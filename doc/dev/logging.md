@@ -263,7 +263,6 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | --- | --- | --- | --- |
 | `mcp_activity_recorded` | INFO | `operation`, `outcome`, `tool_name`, counts, `duration_ms` | `mcp_activity_log` |
 | `mcp_activity_cleared` | INFO | `count` | `mcp_activity_log` |
-| `mcp_activity_dialog_opened` | INFO | `entry_count` | env presenter |
 | `mcp_server_listening` | INFO | `host`, `port` | `qt/mcp_server` |
 | `mcp_server_start_failed` | ERROR/exception | `host`, `port`, `message` | `qt/mcp_server` |
 | `mcp_server_unexpected_exit` | WARNING | — | `qt/mcp_server` |
@@ -271,9 +270,66 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `mcp_operation_start` | DEBUG | `url`, `operation` | `mcp_client_service` |
 | `mcp_operation_success` | DEBUG | `url`, `operation`, `elapsed` | `mcp_client_service` |
 | `mcp_operation_failed` | ERROR | `url`, `operation`, `category`, `detail` | `mcp_client_service` |
-| `mcp_tools_overview_opened` | INFO | `tool_count` | env presenter |
 
-See [mcp_integration.md](mcp_integration.md) for operator workflow.
+#### MCP endpoint persistence and lifecycle (PYPOST-1071)
+
+`McpServerSettingsController` (`pypost/ui/mcp_server_controller.py`) owns registry
+construction, the persisted `AppSettings.mcp_servers` rows, and per-endpoint lifecycle
+commands. Its events answer *what changed on disk*; the runtime half is covered by
+`qt/mcp_server` above and by `MCPServerRegistry`'s own `mcp_registry_*` events
+(`mcp_registry_start_requested`, `mcp_registry_stop_requested`,
+`mcp_registry_reconfigure_rolled_back`, `mcp_registry_status` — all keyed by `instance_id`,
+and all but `mcp_registry_status` also by `port`).
+
+Every event below is emitted by the `ui/mcp_server_controller` logger.
+
+| Event | Level | Key fields |
+| --- | --- | --- |
+| `mcp_manager_source` | DEBUG | `source` (`injected\|new`) |
+| `mcp_registry_source` | DEBUG | `source` (`injected\|new`) |
+| `mcp_persisted_servers_loaded` | INFO | `count`, `enabled_count` |
+| `mcp_servers_persist_requested` | INFO | `reason`, `count` |
+| `mcp_server_reconfigure_finished` | INFO | `instance_id`, `committed` |
+| `mcp_server_activity_unavailable` | DEBUG | `instance_id` |
+
+`reason` is one of `create`, `update`, `remove`, `start`, `stop`, `reconfigure`. The event is
+logged **before** the write, because `ConfigManager.save_config` swallows the failure and
+reports its own `config_save_failed` ERROR — the adjacent pair identifies which MCP mutation
+was lost. Counts only: collection ids, environment ids, hosts and ports never appear in
+these messages; `instance_id` is the one opaque identifier permitted, and the registry
+already logs it.
+
+#### MCP controls in the environment bar (PYPOST-1071)
+
+`McpControlsPresenter` (`pypost/ui/presenters/mcp_controls_presenter.py`) owns the MCP status
+label, buttons and dialogs. These events were emitted by `pypost.ui.presenters.env_presenter`
+before the extraction — the event names and message bodies are unchanged, but the **logger
+name changed**, so grep expressions and allowlist rules pinned to the old logger must be
+repointed.
+
+Every event below is emitted by the `ui/presenters/mcp_controls_presenter` logger.
+
+| Event | Level | Key fields |
+| --- | --- | --- |
+| `mcp_server_started` | INFO | `host`, `port` |
+| `mcp_server_stopped` | INFO | — |
+| `mcp_server_start_failed_ui` | ERROR | `message` |
+| `mcp_active_env_changed` | INFO | `prev_env_id`, `new_env_id` |
+| `mcp_tools_overview_opened` | INFO | `tool_count` |
+| `mcp_activity_dialog_opened` | INFO | `entry_count` |
+| `mcp_servers_dialog_opened` | INFO | `server_count` |
+| `mcp_servers_dialog_no_controller` | WARNING | — |
+
+`mcp_server_start_failed_ui` is the only ERROR here and is registered under its new logger
+name in `tests/expected_log_allowlist.yaml`. That rule is currently dormant: the single test
+that triggers the event wraps it in `unittest.assertLogs`, which turns propagation off for
+the block, so the line never reaches the `--log-file` sink the CI guardrail reads. The
+`do-testing` caplog contract for the event is satisfied by the `assertLogs` block itself
+(clause C1), not by the allowlist entry — see
+[PYPOST-1087](https://pypost.atlassian.net/browse/PYPOST-1087).
+
+See [mcp_integration.md](mcp_integration.md) for operator workflow and
+[mcp_server_registry.md](mcp_server_registry.md) for the registry's own events.
 
 ### Metrics server
 

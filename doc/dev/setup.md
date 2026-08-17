@@ -314,35 +314,38 @@ frozenset in the test module to keep in sync. Jobs do not use a Docker container
 ## ai-tasks artifact expectations (PYPOST-772)
 
 When you close a Jira task via the [top-down workflow](../../.cursor/templates/top-to-bottom/roadmap.md),
-create `ai-tasks/<JIRA-ID>/` with the markdown artifacts below. Step 3 also produces source code,
-tests, and any `doc/dev/` updates recorded in `70-dev-docs.md`.
+create `ai-tasks/<JIRA-ID>/` with the markdown artifacts below. Development also produces source
+code, tests, and — from Step 8 — reviewed developer documentation under `doc/dev/`.
 
-#### Standard closed task (7 files)
+#### Standard closed task (6 files)
 
 | File | Workflow step | Purpose |
 | --- | --- | --- |
 | `00-roadmap.md` | All | Step checklist and artifact index |
 | `10-requirements.md` | 1 | Business goals, acceptance criteria |
 | `20-architecture.md` | 2 | High-level design before coding |
-| `40-code-cleanup.md` | 4 | Cleanup notes and review checklist |
-| `50-observability.md` | 5 | Logging, metrics, tracing (or explicit N/A) |
-| `60-tech-debt.md` | 6 | Debt analysis and Jira-linked follow-ups |
-| `70-dev-docs.md` | 7 | Summary of `doc/dev/` changes |
+| `40-code-cleanup.md` | 5 | Cleanup notes and review checklist |
+| `50-observability.md` | 6 | Logging, metrics, tracing (or explicit N/A) |
+| `60-tech-debt.md` | 7 | Debt analysis and Jira-linked follow-ups |
+
+Step 8 output is **not** a task-local file: it is reviewed developer documentation committed under
+`doc/dev/`, indexed from the task's `00-roadmap.md` (PYPOST-1071). Older folders still carry a
+`70-dev-docs.md` summary from the retired contract; it is accepted but no longer required.
 
 `60-tech-debt.md` is **required** even when no debt remains — state that explicitly. After adding
 Jira-linked follow-ups, regenerate the inventory with
 [`scripts/consolidate_tech_debt.py`](../../scripts/consolidate_tech_debt.py) (see
 [tech_debt_inventory.md](tech_debt_inventory.md)).
 
-#### Code Audit 8-file standard
+#### Code Audit 7-file standard
 
-Code Audit tasks (PYPOST-684–689) add one file between Steps 2 and 4:
+Code Audit tasks (PYPOST-684–689) add one file after Step 2:
 
 | Additional file | Step | Purpose |
 | --- | --- | --- |
 | `30-audit-report.md` | 3 (audit) | Full findings report with severity and evidence |
 
-PYPOST-684 through PYPOST-689 each contain the full eight-file set. See
+PYPOST-684 through PYPOST-689 each contain the full required set. See
 [documentation_audit.md](documentation_audit.md) § ai-tasks Artifact Quality for baseline metrics.
 
 #### Legacy exceptions
@@ -355,7 +358,7 @@ templates for new work:
 | Roadmap-only stub | PYPOST-328, PYPOST-333–350 | `00-roadmap.md` only |
 | Debt file only | PYPOST-312 | `60-tech-debt.md` without other steps |
 | Alternate debt filename | Pre-2024 tasks | `60-review.md` or `40-tech-debt.md` (see inventory scan list) |
-| Partial audit set | PYPOST-40 | Five files; predates the 8-file Code Audit pattern |
+| Partial audit set | PYPOST-40 | Five files; predates the 7-file Code Audit pattern |
 | Supplemental reports | PYPOST-429, PYPOST-376 | `investigation-report.md`, `baseline-metrics.md` — add-ons, not replacements |
 
 As of the PYPOST-690 documentation audit (2026-06-12): 590 of 595 folders have `00-roadmap.md`,

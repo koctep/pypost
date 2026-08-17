@@ -21,7 +21,7 @@ def _make_main_window(qapp, config_manager):  # noqa: ARG001
     storage = MagicMock()
     with (
         patch("pypost.ui.main_window.StateManager") as mock_sm,
-        patch("pypost.ui.main_window.MCPServerManager"),
+        patch("pypost.ui.mcp_server_controller.MCPServerManager"),
         patch(
             "pypost.ui.main_window.CollectionsPresenter",
             return_value=mock_collections,

@@ -18,7 +18,7 @@ def _make_window(qapp):
         patch("pypost.ui.main_window.ConfigManager"),
         patch("pypost.ui.main_window.RequestManager"),
         patch("pypost.ui.main_window.StateManager") as mock_sm,
-        patch("pypost.ui.main_window.MCPServerManager"),
+        patch("pypost.ui.mcp_server_controller.MCPServerManager"),
         patch("pypost.ui.main_window.CollectionsPresenter"),
         patch("pypost.ui.main_window.TabsPresenter"),
         patch("pypost.ui.main_window.EnvPresenter"),

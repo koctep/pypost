@@ -137,7 +137,7 @@ Agents or scripts can read the same payload via MCP resource `metrics://all` on
 
 Counter definitions, test coverage, and migration notes for operators maintaining dashboards:
 
-- [Developer MCP & metrics stack](dev/mcp_integration.md#4-metrics-observability-stack-pypostcoremetricspy)
+- [Developer MCP & metrics stack](dev/mcp_integration.md#7-metrics-observability-stack-pypostcoremetricspy)
 - [Prometheus metrics inventory](prometheus_monitoring.md#metric-inventory) — complete operator
   catalog (PYPOST-750)
 - [Metric rename migration](dev/metric_rename_migration.md)

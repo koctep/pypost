@@ -2,6 +2,7 @@ import pytest
 
 pytestmark = pytest.mark.timeout(60)
 
+import logging
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -9,10 +10,27 @@ from PySide6.QtWidgets import QTabWidget, QWidget
 
 from pypost.models.settings import AppSettings, McpServerConfiguration
 from pypost.ui.main_window import MainWindow
+from pypost.ui.mcp_server_controller import McpServerSettingsController
+
+CONTROLLER_LOGGER = "pypost.ui.mcp_server_controller"
 
 @pytest.mark.usefixtures("qapp")
 
 class TestMainWindow(unittest.TestCase):
+    def _make_mcp_controller(self, settings, registry, config_manager):
+        """PYPOST-1071: persistence/lifecycle moved to McpServerSettingsController."""
+        return McpServerSettingsController(
+            settings_provider=lambda: settings,
+            config_manager=config_manager,
+            collections_provider=lambda: None,
+            get_collections=lambda: [],
+            environment_lookup=lambda _environment_id: None,
+            metrics=MagicMock(),
+            template_service=MagicMock(),
+            mcp_manager=MagicMock(),
+            registry=registry,
+        )
+
     def test_running_mcp_edit_persists_only_after_registry_commits(self):
         previous = McpServerConfiguration(
             id="server", port=1081, collection_id="collection", environment_id="environment"
@@ -20,32 +38,114 @@ class TestMainWindow(unittest.TestCase):
         replacement = previous.model_copy(update={"port": 1082})
         registry = MagicMock()
         registry.is_running.return_value = True
-        window = SimpleNamespace(
-            settings=AppSettings(mcp_servers=[previous]),
-            mcp_registry=registry,
-            config_manager=MagicMock(),
-        )
-        window._mcp_server_configuration = lambda instance_id: MainWindow._mcp_server_configuration(
-            window, instance_id
-        )
-        window._replace_mcp_server_configuration = lambda configuration: (
-            MainWindow._replace_mcp_server_configuration(window, configuration)
-        )
-        window._save_mcp_server_configurations = lambda: (
-            MainWindow._save_mcp_server_configurations(window)
-        )
+        settings = AppSettings(mcp_servers=[previous])
+        config_manager = MagicMock()
+        controller = self._make_mcp_controller(settings, registry, config_manager)
 
-        MainWindow.upsert_mcp_server(window, replacement)
+        controller.upsert_mcp_server(replacement)
 
         registry.reconfigure.assert_called_once_with("server", replacement)
-        self.assertEqual(window.settings.mcp_servers, [previous])
-        window.config_manager.save_config.assert_not_called()
+        self.assertEqual(settings.mcp_servers, [previous])
+        config_manager.save_config.assert_not_called()
 
         registry.list_configurations.return_value = [replacement]
-        MainWindow._on_mcp_server_reconfiguration_finished(window, "server", True)
+        controller._on_mcp_server_reconfiguration_finished("server", True)
 
-        self.assertEqual(window.settings.mcp_servers, [replacement])
-        window.config_manager.save_config.assert_called_once_with(window.settings)
+        self.assertEqual(settings.mcp_servers, [replacement])
+        config_manager.save_config.assert_called_once_with(settings)
+
+    def test_startup_logs_persisted_mcp_server_counts_without_endpoint_details(self):
+        """PYPOST-1071 observability: startup evidence is counts only, never endpoints."""
+        settings = AppSettings(
+            mcp_servers=[
+                McpServerConfiguration(
+                    id="alpha",
+                    port=1081,
+                    collection_id="c1",
+                    environment_id="e1",
+                    enabled=True,
+                ),
+                McpServerConfiguration(
+                    id="beta",
+                    port=1082,
+                    collection_id="c2",
+                    environment_id="e2",
+                    enabled=False,
+                ),
+            ]
+        )
+        with self.assertLogs(CONTROLLER_LOGGER, level=logging.INFO) as caplog:
+            self._make_mcp_controller(settings, MagicMock(), MagicMock())
+
+        loaded = [
+            record.message
+            for record in caplog.records
+            if "mcp_persisted_servers_loaded" in record.message
+        ]
+        self.assertEqual(len(loaded), 1)
+        self.assertIn("count=2", loaded[0])
+        self.assertIn("enabled_count=1", loaded[0])
+        for secret in ("alpha", "beta", "1081", "1082"):
+            self.assertNotIn(secret, loaded[0])
+
+    def test_persisted_mcp_mutations_log_their_reason(self):
+        """PYPOST-1071 observability: every settings write names the mutation."""
+        settings = AppSettings(
+            mcp_servers=[
+                McpServerConfiguration(
+                    id="server",
+                    port=1081,
+                    collection_id="c1",
+                    environment_id="e1",
+                    enabled=False,
+                )
+            ]
+        )
+        registry = MagicMock()
+        registry.is_running.return_value = False
+        controller = self._make_mcp_controller(settings, registry, MagicMock())
+
+        with self.assertLogs(CONTROLLER_LOGGER, level=logging.INFO) as caplog:
+            controller.start_mcp_server("server")
+            controller.stop_mcp_server("server")
+            controller.remove_mcp_server("server")
+
+        reasons = [
+            record.message
+            for record in caplog.records
+            if "mcp_servers_persist_requested" in record.message
+        ]
+        self.assertEqual(len(reasons), 3)
+        self.assertIn("reason=start count=1", reasons[0])
+        self.assertIn("reason=stop count=1", reasons[1])
+        self.assertIn("reason=remove count=0", reasons[2])
+
+    def test_uncommitted_reconfiguration_is_logged_and_not_persisted(self):
+        """PYPOST-1071 observability: a rolled-back edit must not look like a save."""
+        configuration = McpServerConfiguration(
+            id="server", port=1081, collection_id="c1", environment_id="e1"
+        )
+        settings = AppSettings(mcp_servers=[configuration])
+        config_manager = MagicMock()
+        controller = self._make_mcp_controller(settings, MagicMock(), config_manager)
+
+        with self.assertLogs(CONTROLLER_LOGGER, level=logging.INFO) as caplog:
+            controller._on_mcp_server_reconfiguration_finished("server", False)
+
+        self.assertTrue(
+            any(
+                "mcp_server_reconfigure_finished" in record.message
+                and "committed=false" in record.message
+                for record in caplog.records
+            )
+        )
+        self.assertFalse(
+            any(
+                "mcp_servers_persist_requested" in record.message
+                for record in caplog.records
+            )
+        )
+        config_manager.save_config.assert_not_called()
 
     def test_main_window_has_no_collection_delete_flow_methods(self):
         """PYPOST-326: delete flow lives in CollectionTreeActions, not MainWindow."""
@@ -71,7 +171,7 @@ class TestMainWindow(unittest.TestCase):
             patch("pypost.ui.main_window.ConfigManager"),
             patch("pypost.ui.main_window.RequestManager"),
             patch("pypost.ui.main_window.StateManager") as mock_sm,
-            patch("pypost.ui.main_window.MCPServerManager"),
+            patch("pypost.ui.mcp_server_controller.MCPServerManager"),
             patch("pypost.ui.main_window.CollectionsPresenter", return_value=mock_collections),
             patch("pypost.ui.main_window.TabsPresenter"),
             patch("pypost.ui.main_window.EnvPresenter"),
@@ -99,12 +199,12 @@ class TestMainWindow(unittest.TestCase):
             collections_loaded=MagicMock(), restore_tree_state=MagicMock()
         )
         environments = SimpleNamespace(environments_loaded=MagicMock())
-        registry = MagicMock()
+        controller = MagicMock()
         window = SimpleNamespace(
             collections=collections,
             env=environments,
             tabs=SimpleNamespace(restore_tabs=MagicMock()),
-            mcp_registry=registry,
+            mcp_controller=controller,
             _startup_collections_ready=False,
             _startup_env_ready=False,
             _ui_ready=False,
@@ -121,10 +221,10 @@ class TestMainWindow(unittest.TestCase):
 
         MainWindow._on_startup_collections_loaded(window)
 
-        registry.start_enabled.assert_not_called()
+        controller.start_enabled.assert_not_called()
         MainWindow._on_startup_environments_loaded(window)
 
-        registry.start_enabled.assert_called_once()
+        controller.start_enabled.assert_called_once()
         collections.restore_tree_state.assert_called_once()
         window.tabs.restore_tabs.assert_called_once()
         assert window._ui_ready is True
@@ -185,7 +285,7 @@ class TestMainWindow(unittest.TestCase):
             patch("pypost.ui.main_window.ConfigManager"),
             patch("pypost.ui.main_window.RequestManager"),
             patch("pypost.ui.main_window.StateManager") as mock_sm,
-            patch("pypost.ui.main_window.MCPServerManager"),
+            patch("pypost.ui.mcp_server_controller.MCPServerManager"),
             patch(
                 "pypost.ui.main_window.CollectionsPresenter",
                 return_value=mock_collections,

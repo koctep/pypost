@@ -1,915 +1,734 @@
 {
   "tasks": {
-    "PYPOST-163": [
-      "70-dev-docs.md"
-    ],
     "PYPOST-168": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-172": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-173": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-174": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-175": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-176": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-178": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-182": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-183": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-184": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-185": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-186": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-187": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-188": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-189": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-190": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-191": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-192": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-193": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-194": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-195": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-196": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-197": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-198": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-199": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-200": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-201": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-202": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-203": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-204": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-205": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-206": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-207": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-208": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-209": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-210": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-211": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-212": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-213": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-214": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-215": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-216": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-217": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-218": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-219": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-220": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-221": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-222": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-223": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-224": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-225": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-226": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-227": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-228": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-229": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-230": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-231": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-232": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-233": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-234": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-235": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-236": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-237": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-238": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-239": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-240": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-241": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-242": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-243": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-244": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-245": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-246": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-247": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-248": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-253": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-254": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-255": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-256": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-257": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-258": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-259": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-260": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-261": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-262": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-263": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-265": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-266": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-269": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-272": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-273": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-275": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-276": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-277": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-278": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-280": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-281": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-282": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-283": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-284": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-285": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-286": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-287": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-288": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-289": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-290": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-291": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-292": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-294": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-295": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-296": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-297": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-298": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-299": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-300": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-301": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-303": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-304": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-305": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-306": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-308": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-309": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-31": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-313": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-314": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-315": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-318": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-32": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-323": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-328": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-33": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-34": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-341": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-35": [
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-352": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-353": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-355": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-356": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-358": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-359": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-36": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-360": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-361": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-362": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-364": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-37": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-373": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-375": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-38": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-381": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-385": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-39": [
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-393": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-394": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-396": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-397": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-405": [
       "60-tech-debt.md"
-    ],
-    "PYPOST-42": [
-      "70-dev-docs.md"
     ],
     "PYPOST-421": [
       "60-tech-debt.md"
@@ -926,588 +745,453 @@
     "PYPOST-428": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-435": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-436": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-440": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-441": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-450": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-451": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-452": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-468": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-469": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-471": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-474": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-475": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-477": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-485": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-493": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-494": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-497": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-498": [
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-500": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-510": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-511": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-512": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-513": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-517": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-53": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-539": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-546": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-551": [
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-558": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-562": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-580": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-581": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-582": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-583": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-584": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-585": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-586": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-587": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-588": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-589": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-595": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-596": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-597": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-601": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-604": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-605": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-606": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-607": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-608": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-609": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-610": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-611": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-613": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-614": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-617": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-618": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-619": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-620": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-626": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-628": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-629": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-630": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-631": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-632": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-633": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-634": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-635": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-636": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-647": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-652": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-653": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-656": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-659": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-661": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-662": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-663": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-664": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-665": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-666": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-672": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-673": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-674": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-675": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-676": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-677": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-696": [
       "10-requirements.md",
       "20-architecture.md",
       "40-code-cleanup.md",
       "50-observability.md",
-      "60-tech-debt.md",
-      "70-dev-docs.md"
+      "60-tech-debt.md"
     ],
     "PYPOST-697": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-718": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-742": [
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-753": [
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-790": [
       "20-architecture.md",
       "40-code-cleanup.md",
-      "50-observability.md",
-      "70-dev-docs.md"
-    ],
-    "PYPOST-792": [
-      "70-dev-docs.md"
+      "50-observability.md"
     ],
     "PYPOST-88": [
       "60-tech-debt.md"
     ],
     "PYPOST-89": [
       "60-tech-debt.md"
-    ],
-    "PYPOST-919": [
-      "70-dev-docs.md"
-    ],
-    "PYPOST-922": [
-      "70-dev-docs.md"
     ]
   },
-  "violation_count": 259
+  "violation_count": 227
 }

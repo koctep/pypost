@@ -22,6 +22,31 @@ pytestmark = pytest.mark.timeout(30)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# PYPOST-1071: the current Top-Down contract defines Step 8 output as reviewed developer
+# documentation under `doc/dev/`, not a per-task `70-dev-docs.md` summary. The verifier used to
+# demand that obsolete task-local file, which reported 30 compliant current-format tasks as
+# artifact violations; these constants pin the contract so the requirement cannot come back.
+OBSOLETE_DEV_DOCS_FILE = "70-dev-docs.md"
+
+CURRENT_STANDARD_FILES: tuple[str, ...] = (
+    "00-roadmap.md",
+    "10-requirements.md",
+    "20-architecture.md",
+    "40-code-cleanup.md",
+    "50-observability.md",
+    "60-tech-debt.md",
+)
+
+CURRENT_AUDIT_FILES: tuple[str, ...] = (
+    "00-roadmap.md",
+    "10-requirements.md",
+    "20-architecture.md",
+    "30-audit-report.md",
+    "40-code-cleanup.md",
+    "50-observability.md",
+    "60-tech-debt.md",
+)
+
 
 def _write_roadmap(task_dir: Path, body: str) -> None:
     task_dir.mkdir(parents=True, exist_ok=True)
@@ -80,19 +105,25 @@ class TestRoadmapParsing:
 
 
 class TestRequiredFiles:
-    def test_standard_task_requires_seven_files(self) -> None:
+    def test_standard_task_requires_six_files(self) -> None:
         assert required_files_for_task("PYPOST-816") == STANDARD_FILES
+        assert len(STANDARD_FILES) == 6
 
-    def test_code_audit_task_requires_eight_files(self) -> None:
+    def test_code_audit_task_requires_seven_files(self) -> None:
         assert required_files_for_task("PYPOST-684") == AUDIT_FILES
         assert "30-audit-report.md" in AUDIT_FILES
+        assert len(AUDIT_FILES) == 7
 
     def test_missing_required_files_reports_sorted_gaps(self, tmp_path: Path) -> None:
         task_dir = tmp_path / "PYPOST-TEST"
         _write_completed_standard(task_dir)
-        (task_dir / "70-dev-docs.md").unlink()
+        (task_dir / "20-architecture.md").unlink()
+        (task_dir / "10-requirements.md").unlink()
 
-        assert missing_required_files(task_dir, "PYPOST-TEST") == ["70-dev-docs.md"]
+        assert missing_required_files(task_dir, "PYPOST-TEST") == [
+            "10-requirements.md",
+            "20-architecture.md",
+        ]
 
 
 class TestCollectViolations:
@@ -121,6 +152,57 @@ class TestCollectViolations:
         task_dir = tmp_path / "PYPOST-902"
         _write_roadmap(task_dir, "- [ ] **STEP 1: Requirements**\n")
 
+        assert collect_violations(tmp_path) == {}
+
+
+class TestCurrentStep8Contract:
+    """PYPOST-1071: the required-file contract must match the current Step 8 output.
+
+    Step 8 produces reviewed developer documentation under `doc/dev/`; a per-task
+    `70-dev-docs.md` summary is no longer part of the workflow. These offline checks were the
+    Step 3 repro against the then seven-file ``STANDARD_FILES`` / eight-file ``AUDIT_FILES``
+    and now guard the six/seven-file contract against regression.
+    """
+
+    def test_standard_task_requires_six_current_artifacts(self) -> None:
+        assert required_files_for_task("PYPOST-1071") == CURRENT_STANDARD_FILES
+
+    def test_audit_task_requires_seven_current_artifacts(self) -> None:
+        assert required_files_for_task("PYPOST-684") == CURRENT_AUDIT_FILES
+        assert "30-audit-report.md" in CURRENT_AUDIT_FILES
+
+    def test_no_task_kind_requires_obsolete_dev_docs_summary(self) -> None:
+        assert OBSOLETE_DEV_DOCS_FILE not in STANDARD_FILES
+        assert OBSOLETE_DEV_DOCS_FILE not in AUDIT_FILES
+
+    def test_completed_current_format_task_is_compliant_without_dev_docs_summary(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        task_dir = tmp_path / "PYPOST-903"
+        _write_roadmap(
+            task_dir,
+            "\n".join(
+                [
+                    "- [x] **STEP 1: Requirements Gathering and Documentation**",
+                    "- [x] **STEP 2: High-Level Architecture Design**",
+                    "- [x] **STEP 3: Failing Repro Test**",
+                    "- [x] **STEP 4: Development**",
+                    "- [x] **STEP 5: Code Cleanup**",
+                    "- [x] **STEP 6: Observability**",
+                    "- [x] **STEP 7: Technical Debt Analysis**",
+                    "- [x] **STEP 8: Dev Docs**",
+                    "  - `doc/dev/example.md` — reviewed developer documentation.",
+                    "- [x] **COMMIT: Commit Changes**",
+                ]
+            )
+            + "\n",
+        )
+        for filename in CURRENT_STANDARD_FILES:
+            (task_dir / filename).write_text(f"# {filename}\n", encoding="utf-8")
+
+        assert not (task_dir / OBSOLETE_DEV_DOCS_FILE).exists()
+        assert missing_required_files(task_dir, "PYPOST-903") == []
         assert collect_violations(tmp_path) == {}
 
 

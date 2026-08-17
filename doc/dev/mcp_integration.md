@@ -110,27 +110,78 @@ copied into that runtime, preventing UI selection from retargeting another
 endpoint. See [Multiple MCP Servers](mcp_server_registry.md) for the API,
 persistence, migration, observability, and troubleshooting details.
 
-### 4. `EnvPresenter` (`pypost/ui/presenters/env_presenter.py`)
+### 4. `McpServerSettingsController` (`pypost/ui/mcp_server_controller.py`, PYPOST-1071)
 
-The environment selector opens the registry-backed MCP Servers dialog and
-continues to own the legacy single-server adapter used in focused compatibility
-tests. It no longer owns lifecycle or variable context for persisted
-multi-server endpoints.
+The UI-side owner of MCP **persistence and lifecycle**. PYPOST-1044 placed this behaviour in
+`MainWindow`; PYPOST-1071 extracted it, leaving the window as composition root plus startup
+readiness gate.
 
-*   **Responsibility**: Load environments, emit variable changes to the UI, and route
-    endpoint management to the registry-backed MCP Servers dialog.
+*   **Responsibility**: Build (or accept an injected) `MCPServerRegistry` and
+    `MCPServerManager`, load persisted rows at construction, mutate
+    `AppSettings.mcp_servers` and save through `ConfigManager`, and issue per-endpoint
+    start / stop / remove / reconfigure commands.
+*   **Construction**: `MainWindow` calls
+    `McpServerSettingsController.for_window(self, mcp_manager=…, registry=…)`
+    (`pypost/ui/main_window.py:107`), which wires the controller from already-built
+    collaborators through callables. The window then re-publishes
+    `self.mcp_manager` / `self.mcp_registry` from the controller for existing callers.
+*   **Readiness gate**: `start_enabled()` is a pass-through the window calls only from
+    `_maybe_complete_startup_restore()` (`pypost/ui/main_window.py:166`), after both
+    collections and environments have loaded. `stop_all()` runs at shutdown.
+*   **Transactional edits**: it connects to `MCPServerRegistry.reconfiguration_finished`
+    and persists a running-row edit **only** when the replacement endpoint bound
+    (`committed=true`).
+*   **Protocol surface**: it satisfies the `McpServerController` protocol consumed by the
+    controls presenter — `mcp_server_configurations`, `mcp_server_status`,
+    `mcp_server_activity`, `upsert_mcp_server`, `remove_mcp_server`, `start_mcp_server`,
+    `stop_mcp_server`. Configuration rows are returned as deep copies.
+
+### 5. `McpControlsPresenter` (`pypost/ui/presenters/mcp_controls_presenter.py`, PYPOST-1071)
+
+The UI-side owner of the **MCP portion of the environment bar**: status label, the three
+buttons, the dialogs behind them, and scoped registry refreshes. Extracted from
+`EnvPresenter` by PYPOST-1071.
+
+*   **Widgets**: `widgets` returns **MCP Tools**, **MCP Activity**, **MCP Servers…** and the
+    status label in display order; `EnvPresenter` inserts them into its bar layout.
+*   **Status label**: With a registry it shows aggregate running/failed counts, not a
+    potentially misleading endpoint. Row-specific state and errors live in the dialog.
+*   **MCP tools overview**: With a registry, the top-bar button becomes **MCP Server Tools…**
+    and opens the MCP Servers dialog; **Tools…** inside it is scoped to the selected row's
+    collection. Without a registry it opens `McpToolsOverviewDialog` for the aggregate
+    legacy catalog.
+*   **MCP activity log**: The top-bar **MCP Activity (N)** view remains the legacy
+    single-manager feed; the registry dialog exposes activity per selected endpoint.
+*   **Server controller**: `MainWindow` calls `env.set_mcp_server_controller(...)`
+    (`pypost/ui/main_window.py:130`), which forwards to
+    `McpControlsPresenter.set_server_controller`. Without it, **MCP Servers…** logs
+    `mcp_servers_dialog_no_controller` and does nothing.
+*   **Legacy adapter**: `handle_environment_selected` applies the old
+    `Environment.enable_mcp` start/stop rule, and `legacy_server_running()` reports it —
+    both are no-ops once a registry is configured.
+
+### 6. `EnvPresenter` (`pypost/ui/presenters/env_presenter.py`)
+
+The environment selector owns environment state and variable propagation. After PYPOST-1071
+it owns no MCP status, dialog or lifecycle code.
+
+*   **Responsibility**: Load environments, emit variable changes to the UI, and delegate
+    every MCP concern to `McpControlsPresenter`.
 *   **Variable cache**: `EnvVariableSnapshot` is updated on the main thread in
     `_on_env_changed` whenever the user selects or edits an environment.
 *   **Supplier registration**: On init, calls
     `MCPServerManager.set_variable_supplier(self._env_snapshot.snapshot_variables)`.
     The snapshot returns a **copy** so MCP threadpool workers never observe partial writes.
-*   **MCP tools overview**: With a registry, top-bar **MCP Server Tools…** opens
-    the MCP Servers dialog; **Tools…** is scoped to the selected row's collection.
-*   **MCP activity log**: The registry dialog exposes activity for the selected endpoint.
-*   **Status label**: With a registry it shows aggregate running/failed counts, not a
-    potentially misleading endpoint. Row-specific state and errors live in the dialog.
+*   **Retained `mcp_*` shims**: `refresh_mcp_tools()`, `mcp_status_text()`,
+    `mcp_tools_button_text()` and `mcp_activity_button_text()` remain as one-line
+    delegations for the two reasons recorded at `env_presenter.py:179-181`:
+    `pypost/ui/main_window_signals.py:18,21,31` connects `window.env.refresh_mcp_tools` to
+    three Qt signals, and the other three text getters are read by
+    `tests/test_env_presenter.py`. Retiring them is tracked as
+    [PYPOST-1082](https://pypost.atlassian.net/browse/PYPOST-1082); until then, do not add
+    new MCP behaviour behind them — add it to `McpControlsPresenter`.
 
-### 5. Metrics observability stack (`pypost/core/metrics*.py`)
+### 7. Metrics observability stack (`pypost/core/metrics*.py`)
 
 PyPost also exposes a separate MCP server dedicated to observability. PYPOST-75 split the
 former monolithic `MetricsManager` into focused modules:
@@ -160,10 +211,11 @@ former monolithic `MetricsManager` into focused modules:
 
 ### Server Startup
 
-1.  `MainWindow` loads every persisted `AppSettings.mcp_servers` row into
-    `MCPServerRegistry`.
-2.  After collections and environments are both loaded, `start_enabled()` starts
-    each enabled row independently.
+1.  `McpServerSettingsController` loads every persisted `AppSettings.mcp_servers`
+    row into `MCPServerRegistry` while the window composes it, and logs
+    `mcp_persisted_servers_loaded count=… enabled_count=…`.
+2.  After collections and environments are both loaded, `MainWindow` calls
+    `mcp_controller.start_enabled()`, which starts each enabled row independently.
 3.  `start(id)` resolves the row's collection and environment by ID, then copies
     its requests, variables, and hidden keys into that endpoint's manager.
 4.  The endpoint's `MCPServerManager` creates a new thread; its
@@ -212,17 +264,21 @@ delegates lifecycle calls without adding its own lock.
 ### MCP tools overview (PYPOST-556)
 
 `collect_mcp_tool_overview(collections)` in `pypost/core/mcp_tools_overview.py` builds
-sorted `McpToolOverviewEntry` rows. `EnvPresenter` opens `McpToolsOverviewDialog` from the
-top bar. Overview is read-only and does not require MCP to be running.
+sorted `McpToolOverviewEntry` rows. `McpControlsPresenter` opens `McpToolsOverviewDialog`
+from the top bar (`mcp_tools_overview_opened tool_count=…`). Overview is read-only and does
+not require MCP to be running.
 
 ### Scoped tool list refresh
 
 When the user saves a request or edits collections while MCP is running, PyPost must expose an
 up-to-date tool catalog to connected agents.
 
-1.  `MainWindow` connects collection changes to `EnvPresenter.refresh_mcp_tools()`.
-2.  With a registry, the presenter first reconciles missing collection/environment
-    references and then calls `refresh_collection(id)` for each current collection.
+1.  `wire_presenter_signals` connects collection changes to
+    `EnvPresenter.refresh_mcp_tools()` (`pypost/ui/main_window_signals.py:18,21,31`),
+    which delegates to `McpControlsPresenter.refresh_tools()`.
+2.  With a registry, the controls presenter first reconciles missing
+    collection/environment references and then calls `refresh_collection(id)` for each
+    current collection.
 3.  The registry updates only managers whose configuration selected that collection.
     `MCPServerManager.update_tools()` compares its local tool signature and restarts
     only that endpoint when the signature changed.
@@ -247,9 +303,11 @@ up-to-date tool catalog to connected agents.
 | `detail` | — | short error message when applicable |
 
 Each registry-owned manager has its own activity log. `McpServersDialog` opens
-`McpActivityDialog` for the selected endpoint through `MainWindow.mcp_server_activity()`.
-The top-bar **MCP Activity (N)** remains the legacy single-manager view and is not an
-aggregate registry activity feed.
+`McpActivityDialog` for the selected endpoint through
+`McpServerSettingsController.mcp_server_activity()`, which returns `[]` and logs
+`mcp_server_activity_unavailable instance_id=…` at DEBUG when that endpoint has never
+started. The top-bar **MCP Activity (N)** remains the legacy single-manager view and is not
+an aggregate registry activity feed.
 
 ### Tool Execution
 

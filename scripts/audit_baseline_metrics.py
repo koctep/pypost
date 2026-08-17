@@ -27,25 +27,45 @@ AUDIT_ERA_LOC: dict[str, int] = {
 
 # Regression caps: measured 2026-06-11 + ~10% headroom (see baseline-metrics.md).
 FILE_CAPS: dict[str, int] = {
-    "pypost/ui/main_window.py": 435,
+    # PYPOST-1071: PYPOST-1044's multi-server persistence and lifecycle control moved to
+    # pypost/ui/mcp_server_controller.py; cap re-derived from the post-extraction
+    # measurement (433) rather than from the oversized pre-extraction structure.
+    "pypost/ui/main_window.py": 477,
+    # PYPOST-1071: extraction target for the MCP persistence and lifecycle code moved out
+    # of main_window.py; capped on creation at the ~10% headroom policy (269 measured)
+    # so the relocated lines stay measured instead of growing outside the guard.
+    "pypost/ui/mcp_server_controller.py": 296,
     # PYPOST-987/PYPOST-989: import/export workflows remain delegated to action
     # objects; PYPOST-1025 extracted their panel assembly to collections_panel.py.
-    "pypost/ui/presenters/collections_presenter.py": 330,
+    # PYPOST-1071: accepted thin delegation — PYPOST-1005/1012/1013 added thin collection
+    # action entry points and busy-cue coordination and PYPOST-1044 added the read-only
+    # collection_by_id() lookup, so no action-object algorithm was absorbed here.
+    "pypost/ui/presenters/collections_presenter.py": 403,
     "pypost/ui/presenters/tabs_presenter.py": 785,
-    "pypost/ui/presenters/env_presenter.py": 470,
+    # PYPOST-1071: MCP status controls, dialogs and scoped refresh routing moved to
+    # pypost/ui/presenters/mcp_controls_presenter.py; cap re-derived from 392.
+    "pypost/ui/presenters/env_presenter.py": 432,
+    # PYPOST-1071: extraction target for the MCP controls moved out of env_presenter.py;
+    # capped on creation at the ~10% headroom policy (329 measured) so the relocated
+    # lines stay measured instead of growing outside the guard.
+    "pypost/ui/presenters/mcp_controls_presenter.py": 362,
     "pypost/core/qt/metrics.py": 181,
     "pypost/ui/widgets/mixins.py": 411,
     "pypost/core/template_service.py": 225,
     "pypost/core/request_service.py": 530,
     "pypost/core/request_manager.py": 260,
-    "pypost/core/http_client.py": 340,
+    # PYPOST-1071: accepted cohesive growth — PYPOST-1037's strict integer-template
+    # conversion, origin-only error logging and ExecutionError mapping stay inside
+    # outbound transport preparation and failure translation.
+    "pypost/core/http_client.py": 418,
     "pypost/core/storage.py": 380,
     "pypost/core/qt/worker.py": 180,
     "pypost/core/mcp_server_impl.py": 325,
 }
 
 MAIN_WINDOW_CLASS = "MainWindow"
-MAIN_WINDOW_CLASS_CAP = 390
+# PYPOST-1071: re-derived from the post-extraction measurement (387).
+MAIN_WINDOW_CLASS_CAP = 426
 
 
 @dataclass(frozen=True)
