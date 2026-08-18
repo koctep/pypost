@@ -84,14 +84,14 @@ conventions.
 1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
 1. [Jira numeric identifier MCP contract (PYPOST-1038)](mcp_integration.md#jira-numeric-path-identifiers-pypost-1038)
 1. [Jira MCP Example Project Default (PYPOST-1032)](jira_mcp_project_default.md)
-1. [Jira MCP critical REST path freshness (PYPOST-1030)](jira_mcp_path_freshness.md)
+1. [Jira MCP critical REST path freshness (PYPOST-1030 / PYPOST-1056)](jira_mcp_path_freshness.md)
 1. [Optional protected Jira MCP live smoke (PYPOST-1039)](jira_mcp_live_smoke.md)
 1. [CI-safe Jira MCP collection e2e (PYPOST-1053)](jira_mcp_collection_e2e.md)
 1. [Inbound MCP Trust Model (PYPOST-705)](mcp_trust_model.md)
 1. [MCP Secrets Policy](mcp_secrets_policy.md)
 1. [UI Action Tools — out-of-process packaging (PYPOST-918)](ui_actions.md)
 1. [jira-mcp example fixtures](
-   testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028)
+   testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028--pypost-1048--pypost-1056)
    (including protected stretch-operation contracts, PYPOST-1027, and
    env/auth/`mcp_params` contracts, PYPOST-1028)
 

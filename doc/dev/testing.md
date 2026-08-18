@@ -17,7 +17,7 @@ make test-slow       # network-heavy Makefile smoke
 make test-agent-e2e  # broader agent e2e beyond golden (primary packaging)
 make test-mcp-collection-e2e  # credential-free Jira MCP collection e2e
 make test-jira-mcp-live  # protected, explicit opt-in Jira MCP smoke (maintainers only)
-make check-jira-mcp-path-freshness  # offline jira_mcp critical REST paths vs catalog
+make check-jira-mcp-path-freshness  # offline jira_mcp critical REST paths vs catalog (PYPOST-1030 / PYPOST-1056)
 ```
 
 `make test-agent-e2e` is the **primary packaging** path for the **broader**
@@ -410,7 +410,7 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_test_collection.py -v
 ```
 
-## Example fixtures contract (PYPOST-1017 / PYPOST-1026 / PYPOST-1047 / PYPOST-1028 / PYPOST-1048)
+## Example fixtures contract (PYPOST-1017 / PYPOST-1026 / PYPOST-1047 / PYPOST-1028 / PYPOST-1048 / PYPOST-1056)
 
 ### Overview
 
@@ -445,7 +445,7 @@ is documented in
 | `examples/README.md` | Import order, secrets, coverage map |
 | `tests/test_example_fixtures.py` | Offline import + coverage contracts |
 | `FIXED_INPUT_JIRA_MCP_REQUEST_IDS` | Sole escape hatch for empty `mcp_params` |
-| `make check-jira-mcp-path-freshness` | Offline critical-path ↔ catalog gate |
+| `make check-jira-mcp-path-freshness` | Offline critical-path ↔ catalog gate (positive & mutation reject) |
 
 Keep roles distinct: Jira pair for end users / agent demos; `mcp.json` for
 contributors / local probing.
@@ -632,12 +632,51 @@ make test PYTEST_ARGS='tests/test_example_fixtures.py -v'
   create/membership, parent epic link, and assignee (PYPOST-1030).
   Maintainer ritual: `make check-jira-mcp-path-freshness` and
   [Jira MCP path freshness](jira_mcp_path_freshness.md).
+- `test_jira_mcp_critical_rest_paths_rejects_url_drift` — in-memory mutation
+  test ensuring path drift raises `AssertionError` pinning request id, missing
+  locked fragment, and observed URL (PYPOST-1056).
 - `test_jira_mcp_shipped_descriptions_carry_discoverability_guidance` —
   parametrized positive lock: each entry in `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS`
   must survive in the shipped `jira_mcp.json` descriptions (PYPOST-1048).
 - Matching `*_rejects_*` mutation tests pin diagnostics for each checker.
 
 Module timeout: `pytestmark = pytest.mark.timeout(30)`.
+
+### Jira MCP critical REST path catalog and mutation diagnostics (PYPOST-1030 / PYPOST-1056)
+
+`examples/collections/jira_mcp_critical_rest_paths.json` locks the critical
+REST method and URL path markers for the five highest-risk Jira operations:
+`jira-search-issues-jql`, `jira-create-sprint`, `jira-add-issues-to-sprint`,
+`jira-link-issue-parent`, and `jira-assign-issue`.
+
+**Checker: `assert_jira_mcp_critical_rest_paths_match_catalog(collection, catalog)`**
+
+- Validates that every locked request ID exists in the collection, matches the
+  expected HTTP method, contains all required URL fragments, excludes any
+  forbidden fragments, and declares required `mcp_param` keys.
+- Raises `AssertionError` with detailed context when drift is detected.
+
+**Mutation Reject Guard: `test_jira_mcp_critical_rest_paths_rejects_url_drift` (PYPOST-1056)**
+
+- Creates an in-memory deep copy of the collection (`Collection.model_copy(deep=True)`),
+  mutates `jira-search-issues-jql` by stripping `/rest/api/3/search/jql` to
+  `/rest/api/3/search`, and invokes the comparator within `pytest.raises(AssertionError)`.
+- Verifies that the resulting exception message explicitly contains:
+  1. The request ID (`jira-search-issues-jql`)
+  2. The missing locked fragment (`/rest/api/3/search/jql`)
+  3. The observed mutated URL (`{{jira_base_url}}/rest/api/3/search`)
+- Pins the diagnostic quality so future comparator refactoring cannot silently
+  degrade developer troubleshooting information.
+
+**Focused verification command:**
+
+```bash
+make check-jira-mcp-path-freshness
+```
+
+This target executes both `test_jira_mcp_critical_rest_paths_match_locked_catalog`
+and `test_jira_mcp_critical_rest_paths_rejects_url_drift` in under 0.05s offline.
+See [Jira MCP path freshness](jira_mcp_path_freshness.md) for maintainer procedures.
 
 ### Jira MCP discoverability contracts (PYPOST-1048)
 
