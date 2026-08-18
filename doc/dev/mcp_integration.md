@@ -86,10 +86,11 @@ This class contains the actual business logic of the MCP server.
 *   **Tool metadata (PYPOST-553)**: `RequestData.mcp_description` is the agent-visible
     description (falls back to `name`). `RequestData.mcp_params` holds per-parameter
     `McpToolParam` records (`type`, `description`, `required`).
-*   **Schema Generation**: Discovers `{{ mcp.request.VAR_NAME }}` placeholders in URL,
-    headers, params, and body via regex in `McpSecretsPolicy.extract_mcp_request_variables`.
-    Merges discovered names with explicit `mcp_params` and builds JSON Schema via
-    `build_tool_input_schema`.
+*   **Schema Generation (PYPOST-1052)**: Discovers `mcp.request.VAR_NAME` placeholders
+    across URL, headers, params, and body—supporting both bare (e.g. `{{ mcp.request.x }}`)
+    and function-wrapped expressions (e.g. `{{ to_int(mcp.request.id) }}`)—via regex in
+    `McpSecretsPolicy.extract_mcp_request_variables`. Merges discovered names with
+    explicit `mcp_params` and builds JSON Schema via `build_tool_input_schema`.
     Undeclared placeholders default to `type: string`, `required: true` (backward compatible).
 *   **Execution**: Delegates request execution to a fresh `RequestService` per `call_tool`
     invocation so each MCP tool call owns an isolated `HTTPClient` / `requests.Session`
@@ -702,7 +703,7 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 #### Schema pipeline
 
 ```
-McpSecretsPolicy.extract_mcp_request_variables(req)  ← regex on {{ mcp.request.VAR }}
+McpSecretsPolicy.extract_mcp_request_variables(req)  ← regex on mcp.request.VAR (bare & wrapped)
         │
         ▼
 resolve_mcp_param_specs(req, discovered)  ← merges mcp_params overrides

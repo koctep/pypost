@@ -1,15 +1,15 @@
-import pytest
-
-pytestmark = pytest.mark.timeout(60)
 import unittest
 
+import pytest
 from PySide6.QtWidgets import QComboBox
 
 from pypost.models.models import McpToolParam
 from pypost.ui.widgets.request_editor import McpParamsTable, RequestWidget
 
-@pytest.mark.usefixtures("qapp")
+pytestmark = pytest.mark.timeout(60)
 
+
+@pytest.mark.usefixtures("qapp")
 class TestMcpParamsTable(unittest.TestCase):
     def setUp(self):
         self.table = McpParamsTable()
@@ -49,8 +49,8 @@ class TestMcpParamsTable(unittest.TestCase):
         self.table.set_data(params)
         self.assertEqual(self.table.get_data(), params)
 
-@pytest.mark.usefixtures("qapp")
 
+@pytest.mark.usefixtures("qapp")
 class TestRequestWidgetMcpParamSync(unittest.TestCase):
     def setUp(self):
         self.widget = RequestWidget()
@@ -115,3 +115,19 @@ class TestRequestWidgetMcpParamSync(unittest.TestCase):
         self.widget._on_mcp_preview_source_changed()
         params = self.widget.mcp_params_table.get_data()
         self.assertIn("item_id", params)
+
+    def test_wrapped_placeholder_populates_mcp_params_table(self):
+        self.widget.url_input.setText(
+            "http://api.example/boards/{{ to_int(mcp.request.board_id) }}"
+        )
+        self.widget.body_edit.setPlainText(
+            '{"data": "{{ base64(mcp.request.raw_data) }}"}'
+        )
+        self.widget._sync_mcp_params_from_template()
+        params = self.widget.mcp_params_table.get_data()
+        self.assertIn("board_id", params)
+        self.assertIn("raw_data", params)
+        self.assertEqual(params["board_id"].type, "string")
+        self.assertTrue(params["board_id"].required)
+        self.assertEqual(params["raw_data"].type, "string")
+        self.assertTrue(params["raw_data"].required)

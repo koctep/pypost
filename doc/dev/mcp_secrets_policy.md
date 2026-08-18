@@ -36,7 +36,7 @@ flowchart TB
 
 | Data | Agent-visible (`list_tools`) | Execution (`call_tool`) |
 | --- | --- | --- |
-| `{{ mcp.request.* }}` placeholders | Yes — tool input parameters | From agent arguments |
+| `mcp.request.*` placeholders (bare or wrapped) | Yes — tool input parameters | From agent arguments |
 | Environment `{{ var }}` placeholders | No | Real values from the endpoint's selected environment |
 | Hidden env keys (`Environment.hidden_keys`) | No — stripped from schema | Real values from the endpoint's selected environment |
 | Explicit `mcp_params` for hidden keys | No — filtered | N/A |
@@ -45,9 +45,12 @@ flowchart TB
 
 ### `McpSecretsPolicy.extract_mcp_request_variables(request)`
 
-Discovers agent tool input names from `{{ mcp.request.VAR }}` placeholders in the
-request URL, body, headers, and params. Uses module-level `_MCP_REQUEST_VAR_PATTERN`
-(compiled via `import re` at file top — see `mcp_secrets_policy.py`).
+Discovers agent tool input names from `mcp.request.VAR` expressions—both bare
+placeholders (e.g. `{{ mcp.request.VAR }}`) and function-wrapped expressions (e.g.
+`{{ to_int(mcp.request.VAR) }}`)—across the request URL, body, headers, and params
+(PYPOST-1052). Uses module-level `_MCP_REQUEST_VAR_PATTERN` (compiled via
+`re.compile(r"mcp\.request\.([a-zA-Z0-9_]+)")` at file top — see
+`mcp_secrets_policy.py`).
 
 ### `McpSecretsPolicy.filter_agent_param_specs(specs, request, template_service, hidden_keys)`
 

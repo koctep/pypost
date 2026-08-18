@@ -1,13 +1,14 @@
 """Tests for McpSecretsPolicy (PYPOST-554)."""
-import pytest
-
-pytestmark = pytest.mark.timeout(30)
 
 import unittest
+
+import pytest
 
 from pypost.core.mcp_secrets_policy import McpSecretsPolicy
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestMcpSecretsPolicy(unittest.TestCase):
@@ -85,6 +86,53 @@ class TestMcpSecretsPolicy(unittest.TestCase):
         self.assertEqual(
             McpSecretsPolicy.extract_mcp_request_variables(req),
             {"host", "query"},
+        )
+
+    def test_extract_mcp_request_variables_discovers_function_wrapped_placeholders(self):
+        req = RequestData(
+            method="POST",
+            url=(
+                "http://api.example/boards/{{ to_int(mcp.request.board_id) }}"
+                "/sprints/{{ to_int(mcp.request.sprint_id) }}"
+            ),
+            headers={
+                "Authorization": "Basic {{ base64(mcp.request.auth_token) }}",
+                "X-Custom": "{{ upper(mcp.request.custom_header) }}",
+            },
+            params={
+                "query": "{{ urlencode(mcp.request.search_term) }}",
+                "filter": "{{ mcp.request.filter_type }}",
+            },
+            body=(
+                '{"id": {{ to_int(mcp.request.item_id) }}, '
+                '"data": "{{ base64(mcp.request.raw_data) }}"}'
+            ),
+        )
+        self.assertEqual(
+            McpSecretsPolicy.extract_mcp_request_variables(req),
+            {
+                "board_id",
+                "sprint_id",
+                "auth_token",
+                "custom_header",
+                "search_term",
+                "filter_type",
+                "item_id",
+                "raw_data",
+            },
+        )
+
+    def test_extract_mcp_request_variables_discovers_nested_and_concatenated_expressions(self):
+        req = RequestData(
+            method="GET",
+            url=(
+                "http://example.com/{{ base64(urlencode(mcp.request.nested_var)) }}"
+                "/{{ mcp.request.prefix ~ mcp.request.suffix }}"
+            ),
+        )
+        self.assertEqual(
+            McpSecretsPolicy.extract_mcp_request_variables(req),
+            {"nested_var", "prefix", "suffix"},
         )
 
     def test_extract_environment_variable_names_excludes_mcp_namespace(self):

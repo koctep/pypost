@@ -515,11 +515,12 @@ failures name the missing companion key or `request.id`.
 `jira-list-board-sprints` and `jira-get-sprint-issues`.
 
 The allowlist is the **only** escape hatch for empty `mcp_params`. Do not add
-ids casually; review any change like a fixture behavior change. The contract
-scan for `mcp.request.<name>` is deliberately broader than production
-`McpSecretsPolicy.extract_mcp_request_variables`, which misses function-wrapped
-forms such as `{{ to_int(mcp.request.board_id) }}`. Explicit `mcp_params`
-entries still publish those inputs at `list_tools` time.
+ids casually; review any change like a fixture behavior change. With PYPOST-1052,
+production `McpSecretsPolicy.extract_mcp_request_variables` is aligned with the
+fixture test contract scan for `mcp.request.<name>`, discovering both bare and
+function-wrapped forms such as `{{ to_int(mcp.request.board_id) }}`. Explicit
+`mcp_params` entries continue to override or enrich parameter metadata (e.g. types,
+descriptions) at `list_tools` time.
 
 Positive tests load the shipped pair; mutation tests `deepcopy` a request or
 env, break one agreement, and assert the diagnostic. No Jira tenant, network,

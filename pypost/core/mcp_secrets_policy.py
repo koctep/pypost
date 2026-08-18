@@ -10,9 +10,7 @@ from jinja2 import meta
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
 
-_MCP_REQUEST_VAR_PATTERN = re.compile(
-    r"\{\{\s*mcp\.request\.([a-zA-Z0-9_]+)\s*\}\}"
-)
+_MCP_REQUEST_VAR_PATTERN = re.compile(r"mcp\.request\.([a-zA-Z0-9_]+)")
 
 
 def _iter_request_template_fields(request: RequestData) -> list[str]:
@@ -27,7 +25,7 @@ class McpSecretsPolicy:
 
     @staticmethod
     def extract_mcp_request_variables(request: RequestData) -> Set[str]:
-        """Placeholders matching ``{{ mcp.request.VAR }}`` become agent tool inputs."""
+        """Placeholders matching ``mcp.request.VAR`` (bare or wrapped) become agent tool inputs."""
         found: set[str] = set()
         for content in _iter_request_template_fields(request):
             found.update(_MCP_REQUEST_VAR_PATTERN.findall(content))

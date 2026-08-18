@@ -1,19 +1,20 @@
 """Tests for MCP tool contract preview (PYPOST-555)."""
-import pytest
-
-pytestmark = pytest.mark.timeout(30)
 
 import json
 import unittest
 
+import pytest
+
 from pypost.core.mcp_tool_contract import (
-    build_tool_input_schema,
     build_mcp_tool_contract_preview,
+    build_tool_input_schema,
     format_mcp_tool_contract_preview,
     normalize_mcp_tool_name,
 )
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestMcpToolContract(unittest.TestCase):
@@ -122,3 +123,23 @@ class TestMcpToolContract(unittest.TestCase):
         self.assertIn(json.dumps(preview.input_schema, indent=2, sort_keys=True), text)
         self.assertIn("api_key (hidden env key)", text)
         self.assertIn("base_url (env-only)", text)
+
+    def test_preview_generates_schema_for_wrapped_variables_without_mcp_params(self):
+        req = RequestData(
+            name="Get Board Sprints",
+            mcp_description="Fetch sprints for a board",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://api.example/boards/{{ to_int(mcp.request.board_id) }}",
+            body='{"name": "{{ upper(mcp.request.board_name) }}"}',
+            mcp_params={},
+        )
+        preview = build_mcp_tool_contract_preview(
+            req,
+            template_service=TemplateService(),
+        )
+        self.assertIsNotNone(preview)
+        self.assertIn("board_id", preview.input_schema["properties"])
+        self.assertIn("board_name", preview.input_schema["properties"])
+        self.assertIn("board_id", preview.input_schema["required"])
+        self.assertIn("board_name", preview.input_schema["required"])
