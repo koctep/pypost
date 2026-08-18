@@ -85,4 +85,5 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- [x] Committed on branch `dev` — hash `a9d41f9a`
+- Message: `documentation(contracts): PYPOST-1056 document jira-mcp path freshness mutation test`
