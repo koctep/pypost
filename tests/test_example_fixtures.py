@@ -683,7 +683,7 @@ def test_jira_mcp_list_boards_leaves_fixed_input_allowlist():
 
 JIRA_MCP_DISCOVERABILITY_SUBSTRINGS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("jira-delete-sprint", ("irreversible", "backlog")),
-    ("jira-move-issues-to-backlog", ("remove-from-sprint", "membership")),
+    ("jira-move-issues-to-backlog", ("remove-from-sprint", "membership", "50")),
 )
 
 # One case per (request, locked fragment): proves each fragment is enforced
@@ -749,7 +749,7 @@ def test_jira_mcp_discoverability_rejects_stripped_delete_sprint_warning():
 
 
 def test_jira_mcp_discoverability_rejects_stripped_backlog_membership_guidance():
-    """Mutation: strip remove-from-sprint/membership meaning from backlog move."""
+    """Mutation: strip remove-from-sprint/membership/50 meaning from backlog move."""
     collection = _load_jira_mcp_collection()
     request = _request_by_id(collection, "jira-move-issues-to-backlog")
     mutated = request.model_copy(deep=True)
@@ -761,10 +761,10 @@ def test_jira_mcp_discoverability_rejects_stripped_backlog_membership_guidance()
     # Message contract: request id plus every missing fragment, sorted.
     with pytest.raises(
         AssertionError,
-        match=r"jira-move-issues-to-backlog.*'membership', 'remove-from-sprint'",
+        match=r"jira-move-issues-to-backlog.*'50', 'membership', 'remove-from-sprint'",
     ):
         assert_jira_mcp_discoverability_guidance(
-            mutated, ("remove-from-sprint", "membership")
+            mutated, ("remove-from-sprint", "membership", "50")
         )
 
 

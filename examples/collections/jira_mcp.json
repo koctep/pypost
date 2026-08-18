@@ -631,7 +631,7 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "Remove issues from sprint membership by moving them to the backlog (clears active/future sprint assignment). Supported remove-from-sprint path; issues_payload must be serialized JSON, for example {\"issues\":[\"DEMO-1\"]}.",
+      "mcp_description": "Remove issues from sprint membership by moving them to the backlog (clears active/future sprint assignment). Supported remove-from-sprint path (max 50 issues per batch); issues_payload must be serialized JSON, for example {\"issues\":[\"DEMO-1\"]}.",
       "mcp_params": {
         "issues_payload": {
           "type": "string",

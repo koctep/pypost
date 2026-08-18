@@ -101,7 +101,8 @@ Cloud or Atlassian MCP tool.
 | Sprint issues | `jira-get-sprint-issues` |
 | Sprint membership | `jira-add-issues-to-sprint`, `jira-move-issues-to-backlog` |
 
-`jira-move-issues-to-backlog` is the supported remove-from-sprint path.
+`jira-move-issues-to-backlog` is the supported remove-from-sprint path (capped at ≤50 issues
+per batch by Jira Agile).
 
 **Explicit gaps** (out of scope unless added later):
 

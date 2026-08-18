@@ -410,7 +410,7 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_test_collection.py -v
 ```
 
-## Example fixtures contract (PYPOST-1017 / PYPOST-1026 / PYPOST-1047 / PYPOST-1028 / PYPOST-1048 / PYPOST-1056)
+## Example fixtures contract (PYPOST-1017 / PYPOST-1026 / PYPOST-1047 / PYPOST-1028 / PYPOST-1048 / PYPOST-1050 / PYPOST-1056)
 
 ### Overview
 
@@ -498,9 +498,9 @@ failures name the missing companion key or `request.id`.
    requires non-empty `mcp_params` unless the id is that same allowlist.
 5. **Discoverability guidance** (`assert_jira_mcp_discoverability_guidance`) —
    Locked `mcp_description` substrings from `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS`
-   must survive in the shipped collection (PYPOST-1048). The check is
+   must survive in the shipped collection (PYPOST-1048 / PYPOST-1050). The check is
    case-insensitive; failures name the `request.id` and every missing
-   fragment, sorted. See [Jira MCP discoverability contracts](#jira-mcp-discoverability-contracts-pypost-1048) below.
+   fragment, sorted. See [Jira MCP discoverability contracts](#jira-mcp-discoverability-contracts-pypost-1048--pypost-1050) below.
 
 `FIXED_INPUT_JIRA_MCP_REQUEST_IDS` currently freezes:
 
@@ -637,7 +637,7 @@ make test PYTEST_ARGS='tests/test_example_fixtures.py -v'
   locked fragment, and observed URL (PYPOST-1056).
 - `test_jira_mcp_shipped_descriptions_carry_discoverability_guidance` —
   parametrized positive lock: each entry in `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS`
-  must survive in the shipped `jira_mcp.json` descriptions (PYPOST-1048).
+  must survive in the shipped `jira_mcp.json` descriptions (PYPOST-1048 / PYPOST-1050).
 - Matching `*_rejects_*` mutation tests pin diagnostics for each checker.
 
 Module timeout: `pytestmark = pytest.mark.timeout(30)`.
@@ -678,17 +678,18 @@ This target executes both `test_jira_mcp_critical_rest_paths_match_locked_catalo
 and `test_jira_mcp_critical_rest_paths_rejects_url_drift` in under 0.05s offline.
 See [Jira MCP path freshness](jira_mcp_path_freshness.md) for maintainer procedures.
 
-### Jira MCP discoverability contracts (PYPOST-1048)
+### Jira MCP discoverability contracts (PYPOST-1048 / PYPOST-1050)
 
 `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS` locks the agent-facing meaning of two
-sprint-management tools. The table lives in `tests/test_example_fixtures.py` and
-acts as the single source of truth for which substrings the discoverability
-checker enforces:
+sprint-management tools (including the PYPOST-1050 Agile ≤50 backlog batch limit
+on `jira-move-issues-to-backlog`). The table lives in
+`tests/test_example_fixtures.py` and acts as the single source of truth for
+which substrings the discoverability checker enforces:
 
 | Request id | Locked lowercase fragments |
 | ---------- | -------------------------- |
 | `jira-delete-sprint` | `irreversible`, `backlog` |
-| `jira-move-issues-to-backlog` | `remove-from-sprint`, `membership` |
+| `jira-move-issues-to-backlog` | `remove-from-sprint`, `membership`, `50` |
 
 **Checker: `assert_jira_mcp_discoverability_guidance(request, required_substrings)`**
 
@@ -711,7 +712,7 @@ checker enforces:
   (request id + sorted `['backlog', 'irreversible']`).
 - `test_jira_mcp_discoverability_rejects_stripped_backlog_membership_guidance`
   — full-strip mutation for `jira-move-issues-to-backlog`; pins the message
-  contract (request id + sorted `['membership', 'remove-from-sprint']`).
+  contract (request id + sorted `['50', 'membership', 'remove-from-sprint']`).
 - `test_jira_mcp_discoverability_rejects_each_single_stripped_fragment`
   (parametrized one case per locked fragment) — partial-strip mutation; proves
   every individual fragment is enforced independently, not short-circuited
@@ -768,7 +769,7 @@ When editing the curated surface:
 | Empty `mcp_params` outside allowlist | Declare inputs, or review-add the id to the allowlist |
 | Agent-driven without inputs | Same as empty-`mcp_params` outside allowlist; see `request.id` |
 | List tool missing maxResults/startAt | Restore required pagination `mcp_params` and `to_int` query bindings (PYPOST-1029) |
-| Discoverability fragment missing | Restore the named locked substring(s) in the `mcp_description` field of the named request; see `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS` (PYPOST-1048) |
+| Discoverability fragment missing | Restore the named locked substring(s) in the `mcp_description` field of the named request; see `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS` (PYPOST-1048 / PYPOST-1050) |
 | Agent lacks Jira tools | Select companion env; keep `expose_as_mcp` |
 | No remove-from-sprint tool | Call `jira_move_issues_to_backlog` |
 | Delete tool name unknown | MCP name is `jira_delete_sprint` |
