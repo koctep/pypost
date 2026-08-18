@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -475,6 +476,7 @@ class McpParamsTable(QTableWidget):
         super().__init__(0, 4)
         self.setHorizontalHeaderLabels(["Name", "Type", "Description", "Required"])
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self._defaults: dict[str, Any] = {}
         self.itemChanged.connect(self._on_item_changed)
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
@@ -489,6 +491,11 @@ class McpParamsTable(QTableWidget):
     def set_data(self, params: dict[str, McpToolParam]) -> None:
         self.blockSignals(True)
         try:
+            self._defaults = {
+                name: spec.default
+                for name, spec in params.items()
+                if spec.default is not None
+            }
             self.setRowCount(len(params) + 1)
             for row, (name, spec) in enumerate(sorted(params.items())):
                 self._set_row(row, name, spec)
@@ -542,6 +549,7 @@ class McpParamsTable(QTableWidget):
                 type=param_type,
                 description=description,
                 required=required,
+                default=self._defaults.get(name),
             )
         return params
 

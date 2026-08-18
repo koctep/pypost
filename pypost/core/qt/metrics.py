@@ -113,6 +113,9 @@ class MetricsManager(QObject):
     def track_mcp_active_env_changed(self) -> None:
         self._registry.track_mcp_active_env_changed()
 
+    def track_mcp_param_default_applied(self, method: str) -> None:
+        self._registry.track_mcp_param_default_applied(method)
+
     def track_history_entry_appended(self, method: str) -> None:
         self._registry.track_history_entry_appended(method)
 

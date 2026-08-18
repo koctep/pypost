@@ -266,13 +266,15 @@
       "mcp_params": {
         "maxResults": {
           "type": "integer_or_string",
-          "description": "Maximum boards per page (Agile maxResults). Use 50 to match the previous curated default. Accepted as a native integer or decimal string.",
-          "required": true
+          "description": "Maximum boards per page (Agile maxResults). Defaults to 50 when omitted. Accepted as a native integer or decimal string.",
+          "required": false,
+          "default": 50
         },
         "startAt": {
           "type": "integer_or_string",
-          "description": "0-based offset into the board list (Agile startAt). Use 0 for the first page. Accepted as a native integer or decimal string.",
-          "required": true
+          "description": "0-based offset into the board list (Agile startAt). Defaults to 0 when omitted. Accepted as a native integer or decimal string.",
+          "required": false,
+          "default": 0
         }
       },
       "retry_policy": null
@@ -310,13 +312,15 @@
         },
         "maxResults": {
           "type": "integer_or_string",
-          "description": "Maximum sprints per page (Agile maxResults). Use 50 to match the previous curated default. Accepted as a native integer or decimal string.",
-          "required": true
+          "description": "Maximum sprints per page (Agile maxResults). Defaults to 50 when omitted. Accepted as a native integer or decimal string.",
+          "required": false,
+          "default": 50
         },
         "startAt": {
           "type": "integer_or_string",
-          "description": "0-based offset into the sprint list (Agile startAt). Use 0 for the first page. Accepted as a native integer or decimal string.",
-          "required": true
+          "description": "0-based offset into the sprint list (Agile startAt). Defaults to 0 when omitted. Accepted as a native integer or decimal string.",
+          "required": false,
+          "default": 0
         }
       },
       "retry_policy": null
@@ -486,13 +490,15 @@
         },
         "maxResults": {
           "type": "integer_or_string",
-          "description": "Maximum issues per page (Agile maxResults). Use 50 to match the previous curated default. Accepted as a native integer or decimal string.",
-          "required": true
+          "description": "Maximum issues per page (Agile maxResults). Defaults to 50 when omitted. Accepted as a native integer or decimal string.",
+          "required": false,
+          "default": 50
         },
         "startAt": {
           "type": "integer_or_string",
-          "description": "0-based offset into the sprint issue list (Agile startAt). Use 0 for the first page. Accepted as a native integer or decimal string.",
-          "required": true
+          "description": "0-based offset into the sprint issue list (Agile startAt). Defaults to 0 when omitted. Accepted as a native integer or decimal string.",
+          "required": false,
+          "default": 0
         }
       },
       "retry_policy": null

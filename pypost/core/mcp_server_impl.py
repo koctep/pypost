@@ -214,21 +214,40 @@ class MCPServerImpl:
         mcp_args: dict[str, Any],
         env_vars: dict[str, str],
         hidden_keys: set[str],
+        request_data: RequestData | None = None,
     ) -> dict[str, Any]:
+        merged_args = dict(mcp_args or {})
+        defaults_applied = 0
+        if request_data is not None and request_data.mcp_params:
+            for param_name, param_spec in request_data.mcp_params.items():
+                if (
+                    param_name not in merged_args
+                    or merged_args[param_name] is None
+                ) and param_spec.default is not None:
+                    merged_args[param_name] = param_spec.default
+                    defaults_applied += 1
+                    self._metrics.track_mcp_param_default_applied(request_data.method)
+                    logger.info(
+                        "mcp_param_default_applied method=%s param=%s default=%r",
+                        request_data.method,
+                        param_name,
+                        param_spec.default,
+                    )
         counts = McpSecretsPolicy.safe_execution_log_fields(
             len(env_vars),
             len(hidden_keys),
-            len(mcp_args),
+            len(merged_args),
         )
         logger.debug(
             "mcp_execution_variables_merged env_var_count=%d "
-            "hidden_key_count=%d mcp_arg_count=%d",
+            "hidden_key_count=%d mcp_arg_count=%d defaults_applied_count=%d",
             counts["env_var_count"],
             counts["hidden_key_count"],
             counts["mcp_arg_count"],
+            defaults_applied,
         )
         execution_env = McpSecretsPolicy.execution_environment_variables(env_vars)
-        return _merge_execution_variables(execution_env, mcp_args)
+        return _merge_execution_variables(execution_env, merged_args)
 
     def _create_request_service(self) -> ExecuteRequestProtocol:
         """Return an isolated RequestService for one MCP tool invocation (PYPOST-138)."""
@@ -245,7 +264,9 @@ class MCPServerImpl:
         env_vars: dict[str, str],
         hidden_keys: set[str],
     ):
-        variables = self._build_execution_variables(args, env_vars, hidden_keys)
+        variables = self._build_execution_variables(
+            args, env_vars, hidden_keys, request_data=request_data
+        )
         return self._create_request_service().execute(
             request_data, variables, hidden_keys=hidden_keys
         )

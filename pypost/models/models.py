@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,7 @@ class McpToolParam(BaseModel):
     type: str = "string"
     description: str = ""
     required: bool = True
+    default: Optional[Any] = None
 
     def model_post_init(self, __context) -> None:
         if self.type not in _MCP_PARAM_TYPES:

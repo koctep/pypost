@@ -636,7 +636,7 @@ _PAGINATION_MCP_PARAM_NAMES = ("maxResults", "startAt")
 
 
 def assert_jira_mcp_list_pagination_params(request: RequestData) -> None:
-    """List tools must declare and bind maxResults + startAt via mcp.request."""
+    """List tools must declare and bind optional maxResults + startAt with defaults."""
     for name in _PAGINATION_MCP_PARAM_NAMES:
         assert name in request.mcp_params, (
             f"Request {request.id} missing mcp_params key {name!r}"
@@ -645,8 +645,12 @@ def assert_jira_mcp_list_pagination_params(request: RequestData) -> None:
         assert spec.type == "integer_or_string", (
             f"Request {request.id} {name} type must be integer_or_string"
         )
-        assert spec.required is True, (
-            f"Request {request.id} {name} must be required"
+        assert spec.required is False, (
+            f"Request {request.id} {name} must be optional (required: false)"
+        )
+        expected_default = 50 if name == "maxResults" else 0
+        assert getattr(spec, "default", None) == expected_default, (
+            f"Request {request.id} {name} default must be {expected_default}"
         )
         expected = f"{{{{ to_int(mcp.request.{name}) }}}}"
         assert request.params.get(name) == expected, (
@@ -655,7 +659,7 @@ def assert_jira_mcp_list_pagination_params(request: RequestData) -> None:
 
 
 def test_jira_mcp_list_requests_expose_pagination_mcp_params():
-    """PYPOST-1029: board/sprint list tools expose maxResults and startAt."""
+    """PYPOST-1029/PYPOST-1054: list tools expose optional maxResults/startAt with defaults."""
     collection = _load_jira_mcp_collection()
     for request_id in PAGINATED_JIRA_MCP_LIST_REQUEST_IDS:
         assert_jira_mcp_list_pagination_params(_request_by_id(collection, request_id))

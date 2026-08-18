@@ -85,7 +85,8 @@ This class contains the actual business logic of the MCP server.
 *   **Tool Registration**: Converts `RequestData` objects (where `expose_as_mcp=True`) into MCP `Tool` definitions.
 *   **Tool metadata (PYPOST-553)**: `RequestData.mcp_description` is the agent-visible
     description (falls back to `name`). `RequestData.mcp_params` holds per-parameter
-    `McpToolParam` records (`type`, `description`, `required`).
+    `McpToolParam` records (`type`, `description`, `required`, `default` — PYPOST-1054, see
+    [Optional MCP parameter defaults](#optional-mcp-parameter-defaults-pypost-1054) below).
 *   **Schema Generation (PYPOST-1052)**: Discovers `mcp.request.VAR_NAME` placeholders
     across URL, headers, params, and body—supporting both bare (e.g. `{{ mcp.request.x }}`)
     and function-wrapped expressions (e.g. `{{ to_int(mcp.request.id) }}`)—via regex in
@@ -443,6 +444,129 @@ Freshness: the supplier is invoked on **every** `call_tool`. `refresh_environmen
 the snapshot only for endpoints selecting that environment; a top-bar selection change has no
 effect. The legacy `EnvPresenter` cache wiring remains compatibility-only.
 
+### Optional MCP parameter defaults (PYPOST-1054)
+
+Follow-up from [PYPOST-1029](https://pypost.atlassian.net/browse/PYPOST-1029) TD-1: curated
+Jira MCP list tools originally had to mark `maxResults` / `startAt` `required: true` because
+omitting them failed template rendering (`to_int(mcp.request.maxResults)` on a missing key).
+PYPOST-1054 adds a general-purpose `default` value to `McpToolParam` so any optional MCP
+parameter can declare a safe fallback that is both agent-discoverable (published in the
+JSON Schema) and applied automatically at execution time when the caller omits the argument.
+
+#### Model field
+
+`McpToolParam.default: Optional[Any] = None` (`pypost/models/models.py`). `None` means "no
+default declared" — it is not itself a usable default value (a curated tool cannot currently
+express "the true default is `null`"; see Limitations). Defaults to `None`, so every
+pre-existing collection JSON without a `default` key is unaffected.
+
+#### Schema publication
+
+`build_tool_input_schema` (`pypost/core/mcp_tool_contract.py`) adds `prop["default"] =
+spec.default` to a parameter's JSON Schema property whenever `spec.default is not None`,
+alongside the pre-existing `required`-list exclusion for `spec.required is False`. Agents see
+the default in `list_tools`'s `inputSchema` without needing an extra call or documentation
+lookup.
+
+#### Execution-time defaulting
+
+`MCPServerImpl._build_execution_variables` (`pypost/core/mcp_server_impl.py`) takes an
+optional `request_data: RequestData | None = None` fourth argument. When supplied, it walks
+`request_data.mcp_params` and, for each `param_spec.default is not None`, fills
+`merged_args[param_name]` from that default whenever the caller's `mcp_args` **either omits
+the key or explicitly passes `None`/`null`** for it — so `{"maxResults": null}` defaults just
+like omitting `maxResults` entirely. `_execute_request_sync` always passes the current
+`request_data` through, so this applies to every MCP tool call, not just the curated Jira
+fixtures. Explicit non-`None` values (including numeric strings like `"25"` for
+`integer_or_string` params) always win over the declared default.
+
+```python
+def _build_execution_variables(
+    self,
+    mcp_args: dict[str, Any],
+    env_vars: dict[str, str],
+    hidden_keys: set[str],
+    request_data: RequestData | None = None,
+) -> dict[str, Any]:
+    merged_args = dict(mcp_args or {})
+    defaults_applied = 0
+    if request_data is not None and request_data.mcp_params:
+        for param_name, param_spec in request_data.mcp_params.items():
+            if (
+                param_name not in merged_args
+                or merged_args[param_name] is None
+            ) and param_spec.default is not None:
+                merged_args[param_name] = param_spec.default
+                defaults_applied += 1
+                self._metrics.track_mcp_param_default_applied(request_data.method)
+                logger.info(
+                    "mcp_param_default_applied method=%s param=%s default=%r",
+                    request_data.method, param_name, param_spec.default,
+                )
+    counts = McpSecretsPolicy.safe_execution_log_fields(
+        len(env_vars), len(hidden_keys), len(merged_args)
+    )
+    logger.debug(
+        "mcp_execution_variables_merged env_var_count=%d "
+        "hidden_key_count=%d mcp_arg_count=%d defaults_applied_count=%d",
+        counts["env_var_count"], counts["hidden_key_count"],
+        counts["mcp_arg_count"], defaults_applied,
+    )
+    execution_env = McpSecretsPolicy.execution_environment_variables(env_vars)
+    return _merge_execution_variables(execution_env, merged_args)
+```
+
+#### Observability (log + metric)
+
+*   **INFO log**: `mcp_param_default_applied method=%s param=%s default=%r`, emitted once per
+    parameter actually defaulted (`param` is the declared MCP param name, e.g. `maxResults`;
+    `default` is the static value substituted, e.g. `50`). Neither field is sensitive — both
+    are already public via the `list_tools` JSON Schema.
+*   **DEBUG log**: the pre-existing `mcp_execution_variables_merged` line gained a
+    `defaults_applied_count=%d` field. Note: `mcp_arg_count` on this same line now counts
+    `merged_args` (post-defaulting), not the caller's raw argument count as before PYPOST-1054
+    — subtract `defaults_applied_count` to recover the old value
+    ([PYPOST-1090](https://pypost.atlassian.net/browse/PYPOST-1090) tracks documenting or
+    reworking this further).
+*   **Counter**: `mcp_param_defaults_applied_total{method}` (Prometheus + OTel), incremented
+    once per defaulted parameter alongside the INFO log — the same "counter + log at the point
+    of silent substitution" convention as `track_response_body_truncated` in `http_client.py`.
+    Labeled only by the coarse HTTP `method`, never by parameter name, to avoid unbounded
+    label cardinality from user-authored tools. Threaded through all four
+    `MetricsTrackerProtocol` implementers (`metrics_protocol.py`, `metrics_registry.py`,
+    `metrics_otel.py`, `qt/metrics.py`) via `track_mcp_param_default_applied(method)`.
+
+#### UI round-trip
+
+`McpParamsTable` preserves but does not expose `default` — see
+[Tool metadata authoring § UI](#ui) below.
+
+#### Curated Jira fixtures
+
+`examples/collections/jira_mcp.json`'s `jira-list-boards`, `jira-list-board-sprints`, and
+`jira-get-sprint-issues` now declare `maxResults` (`default: 50`) and `startAt`
+(`default: 0`) as `required: false` instead of `required: true`. Calling these tools with `{}`
+now resolves `mcp.request.maxResults` / `mcp.request.startAt` to `50` / `0` instead of failing
+template render. Explicit custom values are still honored unchanged. See
+[Jira MCP Example Project Default § List pagination](jira_mcp_project_default.md#list-pagination-pypost-1029--pypost-1054)
+for the fixture-level writeup and
+[jira-mcp example fixtures contract](testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028--pypost-1048--pypost-1050--pypost-1056)
+for the test coverage.
+
+#### Limitations
+
+*   `default`'s Python type is not cross-checked against the parameter's declared `type`
+    (e.g. `type="boolean"` with `default="fifty"` constructs without error); a mismatch only
+    surfaces later, either in the schema an agent receives or at template-render time.
+*   No GUI affordance authors a `default` — see [UI](#ui) above and
+    [PYPOST-1089](https://pypost.atlassian.net/browse/PYPOST-1089).
+*   Only the three curated Jira list tools above ship the pattern;
+    `jira-search-assignable-users` is list/search-shaped but does not expose pagination
+    `mcp_params` at all yet
+    ([PYPOST-1091](https://pypost.atlassian.net/browse/PYPOST-1091)).
+
+See `ai-tasks/PYPOST-1054/60-tech-debt.md` for the full analysis.
+
 ### MCP argument substitution coverage (PYPOST-1034)
 
 MCP tool arguments are available to request templates below the protected
@@ -597,7 +721,11 @@ product decision. See [Request Execution](request_execution.md#history-recording
 #### Observability
 
 DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
-`env_var_count`, `hidden_key_count`, and `mcp_arg_count` (no names or values). See
+`env_var_count`, `hidden_key_count`, `mcp_arg_count`, and (since PYPOST-1054)
+`defaults_applied_count` (no names or values). Note: `mcp_arg_count` counts arguments
+*after* default application, not the caller's raw argument count — see
+[Optional MCP parameter defaults § Observability](#observability-log--metric) for the full
+field semantics and the open follow-up on that count. See
 `ai-tasks/PYPOST-554/50-observability.md` and `doc/dev/mcp_secrets_policy.md`.
 
 ## Threading Model
@@ -630,9 +758,12 @@ Register a callable returning one endpoint's `hidden_keys` snapshot. The registr
 from the configuration's selected environment before start. It is used by `McpSecretsPolicy`
 during `list_tools` schema generation.
 
-### `MCPServerImpl._build_execution_variables(mcp_args)`
+### `MCPServerImpl._build_execution_variables(mcp_args, env_vars, hidden_keys, request_data=None)`
 
-Internal. Invokes `_variable_supplier()`, logs merge counts at DEBUG, returns merged dict for
+Internal. Fills omitted/`None` `mcp_args` entries from `request_data.mcp_params[*].default`
+when `request_data` is supplied (PYPOST-1054; see
+[Optional MCP parameter defaults](#optional-mcp-parameter-defaults-pypost-1054)), logs merge
+and defaulting counts at DEBUG (INFO per defaulted param), and returns the merged dict for
 `RequestService.execute()`.
 
 ### `_merge_execution_variables(env_vars, mcp_args)`
@@ -687,6 +818,8 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 | Agent cannot connect | Row is stopped, failed, or client uses the wrong host/port | Inspect the row-specific status/error in MCP Servers |
 | Port busy on MCP start | Another process or configured row owns the port | Choose a globally unique endpoint port; a failed row does not stop peers |
 | Port busy on metrics start | Another process on `metrics_port` (default 9080) | Dialog on main window open; free port or change Settings |
+| Optional MCP param stays `None`/missing in the template despite a declared `default` | `default` was set on the wrong parameter name, or `request_data` was not passed into `_build_execution_variables` (e.g. a custom caller bypassing `_execute_request_sync`) | Confirm the param key matches the template's `mcp.request.<name>`, and that `_build_execution_variables` is invoked with `request_data=` set (PYPOST-1054) |
+| No `mcp_param_default_applied` log line for a param you expect to default | Caller passed an explicit non-`None` value, or the param's `default` is `None` (undeclared) | Explicit values always win; add a non-`None` `default` in `mcp_params` to enable defaulting |
 
 ### Tool metadata authoring (PYPOST-553)
 
@@ -697,8 +830,10 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 | `mcp_description` | `str` | Shown in `list_tools`; empty → `name` |
 | `mcp_params` | `Dict[str, McpToolParam]` | Keyed by parameter name |
 
-`McpToolParam`: `type` (`string`, `integer`, `number`, `boolean`, `array`, `object`),
-`description`, `required` (default `True`).
+`McpToolParam`: `type` (`string`, `integer`, `number`, `boolean`, `array`, `object`,
+`integer_or_string`), `description`, `required` (default `True`), `default`
+(`Optional[Any]`, default `None` — PYPOST-1054; see
+[Optional MCP parameter defaults](#optional-mcp-parameter-defaults-pypost-1054)).
 
 #### Schema pipeline
 
@@ -713,6 +848,7 @@ McpSecretsPolicy.filter_agent_param_specs(...)  ← drops env-only / hidden keys
         │
         ▼
 build_tool_input_schema(specs)  → Tool.inputSchema
+                                   (publishes "default": spec.default when set, PYPOST-1054)
 ```
 
 #### UI
@@ -720,6 +856,17 @@ build_tool_input_schema(specs)  → Tool.inputSchema
 `RequestWidget` **MCP** tab: tool description (`QPlainTextEdit`) and `McpParamsTable`
 (name, type, description, required). Persisted via `_PERSISTED_FIELD_NAMES` in
 `request_persisted_fields.py`.
+
+`McpParamsTable` has no **Default** column — a parameter's `default` is not visible or
+editable from the GUI. It is only *preserved* across `set_data()` / `get_data()` round-trips
+(PYPOST-1054): `set_data()` caches `{name: spec.default}` into `self._defaults` (skipping
+entries where `default is None`), and `get_data()` looks the cached value back up by the
+row's current name when rebuilding each `McpToolParam`. Renaming a param's **Name** cell
+therefore silently drops its preserved default — the lookup key changes but the cache does
+not track the rename. Authoring a default for a brand-new param, or fixing the rename gap,
+requires editing the collection JSON directly (or via a fixture) today; adding an editable
+column is tracked as
+[PYPOST-1089](https://pypost.atlassian.net/browse/PYPOST-1089).
 
 #### Agent contract preview (PYPOST-555)
 
@@ -750,5 +897,16 @@ The preview refreshes when MCP metadata or template-bearing fields change and wh
     at execution time and are not listed as tool inputs (PYPOST-554).
 *   **UI sync**: MCP params table is manual; auto-populate from template scan is deferred (see `ai-tasks/PYPOST-553/60-tech-debt.md`).
 *   **Dual variable sources in EnvPresenter**: `current_variables` property reads the combo box while MCP uses `_current_variables` cache (see `ai-tasks/PYPOST-550/60-tech-debt.md`).
+*   **`McpToolParam.default` is not type-checked against `type`** (PYPOST-1054): a param
+    declared `type="boolean"` with `default="fifty"` constructs without error today; see
+    [Optional MCP parameter defaults § Limitations](#limitations) and
+    [PYPOST-1089](https://pypost.atlassian.net/browse/PYPOST-1089).
+*   **No UI affordance to author `default`**: `McpParamsTable` preserves but does not let a
+    user view/edit a parameter's default, and renaming a param's key drops its preserved
+    default (PYPOST-1054; [PYPOST-1089](https://pypost.atlassian.net/browse/PYPOST-1089)).
+*   **`jira-search-assignable-users` has no pagination params**: unlike the three curated
+    list tools with optional-defaulted `maxResults`/`startAt`, this fixture never exposed
+    those query params at all (PYPOST-1054 TD-3;
+    [PYPOST-1091](https://pypost.atlassian.net/browse/PYPOST-1091)).
 
 See `ai-tasks/PYPOST-20/40-tech-debt.md` for more details.

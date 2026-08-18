@@ -54,6 +54,8 @@ def build_tool_input_schema(specs: dict[str, McpToolParam]) -> dict:
             prop = {"type": spec.type}
         if spec.description:
             prop["description"] = spec.description
+        if spec.default is not None:
+            prop["default"] = spec.default
         properties[name] = prop
         if spec.required:
             required.append(name)

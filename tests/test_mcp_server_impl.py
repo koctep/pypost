@@ -5,6 +5,7 @@ pytestmark = pytest.mark.timeout(60)
 
 import asyncio
 import json
+import logging
 import unittest
 from unittest.mock import MagicMock
 
@@ -30,6 +31,7 @@ from pypost.core.mcp_tool_contract import (
     resolve_mcp_param_specs,
     tool_description,
 )
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_service import ExecutionResult
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import McpToolParam, RequestData
@@ -323,6 +325,188 @@ class TestMCPServerImpl(unittest.TestCase):
                 "base_url": "http://api",
                 "mcp": {"request": {"id": "1"}},
             },
+        )
+
+    def test_call_tool_applies_mcp_param_defaults_when_args_omitted(self):
+        """PYPOST-1054: omitted arguments receive declared parameter defaults."""
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="List Boards",
+            expose_as_mcp=True,
+            method="GET",
+            url=(
+                "http://api.example/boards"
+                "?maxResults={{ to_int(mcp.request.maxResults) }}"
+                "&startAt={{ to_int(mcp.request.startAt) }}"
+            ),
+            mcp_params={
+                "maxResults": McpToolParam(
+                    type="integer_or_string",
+                    description="Maximum items",
+                    required=False,
+                    default=50,
+                ),
+                "startAt": McpToolParam(
+                    type="integer_or_string",
+                    description="Start index",
+                    required=False,
+                    default=0,
+                ),
+            },
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("ok")
+        asyncio.run(impl.call_tool("list_boards", {}))
+        mock_svc.execute.assert_called_once()
+        passed_req, passed_ctx = mock_svc.execute.call_args[0]
+        self.assertIs(passed_req, req)
+        self.assertEqual(
+            passed_ctx,
+            {
+                "mcp": {
+                    "request": {
+                        "maxResults": 50,
+                        "startAt": 0,
+                    }
+                }
+            },
+        )
+
+    def test_call_tool_honors_explicit_custom_pagination_args(self):
+        """PYPOST-1054: caller-supplied explicit args override defaults."""
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="List Boards",
+            expose_as_mcp=True,
+            method="GET",
+            url=(
+                "http://api.example/boards"
+                "?maxResults={{ to_int(mcp.request.maxResults) }}"
+                "&startAt={{ to_int(mcp.request.startAt) }}"
+            ),
+            mcp_params={
+                "maxResults": McpToolParam(
+                    type="integer_or_string",
+                    description="Maximum items",
+                    required=False,
+                    default=50,
+                ),
+                "startAt": McpToolParam(
+                    type="integer_or_string",
+                    description="Start index",
+                    required=False,
+                    default=0,
+                ),
+            },
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("ok")
+        asyncio.run(
+            impl.call_tool("list_boards", {"maxResults": 25, "startAt": 100})
+        )
+        mock_svc.execute.assert_called_once()
+        passed_req, passed_ctx = mock_svc.execute.call_args[0]
+        self.assertIs(passed_req, req)
+        self.assertEqual(
+            passed_ctx,
+            {
+                "mcp": {
+                    "request": {
+                        "maxResults": 25,
+                        "startAt": 100,
+                    }
+                }
+            },
+        )
+
+    def test_call_tool_applying_defaults_tracks_metric_and_logs(self):
+        """PYPOST-1054: each silently-applied default is observable via metric+log."""
+        mock_metrics = MagicMock(spec=MetricsTrackerProtocol)
+        impl = MCPServerImpl(metrics=mock_metrics)
+        req = RequestData(
+            name="List Boards",
+            expose_as_mcp=True,
+            method="GET",
+            url=(
+                "http://api.example/boards"
+                "?maxResults={{ to_int(mcp.request.maxResults) }}"
+                "&startAt={{ to_int(mcp.request.startAt) }}"
+            ),
+            mcp_params={
+                "maxResults": McpToolParam(
+                    type="integer_or_string",
+                    description="Maximum items",
+                    required=False,
+                    default=50,
+                ),
+                "startAt": McpToolParam(
+                    type="integer_or_string",
+                    description="Start index",
+                    required=False,
+                    default=0,
+                ),
+            },
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("ok")
+        logger_name = "pypost.core.mcp_server_impl"
+        with self.assertLogs(logger_name, level=logging.INFO) as captured:
+            asyncio.run(impl.call_tool("list_boards", {}))
+        mock_metrics.track_mcp_param_default_applied.assert_any_call("GET")
+        self.assertEqual(mock_metrics.track_mcp_param_default_applied.call_count, 2)
+        applied_lines = [
+            line for line in captured.output if "mcp_param_default_applied" in line
+        ]
+        self.assertEqual(len(applied_lines), 2)
+        self.assertTrue(any("param=maxResults" in line for line in applied_lines))
+        self.assertTrue(any("param=startAt" in line for line in applied_lines))
+
+    def test_call_tool_explicit_args_skip_default_metric_and_logs(self):
+        """PYPOST-1054: no default-applied signal fires when caller supplies args."""
+        mock_metrics = MagicMock(spec=MetricsTrackerProtocol)
+        impl = MCPServerImpl(metrics=mock_metrics)
+        req = RequestData(
+            name="List Boards",
+            expose_as_mcp=True,
+            method="GET",
+            url=(
+                "http://api.example/boards"
+                "?maxResults={{ to_int(mcp.request.maxResults) }}"
+                "&startAt={{ to_int(mcp.request.startAt) }}"
+            ),
+            mcp_params={
+                "maxResults": McpToolParam(
+                    type="integer_or_string",
+                    description="Maximum items",
+                    required=False,
+                    default=50,
+                ),
+                "startAt": McpToolParam(
+                    type="integer_or_string",
+                    description="Start index",
+                    required=False,
+                    default=0,
+                ),
+            },
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("ok")
+        with self.assertLogs(
+            "pypost.core.mcp_server_impl", level=logging.DEBUG
+        ) as captured:
+            asyncio.run(
+                impl.call_tool("list_boards", {"maxResults": 25, "startAt": 100})
+            )
+        mock_metrics.track_mcp_param_default_applied.assert_not_called()
+        self.assertFalse(
+            any("mcp_param_default_applied" in line for line in captured.output)
+        )
+        self.assertTrue(
+            any("defaults_applied_count=0" in line for line in captured.output)
         )
 
     def test_call_tool_invokes_variable_supplier_per_call(self):

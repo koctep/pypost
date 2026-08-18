@@ -150,6 +150,13 @@ class TestMetricsManagerRetryExhaustion(unittest.TestCase):
             out,
         )
 
+    def test_track_mcp_param_default_applied(self):
+        mm = MetricsManager()
+        mm.track_mcp_param_default_applied("GET")
+        mm.track_mcp_param_default_applied("GET")
+        out = _scrape(mm)
+        self.assertIn('mcp_param_defaults_applied_total{method="GET"} 2.0', out)
+
     def test_mcp_server_instance_counts_are_aggregate_and_identity_free(self):
         mm = MetricsManager()
         mm.set_mcp_server_instance_counts(

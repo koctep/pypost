@@ -83,6 +83,7 @@ conventions.
 1. [Multiple independent MCP servers (PYPOST-1044)](mcp_server_registry.md)
 1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
 1. [Jira numeric identifier MCP contract (PYPOST-1038)](mcp_integration.md#jira-numeric-path-identifiers-pypost-1038)
+1. [Optional MCP parameter defaults (PYPOST-1054)](mcp_integration.md#optional-mcp-parameter-defaults-pypost-1054)
 1. [Jira MCP Example Project Default (PYPOST-1032)](jira_mcp_project_default.md)
 1. [Jira MCP critical REST path freshness (PYPOST-1030 / PYPOST-1056)](jira_mcp_path_freshness.md)
 1. [Optional protected Jira MCP live smoke (PYPOST-1039)](jira_mcp_live_smoke.md)
@@ -91,7 +92,7 @@ conventions.
 1. [MCP Secrets Policy](mcp_secrets_policy.md)
 1. [UI Action Tools — out-of-process packaging (PYPOST-918)](ui_actions.md)
 1. [jira-mcp example fixtures](
-   testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028--pypost-1048--pypost-1056)
+   testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028--pypost-1048--pypost-1050--pypost-1056)
    (including protected stretch-operation contracts, PYPOST-1027, and
    env/auth/`mcp_params` contracts, PYPOST-1028)
 

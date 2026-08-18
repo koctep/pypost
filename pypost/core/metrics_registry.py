@@ -236,6 +236,14 @@ class MetricsRegistry:
             registry=self.registry,
         )
 
+        self.mcp_param_defaults_applied = Counter(
+            "mcp_param_defaults_applied_total",
+            "Number of optional MCP tool params filled from their declared default "
+            "because the caller omitted them",
+            ["method"],
+            registry=self.registry,
+        )
+
     def _init_encryption_metrics(self) -> None:
         """Register environment encryption counters."""
         self.environment_value_encryptions_total = Counter(
@@ -318,6 +326,9 @@ class MetricsRegistry:
 
     def track_mcp_active_env_changed(self) -> None:
         self.mcp_active_env_changes.inc()
+
+    def track_mcp_param_default_applied(self, method: str) -> None:
+        self.mcp_param_defaults_applied.labels(method=method).inc()
 
     def track_history_entry_appended(self, method: str) -> None:
         self.history_entries_appended.labels(method=method).inc()

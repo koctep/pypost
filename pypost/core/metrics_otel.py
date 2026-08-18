@@ -143,6 +143,13 @@ class OtelMetricsTracker:
             "mcp_active_env_changes_total",
             description="Active environment changed while MCP server was running",
         )
+        self._mcp_param_defaults_applied = meter.create_counter(
+            "mcp_param_defaults_applied_total",
+            description=(
+                "Number of optional MCP tool params filled from their declared "
+                "default because the caller omitted them"
+            ),
+        )
         self._history_entries_appended = meter.create_counter(
             "history_entries_appended_total",
             description="Number of request history entries recorded",
@@ -278,6 +285,9 @@ class OtelMetricsTracker:
 
     def track_mcp_active_env_changed(self) -> None:
         self._mcp_active_env_changes.add(1)
+
+    def track_mcp_param_default_applied(self, method: str) -> None:
+        self._mcp_param_defaults_applied.add(1, {"method": method})
 
     def track_history_entry_appended(self, method: str) -> None:
         self._history_entries_appended.add(1, {"method": method})

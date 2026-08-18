@@ -509,10 +509,13 @@ failures name the missing companion key or `request.id`.
 | `jira-get-current-user` | Read-only `/myself` smoke; no agent inputs |
 
 `jira-list-boards` left the allowlist in PYPOST-1029 once `maxResults` and
-`startAt` became required agent-facing `mcp_params` (bound via
-`to_int(mcp.request.*)`), while `projectKeyOrId` remains env-bound to
-`jira_project_key`. The same pagination pair is declared on
-`jira-list-board-sprints` and `jira-get-sprint-issues`.
+`startAt` became agent-facing `mcp_params` (bound via `to_int(mcp.request.*)`),
+while `projectKeyOrId` remains env-bound to `jira_project_key`. The same
+pagination pair is declared on `jira-list-board-sprints` and
+`jira-get-sprint-issues`. As of PYPOST-1054 both params are `required: false`
+with a declared `default` (`50` / `0`) applied at execution time when omitted
+— see
+[MCP Integration § Optional MCP parameter defaults](mcp_integration.md#optional-mcp-parameter-defaults-pypost-1054).
 
 The allowlist is the **only** escape hatch for empty `mcp_params`. Do not add
 ids casually; review any change like a fixture behavior change. With PYPOST-1052,
@@ -624,7 +627,8 @@ make test PYTEST_ARGS='tests/test_example_fixtures.py -v'
   agent-driven query/body ⇒ `mcp_params` or allowlist (PYPOST-1028).
 - `test_jira_mcp_list_requests_expose_pagination_mcp_params` —
   board/sprint list tools declare and bind `maxResults` + `startAt`
-  (PYPOST-1029).
+  (PYPOST-1029); asserts `required is False` and `default == 50` / `default == 0`
+  (PYPOST-1054).
 - `test_jira_mcp_list_boards_leaves_fixed_input_allowlist` — empty
   `mcp_params` freeze is current-user only after list-boards pagination
   (PYPOST-1029).
@@ -751,10 +755,12 @@ When editing the curated surface:
    (today: `jira-get-current-user` only; PYPOST-1029 removed
    `jira-list-boards` after pagination parameterization).
 8. For board/sprint list tools (`jira-list-boards`,
-   `jira-list-board-sprints`, `jira-get-sprint-issues`), keep required
-   `maxResults` and `startAt` (`integer_or_string` + `to_int` in query
-   params). Agents should pass `50` / `0` for the previous curated first
-   page; there is no template default when those args are omitted.
+   `jira-list-board-sprints`, `jira-get-sprint-issues`), keep `maxResults`
+   and `startAt` declared as optional (`integer_or_string` + `to_int` in
+   query params, `required: false`) with their safe defaults
+   (`default: 50` / `default: 0`, PYPOST-1054). Agents may omit either
+   argument to get the first 50-item page; explicit values still override
+   the default.
 
 ### Troubleshooting
 
@@ -769,7 +775,7 @@ When editing the curated surface:
 | Missing `mcp_params` key | Add the named agent input to that request's `mcp_params` |
 | Empty `mcp_params` outside allowlist | Declare inputs, or review-add the id to the allowlist |
 | Agent-driven without inputs | Same as empty-`mcp_params` outside allowlist; see `request.id` |
-| List tool missing maxResults/startAt | Restore required pagination `mcp_params` and `to_int` query bindings (PYPOST-1029) |
+| List tool missing maxResults/startAt | Restore optional pagination `mcp_params` (`required: false`, `default: 50`/`0`) and `to_int` query bindings (PYPOST-1029 / PYPOST-1054) |
 | Discoverability fragment missing | Restore the named locked substring(s) in the `mcp_description` field of the named request; see `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS` (PYPOST-1048 / PYPOST-1050) |
 | Agent lacks Jira tools | Select companion env; keep `expose_as_mcp` |
 | No remove-from-sprint tool | Call `jira_move_issues_to_backlog` |

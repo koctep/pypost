@@ -46,6 +46,37 @@ class TestMcpToolContract(unittest.TestCase):
         self.assertEqual(schema["properties"]["legacy_name"], {"type": "string"})
         self.assertEqual(schema["required"], ["identifier"])
 
+    def test_schema_includes_default_and_omits_optional_from_required(self):
+        """PYPOST-1054: schema includes default when set and omits optional params from required."""
+        schema = build_tool_input_schema(
+            {
+                "maxResults": McpToolParam(
+                    type="integer_or_string",
+                    description="Maximum boards per page.",
+                    required=False,
+                    default=50,
+                ),
+                "startAt": McpToolParam(
+                    type="integer_or_string",
+                    description="Offset into list.",
+                    required=False,
+                    default=0,
+                ),
+                "identifier": McpToolParam(
+                    type="integer_or_string",
+                    description="A Jira identifier.",
+                    required=True,
+                ),
+            }
+        )
+
+        self.assertEqual(schema["properties"]["maxResults"]["default"], 50)
+        self.assertEqual(schema["properties"]["startAt"]["default"], 0)
+        self.assertNotIn("default", schema["properties"]["identifier"])
+        self.assertEqual(schema["required"], ["identifier"])
+        self.assertNotIn("maxResults", schema.get("required", []))
+        self.assertNotIn("startAt", schema.get("required", []))
+
     def test_normalize_mcp_tool_name(self):
         self.assertEqual(normalize_mcp_tool_name("Fetch User"), "fetch_user")
 

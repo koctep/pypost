@@ -14,8 +14,8 @@
 | Module | Audit era LOC | Baseline LOC | Cap |
 | --- | ---: | ---: | ---: |
 | `pypost/core/http_client.py` | 198 | 380 | 418 |
-| `pypost/core/mcp_server_impl.py` | 231 | 282 | 325 |
-| `pypost/core/qt/metrics.py` | 286 | 179 | 181 |
+| `pypost/core/mcp_server_impl.py` | 231 | 303 | 325 |
+| `pypost/core/qt/metrics.py` | 286 | 182 | 185 |
 | `pypost/core/qt/worker.py` | 57 | 180 | 180 |
 | `pypost/core/request_manager.py` | 201 | 260 | 260 |
 | `pypost/core/request_service.py` | 95 | 489 | 530 |

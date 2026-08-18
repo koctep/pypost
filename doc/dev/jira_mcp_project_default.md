@@ -26,8 +26,8 @@ collection, and their offline import contract:
 the selected project directly. Its page size and offset are agent inputs
 (`maxResults`, `startAt`; PYPOST-1029). Board-sprint and sprint-issue calls
 retain their native selected-board or selected-sprint scope; they must not be
-described as automatically project-scoped, but they share the same required
-pagination pair.
+described as automatically project-scoped, but they share the same optional,
+safely-defaulted pagination pair (PYPOST-1054).
 
 ## Usage
 
@@ -80,9 +80,9 @@ building the Jira path. Non-decimal strings, floats, and booleans are invalid;
 the request fails before any outbound HTTP dispatch. This input tolerance
 changes neither the selected project behavior above nor Jira authorization.
 
-## List pagination (PYPOST-1029)
+## List pagination (PYPOST-1029 / PYPOST-1054)
 
-These curated list tools require agent-facing `maxResults` and `startAt`
+These curated list tools declare agent-facing `maxResults` and `startAt`
 (`integer_or_string`, rendered with `to_int` into the Agile query string):
 
 | Request id | Notes |
@@ -91,8 +91,15 @@ These curated list tools require agent-facing `maxResults` and `startAt`
 | `jira-list-board-sprints` | Alongside required `board_id` and `state` |
 | `jira-get-sprint-issues` | Alongside required `sprint_id` |
 
-Use `50` / `0` for the previous curated first page. Omitting either argument
-fails closed at template render (`to_int`), not with a silent default.
+As of PYPOST-1054, both parameters are `required: false` and declare a safe `default`
+(`maxResults: 50`, `startAt: 0`), published in the `list_tools` JSON Schema. Omitting either
+argument — or passing it explicitly as `null` — no longer fails template render; PyPost fills
+it from the declared default before executing the request. Passing an explicit non-`null`
+value (native integer or decimal string, e.g. `25`/`"25"`) still overrides the default.
+Before PYPOST-1054 both parameters were `required: true` with no template fallback, so
+omitting them failed closed at render time — see
+[MCP Integration § Optional MCP parameter defaults](mcp_integration.md#optional-mcp-parameter-defaults-pypost-1054)
+for the full model/schema/execution/observability details.
 
 ## Security boundary
 
@@ -125,4 +132,4 @@ See
 | Cross-project work is rejected or allowed unexpectedly | Diagnose Jira Cloud permissions and the target project; this example default does not grant or revoke access. |
 | A board or sprint call rejects its identifier | Supply `42` or `"42"`; do not supply a boolean, float, whitespace-padded value, exponent notation, or a nonnumeric string. |
 | Env/auth/`mcp_params` fail | Fix companion key, auth, or `mcp_params`; empty only on allowlist. |
-| List boards/sprints/issues omit page size | Pass required `maxResults` and `startAt` (e.g. `50` and `0`); there is no template default when omitted (PYPOST-1029). |
+| List boards/sprints/issues omit page size | No action needed — `maxResults`/`startAt` are optional and default to `50`/`0` (PYPOST-1054). Pass explicit values (e.g. `25`/`100`) only to override the default page or offset. |

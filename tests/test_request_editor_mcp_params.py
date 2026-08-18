@@ -49,6 +49,24 @@ class TestMcpParamsTable(unittest.TestCase):
         self.table.set_data(params)
         self.assertEqual(self.table.get_data(), params)
 
+    def test_round_trip_preserves_default(self):
+        params = {
+            "maxResults": McpToolParam(
+                type="integer_or_string",
+                description="Max results",
+                required=False,
+                default=50,
+            ),
+            "startAt": McpToolParam(
+                type="integer_or_string",
+                description="Start at",
+                required=False,
+                default=0,
+            ),
+        }
+        self.table.set_data(params)
+        self.assertEqual(self.table.get_data(), params)
+
 
 @pytest.mark.usefixtures("qapp")
 class TestRequestWidgetMcpParamSync(unittest.TestCase):

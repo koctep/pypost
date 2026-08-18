@@ -76,6 +76,17 @@ def test_track_request_sent_increments_counter(otel_reader):
     assert _counter_value(reader, "requests_sent_total", {"method": "GET"}) == 2
 
 
+def test_track_mcp_param_default_applied_increments_counter(otel_reader):
+    reader, provider = otel_reader
+    tracker = OtelMetricsTracker(meter=provider.get_meter("param-default-test"))
+    tracker.track_mcp_param_default_applied("GET")
+    tracker.track_mcp_param_default_applied("GET")
+    assert (
+        _counter_value(reader, "mcp_param_defaults_applied_total", {"method": "GET"})
+        == 2
+    )
+
+
 def test_track_mcp_tool_call_duration_records_histogram(otel_reader):
     reader, provider = otel_reader
     tracker = OtelMetricsTracker(meter=provider.get_meter("histogram-test"))

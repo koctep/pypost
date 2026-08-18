@@ -51,6 +51,13 @@ class TestMetricsRegistryMcpCounters(unittest.TestCase):
         out = _scrape(reg)
         self.assertIn("mcp_active_env_changes_total 2.0", out)
 
+    def test_track_mcp_param_default_applied(self):
+        reg = MetricsRegistry()
+        reg.track_mcp_param_default_applied("GET")
+        reg.track_mcp_param_default_applied("GET")
+        out = _scrape(reg)
+        self.assertIn('mcp_param_defaults_applied_total{method="GET"} 2.0', out)
+
 
 class TestMetricsRegistryTemplateRenderDuration(unittest.TestCase):
     def test_track_template_expression_render_duration(self):
