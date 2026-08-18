@@ -34,7 +34,7 @@
 - [x] **STEP 8: Dev Docs**
   - [x] Update `doc/dev/testing.md` Jira MCP discoverability contracts section with PYPOST-1050 reference, `'50'` in locked lowercase fragments table, and sorted `['50', 'membership', 'remove-from-sprint']` mutation contract
   - [x] Update Definition of Done in `ai-tasks/PYPOST-1050/10-requirements.md`
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
 
 ## Status Legend
 
@@ -82,4 +82,5 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- [x] Committed on branch `dev` — hash `2c0331b3`
+- Message: `documentation(mcp): PYPOST-1050 document Agile <=50 backlog batch limit`
