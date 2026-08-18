@@ -410,7 +410,7 @@ Focused run:
 .venv/bin/python -m pytest tests/test_mcp_test_collection.py -v
 ```
 
-## Example fixtures contract (PYPOST-1017 / PYPOST-1026 / PYPOST-1047 / PYPOST-1028)
+## Example fixtures contract (PYPOST-1017 / PYPOST-1026 / PYPOST-1047 / PYPOST-1028 / PYPOST-1048)
 
 ### Overview
 
@@ -480,7 +480,7 @@ capability set.
 ### Env / auth / MCP params contracts (PYPOST-1028)
 
 Import success alone does not prove the curated pair stays usable for agents.
-`tests/test_example_fixtures.py` owns four offline agreements via shared
+`tests/test_example_fixtures.py` owns five offline agreements via shared
 checkers (`assert_jira_mcp_*`). Fixture JSON is expected to stay unchanged;
 failures name the missing companion key or `request.id`.
 
@@ -496,6 +496,11 @@ failures name the missing companion key or `request.id`.
    `assert_jira_mcp_agent_driven_declares_inputs`) — Empty `mcp_params` ids
    must equal `FIXED_INPUT_JIRA_MCP_REQUEST_IDS`. Agent-driven query/body
    requires non-empty `mcp_params` unless the id is that same allowlist.
+5. **Discoverability guidance** (`assert_jira_mcp_discoverability_guidance`) —
+   Locked `mcp_description` substrings from `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS`
+   must survive in the shipped collection (PYPOST-1048). The check is
+   case-insensitive; failures name the `request.id` and every missing
+   fragment, sorted. See [Jira MCP discoverability contracts](#jira-mcp-discoverability-contracts-pypost-1048) below.
 
 `FIXED_INPUT_JIRA_MCP_REQUEST_IDS` currently freezes:
 
@@ -627,9 +632,57 @@ make test PYTEST_ARGS='tests/test_example_fixtures.py -v'
   create/membership, parent epic link, and assignee (PYPOST-1030).
   Maintainer ritual: `make check-jira-mcp-path-freshness` and
   [Jira MCP path freshness](jira_mcp_path_freshness.md).
+- `test_jira_mcp_shipped_descriptions_carry_discoverability_guidance` —
+  parametrized positive lock: each entry in `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS`
+  must survive in the shipped `jira_mcp.json` descriptions (PYPOST-1048).
 - Matching `*_rejects_*` mutation tests pin diagnostics for each checker.
 
 Module timeout: `pytestmark = pytest.mark.timeout(30)`.
+
+### Jira MCP discoverability contracts (PYPOST-1048)
+
+`JIRA_MCP_DISCOVERABILITY_SUBSTRINGS` locks the agent-facing meaning of two
+sprint-management tools. The table lives in `tests/test_example_fixtures.py` and
+acts as the single source of truth for which substrings the discoverability
+checker enforces:
+
+| Request id | Locked lowercase fragments |
+| ---------- | -------------------------- |
+| `jira-delete-sprint` | `irreversible`, `backlog` |
+| `jira-move-issues-to-backlog` | `remove-from-sprint`, `membership` |
+
+**Checker: `assert_jira_mcp_discoverability_guidance(request, required_substrings)`**
+
+- Lowercases `request.mcp_description` before all comparisons (case-insensitive
+  contract).
+- Collects every fragment from `required_substrings` absent from the lowercased
+  description, sorts the list, and raises `AssertionError` if it is non-empty.
+- Failure message format: `Request <id> mcp_description missing locked
+  discoverability fragment(s): [<sorted fragments>]`.
+- Named in the message: the `request.id` and every missing fragment (sorted),
+  so CI logs identify exactly what drifted without requiring a re-run.
+
+**Tests**
+
+- `test_jira_mcp_shipped_descriptions_carry_discoverability_guidance`
+  (parametrized over `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS`) — positive lock;
+  fails if any shipped description loses a locked fragment.
+- `test_jira_mcp_discoverability_rejects_stripped_delete_sprint_warning` —
+  full-strip mutation for `jira-delete-sprint`; pins the message contract
+  (request id + sorted `['backlog', 'irreversible']`).
+- `test_jira_mcp_discoverability_rejects_stripped_backlog_membership_guidance`
+  — full-strip mutation for `jira-move-issues-to-backlog`; pins the message
+  contract (request id + sorted `['membership', 'remove-from-sprint']`).
+- `test_jira_mcp_discoverability_rejects_each_single_stripped_fragment`
+  (parametrized one case per locked fragment) — partial-strip mutation; proves
+  every individual fragment is enforced independently, not short-circuited
+  after the first miss.
+
+**Maintainer rule**: when editing `mcp_description` for `jira-delete-sprint` or
+`jira-move-issues-to-backlog`, keep all locked fragments present (case
+insensitive). To add a new discoverability contract, append a new row to
+`JIRA_MCP_DISCOVERABILITY_SUBSTRINGS` — all three test families cover the
+extended table automatically via parametrization.
 
 ### Configuration
 
@@ -676,6 +729,7 @@ When editing the curated surface:
 | Empty `mcp_params` outside allowlist | Declare inputs, or review-add the id to the allowlist |
 | Agent-driven without inputs | Same as empty-`mcp_params` outside allowlist; see `request.id` |
 | List tool missing maxResults/startAt | Restore required pagination `mcp_params` and `to_int` query bindings (PYPOST-1029) |
+| Discoverability fragment missing | Restore the named locked substring(s) in the `mcp_description` field of the named request; see `JIRA_MCP_DISCOVERABILITY_SUBSTRINGS` (PYPOST-1048) |
 | Agent lacks Jira tools | Select companion env; keep `expose_as_mcp` |
 | No remove-from-sprint tool | Call `jira_move_issues_to_backlog` |
 | Delete tool name unknown | MCP name is `jira_delete_sprint` |

@@ -288,6 +288,26 @@ def test_jira_mcp_critical_rest_paths_match_locked_catalog():
     )
 
 
+def test_jira_mcp_critical_rest_paths_rejects_url_drift():
+    """PYPOST-1056: drift diagnostics name the request, fragment, and URL."""
+    catalog = _load_jira_mcp_critical_rest_paths_catalog()
+    collection = _load_jira_mcp_collection().model_copy(deep=True)
+    request = _request_by_id(collection, "jira-search-issues-jql")
+    locked_fragment = "/rest/api/3/search/jql"
+    observed_url = request.url.replace(locked_fragment, "/rest/api/3/search")
+    assert locked_fragment in request.url
+    assert observed_url != request.url
+    request.url = observed_url
+
+    with pytest.raises(AssertionError) as excinfo:
+        assert_jira_mcp_critical_rest_paths_match_catalog(collection, catalog)
+
+    diagnostic = str(excinfo.value)
+    assert request.id in diagnostic
+    assert locked_fragment in diagnostic
+    assert observed_url in diagnostic
+
+
 def test_jira_mcp_numeric_identifier_paths_accept_decimal_strings_and_integers():
     """PYPOST-1038 R3: all and only path IDs use the dual-form contract."""
     collection = _load_jira_mcp_collection()
@@ -649,3 +669,131 @@ def test_jira_mcp_list_boards_leaves_fixed_input_allowlist():
         f"empty mcp_params ids {sorted(empty_ids)} must be "
         f"jira-get-current-user only after list-boards pagination"
     )
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1048: mcp_description discoverability guidance on sprint management
+#
+# Locked table + shared checker + positive lock over the shipped collection,
+# plus mutation coverage (full strip and one-fragment-at-a-time partial strip),
+# because the shipped descriptions already pass and only mutation proves the
+# guard is not vacuous. Every comparison against mcp_description runs on the
+# lowercased text, so locked fragments are stored lowercase.
+# ---------------------------------------------------------------------------
+
+JIRA_MCP_DISCOVERABILITY_SUBSTRINGS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("jira-delete-sprint", ("irreversible", "backlog")),
+    ("jira-move-issues-to-backlog", ("remove-from-sprint", "membership")),
+)
+
+# One case per (request, locked fragment): proves each fragment is enforced
+# independently, so a checker reading only required_substrings[0] fails here.
+_JIRA_MCP_DISCOVERABILITY_PARTIAL_STRIP_CASES = tuple(
+    (request_id, required_substrings, dropped)
+    for request_id, required_substrings in JIRA_MCP_DISCOVERABILITY_SUBSTRINGS
+    for dropped in required_substrings
+)
+
+
+def assert_jira_mcp_discoverability_guidance(
+    request: RequestData, required_substrings: Sequence[str]
+) -> None:
+    """Locked meaning substrings must survive in the agent-facing description.
+
+    Args:
+        request: Shipped (or deep-copied) curated Jira MCP request.
+        required_substrings: Lowercase fragments that must remain present.
+
+    Raises:
+        AssertionError: When any locked fragment is absent; the message names
+            the request id and every missing fragment, sorted.
+    """
+    guidance = request.mcp_description.lower()
+    missing = sorted(
+        fragment for fragment in required_substrings if fragment not in guidance
+    )
+    assert not missing, (
+        f"Request {request.id} mcp_description missing locked discoverability "
+        f"fragment(s): {missing}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("request_id", "required_substrings"), JIRA_MCP_DISCOVERABILITY_SUBSTRINGS
+)
+def test_jira_mcp_shipped_descriptions_carry_discoverability_guidance(
+    request_id: str, required_substrings: tuple[str, ...]
+):
+    """PYPOST-1048: shipped sprint-management guidance keeps its meanings."""
+    collection = _load_jira_mcp_collection()
+    assert_jira_mcp_discoverability_guidance(
+        _request_by_id(collection, request_id), required_substrings
+    )
+
+
+def test_jira_mcp_discoverability_rejects_stripped_delete_sprint_warning():
+    """Mutation: strip irreversible/backlog safety meaning from delete-sprint."""
+    collection = _load_jira_mcp_collection()
+    request = _request_by_id(collection, "jira-delete-sprint")
+    mutated = request.model_copy(deep=True)
+    guidance = mutated.mcp_description.lower()
+    assert "irreversible" in guidance
+    assert "backlog" in guidance
+    mutated.mcp_description = "Delete a Jira Software sprint by numeric ID."
+
+    # Message contract: request id plus every missing fragment, sorted.
+    with pytest.raises(
+        AssertionError, match=r"jira-delete-sprint.*'backlog', 'irreversible'"
+    ):
+        assert_jira_mcp_discoverability_guidance(mutated, ("irreversible", "backlog"))
+
+
+def test_jira_mcp_discoverability_rejects_stripped_backlog_membership_guidance():
+    """Mutation: strip remove-from-sprint/membership meaning from backlog move."""
+    collection = _load_jira_mcp_collection()
+    request = _request_by_id(collection, "jira-move-issues-to-backlog")
+    mutated = request.model_copy(deep=True)
+    guidance = mutated.mcp_description.lower()
+    assert "remove-from-sprint" in guidance
+    assert "membership" in guidance
+    mutated.mcp_description = "Move issues to the backlog."
+
+    # Message contract: request id plus every missing fragment, sorted.
+    with pytest.raises(
+        AssertionError,
+        match=r"jira-move-issues-to-backlog.*'membership', 'remove-from-sprint'",
+    ):
+        assert_jira_mcp_discoverability_guidance(
+            mutated, ("remove-from-sprint", "membership")
+        )
+
+
+@pytest.mark.parametrize(
+    ("request_id", "required_substrings", "dropped"),
+    _JIRA_MCP_DISCOVERABILITY_PARTIAL_STRIP_CASES,
+)
+def test_jira_mcp_discoverability_rejects_each_single_stripped_fragment(
+    request_id: str, required_substrings: tuple[str, ...], dropped: str
+):
+    """Partial strip: every locked fragment is enforced on its own."""
+    collection = _load_jira_mcp_collection()
+    mutated = _request_by_id(collection, request_id).model_copy(deep=True)
+    kept = tuple(
+        fragment for fragment in required_substrings if fragment != dropped
+    )
+    mutated.mcp_description = "Guidance retains: " + "; ".join(kept) + "."
+
+    guidance = mutated.mcp_description.lower()
+    assert dropped not in guidance
+    for fragment in kept:
+        assert fragment in guidance
+
+    with pytest.raises(AssertionError) as excinfo:
+        assert_jira_mcp_discoverability_guidance(mutated, required_substrings)
+
+    # Message contract: names the request id and exactly the missing fragment.
+    message = str(excinfo.value)
+    assert request_id in message
+    assert repr(dropped) in message
+    for fragment in kept:
+        assert repr(fragment) not in message

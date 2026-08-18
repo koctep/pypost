@@ -70,5 +70,6 @@ None. Offline compare only; no environment variables.
 
 ## See also
 
-- [Example fixtures contract](testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028)
+- [Example fixtures contract](testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028--pypost-1048)
+- [Jira MCP discoverability contracts](testing.md#jira-mcp-discoverability-contracts-pypost-1048)
 - [Jira MCP Example Project Default](jira_mcp_project_default.md)

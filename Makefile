@@ -119,7 +119,8 @@ test-jira-mcp-live: $(VENV_MARKER) venv-test venv-otel ## Run the explicitly opt
 
 check-jira-mcp-path-freshness: $(VENV_MARKER) venv-test venv-otel ## Offline jira_mcp critical REST paths vs locked catalog (PYPOST-1030)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
-		tests/test_example_fixtures.py::test_jira_mcp_critical_rest_paths_match_locked_catalog -q
+		tests/test_example_fixtures.py::test_jira_mcp_critical_rest_paths_match_locked_catalog \
+		tests/test_example_fixtures.py::test_jira_mcp_critical_rest_paths_rejects_url_drift -q
 
 test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage report
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
