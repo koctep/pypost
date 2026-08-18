@@ -44,7 +44,7 @@
   - [x] Updated `doc/dev/mcp_integration.md` Schema Generation and pipeline diagram to document bare and function-wrapped placeholder discovery.
   - [x] Updated `doc/dev/testing.md` to reflect production `McpSecretsPolicy.extract_mcp_request_variables` alignment with the broad fixture test scanner.
   - [x] Checked all Definition of Done criteria in `ai-tasks/PYPOST-1052/10-requirements.md`.
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
 
 ## Status Legend
 
@@ -95,4 +95,5 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- [x] Committed on branch `dev` — hash `98eaf969`
+- Message: `feature(mcp): PYPOST-1052 widen McpSecretsPolicy discovery for wrapped request forms`
