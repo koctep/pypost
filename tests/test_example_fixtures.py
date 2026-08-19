@@ -392,6 +392,33 @@ def test_jira_project_default_is_wired_as_soft_guidance(tmp_path, monkeypatch):
     assert "not a security boundary" in readme
 
 
+def test_jira_unconstrained_mode_guidance_and_behavior(tmp_path, monkeypatch):
+    """PYPOST-1068: Jira MCP fixtures describe unconstrained access when
+    jira_project_key is unset.
+    """
+    collection = _load_jira_mcp_collection()
+    requests_by_id = {request.id: request for request in collection.requests}
+
+    boards = requests_by_id["jira-list-boards"]
+    boards_desc = boards.mcp_description.lower()
+    assert "unset" in boards_desc
+    assert "all boards" in boards_desc or "all projects" in boards_desc
+
+    for request_id, payload_name in (
+        ("jira-search-issues-jql", "search_payload"),
+        ("jira-create-issue", "issue_payload"),
+    ):
+        request = requests_by_id[request_id]
+        guidance = " ".join(
+            [
+                request.mcp_description,
+                request.mcp_params[payload_name].description,
+            ]
+        ).lower()
+        assert "unset" in guidance
+        assert "all" in guidance or "explicit" in guidance
+
+
 def test_mcp_probe_collection_still_imports():
     collections, parse_errors = load_collection_import_candidates(MCP_PROBE_PATH)
 

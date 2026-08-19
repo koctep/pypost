@@ -454,6 +454,63 @@ class TestMCPServerIntegration(unittest.TestCase):
             httpd.shutdown()
             server_thread.join(timeout=2.0)
 
+    def test_jira_list_boards_omits_project_key_when_unset_and_includes_when_set(self):
+        """PYPOST-1068: jira-list-boards must omit projectKeyOrId when unset, include when set."""
+        for env_dict, expected_project_in_query in (
+            ({"jira_credentials": "user:token"}, False),
+            ({"jira_credentials": "user:token", "jira_project_key": ""}, False),
+            ({"jira_credentials": "user:token", "jira_project_key": "PROJ"}, True),
+        ):
+            with self.subTest(
+                env_dict=env_dict,
+                expected_project_in_query=expected_project_in_query,
+            ):
+                stub_port = free_port()
+                captured_paths: list[str] = []
+
+                class _StubHandler(BaseHTTPRequestHandler):
+                    def do_GET(self):
+                        captured_paths.append(self.path)
+                        payload = b'{"values": []}'
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json")
+                        self.send_header("Content-Length", str(len(payload)))
+                        self.end_headers()
+                        self.wfile.write(payload)
+
+                    def log_message(self, _format, *_args):
+                        return
+
+                httpd = ThreadingHTTPServer(("127.0.0.1", stub_port), _StubHandler)
+                server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                server_thread.start()
+                try:
+                    tool = _jira_mcp_request_with_local_url(
+                        "jira-list-boards",
+                        f"http://127.0.0.1:{stub_port}/rest/agile/1.0/board",
+                    )
+                    with live_mcp_server([tool]) as mcp_server:
+                        mcp_server.impl.set_variable_supplier(lambda: env_dict)
+                        payload = anyio.run(
+                            _mcp_call_tool,
+                            mcp_server.mcp_url,
+                            "jira_list_boards",
+                            {"maxResults": 50, "startAt": 0},
+                        )
+                    self.assertFalse(payload["error"])
+                    self.assertEqual(payload["status"], 200)
+                    self.assertEqual(len(captured_paths), 1)
+                    query = parse_qs(urlsplit(captured_paths[0]).query)
+                    self.assertEqual(query.get("maxResults"), ["50"])
+                    self.assertEqual(query.get("startAt"), ["0"])
+                    if expected_project_in_query:
+                        self.assertEqual(query.get("projectKeyOrId"), ["PROJ"])
+                    else:
+                        self.assertNotIn("projectKeyOrId", query)
+                finally:
+                    httpd.shutdown()
+                    server_thread.join(timeout=2.0)
+
     def test_call_tool_substitutes_jira_mcp_json_body(self):
         """PYPOST-1034: Jira MCP JSON-body placeholders reach the wire rendered."""
         stub_port = free_port()

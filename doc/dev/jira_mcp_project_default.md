@@ -18,12 +18,14 @@ collection, and their offline import contract:
 | Component | Responsibility |
 | --- | --- |
 | `examples/environments/jira_cloud.json` | Exposes the visible, non-secret `jira_project_key` placeholder beside the hidden credentials. |
-| `examples/collections/jira_mcp.json` | Renders `jira_project_key` in the Jira Software board-list `projectKeyOrId` parameter and gives agents precise default-project guidance for search and create payloads. |
-| Endpoint environment + `MCPServerImpl` | A registry endpoint resolves `{{ jira_project_key }}` from its configured environment snapshot at tool-call time; it does not inspect or merge JSON payload fields. |
+| `examples/collections/jira_mcp.json` | Renders `jira_project_key` in the Jira Software board-list `projectKeyOrId` parameter (omitted when unset) and gives agents precise default-project guidance for search and create payloads. |
+| Endpoint environment + `MCPServerImpl` | A registry endpoint resolves `{{ jira_project_key }}` from its configured environment snapshot at tool-call time; when unset or empty, `HTTPClient` omits `projectKeyOrId` to grant unconstrained access across all accessible projects (PYPOST-1068). |
 | `tests/test_example_fixtures.py` | Loads both JSON files through native importers and locks the placeholder, template binding, guidance, and security wording. |
 
 `jira-list-boards` is the one existing list request whose REST endpoint accepts
-the selected project directly. Its page size and offset are agent inputs
+the selected project directly. When `jira_project_key` is configured, it is project-scoped;
+when `jira_project_key` is omitted or empty, `HTTPClient` omits the `projectKeyOrId`
+query parameter so all accessible boards are listed. Its page size and offset are agent inputs
 (`maxResults`, `startAt`; PYPOST-1029). Board-sprint and sprint-issue calls
 retain their native selected-board or selected-sprint scope; they must not be
 described as automatically project-scoped, but they share the same optional,
@@ -33,14 +35,16 @@ safely-defaulted pagination pair (PYPOST-1054).
 
 After importing the Jira environment, select **Jira Cloud MCP** in the top bar
 for GUI sends and replace `jira_project_key` with the normal Jira project key
-or ID. For MCP, create an **MCP Servers…** row that selects the Jira collection
-and Jira Cloud MCP environment. That endpoint uses the selected value directly
-for `jira-list-boards`; changing the top-bar selection does not retarget it.
+or ID (or leave it unset/empty for unconstrained multi-project access). For MCP,
+create an **MCP Servers…** row that selects the Jira collection and Jira Cloud MCP
+environment. That endpoint uses the selected value directly for `jira-list-boards`
+(omitting `projectKeyOrId` when unset); changing the top-bar selection does not retarget it.
 
 For `jira-search-issues-jql` and `jira-create-issue`, callers supply a
-serialized Jira JSON payload. The collection's `mcp_description` and
-`mcp_params` instruct agents to use `jira_project_key` as the normal project in
-that payload; PyPost deliberately does not parse, inject, validate, or override
+serialized Jira JSON payload. When `jira_project_key` is configured, the collection's
+`mcp_description` and `mcp_params` instruct agents to use it as the normal project;
+when unset, callers operate across all accessible projects or specify the project
+explicitly per operation. PyPost deliberately does not parse, inject, validate, or override
 the payload's project field. A caller can deliberately name another project.
 
 For the import steps and end-user-facing safety notes, see

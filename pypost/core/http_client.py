@@ -130,7 +130,8 @@ class HTTPClient:
         for k, v in request_data.params.items():
             rendered_k = self._render_request_field(k, variables)
             rendered_v = self._render_request_field(v, variables)
-            params[rendered_k] = rendered_v
+            if rendered_v != "":
+                params[rendered_k] = rendered_v
 
         body = self._render_request_field(request_data.body, variables)
         stripped_body = body.strip()
