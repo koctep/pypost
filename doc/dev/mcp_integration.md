@@ -565,10 +565,10 @@ for the test coverage.
     [UI](#ui) above. The column is a plain-text cell for every type (no checkbox for
     `boolean`, no JSON editor for `array`/`object`); a type-aware editor is tracked as
     [PYPOST-1099](https://pypost.atlassian.net/browse/PYPOST-1099).
-*   Only the three curated Jira list tools above ship the pattern;
-    `jira-search-assignable-users` is list/search-shaped but does not expose pagination
-    `mcp_params` at all yet
-    ([PYPOST-1091](https://pypost.atlassian.net/browse/PYPOST-1091)).
+*   Four curated Jira list tools (`jira-list-boards`, `jira-list-board-sprints`,
+    `jira-get-sprint-issues`, `jira-search-assignable-users`) ship the optional pagination
+    pattern with safe defaults (50, 0) (PYPOST-1054, PYPOST-1091). `jira-search-issues-jql`
+    carries explicit pagination guidance in its description for its `search_payload` body.
 
 See `ai-tasks/PYPOST-1054/60-tech-debt.md` for the full analysis.
 
@@ -1042,9 +1042,7 @@ The preview refreshes when MCP metadata or template-bearing fields change and wh
     ([PYPOST-1095](https://pypost.atlassian.net/browse/PYPOST-1095)) and unrecognized
     boolean text silently becoming `False`
     ([PYPOST-1096](https://pypost.atlassian.net/browse/PYPOST-1096)).
-*   **`jira-search-assignable-users` has no pagination params**: unlike the three curated
-    list tools with optional-defaulted `maxResults`/`startAt`, this fixture never exposed
-    those query params at all (PYPOST-1054 TD-3;
-    [PYPOST-1091](https://pypost.atlassian.net/browse/PYPOST-1091)).
+*   **`jira-search-assignable-users` pagination**: now exposes optional `maxResults` and
+    `startAt` params with defaults (50, 0) matching the other list endpoints (PYPOST-1091).
 
 See `ai-tasks/PYPOST-20/40-tech-debt.md` for more details.

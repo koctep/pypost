@@ -37,11 +37,11 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "Search Jira issues with JQL. If this endpoint's selected environment defines jira_project_key, start normal searches with project = <key> (for a single project) or project in (<key1>, <key2>, ...) (for multiple comma-separated projects); when unset, search across all accessible projects. Use another permitted project only when explicitly requested. search_payload must be a JSON object accepted by POST /rest/api/3/search/jql.",
+      "mcp_description": "Search Jira issues with JQL. If this endpoint's selected environment defines jira_project_key, start normal searches with project = <key> (for a single project) or project in (<key1>, <key2>, ...) (for multiple comma-separated projects); when unset, search across all accessible projects. Use another permitted project only when explicitly requested. search_payload must be a JSON object accepted by POST /rest/api/3/search/jql (supports pagination fields such as maxResults and nextPageToken).",
       "mcp_params": {
         "search_payload": {
           "type": "string",
-          "description": "Serialized JSON body for Jira enhanced JQL search. Use jira_project_key (or project in (...) for multiple comma-separated keys) as the normal project scope when set, or search all accessible projects when unset; use another permitted project only when explicitly requested.",
+          "description": "Serialized JSON body for Jira enhanced JQL search (can include jql, maxResults, nextPageToken, fields). Use jira_project_key (or project in (...) for multiple comma-separated keys) as the normal project scope when set, or search all accessible projects when unset; use another permitted project only when explicitly requested.",
           "required": true
         }
       },
@@ -658,7 +658,9 @@
       },
       "params": {
         "query": "{{ mcp.request.query }}",
-        "issueKey": "{{ mcp.request.issue_key }}"
+        "issueKey": "{{ mcp.request.issue_key }}",
+        "maxResults": "{{ to_int(mcp.request.maxResults) }}",
+        "startAt": "{{ to_int(mcp.request.startAt) }}"
       },
       "body": "",
       "body_type": "json",
@@ -676,6 +678,18 @@
           "type": "string",
           "description": "Issue key that scopes assignable-user search.",
           "required": true
+        },
+        "maxResults": {
+          "type": "integer_or_string",
+          "description": "Maximum users per page (maxResults). Defaults to 50 when omitted. Accepted as a native integer or decimal string.",
+          "required": false,
+          "default": 50
+        },
+        "startAt": {
+          "type": "integer_or_string",
+          "description": "0-based offset into the user list (startAt). Defaults to 0 when omitted. Accepted as a native integer or decimal string.",
+          "required": false,
+          "default": 0
         }
       },
       "retry_policy": null

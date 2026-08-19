@@ -26,7 +26,9 @@
   - `ai-tasks/PYPOST-1090/60-tech-debt.md`
 - [x] **STEP 8: Dev Docs**
   - `doc/dev/mcp_integration.md`
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `363798ef` on `dev` — "debt(mcp): PYPOST-1090 clarify mcp_arg_count post-defaulting semantics in debug log"
+  - Branch name (reference only, not switched): `debt/PYPOST-1090-clarify-mcp-arg-count-debug-log`
 
 ## Status Legend
 

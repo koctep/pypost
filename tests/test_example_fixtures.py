@@ -682,6 +682,7 @@ PAGINATED_JIRA_MCP_LIST_REQUEST_IDS = (
     "jira-list-boards",
     "jira-list-board-sprints",
     "jira-get-sprint-issues",
+    "jira-search-assignable-users",
 )
 
 _PAGINATION_MCP_PARAM_NAMES = ("maxResults", "startAt")
