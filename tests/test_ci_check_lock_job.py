@@ -53,3 +53,21 @@ def test_workflow_check_lock_setup_uv_step_pins_version() -> None:
         "check-lock job's setup-uv step must pin a non-empty `version:` input "
         f"to avoid resolver-version drift; got step body:\n{step_tail!r}"
     )
+
+
+def test_workflow_check_lock_dev_setup_uv_step_pins_version() -> None:
+    """check-lock-dev job's setup-uv step must pin a non-empty version: input (PYPOST-995)."""
+    workflow_text = _WORKFLOW.read_text(encoding="utf-8")
+    job = workflow_job_block(workflow_text, "check-lock-dev", workflow_path=_WORKFLOW)
+
+    step_match = _SETUP_UV_STEP.search(job)
+    assert step_match is not None, (
+        "check-lock-dev job must contain an astral-sh/setup-uv step"
+    )
+    step_tail = step_match.group("rest")
+    version_match = re.search(r"version:\s*(\S+)", step_tail)
+    assert version_match is not None and version_match.group(1).strip("\"'"), (
+        "check-lock-dev job's setup-uv step must pin a non-empty `version:` input "
+        f"to avoid resolver-version drift; got step body:\n{step_tail!r}"
+    )
+
