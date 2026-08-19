@@ -57,7 +57,7 @@ When editing `doc/user/` (or the docs hub links):
   ATX headers, hyphen (`-`) lists, line length ≤100, UTF-8 LF, no trailing
   whitespace, fenced code with a language tag, clear link text.
 - Keep steps and labels accurate against the **current** UI (menus, Settings
-  names, default ports, hotkeys). There is no automated docs-contract check.
+  names, default ports, hotkeys).
 - Prefer progressive disclosure: user-level steps in `doc/user/`; deep MCP
   envelopes and scrape setup stay in the integration docs; implementation
   detail stays in `doc/dev/`.
@@ -65,12 +65,52 @@ When editing `doc/user/` (or the docs hub links):
   topic page (product/docs decision, not a drive-by rename).
 - Keep collections/environments import-export guidance consistent with the
   corresponding capability pages in `doc/dev/` when both exist.
-- When a UI or defaults change ships, re-read the affected guide pages (label
-  and default drift is the main ongoing risk).
 
 Capability work that changes user-visible behavior should update the relevant
 `doc/user/` page in the same change set (or a linked docs follow-up), not only
 `doc/dev/`.
+
+## Docs accuracy-drift checklist (PYPOST-1023)
+
+Whenever code changes alter UI elements, default configurations, or shortcuts, engineers
+and reviewers must execute this accuracy-drift checklist before merging:
+
+### 1. Trigger events & ownership
+
+- **Owner:** The engineer implementing the UI / defaults change is responsible for updating
+  documentation in the same change set; the reviewer validates accuracy during code review.
+- **Triggers:**
+  - UI label changes (menu items, button text, dialog titles, tab labels, form field labels).
+  - Default value changes (ports, timeouts, retry policies, format preferences).
+  - Shortcut / hotkey alterations or additions.
+  - New or altered workflow steps (import/export formats, authentication flows).
+
+### 2. UI-to-docs topic mapping
+
+Identify which User Guide pages correspond to the modified components:
+
+| Modified component | User Guide topic page | Key items to inspect |
+| --- | --- | --- |
+| Menu bar / main window layout | [`doc/user/interface.md`](../user/interface.md) | Panes, menu names, status bar elements |
+| Request builder / headers / params | [`doc/user/requests.md`](../user/requests.md) | Tabs, methods, send buttons, URL format |
+| Collections tree & context menus | [`doc/user/collections.md`](../user/collections.md) | Import/export menus, folder actions |
+| Environment manager & variables | [`doc/user/environments.md`](../user/environments.md) | Hidden variables, active selection |
+| Template syntax / functions | [`doc/user/templating.md`](../user/templating.md) | Built-in functions, variable evaluation |
+| Scripts & test assertion helpers | [`doc/user/scripts.md`](../user/scripts.md) | Post-response variables, assertions |
+| History panel & cURL copy | [`doc/user/history-and-curl.md`](../user/history-and-curl.md) | Re-send actions, cURL formatting |
+| MCP tools & servers | [`doc/user/mcp-tools.md`](../user/mcp-tools.md) | Server setup dialog, exposed tools |
+| Settings dialog & defaults | [`doc/user/settings.md`](../user/settings.md) | Setting labels, default values, tabs |
+| Hotkeys dialog / keybindings | [`doc/user/hotkeys.md`](../user/hotkeys.md) | Key combinations, action names |
+| Multi-step procedures | [`doc/user/workflows.md`](../user/workflows.md) | End-to-end task sequences |
+
+### 3. Verification checklist
+
+- [ ] **Exact string match:** Documented button, menu, and dialog names match Qt UI text verbatim.
+- [ ] **Defaults consistency:** Stated defaults (e.g. port 8000, 30s timeout) match runtime defaults.
+- [ ] **Hotkeys verified:** Shortcut descriptions match `QKeySequence` bindings in code and in-app Help.
+- [ ] **Formatting check:** Run `make lint-docs` (verifies line length ≤100, ATX headers, no trailing WS).
+- [ ] **Link resolution:** Run `make check-docs-links` (verifies all relative links and anchor slugs).
+- [ ] **Developer docs alignment:** Update corresponding `doc/dev/` capability notes if applicable.
 
 ## Related
 
