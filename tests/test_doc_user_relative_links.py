@@ -14,7 +14,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _USER_DOCS = tuple(sorted((_REPO_ROOT / "doc" / "user").glob("*.md")))
 _ROOT_DOC_README = _REPO_ROOT / "doc" / "README.md"
 _ROOT_README = _REPO_ROOT / "README.md"
-_ALL_TARGETS = _USER_DOCS + (_ROOT_DOC_README, _ROOT_README)
+_EXAMPLES_README = _REPO_ROOT / "examples" / "README.md"
+_ALL_TARGETS = _USER_DOCS + (_ROOT_DOC_README, _ROOT_README, _EXAMPLES_README)
 
 
 def test_documentation_files_exist() -> None:
@@ -22,6 +23,7 @@ def test_documentation_files_exist() -> None:
     assert len(_USER_DOCS) >= 13
     assert _ROOT_DOC_README.is_file()
     assert _ROOT_README.is_file()
+    assert _EXAMPLES_README.is_file()
 
 
 @pytest.mark.parametrize("target", _ALL_TARGETS, ids=lambda p: str(p.relative_to(_REPO_ROOT)))

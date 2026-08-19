@@ -16,7 +16,11 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_TARGETS = tuple(
     sorted((_REPO_ROOT / "doc" / "user").glob("*.md"))
-    + [_REPO_ROOT / "doc" / "README.md", _REPO_ROOT / "README.md"]
+    + [
+        _REPO_ROOT / "doc" / "README.md",
+        _REPO_ROOT / "README.md",
+        _REPO_ROOT / "examples" / "README.md",
+    ]
 )
 
 _LINK_PATTERN = re.compile(r"\[([^\]]*)\]\(([^)\s]+)(?:\s+[\"'][^\"']*[\"'])?\)")
