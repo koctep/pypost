@@ -27,7 +27,9 @@
   - `ai-tasks/PYPOST-1091/60-tech-debt.md`
 - [x] **STEP 8: Dev Docs**
   - `doc/dev/mcp_integration.md`
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `9adeb9b2` on `dev` — "feat(mcp): PYPOST-1091 pagination support for jira-search-assignable-users and JQL guidance"
+  - Branch name (reference only, not switched): `feature/PYPOST-1091-assignable-users-pagination-jql-guidance`
 
 ## Status Legend
 
