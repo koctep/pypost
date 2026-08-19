@@ -133,6 +133,7 @@ jobs:
         run: |
           python -m flake8 --jobs=1 pypost/
           python scripts/lint_user_docs.py
+          python scripts/check_user_docs_links.py
 
       - name: Run tests
         run: |
