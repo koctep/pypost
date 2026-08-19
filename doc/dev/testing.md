@@ -1728,6 +1728,21 @@ python scripts/audit_test_durations.py tests.txt
 
 Phase 2 caplog contract: [PYPOST-574](https://pypost.atlassian.net/browse/PYPOST-574).
 
+### MCP controller and presenter unit tests (PYPOST-1080)
+
+Dedicated unit test modules cover the decoupled MCP presentation and lifecycle layer:
+
+- `tests/test_mcp_server_controller.py`: unit tests for `McpServerSettingsController`,
+  validating deep-copy configuration returns, status delegation, activity logging under
+  normal and `KeyError` conditions, transactional reconfiguration of running servers,
+  create/update persist flows, and lifecycle start/stop/remove operations.
+- `tests/test_mcp_controls_presenter.py`: unit tests for `McpControlsPresenter`,
+  validating widget attachment, warning on missing controller, info log emission
+  `mcp_servers_dialog_opened` with server count, 13 injected callables contract to
+  `McpServersDialog`, activity dialog lifecycle, and legacy environment selection.
+
+Both modules define module-level 30s timeouts (`pytestmark = pytest.mark.timeout(30)`).
+
 ### Documentation sync (PYPOST-371)
 
 Agent timeout, Qt, caplog, and run commands in `.cursor/lsr/do-testing.md` must stay aligned
