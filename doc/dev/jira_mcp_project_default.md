@@ -41,11 +41,14 @@ environment. That endpoint uses the selected value directly for `jira-list-board
 (omitting `projectKeyOrId` when unset); changing the top-bar selection does not retarget it.
 
 For `jira-search-issues-jql` and `jira-create-issue`, callers supply a
-serialized Jira JSON payload. When `jira_project_key` is configured, the collection's
-`mcp_description` and `mcp_params` instruct agents to use it as the normal project;
-when unset, callers operate across all accessible projects or specify the project
-explicitly per operation. PyPost deliberately does not parse, inject, validate, or override
-the payload's project field. A caller can deliberately name another project.
+serialized Jira JSON payload. When `jira_project_key` is configured with a single key
+(e.g., `PROJ1`) or multiple comma-separated keys (e.g., `PROJ1, PROJ2`), the collection's
+`mcp_description` and `mcp_params` instruct agents to use `project = PROJ1` (single) or
+`project in (PROJ1, PROJ2)` (multiple) for normal searches, and to specify the target
+project or use the primary project for issue creation. When unset, callers operate across
+all accessible projects or specify the project explicitly per operation. PyPost
+deliberately does not parse, inject, validate, or override the payload's project field.
+A caller can deliberately name another project.
 
 For the import steps and end-user-facing safety notes, see
 [`examples/README.md`](../../examples/README.md).
@@ -55,7 +58,7 @@ For the import steps and end-user-facing safety notes, see
 | Key | Committed example value | Handling |
 | --- | --- | --- |
 | `jira_base_url` | `https://your-team.atlassian.net` | Replace locally with the Jira Cloud site URL. |
-| `jira_project_key` | `YOUR_PROJECT_KEY` | Replace locally with the normal project key or ID. It is visible and must not be in `hidden_keys`. |
+| `jira_project_key` | `YOUR_PROJECT_KEY` | Replace locally with a project key, ID, or comma-separated project list (e.g., `PROJ1, PROJ2`). It is visible and must not be in `hidden_keys`. |
 | `jira_credentials` | `you@example.com:your-api-token` | Replace locally and keep it as the only hidden key. Never commit a real value. |
 
 The project key is a normal environment variable. Editing the environment

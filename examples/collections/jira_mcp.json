@@ -37,11 +37,11 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "Search Jira issues with JQL. If this endpoint's selected environment defines jira_project_key, start normal searches with project = <jira_project_key>; when unset, search across all accessible projects. Use another permitted project only when explicitly requested. search_payload must be a JSON object accepted by POST /rest/api/3/search/jql.",
+      "mcp_description": "Search Jira issues with JQL. If this endpoint's selected environment defines jira_project_key, start normal searches with project = <key> (for a single project) or project in (<key1>, <key2>, ...) (for multiple comma-separated projects); when unset, search across all accessible projects. Use another permitted project only when explicitly requested. search_payload must be a JSON object accepted by POST /rest/api/3/search/jql.",
       "mcp_params": {
         "search_payload": {
           "type": "string",
-          "description": "Serialized JSON body for Jira enhanced JQL search. Use jira_project_key as the normal project when set, or search all accessible projects when unset; use another permitted project only when explicitly requested.",
+          "description": "Serialized JSON body for Jira enhanced JQL search. Use jira_project_key (or project in (...) for multiple comma-separated keys) as the normal project scope when set, or search all accessible projects when unset; use another permitted project only when explicitly requested.",
           "required": true
         }
       },
@@ -88,11 +88,11 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "Create a Jira issue. If this endpoint's selected environment defines jira_project_key, use it as the normal fields.project.key; when unset, specify the target project explicitly. issue_payload must be a serialized Jira Create issue JSON body; Jira Cloud rich-text descriptions use Atlassian Document Format.",
+      "mcp_description": "Create a Jira issue. If this endpoint's selected environment defines jira_project_key, use it (or the primary project if multiple comma-separated keys are defined) as the normal fields.project.key; when unset, specify the target project explicitly. issue_payload must be a serialized Jira Create issue JSON body; Jira Cloud rich-text descriptions use Atlassian Document Format.",
       "mcp_params": {
         "issue_payload": {
           "type": "string",
-          "description": "Serialized JSON body for POST /rest/api/3/issue. Use jira_project_key as the normal fields.project.key when set, or specify the target project explicitly when unset; use another permitted project only when explicitly requested.",
+          "description": "Serialized JSON body for POST /rest/api/3/issue. Use jira_project_key (or primary project when multiple keys are specified) as the normal fields.project.key when set, or specify the target project explicitly when unset; use another permitted project only when explicitly requested.",
           "required": true
         }
       },
@@ -262,7 +262,7 @@
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "List Jira Software boards. When this endpoint's selected environment defines jira_project_key, results are project-scoped; when unset, lists all boards accessible to the credentials. This is a normal default, not an authorization or permission restriction.",
+      "mcp_description": "List Jira Software boards. When this endpoint's selected environment defines jira_project_key (single project or comma-separated project list), results are project-scoped to those projects; when unset, lists all boards accessible to the credentials. This is a normal default, not an authorization or permission restriction.",
       "mcp_params": {
         "maxResults": {
           "type": "integer_or_string",

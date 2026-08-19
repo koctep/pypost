@@ -37,8 +37,9 @@ For step-by-step import UI details, see the User Guide:
 2. **Replace placeholders locally** (do not commit real secrets):
    - `jira_base_url` — your site, for example
      `https://your-company.atlassian.net`
-   - `jira_project_key` — set this to the Jira project key or ID that should
-     guide normal issue search, issue creation, and board discovery
+   - `jira_project_key` — set this to the Jira project key, ID, or comma-separated
+     project list (e.g. `PROJ1, PROJ2`) that should guide normal issue search,
+     issue creation, and board discovery
    - `jira_credentials` — `email:api_token` (Atlassian account email and an
      API token from Atlassian account settings); keep the key **Hidden**
 3. **Import the collection** — **Import Collection…** and choose

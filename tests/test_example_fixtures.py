@@ -419,6 +419,31 @@ def test_jira_unconstrained_mode_guidance_and_behavior(tmp_path, monkeypatch):
         assert "all" in guidance or "explicit" in guidance
 
 
+def test_jira_multi_project_keys_guidance_and_normalization(tmp_path, monkeypatch):
+    """PYPOST-1069: Jira MCP fixtures describe multi-project comma-separated guidance."""
+    collection = _load_jira_mcp_collection()
+    requests_by_id = {request.id: request for request in collection.requests}
+
+    search = requests_by_id["jira-search-issues-jql"]
+    search_guidance = " ".join(
+        [
+            search.mcp_description,
+            search.mcp_params["search_payload"].description,
+        ]
+    ).lower()
+    assert "project in" in search_guidance
+    assert "comma-separated" in search_guidance or "multiple" in search_guidance
+
+    create = requests_by_id["jira-create-issue"]
+    create_guidance = " ".join(
+        [
+            create.mcp_description,
+            create.mcp_params["issue_payload"].description,
+        ]
+    ).lower()
+    assert "primary" in create_guidance or "multiple" in create_guidance
+
+
 def test_mcp_probe_collection_still_imports():
     collections, parse_errors = load_collection_import_candidates(MCP_PROBE_PATH)
 
