@@ -119,6 +119,33 @@ push and pull request (PYPOST-804).
 **Dependabot / upgrade workflow:** weekly pip PRs may bump `requirements.in` or `requirements.txt`.
 After merging dependency changes, run `make lock`, commit both files, and run `make check`.
 
+### Lock verification and quality gates (PYPOST-998)
+
+PyPost separates the fast developer quality gate from lockfile compiler checks:
+
+- **`make check` (fast local quality gate):** Runs `lint`, unit tests (`test`), and workflow
+  validation (`verify-ai-tasks`). It runs entirely offline and does not require `uv` on `PATH`
+  or outbound PyPI network access.
+- **`make check-lock`, `make check-lock-dev`, `make check-lock-otel` (lock drift checks):**
+  Verify that committed `*.txt` lockfiles match their respective `*.in` sources using `uv pip compile`.
+  In CI, these run as isolated gating jobs (`check-lock`, `check-lock-dev`, `check-lock-otel`).
+- **`make check-lock-all` (all locks + license inventory):** Convenience target that runs
+  `check-lock`, `check-lock-dev`, `check-lock-otel`, and `check-license-inventory` in sequence.
+
+Whenever you edit `requirements.in`, `requirements-dev.in`, or `requirements-otel.in`:
+
+1. Regenerate the affected locks: `make lock`, `make lock-dev`, and/or `make lock-otel`.
+2. Regenerate transitive license inventory if production dependencies changed:
+   `make generate-license-inventory`.
+3. Verify all locks and license inventory pass:
+   ```bash
+   make check-lock-all
+   ```
+4. Run standard quality gate:
+   ```bash
+   make check
+   ```
+
 **Production packages:** `make install` resolves 11 direct production dependencies from
 `requirements.in` (locked in `requirements.txt`). Pinned versions and audit notes live in
 [dependencies_audit.md](dependencies_audit.md) § Production Dependencies.

@@ -3,7 +3,7 @@
 	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
 	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
-	check-license-inventory lint-docs check-docs-links
+	check-license-inventory lint-docs check-docs-links check-lock-all
 
 .DEFAULT_GOAL := help
 
@@ -140,6 +140,8 @@ check-lock-otel: ## Verify requirements-otel.txt matches requirements-otel.in (n
 		exit 1; \
 	fi
 	rm -f requirements-otel.txt.check requirements-otel.txt.body requirements-otel.txt.check.body
+
+check-lock-all: check-lock check-lock-dev check-lock-otel check-license-inventory ## Verify all lock files and transitive license inventory (PYPOST-998)
 
 run: $(VENV_MARKER) ## Run the PyPost desktop application
 	PYTHONPATH=. $(BIN)/python pypost/main.py
