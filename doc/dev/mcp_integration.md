@@ -524,11 +524,9 @@ def _build_execution_variables(
     `default` is the static value substituted, e.g. `50`). Neither field is sensitive — both
     are already public via the `list_tools` JSON Schema.
 *   **DEBUG log**: the pre-existing `mcp_execution_variables_merged` line gained a
-    `defaults_applied_count=%d` field. Note: `mcp_arg_count` on this same line now counts
-    `merged_args` (post-defaulting), not the caller's raw argument count as before PYPOST-1054
-    — subtract `defaults_applied_count` to recover the old value
-    ([PYPOST-1090](https://pypost.atlassian.net/browse/PYPOST-1090) tracks documenting or
-    reworking this further).
+    `defaults_applied_count=%d` field. `mcp_arg_count` counts `merged_args` (post-defaulting);
+    the caller's raw argument count can be recovered via `(mcp_arg_count - defaults_applied_count)`
+    (clarified in PYPOST-1090).
 *   **Counter**: `mcp_param_defaults_applied_total{method}` (Prometheus + OTel), incremented
     once per defaulted parameter alongside the INFO log — the same "counter + log at the point
     of silent substitution" convention as `track_response_body_truncated` in `http_client.py`.
@@ -789,11 +787,8 @@ product decision. See [Request Execution](request_execution.md#history-recording
 #### Observability
 
 DEBUG log in `_build_execution_variables`: `mcp_execution_variables_merged` with
-`env_var_count`, `hidden_key_count`, `mcp_arg_count`, and (since PYPOST-1054)
-`defaults_applied_count` (no names or values). Note: `mcp_arg_count` counts arguments
-*after* default application, not the caller's raw argument count — see
-[Optional MCP parameter defaults § Observability](#observability-log--metric) for the full
-field semantics and the open follow-up on that count. See
+`env_var_count`, `hidden_key_count`, `mcp_arg_count` (post-defaulting count; raw count = `mcp_arg_count - defaults_applied_count`),
+and `defaults_applied_count` (no names or values; PYPOST-1090). See
 `ai-tasks/PYPOST-554/50-observability.md` and `doc/dev/mcp_secrets_policy.md`.
 
 ## Threading Model

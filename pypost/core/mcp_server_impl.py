@@ -233,6 +233,9 @@ class MCPServerImpl:
                         param_name,
                         param_spec.default,
                     )
+        # Note: mcp_arg_count reflects the total post-default-injection argument
+        # count (len(merged_args)); the raw caller-supplied count can be recovered via
+        # (mcp_arg_count - defaults_applied_count).
         counts = McpSecretsPolicy.safe_execution_log_fields(
             len(env_vars),
             len(hidden_keys),

@@ -25,7 +25,9 @@
   - `ai-tasks/PYPOST-1087/60-tech-debt.md`
 - [x] **STEP 8: Dev Docs**
   - No changes needed.
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `98cb20ff` on `dev` — "debt(tests): PYPOST-1087 annotate forward-looking mcp_server_start_failed_ui allowlist rule"
+  - Branch name (reference only, not switched): `debt/PYPOST-1087-allowlist-forward-looking-rule`
 
 ## Status Legend
 
