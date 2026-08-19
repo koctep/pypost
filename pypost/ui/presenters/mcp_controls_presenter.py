@@ -32,6 +32,8 @@ class McpServerController(Protocol):
 
     def mcp_server_configurations(self) -> list[McpServerConfiguration]: ...
 
+    def mcp_server_count(self) -> int: ...
+
     def mcp_server_status(self, instance_id: str) -> McpServerStatus: ...
 
     def upsert_mcp_server(self, configuration: McpServerConfiguration) -> None: ...
@@ -289,7 +291,7 @@ class McpControlsPresenter(QObject):
         # single entry point for every `mcp_servers_persist_requested` mutation below it.
         logger.info(
             "mcp_servers_dialog_opened server_count=%d",
-            len(controller.mcp_server_configurations()),
+            controller.mcp_server_count(),
         )
         dialog = McpServersDialog(
             configurations=controller.mcp_server_configurations,

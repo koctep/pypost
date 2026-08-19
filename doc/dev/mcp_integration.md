@@ -135,9 +135,13 @@ readiness gate.
     and persists a running-row edit **only** when the replacement endpoint bound
     (`committed=true`).
 *   **Protocol surface**: it satisfies the `McpServerController` protocol consumed by the
-    controls presenter — `mcp_server_configurations`, `mcp_server_status`,
+    controls presenter — `mcp_server_configurations`, `mcp_server_count`, `mcp_server_status`,
     `mcp_server_activity`, `upsert_mcp_server`, `remove_mcp_server`, `start_mcp_server`,
-    `stop_mcp_server`. Configuration rows are returned as deep copies.
+    `stop_mcp_server`. Configuration rows from `mcp_server_configurations` are returned as
+    deep copies; `mcp_server_count` (PYPOST-1083) returns `len(self._settings.mcp_servers)`
+    directly, so call sites that only need the row count — e.g. the
+    `mcp_servers_dialog_opened` log line in `McpControlsPresenter._open_mcp_servers` — no
+    longer pay for a deep copy just to log it.
 
 ### 5. `McpControlsPresenter` (`pypost/ui/presenters/mcp_controls_presenter.py`, PYPOST-1071)
 

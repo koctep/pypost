@@ -119,6 +119,10 @@ class McpServerSettingsController:
             for configuration in self._settings.mcp_servers
         ]
 
+    def mcp_server_count(self) -> int:
+        """Return the number of configured server rows without copying them."""
+        return len(self._settings.mcp_servers)
+
     def mcp_server_status(self, instance_id: str) -> McpServerStatus:
         """Return the current status for one configured endpoint."""
         return self.registry.status(instance_id)

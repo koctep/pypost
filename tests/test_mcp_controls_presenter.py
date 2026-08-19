@@ -95,6 +95,7 @@ def test_open_mcp_servers_with_controller_logs_info_and_constructs_dialog(qapp, 
         ),
     ]
     controller.mcp_server_configurations.return_value = configs
+    controller.mcp_server_count.return_value = 2
 
     presenter = McpControlsPresenter(
         mcp_manager=manager,
@@ -117,6 +118,8 @@ def test_open_mcp_servers_with_controller_logs_info_and_constructs_dialog(qapp, 
             presenter._open_mcp_servers()
 
         assert "mcp_servers_dialog_opened server_count=2" in caplog.text
+        controller.mcp_server_count.assert_called_once()
+        controller.mcp_server_configurations.assert_not_called()
 
         mock_dialog_cls.assert_called_once()
         _, kwargs = mock_dialog_cls.call_args
