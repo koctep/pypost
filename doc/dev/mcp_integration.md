@@ -538,8 +538,8 @@ def _build_execution_variables(
 
 #### UI round-trip
 
-`McpParamsTable` preserves but does not expose `default` — see
-[Tool metadata authoring § UI](#ui) below.
+`McpParamsTable` exposes `default` through an editable **Default** column
+(PYPOST-1089) — see [Tool metadata authoring § UI](#ui) below.
 
 #### Curated Jira fixtures
 
@@ -555,17 +555,84 @@ for the test coverage.
 
 #### Limitations
 
-*   `default`'s Python type is not cross-checked against the parameter's declared `type`
-    (e.g. `type="boolean"` with `default="fifty"` constructs without error); a mismatch only
-    surfaces later, either in the schema an agent receives or at template-render time.
-*   No GUI affordance authors a `default` — see [UI](#ui) above and
-    [PYPOST-1089](https://pypost.atlassian.net/browse/PYPOST-1089).
+*   `default`'s Python type **is** now cross-checked against the parameter's declared
+    `type` at construction time (PYPOST-1089) — see
+    [Default value type validation](#default-value-type-validation-pypost-1089) below.
+    That check only covers the *declared* default, not MCP arguments actually supplied by
+    a caller at execution time; extending it to `mcp_args` in
+    `_build_execution_variables` is tracked as
+    [PYPOST-1100](https://pypost.atlassian.net/browse/PYPOST-1100).
+*   The GUI now has an editable **Default** column (PYPOST-1089) — see
+    [UI](#ui) above. The column is a plain-text cell for every type (no checkbox for
+    `boolean`, no JSON editor for `array`/`object`); a type-aware editor is tracked as
+    [PYPOST-1099](https://pypost.atlassian.net/browse/PYPOST-1099).
 *   Only the three curated Jira list tools above ship the pattern;
     `jira-search-assignable-users` is list/search-shaped but does not expose pagination
     `mcp_params` at all yet
     ([PYPOST-1091](https://pypost.atlassian.net/browse/PYPOST-1091)).
 
 See `ai-tasks/PYPOST-1054/60-tech-debt.md` for the full analysis.
+
+### Default value type validation (PYPOST-1089)
+
+`McpToolParam` validates that `default` (when not `None`) is a Python value compatible
+with the declared `type`, closing the gap noted above.
+
+#### Implementation
+
+Validation runs from a **`model_post_init` hook**, not a `@model_validator`-decorated
+method — the same convention already used by `Settings` elsewhere in `models.py`. Do
+not go looking for a `@model_validator` decorator on `McpToolParam`; there isn't one
+(documentation gap called out by
+[PYPOST-1098](https://pypost.atlassian.net/browse/PYPOST-1098)).
+
+```python
+def model_post_init(self, __context) -> None:
+    if self.type not in _MCP_PARAM_TYPES:
+        raise ValueError(f"Unsupported MCP param type: {self.type}")
+    self._validate_default_type()
+```
+
+`McpToolParam._validate_default_type()` (`pypost/models/models.py`) raises `ValueError`
+on a mismatch, which Pydantic converts to `ValidationError` at construction time
+(`McpToolParam(...)`, including when Pydantic rebuilds a model from stored/imported
+collection JSON).
+
+#### Type compatibility rules
+
+| Declared `type` | Accepted Python type(s) for `default` |
+| --- | --- |
+| `string` | `str` |
+| `integer` | `int`, excluding `bool` |
+| `integer_or_string` | `int` or `str`, excluding `bool` |
+| `number` | `int` or `float`, excluding `bool` |
+| `boolean` | `bool` |
+| `array` | `list` |
+| `object` | `dict` |
+
+*   **`None` is always permitted** regardless of `type` — it means "no default
+    declared", not "the default is `null`" (see
+    [Optional MCP parameter defaults § Model field](#model-field) above).
+*   **`bool` is explicitly excluded** from `integer`, `number`, and `integer_or_string`
+    because Python's `bool` is an `int` subclass (`isinstance(True, int)` is `True`); each
+    check adds `and not isinstance(value, bool)` so `McpToolParam(type="integer",
+    default=True)` still raises.
+
+#### Where this can surface
+
+*   **Direct construction**: `McpToolParam(type="boolean", default="fifty")` now raises
+    `pydantic.ValidationError` instead of constructing silently.
+*   **Loading untrusted data**: `StorageManager.load_collections()`
+    (`pypost/core/storage.py`, `logger.warning("storage_collection_load_failed …")`) and
+    `load_collection_import_candidates()` (`pypost/core/collection_import.py`, per-record
+    `parse_errors` surfaced via the import dialog) already catch and log/report
+    construction errors per-record — see `ai-tasks/PYPOST-1089/50-observability.md` for
+    the full trace. A malformed `default` in a hand-edited or imported collection file
+    now surfaces as a load/import error rather than a downstream schema or
+    template-render failure.
+*   **The MCP params table (GUI)** cannot trigger this in practice: `McpParamsTable`'s
+    `_COERCERS` (see [UI](#ui) above) only ever produce a type-matched value or `None`
+    before `McpToolParam` is constructed from `get_data()`.
 
 ### MCP argument substitution coverage (PYPOST-1034)
 
@@ -834,6 +901,8 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 `integer_or_string`), `description`, `required` (default `True`), `default`
 (`Optional[Any]`, default `None` — PYPOST-1054; see
 [Optional MCP parameter defaults](#optional-mcp-parameter-defaults-pypost-1054)).
+`default` is validated against `type` at construction time — see
+[Default value type validation](#default-value-type-validation-pypost-1089) below.
 
 #### Schema pipeline
 
@@ -854,19 +923,82 @@ build_tool_input_schema(specs)  → Tool.inputSchema
 #### UI
 
 `RequestWidget` **MCP** tab: tool description (`QPlainTextEdit`) and `McpParamsTable`
-(name, type, description, required). Persisted via `_PERSISTED_FIELD_NAMES` in
+(name, type, description, required, default). Persisted via `_PERSISTED_FIELD_NAMES` in
 `request_persisted_fields.py`.
 
-`McpParamsTable` has no **Default** column — a parameter's `default` is not visible or
-editable from the GUI. It is only *preserved* across `set_data()` / `get_data()` round-trips
-(PYPOST-1054): `set_data()` caches `{name: spec.default}` into `self._defaults` (skipping
-entries where `default is None`), and `get_data()` looks the cached value back up by the
-row's current name when rebuilding each `McpToolParam`. Renaming a param's **Name** cell
-therefore silently drops its preserved default — the lookup key changes but the cache does
-not track the rename. Authoring a default for a brand-new param, or fixing the rename gap,
-requires editing the collection JSON directly (or via a fixture) today; adding an editable
-column is tracked as
-[PYPOST-1089](https://pypost.atlassian.net/browse/PYPOST-1089).
+`McpParamsTable` (`pypost/ui/widgets/request_editor.py`) is a 5-column `QTableWidget`:
+**Name**, **Type** (a `QComboBox` per row, one of `McpParamsTable._TYPE_OPTIONS` — the
+same seven types `_MCP_PARAM_TYPES` accepts in `models.py`), **Description**,
+**Required** (checkbox item), and **Default** (PYPOST-1089) — a plain-text cell holding
+the default's editable string representation.
+
+##### Default column: rename-safe by construction
+
+Before PYPOST-1089, a parameter's `default` was preserved only via a name-keyed side
+dict (`self._defaults`), so renaming a param's **Name** cell silently dropped its
+default — the cache's lookup key changed but the cache itself did not track the rename.
+The Default column removes that side dict entirely: `_set_row(row, name, spec)` writes
+`spec.default`'s string form directly into column 4 of that same row
+(`self.setItem(row, 4, QTableWidgetItem(default_text))`), and `get_data()` reads it back
+from the same row it reads the (possibly just-renamed) Name cell from. Because the
+default now lives in the row, not in a dict keyed by the old name, renaming a param no
+longer has any effect on its default — there is no separate key to go stale.
+
+##### `_COERCERS`: type-aware string ↔ value coercion
+
+Round-tripping a typed Python value through an editable text cell needs two directions:
+
+*   **Value → string** (`_serialise_default(value)`, used by `_set_row` when populating
+    a row): `None` → `""`; `bool` → `"true"` / `"false"` (checked *before* the general
+    numeric/string case, since `bool` is an `int` subclass); `list` / `dict` → compact
+    `json.dumps(value, separators=(",", ":"))`; everything else → `str(value)`.
+*   **String → value** (`_parse_default(raw, param_type)`, used by `get_data()`): an
+    empty (post-`strip()`) cell always yields `None`. Otherwise it dispatches through
+    `_COERCERS`, a `dict[str, Callable[[str], Any]]` keyed by MCP param type — a
+    strategy-style lookup rather than an `if`/`elif` chain, so adding a coercer for a new
+    type is a one-line dict entry:
+
+    | `type` | Coercer | Behavior |
+    | --- | --- | --- |
+    | `string` | `_coerce_default_string` | Identity — returns the (already-stripped) text |
+    | `integer` | `_coerce_default_integer` | `int(raw)` |
+    | `number` | `_coerce_default_number` | `int(raw)` when `raw` has no `"."`, else `float(raw)` |
+    | `integer_or_string` | `_coerce_default_integer_or_string` | `int(raw)`, falling back to the raw string on `ValueError` |
+    | `boolean` | `_coerce_default_boolean` | `raw.lower() in ("true", "1")` |
+    | `array` | `_coerce_default_array` | `json.loads(raw)`, requiring the result to be a `list` |
+    | `object` | `_coerce_default_object` | `json.loads(raw)`, requiring the result to be a `dict` |
+
+    A coercer that raises `ValueError`, `TypeError`, or `json.JSONDecodeError` is caught
+    by `_parse_default`, which logs `mcp_param_default_coerce_failed value=%r
+    param_type=%s` at DEBUG and returns `None` — an unparsable Default cell silently
+    becomes "no default" rather than raising into `get_data()`'s caller. A type with no
+    `_COERCERS` entry falls back to the raw stripped string (matching `string`'s
+    behavior).
+
+    Because `get_data()` only ever passes a `_COERCERS` output (or `None`) into
+    `McpToolParam(...)`, the table can never itself trigger the
+    [default value type validation](#default-value-type-validation-pypost-1089)
+    `ValueError` — every value it constructs is already type-matched.
+
+**Known limitations** (see `ai-tasks/PYPOST-1089/60-tech-debt.md` for the full
+analysis):
+
+*   **Scientific notation silently drops the default.** `_coerce_default_number`
+    disambiguates int vs. float by checking for a literal `"."` in the text, not by
+    attempting numeric parsing. `1e-10` or `5e+20` have no `"."`, so `int("1e-10")`
+    raises and the default falls back to `None` with only a DEBUG log — no error is
+    shown to the user. Normal-range floats (`3.14`, `0.0001`) round-trip correctly.
+    Tracked as [PYPOST-1095](https://pypost.atlassian.net/browse/PYPOST-1095).
+*   **Unrecognized boolean text silently becomes `False`, not `None`.**
+    `_coerce_default_boolean` never raises — `raw.lower() in ("true", "1")` maps *any*
+    other text (`"yes"`, `"maybe"`, a typo) to `False`, unlike the other six `_COERCERS`
+    entries, which raise on bad input and fall back to `None` via `_parse_default`'s
+    `except` clause. Tracked as
+    [PYPOST-1096](https://pypost.atlassian.net/browse/PYPOST-1096).
+*   The Default cell is plain text for every type — no checkbox for `boolean`, no JSON
+    editor for `array`/`object`, and changing the Type combo does not clear or
+    re-validate a stale Default cell. Tracked as
+    [PYPOST-1099](https://pypost.atlassian.net/browse/PYPOST-1099).
 
 #### Agent contract preview (PYPOST-555)
 
@@ -897,13 +1029,23 @@ The preview refreshes when MCP metadata or template-bearing fields change and wh
     at execution time and are not listed as tool inputs (PYPOST-554).
 *   **UI sync**: MCP params table is manual; auto-populate from template scan is deferred (see `ai-tasks/PYPOST-553/60-tech-debt.md`).
 *   **Dual variable sources in EnvPresenter**: `current_variables` property reads the combo box while MCP uses `_current_variables` cache (see `ai-tasks/PYPOST-550/60-tech-debt.md`).
-*   **`McpToolParam.default` is not type-checked against `type`** (PYPOST-1054): a param
-    declared `type="boolean"` with `default="fifty"` constructs without error today; see
-    [Optional MCP parameter defaults § Limitations](#limitations) and
-    [PYPOST-1089](https://pypost.atlassian.net/browse/PYPOST-1089).
-*   **No UI affordance to author `default`**: `McpParamsTable` preserves but does not let a
-    user view/edit a parameter's default, and renaming a param's key drops its preserved
-    default (PYPOST-1054; [PYPOST-1089](https://pypost.atlassian.net/browse/PYPOST-1089)).
+*   **`McpToolParam.default` is now type-checked against `type`** (PYPOST-1054 →
+    PYPOST-1089 closes the original gap): a param declared `type="boolean"` with
+    `default="fifty"` raises `ValidationError` at construction instead of constructing
+    silently — see
+    [Default value type validation](#default-value-type-validation-pypost-1089). The
+    remaining gap is that MCP arguments a *caller* supplies at execution time are still
+    unchecked against the declared type, only the declared `default` is — tracked as
+    [PYPOST-1100](https://pypost.atlassian.net/browse/PYPOST-1100).
+*   **UI now has an affordance to author `default`** (PYPOST-1089): `McpParamsTable`'s
+    **Default** column is editable and rename-safe (the default lives in the row, not a
+    name-keyed side dict — see [UI](#ui)). Remaining UI gaps: the column is plain text
+    for every type (no checkbox for `boolean`, no JSON editor for `array`/`object`,
+    [PYPOST-1099](https://pypost.atlassian.net/browse/PYPOST-1099)), and its `_COERCERS`
+    dispatch has two known edge cases — scientific-notation numbers
+    ([PYPOST-1095](https://pypost.atlassian.net/browse/PYPOST-1095)) and unrecognized
+    boolean text silently becoming `False`
+    ([PYPOST-1096](https://pypost.atlassian.net/browse/PYPOST-1096)).
 *   **`jira-search-assignable-users` has no pagination params**: unlike the three curated
     list tools with optional-defaulted `maxResults`/`startAt`, this fixture never exposed
     those query params at all (PYPOST-1054 TD-3;

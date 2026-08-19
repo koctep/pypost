@@ -23,6 +23,43 @@ class McpToolParam(BaseModel):
     def model_post_init(self, __context) -> None:
         if self.type not in _MCP_PARAM_TYPES:
             raise ValueError(f"Unsupported MCP param type: {self.type}")
+        self._validate_default_type()
+
+    def _validate_default_type(self) -> None:
+        """Validate that ``self.default`` is compatible with ``self.type``.
+
+        ``None`` is always permitted (no default set).  Any mismatch raises
+        ``ValueError`` which Pydantic converts to ``ValidationError``.
+        """
+        if self.default is None:
+            return
+
+        value = self.default
+        param_type = self.type
+
+        type_ok: bool
+        if param_type == "string":
+            type_ok = isinstance(value, str)
+        elif param_type == "integer":
+            type_ok = isinstance(value, int) and not isinstance(value, bool)
+        elif param_type == "integer_or_string":
+            type_ok = isinstance(value, (int, str)) and not isinstance(value, bool)
+        elif param_type == "number":
+            type_ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif param_type == "boolean":
+            type_ok = isinstance(value, bool)
+        elif param_type == "array":
+            type_ok = isinstance(value, list)
+        elif param_type == "object":
+            type_ok = isinstance(value, dict)
+        else:
+            # Unknown type — whitelist check above already rejected it; be safe.
+            type_ok = True
+
+        if not type_ok:
+            raise ValueError(
+                f"default value {value!r} is not valid for param type {param_type!r}"
+            )
 
 
 class RequestData(BaseModel):

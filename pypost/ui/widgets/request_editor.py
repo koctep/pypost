@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -461,6 +462,45 @@ class RequestWidget(QWidget):
         self.copy_curl_requested.emit(current_request)
 
 
+def _coerce_default_string(raw: str) -> str:
+    """Identity coercion: Default cell text is already the string value."""
+    return raw
+
+
+def _coerce_default_integer(raw: str) -> int:
+    return int(raw)
+
+
+def _coerce_default_number(raw: str) -> Any:
+    """Parse a numeric Default cell as int when it has no '.', else float."""
+    return int(raw) if "." not in raw else float(raw)
+
+
+def _coerce_default_integer_or_string(raw: str) -> Any:
+    try:
+        return int(raw)
+    except ValueError:
+        return raw
+
+
+def _coerce_default_boolean(raw: str) -> bool:
+    return raw.lower() in ("true", "1")
+
+
+def _coerce_default_array(raw: str) -> list:
+    result = json.loads(raw)
+    if not isinstance(result, list):
+        raise ValueError(f"Expected a JSON array, got {type(result).__name__}")
+    return result
+
+
+def _coerce_default_object(raw: str) -> dict:
+    result = json.loads(raw)
+    if not isinstance(result, dict):
+        raise ValueError(f"Expected a JSON object, got {type(result).__name__}")
+    return result
+
+
 class McpParamsTable(QTableWidget):
     _TYPE_OPTIONS = (
         "string",
@@ -472,11 +512,23 @@ class McpParamsTable(QTableWidget):
         "object",
     )
 
+    # Strategy-style dispatch table: maps a declared MCP param type to the
+    # single-argument callable that parses a Default cell's raw text into
+    # the corresponding typed Python value. See _parse_default().
+    _COERCERS: dict[str, Callable[[str], Any]] = {
+        "string": _coerce_default_string,
+        "integer": _coerce_default_integer,
+        "number": _coerce_default_number,
+        "integer_or_string": _coerce_default_integer_or_string,
+        "boolean": _coerce_default_boolean,
+        "array": _coerce_default_array,
+        "object": _coerce_default_object,
+    }
+
     def __init__(self):
-        super().__init__(0, 4)
-        self.setHorizontalHeaderLabels(["Name", "Type", "Description", "Required"])
+        super().__init__(0, 5)
+        self.setHorizontalHeaderLabels(["Name", "Type", "Description", "Required", "Default"])
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self._defaults: dict[str, Any] = {}
         self.itemChanged.connect(self._on_item_changed)
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
@@ -491,11 +543,6 @@ class McpParamsTable(QTableWidget):
     def set_data(self, params: dict[str, McpToolParam]) -> None:
         self.blockSignals(True)
         try:
-            self._defaults = {
-                name: spec.default
-                for name, spec in params.items()
-                if spec.default is not None
-            }
             self.setRowCount(len(params) + 1)
             for row, (name, spec) in enumerate(sorted(params.items())):
                 self._set_row(row, name, spec)
@@ -523,6 +570,45 @@ class McpParamsTable(QTableWidget):
             Qt.Checked if spec.required else Qt.Unchecked
         )
         self.setItem(row, 3, required_item)
+        # Column 4: serialise default value as a human-readable string
+        default_text = self._serialise_default(spec.default)
+        self.setItem(row, 4, QTableWidgetItem(default_text))
+
+    @staticmethod
+    def _serialise_default(value: Any) -> str:
+        """Convert a typed default value to its editable string representation."""
+        if value is None:
+            return ""
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, (list, dict)):
+            return json.dumps(value, separators=(",", ":"))
+        return str(value)
+
+    def _parse_default(self, raw: str, param_type: str) -> Any:
+        """Parse the raw string from the Default cell into a typed Python value.
+
+        Returns ``None`` when the raw string is empty or cannot be converted.
+        Dispatches to ``_COERCERS[param_type]``; unknown types fall back to
+        the raw (stripped) string, matching the ``string`` behaviour.
+        """
+        stripped = raw.strip()
+        if not stripped:
+            return None
+
+        coercer = self._COERCERS.get(param_type)
+        if coercer is None:
+            return stripped
+
+        try:
+            return coercer(stripped)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            logger.debug(
+                "mcp_param_default_coerce_failed value=%r param_type=%s",
+                stripped,
+                param_type,
+            )
+            return None
 
     def get_data(self) -> dict[str, McpToolParam]:
         params: dict[str, McpToolParam] = {}
@@ -545,11 +631,14 @@ class McpParamsTable(QTableWidget):
                 if required_item
                 else True
             )
+            default_item = self.item(row, 4)
+            raw_default = default_item.text() if default_item else ""
+            default = self._parse_default(raw_default, param_type)
             params[name] = McpToolParam(
                 type=param_type,
                 description=description,
                 required=required,
-                default=self._defaults.get(name),
+                default=default,
             )
         return params
 

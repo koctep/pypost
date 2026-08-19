@@ -149,3 +149,59 @@ class TestRequestWidgetMcpParamSync(unittest.TestCase):
         self.assertTrue(params["board_id"].required)
         self.assertEqual(params["raw_data"].type, "string")
         self.assertTrue(params["raw_data"].required)
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1089 — Step 3: Failing repro tests for McpParamsTable 5-column UI
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("qapp")
+class TestMcpParamsTableFiveColumns(unittest.TestCase):
+    """Failing repro for PYPOST-1089: Default column must exist at index 4."""
+
+    def setUp(self):
+        self.table = McpParamsTable()
+
+    def tearDown(self):
+        self.table.close()
+        self.table.deleteLater()
+
+    def test_mcp_params_table_has_five_columns(self):
+        """McpParamsTable must have 5 columns with 'Default' as the 5th header.
+
+        Currently fails because __init__ creates 4 columns only.
+        """
+        self.assertEqual(self.table.columnCount(), 5)
+        header_item = self.table.horizontalHeaderItem(4)
+        self.assertIsNotNone(header_item, "Column 4 header item must exist")
+        self.assertEqual(header_item.text(), "Default")
+
+    def test_default_column_survives_rename(self):
+        """Default value must survive a param rename (Name cell text change).
+
+        Currently fails because get_data() reads self._defaults keyed by the
+        *original* name; after renaming the cell text the key no longer matches.
+        """
+        params = {
+            "maxResults": McpToolParam(
+                type="integer",
+                description="Max results",
+                required=False,
+                default=50,
+            ),
+        }
+        self.table.set_data(params)
+
+        # Simulate user renaming the param by editing the Name cell directly
+        name_item = self.table.item(0, 0)
+        self.assertIsNotNone(name_item)
+        name_item.setText("limit")
+
+        result = self.table.get_data()
+        self.assertIn("limit", result)
+        self.assertEqual(
+            result["limit"].default,
+            50,
+            "Default must be preserved after renaming the param",
+        )

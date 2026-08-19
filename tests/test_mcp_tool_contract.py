@@ -174,3 +174,56 @@ class TestMcpToolContract(unittest.TestCase):
         self.assertIn("board_name", preview.input_schema["properties"])
         self.assertIn("board_id", preview.input_schema["required"])
         self.assertIn("board_name", preview.input_schema["required"])
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1089 — Step 3: Failing repro tests for McpToolParam.default validation
+# ---------------------------------------------------------------------------
+
+
+def test_boolean_default_string_raises():
+    """McpToolParam(type='boolean', default='fifty') must raise pydantic.ValidationError.
+
+    Currently fails because model_post_init does not cross-check default type.
+    """
+    import pydantic
+
+    with pytest.raises(pydantic.ValidationError):
+        McpToolParam(type="boolean", default="fifty")
+
+
+def test_integer_default_float_raises():
+    """McpToolParam(type='integer', default=3.14) must raise pydantic.ValidationError.
+
+    Currently fails because model_post_init does not cross-check default type.
+    """
+    import pydantic
+
+    with pytest.raises(pydantic.ValidationError):
+        McpToolParam(type="integer", default=3.14)
+
+
+def test_valid_defaults_accepted():
+    """Valid type-compatible defaults must NOT raise.
+
+    These should already work today and will continue to work after the fix.
+    """
+    # integer with int default
+    p1 = McpToolParam(type="integer", default=5)
+    assert p1.default == 5
+
+    # string with str default
+    p2 = McpToolParam(type="string", default="hello")
+    assert p2.default == "hello"
+
+    # boolean with bool default
+    p3 = McpToolParam(type="boolean", default=True)
+    assert p3.default is True
+
+    # number with float default
+    p4 = McpToolParam(type="number", default=3.14)
+    assert p4.default == 3.14
+
+    # No default (None) is always valid
+    p5 = McpToolParam(type="integer", default=None)
+    assert p5.default is None
