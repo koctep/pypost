@@ -69,7 +69,12 @@ class LiveMCPServer:
         asyncio.set_event_loop(loop)
         app = self.impl.create_app()
         config = uvicorn.Config(
-            app=app, host=self.host, port=self.port, loop="asyncio", log_level="warning"
+            app=app,
+            host=self.host,
+            port=self.port,
+            loop="asyncio",
+            log_config=None,
+            log_level="warning",
         )
         self._server = uvicorn.Server(config)
         self._server.install_signal_handlers = lambda: None

@@ -1655,9 +1655,12 @@ passes. Full design: `ai-tasks/PYPOST-571/ci-guardrails-proposal.md`.
 | **Duration budget** | Warn when test duration >80% of `pytest.mark.timeout`; fail at >95% (PYPOST-569) |
 | **Post-run script** | `scripts/verify_test_log_guardrails.py` parses captured pytest log after run; wired in CI after pytest |
 
-### Phase 1 — log allowlist + verifier (PYPOST-572)
+### Phase 1 — log allowlist + verifier (PYPOST-572, PYPOST-1081)
 
-After pytest in `.github/workflows/test.yml`, CI captures stdout/stderr to `pytest.log` and runs:
+For full architectural details, embedded uvicorn `log_config=None` mechanics, allowlist
+curation, and troubleshooting, see [Test Log Guardrails and Capture](test_log_guardrails.md).
+
+After pytest in `.github/workflows/test.yml`, CI captures logs via `--log-file=pytest.log` and runs:
 
 ```bash
 python scripts/verify_test_log_guardrails.py pytest.log
@@ -1672,13 +1675,13 @@ The verifier reuses `parse_log` from `scripts/parse_test_log_inventory.py`. It:
    - **Prefix only:** `message_prefix` matches any logger (for shared event names).
 3. **Fails** when any ERROR line is unlisted.
 4. **Fails** when total ERROR count exceeds `baseline_error_count + error_margin`
-   (baseline **72**, margin **5** from PYPOST-567).
+   (baseline **146**, margin **5** after PYPOST-1081 capture restoration).
 
 Local reproduction:
 
 ```bash
-make test 2>&1 | tee tests.txt
-.venv/bin/python scripts/verify_test_log_guardrails.py tests.txt
+pytest tests/ -m "not slow" --log-file=pytest.log --log-file-level=WARNING
+.venv/bin/python scripts/verify_test_log_guardrails.py pytest.log
 ```
 
 When adding an intentional error-path test that emits a new ERROR pattern, add a rule to

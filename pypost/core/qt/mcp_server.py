@@ -229,7 +229,12 @@ class MCPServerManager(QObject):
         try:
             app = self._impl.create_app()
             config = uvicorn.Config(
-                app=app, host=self._current_host, port=self._current_port, loop="asyncio"
+                app=app,
+                host=self._current_host,
+                port=self._current_port,
+                loop="asyncio",
+                log_config=None,
+                log_level="warning",
             )
             self._server_instance = uvicorn.Server(config)
 

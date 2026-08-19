@@ -170,6 +170,7 @@ class MetricsServer:
                 host=self._current_host,
                 port=self._current_port,
                 loop="asyncio",
+                log_config=None,
                 log_level="warning",
             )
             self.server_instance = uvicorn.Server(config)

@@ -40,7 +40,7 @@ def _sample_log(*error_lines: str) -> list[str]:
 @pytest.mark.timeout(30)
 def test_load_allowlist_reads_baseline_and_rules() -> None:
     allowlist = guardrails.load_allowlist(ALLOWLIST_PATH)
-    assert allowlist.baseline_error_count == 72
+    assert allowlist.baseline_error_count == 146
     assert allowlist.error_margin == 5
     assert len(allowlist.rules) >= 20
     assert any(

@@ -109,6 +109,7 @@ conventions.
 
 1. [Unit Testability Patterns (PYPOST-382)](testability.md)
 1. [Testing via MCP and Prometheus](testing.md)
+1. [Test Log Guardrails and Capture (PYPOST-1081)](test_log_guardrails.md)
 1. [Verification-Artifact Contracts (PYPOST-1077)](verification_artifact_contracts.md)
 1. [AI Task Artifacts Verification (PYPOST-816, PYPOST-1071, PYPOST-1079)](ai_task_artifacts_verification.md)
 1. [Static Type Checking (PYPOST-734)](static_type_checking.md)

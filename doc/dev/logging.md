@@ -58,7 +58,7 @@ Example (INFO):
 | --- | --- | --- |
 | Alert rotating file | JSON lines via dedicated logger | `AlertManager` file logger only |
 | Legacy modules | Human-readable prefix | See [Legacy migration](#legacy-migration) |
-| Uvicorn (metrics/MCP threads) | Uvicorn default | Suppressed to WARNING on server threads |
+| Uvicorn (metrics/MCP threads) | Uvicorn default | Uses `log_config=None` (PYPOST-1081); see [Test Log Guardrails](test_log_guardrails.md) |
 
 ## Domain Event Catalog
 

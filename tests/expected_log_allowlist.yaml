@@ -1,6 +1,6 @@
-# ERROR allowlist derived from PYPOST-567 inventory (expected groups).
+# ERROR allowlist derived from PYPOST-567 inventory and PYPOST-1081 restored capture.
 # CI verifier fails on unlisted ERROR lines or count > baseline + margin.
-baseline_error_count: 72
+baseline_error_count: 146
 error_margin: 5
 
 rules:
@@ -14,17 +14,27 @@ rules:
   - logger: pypost.core.qt.worker
     message_prefix: RequestWorker unexpected error
 
-  # pypost.ui.presenters.tabs_presenter
+  # pypost.ui.presenters.tabs_presenter / tabs_presenter_worker
   - logger: pypost.ui.presenters.tabs_presenter
+    message_prefix: request_error
+  - logger: pypost.ui.presenters.tabs_presenter_worker
     message_prefix: request_error
 
   # pypost.ui.presenters.collection_tree_actions
   - logger: pypost.ui.presenters.collection_tree_actions
     message_prefix: collection_item_delete_failed
+  - logger: pypost.ui.presenters.collection_tree_actions
+    message_prefix: collection_item_rename_failed
+
+  # pypost.core.collection_import_apply
+  - logger: pypost.core.collection_import_apply
+    message_prefix: collection_import_save_failed
 
   # pypost.core.storage
   - logger: pypost.core.storage
     message_prefix: load_environments_failed
+  - logger: pypost.core.storage
+    message_prefix: load_environments_partial_failure
   - logger: pypost.core.storage
     message_prefix: save_environments_replace_failed
 
@@ -41,6 +51,26 @@ rules:
     message_prefix: mcp_operation_failed
   - logger: pypost.core.mcp_client_service
     message_prefix: mcp_operation_timeout
+
+  # pypost.core.mcp_proxy_server_impl
+  - logger: pypost.core.mcp_proxy_server_impl
+    message_prefix: mcp_proxy_list_tools_connect_error
+  - logger: pypost.core.mcp_proxy_server_impl
+    message_prefix: mcp_proxy_list_tools_timeout
+  - logger: pypost.core.mcp_proxy_server_impl
+    message_prefix: mcp_proxy_call_tool_connect_error
+
+  # pypost.core.qt.mcp_server
+  - logger: pypost.core.qt.mcp_server
+    message_prefix: mcp_server_start_failed
+
+  # pypost.core.metrics_server
+  - logger: pypost.core.metrics_server
+    message_prefix: metrics_server_start_failed
+
+  # pypost.core.config_manager
+  - logger: pypost.core.config_manager
+    message_prefix: config_load_failed
 
   # pypost.ui.presenters.mcp_controls_presenter
   # PYPOST-1071 / PYPOST-1087: the MCP start-failure ERROR moved here from
@@ -60,8 +90,10 @@ rules:
     message_prefix: http_request_timed_out
   - logger: pypost.core.http_client
     message_prefix: yaml_to_json_conversion_failed
+  - logger: pypost.core.http_client
+    message_prefix: template_integer_conversion_failed
 
-  # Encryption / environment storage (error-path tests)
+  # Encryption / environment storage / migration workers (error-path tests)
   - logger: pypost.core.key_provider
     message_prefix: encryption_key_rotation_lookup_failed
   - logger: pypost.core.key_provider
@@ -72,10 +104,24 @@ rules:
     message_prefix: environment_storage_worker_load_failed
   - logger: pypost.core.qt.environment_storage_worker
     message_prefix: environment_storage_worker_save_failed
+  - logger: pypost.core.qt.collection_storage_worker
+    message_prefix: collection_storage_worker_load_failed
+  - logger: pypost.core.qt.encryption_migration_worker
+    message_prefix: encryption_migration_worker_failed
   - logger: pypost.core.environment_variables_adapter
     message_prefix: environment_value_encrypt_failed
   - logger: pypost.ui.presenters.env_presenter
     message_prefix: storage_save_failed
+  - logger: pypost.fixtures.agent_e2e_seed
+    message_prefix: agent_e2e_seed_failed
+
+  # uvicorn bind errors in negative tests
+  - logger: uvicorn.error
+    message_prefix: "[Errno 98]"
+
+  # repro & guardrail tests
+  - logger: test.guardrail
+    message_prefix: guardrail_
 
   # asyncio pending-task noise from MCP test teardown
   - logger: asyncio
