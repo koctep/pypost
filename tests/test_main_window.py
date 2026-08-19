@@ -22,8 +22,7 @@ class TestMainWindow(unittest.TestCase):
         return McpServerSettingsController(
             settings_provider=lambda: settings,
             config_manager=config_manager,
-            collections_provider=lambda: None,
-            get_collections=lambda: [],
+            collection_lookup=lambda _collection_id: None,
             environment_lookup=lambda _environment_id: None,
             metrics=MagicMock(),
             template_service=MagicMock(),

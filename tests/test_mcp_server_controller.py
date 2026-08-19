@@ -51,8 +51,7 @@ def test_mcp_server_controller_configurations_returns_deep_copies():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -79,8 +78,7 @@ def test_mcp_server_controller_status_delegates_to_registry():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -105,8 +103,7 @@ def test_mcp_server_activity_returns_entries_when_manager_found():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -128,8 +125,7 @@ def test_mcp_server_activity_handles_keyerror_with_debug_log(caplog):
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -153,8 +149,7 @@ def test_upsert_mcp_server_creates_and_persists_new_configuration(caplog):
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -182,8 +177,7 @@ def test_upsert_mcp_server_updates_existing_stopped_configuration(caplog):
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -211,8 +205,7 @@ def test_upsert_mcp_server_reconfigures_running_server_without_settings_mutation
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -236,8 +229,7 @@ def test_remove_mcp_server_removes_from_registry_and_settings(caplog):
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -262,8 +254,7 @@ def test_start_and_stop_mcp_server():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -291,8 +282,7 @@ def test_reconfiguration_finished_persists_when_committed():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
@@ -308,44 +298,23 @@ def test_reconfiguration_finished_persists_when_committed():
     assert len(config_manager.saved) == 1
 
 
-def test_collection_by_id_uses_presenter_and_fallback():
+def test_collection_lookup_passed_to_registry():
     col_a = Collection(id="col-a", name="Collection A")
-    col_b = Collection(id="col-b", name="Collection B")
     settings = AppSettings()
     config_manager = FakeConfigManager()
-    registry = MagicMock(spec=MCPServerRegistry)
-
-    presenter = MagicMock()
-    presenter.collection_by_id.return_value = col_a
+    lookup_mock = MagicMock(return_value=col_a)
 
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: presenter,
-        get_collections=lambda: [col_b],
+        collection_lookup=lookup_mock,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),
-        mcp_manager=MagicMock(),
-        registry=registry,
     )
 
-    assert controller._collection_by_id("col-a") == col_a
-    presenter.collection_by_id.assert_called_once_with("col-a")
-
-    controller_no_lookup = McpServerSettingsController(
-        settings_provider=lambda: settings,
-        config_manager=config_manager,
-        collections_provider=lambda: object(),
-        get_collections=lambda: [col_b],
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
-        mcp_manager=MagicMock(),
-        registry=registry,
-    )
-    assert controller_no_lookup._collection_by_id("col-b") == col_b
-    assert controller_no_lookup._collection_by_id("missing") is None
+    assert controller.registry._collection_lookup("col-a") == col_a
+    lookup_mock.assert_called_once_with("col-a")
 
 
 def test_start_enabled_and_stop_all():
@@ -356,8 +325,7 @@ def test_start_enabled_and_stop_all():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collections_provider=lambda: None,
-        get_collections=lambda: [],
+        collection_lookup=lambda _id: None,
         environment_lookup=lambda _id: None,
         metrics=MagicMock(),
         template_service=MagicMock(),

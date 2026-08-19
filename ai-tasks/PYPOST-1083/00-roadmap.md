@@ -80,7 +80,10 @@
     were checked and needed no change — neither described the deep-copy-vs-`len()`
     implementation detail that changed. `doc/dev/logging.md`'s `mcp_servers_dialog_opened`
     entry is unaffected (message/level/field unchanged, per Step 6).
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `eeecb435` on `dev` — "refactoring(ui): PYPOST-1083 stop deep-copying MCP
+    rows to log a count"
+  - Branch name (reference only, not switched): `refactoring/PYPOST-1083-mcp-dialog-open-count`
 
 ## Status Legend
 

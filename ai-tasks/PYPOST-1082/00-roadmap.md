@@ -27,7 +27,9 @@
   - [x] Analyze codebase presenter separation, signal wiring, and remaining coupling
   - [x] Create `ai-tasks/PYPOST-1082/60-tech-debt.md`
 - [x] **STEP 8: Dev Docs**
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `2b770ada` on `dev` — "refactoring(ui): PYPOST-1082 retire EnvPresenter MCP delegating shims"
+  - Branch name (reference only, not switched): `refactoring/PYPOST-1082-retire-env-presenter-mcp-shims`
 
 ## Status Legend
 

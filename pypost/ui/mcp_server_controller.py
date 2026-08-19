@@ -37,8 +37,7 @@ class McpServerSettingsController:
         *,
         settings_provider: Callable[[], AppSettings],
         config_manager: ConfigManager,
-        collections_provider: Callable[[], object],
-        get_collections: Callable[[], list[Collection]],
+        collection_lookup: Callable[[str], Collection | None],
         environment_lookup: Callable[[str], Environment | None],
         metrics: MetricsTrackerProtocol,
         template_service: TemplateService,
@@ -47,8 +46,6 @@ class McpServerSettingsController:
     ) -> None:
         self._settings_provider = settings_provider
         self._config_manager = config_manager
-        self._collections_provider = collections_provider
-        self._get_collections = get_collections
         if mcp_manager is not None:
             logger.debug("mcp_manager_source source=injected")
             self.manager = mcp_manager
@@ -63,7 +60,7 @@ class McpServerSettingsController:
         else:
             logger.debug("mcp_registry_source source=new")
             self.registry = MCPServerRegistry(
-                collection_lookup=self._collection_by_id,
+                collection_lookup=collection_lookup,
                 environment_lookup=environment_lookup,
                 metrics=metrics,
                 template_service=template_service,
@@ -85,8 +82,9 @@ class McpServerSettingsController:
         return cls(
             settings_provider=lambda: window.settings,
             config_manager=window.config_manager,
-            collections_provider=lambda: window.collections,
-            get_collections=window.request_manager.get_collections,
+            collection_lookup=lambda collection_id: window.collections.collection_by_id(
+                collection_id
+            ),
             environment_lookup=lambda environment_id: window.env.environment_by_id(
                 environment_id
             ),
@@ -190,21 +188,6 @@ class McpServerSettingsController:
     @property
     def _settings(self) -> AppSettings:
         return self._settings_provider()
-
-    def _collection_by_id(self, collection_id: str) -> Collection | None:
-        """Use the collection presenter lookup, with a test-double-safe fallback."""
-        lookup = getattr(self._collections_provider(), "collection_by_id", None)
-        if callable(lookup):
-            found: Collection | None = lookup(collection_id)
-            return found
-        return next(
-            (
-                collection
-                for collection in self._get_collections()
-                if collection.id == collection_id
-            ),
-            None,
-        )
 
     def _on_mcp_server_reconfiguration_finished(
         self, instance_id: str, committed: bool
