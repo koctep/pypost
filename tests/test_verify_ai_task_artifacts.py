@@ -58,7 +58,7 @@ def _write_completed_standard(task_dir: Path) -> None:
         task_dir,
         "\n".join(
             f"- [x] **STEP {step}: Step {step}**"
-            for step in range(1, 8)
+            for step in range(1, 9)
         )
         + "\n",
     )
@@ -69,23 +69,51 @@ def _write_completed_standard(task_dir: Path) -> None:
 class TestRoadmapParsing:
     def test_individual_steps_all_complete(self) -> None:
         text = "\n".join(
-            f"- [x] **STEP {step}: Step {step}**" for step in range(1, 8)
+            f"- [x] **STEP {step}: Step {step}**" for step in range(1, 9)
         )
         assert is_roadmap_completed(text) is True
 
-    def test_individual_steps_incomplete(self) -> None:
+    def test_missing_step_8_is_incomplete(self) -> None:
         text = "\n".join(
-            f"- [{'x' if step < 7 else ' '}] **STEP {step}: Step {step}**"
-            for step in range(1, 8)
+            f"- [x] **STEP {step}: Step {step}**" for step in range(1, 8)
         )
         assert is_roadmap_completed(text) is False
 
-    def test_collapsed_step_range_complete(self) -> None:
-        text = "- [x] **STEP 1–7** — legacy closure\n"
+    def test_step_8_not_started_is_incomplete(self) -> None:
+        text = "\n".join(
+            [
+                *(f"- [x] **STEP {step}: Step {step}**" for step in range(1, 8)),
+                "- [ ] **STEP 8: Dev Docs**",
+            ]
+        )
+        assert is_roadmap_completed(text) is False
+
+    def test_step_8_in_progress_is_incomplete(self) -> None:
+        text = "\n".join(
+            [
+                *(f"- [x] **STEP {step}: Step {step}**" for step in range(1, 8)),
+                "- [/] **STEP 8: Dev Docs**",
+            ]
+        )
+        assert is_roadmap_completed(text) is False
+
+    def test_individual_steps_incomplete(self) -> None:
+        text = "\n".join(
+            f"- [{'x' if step < 8 else ' '}] **STEP {step}: Step {step}**"
+            for step in range(1, 9)
+        )
+        assert is_roadmap_completed(text) is False
+
+    def test_collapsed_step_1_to_8_complete(self) -> None:
+        text = "- [x] **STEP 1–8** — complete\n"
         assert is_roadmap_completed(text) is True
 
-    def test_collapsed_step_range_incomplete(self) -> None:
-        text = "- [ ] STEP 1–7 complete\n"
+    def test_collapsed_step_1_to_8_incomplete(self) -> None:
+        text = "- [ ] STEP 1–8 complete\n"
+        assert is_roadmap_completed(text) is False
+
+    def test_legacy_collapsed_step_1_to_7_is_incomplete(self) -> None:
+        text = "- [x] **STEP 1–7** — legacy closure\n"
         assert is_roadmap_completed(text) is False
 
     def test_substeps_do_not_count_as_main_steps(self) -> None:
@@ -93,12 +121,13 @@ class TestRoadmapParsing:
             [
                 "- [x] **STEP 1: Requirements**",
                 "- [x] **STEP 2: Architecture**",
-                "- [x] **STEP 3: Development**",
+                "- [x] **STEP 3: Failing Repro**",
                 "  - [x] nested sub-item only",
-                "- [ ] **STEP 4: Cleanup**",
-                "- [x] **STEP 5: Observability**",
-                "- [x] **STEP 6: Debt**",
-                "- [x] **STEP 7: Dev Docs**",
+                "- [ ] **STEP 4: Development**",
+                "- [x] **STEP 5: Code Cleanup**",
+                "- [x] **STEP 6: Observability**",
+                "- [x] **STEP 7: Technical Debt Analysis**",
+                "- [x] **STEP 8: Dev Docs**",
             ]
         )
         assert is_roadmap_completed(text) is False
@@ -138,7 +167,7 @@ class TestCollectViolations:
         _write_roadmap(
             task_dir,
             "\n".join(
-                f"- [x] **STEP {step}: Step {step}**" for step in range(1, 8)
+                f"- [x] **STEP {step}: Step {step}**" for step in range(1, 9)
             )
             + "\n",
         )

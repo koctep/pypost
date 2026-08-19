@@ -15,9 +15,9 @@ ROADMAP_NAME = "00-roadmap.md"
 
 # PYPOST-1071: `70-dev-docs.md` was retired as a required artifact because Step 8's output is
 # reviewed developer documentation under `doc/dev/` (see td-70-dev-docs), not a task-local
-# summary file. No automated check currently verifies that Step 8 happened: `is_roadmap_completed`
-# below only requires steps 1-7, and this script never inspects `doc/dev/`. Restoring a real
-# Step 8 check is tracked as follow-up work, not compensated for here.
+# summary file.
+# PYPOST-1079: Automated verification of Step 8 is established via `is_roadmap_completed`, which
+# requires all steps in range(1, 9) (steps 1 through 8) or collapsed STEP 1-8 to be marked complete.
 STANDARD_FILES: tuple[str, ...] = (
     "00-roadmap.md",
     "10-requirements.md",
@@ -40,7 +40,7 @@ AUDIT_FILES: tuple[str, ...] = (
 CODE_AUDIT_TASKS = frozenset(f"PYPOST-{number}" for number in range(684, 690))
 
 _COLLAPSED_STEP_RE = re.compile(
-    r"^\s*-\s*\[(?P<mark>x| )\]\s+\*?\*?STEP\s+1[\-–]7",
+    r"^\s*-\s*\[(?P<mark>x| )\]\s+\*?\*?STEP\s+1[\-–]8",
     re.IGNORECASE | re.MULTILINE,
 )
 _STEP_LINE_RE = re.compile(
@@ -66,7 +66,7 @@ def is_roadmap_completed(roadmap_text: str) -> bool:
 
     if not step_status:
         return False
-    return all(step_status.get(step, False) for step in range(1, 8))
+    return all(step_status.get(step, False) for step in range(1, 9))
 
 
 def missing_required_files(task_dir: Path, task_id: str) -> list[str]:
@@ -199,14 +199,13 @@ def main() -> int:
         )
         return 1
 
-    compliant_count = sum(
-        1
-        for task_dir in args.ai_tasks_dir.iterdir()
-        if task_dir.is_dir()
-        and task_dir.name.startswith("PYPOST-")
-        and (task_dir / ROADMAP_NAME).is_file()
-        and is_roadmap_completed((task_dir / ROADMAP_NAME).read_text(encoding="utf-8"))
-    )
+    compliant_count = 0
+    for task_dir in args.ai_tasks_dir.iterdir():
+        if not task_dir.is_dir() or not task_dir.name.startswith("PYPOST-"):
+            continue
+        roadmap = task_dir / ROADMAP_NAME
+        if roadmap.is_file() and is_roadmap_completed(roadmap.read_text(encoding="utf-8")):
+            compliant_count += 1
     print(
         f"ai-tasks artifacts baseline OK "
         f"({compliant_count} completed tasks; "
