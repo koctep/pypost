@@ -71,3 +71,34 @@ def test_workflow_check_lock_dev_setup_uv_step_pins_version() -> None:
         f"to avoid resolver-version drift; got step body:\n{step_tail!r}"
     )
 
+
+def test_workflow_has_otel_check_lock_job() -> None:
+    """test.yml must gate opentelemetry lock drift via make check-lock-otel (PYPOST-997)."""
+    workflow_text = _WORKFLOW.read_text(encoding="utf-8")
+    job = workflow_job_block(workflow_text, "check-lock-otel", workflow_path=_WORKFLOW)
+
+    assert _SETUP_UV_ACTION in job, (
+        "check-lock-otel job must install uv via pinned astral-sh/setup-uv action"
+    )
+    assert re.search(r"run:\s*make check-lock-otel\b", job), (
+        "check-lock-otel job must run `make check-lock-otel`"
+    )
+
+
+def test_workflow_check_lock_otel_setup_uv_step_pins_version() -> None:
+    """check-lock-otel job's setup-uv step must pin a non-empty version: input (PYPOST-997)."""
+    workflow_text = _WORKFLOW.read_text(encoding="utf-8")
+    job = workflow_job_block(workflow_text, "check-lock-otel", workflow_path=_WORKFLOW)
+
+    step_match = _SETUP_UV_STEP.search(job)
+    assert step_match is not None, (
+        "check-lock-otel job must contain an astral-sh/setup-uv step"
+    )
+    step_tail = step_match.group("rest")
+    version_match = re.search(r"version:\s*(\S+)", step_tail)
+    assert version_match is not None and version_match.group(1).strip("\"'"), (
+        "check-lock-otel job's setup-uv step must pin a non-empty `version:` input "
+        f"to avoid resolver-version drift; got step body:\n{step_tail!r}"
+    )
+
+

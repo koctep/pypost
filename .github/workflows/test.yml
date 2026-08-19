@@ -435,3 +435,25 @@ jobs:
           echo "## Dev dependency lock check (PYPOST-804)" >> "$GITHUB_STEP_SUMMARY"
           echo "Verified \`requirements-dev.txt\` matches \`requirements-dev.in\` via \`make check-lock-dev\`." \
             >> "$GITHUB_STEP_SUMMARY"
+
+  check-lock-otel:
+    name: "check-lock-otel (requirements-otel.txt)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.31" # pinned to avoid resolver-version drift (PYPOST-997)
+
+      - name: Verify otel lock file matches source
+        run: make check-lock-otel
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## Otel dependency lock check (PYPOST-997)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified \`requirements-otel.txt\` matches \`requirements-otel.in\` via \`make check-lock-otel\`." \
+            >> "$GITHUB_STEP_SUMMARY"
