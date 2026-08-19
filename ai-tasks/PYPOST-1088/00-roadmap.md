@@ -3,7 +3,8 @@
 ## Task Metadata
 
 - **Implementation language**: Python
-- **Branch name**: *[recorded by the commit procedure — reference only, do not switch]*
+- **Branch name**: `fix/PYPOST-1088-errno-encryption-flakiness` (reference only — committed
+  directly on `dev`, not switched)
 
 ## Step Status
 
@@ -36,7 +37,9 @@
   - [x] `doc/dev/testing.md` — documented the errno portability fix (macOS `48` literal → symbolic `errno.EADDRINUSE`) in the existing PYPOST-716 port-busy test paragraph
   - [x] `doc/dev/environment_encryption_at_rest.md` — new "File-backed registry caching (`MtimeFileCache`)" subsection: `clear()` / `clear_registry_cache()` / `clear_spec_cache()` entry points, the same-tick stale-cache race they fix, the `_reset_key_source_caches` autouse fixture, and the documented (not fixed) `env.py` vs `secret_store.py` loader guard asymmetry (PYPOST-1112 follow-up); added `tests/test_key_sources_chain_coverage.py` to the Tests file list with a note on its new coverage
   - [x] `doc/dev/encryption_key_migration.md` — Tests section cross-reference: why `test_encryption_migration.py` / `test_encryption_migrate_cli.py` call `clear_registry_cache()` after mid-test key rotation
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - [x] Commit `a49fec36` on `dev`: "fix(tests): PYPOST-1088 fix Linux errno hardcoding and
+    encryption test flakiness"
 
 ## Status Legend
 
