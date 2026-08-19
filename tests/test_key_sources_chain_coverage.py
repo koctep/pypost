@@ -1,19 +1,23 @@
 """PYPOST-502: expanded key provider chain and secret-store unit coverage."""
 
 
-import pytest
-
-pytestmark = pytest.mark.timeout(30)
-
 import json
 from unittest.mock import MagicMock
 
+import pytest
 
 from pypost.core.key_provider import ChainedKeyProvider, build_key_id
 from pypost.core.key_sources.chain import KeySourceChain
-from pypost.core.key_sources.env import EnvKeySource
-from pypost.core.key_sources.secret_store import SecretBackendChain, SecretStoreKeySource
+from pypost.core.key_sources.env import EnvKeySource, clear_registry_cache
+from pypost.core.key_sources.file_cache import MtimeFileCache
+from pypost.core.key_sources.secret_store import (
+    SecretBackendChain,
+    SecretStoreKeySource,
+    clear_spec_cache,
+)
 from pypost.core.key_source_constants import parse_key_source_fallback
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def test_parse_key_source_fallback_empty_returns_none():
@@ -158,3 +162,77 @@ def test_chained_provider_by_id_uses_chain_fallback(monkeypatch):
     provider = ChainedKeyProvider(KeySourceChain([unavailable, EnvKeySource()]))
     resolved = provider.get_key_by_id(key_id)
     assert resolved.key == key
+
+
+def test_mtime_file_cache_clear(tmp_path):
+    cache = MtimeFileCache[str]()
+    target = tmp_path / "sample.txt"
+    target.write_text("initial", encoding="utf-8")
+
+    calls = 0
+
+    def loader(path):
+        nonlocal calls
+        calls += 1
+        return path.read_text(encoding="utf-8")
+
+    assert cache.get(target, loader) == "initial"
+    assert cache.get(target, loader) == "initial"
+    assert calls == 1
+
+    cache.clear()
+    assert cache.get(target, loader) == "initial"
+    assert calls == 2
+
+
+def test_clear_registry_cache_forces_reload(monkeypatch, tmp_path):
+    fernet = pytest.importorskip("cryptography.fernet")
+    key = fernet.Fernet.generate_key().decode("utf-8")
+    key_id = build_key_id(key)
+    registry_path = tmp_path / "keys.json"
+    registry_path.write_text(
+        json.dumps({"active_key_id": key_id, "keys": {key_id: key}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(EnvKeySource.KEYS_FILE, str(registry_path))
+    calls = 0
+    original = EnvKeySource._read_registry_file
+
+    def counting(self, path):
+        nonlocal calls
+        calls += 1
+        return original(self, path)
+
+    monkeypatch.setattr(EnvKeySource, "_read_registry_file", counting)
+    source = EnvKeySource()
+    assert source.try_resolve_active() is not None
+    assert calls == 1
+
+    clear_registry_cache()
+    assert source.try_resolve_active() is not None
+    assert calls == 2
+
+
+def test_clear_spec_cache_forces_reload(monkeypatch, tmp_path):
+    spec_path = tmp_path / "spec.json"
+    spec_path.write_text(
+        json.dumps({"active_key_id": "dummy", "keys": {"dummy": "fake"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_SECRETS_FILE", str(spec_path))
+    calls = 0
+    original = SecretStoreKeySource._read_spec_file
+
+    def counting(self, path):
+        nonlocal calls
+        calls += 1
+        return original(self, path)
+
+    monkeypatch.setattr(SecretStoreKeySource, "_read_spec_file", counting)
+    source = SecretStoreKeySource()
+    source._load_spec()
+    assert calls == 1
+
+    clear_spec_cache()
+    source._load_spec()
+    assert calls == 2

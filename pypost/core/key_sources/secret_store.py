@@ -23,6 +23,11 @@ SECRETS_FILE_ENV = "PYPOST_ENV_ENCRYPTION_SECRETS_FILE"
 _spec_cache: MtimeFileCache[dict[str, Any]] = MtimeFileCache()
 
 
+def clear_spec_cache() -> None:
+    """Clear the cached secret store specification."""
+    _spec_cache.clear()
+
+
 class SecretBackend:
     """Abstract base class for one secret-store channel."""
 
@@ -190,7 +195,8 @@ class SecretStoreKeySource:
     def _read_spec_file(self, path: Path) -> dict[str, Any] | None:
         try:
             with open(path, encoding="utf-8") as handle:
-                return json.load(handle)
+                data = json.load(handle)
+                return data if isinstance(data, dict) else None
         except (OSError, json.JSONDecodeError) as exc:
             logger.debug("secret_store_spec_load_failed path=%s reason=%s", path, exc)
             return None

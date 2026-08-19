@@ -1,16 +1,17 @@
 """CLI tests for scripts/encryption_migrate.py (PYPOST-487)."""
 
 
-import pytest
-
-pytestmark = pytest.mark.timeout(60)
-
 import json
 
+import pytest
 
+from pypost.core.key_provider import build_key_id
+from pypost.core.key_sources.env import EnvKeySource, clear_registry_cache
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _patch_dirs(tmp_path, monkeypatch) -> None:
@@ -18,6 +19,7 @@ def _patch_dirs(tmp_path, monkeypatch) -> None:
         "pypost.core.storage.user_data_dir",
         lambda app_name, app_author: str(tmp_path / "pypost-data"),
     )
+
     monkeypatch.setattr(
         "pypost.core.config_manager.user_config_dir",
         lambda app_name, app_author: str(tmp_path / "pypost-config"),
@@ -101,11 +103,9 @@ def test_cli_re_encrypt_dry_run(tmp_path, monkeypatch, capsys):
     _patch_dirs(tmp_path, monkeypatch)
     active_key = fernet.Fernet.generate_key().decode("utf-8")
     historical_key = fernet.Fernet.generate_key().decode("utf-8")
-    from pypost.core.key_provider import build_key_id
-    from pypost.core.key_sources.env import EnvKeySource
-
     active_id = build_key_id(active_key)
     historical_id = build_key_id(historical_key)
+
     registry_path = tmp_path / "keys.json"
     registry_path.write_text(
         json.dumps(
@@ -141,6 +141,7 @@ def test_cli_re_encrypt_dry_run(tmp_path, monkeypatch, capsys):
         ),
         encoding="utf-8",
     )
+    clear_registry_cache()
 
     main = _import_cli_main()
     code = main(["re-encrypt", "--dry-run", "--no-backup"])
@@ -159,11 +160,9 @@ def test_cli_re_encrypt_dry_run_json_includes_reencrypt_stats(tmp_path, monkeypa
     _patch_dirs(tmp_path, monkeypatch)
     active_key = fernet.Fernet.generate_key().decode("utf-8")
     historical_key = fernet.Fernet.generate_key().decode("utf-8")
-    from pypost.core.key_provider import build_key_id
-    from pypost.core.key_sources.env import EnvKeySource
-
     active_id = build_key_id(active_key)
     historical_id = build_key_id(historical_key)
+
     registry_path = tmp_path / "keys.json"
     registry_path.write_text(
         json.dumps(
@@ -199,6 +198,7 @@ def test_cli_re_encrypt_dry_run_json_includes_reencrypt_stats(tmp_path, monkeypa
         ),
         encoding="utf-8",
     )
+    clear_registry_cache()
 
     main = _import_cli_main()
     code = main(["re-encrypt", "--dry-run", "--no-backup", "--json"])
@@ -476,9 +476,8 @@ def test_cli_encrypt_plaintext_dry_run(tmp_path, monkeypatch, capsys):
     fernet = pytest.importorskip("cryptography.fernet")
     _patch_dirs(tmp_path, monkeypatch)
     key = fernet.Fernet.generate_key().decode("utf-8")
-    from pypost.core.key_provider import build_key_id
-
     active_id = build_key_id(key)
+
     monkeypatch.setenv("PYPOST_ENV_ENCRYPTION_KEY", key)
     _write_settings(tmp_path, AppSettings(env_encryption_enabled=True))
 
@@ -515,11 +514,9 @@ def test_cli_re_encrypt_reports_reencrypt_stats(tmp_path, monkeypatch, capsys):
     _patch_dirs(tmp_path, monkeypatch)
     active_key = fernet.Fernet.generate_key().decode("utf-8")
     historical_key = fernet.Fernet.generate_key().decode("utf-8")
-    from pypost.core.key_provider import build_key_id
-    from pypost.core.key_sources.env import EnvKeySource
-
     active_id = build_key_id(active_key)
     historical_id = build_key_id(historical_key)
+
     registry_path = tmp_path / "keys.json"
     registry_path.write_text(
         json.dumps(
@@ -555,6 +552,7 @@ def test_cli_re_encrypt_reports_reencrypt_stats(tmp_path, monkeypatch, capsys):
         ),
         encoding="utf-8",
     )
+    clear_registry_cache()
 
     main = _import_cli_main()
     code = main(["re-encrypt", "--no-backup"])

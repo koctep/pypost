@@ -1,10 +1,11 @@
 """Tests for MCPServerManager startup signaling (PYPOST-556, PYPOST-719, PYPOST-726, PYPOST-727)."""
 import asyncio
 import errno
+import gc
 import logging
-import socket
 import warnings
 from unittest.mock import MagicMock, patch
+
 
 import pytest
 
@@ -20,7 +21,7 @@ pytestmark = pytest.mark.timeout(60)
 
 def test_format_mcp_bind_error_addr_in_use():
     exc = OSError("Address already in use")
-    exc.errno = 48
+    exc.errno = errno.EADDRINUSE
     message = format_mcp_bind_error(exc, "127.0.0.1", 1080)
     assert "1080" in message
     assert "busy" in message.lower()
@@ -76,7 +77,9 @@ def test_stop_emits_false(qapp):
 
 def test_set_variable_supplier_forwards_to_impl():
     manager = MCPServerManager()
-    supplier = lambda: {"token": "abc"}
+
+    def supplier():
+        return {"token": "abc"}
 
     manager.set_variable_supplier(supplier)
 
@@ -144,7 +147,10 @@ def test_emit_activity_emits_activity_recorded_signal():
 
 def test_set_hidden_keys_supplier_forwards_to_impl():
     manager = MCPServerManager()
-    supplier = lambda: {"secret", "token"}
+
+    def supplier():
+        return {"secret", "token"}
+
     manager.set_hidden_keys_supplier(supplier)
     assert manager._impl._hidden_keys_supplier is supplier
 
@@ -238,9 +244,8 @@ def test_run_uvicorn_drains_pending_task_without_destroyed_warning():
             warnings.simplefilter("always")
             manager._run_uvicorn()
             leftover_tasks.clear()
-            import gc
-
             gc.collect()
 
     messages = [str(w.message) for w in caught]
+
     assert not any("was destroyed but it is pending" in m for m in messages)

@@ -607,6 +607,13 @@ secret-store fixtures.
 `test_encryption_migration_vault.py` covers Stage 4 (Vault-backed secret_store primary) verify
 and bulk re-encrypt paths using a mocked Vault KV HTTP response — no live Vault server required.
 
+`test_encryption_migration.py` and `test_encryption_migrate_cli.py` simulate key rotation
+mid-test by rewriting the env-channel registry file, then call `clear_registry_cache()` right
+after the rewrite so the next resolve reflects the new active key rather than risking a
+same-filesystem-tick stale-cache read from `MtimeFileCache`. See
+[Environment Encryption at Rest — File-backed registry caching](environment_encryption_at_rest.md#file-backed-registry-caching-mtimefilecache)
+for the cache-invalidation entry points and the race they close (PYPOST-1088).
+
 Full regression:
 
 ```bash

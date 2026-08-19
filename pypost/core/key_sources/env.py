@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 _registry_cache: MtimeFileCache[KeyRegistry] = MtimeFileCache()
 
 
+def clear_registry_cache() -> None:
+    """Clear the cached key registry."""
+    _registry_cache.clear()
+
+
 class EnvKeySource:
     """Resolves keys from process environment and optional JSON registry file."""
 

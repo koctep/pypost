@@ -841,6 +841,19 @@ To prevent native thread-termination crashes and segmentation faults on macOS un
 bind and background thread exit cleanup, while still fully exercising the manager's custom
 error signaling and status transition logic.
 
+**Errno portability (PYPOST-1088):** `test_format_mcp_bind_error_addr_in_use`
+(`test_mcp_server_manager.py`) and `TestFormatBindError::test_metrics_addr_in_use_message`
+(`test_metrics_server_startup.py`) construct a synthetic `OSError("Address already in use")` and
+set `exc.errno` directly to exercise `format_bind_error` (`pypost/core/server_bind.py`) /
+`format_mcp_bind_error` (`pypost/core/qt/mcp_server.py`). Both previously hardcoded
+`exc.errno = 48` — the literal value of
+`errno.EADDRINUSE` on macOS/BSD, not on Linux (`98`) or Windows (`WSAEADDRINUSE` is `10048`). Both
+now set `exc.errno = errno.EADDRINUSE` (the symbolic `errno` module constant) so the synthetic
+exception's `errno` matches the value the OS running the test would actually raise, on every
+platform, instead of a value pinned to one OS. When writing a new bind-error test case, always
+set `exc.errno` from the symbolic `errno.*` constant (e.g. `errno.EADDRINUSE`,
+`errno.EADDRNOTAVAIL`) — never a numeric literal.
+
 Not covered by the above (follow-up debt): integration tests with real outbound HTTP via a
 local stub server for request execution paths.
 

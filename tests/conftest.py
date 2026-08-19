@@ -13,6 +13,19 @@ pytest_plugins = [
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+@pytest.fixture(autouse=True)
+def _reset_key_source_caches():
+    """Reset key source in-process caches between tests to avoid state leakage."""
+    from pypost.core.key_sources.env import clear_registry_cache
+    from pypost.core.key_sources.secret_store import clear_spec_cache
+
+    clear_registry_cache()
+    clear_spec_cache()
+    yield
+    clear_registry_cache()
+    clear_spec_cache()
+
+
 @pytest.fixture(scope="module")
 def qapp():
     """Shared QApplication for Qt widget tests (module-scoped singleton)."""

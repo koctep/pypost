@@ -37,7 +37,11 @@ class MtimeFileCache(Generic[T]):
         self._value = value
         return value
 
-    def _clear(self) -> None:
+    def clear(self) -> None:
+        """Clear cached state."""
         self._path = None
         self._mtime_ns = None
         self._value = None
+
+    def _clear(self) -> None:
+        self.clear()

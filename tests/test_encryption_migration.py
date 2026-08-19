@@ -1,12 +1,10 @@
 """Tests for encryption migration service (PYPOST-487)."""
 
 
-import pytest
-
-pytestmark = pytest.mark.timeout(120)
-
 import json
+import os
 
+import pytest
 
 from pypost.core.encryption_migration import (
     EncryptionMigrationService,
@@ -14,10 +12,12 @@ from pypost.core.encryption_migration import (
     backup_environments_file,
 )
 from pypost.core.key_provider import build_key_id
-from pypost.core.key_sources.env import EnvKeySource
+from pypost.core.key_sources.env import EnvKeySource, clear_registry_cache
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(120)
 
 
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:
@@ -296,6 +296,7 @@ def test_bulk_re_encrypt_dry_run_projects_active_kid(tmp_path, monkeypatch):
         ),
         encoding="utf-8",
     )
+    clear_registry_cache()
 
     service = EncryptionMigrationService(storage)
     report = service.bulk_re_encrypt(settings, dry_run=True, backup=False)
@@ -614,6 +615,8 @@ def test_bulk_re_encrypt_does_not_skip_with_plaintext_hidden(tmp_path, monkeypat
     with open(storage.environments_file, "w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=2)
 
+    before_mtime = storage.environments_file.stat().st_mtime
+    os.utime(storage.environments_file, (before_mtime - 10, before_mtime - 10))
     before_mtime = storage.environments_file.stat().st_mtime
     report = EncryptionMigrationService(storage).bulk_re_encrypt(
         settings,

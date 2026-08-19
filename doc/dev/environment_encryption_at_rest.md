@@ -89,6 +89,58 @@ are still registered.
 
 `LocalKeyProvider` remains as a thin backward-compatible subclass wired to an env-only chain.
 
+### File-backed registry caching (`MtimeFileCache`)
+
+`EnvKeySource` and `SecretStoreKeySource` each cache their parsed JSON registry/spec file in a
+module-level `pypost.core.key_sources.file_cache.MtimeFileCache` instance (`_registry_cache` in
+`env.py`, `_spec_cache` in `secret_store.py`), keyed by `path.stat().st_mtime_ns`.
+`MtimeFileCache.get(path, loader)` re-parses only when the path or `st_mtime_ns` changes since the
+last call, so repeated key lookups within one process do not re-read and re-validate the
+registry/spec file on every call.
+
+**Explicit invalidation (PYPOST-1088):**
+
+| Function | Module | Clears |
+| --- | --- | --- |
+| `MtimeFileCache.clear()` | `pypost/core/key_sources/file_cache.py` | The calling cache instance's `_path` / `_mtime_ns` / `_value` |
+| `clear_registry_cache()` | `pypost/core/key_sources/env.py` | The module-level `_registry_cache` used by `EnvKeySource` |
+| `clear_spec_cache()` | `pypost/core/key_sources/secret_store.py` | The module-level `_spec_cache` used by `SecretStoreKeySource` |
+
+Production read paths do not need to call these — `MtimeFileCache` self-invalidates the next time
+`get()` observes a different `st_mtime_ns`. They exist for callers (today: tests, and any future
+admin/reload tooling) that rewrite the registry/spec file and need the *next* read to be
+guaranteed fresh without depending on filesystem timestamp resolution.
+
+**Why this matters — same-tick stale-cache race:** `st_mtime_ns` is still filesystem-resolution
+bound. Two writes to the same registry file within the same timestamp tick (common on fast
+filesystems during automated tests — e.g. simulating a key rotation with two back-to-back
+`Path.write_text()` calls) can leave `st_mtime_ns` unchanged, so `MtimeFileCache.get()` returns the
+*stale* pre-rewrite value instead of re-reading. This caused order-dependent flakiness in
+encryption-migration tests that rotate the active key mid-test (PYPOST-1088):
+`tests/test_encryption_migration.py` and `tests/test_encryption_migrate_cli.py` now call
+`clear_registry_cache()` immediately after rewriting the registry file mid-test, forcing the next
+resolve to re-read instead of risking a race with the mtime tick.
+`tests/test_key_sources_chain_coverage.py` covers a different angle of the same mechanism: its
+`test_clear_registry_cache_forces_reload` / `test_clear_spec_cache_forces_reload` write the
+registry/spec file only once, then call `clear_registry_cache()` / `clear_spec_cache()` and
+re-resolve the *same*, unrewritten file to verify the loader function is invoked a second time —
+proving the cache-clear functions force a fresh load rather than reproducing the rotation race
+itself.
+
+`tests/conftest.py` also registers an autouse `_reset_key_source_caches` fixture that calls
+`clear_registry_cache()` and `clear_spec_cache()` before and after every test, so cache state from
+one test's registry/spec file writes never leaks into the next test. That fixture only resets
+*between* tests — a test that rewrites the registry/spec file mid-test still needs its own
+explicit `clear_registry_cache()` / `clear_spec_cache()` call right after the rewrite (see above).
+
+**Known asymmetry (tracked separately, not fixed by PYPOST-1088 — PYPOST-1112):**
+`SecretStoreKeySource._read_spec_file` guards against syntactically-valid but non-object JSON
+(`isinstance(data, dict)`), returning `None` instead of raising. `EnvKeySource._read_registry_file`
+performs the structurally identical read but has no equivalent guard — a registry file containing
+valid non-object JSON (e.g. `[]`, `"x"`, `42`) raises `AttributeError` from the first `.get()` call
+instead of returning `None`. This gap predates PYPOST-1088 and is intentionally left as-is here;
+mirroring the guard onto `env.py` is filed as a follow-up.
+
 ### Data flow
 
 1. User edits environment values in UI.
@@ -668,6 +720,14 @@ Primary coverage files:
 - `tests/test_encryption_migration.py`
 - `tests/test_encryption_migrate_cli.py`
 - `tests/test_environment_export.py`
+- `tests/test_key_sources_chain_coverage.py`
+
+`tests/test_key_sources_chain_coverage.py` covers `MtimeFileCache.clear()`
+(`test_mtime_file_cache_clear`) and the `clear_registry_cache()` / `clear_spec_cache()` entry
+points forcing a fresh `EnvKeySource` / `SecretStoreKeySource` load
+(`test_clear_registry_cache_forces_reload`, `test_clear_spec_cache_forces_reload`). See § File-backed
+registry caching above for why these exist and how tests use them to avoid the same-tick
+stale-cache race.
 
 Async orchestration details: [environment_storage_async.md](environment_storage_async.md).
 Migration procedures: [encryption_key_migration.md](encryption_key_migration.md).
