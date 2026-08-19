@@ -43,9 +43,11 @@ rules:
     message_prefix: mcp_operation_timeout
 
   # pypost.ui.presenters.mcp_controls_presenter
-  # PYPOST-1071: the MCP start-failure ERROR moved here from
+  # PYPOST-1071 / PYPOST-1087: the MCP start-failure ERROR moved here from
   # pypost.ui.presenters.env_presenter with the controls extraction; registering it
   # satisfies the do-testing caplog contract (C2) for its new logger name.
+  # Note: in unit tests using unittest.assertLogs, root propagation is disabled during the
+  # assertion block, making this allowlist rule forward-looking for runs capturing root loggers.
   - logger: pypost.ui.presenters.mcp_controls_presenter
     message_prefix: mcp_server_start_failed_ui
 

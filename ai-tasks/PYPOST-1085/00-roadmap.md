@@ -27,7 +27,9 @@
   - `ai-tasks/PYPOST-1085/60-tech-debt.md`
 - [x] **STEP 8: Dev Docs**
   - Updated `doc/dev/mcp_integration.md` and `doc/dev/testability.md`.
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `b81e645b` on `dev` — "refactoring(ui): PYPOST-1085 drop MainWindow back-reference and mcp aliases"
+  - Branch name (reference only, not switched): `refactoring/PYPOST-1085-drop-window-backref-and-aliases`
 
 ## Status Legend
 
