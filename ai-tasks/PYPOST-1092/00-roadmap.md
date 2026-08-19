@@ -22,7 +22,9 @@
 - [x] **STEP 6: Observability**
 - [x] **STEP 7: Technical Debt Analysis**
 - [x] **STEP 8: Dev Docs**
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `d75b3d34` on `dev` — "feature(mcp): PYPOST-1092 support upstream MCP proxy with env header resolution"
+  - Branch name (reference only, not switched): `feature/PYPOST-1092-mcp-proxy-upstream-env-headers`
 
 ## Status Legend
 
