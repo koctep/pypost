@@ -133,7 +133,7 @@ def compose_app(
         window=window,
         metrics=metrics_manager,
         mcp_manager=mcp_manager,
-        mcp_registry=window.mcp_registry,
+        mcp_registry=window.mcp_controller.registry,
         config_manager=config_manager,
         settings=settings,
     )

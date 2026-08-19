@@ -123,11 +123,9 @@ readiness gate.
     `MCPServerManager`, load persisted rows at construction, mutate
     `AppSettings.mcp_servers` and save through `ConfigManager`, and issue per-endpoint
     start / stop / remove / reconfigure commands.
-*   **Construction**: `MainWindow` calls
-    `McpServerSettingsController.for_window(self, mcp_manager=…, registry=…)`
-    (`pypost/ui/main_window.py:107`), which wires the controller from already-built
-    collaborators through callables. The window then re-publishes
-    `self.mcp_manager` / `self.mcp_registry` from the controller for existing callers.
+*   **Construction**: `MainWindow` instantiates
+    `McpServerSettingsController(settings_provider=…, config_manager=…, collection_lookup=…, environment_lookup=…, metrics=…, template_service=…, mcp_manager=…, registry=…)`
+    (`pypost/ui/main_window.py:107`), directly passing collaborator lookup callables. `MainWindow` no longer re-publishes `mcp_manager` or `mcp_registry` attribute aliases (PYPOST-1085).
 *   **Readiness gate**: `start_enabled()` is a pass-through the window calls only from
     `_maybe_complete_startup_restore()` (`pypost/ui/main_window.py:166`), after both
     collections and environments have loaded. `stop_all()` runs at shutdown.

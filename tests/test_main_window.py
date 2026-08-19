@@ -269,8 +269,10 @@ class TestMainWindow(unittest.TestCase):
         self.assertIs(alert_manager, window._alert_manager)
         self.assertIs(history_manager, window.history_manager)
         self.assertIs(storage, window.storage)
-        self.assertIs(request_manager, window.request_manager)
-        self.assertIs(mcp_manager, window.mcp_manager)
+        self.assertIs(mcp_manager, window.mcp_controller.manager)
+        self.assertFalse(hasattr(window, "mcp_manager"))
+        self.assertFalse(hasattr(window, "mcp_registry"))
+        self.assertFalse(hasattr(McpServerSettingsController, "for_window"))
         storage.apply_encryption_settings.assert_not_called()
 
     def test_build_layout_sidebar_is_qtabwidget(self):

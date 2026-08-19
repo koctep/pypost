@@ -37,7 +37,7 @@ item dispatch uses a strategy registry
 MCP chain (PYPOST-1071): `MainWindow` → `McpServerSettingsController` → `EnvPresenter` →
 `McpControlsPresenter`. The controller builds `MCPServerRegistry` itself unless one is passed
 to `MainWindow(mcp_registry=...)`; `pypost/main.py` passes none and reads back
-`window.mcp_registry`.
+`window.mcp_controller.registry` (PYPOST-1085).
 
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
 `TemplateService` chain and [template_service.md](template_service.md) for lifecycle design

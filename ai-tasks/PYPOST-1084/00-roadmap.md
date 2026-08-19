@@ -27,7 +27,9 @@
   - `ai-tasks/PYPOST-1084/60-tech-debt.md`
 - [x] **STEP 8: Dev Docs**
   - Verified `doc/dev/` contains no stale references.
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `143eebbc` on `dev` — "refactoring(ui): PYPOST-1084 inject collection_lookup into McpServerSettingsController"
+  - Branch name (reference only, not switched): `refactoring/PYPOST-1084-inject-collection-lookup`
 
 ## Status Legend
 

@@ -8,7 +8,7 @@ composes this controller and keeps only the startup readiness gate.
 from __future__ import annotations
 
 import logging
-from typing import Callable, TYPE_CHECKING
+from typing import Callable
 
 from pypost.core.config_manager import ConfigManager
 from pypost.core.mcp_activity_log import McpActivityEntry
@@ -18,9 +18,6 @@ from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.template_service import TemplateService
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import AppSettings, McpServerConfiguration
-
-if TYPE_CHECKING:  # pragma: no cover - import cycle guard for the composition root
-    from pypost.ui.main_window import MainWindow
 
 logger = logging.getLogger(__name__)
 
@@ -69,30 +66,6 @@ class McpServerSettingsController:
             self._on_mcp_server_reconfiguration_finished
         )
         self._load_persisted_mcp_servers()
-
-    @classmethod
-    def for_window(
-        cls,
-        window: MainWindow,
-        *,
-        mcp_manager: MCPServerManager | None = None,
-        registry: MCPServerRegistry | None = None,
-    ) -> McpServerSettingsController:
-        """Wire the controller from the composition root's already-built collaborators."""
-        return cls(
-            settings_provider=lambda: window.settings,
-            config_manager=window.config_manager,
-            collection_lookup=lambda collection_id: window.collections.collection_by_id(
-                collection_id
-            ),
-            environment_lookup=lambda environment_id: window.env.environment_by_id(
-                environment_id
-            ),
-            metrics=window.metrics,
-            template_service=window.template_service,
-            mcp_manager=mcp_manager,
-            registry=registry,
-        )
 
     # -- readiness gate and shutdown, driven by the composition root ------------------
 

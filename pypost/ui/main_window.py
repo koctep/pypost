@@ -104,11 +104,20 @@ class MainWindow(QMainWindow):
             self.icons,
             storage=self.storage,
         )
-        self.mcp_controller = McpServerSettingsController.for_window(
-            self, mcp_manager=mcp_manager, registry=mcp_registry
+        self.mcp_controller = McpServerSettingsController(
+            settings_provider=lambda: self.settings,
+            config_manager=self.config_manager,
+            collection_lookup=lambda collection_id: self.collections.collection_by_id(
+                collection_id
+            ),
+            environment_lookup=lambda environment_id: self.env.environment_by_id(
+                environment_id
+            ),
+            metrics=self.metrics,
+            template_service=self.template_service,
+            mcp_manager=mcp_manager,
+            registry=mcp_registry,
         )
-        self.mcp_manager = self.mcp_controller.manager
-        self.mcp_registry = self.mcp_controller.registry
         self.tabs = TabsPresenter(
             self.request_manager,
             self.state_manager,
@@ -121,11 +130,11 @@ class MainWindow(QMainWindow):
         self.env = EnvPresenter(
             self.storage,
             self.config_manager,
-            self.mcp_manager,
+            self.mcp_controller.manager,
             self.settings,
             self.request_manager.get_collections,
             self.metrics,
-            mcp_registry=self.mcp_registry,
+            mcp_registry=self.mcp_controller.registry,
         )
         self.mcp_controls = self.env.mcp_controls
         self.env.set_mcp_server_controller(self.mcp_controller)
