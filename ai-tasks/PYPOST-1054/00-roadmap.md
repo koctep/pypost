@@ -116,7 +116,10 @@
     while cross-checking anchors
   - [x] Verified all new/edited in-file and cross-file Markdown anchors
     resolve (scripted check); `make verify-ai-tasks` passes
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `abf5995aaad9c42dedb0658b4e42a826c0cd6ce9`
+  - Branch: `feature/PYPOST-1054-jira-mcp-pagination-defaults` (committed directly on `dev` per
+    project convention; branch name recorded for reference only)
 
 ## Status Legend
 
