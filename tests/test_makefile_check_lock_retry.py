@@ -84,11 +84,46 @@ def _write_fake_uv(workspace: Path) -> Path:
     return script
 
 
+TARGET_CONFIGS = {
+    "check-lock": {
+        "in": "requirements.in",
+        "txt": "requirements.txt",
+        "lock_target": "make lock",
+        "scratch": (
+            "requirements.txt.check",
+            "requirements.txt.body",
+            "requirements.txt.check.body",
+        ),
+    },
+    "check-lock-dev": {
+        "in": "requirements-dev.in",
+        "txt": "requirements-dev.txt",
+        "lock_target": "make lock-dev",
+        "scratch": (
+            "requirements-dev.txt.check",
+            "requirements-dev.txt.body",
+            "requirements-dev.txt.check.body",
+        ),
+    },
+    "check-lock-otel": {
+        "in": "requirements-otel.in",
+        "txt": "requirements-otel.txt",
+        "lock_target": "make lock-otel",
+        "scratch": (
+            "requirements-otel.txt.check",
+            "requirements-otel.txt.body",
+            "requirements-otel.txt.check.body",
+        ),
+    },
+}
+
+
 def _run_check_lock(
     workspace: Path,
     fake_uv: Path,
     *,
     extra_env: dict[str, str],
+    target: str = "check-lock",
     timeout: int = 20,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
@@ -98,7 +133,7 @@ def _run_check_lock(
     env["FAKE_UV_COUNTER_FILE"] = str(counter_file)
     env.update(extra_env)
     return subprocess.run(
-        ["make", "check-lock", f"UV={fake_uv}"],
+        ["make", target, f"UV={fake_uv}"],
         cwd=workspace,
         capture_output=True,
         text=True,
@@ -112,36 +147,41 @@ def _combined_output(proc: subprocess.CompletedProcess[str]) -> str:
     return f"{proc.stdout}\n{proc.stderr}"
 
 
-def _scratch_files(workspace: Path) -> list[Path]:
-    return [workspace / name for name in _SCRATCH_FILE_NAMES if (workspace / name).exists()]
+def _scratch_files(workspace: Path, target: str = "check-lock") -> list[Path]:
+    scratch_names = TARGET_CONFIGS[target]["scratch"]
+    return [workspace / name for name in scratch_names if (workspace / name).exists()]
 
 
 @pytest.fixture
 def check_lock_workspace(tmp_path: Path) -> Path:
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
-    (tmp_path / "requirements.in").write_text(_REQUIREMENTS_IN, encoding="utf-8")
-    (tmp_path / "requirements.txt").write_text(_REQUIREMENTS_TXT, encoding="utf-8")
+    for cfg in TARGET_CONFIGS.values():
+        (tmp_path / cfg["in"]).write_text(_REQUIREMENTS_IN, encoding="utf-8")
+        (tmp_path / cfg["txt"]).write_text(_REQUIREMENTS_TXT, encoding="utf-8")
     return tmp_path
 
 
 class TestCheckLockRetriesTransientFailure:
     """A one-off uv/network blip must not fail the gate outright."""
 
+    @pytest.mark.parametrize("target", ["check-lock", "check-lock-dev", "check-lock-otel"])
     def test_recovers_after_two_transient_failures(
         self,
         check_lock_workspace: Path,
+        target: str,
     ) -> None:
         fake_uv = _write_fake_uv(check_lock_workspace)
         result = _run_check_lock(
             check_lock_workspace,
             fake_uv,
+            target=target,
             extra_env={
                 "FAKE_UV_FAIL_COUNT": "2",
                 "FAKE_UV_OUTPUT_BODY": _REQUIREMENTS_BODY,
             },
         )
         assert result.returncode == 0, (
-            "make check-lock must retry transient uv pip compile failures and "
+            f"make {target} must retry transient uv pip compile failures and "
             f"still succeed once uv recovers; got:\n{_combined_output(result)}"
         )
 
@@ -149,14 +189,17 @@ class TestCheckLockRetriesTransientFailure:
 class TestCheckLockReportsExhaustedCompileFailure:
     """Exhausted retries must report distinctly and clean up scratch files."""
 
+    @pytest.mark.parametrize("target", ["check-lock", "check-lock-dev", "check-lock-otel"])
     def test_always_failing_uv_reports_distinct_message(
         self,
         check_lock_workspace: Path,
+        target: str,
     ) -> None:
         fake_uv = _write_fake_uv(check_lock_workspace)
         result = _run_check_lock(
             check_lock_workspace,
             fake_uv,
+            target=target,
             extra_env={
                 "FAKE_UV_ALWAYS_FAIL": "1",
                 "FAKE_UV_LEAVE_PARTIAL_OUTPUT": "1",
@@ -164,32 +207,35 @@ class TestCheckLockReportsExhaustedCompileFailure:
         )
         output = _combined_output(result)
         assert result.returncode != 0, (
-            f"make check-lock must fail when uv pip compile never succeeds; got:\n{output}"
+            f"make {target} must fail when uv pip compile never succeeds; got:\n{output}"
         )
         assert "compile failed" in output.lower() and "attempt" in output.lower(), (
-            "make check-lock must emit a distinct 'uv pip compile failed after N "
+            f"make {target} must emit a distinct 'uv pip compile failed after N "
             f"attempts' message when retries are exhausted; got:\n{output}"
         )
         assert "differ" not in output.lower(), (
             f"an exhausted-compile failure must not read like a diff mismatch; got:\n{output}"
         )
 
+    @pytest.mark.parametrize("target", ["check-lock", "check-lock-dev", "check-lock-otel"])
     def test_always_failing_uv_leaves_no_scratch_files(
         self,
         check_lock_workspace: Path,
+        target: str,
     ) -> None:
         fake_uv = _write_fake_uv(check_lock_workspace)
         _run_check_lock(
             check_lock_workspace,
             fake_uv,
+            target=target,
             extra_env={
                 "FAKE_UV_ALWAYS_FAIL": "1",
                 "FAKE_UV_LEAVE_PARTIAL_OUTPUT": "1",
             },
         )
-        leftovers = _scratch_files(check_lock_workspace)
+        leftovers = _scratch_files(check_lock_workspace, target=target)
         assert not leftovers, (
-            "make check-lock must clean up requirements.txt.check/.body scratch "
+            f"make {target} must clean up scratch "
             f"files even when uv pip compile fails; left behind: {leftovers}"
         )
 
@@ -197,24 +243,28 @@ class TestCheckLockReportsExhaustedCompileFailure:
 class TestCheckLockStillCatchesGenuineDrift:
     """Regression guard: retry/messaging changes must not mask real drift."""
 
+    @pytest.mark.parametrize("target", ["check-lock", "check-lock-dev", "check-lock-otel"])
     def test_genuine_mismatch_still_fails_with_distinct_message(
         self,
         check_lock_workspace: Path,
+        target: str,
     ) -> None:
         fake_uv = _write_fake_uv(check_lock_workspace)
         result = _run_check_lock(
             check_lock_workspace,
             fake_uv,
+            target=target,
             extra_env={"FAKE_UV_OUTPUT_BODY": "foo==2.0\n"},
         )
         output = _combined_output(result)
         assert result.returncode != 0, (
-            f"make check-lock must still fail on genuine lock drift; got:\n{output}"
+            f"make {target} must still fail on genuine lock drift; got:\n{output}"
         )
         assert "stale" in output.lower(), (
-            "make check-lock must report genuine drift with a distinct 'stale' lock "
+            f"make {target} must report genuine drift with a distinct 'stale' lock "
             f"message rather than raw diff -q output; got:\n{output}"
         )
         assert "compile failed" not in output.lower(), (
             f"a genuine diff mismatch must not be reported as a compile failure; got:\n{output}"
         )
+

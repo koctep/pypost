@@ -81,20 +81,64 @@ lock-dev: ## Regenerate requirements-dev.txt transitive lock from requirements-d
 	$(UV) pip compile requirements-dev.in -o requirements-dev.txt --python-version $(LOCK_PYTHON_VERSION)
 
 check-lock-dev: ## Verify requirements-dev.txt matches requirements-dev.in (needs uv on PATH)
-	$(UV) pip compile requirements-dev.in -o requirements-dev.txt.check --python-version $(LOCK_PYTHON_VERSION)
+	@attempt=1; max_attempts=3; delay=1; \
+	while [ $$attempt -le $$max_attempts ]; do \
+		if $(UV) pip compile requirements-dev.in -o requirements-dev.txt.check \
+			--python-version $(LOCK_PYTHON_VERSION); then \
+			break; \
+		fi; \
+		if [ $$attempt -eq $$max_attempts ]; then \
+			echo "check-lock-dev: uv pip compile failed after" \
+				"$$max_attempts attempts (network or tool issue)" >&2; \
+			rm -f requirements-dev.txt.check requirements-dev.txt.body requirements-dev.txt.check.body; \
+			exit 2; \
+		fi; \
+		echo "check-lock-dev: uv pip compile attempt $$attempt/$$max_attempts failed," \
+			"retrying in $${delay}s..." >&2; \
+		sleep $$delay; \
+		attempt=$$((attempt + 1)); \
+		delay=$$((delay * 2)); \
+	done
 	tail -n +3 requirements-dev.txt > requirements-dev.txt.body
 	tail -n +3 requirements-dev.txt.check > requirements-dev.txt.check.body
-	diff -q requirements-dev.txt.body requirements-dev.txt.check.body
+	@if ! diff -q requirements-dev.txt.body requirements-dev.txt.check.body > /dev/null; then \
+		echo "check-lock-dev: requirements-dev.txt is stale relative to requirements-dev.in" \
+			"(run 'make lock-dev' and commit)" >&2; \
+		rm -f requirements-dev.txt.check requirements-dev.txt.body requirements-dev.txt.check.body; \
+		exit 1; \
+	fi
 	rm -f requirements-dev.txt.check requirements-dev.txt.body requirements-dev.txt.check.body
 
 lock-otel: ## Regenerate requirements-otel.txt transitive lock from requirements-otel.in
 	$(UV) pip compile requirements-otel.in -o requirements-otel.txt --python-version $(LOCK_PYTHON_VERSION)
 
 check-lock-otel: ## Verify requirements-otel.txt matches requirements-otel.in (needs uv on PATH)
-	$(UV) pip compile requirements-otel.in -o requirements-otel.txt.check --python-version $(LOCK_PYTHON_VERSION)
+	@attempt=1; max_attempts=3; delay=1; \
+	while [ $$attempt -le $$max_attempts ]; do \
+		if $(UV) pip compile requirements-otel.in -o requirements-otel.txt.check \
+			--python-version $(LOCK_PYTHON_VERSION); then \
+			break; \
+		fi; \
+		if [ $$attempt -eq $$max_attempts ]; then \
+			echo "check-lock-otel: uv pip compile failed after" \
+				"$$max_attempts attempts (network or tool issue)" >&2; \
+			rm -f requirements-otel.txt.check requirements-otel.txt.body requirements-otel.txt.check.body; \
+			exit 2; \
+		fi; \
+		echo "check-lock-otel: uv pip compile attempt $$attempt/$$max_attempts failed," \
+			"retrying in $${delay}s..." >&2; \
+		sleep $$delay; \
+		attempt=$$((attempt + 1)); \
+		delay=$$((delay * 2)); \
+	done
 	tail -n +3 requirements-otel.txt > requirements-otel.txt.body
 	tail -n +3 requirements-otel.txt.check > requirements-otel.txt.check.body
-	diff -q requirements-otel.txt.body requirements-otel.txt.check.body
+	@if ! diff -q requirements-otel.txt.body requirements-otel.txt.check.body > /dev/null; then \
+		echo "check-lock-otel: requirements-otel.txt is stale relative to requirements-otel.in" \
+			"(run 'make lock-otel' and commit)" >&2; \
+		rm -f requirements-otel.txt.check requirements-otel.txt.body requirements-otel.txt.check.body; \
+		exit 1; \
+	fi
 	rm -f requirements-otel.txt.check requirements-otel.txt.body requirements-otel.txt.check.body
 
 run: $(VENV_MARKER) ## Run the PyPost desktop application
