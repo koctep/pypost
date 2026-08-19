@@ -12,6 +12,7 @@ import uvicorn
 from PySide6.QtCore import QObject, Signal
 
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
+from pypost.core.mcp_proxy_server_impl import MCPProxyServerImpl
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.server_bind import drain_pending_tasks, format_bind_error
@@ -46,8 +47,10 @@ class MCPServerManager(QObject):
         self._server_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._server_instance: Optional[uvicorn.Server] = None
+        self._metrics = metrics
+        self._template_service = template_service
         self._activity_log = McpActivityLog(on_append=self._emit_activity)
-        self._impl = MCPServerImpl(
+        self._impl: MCPServerImpl | MCPProxyServerImpl = MCPServerImpl(
             metrics=metrics,
             template_service=template_service,
             activity_log=self._activity_log,
@@ -97,6 +100,15 @@ class MCPServerManager(QObject):
         if self.is_running():
             self.stop_server()
 
+        if not isinstance(self._impl, MCPServerImpl):
+            self._impl = MCPServerImpl(
+                metrics=self._metrics,
+                template_service=self._template_service,
+                activity_log=self._activity_log,
+                variable_supplier=self._variable_supplier,
+                hidden_keys_supplier=self._hidden_keys_supplier,
+            )
+
         self._current_port = port
         self._current_host = host
         self._tools_signature = mcp_tools_signature(tools)
@@ -108,6 +120,42 @@ class MCPServerManager(QObject):
         self._server_thread = threading.Thread(target=self._run_uvicorn, daemon=True)
         self._server_thread.start()
         logger.info("MCP server starting on %s:%d", host, port)
+
+    def start_proxy_server(
+        self,
+        port: int,
+        upstream_url: str,
+        upstream_transport: str = "streamable_http",
+        headers: dict[str, str] | None = None,
+        host: str = "127.0.0.1",
+        name: str = "pypost-proxy",
+        timeout: float = 30.0,
+    ) -> None:
+        if self.is_running():
+            self.stop_server()
+
+        self._current_port = port
+        self._current_host = host
+        self._tools_signature = ()
+        self._impl = MCPProxyServerImpl(
+            name=name,
+            upstream_url=upstream_url,
+            upstream_transport=upstream_transport,  # type: ignore[arg-type]
+            headers=headers or {},
+            timeout=timeout,
+            variable_supplier=self._variable_supplier,
+            hidden_keys_supplier=self._hidden_keys_supplier,
+            activity_log=self._activity_log,
+            metrics=self._metrics,
+            template_service=self._template_service,
+        )
+        self._stop_event.clear()
+        self._startup_notified = False
+        self._start_error = None
+
+        self._server_thread = threading.Thread(target=self._run_uvicorn, daemon=True)
+        self._server_thread.start()
+        logger.info("MCP proxy server starting on %s:%d -> %s", host, port, upstream_url)
 
     def stop_server(self):
         if not self.is_running():

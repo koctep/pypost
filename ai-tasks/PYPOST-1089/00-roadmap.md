@@ -86,8 +86,9 @@
   - [x] Re-ran `tests/test_mcp_tool_contract.py` + `tests/test_request_editor_mcp_params.py`
     (22 passed) and `make lint` (clean) after the docs-only change; no production or
     test code touched in this step
-- [ ] **COMMIT: Commit Changes**
-  - Commit hash and message (Conventional Commits + JIRA ID)
+- [x] **COMMIT: Commit Changes**
+  - Commit hash: `d4d7dd00` on `dev` — "feature(mcp): PYPOST-1089 validate McpToolParam default type and add editable Default column"
+  - Branch name (reference only, not switched): `feature/PYPOST-1089-validate-mcp-tool-param-default-and-table-column`
 
 ## Status Legend
 

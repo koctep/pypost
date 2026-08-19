@@ -80,6 +80,7 @@ conventions.
 ### MCP
 
 1. [MCP Integration](mcp_integration.md)
+1. [MCP Reverse Proxy (PYPOST-1092)](mcp_proxy.md)
 1. [Multiple independent MCP servers (PYPOST-1044)](mcp_server_registry.md)
 1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
 1. [Jira numeric identifier MCP contract (PYPOST-1038)](mcp_integration.md#jira-numeric-path-identifiers-pypost-1038)

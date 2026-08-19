@@ -54,14 +54,14 @@ class MCPServerRegistry(QObject):
     def __init__(
         self,
         *,
-        collection_lookup: Callable[[str], Collection | None],
-        environment_lookup: Callable[[str], Environment | None],
+        collection_lookup: Callable[[str], Collection | None] | None = None,
+        environment_lookup: Callable[[str], Environment | None] | None = None,
         metrics: MetricsTrackerProtocol | None = None,
         template_service: TemplateService | None = None,
     ) -> None:
         super().__init__()
-        self._collection_lookup = collection_lookup
-        self._environment_lookup = environment_lookup
+        self._collection_lookup = collection_lookup or (lambda _id: None)
+        self._environment_lookup = environment_lookup or (lambda _id: None)
         self._metrics = metrics
         self._template_service = template_service
         self._configurations: dict[str, McpServerConfiguration] = {}
@@ -69,6 +69,10 @@ class MCPServerRegistry(QObject):
         self._statuses: dict[str, McpServerStatus] = {}
         self._pending_reconfigurations: dict[str, _PendingReconfiguration] = {}
         self._reconfiguration_lock = threading.RLock()
+
+    def get(self, instance_id: str) -> McpServerConfiguration | None:
+        """Return the configuration for instance_id, or None if not found."""
+        return self._configurations.get(instance_id)
 
     def upsert(self, configuration: McpServerConfiguration) -> None:
         """Persist an in-memory configuration after globally checking its port."""
@@ -222,7 +226,11 @@ class MCPServerRegistry(QObject):
             tools = [request.model_copy(deep=True) for request in collection.requests]
             manager.update_tools(tools)
 
-    def reconcile_references(self) -> None:
+    def reconcile_references(
+        self,
+        valid_collection_ids: set[str] | None = None,
+        valid_environment_ids: set[str] | None = None,
+    ) -> bool:
         """Stop and mark only endpoints whose persisted inputs were removed.
 
         Collection and environment presenters can no longer name a deleted
@@ -230,19 +238,64 @@ class MCPServerRegistry(QObject):
         endpoint serving its last copied tool or variable snapshot.  Reconcile
         every persisted row after those source lists change instead.
         """
+        changed = False
         for instance_id, configuration in self._configurations.items():
-            collection = self._collection_lookup(configuration.collection_id)
-            environment = self._environment_lookup(configuration.environment_id)
-            if collection is not None and environment is not None:
+            if configuration.server_type == "proxy":
+                if valid_environment_ids is not None:
+                    env_valid = (
+                        not configuration.environment_id
+                        or configuration.environment_id in valid_environment_ids
+                    )
+                else:
+                    env = (
+                        self._environment_lookup(configuration.environment_id)
+                        if configuration.environment_id
+                        else None
+                    )
+                    env_valid = not configuration.environment_id or env is not None
+
+                if env_valid:
+                    continue
+
+                self.stop(instance_id)
+                self._set_status(
+                    instance_id,
+                    "failed",
+                    f"{instance_id} cannot run: missing environment for port "
+                    f"{configuration.port}",
+                )
+                changed = True
+                continue
+
+            # Local server
+            if valid_collection_ids is not None:
+                coll_valid = (
+                    configuration.collection_id is not None
+                    and configuration.collection_id in valid_collection_ids
+                )
+            else:
+                coll_valid = (
+                    configuration.collection_id is not None
+                    and self._collection_lookup(configuration.collection_id) is not None
+                )
+
+            if valid_environment_ids is not None:
+                env_valid = configuration.environment_id in valid_environment_ids
+            else:
+                env_valid = self._environment_lookup(configuration.environment_id) is not None
+
+            if coll_valid and env_valid:
                 continue
             self.stop(instance_id)
-            missing = "collection" if collection is None else "environment"
+            missing = "collection" if not coll_valid else "environment"
             self._set_status(
                 instance_id,
                 "failed",
                 f"{instance_id} cannot run: missing {missing} for port "
                 f"{configuration.port}",
             )
+            changed = True
+        return changed
 
     def refresh_environment(self, environment_id: str) -> None:
         """Replace environment snapshots only for servers selecting that ID."""
@@ -347,6 +400,18 @@ class MCPServerRegistry(QObject):
     def _runtime_inputs(
         self, configuration: McpServerConfiguration
     ) -> tuple[list, dict[str, str], set[str]] | None:
+        if configuration.server_type == "proxy":
+            env_vars = {}
+            hidden_keys = set()
+            if configuration.environment_id:
+                environment = self._environment_lookup(configuration.environment_id)
+                if environment is not None:
+                    env_vars = dict(environment.variables)
+                    hidden_keys = set(environment.hidden_keys)
+            return ([], env_vars, hidden_keys)
+
+        if not configuration.collection_id:
+            return None
         collection = self._collection_lookup(configuration.collection_id)
         environment = self._environment_lookup(configuration.environment_id)
         if collection is None or environment is None:
@@ -358,7 +423,12 @@ class MCPServerRegistry(QObject):
         )
 
     def _missing_reference(self, configuration: McpServerConfiguration) -> str:
-        if self._collection_lookup(configuration.collection_id) is None:
+        if configuration.server_type == "proxy":
+            return "environment"
+        if (
+            not configuration.collection_id
+            or self._collection_lookup(configuration.collection_id) is None
+        ):
             return "collection"
         return "environment"
 
@@ -371,7 +441,18 @@ class MCPServerRegistry(QObject):
         tools, variables, hidden_keys = runtime
         manager.set_variable_supplier(lambda: dict(variables))
         manager.set_hidden_keys_supplier(lambda: set(hidden_keys))
-        manager.start_server(configuration.port, tools, configuration.host)
+        if configuration.server_type == "proxy":
+            manager.start_proxy_server(
+                port=configuration.port,
+                upstream_url=configuration.upstream_url or "",
+                upstream_transport=configuration.upstream_transport,
+                headers=configuration.headers,
+                host=configuration.host,
+                name=configuration.name or configuration.id,
+                timeout=configuration.timeout,
+            )
+        else:
+            manager.start_server(configuration.port, tools, configuration.host)
 
     def _complete_reconfiguration(
         self, instance_id: str, candidate: MCPServerManager
@@ -466,9 +547,16 @@ class MCPServerRegistry(QObject):
     def _validate_replacement_references(
         self, instance_id: str, configuration: McpServerConfiguration
     ) -> None:
-        if self._collection_lookup(configuration.collection_id) is None:
-            raise ValueError(f"MCP server {instance_id} references a missing collection")
-        if self._environment_lookup(configuration.environment_id) is None:
+        if configuration.server_type == "local":
+            if (
+                not configuration.collection_id
+                or self._collection_lookup(configuration.collection_id) is None
+            ):
+                raise ValueError(f"MCP server {instance_id} references a missing collection")
+        if (
+            configuration.environment_id
+            and self._environment_lookup(configuration.environment_id) is None
+        ):
             raise ValueError(f"MCP server {instance_id} references a missing environment")
 
     @staticmethod

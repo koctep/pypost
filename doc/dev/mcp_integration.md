@@ -2,6 +2,7 @@
 
 See also [PyPost MCP Integration](../mcp_integration.md) for user-facing setup, client
 configuration (Cursor, Claude Desktop), and operator troubleshooting.
+See also [MCP Reverse Proxy](mcp_proxy.md) (PYPOST-1092) for the reverse proxy mode forwarding requests to upstream MCP servers.
 
 This document describes the internal implementation of the **Model Context Protocol (MCP)** server within PyPost.
 

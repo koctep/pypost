@@ -31,6 +31,10 @@ class McpActivityEntry:
     detail: str | None = None
     duration_ms: float | None = None
 
+    @property
+    def details(self) -> str | None:
+        return self.detail
+
     @staticmethod
     def _sanitize_detail(detail: str | None) -> str | None:
         if detail is None:

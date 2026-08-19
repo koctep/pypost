@@ -16,9 +16,24 @@ class McpServerConfiguration(BaseModel):
     name: Optional[str] = None
     host: str = "127.0.0.1"
     port: int = Field(ge=1024, le=65535)
-    collection_id: str
+    collection_id: Optional[str] = None
     environment_id: str
+    server_type: Literal["local", "proxy"] = "local"
+    upstream_url: Optional[str] = None
+    upstream_transport: Literal["streamable_http", "sse"] = "streamable_http"
+    headers: dict[str, str] = Field(default_factory=dict)
+    timeout: float = 30.0
     enabled: bool = False
+
+    @model_validator(mode="after")
+    def validate_server_type_requirements(self) -> "McpServerConfiguration":
+        if self.server_type == "proxy":
+            if not self.upstream_url or not self.upstream_url.strip():
+                raise ValueError("Proxy MCP server requires a non-empty upstream_url")
+        elif self.server_type == "local":
+            if not self.collection_id or not self.collection_id.strip():
+                raise ValueError("Local MCP server requires a non-empty collection_id")
+        return self
 
 
 class AppSettings(BaseModel):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Iterable
+from typing import Literal
 
 from PySide6.QtWidgets import (
     QComboBox,
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QSpinBox,
     QTableWidget,
@@ -138,12 +140,21 @@ class McpServersDialog(QDialog):
         self._table.setRowCount(len(configurations))
         for row, configuration in enumerate(configurations):
             status = self._status_for(configuration.id)
+            if configuration.server_type == "proxy":
+                target_desc = (
+                    f"Proxy -> {configuration.upstream_url}"
+                    if configuration.upstream_url
+                    else "Proxy"
+                )
+            else:
+                cid = configuration.collection_id or ""
+                target_desc = collection_names.get(cid, cid)
             values = (
                 configuration.name or configuration.id,
                 configuration.id,
                 status.state,
                 f"{configuration.host}:{configuration.port}",
-                collection_names.get(configuration.collection_id, configuration.collection_id),
+                target_desc,
                 environment_names.get(configuration.environment_id, configuration.environment_id),
                 status.message,
             )
@@ -232,6 +243,9 @@ class McpServersDialog(QDialog):
         selected = self._selected()
         if selected is None:
             return
+        if selected.server_type == "proxy":
+            self._show_error("Tool overview is only available for local collection MCP servers.")
+            return
         collection = next(
             (
                 item
@@ -269,42 +283,114 @@ class _McpServerEditor(QDialog):
         self.setWindowTitle("Edit MCP server" if configuration else "Add MCP server")
         self._id = configuration.id if configuration else str(uuid.uuid4())
         self._enabled = configuration.enabled if configuration else False
-        layout = QFormLayout(self)
+        self._layout = QFormLayout(self)
         self._name = QLineEdit(configuration.name or "" if configuration else "")
         self._host = QLineEdit(configuration.host if configuration else default_host)
         self._port = QSpinBox()
         self._port.setRange(1024, 65535)
         self._port.setValue(configuration.port if configuration else default_port)
+
+        self._server_type = QComboBox()
+        self._server_type.addItem("Local Collection", "local")
+        self._server_type.addItem("Upstream Proxy", "proxy")
+
         self._collection = QComboBox()
         self._environment = QComboBox()
         for collection in collections:
             self._collection.addItem(collection.name, collection.id)
         for environment in environments:
             self._environment.addItem(environment.name, environment.id)
+
+        self._upstream_url = QLineEdit(
+            configuration.upstream_url or "" if configuration else ""
+        )
+        self._upstream_transport = QComboBox()
+        self._upstream_transport.addItem("Streamable HTTP", "streamable_http")
+        self._upstream_transport.addItem("Server-Sent Events (SSE)", "sse")
+
+        self._headers_edit = QPlainTextEdit()
+        self._headers_edit.setPlaceholderText(
+            "Authorization: Bearer {{ API_KEY }}\nX-Custom: value"
+        )
+        if configuration and configuration.headers:
+            self._headers_edit.setPlainText(
+                "\n".join(f"{k}: {v}" for k, v in configuration.headers.items())
+            )
+
         target_environment = (
             configuration.environment_id
             if configuration
             else getattr(default_environment, "id", None)
         )
         if configuration:
-            self._select_data(self._collection, configuration.collection_id)
+            if configuration.server_type == "proxy":
+                self._select_data(self._server_type, "proxy")
+            else:
+                self._select_data(self._server_type, "local")
+            if configuration.collection_id:
+                self._select_data(self._collection, configuration.collection_id)
+            if configuration.upstream_transport:
+                self._select_data(self._upstream_transport, configuration.upstream_transport)
         if target_environment:
             self._select_data(self._environment, target_environment)
-        layout.addRow("Name", self._name)
-        layout.addRow("Host", self._host)
-        layout.addRow("Port", self._port)
-        layout.addRow("Collection", self._collection)
-        layout.addRow("Environment", self._environment)
+
+        self._layout.addRow("Name", self._name)
+        self._layout.addRow("Host", self._host)
+        self._layout.addRow("Port", self._port)
+        self._layout.addRow("Server Type", self._server_type)
+        self._layout.addRow("Collection", self._collection)
+        self._layout.addRow("Upstream URL", self._upstream_url)
+        self._layout.addRow("Transport", self._upstream_transport)
+        self._layout.addRow("Custom Headers", self._headers_edit)
+        self._layout.addRow("Environment", self._environment)
+
         self._error = QLabel()
         self._error.setStyleSheet("color: #b00020;")
         self._error.setWordWrap(True)
-        layout.addRow(self._error)
+        self._layout.addRow(self._error)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.accepted.connect(self._accept_if_complete)
         buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
+        self._layout.addRow(buttons)
+
+        self._server_type.currentIndexChanged.connect(self._on_server_type_changed)
+        self._on_server_type_changed()
+
+    def _on_server_type_changed(self) -> None:
+        is_proxy = self._server_type.currentData() == "proxy"
+        self._collection.setVisible(not is_proxy)
+        label_collection = self._layout.labelForField(self._collection)
+        if label_collection:
+            label_collection.setVisible(not is_proxy)
+
+        self._upstream_url.setVisible(is_proxy)
+        label_url = self._layout.labelForField(self._upstream_url)
+        if label_url:
+            label_url.setVisible(is_proxy)
+
+        self._upstream_transport.setVisible(is_proxy)
+        label_transport = self._layout.labelForField(self._upstream_transport)
+        if label_transport:
+            label_transport.setVisible(is_proxy)
+
+        self._headers_edit.setVisible(is_proxy)
+        label_headers = self._layout.labelForField(self._headers_edit)
+        if label_headers:
+            label_headers.setVisible(is_proxy)
+
+    def _parse_headers(self) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        for line in self._headers_edit.toPlainText().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if ":" in line:
+                key, val = line.split(":", 1)
+                headers[key.strip()] = val.strip()
+        return headers
 
     @staticmethod
     def _select_data(combo: QComboBox, value: str) -> None:
@@ -313,20 +399,47 @@ class _McpServerEditor(QDialog):
             combo.setCurrentIndex(index)
 
     def _accept_if_complete(self) -> None:
-        if self._collection.currentData() is None or self._environment.currentData() is None:
-            self._error.setText("Collection and environment are required.")
-            return
         if not self._host.text().strip():
             self._error.setText("Host is required.")
             return
+
+        is_proxy = self._server_type.currentData() == "proxy"
+        if is_proxy:
+            if not self._upstream_url.text().strip():
+                self._error.setText("Upstream URL is required for proxy servers.")
+                return
+        else:
+            if self._collection.currentData() is None or self._environment.currentData() is None:
+                self._error.setText("Collection and environment are required.")
+                return
+
         self.accept()
 
     def configuration(self) -> McpServerConfiguration:
+        is_proxy = self._server_type.currentData() == "proxy"
+        if is_proxy:
+            transport_raw = str(self._upstream_transport.currentData() or "streamable_http")
+            upstream_transport: Literal["streamable_http", "sse"] = (
+                "sse" if transport_raw == "sse" else "streamable_http"
+            )
+            return McpServerConfiguration(
+                id=self._id,
+                name=self._name.text().strip() or None,
+                host=self._host.text().strip(),
+                port=self._port.value(),
+                server_type="proxy",
+                upstream_url=self._upstream_url.text().strip(),
+                upstream_transport=upstream_transport,
+                headers=self._parse_headers(),
+                environment_id=str(self._environment.currentData() or ""),
+                enabled=self._enabled,
+            )
         return McpServerConfiguration(
             id=self._id,
             name=self._name.text().strip() or None,
             host=self._host.text().strip(),
             port=self._port.value(),
+            server_type="local",
             collection_id=str(self._collection.currentData()),
             environment_id=str(self._environment.currentData()),
             enabled=self._enabled,
