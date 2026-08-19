@@ -45,18 +45,39 @@ execution on the network.
 
 ## Environment encryption
 
-Optional encryption for **hidden** environment variables at rest:
+PyPost supports optional cryptographic protection for sensitive environment variables
+(flagged as **Hidden**) stored on disk in `environments.json`:
 
-- Enable/disable encryption mode
-- Choose key source (environment variable, OS keyring, secret store) and fallback
-- Run verify / re-encrypt / encrypt-plaintext migration actions when changing modes
+### Encryption configuration
 
-Non-hidden variables remain plaintext on disk even when encryption is on.
+- **Encryption Mode:** Enable or disable encryption at rest. When disabled, hidden variables
+  are stored in plaintext. Non-hidden variables are always stored in plaintext regardless of mode.
+- **Key Source:** Select where the master encryption key is loaded from:
+  - `Environment Variable` (`PYPOST_ENCRYPTION_KEY`)
+  - `OS Keyring` (system credential manager / keychain)
+  - `Secret Store File` (explicit key file path)
+- **Key Identifier (KID):** Identifies the active key version for key rotation.
+
+### Migration operations
+
+When changing encryption modes or rotating keys in **Settings → Encryption**:
+
+1. **Verify Key:** Tests that the configured key source and active Key ID can successfully
+   decrypt currently encrypted records before applying changes.
+2. **Encrypt Plaintext:** Scans all environments for hidden variables stored in plaintext
+   and encrypts them using the active key. Run this immediately after enabling encryption mode.
+3. **Re-encrypt (Key Rotation):** Re-encrypts all hidden records from prior key versions
+   to the new active Key ID. Use this when updating your master key or rotating secrets.
+4. **Export Warning:** Exporting environments containing hidden variables prompts for explicit
+   confirmation because export files contain decrypted secret values (see
+   [Environments](environments.md#hidden-values-in-export-files)).
 
 ## Logging and security
 
 - **Log variable key names when hidden flag is toggled** — when enabled, toggling
   the Hidden flag may log the variable's key name (not the value)
+- **Sensitive data masking** — request URLs, headers, and body payloads automatically mask
+  hidden variable values in logs and terminal outputs
 
 Prefer keeping secrets in hidden variables and enabling encryption if the machine is
 shared or the data directory is backed up to an untrusted location.
