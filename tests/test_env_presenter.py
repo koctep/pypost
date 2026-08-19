@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QApplication, QWidget, QInputDialog
+from PySide6.QtWidgets import QInputDialog, QWidget
 
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
@@ -147,7 +147,7 @@ class TestEnvPresenter(unittest.TestCase):
         registry._set_status("first", "running")
         registry._set_status("second", "failed", "port unavailable")
 
-        self.assertEqual(p.mcp_status_text(), "MCP Servers: 1 running; 1 failed")
+        self.assertEqual(p.mcp_controls.status_text(), "MCP Servers: 1 running; 1 failed")
 
     def test_load_environments_populates_combo(self):
         envs = [_make_env("e1", "Production"), _make_env("e2", "Staging")]
@@ -370,19 +370,19 @@ class TestEnvPresenter(unittest.TestCase):
     def test_mcp_status_label_updated_on_running(self):
         p = self._make_presenter([])
         p._mcp_controls._on_mcp_status_changed(True)
-        self.assertIn("ON", p.mcp_status_text())
+        self.assertIn("ON", p.mcp_controls.status_text())
 
     def test_mcp_status_label_updated_on_stopped(self):
         p = self._make_presenter([])
         p._mcp_controls._on_mcp_status_changed(False)
-        self.assertEqual(p.mcp_status_text(), "MCP: OFF")
+        self.assertEqual(p.mcp_controls.status_text(), "MCP: OFF")
 
     def test_mcp_tools_button_shows_count(self):
         req = RequestData(id="r1", name="Tool", expose_as_mcp=True)
         col = Collection(id="c1", name="API", requests=[req])
         p = self._make_presenter(collections=[col])
-        p._mcp_controls.refresh_tools_button()
-        self.assertEqual(p.mcp_tools_button_text(), "MCP Tools (1)")
+        p.mcp_controls.refresh_tools_button()
+        self.assertEqual(p.mcp_controls.tools_button_text(), "MCP Tools (1)")
 
     def test_refresh_mcp_tools_restarts_when_running(self):
         env = _make_env("e1", "MCP-Env", enable_mcp=True)
@@ -400,29 +400,29 @@ class TestEnvPresenter(unittest.TestCase):
         req2 = RequestData(id="r2", name="NewTool", expose_as_mcp=True)
         col.requests.append(req2)
 
-        p.refresh_mcp_tools()
+        p.mcp_controls.refresh_tools()
         self.assertEqual(len(p._mcp_manager.started), 2)
-        self.assertEqual(p.mcp_tools_button_text(), "MCP Tools (2)")
+        self.assertEqual(p.mcp_controls.tools_button_text(), "MCP Tools (2)")
 
     def test_refresh_mcp_tools_noop_when_mcp_disabled(self):
         req = RequestData(id="r1", name="Tool", expose_as_mcp=True)
         col = Collection(id="c1", name="API", requests=[req])
         p = self._make_presenter(collections=[col])
-        p.refresh_mcp_tools()
+        p.mcp_controls.refresh_tools()
         self.assertEqual(len(p._mcp_manager.started), 0)
-        self.assertEqual(p.mcp_tools_button_text(), "MCP Tools (1)")
+        self.assertEqual(p.mcp_controls.tools_button_text(), "MCP Tools (1)")
 
     def test_mcp_activity_button_shows_count(self):
         p = self._make_presenter([])
         p._mcp_manager.activity_log.append(McpActivityEntry.new_list_tools(2))
-        p._mcp_controls._refresh_mcp_activity_button()
-        self.assertEqual(p.mcp_activity_button_text(), "MCP Activity (1)")
+        p.mcp_controls._refresh_mcp_activity_button()
+        self.assertEqual(p.mcp_controls.activity_button_text(), "MCP Activity (1)")
 
     def test_mcp_activity_recorded_updates_button(self):
         p = self._make_presenter([])
         p._mcp_manager.activity_log.append(McpActivityEntry.new_list_tools(1))
         p._mcp_controls._on_mcp_activity_recorded(McpActivityEntry.new_list_tools(99))
-        self.assertEqual(p.mcp_activity_button_text(), "MCP Activity (1)")
+        self.assertEqual(p.mcp_controls.activity_button_text(), "MCP Activity (1)")
 
     def test_on_env_changed_shows_starting_when_mcp_enabled(self):
         env = _make_env("e1", "MCP-Env", enable_mcp=True)
@@ -434,7 +434,7 @@ class TestEnvPresenter(unittest.TestCase):
         p._env_selector.addItem(env.name, env)
         p._env_selector.blockSignals(False)
         p._on_env_changed(1)
-        self.assertIn("Starting", p.mcp_status_text())
+        self.assertIn("Starting", p.mcp_controls.status_text())
 
     def test_mcp_start_failed_shows_warning(self):
         p = self._make_presenter([])
@@ -452,7 +452,7 @@ class TestEnvPresenter(unittest.TestCase):
             # so pin the new logger name here as well as in the CI allowlist.
             with self.assertLogs(controls_logger, level=logging.ERROR) as caplog:
                 p._mcp_controls._on_mcp_start_failed("Port is busy")
-        self.assertEqual(p.mcp_status_text(), "MCP: OFF")
+        self.assertEqual(p.mcp_controls.status_text(), "MCP: OFF")
         self.assertEqual(len(shown), 1)
         self.assertIn("Port is busy", shown[0][1])
         self.assertTrue(

@@ -169,8 +169,8 @@ Built with **PySide6** (Qt for Python).
   persistence/lifecycle to `McpServerSettingsController` (PYPOST-1071).
 - **Presenters**: Keep collection, tab, and environment wiring out of widgets. MCP status,
   buttons and dialogs live in `McpControlsPresenter`, whose widgets `EnvPresenter` hosts in
-  the environment bar (PYPOST-1071). Collection reads go through
-  `RequestManager.get_collections()` only — see
+  the environment bar (PYPOST-1071, PYPOST-1082). See [presenter_architecture.md](presenter_architecture.md).
+  Collection reads go through `RequestManager.get_collections()` only — see
   [collection_loading.md](collection_loading.md).
 - **Widgets**: Specialized components like `RequestEditor` for composing requests and `ResponseView`
   for displaying results. `ResponseView` includes a status bar, search bar (plain-text search with

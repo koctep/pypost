@@ -110,6 +110,12 @@ the command prints the canonical Markdown to stdout.
 Always run both `--check` and the pytest module after reconciliation. A green cap check alone
 does not prove that the committed snapshot is fresh.
 
+**PYPOST-1082 (2026-08-19):** Retired the four temporary delegating shims on `EnvPresenter`
+(`mcp_status_text`, `mcp_tools_button_text`, `mcp_activity_button_text`, `refresh_mcp_tools`),
+updated its class docstring, exposed the `mcp_controls` property seam on `EnvPresenter` and
+`MainWindow`, and re-routed `main_window_signals.py` directly to `window.mcp_controls.refresh_tools`.
+See [`presenter_architecture.md`](presenter_architecture.md).
+
 **PYPOST-1071 (2026-08-16):** Gave each of the five measured violations an explicit
 disposition instead of a blanket cap raise. Extracted PYPOST-1044's misplaced
 responsibilities first: multi-server persistence and lifecycle control moved from

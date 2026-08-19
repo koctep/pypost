@@ -17,6 +17,7 @@ class _DeferredEnvPresenter(QObject):
     def __init__(self) -> None:
         super().__init__()
         self.widget = MagicMock()
+        self.mcp_controls = MagicMock()
         self.wait_storage_idle = MagicMock(return_value=True)
 
     def load_environments(self) -> None:

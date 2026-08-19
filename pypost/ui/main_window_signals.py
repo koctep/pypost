@@ -15,10 +15,10 @@ def wire_presenter_signals(window: MainWindow) -> None:
     window.collections.open_request_in_tab.connect(window.tabs.add_new_tab)
     window.collections.open_request_in_isolated_tab.connect(window.tabs.add_new_tab)
     window.collections.collections_changed.connect(window.env.load_environments)
-    window.collections.collections_changed.connect(window.env.refresh_mcp_tools)
+    window.collections.collections_changed.connect(window.mcp_controls.refresh_tools)
     window.collections.request_renamed.connect(window.tabs.rename_request_tabs)
     window.collections.requests_deleted.connect(window.tabs.close_tabs_for_request_ids)
-    window.collections.requests_deleted.connect(window.env.refresh_mcp_tools)
+    window.collections.requests_deleted.connect(window.mcp_controls.refresh_tools)
     window.env.env_variables_changed.connect(window.tabs.on_env_variables_changed)
     window.env.env_keys_changed.connect(window.tabs.on_env_keys_changed)
     window.env.env_hidden_keys_changed.connect(
@@ -28,7 +28,7 @@ def wire_presenter_signals(window: MainWindow) -> None:
     window.tabs.env_update_requested.connect(window.env.on_env_update)
     window.tabs.request_saved.connect(window.collections.refresh_tree)
     window.tabs.request_saved.connect(window.collections.restore_tree_state)
-    window.tabs.request_saved.connect(window.env.refresh_mcp_tools)
+    window.tabs.request_saved.connect(window.mcp_controls.refresh_tools)
     window.tabs.request_save_as_completed.connect(
         window.collections.add_saved_request_to_tree,
     )

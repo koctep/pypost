@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 
 class EnvPresenter(QObject):
-    """Owns the environment selector: loading envs, propagating vars, managing MCP lifecycle."""
+    """Owns the environment selector: loading envs, propagating vars, and environment selection."""
 
     env_variables_changed = Signal(object)  # payload: dict[str, str]
     env_keys_changed = Signal(object)  # payload: list[str] | None
@@ -176,17 +176,9 @@ class EnvPresenter(QObject):
             None,
         )
 
-    # PYPOST-1071: the four public ``mcp_*`` methods stay as delegating shims —
-    # ``main_window_signals.wire_presenter_signals`` connects ``refresh_mcp_tools`` to
-    # three Qt signals and the focused presenter tests read these texts.
-    def mcp_status_text(self) -> str:
-        return self._mcp_controls.status_text()
-
-    def mcp_tools_button_text(self) -> str:
-        return self._mcp_controls.tools_button_text()
-
-    def mcp_activity_button_text(self) -> str:
-        return self._mcp_controls.activity_button_text()
+    @property
+    def mcp_controls(self) -> McpControlsPresenter:
+        return self._mcp_controls
 
     def reload_current_env(self) -> None:
         """Re-resolves variables and MCP state for the current combo selection."""
@@ -359,10 +351,6 @@ class EnvPresenter(QObject):
         self._mcp_controls.refresh_tools_button()
         if mcp_was_running:
             self._mcp_controls.track_active_env_changed(previous, selected)
-
-    def refresh_mcp_tools(self) -> None:
-        """Delegating shim: three Qt signals connect to this name (PYPOST-1071)."""
-        self._mcp_controls.refresh_tools()
 
     def _open_env_manager(self) -> None:
         current_env_name = self._env_selector.currentText()

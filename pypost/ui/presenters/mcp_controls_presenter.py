@@ -2,9 +2,7 @@
 
 Extracted from ``EnvPresenter``: PYPOST-1044 grew the environment presenter with
 multi-server status rendering, per-endpoint dialogs and scoped registry refreshes, none of
-which are environment state. ``EnvPresenter`` keeps its public ``mcp_*`` methods as
-delegating shims because ``pypost/ui/main_window_signals.py`` connects
-``window.env.refresh_mcp_tools`` to three Qt signals.
+which are environment state.
 """
 from __future__ import annotations
 

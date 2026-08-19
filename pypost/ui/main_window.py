@@ -127,6 +127,7 @@ class MainWindow(QMainWindow):
             self.metrics,
             mcp_registry=self.mcp_registry,
         )
+        self.mcp_controls = self.env.mcp_controls
         self.env.set_mcp_server_controller(self.mcp_controller)
         self._build_layout()
         wire_presenter_signals(self)

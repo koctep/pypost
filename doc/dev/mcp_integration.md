@@ -175,14 +175,12 @@ it owns no MCP status, dialog or lifecycle code.
 *   **Supplier registration**: On init, calls
     `MCPServerManager.set_variable_supplier(self._env_snapshot.snapshot_variables)`.
     The snapshot returns a **copy** so MCP threadpool workers never observe partial writes.
-*   **Retained `mcp_*` shims**: `refresh_mcp_tools()`, `mcp_status_text()`,
-    `mcp_tools_button_text()` and `mcp_activity_button_text()` remain as one-line
-    delegations for the two reasons recorded at `env_presenter.py:179-181`:
-    `pypost/ui/main_window_signals.py:18,21,31` connects `window.env.refresh_mcp_tools` to
-    three Qt signals, and the other three text getters are read by
-    `tests/test_env_presenter.py`. Retiring them is tracked as
-    [PYPOST-1082](https://pypost.atlassian.net/browse/PYPOST-1082); until then, do not add
-    new MCP behaviour behind them — add it to `McpControlsPresenter`.
+*   **Retired `mcp_*` shims (PYPOST-1082)**: Legacy delegating methods (`refresh_mcp_tools()`,
+    `mcp_status_text()`, `mcp_tools_button_text()`, and `mcp_activity_button_text()`) were
+    retired in PYPOST-1082. `EnvPresenter` exposes the public property `mcp_controls` returning
+    its embedded `McpControlsPresenter` instance, and `MainWindow` exposes `mcp_controls`
+    directly. Signal wiring in `pypost/ui/main_window_signals.py` connects directly to
+    `window.mcp_controls.refresh_tools`. See [Presenter Architecture](presenter_architecture.md).
 
 ### 7. Metrics observability stack (`pypost/core/metrics*.py`)
 
@@ -277,8 +275,8 @@ When the user saves a request or edits collections while MCP is running, PyPost 
 up-to-date tool catalog to connected agents.
 
 1.  `wire_presenter_signals` connects collection changes to
-    `EnvPresenter.refresh_mcp_tools()` (`pypost/ui/main_window_signals.py:18,21,31`),
-    which delegates to `McpControlsPresenter.refresh_tools()`.
+    `window.mcp_controls.refresh_tools()` (`pypost/ui/main_window_signals.py:18,21,31`)
+    on `McpControlsPresenter`.
 2.  With a registry, the controls presenter first reconciles missing
     collection/environment references and then calls `refresh_collection(id)` for each
     current collection.
