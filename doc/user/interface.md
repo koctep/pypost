@@ -2,6 +2,27 @@
 
 The main window is divided into these areas:
 
+## Overview layout
+
+```text
++---------------------------------------------------------------------------------------+
+| Menu Bar: File | Help                                                                 |
++---------------------------------------------------------------------------------------+
+| Environment: [Local v] [Manage Ctrl+E] | MCP: [Servers...] Status: 1 running          |
++-----------------------+---------------------------------------------------------------+
+| SIDEBAR (Left)        | WORKSPACE (Right) - Tabs: [Request 1 (GET)] [+]               |
+| [Collections][History]|---------------------------------------------------------------|
+|                       | [GET  v] [ https://httpbin.org/get          ] [Send F5] [Actions]|
+| v My Collection       |---------------------------------------------------------------|
+|   - List Items        | Tabs: [Params] [Headers] [Body] [Script] [MCP]                |
+|   - Create Item       | Key-value parameters, headers, JSON body editor, scripts      |
+|                       |---------------------------------------------------------------|
+|                       | RESPONSE PANE                                                 |
+|                       | Status: 200 OK | Time: 120ms | Size: 1.1 KB | Search (Ctrl+F) |
+|                       | { "args": {}, "headers": { ... }, "origin": "..." }           |
++-----------------------+---------------------------------------------------------------+
+```
+
 ## Menu bar
 
 - **File → Quit** (`Ctrl+Q`) — exit the application

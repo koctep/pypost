@@ -50,6 +50,23 @@ metrics (default port 9080).
 6. Inspect status, timing, and body in the response pane.
 7. Open **Actions → Save** (`Ctrl+S`) and store the request in a new collection.
 
+### First-run workflow diagram
+
+```text
++-----------------------+     +-----------------------+     +-----------------------+
+| 1. Define Environment | --> | 2. Compose Request    | --> | 3. Send & Inspect     |
+| [Local v]             |     | [GET] {{ host }}/get  |     | Status: 200 OK        |
+| host=https://...      |     | Headers / JSON Body   |     | Time: 120ms | Size    |
++-----------------------+     +-----------------------+     +-----------------------+
+                                                                        |
+                                                                        v
+                                                            +-----------------------+
+                                                            | 4. Save to Collection |
+                                                            | Actions -> Save       |
+                                                            | [My APIs / Get Users] |
+                                                            +-----------------------+
+```
+
 Next: [Interface](interface.md) or jump to [Common Workflows](workflows.md).
 
 ## Where data is stored
