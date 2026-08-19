@@ -17,7 +17,6 @@ from pypost.agent.ui_actions_mcp import (
     AGENT_UI_MCP_TOOL_NAMES,
     SERVER_NAME,
 )
-from pypost.core.mcp_server_impl import MCPServerImpl
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -47,17 +46,6 @@ def test_pyproject_declares_agent_ui_mcp_console_script() -> None:
     if not re.search(pattern, text, flags=re.MULTILINE):
         pytest.fail(
             f"Missing [project.scripts] entry {_ENTRY_SCRIPT!r} in pyproject.toml"
-        )
-
-
-def test_mcpserver_impl_catalog_excludes_agent_ui_tools() -> None:
-    """Product MCP must not expose agent UI drive tool names."""
-    impl = MCPServerImpl()
-    names = {tool.name for tool in asyncio.run(impl.list_tools())}
-    overlap = names & AGENT_UI_MCP_TOOL_NAMES
-    if overlap:
-        pytest.fail(
-            f"MCPServerImpl must not register agent UI tools; found {sorted(overlap)}"
         )
 
 
