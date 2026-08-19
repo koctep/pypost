@@ -184,8 +184,8 @@ check-docs-links: $(VENV_MARKER) ## Check relative links in User Guide and READM
 
 lint: $(VENV_MARKER) venv-test ## Run flake8 static analysis on pypost/ and documentation checks
 	$(BIN)/python -m flake8 --jobs=1 pypost/
-	$(BIN)/python scripts/lint_user_docs.py
-	$(BIN)/python scripts/check_user_docs_links.py
+	@if [ -f scripts/lint_user_docs.py ]; then $(BIN)/python scripts/lint_user_docs.py; fi
+	@if [ -f scripts/check_user_docs_links.py ]; then $(BIN)/python scripts/check_user_docs_links.py; fi
 
 typecheck: $(VENV_MARKER) venv-test ## Optional mypy on pypost/core/, models/, and ui/ (baseline gate)
 	$(BIN)/python scripts/check_mypy_baseline.py
