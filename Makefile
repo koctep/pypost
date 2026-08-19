@@ -3,7 +3,7 @@
 	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
 	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
-	check-license-inventory
+	check-license-inventory lint-docs
 
 .DEFAULT_GOAL := help
 
@@ -175,8 +175,12 @@ test-agent-e2e: $(VENV_MARKER) venv-test venv-otel ## Broader agent e2e beyond g
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "agent_e2e and not slow")
 
-lint: $(VENV_MARKER) venv-test ## Run flake8 static analysis on pypost/
+lint-docs: $(VENV_MARKER) ## Run Markdown formatting checks on doc/user/ and doc/README.md (PYPOST-1020)
+	$(BIN)/python scripts/lint_user_docs.py
+
+lint: $(VENV_MARKER) venv-test ## Run flake8 static analysis on pypost/ and Markdown lint on doc/user/
 	$(BIN)/python -m flake8 --jobs=1 pypost/
+	$(BIN)/python scripts/lint_user_docs.py
 
 typecheck: $(VENV_MARKER) venv-test ## Optional mypy on pypost/core/, models/, and ui/ (baseline gate)
 	$(BIN)/python scripts/check_mypy_baseline.py

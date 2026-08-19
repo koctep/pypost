@@ -73,8 +73,8 @@ Save one or all environments to a JSON file you can import elsewhere or keep as 
 2. Choose **Selected Environment** (the row highlighted in the list) or **All
    Environments**.
 3. If the export includes any **Hidden** variables, PyPost asks you to confirm —
-   the saved file will contain those secret values (see [Hidden policy](#hidden-values-in-export-files)
-   below).
+   the saved file will contain those secret values (see
+   [Hidden policy](#hidden-values-in-export-files) below).
 4. Pick where to save the file. One environment is written as a single JSON object;
    several environments are written as a JSON list — the same shapes **Import…** accepts.
 5. A summary dialog confirms what was exported and where it was saved.
