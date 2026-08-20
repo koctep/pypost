@@ -5,7 +5,8 @@
 - **Implementation language**: Python (repo is a single Python/PySide6 application; the
   affected test module, teardown code, and any resulting fix/regression test are all Python —
   see `pypost/agent/lifecycle.py`, `tests/test_agent_dialog_settle_e2e.py`).
-- **Branch name**: *[recorded by the commit procedure — reference only, do not switch]*
+- **Branch name**: `test/PYPOST-1040-diagnose-qt-teardown-crash` (reference only — commit
+  landed directly on `dev` per this task's instructions; do not switch branches)
 
 ## Step Status
 
@@ -121,7 +122,7 @@
     and `ai-tasks/PYPOST-1040/60-tech-debt.md` (disposition + PYPOST-1115 follow-up), matching
     this doc's existing `../../ai-tasks/...` relative-link convention. No other file under
     `doc/dev/` touched; existing structure, tone, and unrelated content preserved.
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
 
 ## Status Legend
 
@@ -169,4 +170,8 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- Commit hash: `deabefb7e2c453a0864b90a5b81d37fea991cb39` (on `dev`)
+- Message: `test(agent): PYPOST-1040 diagnose intermittent Qt teardown SIGSEGV`
+- Follow-ups: [PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115) (mitigation
+  attempt), [PYPOST-1116](https://pypost.atlassian.net/browse/PYPOST-1116)
+  (`duration_report.py` xfail mis-reporting)
