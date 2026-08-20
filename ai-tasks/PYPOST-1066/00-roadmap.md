@@ -73,7 +73,9 @@
   - Validation passed: `make lint-docs`; direct relative-link checks for the updated guide and
     roadmap; `git diff --check`; 100-character line-length checks; and both focused mypy-baseline
     boundary tests via `make test` (2 passed).
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Primary commit: `bb2757f1` — `test(typecheck): PYPOST-1066 cover clean baseline boundaries`
+  - Working branch: `dev`; suggested branch: `test/PYPOST-1066-cover-clean-mypy-boundaries`
 
 ## Status Legend
 
@@ -121,4 +123,5 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- `bb2757f1` — `test(typecheck): PYPOST-1066 cover clean baseline boundaries`
+- Metadata closure recorded in a follow-up Conventional Commit on `dev`.
