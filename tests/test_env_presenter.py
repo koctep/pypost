@@ -295,10 +295,13 @@ class TestEnvPresenter(unittest.TestCase):
 
     def test_on_env_changed_no_environment_emits_empty_dict(self):
         p = self._make_presenter([])
-        received = []
-        p.env_variables_changed.connect(received.append)
+        variables_received = []
+        keys_received = []
+        p.env_variables_changed.connect(variables_received.append)
+        p.env_keys_changed.connect(keys_received.append)
         p._on_env_changed(0)
-        self.assertEqual(received[-1], {})
+        self.assertEqual(variables_received[-1], {})
+        self.assertIsNone(keys_received[-1])
 
     def test_on_env_changed_stops_mcp_for_no_environment(self):
         env = _make_env("e1", "Dev", enable_mcp=True)

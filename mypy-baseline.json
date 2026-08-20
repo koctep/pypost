@@ -1,5 +1,5 @@
 {
-  "error_count": 219,
+  "error_count": 217,
   "errors": [
     {
       "code": "arg-type",
@@ -55,11 +55,6 @@
       "code": "assignment",
       "message": "Incompatible types in assignment (expression has type \"EncryptedValueEnvelope\", variable has type \"EncryptedValueEnvelopeV2\")",
       "path": "pypost/core/environment_variables_adapter.py"
-    },
-    {
-      "code": "no-any-return",
-      "message": "Returning Any from function declared to return \"dict[str, Any] | None\"",
-      "path": "pypost/core/key_sources/secret_store.py"
     },
     {
       "code": "assignment",
@@ -1050,11 +1045,6 @@
       "code": "attr-defined",
       "message": "\"type[Qt]\" has no attribute \"CustomContextMenu\"",
       "path": "pypost/ui/widgets/response_view.py"
-    },
-    {
-      "code": "arg-type",
-      "message": "Argument 2 to \"EncryptionMigrationWorker\" has incompatible type \"str\"; expected \"Literal['re_encrypt', 'encrypt_plaintext']\"",
-      "path": "pypost/ui/widgets/settings/encryption_migration_section.py"
     },
     {
       "code": "assignment",

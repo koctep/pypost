@@ -4,11 +4,55 @@ import pytest
 import unittest
 from unittest.mock import MagicMock, patch
 
+from PySide6.QtCore import QThread
+
 from pypost.core.qt.worker import RequestWorker
+from pypost.core.request_service import ExecutionResult
 from pypost.models.models import RequestData
 from pypost.models.errors import ErrorCategory, ExecutionError
+from pypost.models.response import ResponseData
+from tests.helpers.process_until import process_until
 
 pytestmark = pytest.mark.timeout(60)
+
+
+@pytest.mark.timeout(30)
+def test_request_worker_separates_result_from_qthread_finished(qapp):
+    """A request result must not replace QThread's zero-argument lifecycle signal."""
+    assert RequestWorker.finished is QThread.finished, (
+        "RequestWorker must inherit QThread.finished() for native termination; "
+        "the response-bearing signal currently shadows it"
+    )
+
+    request = RequestData(method="GET", url="http://x")
+    worker = RequestWorker(request, variables={}, metrics=MagicMock())
+    response = ResponseData(
+        status_code=200,
+        headers={},
+        body="ok",
+        elapsed_time=0.1,
+        size=2,
+    )
+    result = ExecutionResult(response=response, updated_variables={}, script_logs=[])
+    received_results = []
+    native_terminations = []
+
+    worker.request_finished.connect(received_results.append)
+    worker.finished.connect(lambda: native_terminations.append(True))
+
+    with patch.object(worker.service, "execute", return_value=result):
+        worker.start()
+        try:
+            process_until(
+                lambda: received_results == [response] and native_terminations == [True],
+                timeout_ms=5_000,
+            )
+        finally:
+            worker.wait(5_000)
+
+    assert received_results == [response]
+    assert native_terminations == [True]
+    assert not worker.isRunning()
 
 
 class TestRequestWorkerError(unittest.TestCase):
@@ -18,13 +62,10 @@ class TestRequestWorkerError(unittest.TestCase):
         return RequestWorker(req, variables={}, metrics=MagicMock())
 
     def test_worker_emits_error_on_cancelled_execution_result(self):
-        from pypost.core.request_service import ExecutionResult
-        from pypost.models.response import ResponseData
-
         worker = self._make_worker()
-        finished = []
+        responses = []
         errors = []
-        worker.finished.connect(lambda r: finished.append(r))
+        worker.request_finished.connect(responses.append)
         worker.error.connect(lambda e: errors.append(e))
 
         exc = ExecutionError(
@@ -46,16 +87,13 @@ class TestRequestWorkerError(unittest.TestCase):
 
         self.assertEqual(len(errors), 1)
         self.assertEqual(errors[0].category, ErrorCategory.CANCELLED)
-        self.assertEqual(len(finished), 0)
+        self.assertEqual(responses, [])
 
-    def test_worker_emits_finished_on_execution_result_error(self):
-        from pypost.core.request_service import ExecutionResult
-        from pypost.models.response import ResponseData
-
+    def test_worker_emits_request_finished_on_execution_result_error(self):
         worker = self._make_worker()
-        finished = []
+        responses = []
         errors = []
-        worker.finished.connect(lambda r: finished.append(r))
+        worker.request_finished.connect(responses.append)
         worker.error.connect(lambda e: errors.append(e))
 
         exc = ExecutionError(category=ErrorCategory.NETWORK, message="no conn")
@@ -71,7 +109,7 @@ class TestRequestWorkerError(unittest.TestCase):
         with patch.object(worker.service, "execute", return_value=result):
             worker.run()
 
-        self.assertEqual(len(finished), 1)
+        self.assertEqual(len(responses), 1)
         self.assertEqual(len(errors), 0)
 
     def test_worker_wraps_unexpected_exception_as_execution_error_unknown(self):
@@ -86,13 +124,10 @@ class TestRequestWorkerError(unittest.TestCase):
         self.assertIsInstance(received[0], ExecutionError)
         self.assertEqual(received[0].category, ErrorCategory.UNKNOWN)
 
-    def test_worker_emits_finished_on_success(self):
-        from pypost.models.response import ResponseData
-        from pypost.core.request_service import ExecutionResult
-
+    def test_worker_emits_request_finished_on_success(self):
         worker = self._make_worker()
-        finished = []
-        worker.finished.connect(lambda r: finished.append(r))
+        responses = []
+        worker.request_finished.connect(responses.append)
 
         resp = ResponseData(status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2)
         result = ExecutionResult(
@@ -101,8 +136,30 @@ class TestRequestWorkerError(unittest.TestCase):
         with patch.object(worker.service, "execute", return_value=result):
             worker.run()
 
-        self.assertEqual(len(finished), 1)
-        self.assertEqual(finished[0].status_code, 200)
+        self.assertEqual(len(responses), 1)
+        self.assertEqual(responses[0].status_code, 200)
+
+    def test_worker_script_output_preserves_none_error_detail(self):
+        worker = self._make_worker()
+        received = []
+        worker.script_output.connect(lambda logs, err: received.append((logs, err)))
+        response = ResponseData(
+            status_code=200,
+            headers={},
+            body="ok",
+            elapsed_time=0.1,
+            size=2,
+        )
+        result = ExecutionResult(
+            response=response,
+            updated_variables={},
+            script_logs=["script log"],
+        )
+
+        with patch.object(worker.service, "execute", return_value=result):
+            worker.run()
+
+        self.assertEqual(received, [(["script log"], None)])
 
 
 class TestRequestWorkerRetrySignal(unittest.TestCase):
@@ -112,8 +169,6 @@ class TestRequestWorkerRetrySignal(unittest.TestCase):
         return RequestWorker(req, variables={}, metrics=MagicMock())
 
     def test_worker_emits_retry_attempt_signal(self):
-        from pypost.core.request_service import ExecutionResult
-        from pypost.models.response import ResponseData
         from pypost.models.retry import RetryPolicy
 
         worker = self._make_worker()
@@ -163,9 +218,6 @@ class TestRequestWorkerAlertManagerInjection(unittest.TestCase):
 class TestRequestWorkerHiddenKeys(unittest.TestCase):
 
     def test_hidden_keys_forwarded_to_service_execute(self):
-        from pypost.models.response import ResponseData
-        from pypost.core.request_service import ExecutionResult
-
         req = RequestData(method="GET", url="http://x")
         worker = RequestWorker(req, variables={}, hidden_keys={"token"})
         resp = ResponseData(

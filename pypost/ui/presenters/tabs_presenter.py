@@ -78,10 +78,10 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     """Owns the QTabWidget: opening, closing, restoring tabs and worker lifecycle."""
 
     variable_set_requested = Signal(object, str)  # (key: str | None, value: str)
-    env_update_requested = Signal(object)  # payload: dict (from RequestWorker)
+    env_update_requested = Signal(dict)  # payload from RequestWorker
     request_saved = Signal()  # after save, triggers collections tree refresh
-    request_save_as_completed = Signal(object, str)  # RequestData, collection_id
-    request_persisted = Signal(str, object, object)  # id, snapshot, source_tab
+    request_save_as_completed = Signal(RequestData, str)  # request, collection_id
+    request_persisted = Signal(str, RequestData, RequestTab)  # id, snapshot, source_tab
     request_executed = Signal()  # emitted after each completed request
 
     def __init__(
@@ -220,8 +220,14 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
                     keys = list(variables.keys()) if variables else None
                     tab.response_view.set_env_keys(keys)
 
-    def on_env_keys_changed(self, keys: list | None) -> None:
+    def on_env_keys_changed(self, keys: object) -> None:
         """Pushes env key list to all ResponseView widgets."""
+        if keys is not None and not isinstance(keys, list):
+            logger.warning(
+                "env_keys_update_ignored reason=invalid_payload_type type=%s",
+                type(keys).__name__,
+            )
+            return
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
@@ -465,7 +471,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             default_retry_policy=self._settings.default_retry_policy,
             max_response_bytes=self._settings.max_response_bytes,
         )
-        worker.finished.connect(lambda resp: self._on_request_finished(sender_tab, resp))
+        worker.request_finished.connect(
+            lambda resp: self._on_request_finished(sender_tab, resp)
+        )
         worker.error.connect(lambda err: self._on_request_error(sender_tab, err))
         worker.env_update.connect(lambda vars: self.env_update_requested.emit(vars))
         worker.script_output.connect(
@@ -478,8 +486,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         worker.retry_attempt.connect(
             lambda attempt, max_r, _err, tab=sender_tab: self._on_retry_attempt(tab, attempt, max_r)
         )
+        # Deferred deletion follows native thread termination on every exit path.
         worker.finished.connect(worker.deleteLater)
-        worker.error.connect(worker.deleteLater)
         sender_tab.worker = worker
         worker.start()
 
@@ -582,10 +590,15 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
         if result.action == SaveAction.OVERWRITE:
             snapshot = result.request
-            if snapshot is not None:
-                source_tab.request_data = snapshot
-                source_tab.persisted_baseline = snapshot_persisted_fields(snapshot)
-                source_tab.stale_persisted = False
+            if snapshot is None:
+                logger.error(
+                    "save_request_overwrite_failed reason=missing_snapshot request_id=%s",
+                    request_data.id,
+                )
+                return
+            source_tab.request_data = snapshot
+            source_tab.persisted_baseline = snapshot_persisted_fields(snapshot)
+            source_tab.stale_persisted = False
             self.request_persisted.emit(request_data.id, snapshot, source_tab)
             self._sync_tab_labels_for_request(request_data.id, request_data.name)
             self.request_saved.emit()

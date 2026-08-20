@@ -28,11 +28,11 @@ class RequestWorker(QThread):
     cleared. ``TabsPresenter`` follows this by creating a fresh worker for each request.
     """
 
-    finished = Signal(ResponseData)
+    request_finished = Signal(ResponseData)
     error = Signal(object)  # carries ExecutionError; falls back to str for cancellation
     retry_attempt = Signal(int, int, object)  # attempt, max_retries, ExecutionError
     env_update = Signal(dict)
-    script_output = Signal(list, str)  # logs, error_message
+    script_output = Signal(list, object)  # logs, error_message: str | None
     chunk_received = Signal(str)
     headers_received = Signal(int, dict)
 
@@ -168,7 +168,7 @@ class RequestWorker(QThread):
                 self.request_data.url,
                 stopped,
             )
-            self.finished.emit(result.response)
+            self.request_finished.emit(result.response)
         except Exception as exc:
             logger.error("RequestWorker unexpected error: %s", exc, exc_info=True)
             self.error.emit(

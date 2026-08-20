@@ -51,9 +51,9 @@ logger = logging.getLogger(__name__)
 class EnvPresenter(QObject):
     """Owns the environment selector: loading envs, propagating vars, and environment selection."""
 
-    env_variables_changed = Signal(object)  # payload: dict[str, str]
+    env_variables_changed = Signal(dict)  # payload: dict[str, str]
     env_keys_changed = Signal(object)  # payload: list[str] | None
-    env_hidden_keys_changed = Signal(object)  # payload: set[str]
+    env_hidden_keys_changed = Signal(set)  # payload: set[str]
     environments_loaded = Signal()
 
     def __init__(

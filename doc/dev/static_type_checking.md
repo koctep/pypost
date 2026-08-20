@@ -16,6 +16,12 @@ make install      # editable install with [dev] extra (includes mypy)
 make typecheck    # mypy + baseline gate (optional; not part of make check)
 ```
 
+The current gate passes with 217 known errors:
+
+```text
+mypy baseline OK (217 known errors in pypost/core, pypost/models, pypost/ui)
+```
+
 To see raw mypy output (including all known baseline errors):
 
 ```bash
@@ -43,6 +49,24 @@ At module import, the gate escapes each configured prefix for literal regular-ex
 and orders overlapping prefixes longest-first. The parser requires a literal slash immediately
 after the selected prefix, so configuring `pypost/agent` accepts `pypost/agent/module.py` but not
 the sibling path `pypost/agent_extra/module.py`.
+
+### Typing Qt signals and thread lifecycle
+
+Treat every custom Qt signal declaration as a runtime payload contract:
+
+- Use concrete payload classes whenever the signal always emits one runtime family, such as
+  `Signal(dict)`, `Signal(list)`, or `Signal(ResponseData)`.
+- Do not shadow a native Qt lifecycle signal with a custom payload signal. In particular, a
+  `QThread` subclass must preserve zero-argument `QThread.finished()` for termination handling and
+  use a distinct name such as `request_finished` for response delivery.
+- Connect thread cleanup, such as `deleteLater()`, to native `QThread.finished()` rather than to a
+  success or error payload signal. Native termination occurs on every exit path.
+- For a genuine optional union that Qt cannot express as one signal type, declare an `object`
+  boundary and validate it immediately in the receiver. Accept only the documented types; reject
+  anything else with a type-only warning that does not interpolate or stringify the payload.
+
+Keep the connected callback annotation at least as precise as the validated value. Do not use a
+broad `object` declaration when one concrete payload class describes every live emission.
 
 ### Baseline gate behavior
 
@@ -150,9 +174,10 @@ in `requirements-dev.in`.
 218 errors total (July 2026 snapshot): 41 in `pypost/core/`, 0 in `pypost/models/`, 177 in
 `pypost/ui/` (29 files). Per-code breakdown below is this original snapshot; it illustrates
 *typical* fixes rather than a live count. The baseline was regenerated under PYPOST-1007 for the
-key-format change (see [Architecture](#architecture)) and now holds 219 errors — the small drift
-is incidental code churn since July 2026, not a format change; open `mypy-baseline.json` (one
-JSON object per error, with an `error_count` summary field) for the current exact breakdown.
+key-format change (see [Architecture](#architecture)). The current baseline holds 217 known errors
+after resolving the Qt signal overload drift and removing two stale records. `make typecheck`
+passes when those 217 current diagnostics match the committed records. Open `mypy-baseline.json`
+(one JSON object per error, with an `error_count` summary field) for the exact live breakdown.
 
 ### Core (`pypost/core/`) — 41 errors in 14 files
 

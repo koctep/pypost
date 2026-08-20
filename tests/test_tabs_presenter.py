@@ -273,8 +273,29 @@ class TestTabsPresenter(unittest.TestCase):
     def test_on_env_keys_changed_pushes_keys(self):
         p = self._make_presenter()
         p.add_new_tab()
+        tab = p.widget.widget(0)
         keys = ["KEY1", "KEY2"]
         p.on_env_keys_changed(keys)
+        self.assertEqual(tab.response_view.current_env_keys, keys)
+
+    def test_on_env_keys_changed_ignores_invalid_payload(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        invalid_payload = "sensitive-token-value"
+
+        with self.assertLogs("pypost.ui.presenters.tabs_presenter", level="WARNING") as caplog:
+            p.on_env_keys_changed(invalid_payload)
+
+        self.assertIsNone(tab.response_view.current_env_keys)
+        self.assertEqual(
+            caplog.output,
+            [
+                "WARNING:pypost.ui.presenters.tabs_presenter:"
+                "env_keys_update_ignored reason=invalid_payload_type type=str",
+            ],
+        )
+        self.assertNotIn(invalid_payload, caplog.output[0])
 
     def test_on_env_hidden_keys_changed_pushes_to_request_editor(self):
         p = self._make_presenter()
@@ -284,6 +305,26 @@ class TestTabsPresenter(unittest.TestCase):
         hidden_keys = {"TOKEN"}
         p.on_env_hidden_keys_changed(hidden_keys)
         tab.request_editor.set_hidden_keys.assert_called_once_with(hidden_keys)
+
+    def test_on_script_output_rejects_invalid_error_payload(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+
+        with self.assertLogs(
+            "pypost.ui.presenters.tabs_presenter_worker",
+            level="WARNING",
+        ) as caplog:
+            p._on_script_output(tab, [], {"secret": "must-not-be-forwarded"})
+
+        self.assertEqual(
+            caplog.output,
+            [
+                "WARNING:pypost.ui.presenters.tabs_presenter_worker:"
+                "script_output_ignored reason=invalid_error_type type=dict",
+            ],
+        )
+        self.assertNotIn("must-not-be-forwarded", caplog.output[0])
 
     def test_handle_new_tab_opens_tab(self):
         p = self._make_presenter()
@@ -673,6 +714,25 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(received[0][0], "r1")
         self.assertEqual(received[0][1], "https://updated.example.com")
         self.assertIs(received[0][2], tab)
+
+    def test_save_overwrite_without_snapshot_is_rejected(self):
+        from pypost.ui.request_save_orchestrator import SaveAction, SaveResult
+
+        req = _make_request("r1", "Existing")
+        p = self._make_presenter([req])
+        p.add_new_tab(req, save_state=False)
+        tab = p.widget.widget(0)
+        p._save_orchestrator.save_request = MagicMock(
+            return_value=SaveResult(SaveAction.OVERWRITE),
+        )
+        persisted_slot = MagicMock()
+        p.request_persisted.connect(persisted_slot)
+
+        with self.assertLogs("pypost.ui.presenters.tabs_presenter", level="ERROR") as caplog:
+            p._handle_save_request(tab, req)
+
+        persisted_slot.assert_not_called()
+        self.assertIn("reason=missing_snapshot", caplog.output[0])
 
     def test_save_overwrite_updates_all_matching_tab_labels(self):
         req = _make_request("r1", "Old Label")

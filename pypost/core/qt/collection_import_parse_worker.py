@@ -19,7 +19,7 @@ ReadImportFile = Callable[[Path], tuple[list[Collection], list[str]]]
 class CollectionImportParseWorker(QThread):
     """Run ``read_import_file(path)`` off the GUI thread."""
 
-    parse_completed = Signal(object, object)  # collections, parse_errors
+    parse_completed = Signal(list, list)  # collections, parse_errors
     parse_failed = Signal(object)  # CollectionImportFileError or Exception
 
     def __init__(self, path: Path, read_import_file: ReadImportFile) -> None:
