@@ -146,6 +146,53 @@ hang. Keep the capture around the helper call so records emitted inside the
 nested modal loop are included, and keep modal dismissal independent of later
 assertions.
 
+### Teardown stress detector (PYPOST-1040)
+
+The Troubleshooting entry below for "Native crash after tests report PASS" is
+now diagnosed, not just tracked. [PYPOST-1040](https://pypost.atlassian.net/browse/PYPOST-1040)
+traced the intermittent post-PASS SIGSEGV/SIGBUS to an **upstream PySide6/
+shiboken6 6.11.1 `QWidgetItem` GC-teardown lifecycle defect**: pytest's own
+`unraisableexception` plugin forces five rounds of cyclic `gc.collect()` at
+session end, and that deferred collection — not prompt refcounting — is what
+reaches `SettingsDialog`'s nested `QVBoxLayout`/`QFormLayout`/seven-section
+widget subtree and crashes inside Shiboken's `QWidgetItem` destructor.
+Ablation confirmed both halves: disabling the forced-GC plugin eliminates the
+crash (0/20), and exercising the same `AgentAppSession` start/shutdown
+machinery with no Settings dialog ever opened also eliminates it (0/20). No
+PyPost-owned anti-pattern was found (no raw `QLayoutItem`/`QWidgetItem`
+reference is held in `pypost/`, and `AgentAppSession.shutdown()` always
+completes and logs success before the crash). Measured rate: **32.5%
+(13/40)** on Linux/Python 3.13.5/PySide6 6.11.1 — CI's exact pinned binding
+version. Full evidence: [PYPOST-1040 Architecture](../../ai-tasks/PYPOST-1040/20-architecture.md).
+
+`tests/test_agent_dialog_settle_teardown_stress.py` is the resulting
+**stress detector**, added as a sibling module (not a change to this
+module). It does not fix the crash — no PyPost-owned fix is in scope for
+that diagnostic ticket — it makes the defect visible and regression-checked:
+
+- Spawns `STRESS_ITERATIONS = 25` independent, isolated child `pytest`
+  processes of `tests/test_agent_dialog_settle_e2e.py` (each a full
+  `subprocess.run`, so a child's native crash cannot take down the stress
+  test's own process) and asserts every child exits `0`. At the measured
+  32.5% single-run rate this gives >99.9% detection power if the defect is
+  still present.
+- Marked `pytest.mark.xfail(reason=..., strict=False)`: a detected crash is
+  the expected, non-blocking XFAIL state (no PyPost-owned fix exists to
+  apply), while `strict=False` means a future `XPASS` — e.g. after a
+  PySide6/shiboken6 upgrade or a follow-up mitigation — surfaces as a
+  visible, non-blocking signal to revisit the marker instead of silently
+  passing or breaking CI.
+- Marked `pytest.mark.slow` and excluded from the default `-m "not slow"`
+  CI selection, same convention as other opt-in-only scenarios; it costs
+  ~25-40s wall time (25 children at the measured baseline).
+
+Run it explicitly:
+
+```bash
+pytest tests/test_agent_dialog_settle_teardown_stress.py -m slow -v
+make test-slow  # runs all slow-marked tests, including this one
+```
+
 ### Pattern sketch (shared helper)
 
 ```python
@@ -224,10 +271,15 @@ No extra environment variables. Prefer `make test-agent-e2e` for
 | DEBUG contract assertion failure | Confirm logger `pypost.agent.ui_wait`, DEBUG |
 | | event `ui_wait_timeout`, and condition |
 | | `forced_dialog_settle_timeout`; do not substitute live CLI logs. |
-| Native crash after tests report PASS | Re-run the module in a fresh process and |
-| | retain the crash output. Intermittent post-PASS Qt teardown is tracked by |
-| | [PYPOST-1040](https://pypost.atlassian.net/browse/PYPOST-1040); it does not |
-| | relax the bounded modal cleanup contract. |
+| Native crash after tests report PASS | Diagnosed by |
+| | [PYPOST-1040](https://pypost.atlassian.net/browse/PYPOST-1040): an upstream |
+| | PySide6/shiboken6 6.11.1 `QWidgetItem` GC-teardown defect, triggered by |
+| | pytest's forced cyclic GC (`unraisableexception` plugin) acting on |
+| | `SettingsDialog`'s nested-layout widget subtree — **not** a PyPost-owned |
+| | defect. Measured at 32.5% (13/40) on Linux/Python 3.13.5/PySide6 6.11.1 |
+| | (CI's exact pinned version). Detected (not fixed) by the stress test — |
+| | see [Teardown stress detector](#teardown-stress-detector-pypost-1040); |
+| | it does not relax the bounded modal cleanup contract. |
 
 Observability reuses DEBUG `ui_wait_settled` / `ui_wait_timeout`. The happy
 path uses `condition=settings_dialog_present`; the forced proof locks
@@ -245,3 +297,7 @@ exception path (`step` + modal scalars), not new production metrics. Catalog:
 - [Settings Dialog](settings_dialog.md) — product Settings surface
 - [GUI Testing](gui_testing.md) — offscreen Qt, modal hang pitfalls
 - [Logging Event Naming Convention](logging.md) — `ui_wait_*` events
+- [ai-tasks/PYPOST-1040/20-architecture.md](../../ai-tasks/PYPOST-1040/20-architecture.md) —
+  full crash investigation: root cause, ablation experiments, reproduction evidence
+- [ai-tasks/PYPOST-1040/60-tech-debt.md](../../ai-tasks/PYPOST-1040/60-tech-debt.md) —
+  tech-debt disposition and mitigation-attempt follow-up ([PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115))

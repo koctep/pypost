@@ -88,14 +88,64 @@ No problematic hardcoded value was introduced.
 
 #### TD-1: Diagnose intermittent post-PASS Qt teardown SIGSEGV
 
-- **Priority:** Low.
+- **Priority:** Medium (raised from Low on 2026-08-20 by the PYPOST-1040
+  investigation below; kept below High/Critical because no PyPost-owned fix
+  exists yet and CI already excludes the detector test via the `slow`
+  marker, so this is not currently blocking builds).
 - **Action:** Capture a native backtrace and isolate modal/session teardown if
   the crash reproduces on a supported CI interpreter or continues locally.
-- **Evidence:** The assertions finish as PASS before the crash, the `caplog`
-  context has already exited, and two of three fresh independent module runs
-  exited cleanly. Linux CI uses Python 3.11/3.13, while the crash was observed
-  on macOS Python 3.14. Predecessor tasks document the same Qt/PySide modal
-  teardown lineage.
+- **Evidence (original, PYPOST-968 closure):** The assertions finish as PASS
+  before the crash, the `caplog` context has already exited, and two of
+  three fresh independent module runs exited cleanly. Linux CI uses Python
+  3.11/3.13, while the crash was observed on macOS Python 3.14. Predecessor
+  tasks document the same Qt/PySide modal teardown lineage.
+- **Evidence (new, PYPOST-1040 investigation, 2026-08-20):** PYPOST-1040 ran
+  to completion as the dedicated diagnosis ticket for this entry and
+  reproduced the crash directly on **Linux/Python 3.13.5/PySide6 6.11.1 —
+  the exact supported-CI binding combination** (`.github/workflows/
+  test.yml` pins the same PySide6 version; Python 3.13 is one of the two CI
+  matrix versions), at **32.5% (13/40, N=40)** across fresh, independent
+  `pytest tests/test_agent_dialog_settle_e2e.py` invocations (11x
+  SIGSEGV/139, 2x SIGBUS/135) — materially stronger and more frequent than
+  the original macOS-only observation above, and on the actual environment
+  CI uses, not an unsupported one.
+  - *Root cause:* ablation isolates the mechanism precisely — disabling
+    pytest's own forced-GC plugin (`-p no:unraisableexception`) eliminates
+    the crash (0/20), and removing `SettingsDialog` from the exercised path
+    (a no-dialog `AgentAppSession` smoke test) also eliminates it (0/20
+    under identical forced-GC conditions). The trigger is `SettingsDialog`'s
+    nested `QVBoxLayout`/`QFormLayout`/seven-composite-section widget
+    subtree becoming reachable only through CPython's deferred **cyclic** GC
+    path (forced by pytest's `_pytest/unraisableexception.py`
+    `gc_collect_harder()`, 5 rounds of `gc.collect()` at session end) rather
+    than prompt refcounting — `QWidgetItem`/`QLayoutItem` are not
+    `QObject`s, so Shiboken cannot apply its usual "C++ parent still alive,
+    skip delete" rule for them, matching the upstream bug class documented
+    in PYSIDE-665, PYSIDE-2482, and PYSIDE-1919. No PyPost-owned anti-pattern
+    was found (no raw `QWidgetItem`/`QLayoutItem` reference held anywhere in
+    `pypost/`; `AgentAppSession.shutdown()` completes and logs success
+    before the crash, every time).
+  - *New test evidence:* a subprocess-based stress detector,
+    `tests/test_agent_dialog_settle_teardown_stress.py`, was added
+    (`pytest.mark.slow` + `xfail(strict=False)`, `STRESS_ITERATIONS = 25`,
+    >99.9% detection power at the measured rate). It spawns isolated child
+    `pytest` processes of the target module and asserts every child exits 0,
+    so a future PySide6/shiboken6 upgrade or mitigation that actually fixes
+    this would show as a visible, non-blocking `XPASS` rather than silence.
+  - *Full detail:* [ai-tasks/PYPOST-1040/20-architecture.md](
+    ../PYPOST-1040/20-architecture.md) — environment/reproduction tables,
+    ablation experiments, external upstream-bug research, and the
+    component-ownership diagram.
+  - *Recommended follow-up:* [PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115)
+    (8 story points, Medium priority) — candidates are pinning a
+    different PySide6/shiboken6 patch version and re-running this stress
+    harness to check whether the rate changes, breaking the specific
+    reference cycle so the relevant wrapper objects are reclaimed by prompt
+    refcounting instead of deferred cyclic GC, or explicitly calling
+    `gc.collect()` once right after `AgentAppSession.shutdown()` while the
+    object graph is still well-understood. See
+    `ai-tasks/PYPOST-1040/20-architecture.md`'s "What is explicitly
+    deferred, and why" section for the full rationale.
 - **Classification:** This is not evidence that the PYPOST-968 logging contract
   is broken, incomplete, or unsafe.
 - **Jira:** [PYPOST-1040](https://pypost.atlassian.net/browse/PYPOST-1040)
@@ -122,7 +172,7 @@ work and are not PYPOST-968 debt.
 | Product behavior or safety regression | None |
 | Merge/release blocker | **None** |
 
-The intermittent native teardown exit is retained as Low-priority, non-blocking
+The intermittent native teardown exit is retained as Medium-priority, non-blocking
 debt because it affects local test-process reliability, but it is not caused by
 the test's logging assertion on available evidence and does not invalidate the
 accepted observability behavior. Step 7 remains in progress until independent
