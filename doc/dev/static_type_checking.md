@@ -53,6 +53,29 @@ To see raw mypy output (including all known baseline errors):
    `path:line:code` format) is rejected outright with an error pointing at `--update-baseline` —
    there is no silent dual-format fallback.
 
+### Reading occurrence reports
+
+The gate reports duplicate-key changes by occurrence count:
+
+- A partial regression appends `N new of M total`, where `N` is the number of new occurrences
+  and `M` is the current number of occurrences for that key.
+- A partial fix appends `N of M baselined`, where `N` is the number of resolved occurrences and
+  `M` is the previous baseline count for that key.
+- Entirely new and entirely resolved keys omit these qualifiers because every occurrence changed.
+- New-error source lines are listed in ascending numerical order, independent of mypy's input
+  order. The listed lines identify all current occurrences for the key; the qualifier identifies
+  how many of them are new.
+
+For example, a key with three current occurrences, two of which are new, is rendered as:
+
+```text
+New mypy errors (not in baseline):
+  + pypost/core/client.py: Incompatible value [assignment]
+    lines: 12, 45, 90  (2 new of 3 total)
+```
+
+These formatting contracts have direct regression coverage in `tests/test_mypy_baseline.py`.
+
 After fixing type errors intentionally:
 
 ```bash

@@ -14,6 +14,8 @@ from scripts.check_mypy_baseline import (
     BaselineEntry,
     MypyError,
     _diff_errors,
+    _format_fixed_report,
+    _format_new_report,
     _load_baseline,
     _parse_errors,
     _write_baseline,
@@ -265,6 +267,61 @@ class TestDiffErrors:
 
         assert new_keys == []
         assert fixed_keys == [key, key, key]
+
+
+class TestFormatReports:
+    def test_format_new_report_describes_partial_change_and_sorts_lines(self) -> None:
+        key = ("pypost/core/client.py", "assignment", "Incompatible value")
+        current = [
+            MypyError(path=key[0], line=line, code=key[1], message=key[2])
+            for line in (90, 12, 45)
+        ]
+
+        report = _format_new_report([key, key], current)
+
+        assert report == [
+            "New mypy errors (not in baseline):",
+            "  + pypost/core/client.py: Incompatible value [assignment]",
+            "    lines: 12, 45, 90  (2 new of 3 total)",
+        ]
+
+    def test_format_new_report_omits_qualifier_for_whole_key(self) -> None:
+        key = ("pypost/core/client.py", "assignment", "Incompatible value")
+        current = [
+            MypyError(path=key[0], line=line, code=key[1], message=key[2])
+            for line in (90, 12)
+        ]
+
+        report = _format_new_report([key, key], current)
+
+        assert report == [
+            "New mypy errors (not in baseline):",
+            "  + pypost/core/client.py: Incompatible value [assignment]",
+            "    lines: 12, 90",
+        ]
+
+    def test_format_fixed_report_describes_partial_change(self) -> None:
+        key = ("pypost/core/client.py", "assignment", "Incompatible value")
+        baseline = [BaselineEntry(*key) for _ in range(3)]
+
+        report = _format_fixed_report([key, key], baseline)
+
+        assert report == [
+            "Resolved baseline errors (update baseline):",
+            "  - pypost/core/client.py: Incompatible value [assignment]"
+            "  (2 of 3 baselined)",
+        ]
+
+    def test_format_fixed_report_omits_qualifier_for_whole_key(self) -> None:
+        key = ("pypost/core/client.py", "assignment", "Incompatible value")
+        baseline = [BaselineEntry(*key) for _ in range(2)]
+
+        report = _format_fixed_report([key, key], baseline)
+
+        assert report == [
+            "Resolved baseline errors (update baseline):",
+            "  - pypost/core/client.py: Incompatible value [assignment]",
+        ]
 
 
 class TestLoadBaseline:
