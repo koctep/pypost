@@ -3,7 +3,8 @@
 ## Task Metadata
 
 - **Implementation language**: Python
-- **Branch name**: `fix/PYPOST-1067-derive-mypy-parser-scope`
+- **Suggested branch name**: `fix/PYPOST-1067-derive-mypy-parser-scope`
+- **Delivery branch**: `dev` (existing sprint branch; no branch switch performed)
 
 ## Step Status
 
@@ -61,7 +62,8 @@
   - [x] Documented prefix escaping, longest-first overlap ordering, the required slash boundary,
     and the one-edit scope-extension workflow
   - [x] Preserved the guide's accurate `make typecheck` optional and not-in-CI wording
-- [/] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Primary commit: `b11babda` — `fix(typecheck): PYPOST-1067 derive parser scope from paths`
 
 ## Status Legend
 
@@ -109,4 +111,4 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- `b11babda` — `fix(typecheck): PYPOST-1067 derive parser scope from paths`
