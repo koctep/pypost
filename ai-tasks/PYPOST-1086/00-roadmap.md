@@ -64,7 +64,8 @@
   - [x] Documented concrete Qt payload types, native thread lifecycle, and safe union boundaries
   - [x] Preserved the optional `make typecheck` and not-in-CI policy
   - [x] Passed Markdown/link checks, repository lint/typecheck, focused tests, and diff checks
-- [/] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Primary commit: `849f7db9` — `fix(typecheck): PYPOST-1086 resolve Qt signal drift`
 
 ## Status Legend
 
@@ -112,4 +113,4 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- `849f7db9` — `fix(typecheck): PYPOST-1086 resolve Qt signal drift`
