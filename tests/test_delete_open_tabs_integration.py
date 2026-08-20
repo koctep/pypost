@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import unittest
 from unittest.mock import MagicMock
 
@@ -11,6 +9,9 @@ from pypost.models.models import Collection, RequestData
 from pypost.models.settings import AppSettings
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
+
+pytestmark = pytest.mark.timeout(120)
+
 
 def _request_tab_count(tabs_presenter: TabsPresenter) -> int:
     widget = tabs_presenter.widget

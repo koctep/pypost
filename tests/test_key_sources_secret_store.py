@@ -1,8 +1,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import json
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +13,8 @@ from pypost.core.key_sources.secret_store import (
     SecretStoreKeySource,
     VaultSecretBackend,
 )
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def test_file_secret_backend_loads_registry(tmp_path):

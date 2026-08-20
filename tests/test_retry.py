@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 from unittest.mock import MagicMock
 
@@ -16,6 +14,8 @@ from pydantic import ValidationError
 from pypost.models.retry import RetryPolicy
 from pypost.models.response import ResponseData
 from pypost.models.errors import ErrorCategory, ExecutionError
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def _make_response(status=200, body="OK"):

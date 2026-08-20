@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import call, patch
 
@@ -20,6 +18,9 @@ from tests.helpers.collections_tree import (
     patch_rename_context_menu,
     wait_for_rename_editor,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

@@ -4,8 +4,6 @@ import unicodedata
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 from pypost.core.variable_name_validation import (
     MSG_EMPTY,
     MSG_INVALID_CHARS,
@@ -13,6 +11,8 @@ from pypost.core.variable_name_validation import (
     validate_variable_name,
     validation_failure_reason,
 )
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestValidateVariableName:

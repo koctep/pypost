@@ -1,13 +1,13 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.core.http_client import ResolvedRequestFields
 from pypost.core.sensitive_data_masking_policy import SensitiveDataMaskingPolicy
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestSensitiveDataMaskingPolicyBuildHistorySafeFields(unittest.TestCase):

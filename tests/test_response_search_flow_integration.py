@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock
 
@@ -15,6 +13,9 @@ from pypost.models.settings import AppSettings
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
 
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _response_body(text: str) -> ResponseData:
     encoded = text.encode("utf-8")

@@ -1,12 +1,12 @@
 """Tests for MCP tools overview collection (PYPOST-556)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
 from pypost.models.models import Collection, RequestData
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestMcpToolsOverview(unittest.TestCase):

@@ -2,11 +2,11 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import MagicMock
 
 from pypost.ui.main_window_signals import wire_presenter_signals
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def test_wire_presenter_signals_connects_curl_copied_status_bar():

@@ -3,8 +3,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +12,9 @@ from pypost.core.key_sources.env import EnvKeySource
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(120)
+
 
 VAULT_URL = "https://vault.example/v1/secret/data/pypost"
 

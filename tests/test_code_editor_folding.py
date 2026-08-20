@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import json
 import unittest
 
@@ -16,6 +14,9 @@ from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.fold.json_structure_scanner import JsonStructureScanner
 from pypost.ui.widgets.fold.xml_structure_scanner import XmlStructureScanner
 from pypost.ui.widgets.fold.yaml_structure_scanner import YamlStructureScanner
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _wait_for_scan(editor: CodeEditor) -> None:
     editor.fold_controller()._run_scan()

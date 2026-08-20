@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.ui.presenters.tabs_presenter import TabsPresenter
 from pypost.ui.styles.style_manager import StyleManager
@@ -11,6 +9,9 @@ from tests.helpers.collections_tree import FakeMetrics, FakeRequestManager, Fake
 from tests.test_tabs_presenter import FakeRequestManager as TabsFakeRequestManager
 from tests.test_tabs_presenter import FakeStateManager as TabsFakeStateManager
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _apply_font_size(qapp, size: int) -> None:
     StyleManager().apply_appearance(qapp, theme="system", font_size=size)

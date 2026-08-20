@@ -1,8 +1,6 @@
 """GUI tests for McpActivityDialog (PYPOST-721)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.ui.dialogs.mcp_activity_dialog import (
     McpActivityDialog,
@@ -10,6 +8,8 @@ from pypost.ui.dialogs.mcp_activity_dialog import (
     _format_timestamp,
     _format_tool_column,
 )
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _list_tools_entry(tool_count: int = 3) -> McpActivityEntry:

@@ -2,14 +2,14 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.models.retry import (
     RetryableCodesValidationFailure,
     parse_retryable_status_codes,
 )
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestParseRetryableStatusCodes(unittest.TestCase):

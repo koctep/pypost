@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import logging
 import unittest
 from types import SimpleNamespace
@@ -11,6 +9,9 @@ from PySide6.QtWidgets import QTabWidget, QWidget
 from pypost.models.settings import AppSettings, McpServerConfiguration
 from pypost.ui.main_window import MainWindow
 from pypost.ui.mcp_server_controller import McpServerSettingsController
+
+pytestmark = pytest.mark.timeout(60)
+
 
 CONTROLLER_LOGGER = "pypost.ui.mcp_server_controller"
 

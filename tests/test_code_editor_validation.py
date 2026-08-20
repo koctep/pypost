@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import json
 import unittest
 
@@ -15,6 +13,9 @@ from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.validate.json_body_validator import JsonBodyValidator
 from pypost.ui.widgets.validate.xml_body_validator import XmlBodyValidator
 from pypost.ui.widgets.validate.yaml_body_validator import YamlBodyValidator
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _wait_for_validate(editor: CodeEditor) -> None:
     editor.validation_controller()._run_validate()

@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.core.template_expression_tokenizer import (
@@ -11,6 +9,8 @@ from pypost.core.template_expression_tokenizer import (
     is_plain_variable_token,
     tokenize_template_expressions,
 )
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestTemplateExpressionTokenizer(unittest.TestCase):

@@ -877,18 +877,35 @@ PYPOST-177 component-level metrics tests:
 
 ## Per-test timeouts (mandatory)
 
-Every test must declare an explicit timeout so the suite cannot hang indefinitely.
+Every test must declare an explicit timeout so the suite cannot hang indefinitely. In test
+modules, keep the complete import block at the top of the file and assign module-level
+`pytestmark` only after all imports. This ordering preserves the timeout policy without
+triggering flake8 E402.
 Agent rules: [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md).
 
 ### Declaration
 
-Use module-level `pytestmark` (preferred), class-level, or per-function markers:
+Use module-level `pytestmark` (preferred), class-level, or per-function markers. For the
+module-level form, import everything first, then assign `pytestmark`:
 
 ```python
+from pathlib import Path
+
 import pytest
 
+from pypost.core.config import Config
+
 pytestmark = pytest.mark.timeout(30)
+
+
+def test_config_path(tmp_path: Path) -> None:
+    config = Config(tmp_path)
+    assert config is not None
 ```
+
+Do not put `pytestmark` between `import pytest` and later imports, and do not add
+`# noqa: E402` to suppress the resulting warnings. Reorder the module so all standard-library,
+third-party, and project imports precede `pytestmark`; this is the single repository convention.
 
 Qt / event-loop tests use the default signal-based timeout (do not use `method="thread"`):
 
@@ -915,6 +932,14 @@ class, or function must declare its own timeout.
 ```bash
 make test
 ```
+
+Troubleshooting import-order lint failures:
+
+- **E402 on imports below `pytestmark`** — move the assignment below the module's final import.
+  Do not silence the finding with `# noqa: E402`.
+- **Timeout enforcement fails after reordering** — confirm the module still assigns
+  `pytestmark = pytest.mark.timeout(...)`; its position after imports does not change pytest's
+  module-level marker behavior.
 
 ### Strict markers (PYPOST-865)
 

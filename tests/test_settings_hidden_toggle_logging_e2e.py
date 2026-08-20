@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import logging
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +12,9 @@ from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.presenters.env_presenter import EnvPresenter
 
 from tests.test_env_presenter import FakeConfigManager, FakeMCPManager, FakeStorage
+
+pytestmark = pytest.mark.timeout(120)
+
 
 ENV_NAME = "Dev"
 VARIABLE_KEY = "API_KEY"

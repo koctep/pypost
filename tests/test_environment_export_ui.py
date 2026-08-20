@@ -6,11 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from pypost.core.environment_export import ExportScope
 from pypost.models.models import Environment
 from pypost.ui.widgets.environments.environment_list_widget import EnvironmentListWidget
+
+pytestmark = pytest.mark.timeout(60)
+
 
 _MODULE = "pypost.ui.widgets.environments.environment_list_widget"
 

@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 
 from pypost.models.models import Collection, RequestData
@@ -16,6 +14,9 @@ from tests.helpers.collections_tree import (
     make_collection,
     make_request,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

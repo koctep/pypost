@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import json
 import logging
 import os
@@ -22,6 +20,9 @@ from pypost.models.models import Environment, Collection, RequestData
 from pypost.models.settings import AppSettings, McpServerConfiguration
 from tests.helpers import FakeStorageManager
 from tests.helpers.process_until import process_until
+
+pytestmark = pytest.mark.timeout(60)
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 

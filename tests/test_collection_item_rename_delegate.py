@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock
 
@@ -13,6 +11,9 @@ from PySide6.QtWidgets import QAbstractItemDelegate, QLineEdit, QTreeView
 
 from pypost.models.models import RequestData
 from pypost.ui.delegates.collection_item_rename_delegate import CollectionItemRenameDelegate
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

@@ -7,8 +7,6 @@ QTextLayout format ranges (QTextCursor.charFormat ignores QSyntaxHighlighter ran
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 
 from PySide6.QtGui import QColor, QTextDocument
@@ -24,6 +22,9 @@ from pypost.ui.widgets.json_highlighter import (
     MAX_HIGHLIGHT_BLOCK_CHARS,
     JsonHighlighter,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _hex_color_at(doc: QTextDocument, position: int) -> str:
     """Hex foreground from QSyntaxHighlighter ranges at document position."""

@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +13,9 @@ from pypost.models.settings import AppSettings
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
 
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager
+
+pytestmark = pytest.mark.timeout(120)
+
 
 def _http_result(status_code: int) -> HTTPRequestResult:
     body = str(status_code)

@@ -4,10 +4,10 @@ import unittest
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 from pypost.main import _resolve_log_level
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestResolveLogLevel(unittest.TestCase):

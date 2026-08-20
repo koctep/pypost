@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import asyncio
 import unittest
 
@@ -11,6 +9,8 @@ from prometheus_client import generate_latest
 
 from pypost.core.qt.metrics import MetricsManager
 from pypost.models.errors import ErrorCategory
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def _scrape(mm: MetricsManager) -> str:

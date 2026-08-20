@@ -2,13 +2,14 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock, call, patch
 
 from pypost.models.models import Collection, RequestData
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _make_collection(col_id: str, name: str, requests=None) -> Collection:
     return Collection(id=col_id, name=name, requests=requests or [])

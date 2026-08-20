@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 
 from pypost.core.environment_messages import (
@@ -17,6 +15,8 @@ from pypost.core.environment_ops import (
     validate_environment_variable_name,
 )
 from pypost.models.models import Environment
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class TestCloneEnvironment(unittest.TestCase):

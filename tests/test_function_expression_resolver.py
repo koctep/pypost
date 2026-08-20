@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.core.function_expression_resolver import (
@@ -9,6 +7,9 @@ from pypost.core.function_expression_resolver import (
     FunctionExpressionResolver,
 )
 from pypost.core.function_registry import FunctionRegistry
+
+pytestmark = pytest.mark.timeout(30)
+
 
 MALFORMED_NESTED_EXPRESSION_CASES = [
     ("M1", "{{ md5(urlencode(db) }}", "invalid_argument", "md5"),

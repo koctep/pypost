@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(10)
-
 from unittest.mock import MagicMock
 
 from pypost.core.qt.metrics import MetricsManager
@@ -14,6 +12,8 @@ from pypost.core.metrics_protocol import (
     resolve_metrics,
 )
 from pypost.models.errors import ErrorCategory
+
+pytestmark = pytest.mark.timeout(10)
 
 
 def test_metrics_manager_satisfies_tracker_protocol():

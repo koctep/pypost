@@ -3,8 +3,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import json
 
 
@@ -16,6 +14,8 @@ from pypost.core.encryption_config import (
 )
 from pypost.core.key_provider import ChainedKeyProvider, LocalKeyProvider, build_key_id
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def test_resolve_encryption_enabled_uses_settings_when_set(monkeypatch):

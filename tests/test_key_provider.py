@@ -1,8 +1,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import hashlib
 import json
 from unittest.mock import MagicMock, patch
@@ -17,6 +15,8 @@ from pypost.core.key_provider import (
 from pypost.core.key_sources.chain import KeySourceChain
 from pypost.core.key_sources.env import EnvKeySource
 from pypost.core.key_sources.keyring import KeyringKeySource
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def test_get_key_by_id_raises_when_current_key_id_does_not_match(monkeypatch):

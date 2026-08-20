@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from pypost.core.config_manager import ConfigManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import (
@@ -16,6 +14,9 @@ from pypost.ui.dialogs.settings_dialog import (
     SettingsDialog,
     parse_env_encryption_enabled_from_mode,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 class TestSettingsDialogEnvironmentEncryption:
     def test_encryption_controls_on_form(self, qapp):

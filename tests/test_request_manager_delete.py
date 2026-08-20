@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 import sys
 import types
@@ -16,6 +14,8 @@ except ModuleNotFoundError:
 from tests.helpers import FakeStorageManager
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import Collection, RequestData
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class RequestManagerDeleteTests(unittest.TestCase):

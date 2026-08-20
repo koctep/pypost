@@ -3,8 +3,6 @@ import logging
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +10,9 @@ from pypost.core.qt.worker import RequestWorker
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.core.request_service import ExecutionResult
+
+pytestmark = pytest.mark.timeout(120)
+
 
 def _make_worker():
     req = RequestData(method="GET", url="http://x")

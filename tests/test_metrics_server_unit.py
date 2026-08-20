@@ -5,10 +5,10 @@ import unittest
 import warnings
 from unittest.mock import MagicMock, patch
 
-pytestmark = pytest.mark.timeout(30)
-
 from pypost.core.metrics_registry import MetricsRegistry
 from pypost.core.metrics_server import MetricsServer
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def _make_server() -> MetricsServer:

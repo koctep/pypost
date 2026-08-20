@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -17,6 +15,9 @@ from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.ui.widgets.history_panel import HistoryPanel
+
+pytestmark = pytest.mark.timeout(120)
+
 
 HIDDEN_KEY = "token"
 HIDDEN_VALUE = "supersecret"

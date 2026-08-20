@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtCore import Qt, QPoint
@@ -17,6 +15,9 @@ from tests.helpers.collections_tree import (
     patch_rename_context_menu,
     patch_view_context_menu,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

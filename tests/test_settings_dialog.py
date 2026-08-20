@@ -4,8 +4,6 @@ import logging
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import patch
 
 from PySide6.QtWidgets import QLineEdit
@@ -18,6 +16,8 @@ from pypost.ui.dialogs.settings_dialog import (
     _resolve_webhook_auth_header,
 )
 from pypost.ui.widget_ids import SETTINGS_DIALOG
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class TestSettingsDialogWidgetIdentity:

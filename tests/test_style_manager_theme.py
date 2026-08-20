@@ -2,12 +2,13 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from PySide6.QtGui import QPalette
 
 from pypost.ui.styles.style_manager import StyleManager
 from pypost.ui.styles.custom_style import PyPostStyle
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def test_apply_theme_dark_uses_fusion_and_dark_window(qapp):
     manager = StyleManager()

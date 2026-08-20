@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock
 import requests as requests_lib
@@ -16,6 +14,8 @@ from pypost.core.http_client import (
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 from pypost.models.errors import ErrorCategory, ExecutionError
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _make_response(status=200, headers=None, chunks=None):

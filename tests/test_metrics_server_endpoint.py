@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import asyncio
 import socket
 import time
@@ -15,6 +13,8 @@ from starlette.testclient import TestClient
 
 from pypost.core.metrics_registry import MetricsRegistry
 from pypost.core.metrics_server import MetricsServer
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def _scrape(registry: MetricsRegistry) -> str:

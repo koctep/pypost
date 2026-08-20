@@ -1,8 +1,6 @@
 """Tests for MCP activity log (PYPOST-141)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import asyncio
 import unittest
 from unittest.mock import MagicMock
@@ -12,6 +10,8 @@ from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.request_service import ExecutionResult
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def _exec_result(body="ok", status_code=200):

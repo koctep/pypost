@@ -1,8 +1,6 @@
 """Tests for MCPClientService (MCP method for testing MCP endpoints)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import json
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -11,6 +9,8 @@ import httpx
 
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.models.errors import ErrorCategory, ExecutionError
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class MCPClientServiceTests(unittest.TestCase):

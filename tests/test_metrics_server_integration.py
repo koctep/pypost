@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import socket
 import time
 import unittest
@@ -17,6 +15,8 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
 from pypost.core.qt.metrics import MetricsManager
+
+pytestmark = pytest.mark.timeout(120)
 
 
 def _free_port() -> int:

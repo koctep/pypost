@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtCore import Qt
@@ -18,6 +16,9 @@ from pypost.ui.presenters.tab_dirty import is_tab_dirty
 from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab, PLUS_TAB_MARKER
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _make_request(req_id: str = "r1", name: str = "Test", method: str = "GET") -> RequestData:
     return RequestData(id=req_id, name=name, method=method)

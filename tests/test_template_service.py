@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 from functools import lru_cache
 from unittest.mock import MagicMock, call, patch
@@ -15,6 +13,8 @@ from pypost.core.template_service_render import (
     render_with_jinja,
 )
 from tests.test_function_expression_resolver import MALFORMED_NESTED_EXPRESSION_CASES
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestTemplateServiceRenderString(unittest.TestCase):

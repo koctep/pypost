@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 
 from pypost.core.collection_item_strategies import (
@@ -11,6 +9,8 @@ from pypost.core.collection_item_strategies import (
 from pypost.core.request_manager import RequestManager
 from pypost.models.models import Collection, RequestData
 from tests.helpers import FakeStorageManager
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class CollectionItemStrategiesTests(unittest.TestCase):

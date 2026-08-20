@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import unittest
 
 from pypost.core.request_persisted_fields import (
@@ -11,6 +9,8 @@ from pypost.core.request_persisted_fields import (
     snapshot_persisted_fields,
 )
 from pypost.models.models import RequestData
+
+pytestmark = pytest.mark.timeout(120)
 
 
 def _make_request(

@@ -2,11 +2,12 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import MagicMock, patch
 
 from pypost.ui.styles.style_manager import StyleManager
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def test_apply_appearance_calls_apply_theme(qapp):
     manager = StyleManager()

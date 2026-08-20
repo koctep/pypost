@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 import logging
 from unittest.mock import MagicMock, patch
@@ -17,6 +15,9 @@ from pypost.ui.dialogs.settings_dialog import (
     ENCRYPTION_MODE_ENABLED,
     SettingsDialog,
 )
+
+pytestmark = pytest.mark.timeout(120)
+
 
 ENV_NAME = "Dev"
 SECRET_KEY = "SECRET"

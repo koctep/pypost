@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock, call, patch
 
@@ -16,6 +14,9 @@ from tests.helpers.collections_tree import (
     make_request,
     patch_delete_context_menu,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

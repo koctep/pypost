@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import json
 import tempfile
 import threading
@@ -11,6 +9,8 @@ from pathlib import Path
 
 from pypost.core.history_manager import HistoryManager
 from pypost.models.models import HistoryEntry
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _make_entry(**kwargs) -> HistoryEntry:

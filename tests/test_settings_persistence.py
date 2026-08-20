@@ -7,8 +7,6 @@ Includes restart-level integration for request_timeout via SettingsDialog (PYPOS
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 import shutil
 import tempfile
@@ -22,6 +20,9 @@ from pypost.core.config_manager import ConfigManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
+
+pytestmark = pytest.mark.timeout(120)
+
 
 class TestConfigManagerPersistence(unittest.TestCase):
     def test_load_missing_file_returns_defaults(self):

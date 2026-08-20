@@ -1,8 +1,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 
 from prometheus_client import generate_latest
@@ -12,6 +10,8 @@ from pypost.core.key_provider import EnvironmentEncryptionError, build_key_id
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(120)
 
 
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:

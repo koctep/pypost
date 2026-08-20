@@ -3,8 +3,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 import time
 
@@ -14,6 +12,9 @@ from pypost.core.environment_variables_adapter import EnvironmentVariablesAdapte
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
+
+pytestmark = pytest.mark.timeout(120)
+
 
 HIDDEN_KEY_COUNT = 120
 MIN_REUSE_SPEEDUP_RATIO = 2.0

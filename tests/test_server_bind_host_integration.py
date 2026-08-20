@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import re
 import shutil
 import socket
@@ -16,6 +14,9 @@ from PySide6.QtCore import QCoreApplication
 
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.qt.mcp_server import MCPServerManager
+
+pytestmark = pytest.mark.timeout(120)
+
 
 @dataclass(frozen=True)
 class BindHostCase:

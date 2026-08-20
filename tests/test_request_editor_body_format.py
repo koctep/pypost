@@ -1,6 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import MagicMock
 
@@ -11,6 +10,9 @@ from pypost.ui.widgets.request_editor import (
     body_format_to_body_type,
     body_type_to_body_format,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 class TestBodyFormatMapping(unittest.TestCase):
     def test_body_type_to_format_json(self):

@@ -2,12 +2,12 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
 from pypost.core.constants import HIDDEN_MASK
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class TestHiddenToggleLogPolicy(unittest.TestCase):

@@ -2,14 +2,15 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QTextCursor
 
 from pypost.ui.widgets.response_view import ResponseView
+
+pytestmark = pytest.mark.timeout(60)
+
 
 _QMENU_PATCH = "pypost.ui.widgets.response_view.QMenu"
 

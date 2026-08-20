@@ -1,11 +1,11 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 from unittest.mock import patch
 from pypost.core.curl_generator import CurlGenerator
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData, HistoryEntry
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def test_curl_generator_basic():

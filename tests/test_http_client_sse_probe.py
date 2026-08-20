@@ -1,14 +1,14 @@
 """Tests for HTTPClient SSE probe (PYPOST-39, PYPOST-430)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock, patch
 
 from pypost.core.http_client import HTTPClient
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _make_sse_response(events_data):

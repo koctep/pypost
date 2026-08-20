@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import logging
 from pathlib import Path
 from unittest.mock import patch
@@ -16,6 +14,9 @@ from pypost.core.environment_import import EnvironmentImportFileError, ImportCon
 from pypost.models.models import Environment
 from pypost.ui.widget_ids import ENV_IMPORT_BUTTON
 from pypost.ui.widgets.environments.environment_list_widget import EnvironmentListWidget
+
+pytestmark = pytest.mark.timeout(60)
+
 
 _MODULE = "pypost.ui.widgets.environments.environment_list_widget"
 

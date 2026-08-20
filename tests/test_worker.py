@@ -1,14 +1,14 @@
 """Tests for RequestWorker error signal behavior."""
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock, patch
 
 from pypost.core.qt.worker import RequestWorker
 from pypost.models.models import RequestData
 from pypost.models.errors import ErrorCategory, ExecutionError
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class TestRequestWorkerError(unittest.TestCase):

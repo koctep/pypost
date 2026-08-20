@@ -3,8 +3,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 from unittest.mock import MagicMock, patch
 
@@ -16,6 +14,8 @@ from pypost.core.key_sources.keyring import ACTIVE_ENTRY, SERVICE_NAME
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(120)
 
 
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:

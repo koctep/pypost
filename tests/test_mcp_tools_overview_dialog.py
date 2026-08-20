@@ -1,10 +1,10 @@
 """GUI tests for McpToolsOverviewDialog (PYPOST-721)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from pypost.core.mcp_tools_overview import McpToolOverviewEntry
 from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _entry(**kwargs) -> McpToolOverviewEntry:

@@ -1,11 +1,13 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
 import unittest
 from unittest.mock import MagicMock
 
 from pypost.models.models import RequestData
 from pypost.ui.widgets.request_editor import RequestWidget
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

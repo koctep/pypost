@@ -12,8 +12,6 @@ PYPOST-131: QToolTip + PlainTextEdit (JSON body) contract, same mixin as CodeEdi
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from typing import Tuple
 from unittest.mock import MagicMock, patch
@@ -35,6 +33,9 @@ from pypost.ui.widgets.mixins import (
     VariableHoverResolver,
 )
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareTableWidget
+
+pytestmark = pytest.mark.timeout(60)
+
 
 class _FixedCursorHoverLineEdit(VariableHoverMixin, QLineEdit):
     """Same MRO as VariableAwareLineEdit; Python cursorPositionAt for stable tests."""

@@ -1,12 +1,12 @@
 """GUI tests for SaveRequestDialog (PYPOST-721)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import patch
 
 from pypost.models.models import Collection
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class TestSaveRequestDialog:

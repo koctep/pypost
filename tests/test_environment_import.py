@@ -7,8 +7,6 @@ round-trip lock
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import json
 import unittest
 
@@ -23,6 +21,8 @@ from pypost.core.environment_import import (
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:

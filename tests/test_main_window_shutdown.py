@@ -2,13 +2,14 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtWidgets import QApplication
 
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(120)
+
 
 def _make_window(qapp):
     metrics = MagicMock()

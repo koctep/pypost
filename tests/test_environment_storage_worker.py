@@ -2,14 +2,14 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import unittest
 from unittest.mock import MagicMock
 
 from pypost.core.qt.environment_storage_worker import EnvironmentStorageWorker
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.models.models import Environment
+
+pytestmark = pytest.mark.timeout(120)
 
 
 class TestEnvironmentStorageWorker(unittest.TestCase):

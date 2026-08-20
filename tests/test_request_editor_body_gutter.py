@@ -2,7 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
 import unittest
 
 from PySide6.QtCore import QPoint, Qt
@@ -10,6 +9,9 @@ from PySide6.QtTest import QTest
 
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.request_editor import RequestWidget
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

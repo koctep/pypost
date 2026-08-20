@@ -1,8 +1,6 @@
 """Unit tests for AlertManager and AlertPayload."""
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import gc
 import json
 import logging
@@ -14,6 +12,8 @@ from unittest.mock import MagicMock, patch
 import requests
 
 from pypost.core.alert_manager import AlertManager, AlertPayload
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def _make_payload(**kwargs) -> AlertPayload:

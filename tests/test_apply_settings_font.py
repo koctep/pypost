@@ -1,11 +1,12 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import MagicMock, patch
 from PySide6.QtGui import QShowEvent
 from pypost.models.settings import AppSettings
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _make_window(qapp):
     """Build a MainWindow with all heavy dependencies mocked."""

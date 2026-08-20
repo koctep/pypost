@@ -1,8 +1,6 @@
 """Live MCP integration tests for the committed MCP test collection (PYPOST-181)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 import unittest
 from unittest.mock import MagicMock
@@ -21,6 +19,8 @@ from tests.helpers.mcp_test_collection import (
     load_mcp_test_collection,
     mcp_exposed_requests,
 )
+
+pytestmark = pytest.mark.timeout(120)
 
 
 def _exec_result(body: str = "ok", status_code: int = 200) -> ExecutionResult:

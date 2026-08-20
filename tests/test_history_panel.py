@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtCore import QPoint
@@ -9,6 +7,9 @@ from PySide6.QtWidgets import QApplication, QSizePolicy
 
 from pypost.ui.widgets.history_panel import HistoryPanel
 from pypost.models.models import HistoryEntry
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

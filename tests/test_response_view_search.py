@@ -2,14 +2,14 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import MagicMock
 
 from PySide6.QtTest import QTest
 
 from pypost.models.response import ResponseData
 from pypost.ui.widgets.response_view import SEARCH_DEBOUNCE_MS, ResponseView
+
+pytestmark = pytest.mark.timeout(60)
 
 
 class TestResponseViewSearch:

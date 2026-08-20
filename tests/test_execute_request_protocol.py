@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(10)
-
 from unittest.mock import MagicMock
 
 from pypost.core.execute_request_protocol import ExecuteRequestProtocol
@@ -11,6 +9,8 @@ from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
 from pypost.core.qt.worker import RequestWorker
 from pypost.models.models import RequestData
+
+pytestmark = pytest.mark.timeout(10)
 
 
 def test_request_service_satisfies_protocol():

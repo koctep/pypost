@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import patch
 
 from PySide6.QtWidgets import QTableWidgetItem
@@ -13,6 +11,9 @@ from pypost.models.models import Environment
 from pypost.ui.widgets.environments.environment_variables_widget import (
     EnvironmentVariablesWidget,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 class TestEnvironmentVariablesWidgetRowHelpers:
     def _widget_with_env(self, env: Environment) -> EnvironmentVariablesWidget:

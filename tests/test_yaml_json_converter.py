@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.core.yaml_json_converter import (
@@ -9,6 +7,8 @@ from pypost.core.yaml_json_converter import (
     convert_json_object_to_yaml,
     convert_yaml_body_to_object,
 )
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestConvertYamlBodyToObject(unittest.TestCase):

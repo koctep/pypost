@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -13,6 +11,9 @@ from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
 
 from tests.test_request_save_orchestrator import _mock_save_dialog
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager, _make_request
+
+pytestmark = pytest.mark.timeout(120)
+
 
 @pytest.mark.usefixtures("qapp")
 

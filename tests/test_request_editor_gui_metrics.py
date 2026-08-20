@@ -2,7 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
 import unittest
 
 from prometheus_client import generate_latest
@@ -11,6 +10,9 @@ from PySide6.QtTest import QTest
 
 from pypost.core.qt.metrics import MetricsManager
 from pypost.ui.widgets.request_editor import RequestWidget
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _scrape(mm: MetricsManager) -> str:
     return generate_latest(mm.registry).decode("utf-8")

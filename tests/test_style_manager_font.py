@@ -4,11 +4,12 @@ PYPOST-114: bundled main.qss includes QToolTip styling hook.
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from PySide6.QtWidgets import QWidget
 
 from pypost.ui.styles.style_manager import StyleManager
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def test_apply_styles_appends_font_size_rule(qapp):
     widget = QWidget()

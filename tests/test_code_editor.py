@@ -8,8 +8,6 @@ PYPOST-510: line-number gutter width, viewport margin, read-only gutter clicks.
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import json
 import unittest
 from unittest.mock import patch
@@ -22,6 +20,9 @@ from PySide6.QtWidgets import QApplication, QPlainTextEdit
 from pypost.core.yaml_json_converter import convert_yaml_body_to_object
 from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
+
+pytestmark = pytest.mark.timeout(60)
+
 
 def _collect_gutter_numbers(editor: CodeEditor) -> list[str]:
     editor.show()

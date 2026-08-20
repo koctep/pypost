@@ -1,8 +1,6 @@
 """Groundwork tests for the MCP test collection and environment (PYPOST-180)."""
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.core.mcp_tool_contract import build_mcp_tool_contract_preview
@@ -20,6 +18,8 @@ from tests.helpers.mcp_test_collection import (
     load_mcp_test_environments,
     mcp_test_environment,
 )
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestMcpTestCollectionPaths(unittest.TestCase):

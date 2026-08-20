@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 from unittest.mock import MagicMock, patch
 
 from PySide6.QtWidgets import QInputDialog
@@ -11,6 +9,9 @@ from PySide6.QtWidgets import QInputDialog
 from pypost.models.models import Environment
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.ui.widgets.response_view import ResponseView
+
+pytestmark = pytest.mark.timeout(120)
+
 
 def _make_presenter_with_env(env: Environment) -> EnvPresenter:
     storage = MagicMock()

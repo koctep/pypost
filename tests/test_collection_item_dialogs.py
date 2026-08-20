@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import unittest
 from unittest.mock import patch
 
@@ -36,6 +34,9 @@ from pypost.ui.collection_item_dialogs import (
     show_save_collection_name_required,
     show_save_request_name_required,
 )
+
+pytestmark = pytest.mark.timeout(60)
+
 
 @pytest.mark.usefixtures("qapp")
 

@@ -1,8 +1,6 @@
 """Tests for MCPServerImpl: tool registration, schemas, routing, and call_tool path."""
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 import asyncio
 import json
 import logging
@@ -36,6 +34,8 @@ from pypost.core.request_service import ExecutionResult
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import McpToolParam, RequestData
 from pypost.models.response import ResponseData
+
+pytestmark = pytest.mark.timeout(60)
 
 
 def _exec_result(body="ok", logs=None, script_error=None, status_code=200):

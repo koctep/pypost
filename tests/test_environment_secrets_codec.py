@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import base64
 from unittest.mock import MagicMock
 
@@ -17,6 +15,8 @@ from pypost.core.key_provider import (
     EnvironmentEncryptionError,
     KeyProvider,
 )
+
+pytestmark = pytest.mark.timeout(30)
 
 
 @pytest.fixture

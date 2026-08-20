@@ -2,8 +2,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(60)
-
 from unittest.mock import MagicMock
 
 from prometheus_client import generate_latest
@@ -15,6 +13,9 @@ from pypost.core.request_service import RequestService
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
+
+pytestmark = pytest.mark.timeout(60)
+
 
 HIDDEN_KEY = "token"
 HIDDEN_VALUE = "supersecret"

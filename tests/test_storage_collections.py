@@ -1,11 +1,11 @@
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import json
 
 from pypost.core.storage import StorageManager
 from pypost.models.models import Collection, RequestData
+
+pytestmark = pytest.mark.timeout(120)
 
 
 def _make_storage(tmp_path, monkeypatch) -> StorageManager:

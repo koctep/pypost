@@ -5,11 +5,11 @@ Compiled templates are cached per TemplateService instance (LRU maxsize=256).
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.core.template_service import TemplateService
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestTemplateRenderCachingPrerequisites(unittest.TestCase):

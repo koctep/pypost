@@ -1,8 +1,6 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(120)
-
 import logging
 import tempfile
 from unittest.mock import MagicMock, patch
@@ -15,6 +13,9 @@ from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.core.mcp_activity_log import McpActivityLog
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.core.constants import HIDDEN_MASK
+
+pytestmark = pytest.mark.timeout(120)
+
 
 class _FakeMCPManager:
     def __init__(self):

@@ -2,11 +2,11 @@
 
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 import unittest
 
 from pypost.core.env_variable_snapshot import EnvVariableSnapshot
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestEnvVariableSnapshot(unittest.TestCase):

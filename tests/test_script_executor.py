@@ -2,11 +2,11 @@
 import pytest
 import unittest
 
-pytestmark = pytest.mark.timeout(30)
-
 from pypost.core.script_executor import ScriptContext, ScriptExecutor
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestScriptContext(unittest.TestCase):
