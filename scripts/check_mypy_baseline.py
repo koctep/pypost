@@ -25,8 +25,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = REPO_ROOT / "mypy-baseline.json"
 MYPY_PATHS = ("pypost/core", "pypost/models", "pypost/ui")
 BASELINE_VERSION = 2
+_MYPY_PATH_RE = "|".join(
+    re.escape(path)
+    for path in sorted(MYPY_PATHS, key=lambda path: (-len(path), path))
+)
 _ERROR_RE = re.compile(
-    r"^(?P<path>pypost/(?:core|models|ui)/[^:]+):(?P<line>\d+): error: "
+    rf"^(?P<path>(?:{_MYPY_PATH_RE})/[^:]+):(?P<line>\d+): error: "
     r"(?P<message>.*) \[(?P<code>[^\]]+)\]$",
 )
 

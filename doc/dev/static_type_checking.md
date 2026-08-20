@@ -4,7 +4,8 @@
 
 PyPost runs optional [mypy](https://mypy.readthedocs.io/) static analysis on **`pypost/core/`**,
 **`pypost/models/`**, and **`pypost/ui/`** — domain, persistence, and Qt presentation layers.
-Configuration lives in root `pyproject.toml` under `[tool.mypy]`. Known errors are frozen in
+Checker settings live in root `pyproject.toml` under `[tool.mypy]`; the authoritative checked path
+prefixes live in `scripts/check_mypy_baseline.py` as `MYPY_PATHS`. Known errors are frozen in
 `mypy-baseline.json`; `make typecheck` compares current findings with that committed baseline and
 blocks unreviewed type-regression drift.
 
@@ -25,14 +26,27 @@ To see raw mypy output (including all known baseline errors):
 
 | File | Role |
 | --- | --- |
-| `pyproject.toml` `[tool.mypy]` | Checker settings and scoped paths |
+| `pyproject.toml` `[tool.mypy]` | Checker settings |
 | `mypy-baseline.json` | Version 2 frozen `(path, code, message)` error records |
-| `scripts/check_mypy_baseline.py` | Runs mypy and compares against baseline |
+| `scripts/check_mypy_baseline.py` `MYPY_PATHS` | Authoritative checked path prefixes |
+| `scripts/check_mypy_baseline.py` | Runs mypy, parses diagnostics, and compares the baseline |
 | `Makefile` `typecheck` | Developer entry point |
+
+### Configuring checked paths
+
+`MYPY_PATHS` drives the mypy invocation, baseline scope metadata, successful-run message, and
+accepted diagnostic path prefixes. To extend coverage, add the repository-relative directory
+prefix to `MYPY_PATHS` without a trailing slash. Do not edit `_ERROR_RE` or maintain a second path
+list.
+
+At module import, the gate escapes each configured prefix for literal regular-expression matching
+and orders overlapping prefixes longest-first. The parser requires a literal slash immediately
+after the selected prefix, so configuring `pypost/agent` accepts `pypost/agent/module.py` but not
+the sibling path `pypost/agent_extra/module.py`.
 
 ### Baseline gate behavior
 
-1. Run mypy on `pypost/core`, `pypost/models`, and `pypost/ui`.
+1. Run mypy on every directory in `MYPY_PATHS`, preserving the tuple's configured order.
 2. Parse errors into `(path, code, message)` keys — **not** `path:line:code`. The line number is
    parsed too, but only for display in the "new errors" report; it is deliberately excluded from
    the comparison key because it shifts whenever unrelated code moves above an error (an import
@@ -202,6 +216,12 @@ Run `make venv-test`. The `[dev]` extra includes `types-PyYAML` and `types-PySid
 ### Mypy cannot import `pypost`
 
 Run from the repository root. The configuration sets `mypy_path = "."`.
+
+### Diagnostics from a newly configured path are not recognized
+
+Confirm the `MYPY_PATHS` entry is a repository-relative directory prefix without a trailing slash,
+then run the gate in a fresh process. Diagnostic recognition is compiled from `MYPY_PATHS` at
+module import; do not patch `_ERROR_RE` separately.
 
 ## See Also
 

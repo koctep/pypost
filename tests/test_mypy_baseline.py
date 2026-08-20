@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import ast
 import json
+import runpy
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -24,6 +27,34 @@ from scripts.check_mypy_baseline import (
 pytestmark = pytest.mark.timeout(30)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_with_mypy_paths(
+    tmp_path: Path,
+    paths: tuple[str, ...],
+) -> dict[str, Any]:
+    source_path = REPO_ROOT / "scripts/check_mypy_baseline.py"
+    source = source_path.read_text(encoding="utf-8")
+    assignments = [
+        node
+        for node in ast.parse(source).body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "MYPY_PATHS"
+            for target in node.targets
+        )
+    ]
+    assert len(assignments) == 1
+    assignment_source = ast.get_source_segment(source, assignments[0])
+    assert assignment_source is not None
+    assert source.count(assignment_source) == 1
+
+    temporary_module = tmp_path / "check_mypy_baseline.py"
+    temporary_module.write_text(
+        source.replace(assignment_source, f"MYPY_PATHS = {paths!r}"),
+        encoding="utf-8",
+    )
+    return runpy.run_path(str(temporary_module))
 
 
 class TestMypyBaseline:
@@ -56,6 +87,63 @@ class TestMypyBaseline:
                 line=42,
                 code="union-attr",
                 message='Item "None" of "QWidget | None" has no attribute "show"',
+            ),
+        ]
+
+    def test_configured_path_extension_drives_diagnostic_parsing(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        assert (REPO_ROOT / "pypost/agent").is_dir()
+
+        module = _load_with_mypy_paths(
+            tmp_path,
+            (*check_mypy_baseline.MYPY_PATHS, "pypost/agent"),
+        )
+
+        agent_path = "pypost/agent/tree_index.py"
+        lookalike_path = "pypost/agent_extra/check.py"
+        errors = module["_parse_errors"](
+            f"{agent_path}:17: error: Incompatible return value type [return-value]\n"
+            f'{lookalike_path}:9: error: Name "missing" is not defined [name-defined]\n',
+        )
+
+        assert all(error.path != lookalike_path for error in errors)
+        assert errors == [
+            module["MypyError"](
+                path=agent_path,
+                line=17,
+                code="return-value",
+                message="Incompatible return value type",
+            ),
+        ], "a newly configured MYPY_PATHS entry must drive diagnostic parsing"
+
+    def test_configured_path_alternation_escapes_and_orders_prefixes(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        module = _load_with_mypy_paths(
+            tmp_path,
+            ("pypost/agent", "pypost/agent.ui"),
+        )
+
+        assert "(?:pypost/agent\\.ui|pypost/agent)/" in module["_ERROR_RE"].pattern
+        assert module["_parse_errors"](
+            "pypost/agent.ui/check.py:3: error: Specific path [assignment]\n"
+            "pypost/agent/check.py:5: error: Parent path [assignment]\n"
+            "pypost/agentXui/check.py:7: error: Lookalike path [assignment]\n",
+        ) == [
+            module["MypyError"](
+                path="pypost/agent.ui/check.py",
+                line=3,
+                code="assignment",
+                message="Specific path",
+            ),
+            module["MypyError"](
+                path="pypost/agent/check.py",
+                line=5,
+                code="assignment",
+                message="Parent path",
             ),
         ]
 
