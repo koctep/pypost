@@ -5,7 +5,8 @@
 PyPost runs optional [mypy](https://mypy.readthedocs.io/) static analysis on **`pypost/core/`**,
 **`pypost/models/`**, and **`pypost/ui/`** — domain, persistence, and Qt presentation layers.
 Configuration lives in root `pyproject.toml` under `[tool.mypy]`. Known errors are frozen in
-`mypy-baseline.json` so `make typecheck` passes today while blocking **new** type regressions.
+`mypy-baseline.json`; `make typecheck` compares current findings with that committed baseline and
+blocks unreviewed type-regression drift.
 
 ## Quick Start
 
@@ -25,7 +26,7 @@ To see raw mypy output (including all known baseline errors):
 | File | Role |
 | --- | --- |
 | `pyproject.toml` `[tool.mypy]` | Checker settings and scoped paths |
-| `mypy-baseline.json` | Frozen `(path, code, message)` error records, `"version": 2` (219 as of PYPOST-1007) |
+| `mypy-baseline.json` | Version 2 frozen `(path, code, message)` error records |
 | `scripts/check_mypy_baseline.py` | Runs mypy and compares against baseline |
 | `Makefile` `typecheck` | Developer entry point |
 
@@ -48,8 +49,14 @@ To see raw mypy output (including all known baseline errors):
    Counter subtraction tracks per-key *counts*, so partial fixes and partial regressions within a
    duplicate-key group are still detected correctly.
 4. **Pass** when the multiset of current-run keys equals the multiset in the committed baseline.
+   In particular, an empty current run compared with an empty baseline has no differences and
+   exits successfully.
 5. **Fail** when new errors appear or baseline entries disappear without updating the JSON.
-6. `mypy-baseline.json` missing/wrong `"version"` (i.e. not `2`, including the legacy flat
+6. When the current run is clean but the baseline is non-empty, every baseline entry is resolved
+   debt. The gate lists the resolved entries under `Resolved baseline errors (update baseline):`,
+   reports the baseline and current counts, and exits with status `1`. It does not print ordinary
+   `mypy baseline OK` output in this state because the committed baseline is stale.
+7. `mypy-baseline.json` missing/wrong `"version"` (i.e. not `2`, including the legacy flat
    `path:line:code` format) is rejected outright with an error pointing at `--update-baseline` —
    there is no silent dual-format fallback.
 
@@ -76,7 +83,8 @@ New mypy errors (not in baseline):
 
 These formatting contracts have direct regression coverage in `tests/test_mypy_baseline.py`.
 
-After fixing type errors intentionally:
+After fixing type errors intentionally, explicitly regenerate the baseline and commit the result.
+The normal gate never rewrites the baseline automatically:
 
 ```bash
 .venv/bin/python scripts/check_mypy_baseline.py --update-baseline
@@ -86,7 +94,8 @@ git add mypy-baseline.json
 ## Postponed annotations convention
 
 All modules under **`pypost/core/`**, **`pypost/models/`**, and **`pypost/ui/`** must include
-postponed evaluation of annotations (PEP 563 behavior via PEP 649 backport on 3.11):
+postponed evaluation of annotations. On Python 3.11, `from __future__ import annotations`
+provides PEP 563-style postponed evaluation:
 
 ```python
 """Optional module docstring."""
@@ -171,20 +180,28 @@ Full breakdown: `ai-tasks/PYPOST-734/20-architecture.md` (core initial triage);
 | Target | Includes mypy? |
 | --- | --- |
 | `make lint` | No (flake8) |
-| `make check` | No (lint + fast tests) |
+| `make check` | No (lint + fast tests + `verify-ai-tasks`) |
 | `make typecheck` | Yes (optional) |
 
 CI (`.github/workflows/test.yml`) does not run mypy yet.
 
 ## Troubleshooting
 
-| Symptom | Fix |
-| --- | --- |
-| `make typecheck` reports new errors | Fix types or revert; do not edit baseline to hide regressions |
-| Fixed errors but gate still fails | Run `check_mypy_baseline.py --update-baseline` and commit JSON |
-| `Library stubs not installed for "yaml"` | Run `make venv-test` (installs `types-PyYAML` via `[dev]` extra) |
-| `Library stubs not installed for "PySide6"` | Run `make venv-test` (installs `types-PySide6` via `[dev]` extra) |
-| mypy cannot import `pypost` | Run from repo root; config sets `mypy_path = "."` |
+### `make typecheck` reports new errors
+
+Fix the type errors or revert the change. Do not edit the baseline to hide regressions.
+
+### Fixed errors but the gate still fails
+
+Run `check_mypy_baseline.py --update-baseline` and commit the updated JSON.
+
+### Mypy reports missing `yaml` or `PySide6` stubs
+
+Run `make venv-test`. The `[dev]` extra includes `types-PyYAML` and `types-PySide6`.
+
+### Mypy cannot import `pypost`
+
+Run from the repository root. The configuration sets `mypy_path = "."`.
 
 ## See Also
 

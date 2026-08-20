@@ -129,6 +129,44 @@ class TestMypyBaseline:
             f"(exit_code={exit_code})"
         )
 
+    def test_gate_reports_all_baselined_errors_fixed_when_current_is_empty(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        baseline_file = tmp_path / "mypy-baseline.json"
+        baseline_file.write_text(
+            json.dumps(
+                {
+                    "version": check_mypy_baseline.BASELINE_VERSION,
+                    "scope": list(check_mypy_baseline.MYPY_PATHS),
+                    "error_count": 1,
+                    "errors": [
+                        {
+                            "path": "pypost/core/client.py",
+                            "code": "assignment",
+                            "message": "Incompatible value",
+                        },
+                    ],
+                },
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(check_mypy_baseline, "BASELINE_PATH", baseline_file)
+        monkeypatch.setattr(check_mypy_baseline, "_run_mypy", lambda: (0, ""))
+        monkeypatch.setattr(sys, "argv", ["check_mypy_baseline.py"])
+
+        exit_code = check_mypy_baseline.main()
+        captured = capsys.readouterr()
+
+        assert exit_code == 1
+        assert "New mypy errors (not in baseline):" not in captured.err
+        assert "Resolved baseline errors (update baseline):" in captured.err
+        assert "- pypost/core/client.py: Incompatible value [assignment]" in captured.err
+        assert "Baseline: 1 errors; current: 0 errors" in captured.err
+        assert "mypy baseline OK" not in captured.out
+
 
 class TestDiffErrors:
     """Unit tests for the pure `_diff_errors` multiset difference.
@@ -136,6 +174,12 @@ class TestDiffErrors:
     All hermetic: no subprocess/mypy invocation, no filesystem I/O — data is
     constructed directly, per do-testing.md's pure-unit tier.
     """
+
+    def test_diff_errors_empty_current_and_baseline_have_no_diff(self) -> None:
+        new_keys, fixed_keys = _diff_errors([], [])
+
+        assert new_keys == []
+        assert fixed_keys == []
 
     def test_diff_errors_ignores_line_shift_alone(self) -> None:
         # Red test 1 (PYPOST-1007 Step 3): same (path, code, message) at two
