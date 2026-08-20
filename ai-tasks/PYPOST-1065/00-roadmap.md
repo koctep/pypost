@@ -58,7 +58,8 @@
 - [x] **STEP 8: Dev Docs**
   - `doc/dev/static_type_checking.md` — document the partial-occurrence report qualifiers,
     qualifier omission for whole-key changes, and deterministic new-error line ordering.
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Implementation commit: `301ae91b` — `test(mypy): PYPOST-1065 cover report formatters`.
 
 ## Status Legend
 
@@ -106,4 +107,4 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- `301ae91b` — `test(mypy): PYPOST-1065 cover report formatters`
