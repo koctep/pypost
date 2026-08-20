@@ -232,7 +232,10 @@
     suppression and directs contributors to move `pytestmark` after the final import.
   - Validation: Markdown structure inspected; policy phrases and example ordering verified;
     `git diff --check` passed. Execution is complete and awaiting Step 8 review.
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Implementation commit: `98dd93d6` — `style(tests): PYPOST-1070 fix pytestmark E402 noise`.
+  - Current branch: `dev`; suggested branch reference:
+    `style/PYPOST-1070-fix-pytestmark-e402`.
 
 ## Status Legend
 
@@ -280,4 +283,4 @@ See the `td-roadmap` skill for who writes which mark and when.
 
 ### COMMIT
 
-- Commit hash and message (Conventional Commits + JIRA ID)
+- `98dd93d6` — `style(tests): PYPOST-1070 fix pytestmark E402 noise`
