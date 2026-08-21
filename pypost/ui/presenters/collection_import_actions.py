@@ -23,6 +23,7 @@ from pypost.core.collection_import import (
     find_collection_conflicts,
     format_collection_import_result,
     plan_collection_import,
+    recount_collection_import_plan,
 )
 from pypost.core.collection_import_apply import apply_imported_collections
 from pypost.core.collection_messages import (
@@ -152,11 +153,14 @@ class CollectionImportActions(QObject):
         result = plan_collection_import(existing, collections, decisions)
         result.parse_errors.extend(parse_errors)
 
-        save_errors = apply_imported_collections(
+        apply_result = apply_imported_collections(
             self._request_manager,
             result.collections,
             result.persisted,
         )
+        if getattr(apply_result, "failed_ids", None):
+            result = recount_collection_import_plan(result, apply_result.failed_ids)
+        save_errors = apply_result.failures if hasattr(apply_result, "failures") else apply_result
         result.parse_errors.extend(save_errors)
 
         self._refresh_tree()

@@ -288,6 +288,55 @@ def plan_collection_import(
     )
 
 
+def recount_collection_import_plan(
+    plan: CollectionImportPlanResult,
+    failed_ids: set[str],
+) -> CollectionImportPlanResult:
+    """Recount import plan counts to reflect only collections persisted to disk.
+
+    Args:
+        plan: The initial planned import result.
+        failed_ids: Collection IDs that encountered OSError during save_collection.
+
+    Returns:
+        A new CollectionImportPlanResult with added, updated, renamed, and
+        request_count adjusted to exclude failed collections.
+    """
+    if not failed_ids:
+        return plan
+
+    failed_persisted = [col for col in plan.persisted if col.id in failed_ids]
+    succeeded_persisted = [col for col in plan.persisted if col.id not in failed_ids]
+
+    failed_names = {col.name for col in failed_persisted}
+
+    failed_renamed_pairs = {
+        (orig, new_name)
+        for orig, new_name in plan.renamed
+        if new_name in failed_names
+    }
+    renamed = [pair for pair in plan.renamed if pair not in failed_renamed_pairs]
+
+    failed_renamed_new_names = {new_name for _, new_name in failed_renamed_pairs}
+    non_renamed_failed_names = failed_names - failed_renamed_new_names
+
+    updated = [name for name in plan.updated if name not in non_renamed_failed_names]
+    added = [name for name in plan.added if name not in non_renamed_failed_names]
+
+    request_count = sum(len(col.requests) for col in succeeded_persisted)
+
+    return CollectionImportPlanResult(
+        collections=[col for col in plan.collections if col.id not in failed_ids],
+        persisted=succeeded_persisted,
+        added=added,
+        updated=updated,
+        skipped=list(plan.skipped),
+        renamed=renamed,
+        request_count=request_count,
+        parse_errors=list(plan.parse_errors),
+    )
+
+
 def format_collection_import_result(result: CollectionImportPlanResult) -> str:
     """Human-readable summary for the import result dialog."""
     lines = [

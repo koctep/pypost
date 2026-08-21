@@ -103,3 +103,21 @@ def test_mid_write_save_failure_reconciles_memory_to_durable_storage(caplog):
         "collection_import_reconciled failed_count=1 collection_count=2" in r.message
         for r in caplog.records
     )
+
+
+def test_partial_save_failure_returns_failed_collection_ids(caplog):
+    """Save failure must return a structured result with failed_ids (PYPOST-1058)."""
+    first = make_collection("c1", "Saved")
+    second = make_collection("c2", "Failed")
+    manager = FakeRequestManager([])
+    manager.storage.save_collection.side_effect = [None, OSError("disk full")]
+
+    with caplog.at_level(logging.WARNING, logger="pypost.core.collection_import_apply"):
+        result = apply_imported_collections(manager, [first, second], [first, second])
+
+    assert hasattr(
+        result, "failed_ids"
+    ), "apply_imported_collections must return result with failed_ids"
+    assert result.failed_ids == {"c2"}
+    assert len(result.failures) == 1
+    assert "Failed" in result.failures[0]

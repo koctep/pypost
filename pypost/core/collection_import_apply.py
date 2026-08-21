@@ -14,6 +14,7 @@ would refuse.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from pypost.core.collection_messages import format_collection_entry_error
@@ -27,11 +28,38 @@ logger = logging.getLogger(__name__)
 MSG_SAVE_FAILED = "could not be saved ({reason})"
 
 
+@dataclass(frozen=True)
+class CollectionImportApplyResult:
+    """Outcome of applying and saving imported collections."""
+
+    failures: list[str] = field(default_factory=list)
+    failed_ids: set[str] = field(default_factory=set)
+
+    def __iter__(self):
+        return iter(self.failures)
+
+    def __len__(self) -> int:
+        return len(self.failures)
+
+    def __getitem__(self, index):
+        return self.failures[index]
+
+    def __bool__(self) -> bool:
+        return bool(self.failures)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, list):
+            return self.failures == other
+        if isinstance(other, CollectionImportApplyResult):
+            return self.failures == other.failures and self.failed_ids == other.failed_ids
+        return False
+
+
 def apply_imported_collections(
     manager: "RequestManager",
     collections: list[Collection],
     persisted: list[Collection],
-) -> list[str]:
+) -> CollectionImportApplyResult:
     """Swap in the imported collection list and persist the changed subset.
 
     On any ``OSError`` during persist, reloads collections from durable storage
@@ -45,12 +73,13 @@ def apply_imported_collections(
             chose to skip are absent, so their stored files stay untouched.
 
     Returns:
-        One formatted message per collection that could not be written; empty
-        when every write succeeded.
+        A CollectionImportApplyResult containing formatted failure messages and
+        the set of collection IDs that failed to save; empty when every write succeeded.
     """
     manager.apply_loaded_collections(collections)
 
     failures: list[str] = []
+    failed_ids: set[str] = set()
     for col in persisted:
         try:
             manager.storage.save_collection(col)
@@ -63,6 +92,7 @@ def apply_imported_collections(
             failures.append(
                 format_collection_entry_error(col.name, MSG_SAVE_FAILED.format(reason=exc))
             )
+            failed_ids.add(col.id)
 
     if failures:
         # Durable storage is source of truth after any mid-write save failure
@@ -80,4 +110,4 @@ def apply_imported_collections(
         len(persisted),
         len(failures),
     )
-    return failures
+    return CollectionImportApplyResult(failures=failures, failed_ids=failed_ids)

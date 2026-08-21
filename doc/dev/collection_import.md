@@ -20,6 +20,11 @@ main window. Conflict prompts, plan, and apply still run on the GUI thread after
 completes — same outcomes as PYPOST-987 / PYPOST-1004, with a non-modal preparing cue
 while the worker runs.
 
+**PYPOST-1058** aligns the completion summary dialog and `collection_import_completed`
+log with durable storage after save failures. If any collection fails to save to disk,
+`recount_collection_import_plan` adjusts Added, Updated, Renamed, and Requests Imported
+totals to reflect only what successfully persisted, matching the sidebar tree.
+
 ## Architecture
 
 ```text
@@ -46,7 +51,8 @@ After:
 
 - **`pypost/core/collection_import.py`** — the pure core. No Qt, no storage. Parses a
   file into candidate `Collection` models, detects name conflicts, reserves colliding
-  ids, computes the resulting collection list, and formats the summary text. Directly
+  ids, computes the resulting collection list, recounts plan results against save
+  failures (`recount_collection_import_plan`), and formats the summary text. Directly
   unit-testable without a `QApplication` or a data directory. Called from the parse
   worker via the injected `read_import_file` callable (default
   `load_collection_import_candidates`).
@@ -66,7 +72,9 @@ After:
 - **`pypost/core/collection_import_apply.py`** — `apply_imported_collections`, the only
   bulk collection-write loop in the codebase. A free function over `RequestManager`'s
   public surface rather than a method on it, which keeps `request_manager.py` inside its
-  SOLID audit cap (`scripts/audit_baseline_metrics.py`).
+  SOLID audit cap (`scripts/audit_baseline_metrics.py`). Returns
+  `CollectionImportApplyResult` containing formatted failure messages and failed collection
+  IDs.
 - **`pypost/ui/presenters/collection_import_actions.py`** — `CollectionImportActions`,
   a `QObject` orchestrator. Owns worker lifecycle and busy state; sequences pick →
   async parse → sync conflict/plan/apply/result. Split out of `CollectionsPresenter`
@@ -195,12 +203,30 @@ Human-readable summary for the result dialog: counts (`len(result.renamed)` for 
 Renamed line), every `"original" -> "new_name"` pair from `result.renamed`, and any
 per-entry failures.
 
-### `apply_imported_collections(manager, collections, persisted) -> list[str]`
+### `recount_collection_import_plan(plan, failed_ids) -> CollectionImportPlanResult`
+
+Pure function adjusting import plan metrics when save failures occur (PYPOST-1058):
+
+- **plan**: The original `CollectionImportPlanResult` computed by `plan_collection_import`.
+- **failed_ids**: `set[str]` of collection IDs that failed during `save_collection`.
+- **Returns**: A new `CollectionImportPlanResult` where failed collections are removed from
+  `added`, `updated`, and `renamed` (both count and `(orig, new_name)` detail pairs), and
+  `request_count` sums only the requests of successfully persisted collections. `skipped`
+  and `parse_errors` are preserved.
+- When `failed_ids` is empty (happy path), returns `plan` directly with zero overhead.
+
+### `apply_imported_collections(manager, collections, persisted) -> CollectionImportApplyResult`
 
 Swaps in the planned list via `RequestManager.apply_loaded_collections` (which rebuilds
-`_request_index`) and writes each collection in `persisted`. Returns one formatted message
-per collection that could not be written; the loop continues past a failure so one bad
-write cannot strand the rest.
+`_request_index`) and writes each collection in `persisted`. Returns a
+`CollectionImportApplyResult` containing `failures: list[str]` (formatted error strings)
+and `failed_ids: set[str]` (IDs of collections that failed to save). The loop continues
+past a failure so one bad write cannot strand the rest.
+
+`CollectionImportApplyResult` implements Python's sequence protocol (`__iter__`,
+`__len__`, `__getitem__`, `__bool__`, and `__eq__` with `list[str]`), maintaining full
+backwards compatibility for callers and tests that treat the return value as a list of
+failure messages.
 
 If any write raises `OSError`, the function calls `manager.reload_collections()` before
 returning so in-memory collections and `_request_index` match durable storage
@@ -212,15 +238,24 @@ Deliberately **not** routed through `RequestManager.create_collection`, which re
 duplicate names: an import resolves name conflicts through an explicit user decision and
 may legitimately produce a name `create_collection` would refuse.
 
-### Result dialog after save failure (contract B)
+### Result dialog and logging after save failure (PYPOST-1058)
 
-After apply returns with save failures (and memory has been reconciled),
-`CollectionImportActions` still formats the result from the **plan** (`added` /
-`updated` / `skipped` / `renamed` / `request_count`), appends the save-failure lines,
-sets `success=False`, refreshes the tree (now durable-aligned), and shows the
-unsuccessful dialog. Plan counts describe the attempted import; they are **not**
-recomputed against the post-reload durable set. The tree shows what is on disk; the
-dialog shows what was attempted plus which saves failed.
+When `apply_imported_collections` returns with save failures (`failed_ids` is non-empty),
+`CollectionImportActions` invokes `recount_collection_import_plan(result, apply_result.failed_ids)`
+before appending the save failure messages to `result.parse_errors`.
+
+The result summary dialog and the `collection_import_completed` log event reflect the
+**durable outcome** rather than pre-save plan counts:
+- Failed additions are excluded from `added` and reported as 0 Added.
+- Failed overwrites are excluded from `updated` and reported as 0 Updated.
+- Failed conflict copies / in-file renames are excluded from `renamed` count and the
+  `"original" -> "new_name"` detail section.
+- `request_count` includes only requests belonging to successfully persisted collections.
+- `save_errors` are listed under the errors section.
+- `success=False` is set whenever save failures occur.
+
+This ensures the completion dialog, log events, and sidebar tree all truthfully agree on
+what persisted to disk.
 
 ### `CollectionImportParseWorker`
 
@@ -295,8 +330,9 @@ lists, and the status-bar string itself are never logged — an imported collect
 routinely carries credentials in a header template. Paths are logged for triage
 (user-chosen import file). See `ai-tasks/PYPOST-987/50-observability.md`,
 `ai-tasks/PYPOST-1004/50-observability.md`,
-`ai-tasks/PYPOST-1005/50-observability.md`, and
-`ai-tasks/PYPOST-1006/50-observability.md`.
+`ai-tasks/PYPOST-1005/50-observability.md`,
+`ai-tasks/PYPOST-1006/50-observability.md`, and
+`ai-tasks/PYPOST-1058/50-observability.md`.
 
 ### Async parse lifecycle (PYPOST-1005)
 
@@ -335,7 +371,7 @@ worker `collection_import_parse_worker_failed` as the terminal event.
 Zero-usable-collections is not a worker failure: parse returns `[]`, and only
 the orchestrator emits `reason=no_valid_collections`.
 
-### Parse / apply / completion (PYPOST-987 / PYPOST-1004)
+### Parse / apply / completion (PYPOST-987 / PYPOST-1004 / PYPOST-1058)
 
 In `collection_import.py`:
 
@@ -346,7 +382,8 @@ In `collection_import_actions.py`:
 - **WARNING** `collection_import_file_invalid reason=…` — the exception message, or the
   literal `no_valid_collections` (both reasons locked via caplog, PYPOST-1006)
 - **INFO** `collection_import_completed added_count=… updated_count=… skipped_count=…
-  renamed_count=… request_count=… error_count=…`
+  renamed_count=… request_count=… error_count=…` — counts reflect the durable
+  outcome after `recount_collection_import_plan` (PYPOST-1058) when save failures occur
 
 In `collection_import_apply.py`:
 
@@ -374,7 +411,7 @@ the collection id, not its name.
 | Second Import click does nothing while preparing | Busy re-entry guard (`is_busy`); click is not queued | Wait for the preparing cue to clear, then click again; look for INFO `collection_import_skipped reason=busy` |
 | "No valid collections found in this file." | The file parsed, but every entry was rejected — most often a foreign format whose root object has no top-level `name` | Check the per-entry reasons listed below the message in the same dialog; export from PyPost or hand-write the documented shape |
 | An entry is listed as `Entry 3: missing or empty "name" field` | That record had no usable `name`, so it could not be labelled | `name` is the one required field on a collection record |
-| Result dialog is unsuccessful and plan counts look higher than the tree | At least one `save_collection` write failed (disk full, permissions, read-only data directory); apply reloaded memory from disk (PYPOST-1004) | Read ERROR `collection_import_save_failed` for failing ids, then WARNING `collection_import_reconciled`; the tree matches durable storage; dialog counts are plan attempts (contract B), not a post-reload recount |
+| Result dialog is unsuccessful and lists save failures | At least one `save_collection` write failed (disk full, permissions, read-only data directory); apply reloaded memory from disk (PYPOST-1004) and recounted summary metrics (PYPOST-1058) | Read ERROR `collection_import_save_failed` for failing ids, then WARNING `collection_import_reconciled`; the tree and summary dialog both reflect the durable persisted state (failed items report 0 added/updated and list save errors) |
 | Imported requests do not send correctly | `{{placeholders}}` are imported verbatim and need their environment | Select the matching environment — see [Environments Dialog](environments_dialog.md) |
 | An imported collection appears as `Copy of X` without a prompt | Two entries in the same file shared that name | Expected: in-file duplicates are always renamed, since neither is a collection you already had |
 | Result dialog "Renamed" count is lower than the number of `Copy of …` names in the tree | `renamed` was stored as a dict keyed by original name (fixed in PYPOST-1003) | Confirm you are on a build where `CollectionImportPlanResult.renamed` is `list[tuple[str, str]]`; n same-named duplicates should report n−1 renames |

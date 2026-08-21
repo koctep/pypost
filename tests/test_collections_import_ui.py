@@ -314,6 +314,38 @@ class TestImportCollections:
 
     @patch(_RESULT)
     @patch(_PICKER, return_value=_PATH)
+    def test_partial_save_failure_recounts_summary_to_durable_membership(
+        self, _mock_picker, mock_result, qapp, caplog
+    ):
+        first = make_collection("c1", "Saved", [make_request("r1", "Req 1")])
+        second = make_collection(
+            "c2", "Failed", [make_request("r2", "Req 2"), make_request("r3", "Req 3")]
+        )
+        presenter, manager = _make_presenter([], _reader([first, second]))
+
+        def save_collection(col):
+            if col.id == "c2":
+                raise OSError("disk full")
+
+        manager.storage.save_collection.side_effect = save_collection
+
+        try:
+            with caplog.at_level(logging.ERROR, logger="pypost.core.collection_import_apply"):
+                presenter.import_collections()
+                _wait_import(lambda: mock_result.call_count >= 1)
+
+            _args, kwargs = mock_result.call_args
+            summary = _args[1]
+            assert kwargs["success"] is False
+            assert "Collections added: 1" in summary
+            assert "Requests imported: 1" in summary
+            assert "Failed" in summary
+            assert "disk full" in summary
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_PICKER, return_value=_PATH)
     def test_logs_completed_event_with_counts(
         self, _mock_picker, _mock_result, qapp, caplog
     ):

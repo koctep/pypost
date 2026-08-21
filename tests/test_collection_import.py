@@ -17,7 +17,9 @@ from pypost.core.collection_import import (
     format_collection_import_result,
     load_collection_import_candidates,
     plan_collection_import,
+    recount_collection_import_plan,
 )
+
 from pypost.core.import_conflicts import ImportConflictDecision
 from pypost.models.models import Collection, RequestData
 
@@ -418,6 +420,97 @@ class TestFormatResult(unittest.TestCase):
         self.assertIn("Copy of My API", summary)
         self.assertIn("Broken: missing name", summary)
         self.assertIn("1", summary)
+
+
+class TestRecountCollectionImportPlan(unittest.TestCase):
+    def test_recount_partial_addition_failure(self) -> None:
+        self.assertIsNotNone(
+            recount_collection_import_plan,
+            "recount_collection_import_plan must be defined in pypost.core.collection_import",
+        )
+        existing: list[Collection] = []
+        col1 = _make_collection("c1", "Added1", [_make_request("r1"), _make_request("r2")])
+        col2 = _make_collection(
+            "c2", "Added2", [_make_request("r3"), _make_request("r4"), _make_request("r5")]
+        )
+        plan = plan_collection_import(existing, [col1, col2], {})
+        recounted = recount_collection_import_plan(plan, failed_ids={"c2"})
+
+        self.assertEqual(recounted.added, ["Added1"])
+        self.assertEqual(recounted.request_count, 2)
+        self.assertEqual(recounted.updated, [])
+        self.assertEqual(recounted.renamed, [])
+        self.assertEqual(recounted.skipped, [])
+
+    def test_recount_overwrite_failure(self) -> None:
+        self.assertIsNotNone(
+            recount_collection_import_plan,
+            "recount_collection_import_plan must be defined in pypost.core.collection_import",
+        )
+        existing = [_make_collection("c1", "My API", [_make_request("old1")])]
+        incoming = [
+            _make_collection(
+                "c1", "My API", [_make_request("n1"), _make_request("n2"), _make_request("n3")]
+            )
+        ]
+        plan = plan_collection_import(
+            existing, incoming, {"My API": ImportConflictDecision.OVERWRITE}
+        )
+        recounted = recount_collection_import_plan(plan, failed_ids={"c1"})
+
+        self.assertEqual(recounted.updated, [])
+        self.assertEqual(recounted.request_count, 0)
+        self.assertEqual(recounted.added, [])
+
+    def test_recount_renamed_copy_failure(self) -> None:
+        self.assertIsNotNone(
+            recount_collection_import_plan,
+            "recount_collection_import_plan must be defined in pypost.core.collection_import",
+        )
+        existing = [_make_collection("c1", "My API", [_make_request("old1")])]
+        incoming = [_make_collection("c2", "My API", [_make_request("n1")])]
+        plan = plan_collection_import(
+            existing, incoming, {"My API": ImportConflictDecision.KEEP_BOTH}
+        )
+        self.assertEqual(len(plan.persisted), 1)
+        failed_id = plan.persisted[0].id
+        recounted = recount_collection_import_plan(plan, failed_ids={failed_id})
+
+        self.assertEqual(recounted.renamed, [])
+        self.assertEqual(recounted.request_count, 0)
+        self.assertEqual(recounted.added, [])
+
+    def test_recount_total_failure_zeroes_all_counts(self) -> None:
+        self.assertIsNotNone(
+            recount_collection_import_plan,
+            "recount_collection_import_plan must be defined in pypost.core.collection_import",
+        )
+        existing = [_make_collection("c1", "Existing")]
+        col_new = _make_collection("c2", "New", [_make_request("r1")])
+        col_up = _make_collection("c1", "Existing", [_make_request("r2")])
+        plan = plan_collection_import(
+            existing, [col_new, col_up], {"Existing": ImportConflictDecision.OVERWRITE}
+        )
+        all_failed = {col.id for col in plan.persisted}
+        recounted = recount_collection_import_plan(plan, failed_ids=all_failed)
+
+        self.assertEqual(recounted.added, [])
+        self.assertEqual(recounted.updated, [])
+        self.assertEqual(recounted.renamed, [])
+        self.assertEqual(recounted.request_count, 0)
+
+    def test_recount_happy_path_with_no_failures_preserves_plan(self) -> None:
+        self.assertIsNotNone(
+            recount_collection_import_plan,
+            "recount_collection_import_plan must be defined in pypost.core.collection_import",
+        )
+        existing = [_make_collection("c1", "Existing")]
+        col_new = _make_collection("c2", "New", [_make_request("r1")])
+        plan = plan_collection_import(existing, [col_new], {})
+        recounted = recount_collection_import_plan(plan, failed_ids=set())
+
+        self.assertEqual(recounted.added, ["New"])
+        self.assertEqual(recounted.request_count, 1)
 
 
 if __name__ == "__main__":
