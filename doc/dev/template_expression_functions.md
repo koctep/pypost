@@ -1,4 +1,4 @@
-# Template Expression Functions (PYPOST-450–PYPOST-454, PYPOST-1037)
+# Template Expression Functions (PYPOST-450–PYPOST-454, PYPOST-1037, PYPOST-1118)
 
 ## Overview
 
@@ -38,6 +38,10 @@ optional leading `+` or `-`, is accepted.  The special failure handling applies
 only while an `HTTPClient` prepares an outbound request; it prevents an invalid
 direct `to_int(...)` expression from being sent as a literal value.
 
+PYPOST-1118 adds `env(name)`: an allow-listed template function retrieving
+operating system environment variables from `os.environ`, safely returning an
+empty string when the variable is unset and converting input objects to string.
+
 Outside the narrow strict HTTP conversion boundary described below, implemented
 behavior is backward compatible:
 
@@ -55,7 +59,7 @@ Main components:
 
 - `pypost/core/function_registry.py` (`FunctionRegistry`)
   - Single source of truth for allow-listed template-callable names and implementations:
-    `urlencode`, `md5`, `base64`, `to_int`.
+    `urlencode`, `md5`, `base64`, `to_int`, `env`.
   - Exposes `allowed_names()`, `is_allowed()`, `get()`, and `register_into_env(env)` to bind
     those callables onto `jinja2.Environment.globals` (catalog keys only).
 - `pypost/core/template_expression_types.py` (`ValidationResult`)
@@ -186,6 +190,27 @@ Supported functions:
 - `base64(var)` -> Base64-encoded string
 - `to_int(var)` -> integer from a native Python `int` or one ASCII decimal string
   (PYPOST-1037, PYPOST-1038)
+- `env(var)` -> operating system environment variable value, or empty string if unset
+  (PYPOST-1118)
+
+### Environment variable resolution (PYPOST-1118)
+
+Use `env(...)` to safely retrieve operating system environment variables from
+`os.environ`. The expression is available across all template-rendering surfaces:
+URLs, header names and values, parameter names and values, and request bodies.
+
+The argument provides the environment variable key name, which may be a variable
+name, a safe dotted path (e.g. `mcp.request.env_var`), or the result of another
+nested function call. If the environment variable is not defined in `os.environ`,
+`env(...)` safely returns an empty string `""` without raising errors. Non-string
+input objects are converted to strings before environment lookup.
+
+| Request field | Template and variables | OS Environment | Prepared value |
+| --- | --- | --- | --- |
+| Header value | `Bearer {{env(api_key_name)}}`, `{"api_key_name": "SECRET_TOKEN"}` | `SECRET_TOKEN=my-secret-token` | `Bearer my-secret-token` |
+| URL | `/items/{{env(mcp.request.env_var)}}`, `{"mcp": {"request": {"env_var": "ITEM_ID"}}}` | `ITEM_ID=100` | `/items/100` |
+| Unset variable | `{{env(missing_var)}}`, `{"missing_var": "UNSET_KEY"}` | *(not set)* | `""` (empty string) |
+| Nested hash | `{{md5(env(secret_key))}}`, `{"secret_key": "API_SECRET"}` | `API_SECRET=pass` | Hex MD5 of `pass` |
 
 ### Integer conversion for HTTP templates (PYPOST-1037, PYPOST-1038)
 
@@ -270,9 +295,11 @@ Examples:
 - URL field: `/{{host}}/{{urlencode(db)}}`
 - MCP tool args (nested context): `{{ mcp.request.issue_key }}` with
   `variables={"mcp": {"request": {"issue_key": "PROJ-1"}}}` → `PROJ-1`
+- Environment variable: `{{ env(api_key) }}` or `{{ env(mcp.request.env_var) }}`
 - Header/param/body values: `{{md5(secret)}}`, `{{base64(path)}}`
 - Hover tooltip resolution uses the same render rules as runtime for function placeholders.
 - Nested chain: `{{md5(urlencode(db))}}` with `db="a b"` → MD5 of URL-encoded value.
+- Nested chain with env: `{{md5(env(secret_key))}}` → MD5 of environment variable value.
 
 Invalid examples (kept as original text due fallback behavior):
 

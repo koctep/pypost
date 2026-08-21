@@ -1,8 +1,9 @@
-import pytest
-
+import os
 import unittest
 from functools import lru_cache
 from unittest.mock import MagicMock, call, patch
+
+import pytest
 
 import jinja2.nodes
 
@@ -47,6 +48,67 @@ class TestTemplateServiceRenderString(unittest.TestCase):
     def test_render_base64_function_with_variable_argument(self):
         result = self.svc.render_string("{{base64(db)}}", {"db": "hello"})
         self.assertEqual("aGVsbG8=", result)
+
+    def test_render_env_function_with_variable_argument(self):
+        with patch.dict(os.environ, {"API_KEY": "secret-value-123"}):
+            result = self.svc.render_string("{{env(key)}}", {"key": "API_KEY"})
+            self.assertEqual("secret-value-123", result)
+
+    def test_render_env_function_missing_key_renders_empty_string(self):
+        with patch.dict(os.environ, {}, clear=True):
+            result = self.svc.render_string("{{env(key)}}", {"key": "NON_EXISTENT"})
+            self.assertEqual("", result)
+
+    def test_render_env_function_in_mixed_text(self):
+        with patch.dict(os.environ, {"STAGE": "prod"}):
+            result = self.svc.render_string(
+                "https://api.{{env(stage_var)}}.example.com",
+                {"stage_var": "STAGE"},
+            )
+            self.assertEqual("https://api.prod.example.com", result)
+
+    def test_render_env_function_with_dotted_path(self):
+        with patch.dict(os.environ, {"MCP_TOKEN": "token-xyz"}):
+            result = self.svc.render_string(
+                "Bearer {{env(mcp.request.env_var)}}",
+                {"mcp": {"request": {"env_var": "MCP_TOKEN"}}},
+            )
+            self.assertEqual("Bearer token-xyz", result)
+
+    def test_render_nested_functions_with_env(self):
+        with patch.dict(os.environ, {
+            "SECRET": "my_secret",
+            "PORT": "8080",
+            "DATA": "hello",
+            "QUERY": "foo bar/baz",
+        }):
+            self.assertEqual(
+                "e3e8aeef9640678a2427975aa4fedbc0",
+                self.svc.render_string("{{md5(urlencode(env(k)))}}", {"k": "QUERY"}),
+            )
+            self.assertEqual(
+                "8080",
+                self.svc.render_string("{{to_int(env(p))}}", {"p": "PORT"}),
+            )
+            self.assertEqual(
+                "aGVsbG8=",
+                self.svc.render_string("{{base64(env(d))}}", {"d": "DATA"}),
+            )
+            self.assertEqual(
+                "foo%20bar%2Fbaz",
+                self.svc.render_string("{{urlencode(env(q))}}", {"q": "QUERY"}),
+            )
+
+    def test_runtime_hover_parity_env_function(self):
+        content = "Key: {{env(key_name)}}"
+        variables = {"key_name": "TEST_VAR"}
+        with patch.dict(os.environ, {"TEST_VAR": "secret_abc"}):
+            for render_path in ("runtime", "hover"):
+                with self.subTest(render_path=render_path):
+                    result = self.svc.render_string(
+                        content, variables, render_path=render_path,
+                    )
+                    self.assertEqual("Key: secret_abc", result)
 
     def test_render_to_int_function_with_single_value_argument(self):
         content = "{{to_int(value)}}"

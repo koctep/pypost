@@ -233,5 +233,33 @@ class TestFunctionExpressionResolver(unittest.TestCase):
                 self.assertEqual("invalid_syntax", r.code)
 
 
+    def test_env_function_validation_valid(self):
+        cases = [
+            ("standalone", "{{ env(API_KEY) }}"),
+            ("dotted_path", "{{ env(mcp.request.env_var) }}"),
+            ("nested_outer", "{{ md5(env(API_KEY)) }}"),
+            ("nested_inner", "{{ env(urlencode(var)) }}"),
+            ("chain", "{{ base64(md5(env(API_KEY))) }}"),
+        ]
+        for label, content in cases:
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertTrue(r.is_valid)
+
+    def test_env_function_validation_invalid(self):
+        cases = [
+            ("multi_arg", "{{ env(a, b) }}", "invalid_arity", "env"),
+            ("empty_arg", "{{ env() }}", "invalid_argument", "env"),
+            ("literal_arg", "{{ env('API_KEY') }}", "invalid_argument", "env"),
+            ("nested_multi_arg", "{{ md5(env(a, b)) }}", "invalid_argument", "md5"),
+        ]
+        for label, content, expected_code, expected_fn in cases:
+            with self.subTest(label=label, content=content):
+                r = self.resolver.validate_content(content)
+                self.assertFalse(r.is_valid)
+                self.assertEqual(expected_code, r.code)
+                self.assertEqual(expected_fn, r.function_name)
+
+
 if __name__ == "__main__":
     unittest.main()

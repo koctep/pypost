@@ -121,7 +121,7 @@ def test_dialog_audit_report_has_full_discovery_and_coherent_aggregates() -> Non
     assert not errors, "\n".join(errors)
 
 
-def test_function_catalog_expectation_is_the_exact_four_name_frozenset() -> None:
+def test_function_catalog_expectation_is_the_exact_catalog_frozenset() -> None:
     method = _find_function(
         _parse_python(_FUNCTION_REGISTRY_TEST),
         "test_allowed_names_matches_catalog",
@@ -141,6 +141,7 @@ def test_function_catalog_expectation_is_the_exact_four_name_frozenset() -> None
         "md5",
         "base64",
         "to_int",
+        "env",
     }
 
 

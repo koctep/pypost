@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 import re
 from typing import Any, Callable
 from urllib.parse import quote
@@ -41,11 +42,17 @@ def _to_int(value: object) -> int:
     raise IntegerConversionError("to_int requires a native integer or ASCII decimal string")
 
 
+def _env(name: object) -> str:
+    """Return operating system environment variable value, or empty string if unset."""
+    return os.environ.get(str(name), "")
+
+
 _DEFAULT_CATALOG: dict[str, Callable[..., Any]] = {
     "urlencode": _urlencode,
     "md5": _md5,
     "base64": _base64_encode,
     "to_int": _to_int,
+    "env": _env,
 }
 
 
