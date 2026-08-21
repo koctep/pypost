@@ -192,7 +192,9 @@ extends the 3+-conflict "apply to all" test matrix in
 (`test_apply_to_all_conflicts_applies_overwrite_to_third_and_later_conflicts`) and
 `KEEP_BOTH` (`test_apply_to_all_conflicts_applies_keep_both_to_third_and_later_conflicts`)
 decisions across 3 collisions, asserting single prompt execution, ID preservation for
-overwrite, and numbered copy name generation for keep-both.
+overwrite, and numbered copy name generation for keep-both. PYPOST-1075 locks
+`generate_import_copy_name` strictly evaluating while loop iteration through a 3-collision
+set to produce suffix `(4)` (`TestGenerateImportCopyName.test_returns_next_numbered_copy_when_first_three_taken`).
 
 ## Export environments (PYPOST-988)
 

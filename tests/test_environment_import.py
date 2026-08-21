@@ -154,6 +154,14 @@ class TestGenerateImportCopyName(unittest.TestCase):
             "Copy of Dev (3)",
         )
 
+    def test_returns_next_numbered_copy_when_first_three_taken(self) -> None:
+        self.assertEqual(
+            generate_import_copy_name(
+                "Dev", {"Copy of Dev", "Copy of Dev (2)", "Copy of Dev (3)"}
+            ),
+            "Copy of Dev (4)",
+        )
+
 
 class TestPlanImportOverwrite(unittest.TestCase):
     def test_preserves_existing_id_and_position(self) -> None:
