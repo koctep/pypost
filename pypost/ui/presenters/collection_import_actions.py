@@ -29,6 +29,7 @@ from pypost.core.collection_import_apply import apply_imported_collections
 from pypost.core.collection_messages import (
     MSG_IMPORT_NO_VALID_COLLECTIONS,
     MSG_IMPORT_PREPARING,
+    format_import_validating_message,
 )
 from pypost.core.import_conflicts import ImportConflictDecision
 from pypost.core.qt.collection_import_parse_worker import (
@@ -101,12 +102,17 @@ class CollectionImportActions(QObject):
     def _start_parse(self, path: Path) -> None:
         self._set_preparing(True)
         worker = CollectionImportParseWorker(path, self._read_import_file)
+        worker.parse_progress.connect(self._on_parse_progress)
         worker.parse_completed.connect(self._on_parse_completed)
         worker.parse_failed.connect(self._on_parse_failed)
         worker.finished.connect(self._on_worker_finished)
         self._worker = worker
         worker.start()
         logger.info("collection_import_parse_started path=%s", path)
+
+    def _on_parse_progress(self, done: int, total: int) -> None:
+        if self._show_status is not None:
+            self._show_status(format_import_validating_message(done, total))
 
     def _on_parse_completed(
         self,

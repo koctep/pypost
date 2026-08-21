@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -114,7 +115,10 @@ def _shape_error(record: dict) -> str | None:
     return None
 
 
-def load_collection_import_candidates(path: Path) -> tuple[list[Collection], list[str]]:
+def load_collection_import_candidates(
+    path: Path,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> tuple[list[Collection], list[str]]:
     """Read and parse an import file into candidate collections.
 
     Accepts either a JSON list of collection records or a single JSON object
@@ -129,6 +133,7 @@ def load_collection_import_candidates(path: Path) -> tuple[list[Collection], lis
             never blocks the rest of the file.
     """
     records = _read_records(path)
+    total_records = len(records)
 
     collections: list[Collection] = []
     parse_errors: list[str] = []
@@ -137,11 +142,15 @@ def load_collection_import_candidates(path: Path) -> tuple[list[Collection], lis
         shape_error = _shape_error(record)
         if shape_error is not None:
             parse_errors.append(format_collection_entry_error(label, shape_error))
+            if on_progress is not None:
+                on_progress(index, total_records)
             continue
         try:
             collections.append(Collection(**record))
         except ValidationError as exc:
             parse_errors.append(format_collection_entry_error(label, str(exc)))
+        if on_progress is not None:
+            on_progress(index, total_records)
 
     logger.info(
         "collection_import_file_parsed path=%s candidate_count=%d error_count=%d",

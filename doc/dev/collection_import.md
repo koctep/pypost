@@ -29,6 +29,12 @@ totals to reflect only what successfully persisted, matching the sidebar tree.
 (`QTreeView` / `QStandardItemModel`) and `RequestManager.get_collections()` strictly
 synchronize with durable storage after partial or total import save failures.
 
+**PYPOST-1061** introduces optional determinate progress updates during collection import
+validation. `load_collection_import_candidates` accepts an optional `on_progress(done, total)`
+callback, `CollectionImportParseWorker` emits `parse_progress(int, int)` (with alias `progress`),
+and `CollectionImportActions` updates the status bar with `MSG_IMPORT_VALIDATING`
+("Validating collections ({done}/{total})…") while parsing and validating candidate records.
+
 ## Architecture
 
 ```text
@@ -100,9 +106,10 @@ After:
 1. User clicks **Import Collection…**; `import_collections` returns immediately if
    `is_busy()` (second click while preparing is skipped — log-and-return, not queued).
 2. File picker runs on the GUI thread (unchanged).
-3. Orchestrator shows the busy cue and starts `CollectionImportParseWorker`:
-   - Status bar: `MSG_IMPORT_PREPARING` (“Preparing collection import…”) via injected
-     `show_status` / `clear_status` callables.
+3. Orchestrator shows the initial busy cue and starts `CollectionImportParseWorker`:
+   - Status bar: `MSG_IMPORT_PREPARING` (“Preparing collection import…”), transitioning
+     to `MSG_IMPORT_VALIDATING` (“Validating collections ({done}/{total})…”) as
+     `parse_progress(done, total)` signals arrive from the worker.
    - Import button (`COLLECTION_IMPORT_BUTTON`) disabled via `findChild` on the panel.
 4. Worker runs `read_import_file` off-thread; emits completed or failed.
 5. Orchestrator clears the cue, then on the GUI thread either shows the invalid-file

@@ -91,8 +91,7 @@ def test_event_loop_stays_responsive_during_collection_import_parse(
     presenter, manager = _make_presenter([], slow_read_import_file)
     try:
         responsiveness_timer = QTimer()
-        responsiveness_timer.setInterval(0)
-        responsiveness_timer.setSingleShot(True)
+        responsiveness_timer.setInterval(20)
         responsiveness_timer.timeout.connect(on_responsiveness_timeout)
 
         busy_sample_timer = QTimer()
@@ -107,6 +106,7 @@ def test_event_loop_stays_responsive_during_collection_import_parse(
             lambda: mock_result.call_count >= 1,
             timeout_ms=10_000,
         )
+        responsiveness_timer.stop()
         busy_sample_timer.stop()
 
         assert timer_during_parse, (

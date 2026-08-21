@@ -30,6 +30,7 @@ MSG_IMPORT_COLLECTION_CONFLICT = (
 )
 MSG_IMPORT_NO_VALID_COLLECTIONS = "No valid collections found in this file."
 MSG_IMPORT_PREPARING = "Preparing collection import…"
+MSG_IMPORT_VALIDATING = "Validating collections ({done}/{total})…"
 
 MSG_FILE_UNREADABLE = "Could not read file: {reason}"
 MSG_FILE_NOT_JSON = "File is not valid JSON: {reason}"
@@ -60,3 +61,11 @@ def format_collection_entry_error(label: str, reason: str) -> str:
 
 def format_unnamed_entry_label(index: int) -> str:
     return LABEL_UNNAMED_ENTRY.format(index=index)
+
+
+def format_import_validating_message(done: int, total: int) -> str:
+    return MSG_IMPORT_VALIDATING.format(done=done, total=total)
+
+
+def format_collection_import_progress(done: int, total: int) -> str:
+    return format_import_validating_message(done, total)
