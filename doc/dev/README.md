@@ -54,6 +54,7 @@ conventions.
 1. [Collection Item Delete](collection_item_delete.md)
 1. [Collection Item Rename](collection_item_rename.md)
 1. [Environments Dialog](environments_dialog.md)
+1. [Environment Management and Variable Display (PYPOST-1073)](environments.md)
 1. [Environment Variable Delete](environment_variable_delete.md)
 1. [Environment Encryption at Rest](environment_encryption_at_rest.md)
 1. [Async Environment Storage (PYPOST-486)](environment_storage_async.md)

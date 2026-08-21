@@ -51,6 +51,14 @@ Initializes the dialog.
 - **current_env_name**: The name of the environment currently active in the application.
 - **log_hidden_key_names**: Configuration for logging hidden key names.
 
+#### Initial synchronization & selection lifecycle (PYPOST-1073)
+
+Upon initialization, `EnvironmentDialog` connects `EnvironmentListWidget.environment_selected` to `self.on_env_selected` and immediately triggers `self.on_env_selected(self.env_list.currentRow())`. This guarantees that:
+- When opened with an active environment name, the active environment is selected in the list and its variables and MCP settings are immediately populated in the variables table.
+- When opened with no environment specified (`current_env_name=None`), the first available environment (row 0) is selected and loaded into the variables table. If the list is empty, the table remains cleared (0 rows) and disabled.
+- Any list mutation (`load_list`, `add_environment`, `delete_environment`) in `EnvironmentListWidget` explicitly emits `environment_selected(self.env_list.currentRow())` to prevent stale variable views when list indices are reused.
+
+
 ### Context Menu Actions (Environment List)
 Instead of main UI buttons, actions on existing environments are handled via a right-click context menu on the `env_list`:
 - **Rename**: Triggered via `_on_env_list_context_menu` or the `F2` hotkey, it calls `_rename_environment_at_row(row)` to trigger inline editing of the list item. The `itemChanged` signal handles validation and updates the selected environment.
@@ -255,6 +263,7 @@ Automated Qt/offscreen coverage lives in `tests/test_env_dialog.py` (module time
 The suite exercises:
 
 - Environment list selection, add/delete, and rename validation
+- **Initial synchronization & selection** (PYPOST-1073): immediate variable table population on open (active env, no env fallback, empty list), reactive updates on row switching, add, and delete
 - **Copy / duplicate** via `_duplicate_environment_at_row` and context-menu wiring
   (QInputDialog cancel, empty name, duplicate name — patched dialogs/message boxes)
 - Variables table: hidden flags, moves, deletes, trailing add row, invalid name revert

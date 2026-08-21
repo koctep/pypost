@@ -6,7 +6,7 @@ import logging
 
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QMessageBox, QTableWidgetItem
+from PySide6.QtWidgets import QTableWidgetItem
 
 from pypost.models.models import Environment
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
@@ -519,7 +519,8 @@ class TestEnvironmentDialog:
             dlg.close()
 
     @patch(
-        "pypost.ui.widgets.environments.environment_list_widget.show_copy_environment_empty_name_error"
+        "pypost.ui.widgets.environments.environment_list_widget."
+        "show_copy_environment_empty_name_error"
     )
     @patch(
         "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText"
@@ -540,7 +541,8 @@ class TestEnvironmentDialog:
             dlg.close()
 
     @patch(
-        "pypost.ui.widgets.environments.environment_list_widget.show_copy_environment_duplicate_name_error"
+        "pypost.ui.widgets.environments.environment_list_widget."
+        "show_copy_environment_duplicate_name_error"
     )
     @patch(
         "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText"
@@ -691,3 +693,143 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
+    @pytest.mark.timeout(10)
+    def test_dialog_init_immediately_loads_current_environment_variables(self, qapp):
+        env1 = Environment(
+            name="Dev",
+            variables={"BASE_URL": "https://dev.api", "API_KEY": "secret123"},
+            hidden_keys={"API_KEY"},
+            enable_mcp=True,
+        )
+        env2 = Environment(
+            name="Prod",
+            variables={"BASE_URL": "https://prod.api"},
+            enable_mcp=False,
+        )
+        dlg = EnvironmentDialog([env1, env2], current_env_name="Dev")
+        try:
+            assert dlg.env_list.currentRow() == 0
+            # Variables table should immediately load Dev variables
+            # without manual on_env_selected calls
+            assert dlg.vars_table.rowCount() == 3  # 2 vars + 1 trailing add row
+            assert dlg.vars_table.item(0, 0).text() == "BASE_URL"
+            assert dlg.vars_table.item(0, 1).text() == "https://dev.api"
+            assert dlg.vars_table.item(1, 0).text() == "API_KEY"
+            assert dlg.vars_table.item(1, 1).text() == HIDDEN_MASK
+            hidden_cb = dlg._get_hidden_checkbox(1)
+            assert hidden_cb is not None
+            assert hidden_cb.isChecked() is True
+            assert dlg.mcp_check.isEnabled() is True
+            assert dlg.mcp_check.isChecked() is True
+        finally:
+            dlg.close()
+
+    @pytest.mark.timeout(10)
+    def test_dialog_init_with_no_env_specified_loads_first_env(self, qapp):
+        env1 = Environment(
+            name="Staging",
+            variables={"STAGE_KEY": "stage_val"},
+            enable_mcp=True,
+        )
+        env2 = Environment(
+            name="Prod",
+            variables={"PROD_KEY": "prod_val"},
+            enable_mcp=False,
+        )
+        dlg = EnvironmentDialog([env1, env2], current_env_name=None)
+        try:
+            assert dlg.env_list.currentRow() == 0
+            # Fallback to row 0 should immediately populate table and MCP settings
+            assert dlg.vars_table.rowCount() == 2  # 1 var + 1 trailing add row
+            assert dlg.vars_table.item(0, 0).text() == "STAGE_KEY"
+            assert dlg.vars_table.item(0, 1).text() == "stage_val"
+            assert dlg.mcp_check.isEnabled() is True
+            assert dlg.mcp_check.isChecked() is True
+        finally:
+            dlg.close()
+
+    @pytest.mark.timeout(10)
+    def test_dialog_init_with_empty_environments_leaves_table_empty_and_disabled(
+        self, qapp
+    ):
+        dlg = EnvironmentDialog([])
+        try:
+            assert dlg.env_list.currentRow() == -1
+            assert dlg.vars_table.rowCount() == 0
+            assert dlg.mcp_check.isEnabled() is False
+            assert dlg.mcp_check.isChecked() is False
+        finally:
+            dlg.close()
+
+    @pytest.mark.timeout(10)
+    def test_dialog_switching_environment_updates_variables_table(self, qapp):
+        env1 = Environment(
+            name="Dev",
+            variables={"DEV_KEY": "dev_val"},
+            enable_mcp=False,
+        )
+        env2 = Environment(
+            name="Prod",
+            variables={"PROD_KEY": "prod_val"},
+            enable_mcp=True,
+        )
+        dlg = EnvironmentDialog([env1, env2], current_env_name="Dev")
+        try:
+            assert dlg.env_list.currentRow() == 0
+            assert dlg.vars_table.item(0, 0).text() == "DEV_KEY"
+            assert dlg.mcp_check.isChecked() is False
+
+            # Switch to Prod
+            dlg.env_list.setCurrentRow(1)
+            assert dlg.vars_table.item(0, 0).text() == "PROD_KEY"
+            assert dlg.vars_table.item(0, 1).text() == "prod_val"
+            assert dlg.mcp_check.isChecked() is True
+
+            # Switch back to Dev
+            dlg.env_list.setCurrentRow(0)
+            assert dlg.vars_table.item(0, 0).text() == "DEV_KEY"
+            assert dlg.vars_table.item(0, 1).text() == "dev_val"
+            assert dlg.mcp_check.isChecked() is False
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.QInputDialog.getText",
+        return_value=("Testing", True),
+    )
+    @pytest.mark.timeout(10)
+    def test_dialog_add_environment_updates_variables_table(self, _mock_input, qapp):
+        env1 = Environment(name="Dev", variables={"DEV_KEY": "dev_val"})
+        dlg = EnvironmentDialog([env1])
+        try:
+            assert dlg.vars_table.item(0, 0).text() == "DEV_KEY"
+            dlg.add_environment()
+            assert dlg.env_list.currentRow() == 1
+            assert len(dlg.environments) == 2
+            assert dlg.environments[1].name == "Testing"
+            # Table should be loaded for Testing (empty variables, 1 trailing add row)
+            assert dlg.vars_table.rowCount() == 1
+            assert not dlg.vars_table.item(0, 0) or not dlg.vars_table.item(0, 0).text()
+            assert dlg.mcp_check.isEnabled() is True
+            assert dlg.mcp_check.isChecked() is False
+        finally:
+            dlg.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_list_widget.confirm_delete_environment",
+        return_value=True,
+    )
+    @pytest.mark.timeout(10)
+    def test_dialog_delete_environment_updates_variables_table(self, _mock_confirm, qapp):
+        env1 = Environment(name="Dev", variables={"DEV_KEY": "dev_val"})
+        env2 = Environment(name="Prod", variables={"PROD_KEY": "prod_val"})
+        dlg = EnvironmentDialog([env1, env2])
+        try:
+            assert dlg.env_list.currentRow() == 0
+            assert dlg.vars_table.item(0, 0).text() == "DEV_KEY"
+            dlg.delete_environment(0)
+            assert len(dlg.environments) == 1
+            assert dlg.environments[0].name == "Prod"
+            assert dlg.vars_table.item(0, 0).text() == "PROD_KEY"
+        finally:
+            dlg.close()

@@ -49,6 +49,9 @@ class EnvironmentDialog(QDialog):
 
         self._env_list_widget.environment_selected.connect(self.on_env_selected)
 
+        # Initial synchronization: load the initially selected environment into the variables table
+        self.on_env_selected(self.env_list.currentRow())
+
     @property
     def environments(self) -> List[Environment]:
         """Working copy edited in the dialog; presenter applies on close."""

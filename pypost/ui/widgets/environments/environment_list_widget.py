@@ -152,6 +152,7 @@ class EnvironmentListWidget(QWidget):
         if self.environments:
             self.env_list.setCurrentRow(target_row)
         self.env_list.blockSignals(False)
+        self.environment_selected.emit(self.env_list.currentRow())
 
     def add_environment(self) -> None:
         name, ok = QInputDialog.getText(
@@ -168,6 +169,7 @@ class EnvironmentListWidget(QWidget):
             self.env_list.addItem(item)
             self.env_list.setCurrentRow(len(self.environments) - 1)
             self.env_list.blockSignals(False)
+            self.environment_selected.emit(self.env_list.currentRow())
 
     def delete_environment(self, row: int | None = None) -> None:
         if row is None:
@@ -182,6 +184,7 @@ class EnvironmentListWidget(QWidget):
         logger.info("environment_deleted env_name=%s", deleted_env.name)
         del self.environments[row]
         self.env_list.takeItem(row)
+        self.environment_selected.emit(self.env_list.currentRow())
 
     def _on_env_list_context_menu(self, pos) -> None:
         item = self.env_list.itemAt(pos)
