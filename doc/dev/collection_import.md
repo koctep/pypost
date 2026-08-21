@@ -35,6 +35,13 @@ callback, `CollectionImportParseWorker` emits `parse_progress(int, int)` (with a
 and `CollectionImportActions` updates the status bar with `MSG_IMPORT_VALIDATING`
 ("Validating collections ({done}/{total})…") while parsing and validating candidate records.
 
+**PYPOST-1062** profiles collection import planning (`plan_collection_import`) and application
+(`apply_imported_collections`) under large synthetic datasets (500 collections, 2,500 requests).
+Profiling confirmed that in-memory planning executes in ~20ms (< 100ms budget) and batch persistence
+executes with minimal latency, validating that keeping plan/apply on the GUI thread avoids unnecessary
+threading complexity while maintaining interactive responsiveness. Automated benchmarks reside in
+`tests/test_collection_import_profile.py`.
+
 ## Architecture
 
 ```text
