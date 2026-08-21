@@ -277,9 +277,9 @@ class CollectionsPresenter(QObject):
         if callable(status_bar):
             status_bar().clearMessage()
 
-    def export_collection(self) -> None:
+    def export_collection(self, source_index: QModelIndex | None = None) -> None:
         """Run the Export Collection flow (delegated to CollectionExportActions)."""
-        self._export_actions.export_collection()
+        self._export_actions.export_collection(source_index=source_index)
 
     def export_all_collections(self) -> None:
         """Run the complete collection backup flow without a tree selection."""

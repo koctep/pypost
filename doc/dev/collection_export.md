@@ -63,7 +63,8 @@ CollectionExportActions             selection/snapshot → save dialog → write
   selection/error/result helpers. `prompt_export_all_collections_file` uses
   `collections.json` and the shared JSON file filter.
 - **`pypost/ui/presenters/collections_presenter.py`** — adds both export buttons next to
-  Import in the panel action row; wires `export_collection` (button, no index),
+  Import in the panel action row; wires `export_collection` (accepts optional `source_index`
+  and forwards to `CollectionExportActions.export_collection(source_index=source_index)`),
   `_export_collection_at_index` (menu), and `export_all_collections` (no selection) to
   `CollectionExportActions`.
   Optional constructor injection `serialize_collection` for tests (defaults to
@@ -82,16 +83,18 @@ flags.
 
 Both entry points resolve a model index the same way (`_selected_collection_id`):
 
-| Resolved tree index | Exported collection |
-| --- | --- |
-| Collection row | That collection |
-| Request row | Parent collection |
-| Invalid / none | Error: select a collection first |
+| Resolved tree index | Node data role (`Qt.ItemDataRole.UserRole`) | Exported collection |
+| --- | --- | --- |
+| Collection row | `str` (collection id) | That collection |
+| Request row | `RequestData` | Parent collection (resolved via `item.parent()`) |
+| Invalid / none | `None` or missing | Error: select a collection first |
 
-| Entry point | Index source |
-| --- | --- |
-| Below-tree **Export Collection…** | `tree.currentIndex()` |
-| Context-menu **Export Collection…** | Clicked `indexAt(pos)` via optional `source_index` |
+When `source_index` is explicitly provided, it takes precedence over `tree.currentIndex()`. When `source_index` is omitted or `None`, the action falls back to `tree.currentIndex()`:
+
+| Entry point | Index source | Precedence |
+| --- | --- | --- |
+| Below-tree **Export Collection…** | Panel button | Uses `tree.currentIndex()` (no `source_index` passed) |
+| Context-menu **Export Collection…** | Clicked row `indexAt(pos)` | Passes `source_index=clicked_index` (overrides `currentIndex()`) |
 
 Unlike environment export, there is no Hidden-secrets confirmation — collections do not
 store encrypted environment variables.
@@ -102,16 +105,22 @@ store encrypted environment variables.
 
 Runs one export interaction end to end.
 
-- **`source_index`**: Optional `QModelIndex`. When omitted, uses `tree.currentIndex()`
-  (button). Context-menu callers pass the clicked index.
+- **`source_index`**: Optional `QModelIndex`. When provided, takes precedence over
+  `tree.currentIndex()`. When omitted/`None`, uses `tree.currentIndex()` (panel button).
+- Resolves collection id via `_selected_collection_id`:
+  - If the item's `Qt.ItemDataRole.UserRole` is a `str`, it is the target collection id.
+  - If the item's `Qt.ItemDataRole.UserRole` is `RequestData`, resolves to the `str` id on `item.parent()`.
+  - Otherwise returns `None`.
 - Resolves collection id → `collection_for_export` → save dialog → serialize/write →
   success or error dialog.
 - **Returns**: `None` (side effects only).
 
-### `CollectionsPresenter.export_collection()`
+### `CollectionsPresenter.export_collection(source_index=None)`
 
-Panel-button entry: delegates to `CollectionExportActions.export_collection()` with no
-index.
+Public export entry point on the presenter. Accepts optional `source_index: QModelIndex | None = None`.
+- Delegates directly to `CollectionExportActions.export_collection(source_index=source_index)`.
+- When `source_index` is provided, takes precedence over `tree.currentIndex()`, exporting the target collection (or parent collection for a child request node) even if `currentIndex()` points to a distant row.
+- When called with no arguments (e.g. from the below-tree action button), defaults to `source_index=None` and uses `tree.currentIndex()`.
 
 ### `CollectionExportActions.export_all_collections()`
 
@@ -178,11 +187,11 @@ Button path emits only the shared outcome events (no `collection_export_selected
 entry: [Logging](logging.md#collections-and-persistence).
 
 ## Tests
-
+ 
 | Module | Coverage |
 | --- | --- |
 | `tests/test_collection_export.py` | Pure core: target, filename, object/list payload, write, round-trip |
-| `tests/test_collection_export_ui.py` | Single/bulk button wiring, success, empty backup, cancel/error, completion log |
+| `tests/test_collection_export_ui.py` | Single/bulk button wiring, success, empty backup, cancel/error, completion log, `source_index` overriding distant `currentIndex` (`TestExportCollectionSourcePrecedence`) |
 | `tests/test_collection_tree_actions.py` | Menu labels, clicked-index dispatch, selection log |
 
 Run:

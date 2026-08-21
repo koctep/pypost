@@ -40,7 +40,7 @@ Wiring in `CollectionsPresenter.__init__`:
 
 - `setItemDelegate(CollectionItemRenameDelegate)` — commit/cancel callbacks to tree actions
 - `customContextMenuRequested` → `CollectionTreeActions.show_context_menu`
-- `export_collection=self._export_collection_at_index` — menu export uses clicked index
+- `export_collection=self._export_collection_at_index` — menu export passes clicked index as `source_index`, overriding distant selection
 
 ## Expand/collapse state (`CollectionsPresenter`)
 
@@ -74,6 +74,11 @@ Menu order (PYPOST-1013):
 **Export Collection…** is omitted when the optional `export_collection` callback is
 `None` (isolated rename/delete harnesses). Production always injects it. Choosing export
 logs `collection_export_selected` then calls `export_collection(clicked_index)`.
+The passed `clicked_index` acts as `source_index` in `CollectionsPresenter` / `CollectionExportActions`,
+ensuring the clicked collection (or parent collection for a clicked request) is exported regardless of
+what row currently holds `currentIndex()`. Node resolution inspects `Qt.ItemDataRole.UserRole`:
+a `str` payload targets that collection directly, while a `RequestData` payload resolves to the collection id
+on `item.parent()`.
 
 ### `CollectionTreeActions.handle_rename_committed(new_name)`
 
@@ -229,7 +234,7 @@ Patch `QMenu` under `pypost.ui.presenters.collection_tree_actions`. Patch dialog
 (`confirm_delete`, `show_rename_empty_name_error`, `show_delete_failure`, etc.) at the same
 import site used by the caller (e.g. `pypost.ui.presenters.tabs_presenter.show_request_error`).
 Unit tests for helpers live in `tests/test_collection_item_dialogs.py`.
-Presenter wiring and integration paths remain in `tests/test_collections_presenter.py`.
+Presenter wiring and integration paths remain in `tests/test_collections_presenter.py`, while `tests/test_collection_export_ui.py` (`TestExportCollectionSourcePrecedence`) tests end-to-end source index override of distant tree selections.
 
 ### Tree expand/collapse state tests (PYPOST-388)
 

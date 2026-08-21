@@ -17,6 +17,7 @@ from tests.helpers.collections_tree import (
     make_collection,
     make_request,
 )
+from pypost.models.models import RequestData
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -43,13 +44,29 @@ def _make_presenter(collections=None, serialize_collection=None):
 
 
 def _select_collection(presenter, collection_id: str) -> None:
+    presenter.widget.setCurrentIndex(_index_for_collection(presenter, collection_id))
+
+
+def _index_for_collection(presenter, collection_id: str):
     model = presenter.widget.model()
     for row in range(model.rowCount()):
         item = model.item(row)
         if item.data(Qt.UserRole) == collection_id:
-            presenter.widget.setCurrentIndex(item.index())
-            return
+            return item.index()
     raise AssertionError(f"collection {collection_id} not found in tree")
+
+
+def _index_for_request(presenter, collection_id: str, request_id: str):
+    model = presenter.widget.model()
+    for row in range(model.rowCount()):
+        item = model.item(row)
+        if item.data(Qt.UserRole) == collection_id:
+            for child_row in range(item.rowCount()):
+                child = item.child(child_row)
+                data = child.data(Qt.UserRole)
+                if isinstance(data, RequestData) and data.id == request_id:
+                    return child.index()
+    raise AssertionError(f"request {request_id} not found in collection {collection_id}")
 
 
 class TestExportCollectionEntryPoint:
@@ -348,5 +365,123 @@ class TestExportAllCollections:
                 in r.message
                 for r in caplog.records
             )
+        finally:
+            presenter.panel.close()
+
+
+class TestExportCollectionSourcePrecedence:
+    @patch(_RESULT)
+    @patch(_SAVE)
+    def test_source_index_pointing_to_collection_overrides_distant_current_index(
+        self, mock_save, mock_result, qapp, tmp_path
+    ):
+        export_path = tmp_path / "Collection B.json"
+        mock_save.return_value = export_path
+        col_a = make_collection("c1", "Collection A", [make_request("r1", "Req A")])
+        col_b = make_collection("c2", "Collection B", [make_request("r2", "Req B")])
+        presenter, _manager = _make_presenter(
+            [col_a, col_b],
+            serialize_collection=lambda col: col.model_dump(mode="json"),
+        )
+        try:
+            _select_collection(presenter, "c1")
+            b_index = _index_for_collection(presenter, "c2")
+
+            presenter.export_collection(source_index=b_index)
+
+            assert export_path.exists()
+            data = json.loads(export_path.read_text(encoding="utf-8"))
+            assert data["name"] == "Collection B"
+            assert data["requests"][0]["name"] == "Req B"
+
+            assert mock_save.call_args.kwargs.get("suggested_name") == "Collection B.json"
+            mock_result.assert_called_once()
+            assert "Collection B" in mock_result.call_args.args[1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_SAVE)
+    def test_source_index_pointing_to_child_request_exports_its_parent_collection(
+        self, mock_save, mock_result, qapp, tmp_path
+    ):
+        export_path = tmp_path / "Collection B.json"
+        mock_save.return_value = export_path
+        col_a = make_collection("c1", "Collection A", [make_request("r1", "Req A")])
+        col_b = make_collection("c2", "Collection B", [make_request("r2", "Req B")])
+        presenter, _manager = _make_presenter(
+            [col_a, col_b],
+            serialize_collection=lambda col: col.model_dump(mode="json"),
+        )
+        try:
+            _select_collection(presenter, "c1")
+            req_b_index = _index_for_request(presenter, "c2", "r2")
+
+            presenter.export_collection(source_index=req_b_index)
+
+            assert export_path.exists()
+            data = json.loads(export_path.read_text(encoding="utf-8"))
+            assert data["name"] == "Collection B"
+            assert data["requests"][0]["name"] == "Req B"
+
+            assert mock_save.call_args.kwargs.get("suggested_name") == "Collection B.json"
+            mock_result.assert_called_once()
+            assert "Collection B" in mock_result.call_args.args[1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_SAVE)
+    def test_export_without_source_index_defaults_to_current_index(
+        self, mock_save, mock_result, qapp, tmp_path
+    ):
+        export_path = tmp_path / "Collection A.json"
+        mock_save.return_value = export_path
+        col_a = make_collection("c1", "Collection A", [make_request("r1", "Req A")])
+        col_b = make_collection("c2", "Collection B", [make_request("r2", "Req B")])
+        presenter, _manager = _make_presenter(
+            [col_a, col_b],
+            serialize_collection=lambda col: col.model_dump(mode="json"),
+        )
+        try:
+            _select_collection(presenter, "c1")
+
+            presenter.export_collection(source_index=None)
+
+            assert export_path.exists()
+            data = json.loads(export_path.read_text(encoding="utf-8"))
+            assert data["name"] == "Collection A"
+            assert data["requests"][0]["name"] == "Req A"
+
+            assert mock_save.call_args.kwargs.get("suggested_name") == "Collection A.json"
+            mock_result.assert_called_once()
+            assert "Collection A" in mock_result.call_args.args[1]
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_SAVE)
+    def test_presenter_export_collection_at_index_forwards_source_index(
+        self, mock_save, mock_result, qapp, tmp_path
+    ):
+        export_path = tmp_path / "Collection B.json"
+        mock_save.return_value = export_path
+        col_a = make_collection("c1", "Collection A", [make_request("r1", "Req A")])
+        col_b = make_collection("c2", "Collection B", [make_request("r2", "Req B")])
+        presenter, _manager = _make_presenter(
+            [col_a, col_b],
+            serialize_collection=lambda col: col.model_dump(mode="json"),
+        )
+        try:
+            _select_collection(presenter, "c1")
+            b_index = _index_for_collection(presenter, "c2")
+
+            presenter._export_collection_at_index(b_index)
+
+            assert export_path.exists()
+            data = json.loads(export_path.read_text(encoding="utf-8"))
+            assert data["name"] == "Collection B"
+            assert mock_save.call_args.kwargs.get("suggested_name") == "Collection B.json"
+            mock_result.assert_called_once()
         finally:
             presenter.panel.close()
