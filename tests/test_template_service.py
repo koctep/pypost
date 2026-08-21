@@ -697,5 +697,53 @@ class TestTemplateServiceHelperStages(unittest.TestCase):
         self.assertGreaterEqual(args[1], 0.0)
 
 
+class TestTemplateServiceEnvironmentVariableResolution(unittest.TestCase):
+    def setUp(self):
+        self.svc = TemplateService()
+
+    def test_resolve_environment_variables_static_unchanged(self):
+        variables = {"host": "example.com", "port": "443"}
+        self.assertEqual(variables, self.svc.resolve_environment_variables(variables))
+
+    def test_resolve_environment_variables_cross_referencing(self):
+        variables = {
+            "host": "localhost",
+            "port": "8080",
+            "base_url": "http://{{ host }}:{{ port }}",
+            "api_url": "{{ base_url }}/api",
+        }
+        resolved = self.svc.resolve_environment_variables(variables)
+        self.assertEqual("http://localhost:8080", resolved["base_url"])
+        self.assertEqual("http://localhost:8080/api", resolved["api_url"])
+
+    def test_resolve_environment_variables_with_env_function(self):
+        with patch.dict(os.environ, {"SECRET_TOKEN": "my_secret_token_123"}):
+            variables = {
+                "raw_token": "{{ env(SECRET_TOKEN) }}",
+                "auth": "Bearer {{ base64(raw_token) }}",
+            }
+            resolved = self.svc.resolve_environment_variables(variables)
+            self.assertEqual("my_secret_token_123", resolved["raw_token"])
+            self.assertEqual("Bearer bXlfc2VjcmV0X3Rva2VuXzEyMw==", resolved["auth"])
+
+    def test_resolve_environment_variables_cycle_handling(self):
+        variables = {
+            "a": "{{ b }}",
+            "b": "{{ a }}",
+        }
+        resolved = self.svc.resolve_environment_variables(variables)
+        self.assertIn(resolved["a"], ["{{ b }}", "{{ a }}"])
+        self.assertIn(resolved["b"], ["{{ a }}", "{{ b }}"])
+
+    def test_render_string_evaluates_embedded_template_variables(self):
+        variables = {
+            "host": "127.0.0.1",
+            "port": "5000",
+            "base_url": "http://{{ host }}:{{ port }}",
+        }
+        rendered = self.svc.render_string("{{ base_url }}/status", variables)
+        self.assertEqual("http://127.0.0.1:5000/status", rendered)
+
+
 if __name__ == "__main__":
     unittest.main()

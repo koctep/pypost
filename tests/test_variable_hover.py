@@ -567,5 +567,23 @@ class TestVariableAwareTableWidgetTooltips(unittest.TestCase):
         resolve_mock.assert_called_once()
         self.assertEqual(show_mock.call_count, 2)
 
+    @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
+    @patch("pypost.ui.widgets.mixins.QToolTip.showText")
+    def test_mouse_over_variable_with_nested_template_expression_shows_resolved_tooltip(
+        self, show_mock, _hide,
+    ):
+        w = _FixedCursorHoverLineEdit()
+        w.resize(400, 32)
+        w.setText("{{base_url}}/api")
+        w.set_variables({
+            "host": "api.example.com",
+            "port": "443",
+            "base_url": "https://{{host}}:{{port}}",
+        })
+        w.fixed_cursor_index = 2
+        w.mouseMoveEvent(_mouse_move_event(w, QPoint(10, 16)))
+        show_mock.assert_called_once()
+        self.assertEqual(show_mock.call_args[0][1], "https://api.example.com:443")
+
 if __name__ == "__main__":
     unittest.main()

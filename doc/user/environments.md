@@ -141,3 +141,19 @@ Import with **Manage Environments → Import…** using the same steps as above.
 
 See [Templating](templating.md). Example: set `host` = `https://api.example.com`, then use
 `{{ host }}/users` in the URL field.
+
+## Template expressions in variable values
+
+Environment variable values can themselves contain template expressions and function calls
+(such as `{{ env(API_KEY) }}` or `{{ host }}:{{ port }}`):
+
+- **Cross-variable references**: Variable values can reference other environment variables
+  (e.g. `base_url` = `http://{{ host }}:{{ port }}`).
+- **Built-in functions**: Built-in functions such as `env(...)`, `urlencode(...)`, `md5(...)`,
+  and `base64(...)` can be used directly within variable values.
+- **Automatic evaluation**: Expressions are evaluated prior to request execution, cURL
+  generation, and hover tooltips.
+- **Cycle safety**: Circular references (e.g. `a` -> `b` -> `a`) and deep recursion chains
+  are detected safely and kept unrendered without crashing.
+
+

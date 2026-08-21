@@ -14,6 +14,7 @@ from mcp.types import TextContent, Tool
 from starlette.concurrency import run_in_threadpool
 from starlette.routing import Mount
 
+from pypost.core.environment_variable_resolver import resolve_environment_variables
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_response_sanitizer import McpResponseSanitizer
 from pypost.core.mcp_secrets_policy import McpSecretsPolicy
@@ -249,7 +250,12 @@ class MCPServerImpl:
             counts["mcp_arg_count"],
             defaults_applied,
         )
-        execution_env = McpSecretsPolicy.execution_environment_variables(env_vars)
+        resolved_env_vars = resolve_environment_variables(
+            env_vars,
+            template_service=self._template_service,
+            render_path="mcp",
+        )
+        execution_env = McpSecretsPolicy.execution_environment_variables(resolved_env_vars)
         return _merge_execution_variables(execution_env, merged_args)
 
     def _create_request_service(self) -> ExecuteRequestProtocol:

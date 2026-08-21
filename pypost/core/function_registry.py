@@ -44,7 +44,11 @@ def _to_int(value: object) -> int:
 
 def _env(name: object) -> str:
     """Return operating system environment variable value, or empty string if unset."""
-    return os.environ.get(str(name), "")
+    if hasattr(name, "_undefined_name") and getattr(name, "_undefined_name"):
+        key_name = getattr(name, "_undefined_name")
+    else:
+        key_name = str(name)
+    return os.environ.get(key_name, "")
 
 
 _DEFAULT_CATALOG: dict[str, Callable[..., Any]] = {

@@ -6,6 +6,7 @@ from typing import Any
 
 from jinja2 import Environment
 
+from pypost.core.environment_variable_resolver import EnvironmentVariableResolver
 from pypost.core.function_expression_resolver import FunctionExpressionResolver
 from pypost.core.function_registry import FunctionRegistry
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
@@ -27,11 +28,7 @@ from pypost.core.template_service_render import (
 class TemplateService:
     """Central ``{{...}}`` substitution entry point (PYPOST-18).
 
-    Autonomous-default (PYPOST-45): ``HTTPClient``, ``RequestService``, and
-    ``MCPServerImpl`` accept optional ``template_service``. When omitted or
-    ``None``, each creates ``TemplateService()`` locally — no module singleton.
-    ``main.py`` injects one instance through the UI/MCP chain for a shared
-    Jinja2 ``Environment``; isolated callers get separate envs (cheap, intentional).
+    Accepts optional ``template_service`` across client/service layer.
     See ``doc/dev/template_service.md`` for consumers and test seams.
     """
 
@@ -56,13 +53,19 @@ class TemplateService:
         self._compile_template = _compile_template
 
     def validate_function_expressions(self, content: str) -> ValidationResult:
-        """
-        Allow only these placeholder forms:
-        - {{identifier}}
-        - {{allowed_function(identifier)}}
-        - {{allowed_function(nested_func(identifier))}} (recursive allow-list)
-        """
+        """Validate placeholder forms against allowed function expressions."""
         return self._function_expression_resolver.validate_content(content)
+
+    def resolve_environment_variables(
+        self,
+        variables: dict[str, Any],
+        render_path: str = "runtime",
+    ) -> dict[str, str]:
+        """Evaluate template expressions defined in environment variables (PYPOST-1119)."""
+        return EnvironmentVariableResolver(self).resolve(
+            variables,
+            render_path=render_path,
+        )
 
     def render_string(
         self,
@@ -72,29 +75,17 @@ class TemplateService:
         *,
         strict_conversion: bool = False,
     ) -> str:
-        """
-        Renders a string template with provided variables using Jinja2.
-
-        Orchestration stages:
-        1. Empty content: record empty_content attempt when metrics exist; return "".
-        2. Count `{{ ... }}` placeholders for logs and metrics.
-        3. Validate function-style placeholders via the resolver.
-        4. If invalid: validation observability; raise ValueError inside the try (caught
-           below; original content is returned).
-        5. Build template and render with Jinja; on success, record success observability.
-        6. On any Exception inside the try (including that ValueError): warning log; for
-           non-ValueError, record render_error when metrics exist; return original content.
-
-        Args:
-            content: The string containing variables like {{ var_name }}
-            variables: A dictionary of variable names and values
-
-        Returns:
-            The rendered string with variables substituted.
-        """
+        """Renders a string template with provided variables using Jinja2."""
         if not content:
             record_empty_render_attempt(self._metrics, render_path)
             return ""
+
+        if render_path != "env_resolve" and variables and any(
+            isinstance(v, str) and "{{" in v for v in variables.values()
+        ):
+            variables = self.resolve_environment_variables(
+                variables, render_path=render_path
+            )
 
         expressions = tokenize_template_expressions(content)
         expression_count = len(expressions)

@@ -139,6 +139,12 @@ class VariableHoverResolver:
             return raw
 
         if not is_plain_variable_token(raw):
+            if "{{" in raw:
+                return VariableHoverResolver._template_service().render_string(
+                    raw,
+                    variables,
+                    render_path="hover",
+                )
             return raw
 
         inner_name = extract_plain_variable_name(raw)

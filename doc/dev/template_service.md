@@ -41,7 +41,8 @@ flowchart LR
 
 | Module | Role |
 | --- | --- |
-| `function_registry.py` | Allow-listed callable names (`urlencode`, `md5`, `base64`) |
+| `environment_variable_resolver.py` | Evaluates template expressions and built-ins in environment variable values (PYPOST-1119) |
+| `function_registry.py` | Allow-listed callable names (`urlencode`, `md5`, `base64`, `env`) |
 | `function_expression_resolver.py` | Validates `{{func(...)}}` and safe dotted paths before render (PYPOST-1033) |
 | `template_expression_tokenizer.py` | Shared `{{...}}` token patterns |
 | `template_service_render.py` | Private render stages, metrics, and logging helpers (PYPOST-700) |

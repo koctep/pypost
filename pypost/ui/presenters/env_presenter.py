@@ -17,6 +17,7 @@ from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.env_variable_snapshot import EnvVariableSnapshot
 from pypost.core.environment_import import load_import_candidates
+from pypost.core.environment_variable_resolver import resolve_environment_variables
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.qt.mcp_server import MCPServerManager
@@ -130,7 +131,7 @@ class EnvPresenter(QObject):
         """Returns currently active env vars."""
         selected = self._env_selector.currentData()
         if isinstance(selected, Environment):
-            return dict(selected.variables)
+            return resolve_environment_variables(selected.variables)
         return {}
 
     @property
@@ -332,7 +333,7 @@ class EnvPresenter(QObject):
                 len(selected.variables),
             )
             self._settings.last_environment_id = selected.id
-            variables = selected.variables
+            variables = resolve_environment_variables(selected.variables)
             self._mcp_controls.handle_environment_selected(selected)
         else:
             logger.info("env_deselected index=%d", index)

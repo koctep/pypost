@@ -108,6 +108,15 @@ Run tests via:
 pytest tests/test_env_dialog.py -q
 ```
 
+## Variable Template Resolution
+
+Environment variables can contain template expressions and built-in function calls (e.g. `{{ env(API_KEY) }}` or `{{ host }}:{{ port }}`).
+Resolution is handled by `EnvironmentVariableResolver` (`pypost/core/environment_variable_resolver.py`), which:
+- Resolves cross-variable references recursively up to a depth limit (32).
+- Executes built-in functions registered in `FunctionRegistry`.
+- Detects circular dependency cycles (e.g., `A -> B -> A`), logging a warning and preserving the unrendered token to prevent infinite loops.
+- Automatically resolves environment variables before request dispatch in `HTTPClient`, `RequestService`, and hover previews in `VariableHoverResolver`.
+
 ## Troubleshooting
 
 - **Variables Table Empty on Dialog Open**: Check `EnvironmentDialog.__init__` to verify that `self.on_env_selected(self.env_list.currentRow())` is invoked after signal connections.
