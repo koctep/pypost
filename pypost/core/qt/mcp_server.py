@@ -15,9 +15,16 @@ from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_proxy_server_impl import MCPProxyServerImpl
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
-from pypost.core.server_bind import drain_pending_tasks, format_bind_error
+from pypost.core.server_bind import (
+    drain_pending_tasks,
+    format_bind_error,
+    get_process_exit_original,
+    install_thread_exit,
+    uninstall_thread_exit,
+)
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
+
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +162,7 @@ class MCPServerManager(QObject):
 
         self._server_thread = threading.Thread(target=self._run_uvicorn, daemon=True)
         self._server_thread.start()
-        logger.info("MCP proxy server starting on %s:%d -> %s", host, port, upstream_url)
+        logger.info("MCP proxy server starting on %s:%d", host, port)
 
     def stop_server(self):
         if not self.is_running():
@@ -215,7 +222,6 @@ class MCPServerManager(QObject):
     def _run_uvicorn(self):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        original_exit = sys.exit
 
         def thread_exit(code=0):
             if code != 0:
@@ -223,9 +229,10 @@ class MCPServerManager(QObject):
                     errno.EADDRINUSE,
                     f"bind failed on {self._current_host}:{self._current_port}",
                 )
-            original_exit(code)
+            original = get_process_exit_original() or sys.exit
+            return original(code)
 
-        sys.exit = thread_exit
+        install_thread_exit(thread_exit)
         try:
             app = self._impl.create_app()
             config = uvicorn.Config(
@@ -258,9 +265,10 @@ class MCPServerManager(QObject):
             logger.exception("mcp_server_start_failed")
             self._notify_start_failed(f"MCP server failed to start: {exc}")
         finally:
-            sys.exit = original_exit
+            uninstall_thread_exit()
             drain_pending_tasks(loop)
             loop.close()
+
             if not self._stop_event.is_set() and not self._startup_notified:
                 self.status_changed.emit(False)
             elif not self._stop_event.is_set() and self._startup_notified:

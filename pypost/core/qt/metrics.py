@@ -1,18 +1,17 @@
-"""Metrics facade composing registry (counters) and server (uvicorn/MCP)."""
 from __future__ import annotations
 
 from collections.abc import Mapping
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import Signal
 
 from pypost.core.metrics_registry import MetricsRegistry
 from pypost.core.metrics_server import MetricsServer
+from pypost.core.qt.metrics_lifecycle import MetricsLifecycle
 from pypost.models.errors import ErrorCategory
 
 
-class MetricsManager(QObject):
-    """Facade for Prometheus counters and the observability HTTP/MCP server."""
-
+# Qt-facing listener lifecycle is inherited from MetricsLifecycle.
+class MetricsManager(MetricsLifecycle):
     start_failed = Signal(str)  # operator-facing bind / startup error
 
     def __init__(self) -> None:
@@ -22,6 +21,7 @@ class MetricsManager(QObject):
         self._pending_start_failure: str | None = None
         self._start_failed_connected = False
         self._server.set_start_failed_handler(self._handle_start_failed)
+        self._bind_metrics_server(self._server)
 
     def _handle_start_failed(self, message: str) -> None:
         if self._start_failed_connected:

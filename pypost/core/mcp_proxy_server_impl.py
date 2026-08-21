@@ -108,11 +108,10 @@ class MCPProxyServerImpl:
             hidden_keys=self._hidden_keys_supplier(),
         )
         logger.debug(
-            "mcp_proxy_connecting_upstream proxy=%s transport=%s url=%s "
+            "mcp_proxy_connecting_upstream proxy=%s transport=%s "
             "header_keys=%s timeout=%.1f",
             self.name,
             self.upstream_transport,
-            self.upstream_url,
             list(sanitized_headers.keys()),
             self.timeout,
         )
@@ -141,7 +140,7 @@ class MCPProxyServerImpl:
         logger.debug("mcp_proxy_list_tools_started proxy=%s", self.name)
         try:
             resolved_headers = self._resolve_headers()
-        except McpUnresolvedVariableError as exc:
+        except McpUnresolvedVariableError:
             duration_ms = (time.perf_counter() - started) * 1000.0
             if self._activity_log is not None:
                 self._activity_log.append(
@@ -150,7 +149,7 @@ class MCPProxyServerImpl:
                         timestamp=datetime.now(timezone.utc),
                         operation="list_tools",
                         outcome="error",
-                        detail=str(exc),
+                        detail="Proxy variable could not be resolved",
                         duration_ms=duration_ms,
                     )
                 )
@@ -178,10 +177,8 @@ class MCPProxyServerImpl:
         except (httpx.TimeoutException, TimeoutError) as exc:
             duration_ms = (time.perf_counter() - started) * 1000.0
             logger.error(
-                "mcp_proxy_list_tools_timeout proxy=%s url=%s error=%s duration_ms=%.2f",
+                "mcp_proxy_list_tools_timeout proxy=%s duration_ms=%.2f",
                 self.name,
-                self.upstream_url,
-                exc,
                 duration_ms,
             )
             if self._activity_log is not None:
@@ -191,7 +188,7 @@ class MCPProxyServerImpl:
                         timestamp=datetime.now(timezone.utc),
                         operation="list_tools",
                         outcome="error",
-                        detail=f"Upstream timed out: {exc}",
+                        detail="Upstream request timed out",
                         duration_ms=duration_ms,
                     )
                 )
@@ -199,10 +196,8 @@ class MCPProxyServerImpl:
         except (httpx.ConnectError, httpx.NetworkError) as exc:
             duration_ms = (time.perf_counter() - started) * 1000.0
             logger.error(
-                "mcp_proxy_list_tools_connect_error proxy=%s url=%s error=%s duration_ms=%.2f",
+                "mcp_proxy_list_tools_connect_error proxy=%s duration_ms=%.2f",
                 self.name,
-                self.upstream_url,
-                exc,
                 duration_ms,
             )
             if self._activity_log is not None:
@@ -212,7 +207,7 @@ class MCPProxyServerImpl:
                         timestamp=datetime.now(timezone.utc),
                         operation="list_tools",
                         outcome="error",
-                        detail=f"Connection failed: {exc}",
+                        detail="Upstream connection failed",
                         duration_ms=duration_ms,
                     )
                 )
@@ -220,9 +215,9 @@ class MCPProxyServerImpl:
         except Exception as exc:
             duration_ms = (time.perf_counter() - started) * 1000.0
             logger.error(
-                "mcp_proxy_list_tools_error proxy=%s error=%s duration_ms=%.2f",
+                "mcp_proxy_list_tools_error proxy=%s category=%s duration_ms=%.2f",
                 self.name,
-                exc,
+                type(exc).__name__,
                 duration_ms,
             )
             if self._activity_log is not None:
@@ -232,7 +227,7 @@ class MCPProxyServerImpl:
                         timestamp=datetime.now(timezone.utc),
                         operation="list_tools",
                         outcome="error",
-                        detail=str(exc),
+                        detail="Upstream operation failed",
                         duration_ms=duration_ms,
                     )
                 )
@@ -244,7 +239,7 @@ class MCPProxyServerImpl:
         self._metrics.track_mcp_request_received("POST")
         try:
             resolved_headers = self._resolve_headers()
-        except McpUnresolvedVariableError as exc:
+        except McpUnresolvedVariableError:
             duration_ms = (time.perf_counter() - started) * 1000.0
             self._metrics.track_mcp_response_sent("POST", "error")
             self._metrics.track_mcp_tool_call_duration("POST", "error", duration_ms / 1000.0)
@@ -254,7 +249,7 @@ class MCPProxyServerImpl:
                         name,
                         outcome="error",
                         mcp_arg_count=len(mcp_args),
-                        detail=str(exc),
+                        detail="Proxy variable could not be resolved",
                         duration_ms=duration_ms,
                     )
                 )
@@ -299,11 +294,9 @@ class MCPProxyServerImpl:
             self._metrics.track_mcp_response_sent("POST", "error")
             self._metrics.track_mcp_tool_call_duration("POST", "error", duration_ms / 1000.0)
             logger.error(
-                "mcp_proxy_call_tool_timeout proxy=%s tool=%s url=%s error=%s duration_ms=%.2f",
+                "mcp_proxy_call_tool_timeout proxy=%s tool=%s duration_ms=%.2f",
                 self.name,
                 name,
-                self.upstream_url,
-                exc,
                 duration_ms,
             )
             if self._activity_log is not None:
@@ -312,7 +305,7 @@ class MCPProxyServerImpl:
                         name,
                         outcome="error",
                         mcp_arg_count=len(mcp_args),
-                        detail=f"Upstream timed out: {exc}",
+                        detail="Upstream request timed out",
                         duration_ms=duration_ms,
                     )
                 )
@@ -322,12 +315,10 @@ class MCPProxyServerImpl:
             self._metrics.track_mcp_response_sent("POST", "error")
             self._metrics.track_mcp_tool_call_duration("POST", "error", duration_ms / 1000.0)
             logger.error(
-                "mcp_proxy_call_tool_connect_error proxy=%s tool=%s url=%s error=%s "
+                "mcp_proxy_call_tool_connect_error proxy=%s tool=%s "
                 "duration_ms=%.2f",
                 self.name,
                 name,
-                self.upstream_url,
-                exc,
                 duration_ms,
             )
             if self._activity_log is not None:
@@ -336,7 +327,7 @@ class MCPProxyServerImpl:
                         name,
                         outcome="error",
                         mcp_arg_count=len(mcp_args),
-                        detail=f"Connection failed: {exc}",
+                        detail="Upstream connection failed",
                         duration_ms=duration_ms,
                     )
                 )
@@ -346,10 +337,10 @@ class MCPProxyServerImpl:
             self._metrics.track_mcp_response_sent("POST", "error")
             self._metrics.track_mcp_tool_call_duration("POST", "error", duration_ms / 1000.0)
             logger.error(
-                "mcp_proxy_call_tool_error proxy=%s tool=%s error=%s duration_ms=%.2f",
+                "mcp_proxy_call_tool_error proxy=%s tool=%s category=%s duration_ms=%.2f",
                 self.name,
                 name,
-                exc,
+                type(exc).__name__,
                 duration_ms,
             )
             if self._activity_log is not None:
@@ -358,7 +349,7 @@ class MCPProxyServerImpl:
                         name,
                         outcome="error",
                         mcp_arg_count=len(mcp_args),
-                        detail=str(exc),
+                        detail="Upstream operation failed",
                         duration_ms=duration_ms,
                     )
                 )

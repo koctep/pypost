@@ -46,6 +46,7 @@ otel = [
 
 [project.scripts]
 pypost-agent-ui-mcp = "pypost.agent.ui_actions_mcp:main"
+pypost-daemon = "pypost.daemon:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

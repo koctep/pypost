@@ -12,6 +12,13 @@ from pypost.models.settings import AppSettings
 logger = logging.getLogger(__name__)
 
 
+class StrictConfigError(Exception):
+    def __init__(self, path: Path, category: str) -> None:
+        self.path = path
+        self.category = category
+        super().__init__(f"settings failure path={path} category={category}")
+
+
 class ConfigManager:
     def __init__(
         self,
@@ -37,7 +44,6 @@ class ConfigManager:
     def load_config(self) -> AppSettings:
         if not self.config_path.exists():
             return AppSettings()
-
         try:
             with open(self.config_path, "r") as f:
                 data = json.load(f)
@@ -45,6 +51,24 @@ class ConfigManager:
         except Exception as e:
             logger.error("config_load_failed path=%s error=%s", self.config_path, e)
             return AppSettings()
+
+    def load_config_strict(self) -> AppSettings:
+        if not self.config_path.exists():
+            return AppSettings()
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            if not isinstance(data, dict):
+                raise StrictConfigError(self.config_path, "invalid_root")
+            return parse_settings_from_disk(data)
+        except StrictConfigError:
+            raise
+        except json.JSONDecodeError as exc:
+            raise StrictConfigError(self.config_path, "malformed_json") from exc
+        except OSError as exc:
+            raise StrictConfigError(self.config_path, "unreadable") from exc
+        except Exception as exc:
+            raise StrictConfigError(self.config_path, "invalid_settings") from exc
 
     def save_config(self, settings: AppSettings):
         try:

@@ -14,6 +14,10 @@ from pypost.core.environment_variables_adapter import (
     EnvironmentSerializeStats,
     EnvironmentVariablesAdapter,
 )
+from pypost.core.daemon_storage import (
+    load_collections_snapshot_strict as _load_collections_snapshot_strict,
+    load_environments_snapshot_strict as _load_environments_snapshot_strict,
+)
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.metrics_protocol import resolve_metrics
 from pypost.models.models import Collection, Environment
@@ -45,16 +49,21 @@ class StorageManager:
         app_author=None,
         metrics: "MetricsTrackerProtocol | None" = None,
         data_dir: str | Path | None = None,
+        *,
+        collections_dir: str | Path | None = None, environments_dir: str | Path | None = None,
+        initialize_collections: bool = True, initialize_environments: bool = True,
     ):
         if data_dir is not None:
             self.data_dir = Path(data_dir)
         else:
             self.data_dir = Path(user_data_dir(app_name, app_author))
-        self.collections_path = self.data_dir / "collections"
-        self.environments_file = self.data_dir / "environments.json"
+        self.collections_path = Path(collections_dir or self.data_dir / "collections")
+        environment_root = Path(environments_dir or self.data_dir)
+        self.environments_file = environment_root / "environments.json"
         self._metrics = resolve_metrics(metrics)
         self._env_adapter = EnvironmentVariablesAdapter(metrics=metrics)
-        self._ensure_paths()
+        from pypost.core.daemon_storage import initialize_selected_paths
+        initialize_selected_paths(self, initialize_collections, initialize_environments)
 
     def apply_encryption_settings(self, settings: AppSettings | None) -> None:
         self._env_adapter.apply_encryption_settings(settings)
@@ -157,6 +166,8 @@ class StorageManager:
                     e,
                 )
         return collections
+
+    load_collections_snapshot_strict = _load_collections_snapshot_strict
 
     def save_environments(
         self,
@@ -329,26 +340,15 @@ class StorageManager:
         )
         return environments
 
+    load_environments_snapshot_strict = _load_environments_snapshot_strict
+
     def load_environments_with_errors(
         self,
     ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]:
-        """Load all stored environments, collecting per-record failures.
+        """Load environments and return successful records plus per-record failures.
 
-        Unlike load_environments(), continues after individual decrypt or
-        deserialize failures and returns both successful environments and
-        structured failure details.
-
-        Caller must invoke apply_encryption_settings() before this method when
-        encryption policy matters (same as load_environments).
-
-        Returns:
-            A pair (environments, failures). environments preserves on-disk order
-            for successfully loaded records only. failures lists every record that
-            could not be deserialized.
-
-        File-level behavior (missing file, invalid JSON, non-list root):
-            Returns ([], ()) and logs an error — same effective outcome as an empty
-            store. Per-environment reporting applies only to valid list entries.
+        The caller applies encryption settings first. File-level failures return
+        ``([], ())`` and log an error, matching the tolerant desktop outcome.
         """
         records = self._read_environment_records()
         if records is None:

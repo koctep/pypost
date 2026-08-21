@@ -4,6 +4,7 @@ protocol forwarding, secrets masking, and upstream error handling.
 from __future__ import annotations
 
 import asyncio
+import logging
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -312,6 +313,61 @@ class TestMcpProxyServerImpl(unittest.TestCase):
             mock_metrics.track_mcp_request_received.assert_called_once_with("POST")
             mock_metrics.track_mcp_response_sent.assert_called_once_with("POST", "error")
             mock_metrics.track_mcp_tool_call_duration.assert_called_once()
+
+
+@pytest.mark.parametrize("operation", ["list_tools", "call_tool"])
+@pytest.mark.parametrize(
+    "failure",
+    [httpx.ReadTimeout, httpx.ConnectError, RuntimeError],
+    ids=["timeout", "connect", "generic"],
+)
+def test_proxy_failure_logs_and_activity_never_expose_raw_error(
+    caplog, operation, failure
+):
+    upstream_url = "https://credentials.example.invalid/private?token=secret"
+    activity_log = McpActivityLog()
+    proxy = MCPProxyServerImpl(
+        name="privacy-proxy",
+        upstream_url=upstream_url,
+        activity_log=activity_log,
+    )
+    exception = failure(f"failure contacting {upstream_url}")
+
+    with (
+        patch.object(proxy, "_connect_upstream", side_effect=exception),
+        caplog.at_level(logging.ERROR, logger="pypost.core.mcp_proxy_server_impl"),
+        pytest.raises(Exception),
+    ):
+        if operation == "list_tools":
+            asyncio.run(proxy.list_tools())
+        else:
+            asyncio.run(proxy.call_tool("private-tool"))
+
+    assert upstream_url not in caplog.text
+    assert upstream_url not in str(activity_log.get_entries())
+    assert activity_log.get_entries()[0].detail in {
+        "Upstream request timed out",
+        "Upstream connection failed",
+        "Upstream operation failed",
+    }
+
+
+@pytest.mark.parametrize("operation", ["list_tools", "call_tool"])
+def test_proxy_unresolved_variable_activity_is_sanitized(operation):
+    activity_log = McpActivityLog()
+    proxy = MCPProxyServerImpl(
+        upstream_url="https://example.invalid/private?token=secret",
+        headers={"Authorization": "Bearer {{ CREDENTIAL_NAME }}"},
+        activity_log=activity_log,
+    )
+
+    with pytest.raises(McpUnresolvedVariableError):
+        if operation == "list_tools":
+            asyncio.run(proxy.list_tools())
+        else:
+            asyncio.run(proxy.call_tool("private-tool"))
+
+    assert activity_log.get_entries()[0].detail == "Proxy variable could not be resolved"
 
 
 class TestMcpProxyRegistryIntegration(unittest.TestCase):

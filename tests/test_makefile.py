@@ -153,6 +153,7 @@ SLOW_SMOKE_MINIMUM_PYPPOST_FILES = frozenset(
         "version.py",
         "agent/__init__.py",
         "agent/ui_actions_mcp.py",
+        "daemon.py",
     }
 )
 

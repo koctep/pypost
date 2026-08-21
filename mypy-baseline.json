@@ -1,5 +1,5 @@
 {
-  "error_count": 217,
+  "error_count": 210,
   "errors": [
     {
       "code": "arg-type",
@@ -69,41 +69,6 @@
     {
       "code": "arg-type",
       "message": "Argument \"uri\" to \"TextResourceContents\" has incompatible type \"str\"; expected \"AnyUrl\"",
-      "path": "pypost/core/metrics_server.py"
-    },
-    {
-      "code": "assignment",
-      "message": "Incompatible types in assignment (expression has type \"Server\", variable has type \"None\")",
-      "path": "pypost/core/metrics_server.py"
-    },
-    {
-      "code": "assignment",
-      "message": "Incompatible types in assignment (expression has type \"Thread\", variable has type \"None\")",
-      "path": "pypost/core/metrics_server.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"None\" has no attribute \"install_signal_handlers\"",
-      "path": "pypost/core/metrics_server.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"None\" has no attribute \"serve\"",
-      "path": "pypost/core/metrics_server.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"None\" has no attribute \"start\"",
-      "path": "pypost/core/metrics_server.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"None\" has no attribute \"startup\"",
-      "path": "pypost/core/metrics_server.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"None\" has no attribute \"startup\"",
       "path": "pypost/core/metrics_server.py"
     },
     {

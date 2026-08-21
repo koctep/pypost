@@ -11,6 +11,7 @@ As of 2026-06-12 (141 Python modules). Grouped by subsystem; see the live tree u
 ```text
 pypost/
 ├── main.py                 # Application entry point (composition root)
+├── daemon.py               # Headless daemon entry point (PYPOST-1046)
 ├── version.py
 ├── core/                   # Business logic (68 modules)
 │   ├── request_manager.py  # Request & collection lifecycle
@@ -106,13 +107,19 @@ ConfigManager.load_config() → AppSettings
 The same `ConfigManager` instance is injected into `MainWindow` so `settings.json` is read once
 (PYPOST-404). Do not lazy-create `ConfigManager` inside `MainWindow` in production. See
 [testability.md](testability.md#composition-root) and
-[PYPOST-404 dev notes](../ai-tasks/PYPOST-404/70-dev-docs.md).
+[PYPOST-404 dev notes](../../ai-tasks/PYPOST-404/70-dev-docs.md).
 
 `MainWindow` still constructs `StyleManager` and presenters/widgets internally.
 `StorageManager`, `RequestManager`, and `MCPServerManager` are created in `main.py` and injected
 (PYPOST-695). `HistoryManager` is created in `main.py` and injected (PYPOST-694). Remaining
 partial composition root items are tracked in
 [architecture_audit.md](architecture_audit.md#executive-summary) (PYPOST-684).
+
+### Headless daemon composition root (`daemon.py`)
+
+Headless execution (`pypost/daemon.py`, `pypost-daemon`) runs without desktop widgets, creating a
+`QCoreApplication` and `DaemonRuntime` with strict path resolution and snapshot loading. See
+[daemon.md](daemon.md) (PYPOST-1046) for architecture and lifecycle details.
 
 ## Core Components
 

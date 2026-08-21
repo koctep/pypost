@@ -1,5 +1,5 @@
 .PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev \
-	lock-otel check-lock-otel run run-agent-ui-mcp clean test test-slow \
+	lock-otel check-lock-otel run run-daemon run-agent-ui-mcp clean test test-slow \
 	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
 	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
@@ -145,6 +145,9 @@ check-lock-all: check-lock check-lock-dev check-lock-otel check-license-inventor
 
 run: $(VENV_MARKER) ## Run the PyPost desktop application
 	PYTHONPATH=. $(BIN)/python pypost/main.py
+
+run-daemon: $(VENV_MARKER) ## Run PyPost services without a graphical interface
+	PYTHONPATH=. $(BIN)/python -m pypost.daemon
 
 run-agent-ui-mcp: $(VENV_MARKER) ## Stdio MCP sidecar for agent UI actions (PYPOST-952)
 	QT_QPA_PLATFORM=offscreen PYTHONPATH=. $(BIN)/python -m pypost.agent.ui_actions_mcp
