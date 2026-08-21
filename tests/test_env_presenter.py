@@ -26,8 +26,10 @@ pytestmark = pytest.mark.timeout(60)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
+
 def _make_env(env_id: str, name: str, variables=None, enable_mcp=False) -> Environment:
     return Environment(id=env_id, name=name, variables=variables or {}, enable_mcp=enable_mcp)
+
 
 class FakeStorage:
     def __init__(self, environments=None):
@@ -55,6 +57,7 @@ class FakeConfigManager:
 
     def save_config(self, settings):
         self.saved.append(settings)
+
 
 class FakeMCPManager:
     status_changed = MagicMock()
@@ -92,6 +95,7 @@ class FakeMCPManager:
     def set_hidden_keys_supplier(self, supplier):
         self.hidden_keys_supplier = supplier
 
+
 def _make_mcp_manager():
     mgr = FakeMCPManager()
     mgr.status_changed = MagicMock()
@@ -102,8 +106,8 @@ def _make_mcp_manager():
     mgr.activity_recorded.connect = MagicMock()
     return mgr
 
-@pytest.mark.usefixtures("qapp")
 
+@pytest.mark.usefixtures("qapp")
 class TestEnvPresenter(unittest.TestCase):
     def _make_presenter(self, environments=None, collections=None):
         storage = FakeStorage(environments)
@@ -681,15 +685,7 @@ class TestEnvPresenter(unittest.TestCase):
     @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
     def test_open_env_manager_passes_working_read_import_file(self, mock_dialog):
         """PYPOST-1000: presenter wires a storage-backed read_import_file."""
-
-        class ImportFakeStorage(FakeStorageManager):
-            def deserialize_environment_records(self, records):
-                environments = [
-                    Environment.model_validate(record) for record in records
-                ]
-                return environments, ()
-
-        storage = ImportFakeStorage()
+        storage = FakeStorageManager()
         config = FakeConfigManager()
         mcp = _make_mcp_manager()
         presenter = EnvPresenter(
@@ -844,6 +840,7 @@ else:
             p._save_environments()
             save_async.assert_not_called()
         self.assertEqual(len(p._storage.saved), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

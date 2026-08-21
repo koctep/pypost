@@ -166,9 +166,9 @@ changed Hidden → `load_environments` (see also
 `doc/dev/environment_encryption_at_rest.md` § Overwrite import × selective
 re-encrypt). PYPOST-1000 locks presenter wiring in
 `tests/test_env_presenter.py::test_open_env_manager_passes_working_read_import_file`:
-`_open_env_manager` must pass a `read_import_file` that, against a
-`FakeStorageManager` subclass with working deserialize, loads candidates
-from a temp JSON file (same patch-`EnvironmentDialog` style as
+`_open_env_manager` must pass a `read_import_file` that, against standard
+`FakeStorageManager` with native plaintext deserialize (PYPOST-1060), loads
+candidates from a temp JSON file (same patch-`EnvironmentDialog` style as
 PYPOST-1008's invoke lock
 `test_open_env_manager_passes_working_serialize_export_records`). PYPOST-1001
 adds a click-level wiring lock, distinct from the direct-call tests above:
@@ -270,3 +270,16 @@ The suite exercises:
 - MCP checkbox sync and logging (`caplog` for masked vs readable hidden keys)
 
 Run: `pytest tests/test_env_dialog.py -q`
+
+### Test Doubles and Helpers: FakeStorageManager (PYPOST-1060)
+
+For hermetic unit and UI tests without cryptography dependencies or temporary keyrings, `tests/helpers/__init__.py` provides `FakeStorageManager`, which implements native in-memory environment serialization and deserialization:
+
+- **`serialize_environment_records(environments)`**: Serializes `Environment` instances to a list of dictionaries using `env.model_dump(mode="json")`.
+- **`deserialize_environment_records(records)`**: Deserializes in-memory plaintext environment dictionaries into `tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]` using `Environment.model_validate(item)`.
+
+Key characteristics:
+- **Fault isolation**: If a record is malformed (e.g. invalid field types or non-mapping items), it is collected as an `EnvironmentLoadFailure(name, environment_id, reason)` without raising exceptions or aborting processing for the remaining valid records in the batch.
+- **Zero encryption overhead**: Operates directly on plaintext dictionaries without requiring fake encryption keys, keyring services, or on-disk storage setup.
+- **Direct test usage**: Tests such as `tests/test_env_presenter.py` and `tests/test_fake_storage_manager.py` can instantiate `FakeStorageManager()` directly to serialize and deserialize environment records instead of defining ad-hoc test double subclasses or mocking deserialization methods.
+

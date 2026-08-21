@@ -1,8 +1,14 @@
 """Shared test helpers for PyPost unit tests."""
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
+
+from pydantic import ValidationError
 
 from pypost.core.environment_variables_adapter import EnvironmentSerializeStats
+from pypost.core.storage import EnvironmentLoadFailure
+from pypost.models.models import Environment
 
 
 class FakeStorageManager:
@@ -52,8 +58,50 @@ class FakeStorageManager:
     def load_environments_with_errors(self):
         return [], ()
 
-    def deserialize_environment_records(self, records):
-        return [], ()
+    def deserialize_environment_records(
+        self,
+        records: Sequence[Mapping[str, Any]] | list[dict],
+    ) -> tuple[list[Environment], tuple[EnvironmentLoadFailure, ...]]:
+        """Deserialize in-memory environment JSON records in plaintext for tests (PYPOST-1060)."""
+        environments: list[Environment] = []
+        failures: list[EnvironmentLoadFailure] = []
+
+        for item in records:
+            if not isinstance(item, (dict, Mapping)):
+                failures.append(
+                    EnvironmentLoadFailure(
+                        name="unknown",
+                        environment_id=None,
+                        reason=f"Record is not a mapping: {type(item).__name__}",
+                    )
+                )
+                continue
+
+            env_name = str(item.get("name", "unknown"))
+            raw_id = item.get("id")
+            environment_id = raw_id if isinstance(raw_id, str) else None
+
+            try:
+                env = Environment.model_validate(item)
+                environments.append(env)
+            except ValidationError as exc:
+                failures.append(
+                    EnvironmentLoadFailure(
+                        name=env_name,
+                        environment_id=environment_id,
+                        reason=str(exc),
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                failures.append(
+                    EnvironmentLoadFailure(
+                        name=env_name,
+                        environment_id=environment_id,
+                        reason=str(exc),
+                    )
+                )
+
+        return environments, tuple(failures)
 
     def serialize_environment_records(
         self,
