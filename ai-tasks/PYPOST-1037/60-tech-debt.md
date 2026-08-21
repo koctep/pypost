@@ -88,8 +88,8 @@ optimizing this targeted change prematurely.
 
 | Priority | Follow-up | Rationale | Jira |
 | --- | --- | --- | --- |
-| Low | Return structured failed-function provenance from `FunctionExpressionResolver` for strict rendering. | Removes the renderer's narrow regex coupling if expression grammar evolves. | Not created — follow-up creation is outside this step. |
-| Low | Add an MCP-adapter integer-field integration fixture with the dependent collection wiring. | Confirms the user-facing Jira/MCP scenario once PYPOST-1038 wires a real integer-required operation. | Not created — dependent story is outside this task. |
+| Low | Return structured failed-function provenance from `FunctionExpressionResolver` for strict rendering. | Removes the renderer's narrow regex coupling if expression grammar evolves. | [PYPOST-1120](https://pypost.atlassian.net/browse/PYPOST-1120) |
+| Low | Add an MCP-adapter integer-field integration fixture with the dependent collection wiring. | Confirms the user-facing Jira/MCP scenario once PYPOST-1038 wires a real integer-required operation. | Done in [PYPOST-1038](https://pypost.atlassian.net/browse/PYPOST-1038) |
 
 ## Conclusion
 

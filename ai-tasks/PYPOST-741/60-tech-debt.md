@@ -8,6 +8,6 @@ None — safe to close.
 
 | Item | Priority | Notes |
 | --- | --- | --- |
-| WARNING `response_body_truncated` logs resolved URL | Low | Out of scope; separate ticket |
+| WARNING `response_body_truncated` logs resolved URL | Low | Out of scope; separate ticket: [PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122) |
 | `ExecutionError` UI messages still contain resolved URLs | Low | Product decision |
 | Path-segment secrets without query heuristics | Low | Needs `hidden_keys` in HTTPClient if required |

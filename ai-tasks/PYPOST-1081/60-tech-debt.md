@@ -110,7 +110,7 @@ Reviewed and verified:
 
 | ID | Task | Source | Priority | Jira / Status |
 | --- | --- | --- | --- | --- |
-| F1 | Consolidate embedded uvicorn configuration into a shared helper factory (`pypost.core.server_utils`) to prevent future uvicorn instances from omitting `log_config=None` | Code Quality #1 | Low | Unticketed |
+| F1 | Consolidate embedded uvicorn configuration into a shared helper factory (`pypost.core.server_utils`) to prevent future uvicorn instances from omitting `log_config=None` | Code Quality #1 | Low | [PYPOST-1121](https://pypost.atlassian.net/browse/PYPOST-1121) |
 | F2 | Resolve pre-existing Qt overload typecheck errors and update mypy baseline | Pre-existing #1 | Low | [PYPOST-1086](https://pypost.atlassian.net/browse/PYPOST-1086) |
 
 ---
