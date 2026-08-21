@@ -346,6 +346,82 @@ class TestImportCollections:
 
     @patch(_RESULT)
     @patch(_PICKER, return_value=_PATH)
+    def test_partial_save_failure_tree_and_manager_match_durable_storage(
+        self, _mock_picker, mock_result, qapp
+    ):
+        existing = make_collection("c0", "Existing", [make_request("r0", "Req 0")])
+        first = make_collection("c1", "Saved", [make_request("r1", "Req 1")])
+        second = make_collection(
+            "c2", "Failed", [make_request("r2", "Req 2"), make_request("r3", "Req 3")]
+        )
+        durable = [existing]
+        presenter, manager = _make_presenter([existing], _reader([first, second]))
+
+        def save_collection(col):
+            if col.id == "c2":
+                raise OSError("disk full")
+            durable.append(col)
+
+        manager.storage.save_collection.side_effect = save_collection
+        manager.storage.load_collections.side_effect = lambda: list(durable)
+
+        try:
+            presenter.import_collections()
+            _wait_import(lambda: mock_result.call_count >= 1)
+
+            _args, kwargs = mock_result.call_args
+            assert kwargs["success"] is False
+            assert "disk full" in _args[1]
+            assert [col.name for col in manager.get_collections()] == [
+                "Existing",
+                "Saved",
+            ]
+            model = presenter.widget.model()
+            assert model.rowCount() == 2
+            assert [model.item(r).text() for r in range(2)] == ["Existing", "Saved"]
+            assert not any(
+                col.name == "Failed" or col.id == "c2"
+                for col in manager.get_collections()
+            )
+            assert not any(
+                model.item(r).text() == "Failed" for r in range(model.rowCount())
+            )
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_PICKER, return_value=_PATH)
+    def test_total_save_failure_retains_only_preexisting_durable_collections(
+        self, _mock_picker, mock_result, qapp
+    ):
+        existing = make_collection("c0", "Existing", [make_request("r0", "Req 0")])
+        incoming = make_collection("c1", "Failed", [make_request("r1", "Req 1")])
+        durable = [existing]
+        presenter, manager = _make_presenter([existing], _reader([incoming]))
+
+        manager.storage.save_collection.side_effect = OSError("permission denied")
+        manager.storage.load_collections.side_effect = lambda: list(durable)
+
+        try:
+            presenter.import_collections()
+            _wait_import(lambda: mock_result.call_count >= 1)
+
+            _args, kwargs = mock_result.call_args
+            assert kwargs["success"] is False
+            assert "permission denied" in _args[1]
+            assert [col.name for col in manager.get_collections()] == ["Existing"]
+            model = presenter.widget.model()
+            assert model.rowCount() == 1
+            assert model.item(0).text() == "Existing"
+            assert not any(col.name == "Failed" for col in manager.get_collections())
+            assert not any(
+                model.item(r).text() == "Failed" for r in range(model.rowCount())
+            )
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    @patch(_PICKER, return_value=_PATH)
     def test_logs_completed_event_with_counts(
         self, _mock_picker, _mock_result, qapp, caplog
     ):
@@ -495,5 +571,86 @@ class TestImportCollectionsEndToEnd:
             assert request.post_script == "print(response.status_code)"
             assert request.expose_as_mcp is True
             assert request.mcp_description == "Create a user"
+        finally:
+            presenter.panel.close()
+
+    @patch(_RESULT)
+    def test_real_storage_save_failure_reconciles_tree_and_disk(
+        self, mock_result, qapp, tmp_path
+    ):
+        source = tmp_path / "multi.json"
+        source.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "new-col-1",
+                        "name": "New API 1",
+                        "requests": [
+                            {
+                                "id": "r1",
+                                "name": "Get Status",
+                                "method": "GET",
+                                "url": "https://api.example.com/status",
+                            }
+                        ],
+                    },
+                    {
+                        "id": "new-col-2",
+                        "name": "New API 2",
+                        "requests": [
+                            {
+                                "id": "r2",
+                                "name": "Post Data",
+                                "method": "POST",
+                                "url": "https://api.example.com/data",
+                            }
+                        ],
+                    },
+                ]
+            ),
+            encoding="utf-8",
+        )
+        storage = StorageManager(data_dir=tmp_path / "data")
+        existing = make_collection("c0", "Existing API", [make_request("r0", "Health")])
+        storage.save_collection(existing)
+
+        manager = RequestManager(storage)
+        presenter = CollectionsPresenter(manager, FakeStateManager(), FakeMetrics(), {})
+        presenter.refresh_tree()
+        assert presenter.widget.model().rowCount() == 1
+
+        real_save = storage.save_collection
+
+        def failing_save(col):
+            if col.name == "New API 2":
+                raise OSError("simulated disk full")
+            return real_save(col)
+
+        try:
+            with patch.object(storage, "save_collection", side_effect=failing_save):
+                with patch(_PICKER, return_value=source):
+                    presenter.import_collections()
+                    _wait_import(lambda: mock_result.call_count >= 1)
+
+            assert mock_result.call_args[1]["success"] is False
+            disk_collections = StorageManager(data_dir=tmp_path / "data").load_collections()
+            assert {col.name for col in disk_collections} == {"Existing API", "New API 1"}
+
+            assert [col.name for col in manager.get_collections()] == [
+                col.name for col in disk_collections
+            ]
+
+            model = presenter.widget.model()
+            assert model.rowCount() == len(disk_collections)
+            assert [model.item(r).text() for r in range(model.rowCount())] == [
+                col.name for col in disk_collections
+            ]
+
+            for r, col in enumerate(disk_collections):
+                item = model.item(r)
+                assert item.text() == col.name
+                assert item.rowCount() == len(col.requests)
+                for req_idx, req in enumerate(col.requests):
+                    assert item.child(req_idx).text() == f"{req.method} {req.name}"
         finally:
             presenter.panel.close()

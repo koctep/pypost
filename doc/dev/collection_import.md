@@ -25,6 +25,10 @@ log with durable storage after save failures. If any collection fails to save to
 `recount_collection_import_plan` adjusts Added, Updated, Renamed, and Requests Imported
 totals to reflect only what successfully persisted, matching the sidebar tree.
 
+**PYPOST-1059** establishes UI regression assertions guaranteeing that the sidebar tree
+(`QTreeView` / `QStandardItemModel`) and `RequestManager.get_collections()` strictly
+synchronize with durable storage after partial or total import save failures.
+
 ## Architecture
 
 ```text
@@ -257,6 +261,29 @@ The result summary dialog and the `collection_import_completed` log event reflec
 This ensures the completion dialog, log events, and sidebar tree all truthfully agree on
 what persisted to disk.
 
+### UI sidebar tree model synchronization after save failure (PYPOST-1059)
+
+When `apply_imported_collections` completes—regardless of whether all collections saved or
+some/all failed—`CollectionImportActions._finish_import` unconditionally triggers
+`self._refresh_tree()` before displaying the result dialog.
+
+The synchronization guarantee works as follows:
+1. **Apply & Reconcile**: If any write raises `OSError`, `apply_imported_collections`
+   invokes `RequestManager.reload_collections()`, reloading memory and index state from
+   `StorageManager.load_collections()`.
+2. **Model Rebuild**: `_refresh_tree()` calls `CollectionsPresenter.refresh_tree()`, which
+   clears the underlying `QStandardItemModel` and rebuilds the `QTreeView` hierarchy from
+   `RequestManager.get_collections()`.
+3. **Consistency**:
+   - Each successfully persisted collection appears as a top-level `QStandardItem` with its
+     child request items (`{method} {name}`).
+   - Collections that failed to save are never rendered in the tree model (or revert to their
+     prior durable on-disk state if an overwrite failed).
+   - Pre-existing collections that were not part of the import remain intact.
+4. **State Restoration**: `self._restore_tree_state()` and `self._emit_collections_changed()`
+   ensure selection, expansion state, and downstream listeners (e.g. MCP endpoints) reflect
+   the durable collection set.
+
 ### `CollectionImportParseWorker`
 
 Background `QThread` that calls the injected `read_import_file(path)` and emits:
@@ -317,6 +344,29 @@ PYPOST-1006 (verification debt; no product change) adds three locks:
   `plan_collection_import` KEEP_BOTH when `Copy of API` and
   `Copy of API (2)` are already taken yields unique `Copy of API (3)`.
 
+### UI storage reconciliation regression coverage (PYPOST-1059)
+
+To ensure the UI sidebar never presents ghost or unsaved collections after I/O errors,
+`tests/test_collections_import_ui.py` contains regression tests verifying tree model
+synchronization against durable storage:
+
+- **Partial save failure (`TestImportCollections.test_partial_save_failure_tree_and_manager_match_durable_storage`)**:
+  Simulates a multi-collection import where one collection succeeds and another fails with
+  `OSError("disk full")`. Asserts that `manager.get_collections()` and
+  `presenter.widget.model()` (`QStandardItemModel`) contain only the pre-existing and
+  successfully persisted collections (`rowCount() == 2`), with zero ghost rows for the failed
+  collection.
+- **Total save failure (`TestImportCollections.test_total_save_failure_retains_only_preexisting_durable_collections`)**:
+  Simulates an import where all collection writes raise `OSError("permission denied")`.
+  Asserts that `manager.get_collections()` and `presenter.widget.model()` strictly retain only
+  the pre-existing collection (`rowCount() == 1`), leaving the tree unaltered.
+- **End-to-end real storage failure (`TestImportCollectionsEndToEnd.test_real_storage_save_failure_reconciles_tree_and_disk`)**:
+  Drives a real `StorageManager` in `tmp_path`, real `RequestManager`, and `CollectionsPresenter`.
+  Monkeypatches a save error on a secondary collection in a multi-collection file. Asserts that
+  actual on-disk files (`StorageManager.load_collections()`), in-memory state
+  (`manager.get_collections()`), and the rendered `QTreeView` hierarchy (top-level collection
+  rows and child request items) strictly match the durably saved state.
+
 ## Configuration
 
 None. No new setting, environment variable, on-disk format, `StorageInterface` method, or
@@ -331,8 +381,9 @@ routinely carries credentials in a header template. Paths are logged for triage
 (user-chosen import file). See `ai-tasks/PYPOST-987/50-observability.md`,
 `ai-tasks/PYPOST-1004/50-observability.md`,
 `ai-tasks/PYPOST-1005/50-observability.md`,
-`ai-tasks/PYPOST-1006/50-observability.md`, and
-`ai-tasks/PYPOST-1058/50-observability.md`.
+`ai-tasks/PYPOST-1006/50-observability.md`,
+`ai-tasks/PYPOST-1058/50-observability.md`, and
+`ai-tasks/PYPOST-1059/50-observability.md`.
 
 ### Async parse lifecycle (PYPOST-1005)
 
