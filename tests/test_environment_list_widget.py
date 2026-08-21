@@ -177,6 +177,82 @@ class TestImportEnvironments:
             widget.close()
 
     @patch(f"{_MODULE}.show_import_result")
+    @patch(
+        f"{_MODULE}.prompt_import_conflict",
+        return_value=(ImportConflictDecision.OVERWRITE, True),
+    )
+    @patch(f"{_MODULE}.prompt_import_environments_file", return_value=Path("/tmp/import.json"))
+    def test_apply_to_all_conflicts_applies_overwrite_to_third_and_later_conflicts(
+        self, _mock_prompt_file, mock_prompt_conflict, mock_show_result, qapp
+    ):
+        def read_import_file(path):
+            return [
+                Environment(name="Dev", variables={"A": "new"}),
+                Environment(name="Prod", variables={"B": "new"}),
+                Environment(name="Staging", variables={"C": "new"}),
+            ], []
+
+        envs = [
+            Environment(id="dev-id", name="Dev", variables={"A": "old"}),
+            Environment(id="prod-id", name="Prod", variables={"B": "old"}),
+            Environment(id="staging-id", name="Staging", variables={"C": "old"}),
+        ]
+        widget = _make_widget(envs, read_import_file=read_import_file)
+        try:
+            widget.import_environments()
+            mock_prompt_conflict.assert_called_once()
+            assert len(envs) == 3
+            assert [e.id for e in envs] == ["dev-id", "prod-id", "staging-id"]
+            assert envs[0].variables == {"A": "new"}
+            assert envs[1].variables == {"B": "new"}
+            assert envs[2].variables == {"C": "new"}
+        finally:
+            widget.close()
+
+    @patch(f"{_MODULE}.show_import_result")
+    @patch(
+        f"{_MODULE}.prompt_import_conflict",
+        return_value=(ImportConflictDecision.KEEP_BOTH, True),
+    )
+    @patch(f"{_MODULE}.prompt_import_environments_file", return_value=Path("/tmp/import.json"))
+    def test_apply_to_all_conflicts_applies_keep_both_to_third_and_later_conflicts(
+        self, _mock_prompt_file, mock_prompt_conflict, mock_show_result, qapp
+    ):
+        def read_import_file(path):
+            return [
+                Environment(name="Dev", variables={"A": "new"}),
+                Environment(name="Prod", variables={"B": "new"}),
+                Environment(name="Staging", variables={"C": "new"}),
+            ], []
+
+        envs = [
+            Environment(id="dev-id", name="Dev", variables={"A": "old"}),
+            Environment(id="prod-id", name="Prod", variables={"B": "old"}),
+            Environment(id="staging-id", name="Staging", variables={"C": "old"}),
+        ]
+        widget = _make_widget(envs, read_import_file=read_import_file)
+        try:
+            widget.import_environments()
+            mock_prompt_conflict.assert_called_once()
+            assert len(envs) == 6
+            assert [e.name for e in envs] == [
+                "Dev",
+                "Prod",
+                "Staging",
+                "Copy of Dev",
+                "Copy of Prod",
+                "Copy of Staging",
+            ]
+            assert envs[0].variables == {"A": "old"}
+            assert envs[1].variables == {"B": "old"}
+            assert envs[2].variables == {"C": "old"}
+            assert envs[3].variables == {"A": "new"}
+            assert envs[4].variables == {"B": "new"}
+            assert envs[5].variables == {"C": "new"}
+        finally:
+            widget.close()
+
+    @patch(f"{_MODULE}.show_import_result")
     @patch(f"{_MODULE}.prompt_import_environments_file", return_value=Path("/tmp/import.json"))
     def test_partial_parse_failure_still_imports_valid_entries(
         self, _mock_prompt_file, mock_show_result, qapp

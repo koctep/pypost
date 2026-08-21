@@ -186,7 +186,13 @@ third and later conflict, not just a second, and
 `test_environment_import.py::TestGenerateImportCopyName::test_returns_next_numbered_copy_when_first_two_taken`
 locks `generate_import_copy_name` advancing past `"Copy of X (2)"` to
 `"Copy of X (3)"` when both are already taken. Both were verification locks
-against existing, already-correct logic — no production code changed.
+against existing, already-correct logic — no production code changed. PYPOST-1074
+extends the 3+-conflict "apply to all" test matrix in
+`test_environment_list_widget.py::TestImportEnvironments` to cover `OVERWRITE`
+(`test_apply_to_all_conflicts_applies_overwrite_to_third_and_later_conflicts`) and
+`KEEP_BOTH` (`test_apply_to_all_conflicts_applies_keep_both_to_third_and_later_conflicts`)
+decisions across 3 collisions, asserting single prompt execution, ID preservation for
+overwrite, and numbered copy name generation for keep-both.
 
 ## Export environments (PYPOST-988)
 
