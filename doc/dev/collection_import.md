@@ -42,6 +42,11 @@ executes with minimal latency, validating that keeping plan/apply on the GUI thr
 threading complexity while maintaining interactive responsiveness. Automated benchmarks reside in
 `tests/test_collection_import_profile.py`.
 
+**PYPOST-1063** closes remaining asynchronous collection-import test gaps, adding automated test
+coverage for busy re-entry prevention, unexpected reader exceptions caught by the worker thread,
+status bar lifecycle message transitions, and real-file disk JSON parsing in
+`tests/test_collection_import_async_gaps.py`.
+
 ## Architecture
 
 ```text
