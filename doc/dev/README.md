@@ -17,6 +17,7 @@ conventions.
 1. [User Guide and Documentation Layout (PYPOST-1015)](user_guide.md)
 1. [Architecture Decision Records (ADR) index](../adr/README.md)
 1. [Request Execution](request_execution.md)
+1. [WebSocket Transport Seam and Session Engine (PYPOST-1127)](websocket_session_engine.md)
 1. [TemplateService — central variable substitution](template_service.md)
 1. [Template Expression Functions and Integer Conversion (PYPOST-450, PYPOST-1037, PYPOST-1038)](template_expression_functions.md)
 1. [Variable Propagation](variable_propagation.md)
