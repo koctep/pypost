@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from pypost.core.request_manager import RequestManager
+    from pypost.core.websocket_registry import WebSocketRegistry
 
-DeleteHandler = Callable[["RequestManager", str], bool]
-RenameHandler = Callable[["RequestManager", str, str], bool]
+DeleteHandler = Callable[[Any, str], bool]
+RenameHandler = Callable[[Any, str, str], bool]
 
 
 @dataclass(frozen=True)
@@ -20,20 +21,46 @@ class CollectionItemStrategy:
     rename: RenameHandler
 
 
-def _collection_delete(manager: RequestManager, item_id: str) -> bool:
+def _unpack_context(
+    ctx: Any,
+) -> tuple[RequestManager, WebSocketRegistry | None]:
+    if hasattr(ctx, "request_manager"):
+        return ctx.request_manager, getattr(ctx, "websocket_registry", None)
+    return ctx, getattr(ctx, "websocket_registry", None)
+
+
+def _collection_delete(ctx: Any, item_id: str) -> bool:
+    manager, _ = _unpack_context(ctx)
     return manager.delete_collection(item_id)
 
 
-def _collection_rename(manager: RequestManager, item_id: str, new_name: str) -> bool:
+def _collection_rename(ctx: Any, item_id: str, new_name: str) -> bool:
+    manager, _ = _unpack_context(ctx)
     return manager.rename_collection(item_id, new_name)
 
 
-def _request_delete(manager: RequestManager, item_id: str) -> bool:
+def _request_delete(ctx: Any, item_id: str) -> bool:
+    manager, _ = _unpack_context(ctx)
     return manager.delete_request(item_id)
 
 
-def _request_rename(manager: RequestManager, item_id: str, new_name: str) -> bool:
+def _request_rename(ctx: Any, item_id: str, new_name: str) -> bool:
+    manager, _ = _unpack_context(ctx)
     return manager.rename_request(item_id, new_name)
+
+
+def _websocket_delete(ctx: Any, item_id: str) -> bool:
+    _, ws_registry = _unpack_context(ctx)
+    if ws_registry is None:
+        return False
+    return ws_registry.delete_websocket(item_id)
+
+
+def _websocket_rename(ctx: Any, item_id: str, new_name: str) -> bool:
+    _, ws_registry = _unpack_context(ctx)
+    if ws_registry is None:
+        return False
+    return ws_registry.rename_websocket(item_id, new_name)
 
 
 DEFAULT_COLLECTION_ITEM_STRATEGIES: dict[str, CollectionItemStrategy] = {
@@ -44,5 +71,9 @@ DEFAULT_COLLECTION_ITEM_STRATEGIES: dict[str, CollectionItemStrategy] = {
     "request": CollectionItemStrategy(
         delete=_request_delete,
         rename=_request_rename,
+    ),
+    "websocket": CollectionItemStrategy(
+        delete=_websocket_delete,
+        rename=_websocket_rename,
     ),
 }

@@ -14,16 +14,17 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+import uuid
 
 from pydantic import ValidationError
 
 from pypost.core.collection_messages import (
     MSG_ENTRY_MISSING_NAME,
     MSG_ENTRY_REQUESTS_NOT_LIST,
+    MSG_ENTRY_WEBSOCKETS_NOT_LIST,
     MSG_FILE_ENTRY_NOT_OBJECT,
     MSG_FILE_NOT_JSON,
     MSG_FILE_UNREADABLE,
@@ -35,11 +36,13 @@ from pypost.core.collection_messages import (
     SUMMARY_ERRORS_HEADER,
     SUMMARY_RENAMED_HEADER,
     SUMMARY_REQUESTS_IMPORTED,
+    SUMMARY_WEBSOCKETS_IMPORTED,
     format_collection_entry_error,
     format_unnamed_entry_label,
 )
 from pypost.core.import_conflicts import ImportConflictDecision, generate_import_copy_name
 from pypost.models.models import Collection, RequestData
+from pypost.models.websocket import WebSocketConnection
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +68,7 @@ class CollectionImportPlanResult:
     renamed: list[tuple[str, str]]
     request_count: int
     parse_errors: list[str]
+    websocket_count: int = 0
 
 
 def _read_records(path: Path) -> list[dict]:
@@ -112,6 +116,9 @@ def _shape_error(record: dict) -> str | None:
     requests = record.get("requests")
     if requests is not None and not isinstance(requests, list):
         return MSG_ENTRY_REQUESTS_NOT_LIST
+    websockets = record.get("websockets")
+    if websockets is not None and not isinstance(websockets, list):
+        return MSG_ENTRY_WEBSOCKETS_NOT_LIST
     return None
 
 
@@ -194,11 +201,26 @@ def _reserve_requests(
     return reserved
 
 
+def _reserve_websockets(
+    websockets: list[WebSocketConnection], taken_ws_ids: set[str]
+) -> list[WebSocketConnection]:
+    """Copy websockets, minting a fresh id for any that would collide."""
+    reserved: list[WebSocketConnection] = []
+    for ws in websockets:
+        ws_id = ws.id
+        if ws_id in taken_ws_ids:
+            ws_id = str(uuid.uuid4())
+        taken_ws_ids.add(ws_id)
+        reserved.append(ws.model_copy(update={"id": ws_id}, deep=True))
+    return reserved
+
+
 def _materialize(
     source: Collection,
     name: str,
     taken_collection_ids: set[str],
     taken_request_ids: set[str],
+    taken_ws_ids: set[str],
 ) -> Collection:
     """Build the collection to insert, resolving id collisions silently.
 
@@ -214,13 +236,16 @@ def _materialize(
         id=collection_id,
         name=name,
         requests=_reserve_requests(source.requests, taken_request_ids),
+        websockets=_reserve_websockets(getattr(source, "websockets", []), taken_ws_ids),
     )
 
 
 def plan_collection_import(
     existing: list[Collection],
     incoming: list[Collection],
-    decisions: dict[str, ImportConflictDecision],
+    decisions: dict[str, ImportConflictDecision] | None = None,
+    *,
+    conflict_decisions: dict[str, ImportConflictDecision] | None = None,
 ) -> CollectionImportPlanResult:
     """Build the resulting collection list by applying decisions per conflict.
 
@@ -229,10 +254,15 @@ def plan_collection_import(
     no ``decisions`` lookup, since neither duplicate is a collection the user
     already had locally to protect.
     """
+    if decisions is None and conflict_decisions is not None:
+        decisions = conflict_decisions
+    if decisions is None:
+        decisions = {}
     result: list[Collection] = list(existing)
     existing_names = {col.name for col in existing}
     taken_collection_ids = {col.id for col in existing}
     taken_request_ids = {req.id for col in existing for req in col.requests}
+    taken_ws_ids = {ws.id for col in existing for ws in getattr(col, "websockets", [])}
 
     added: list[str] = []
     updated: list[str] = []
@@ -240,16 +270,20 @@ def plan_collection_import(
     renamed: list[tuple[str, str]] = []
     persisted: list[Collection] = []
     request_count = 0
+    websocket_count = 0
     seen_incoming_names: set[str] = set()
 
     def keep_both(source: Collection, name: str) -> None:
-        nonlocal request_count
+        nonlocal request_count, websocket_count
         new_name = generate_import_copy_name(name, {col.name for col in result})
-        new_col = _materialize(source, new_name, taken_collection_ids, taken_request_ids)
+        new_col = _materialize(
+            source, new_name, taken_collection_ids, taken_request_ids, taken_ws_ids
+        )
         result.append(new_col)
         persisted.append(new_col)
         renamed.append((name, new_name))
         request_count += len(new_col.requests)
+        websocket_count += len(getattr(new_col, "websockets", []))
 
     for source in incoming:
         name = source.name
@@ -259,11 +293,14 @@ def plan_collection_import(
         seen_incoming_names.add(name)
 
         if name not in existing_names:
-            new_col = _materialize(source, name, taken_collection_ids, taken_request_ids)
+            new_col = _materialize(
+                source, name, taken_collection_ids, taken_request_ids, taken_ws_ids
+            )
             result.append(new_col)
             persisted.append(new_col)
             added.append(name)
             request_count += len(new_col.requests)
+            websocket_count += len(getattr(new_col, "websockets", []))
             continue
 
         decision = decisions.get(name, ImportConflictDecision.SKIP)
@@ -273,18 +310,32 @@ def plan_collection_import(
             index = next(i for i, col in enumerate(result) if col.name == name)
             replaced = result[index]
             taken_request_ids.difference_update(req.id for req in replaced.requests)
+            taken_ws_ids.difference_update(ws.id for ws in getattr(replaced, "websockets", []))
             new_requests = _reserve_requests(source.requests, taken_request_ids)
+            new_websockets = _reserve_websockets(getattr(source, "websockets", []), taken_ws_ids)
             result[index] = Collection(
                 id=replaced.id,
                 name=replaced.name,
                 requests=new_requests,
+                websockets=new_websockets,
             )
             persisted.append(result[index])
             updated.append(name)
             request_count += len(new_requests)
+            websocket_count += len(new_websockets)
         elif decision is ImportConflictDecision.KEEP_BOTH:
             keep_both(source, name)
 
+    logger.info(
+        "collection_import_plan_created added=%d updated=%d skipped=%d "
+        "renamed=%d requests=%d websockets=%d",
+        len(added),
+        len(updated),
+        len(skipped),
+        len(renamed),
+        request_count,
+        websocket_count,
+    )
     return CollectionImportPlanResult(
         collections=result,
         persisted=persisted,
@@ -294,6 +345,7 @@ def plan_collection_import(
         renamed=renamed,
         request_count=request_count,
         parse_errors=[],
+        websocket_count=websocket_count,
     )
 
 
@@ -333,7 +385,16 @@ def recount_collection_import_plan(
     added = [name for name in plan.added if name not in non_renamed_failed_names]
 
     request_count = sum(len(col.requests) for col in succeeded_persisted)
+    websocket_count = sum(len(getattr(col, "websockets", [])) for col in succeeded_persisted)
 
+    logger.info(
+        "collection_import_plan_recounted failed_count=%d persisted_collections=%d "
+        "requests=%d websockets=%d",
+        len(failed_ids),
+        len(succeeded_persisted),
+        request_count,
+        websocket_count,
+    )
     return CollectionImportPlanResult(
         collections=[col for col in plan.collections if col.id not in failed_ids],
         persisted=succeeded_persisted,
@@ -343,6 +404,7 @@ def recount_collection_import_plan(
         renamed=renamed,
         request_count=request_count,
         parse_errors=list(plan.parse_errors),
+        websocket_count=websocket_count,
     )
 
 
@@ -354,6 +416,7 @@ def format_collection_import_result(result: CollectionImportPlanResult) -> str:
         SUMMARY_COLLECTIONS_SKIPPED.format(count=len(result.skipped)),
         SUMMARY_COLLECTIONS_RENAMED.format(count=len(result.renamed)),
         SUMMARY_REQUESTS_IMPORTED.format(count=result.request_count),
+        SUMMARY_WEBSOCKETS_IMPORTED.format(count=result.websocket_count),
     ]
     if result.renamed:
         lines.append("")

@@ -4,6 +4,11 @@ import logging
 import uuid
 from typing import Dict, List, Optional, Tuple
 
+from pypost.core.collection_item_dispatch import (
+    ItemDispatchContext,
+    delete_collection_item as dispatch_delete_item,
+    rename_collection_item as dispatch_rename_item,
+)
 from pypost.core.collection_item_strategies import (
     DEFAULT_COLLECTION_ITEM_STRATEGIES,
     CollectionItemStrategy,
@@ -169,24 +174,9 @@ class RequestManager:
         return False
 
     def delete_collection_item(self, item_id: str, item_type: str) -> bool:
-        """
-        Deletes a collection item by type.
-        Supported types: "collection", "request".
-        """
-        logger.info(
-            "delete_collection_item_started item_id=%s item_type=%s",
-            item_id,
-            item_type,
-        )
-        strategy = self._item_strategies.get(item_type)
-        if strategy is None:
-            logger.warning(
-                "delete_collection_item_unsupported_type item_id=%s item_type=%s",
-                item_id,
-                item_type,
-            )
-            return False
-        return strategy.delete(self, item_id)
+        """Deletes a collection item by type."""
+        ctx = ItemDispatchContext(request_manager=self)
+        return dispatch_delete_item(ctx, item_id, item_type, strategies=self._item_strategies)
 
     def rename_request(self, request_id: str, new_name: str) -> bool:
         """Renames a request by ID and persists the parent collection."""
@@ -243,18 +233,8 @@ class RequestManager:
         return False
 
     def rename_collection_item(self, item_id: str, item_type: str, new_name: str) -> bool:
-        """Renames a collection item by type. Supported types: collection and request."""
-        logger.info(
-            "rename_collection_item_started item_id=%s item_type=%s",
-            item_id,
-            item_type,
+        """Renames a collection item by type."""
+        ctx = ItemDispatchContext(request_manager=self)
+        return dispatch_rename_item(
+            ctx, item_id, item_type, new_name, strategies=self._item_strategies
         )
-        strategy = self._item_strategies.get(item_type)
-        if strategy is None:
-            logger.warning(
-                "rename_collection_item_unsupported_type item_id=%s item_type=%s",
-                item_id,
-                item_type,
-            )
-            return False
-        return strategy.rename(self, item_id, new_name)

@@ -41,6 +41,7 @@ class CollectionExportResult:
     collection_name: str
     request_count: int
     path: Path
+    websocket_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class CollectionsExportResult:
     collection_count: int
     request_count: int
     path: Path
+    websocket_count: int = 0
 
 
 def collection_for_export(
@@ -78,9 +80,10 @@ def build_export_payload(collection: Collection) -> dict:
     """Serialize one collection into native PyPost JSON import shape."""
     payload = collection.model_dump(mode="json")
     logger.info(
-        "collection_export_payload_built collection_name=%s request_count=%d",
+        "collection_export_payload_built collection_name=%s request_count=%d websocket_count=%d",
         collection.name,
         len(collection.requests),
+        len(getattr(collection, "websockets", [])),
     )
     return payload
 
@@ -88,7 +91,14 @@ def build_export_payload(collection: Collection) -> dict:
 def build_all_export_payload(collections: list[Collection]) -> list[dict]:
     """Serialize collections in order into the native JSON-list import shape."""
     payload = [build_export_payload(collection) for collection in collections]
-    logger.info("collections_export_payload_built collection_count=%d", len(payload))
+    total_requests = sum(len(c.requests) for c in collections)
+    total_websockets = sum(len(getattr(c, "websockets", [])) for c in collections)
+    logger.info(
+        "collections_export_payload_built collection_count=%d request_count=%d websocket_count=%d",
+        len(payload),
+        total_requests,
+        total_websockets,
+    )
     return payload
 
 
@@ -100,8 +110,12 @@ def write_export_file(path: Path, payload: dict | list[dict]) -> None:
 
 def format_export_result(result: CollectionExportResult) -> str:
     """Human-readable summary for the export result dialog."""
+    if result.websocket_count > 0:
+        counts = f"{result.request_count} request(s), {result.websocket_count} websocket(s)"
+    else:
+        counts = f"{result.request_count} request(s)"
     lines = [
-        f'Exported collection "{result.collection_name}" ({result.request_count} request(s)) to:',
+        f'Exported collection "{result.collection_name}" ({counts}) to:',
         str(result.path),
     ]
     return "\n".join(lines)
@@ -109,11 +123,12 @@ def format_export_result(result: CollectionExportResult) -> str:
 
 def format_all_export_result(result: CollectionsExportResult) -> str:
     """Human-readable summary for the all-collections export result dialog."""
+    if result.websocket_count > 0:
+        counts = f"{result.request_count} request(s), {result.websocket_count} websocket(s)"
+    else:
+        counts = f"{result.request_count} request(s)"
     lines = [
-        (
-            f"Exported {result.collection_count} collection(s) "
-            f"({result.request_count} request(s)) to:"
-        ),
+        f"Exported {result.collection_count} collection(s) ({counts}) to:",
         str(result.path),
     ]
     return "\n".join(lines)

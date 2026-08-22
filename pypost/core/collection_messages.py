@@ -39,6 +39,7 @@ MSG_FILE_ENTRY_NOT_OBJECT = "Each collection entry in the file must be a JSON ob
 
 MSG_ENTRY_MISSING_NAME = 'missing or empty "name" field'
 MSG_ENTRY_REQUESTS_NOT_LIST = 'the "requests" field must be a list'
+MSG_ENTRY_WEBSOCKETS_NOT_LIST = 'the "websockets" field must be a list'
 
 LABEL_UNNAMED_ENTRY = "Entry {index}"
 
@@ -47,6 +48,7 @@ SUMMARY_COLLECTIONS_UPDATED = "Collections updated: {count}"
 SUMMARY_COLLECTIONS_SKIPPED = "Collections skipped: {count}"
 SUMMARY_COLLECTIONS_RENAMED = "Collections renamed: {count}"
 SUMMARY_REQUESTS_IMPORTED = "Requests imported: {count}"
+SUMMARY_WEBSOCKETS_IMPORTED = "WebSockets imported: {count}"
 SUMMARY_RENAMED_HEADER = "Renamed on import:"
 SUMMARY_ERRORS_HEADER = "Entries that failed to import:"
 

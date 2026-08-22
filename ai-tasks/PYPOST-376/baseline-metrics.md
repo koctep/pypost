@@ -13,14 +13,16 @@
 
 | Module | Audit era LOC | Baseline LOC | Cap |
 | --- | ---: | ---: | ---: |
+| `pypost/core/collection_item_dispatch.py` | — | 81 | 83 |
 | `pypost/core/http_client.py` | 198 | 381 | 418 |
 | `pypost/core/mcp_server_impl.py` | 231 | 312 | 325 |
 | `pypost/core/qt/metrics.py` | 286 | 182 | 185 |
 | `pypost/core/qt/worker.py` | 57 | 180 | 180 |
-| `pypost/core/request_manager.py` | 201 | 260 | 260 |
-| `pypost/core/request_service.py` | 95 | 489 | 530 |
+| `pypost/core/request_manager.py` | 201 | 240 | 264 |
+| `pypost/core/request_service.py` | 95 | 489 | — |
 | `pypost/core/storage.py` | 80 | 364 | 380 |
 | `pypost/core/template_service.py` | 36 | 212 | 225 |
+| `pypost/core/websocket_registry.py` | — | 130 | 131 |
 | `pypost/ui/mcp_server_controller.py` | — | 229 | 296 |
 | `pypost/ui/presenters/collections_presenter.py` | — | 366 | 403 |
 | `pypost/ui/presenters/env_presenter.py` | — | 381 | 432 |

@@ -55,8 +55,15 @@ FILE_CAPS: dict[str, int] = {
     "pypost/core/qt/metrics.py": 185,
     "pypost/ui/widgets/mixins.py": 411,
     "pypost/core/template_service.py": 225,
-    "pypost/core/request_service.py": 530,
-    "pypost/core/request_manager.py": 260,
+    # PYPOST-1128: item dispatch extracted to collection_item_dispatch.py;
+    # cap re-derived from post-extraction measurement (240) + ~10% headroom.
+    "pypost/core/request_manager.py": 264,
+    # PYPOST-1128: cross-collection WebSocket indexing and CRUD operations;
+    # capped on creation at ~10% headroom policy (119 measured).
+    "pypost/core/websocket_registry.py": 131,
+    # PYPOST-1128: polymorphic collection item action dispatch extracted from request_manager.py;
+    # capped on creation at ~10% headroom policy (75 measured).
+    "pypost/core/collection_item_dispatch.py": 83,
     # PYPOST-1071: accepted cohesive growth — PYPOST-1037's strict integer-template
     # conversion, origin-only error logging and ExecutionError mapping stay inside
     # outbound transport preparation and failure translation.

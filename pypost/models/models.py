@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Set
 from pydantic import BaseModel, Field
 
 from pypost.models.retry import RetryPolicy
+from pypost.models.websocket import WebSocketConnection
 
 _MCP_PARAM_TYPES = frozenset(
     {"string", "integer", "integer_or_string", "number", "boolean", "array", "object"}
@@ -92,6 +93,7 @@ class Collection(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "New Collection"
     requests: List[RequestData] = Field(default_factory=list)
+    websockets: List[WebSocketConnection] = Field(default_factory=list)
 
 
 class Environment(BaseModel):
@@ -113,3 +115,6 @@ class HistoryEntry(BaseModel):
     response_time_ms: float  # round-trip time in milliseconds
     collection_name: Optional[str] = None  # None for ad-hoc requests
     request_name: Optional[str] = None  # None for ad-hoc requests
+
+
+WebSocketConnection.model_rebuild(_types_namespace={"McpToolParam": McpToolParam})
