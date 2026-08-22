@@ -47,6 +47,19 @@ def mcp_collection_live_server():
     server.stop()
 
 
+@pytest.fixture
+def ws_test_server(qapp):
+    """Function-scoped scripted WebSocket test server fixture."""
+    from tests.websocket_echo_server import ScriptedWebSocketServer
+
+    server = ScriptedWebSocketServer()
+    server.start()
+    try:
+        yield server
+    finally:
+        server.stop()
+
+
 def pytest_runtest_setup(item):
     if item.get_closest_marker("timeout") is None:
         pytest.fail(

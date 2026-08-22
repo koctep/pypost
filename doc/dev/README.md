@@ -133,6 +133,7 @@ conventions.
 1. [Agent E2E Product Dialog Settle (PYPOST-919)](agent_dialog_settle.md)
 1. [Agent E2E Double Response-Body Lock (PYPOST-889)](agent_e2e_double_response_body.md)
 1. [Agent E2E Presentation Matrix (PYPOST-890)](agent_e2e_presentation_matrix.md)
+1. [Scripted WebSocket Test Server and Fixture (PYPOST-1129)](websocket_test_harness.md)
 1. [Metric Rename Migration (PYPOST-443)](metric_rename_migration.md)
 
 ### Tech debt

@@ -28,7 +28,11 @@ class QtWebSocketTransport(WebSocketTransport):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         self._listener: Optional[WebSocketTransportListener] = None
         self._local_close_requested: bool = False
-        self._socket: QWebSocket = QWebSocket("", QWebSocketProtocol.VersionLatest, parent)
+        self._socket: QWebSocket = QWebSocket(
+            "",
+            QWebSocketProtocol.Version.VersionLatest,
+            parent,
+        )
         self._connect_signals()
 
     def _connect_signals(self) -> None:
@@ -48,7 +52,11 @@ class QtWebSocketTransport(WebSocketTransport):
     def _on_disconnected(self) -> None:
         if self._listener is not None:
             raw_code = self._socket.closeCode()
-            code_val = raw_code.value if hasattr(raw_code, "value") else int(raw_code)
+            code_val = (
+                int(raw_code.value)
+                if hasattr(raw_code, "value") and isinstance(raw_code.value, int)
+                else 1000
+            )
             reason = self._socket.closeReason() or ""
             peer_initiated = not self._local_close_requested
             self._listener.on_closed(code_val, reason, peer_initiated)
