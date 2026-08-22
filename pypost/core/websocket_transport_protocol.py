@@ -7,6 +7,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Protocol, runtime_checkable
 
+from pypost.core.websocket_security_policy import TlsCertificateError
+
 
 class FrameType(str, Enum):
     """Payload format type of a WebSocket frame."""
@@ -72,7 +74,7 @@ class WebSocketTransportListener(Protocol):
         """Invoked when an unrecoverable connection or protocol error occurs."""
         ...
 
-    def on_tls_errors(self, errors: tuple[str, ...]) -> bool:
+    def on_tls_errors(self, errors: tuple[TlsCertificateError, ...]) -> bool:
         """Invoked on TLS certificate validation failure. Returns True to ignore."""
         ...
 

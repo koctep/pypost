@@ -9,6 +9,10 @@ from typing import Callable, Optional
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from pypost.core.qt.websocket_transport import QtWebSocketTransport
+from pypost.core.websocket_security_policy import (
+    TlsCertificateError,
+    classify_endpoint_security,
+)
 from pypost.core.websocket_session_policy import (
     HeartbeatConfig,
     ReconnectConfig,
@@ -31,6 +35,7 @@ class WebSocketSessionController(QObject):
     """Headless coordinator managing WebSocket transport lifecycle, state, and signals."""
 
     state_changed = Signal(str, object)
+    security_classification_changed = Signal(str)
     frame_received = Signal(object)
     frame_sent = Signal(object)
     lifecycle_event = Signal(str, str)
@@ -44,6 +49,7 @@ class WebSocketSessionController(QObject):
         self._state: SessionState = SessionState.IDLE
         self._policy = WebSocketSessionPolicy()
         self._target: Optional[HandshakeTarget] = None
+        self._ephemeral_trust_granted: bool = False
         self._heartbeat_config: HeartbeatConfig = HeartbeatConfig()
         self._reconnect_config: ReconnectConfig = ReconnectConfig()
         self._reconnect_attempts_made: int = 0
@@ -68,6 +74,26 @@ class WebSocketSessionController(QObject):
         """Current session lifecycle state."""
         return self._state
 
+    def grant_ephemeral_tls_exception(self) -> None:
+        """Grant in-memory ephemeral TLS verification bypass for active/next connection."""
+        logger.warning(
+            "websocket_ephemeral_tls_exception_granted session_state=%s",
+            self._state.value,
+        )
+        self._ephemeral_trust_granted = True
+
+    def has_ephemeral_tls_exception(self) -> bool:
+        """Return True if ephemeral TLS exception is active in memory."""
+        return self._ephemeral_trust_granted
+
+    def revoke_ephemeral_tls_exception(self) -> None:
+        """Revoke active ephemeral TLS exception."""
+        logger.info(
+            "websocket_ephemeral_tls_exception_revoked session_state=%s",
+            self._state.value,
+        )
+        self._ephemeral_trust_granted = False
+
     def set_transport_factory(self, factory: Callable[[], WebSocketTransport]) -> None:
         """Override transport instantiation factory (useful for tests and mock adapters)."""
         self._transport_factory = factory
@@ -79,19 +105,39 @@ class WebSocketSessionController(QObject):
         reconnect: Optional[ReconnectConfig] = None,
     ) -> None:
         """Initiate connection handshake to target endpoint."""
-        self._target = target
+        if self._ephemeral_trust_granted and target.url.lower().startswith("wss://"):
+            effective_target = HandshakeTarget(
+                url=target.url,
+                headers=target.headers,
+                subprotocols=target.subprotocols,
+                max_incoming_message_bytes=target.max_incoming_message_bytes,
+                verify_tls=False,
+            )
+        else:
+            effective_target = target
+
+        self._target = effective_target
         if heartbeat is not None:
             self._heartbeat_config = heartbeat
         if reconnect is not None:
             self._reconnect_config = reconnect
         self._reconnect_attempts_made = 0
 
+        classification = classify_endpoint_security(
+            effective_target.url,
+            verify_tls=effective_target.verify_tls,
+        )
+        self.security_classification_changed.emit(classification.value)
+
         logger.info(
-            "Opening WebSocket session to %s (verify_tls=%s, heartbeat=%.1fs, reconnect=%s)",
-            target.url,
-            target.verify_tls,
+            "Opening WebSocket session to %s (verify_tls=%s, security=%s, "
+            "heartbeat=%.1fs, reconnect=%s, ephemeral_trust=%s)",
+            effective_target.url,
+            effective_target.verify_tls,
+            classification.value,
             self._heartbeat_config.interval_seconds,
             self._reconnect_config.enabled,
+            self._ephemeral_trust_granted,
         )
 
         self._stop_all_timers()
@@ -101,12 +147,12 @@ class WebSocketSessionController(QObject):
 
         self._transition_to(
             SessionState.CONNECTING,
-            StateDetail(message=f"Connecting to {target.url}"),
+            StateDetail(message=f"Connecting to {effective_target.url}"),
         )
 
         self._transport = self._transport_factory()
         self._transport.set_listener(self)
-        self._transport.open(target)
+        self._transport.open(effective_target)
 
     def send_text(self, message: str) -> None:
         """Send UTF-8 text message frame and emit frame_sent."""
@@ -146,6 +192,7 @@ class WebSocketSessionController(QObject):
             reason,
             self._state.value,
         )
+        self._ephemeral_trust_granted = False
         self._stop_all_timers()
 
         if self._state in (SessionState.CONNECTING, SessionState.RECONNECTING):
@@ -177,6 +224,7 @@ class WebSocketSessionController(QObject):
             "Aborting WebSocket session immediately (current_state=%s)",
             self._state.value,
         )
+        self._ephemeral_trust_granted = False
         self._stop_all_timers()
         if self._transport is not None:
             self._transport.abort()
@@ -311,7 +359,7 @@ class WebSocketSessionController(QObject):
     def on_failed(self, category: str, message: str, detail: str) -> None:
         """Transport listener callback on error or handshake rejection."""
         logger.error(
-            "WebSocket session error occurred (category=%s, message=%s, detail=%s)",
+            "websocket_session_failed category=%s message=%s detail=%s",
             category,
             message,
             detail,
@@ -328,18 +376,48 @@ class WebSocketSessionController(QObject):
         self._transition_to(SessionState.FAILED, state_detail)
         self.session_failed.emit(category, message)
 
-    def on_tls_errors(self, errors: tuple[str, ...]) -> bool:
+    def on_tls_errors(
+        self,
+        errors: tuple[TlsCertificateError, ...] | tuple[str, ...],
+    ) -> bool:
         """Transport listener callback on TLS certificate errors."""
         ignored = bool(self._target and not self._target.verify_tls)
+        first_err = errors[0] if errors else None
+        if first_err is not None:
+            if hasattr(first_err, "message"):
+                summary = getattr(first_err, "message")
+            else:
+                summary = str(first_err)
+        else:
+            summary = "TLS certificate validation failed"
+
         logger.warning(
-            "WebSocket TLS certificate errors encountered (count=%d, ignored=%s): %s",
+            "websocket_tls_errors_encountered count=%d ignored=%s summary=%s",
             len(errors),
             ignored,
-            errors,
+            summary,
         )
         self.tls_errors_raised.emit(errors)
         if ignored:
             return True
+
+        logger.error(
+            "websocket_session_tls_validation_failed url=%s error=%s",
+            self._target.url if self._target else "unknown",
+            summary,
+        )
+
+        self._stop_all_timers()
+        if self._transport is not None:
+            self._transport.abort()
+
+        state_detail = StateDetail(
+            message=summary,
+            error_category="tls_error",
+            reason=str(errors),
+        )
+        self._transition_to(SessionState.FAILED, state_detail)
+        self.session_failed.emit("tls_error", summary)
         return False
 
     def _transition_to(

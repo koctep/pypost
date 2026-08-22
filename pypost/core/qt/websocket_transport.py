@@ -6,13 +6,14 @@ import logging
 from typing import Optional
 
 from PySide6.QtCore import QByteArray, QObject, QUrl
-from PySide6.QtNetwork import QNetworkRequest
+from PySide6.QtNetwork import QNetworkRequest, QSslConfiguration, QSslSocket
 from PySide6.QtWebSockets import (
     QWebSocket,
     QWebSocketHandshakeOptions,
     QWebSocketProtocol,
 )
 
+from pypost.core.websocket_security_policy import TlsCertificateError
 from pypost.core.websocket_transport_protocol import (
     HandshakeTarget,
     WebSocketTransport,
@@ -78,7 +79,7 @@ class QtWebSocketTransport(WebSocketTransport):
             error_str = self._socket.errorString() or "WebSocket error"
             category = getattr(error, "name", "socket_error")
             logger.warning(
-                "QtWebSocket error occurred: category=%s, message=%s",
+                "websocket_transport_socket_error category=%s message=%s",
                 category,
                 error_str,
             )
@@ -86,18 +87,67 @@ class QtWebSocketTransport(WebSocketTransport):
 
     def _on_ssl_errors(self, errors: list[object]) -> None:
         if self._listener is not None:
-            err_strings = tuple(
-                str(getattr(e, "errorString", lambda: str(e))())
-                for e in errors
-            )
-            ignore = self._listener.on_tls_errors(err_strings)
+            parsed_errors: list[TlsCertificateError] = []
+            for e in errors:
+                if isinstance(e, TlsCertificateError):
+                    parsed_errors.append(e)
+                    continue
+
+                msg = str(getattr(e, "errorString", lambda: str(e))())
+                code = "ssl_error"
+                if hasattr(e, "error"):
+                    err_enum = e.error()
+                    code = getattr(err_enum, "name", str(err_enum)).lower()
+                elif "self-signed" in msg.lower():
+                    code = "self_signed"
+                elif "host" in msg.lower() and "match" in msg.lower():
+                    code = "host_mismatch"
+                elif "expired" in msg.lower():
+                    code = "expired"
+
+                subject = ""
+                issuer = ""
+                fingerprint = ""
+                expiry_date = None
+
+                cert = getattr(e, "certificate", lambda: None)()
+                if cert is not None and getattr(cert, "isNull", lambda: True)() is False:
+                    if hasattr(cert, "subjectDisplayName"):
+                        subject = cert.subjectDisplayName()
+                    if hasattr(cert, "issuerDisplayName"):
+                        issuer = cert.issuerDisplayName()
+                    if hasattr(cert, "digest"):
+                        try:
+                            digest_hex = cert.digest().toHex().data().decode("utf-8")
+                            if digest_hex:
+                                fingerprint = f"SHA256:{digest_hex}"
+                        except Exception:
+                            pass
+                    if hasattr(cert, "expiryDate"):
+                        try:
+                            qdt = cert.expiryDate()
+                            if hasattr(qdt, "toPython"):
+                                expiry_date = qdt.toPython()
+                        except Exception:
+                            pass
+
+                parsed_errors.append(
+                    TlsCertificateError(
+                        error_code=code,
+                        message=msg,
+                        certificate_subject=subject,
+                        certificate_issuer=issuer,
+                        certificate_fingerprint=fingerprint,
+                        expiry_date=expiry_date,
+                    )
+                )
+
             logger.warning(
-                "QtWebSocket SSL errors encountered: count=%d, ignored=%s",
-                len(err_strings),
-                ignore,
+                "websocket_transport_ssl_errors_encountered count=%d errors=%s",
+                len(parsed_errors),
+                [e.message for e in parsed_errors],
             )
-            if ignore:
-                self._socket.ignoreSslErrors()
+            self._listener.on_tls_errors(tuple(parsed_errors))
 
     def set_listener(self, listener: WebSocketTransportListener) -> None:
         """Register the listener receiving transport lifecycle callbacks."""
@@ -106,13 +156,22 @@ class QtWebSocketTransport(WebSocketTransport):
     def open(self, target: HandshakeTarget) -> None:
         """Configure socket and open connection to target."""
         logger.debug(
-            "QtWebSocketTransport opening connection to %s (max_bytes=%d, subprotocols=%s)",
+            "websocket_transport_open_initiated url=%s max_bytes=%d subprotocols=%s verify_tls=%s",
             target.url,
             target.max_incoming_message_bytes,
             target.subprotocols,
+            target.verify_tls,
         )
         self._local_close_requested = False
         self._socket.setMaxAllowedIncomingMessageSize(target.max_incoming_message_bytes)
+
+        if target.url.lower().startswith("wss://"):
+            ssl_config = QSslConfiguration.defaultConfiguration()
+            if target.verify_tls:
+                ssl_config.setPeerVerifyMode(QSslSocket.PeerVerifyMode.VerifyPeer)
+            else:
+                ssl_config.setPeerVerifyMode(QSslSocket.PeerVerifyMode.VerifyNone)
+            self._socket.setSslConfiguration(ssl_config)
 
         request = QNetworkRequest(QUrl(target.url))
         for header_name, header_val in target.headers.items():
