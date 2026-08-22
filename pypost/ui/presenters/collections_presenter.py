@@ -10,11 +10,12 @@ from PySide6.QtWidgets import QTreeView, QWidget
 
 from pypost.core.collection_export import build_export_payload
 from pypost.core.collection_import import load_collection_import_candidates
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.models import Collection, RequestData
+from pypost.models.websocket import WebSocketConnection
 from pypost.ui.delegates import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_export_actions import CollectionExportActions
 from pypost.ui.presenters.collection_import_actions import CollectionImportActions
@@ -35,6 +36,7 @@ class CollectionsPresenter(QObject):
 
     open_request_in_tab = Signal(object)  # payload: RequestData (deep copy for new tab)
     open_request_in_isolated_tab = Signal(object)  # payload: RequestData (deep copy)
+    open_websocket_in_tab = Signal(object)  # payload: WebSocketConnection
     collections_changed = Signal()  # after create / delete / rename
     collections_loaded = Signal()  # after async startup load completes
     request_renamed = Signal(str, str)  # (request_id, new_name)
@@ -44,8 +46,8 @@ class CollectionsPresenter(QObject):
         self,
         request_manager: RequestManager,
         state_manager: StateManager,
-        metrics: MetricsTrackerProtocol,
-        icons: dict,
+        metrics: MetricsTrackerProtocol | None = None,
+        icons: dict | None = None,
         storage=None,
         parent: QObject | None = None,
         *,
@@ -57,8 +59,8 @@ class CollectionsPresenter(QObject):
         super().__init__(parent)
         self._request_manager = request_manager
         self._state_manager = state_manager
-        self._metrics = metrics
-        self._icons = icons
+        self._metrics = resolve_metrics(metrics)
+        self._icons = icons if icons is not None else {}
         self._read_import_file = read_import_file or load_collection_import_candidates
         self._async_loader = (
             CollectionsAsyncLoader(
@@ -136,6 +138,7 @@ class CollectionsPresenter(QObject):
             self._request_manager,
             serialize_collection=serialize_collection,
         )
+        self.refresh_tree()
 
     @property
     def widget(self) -> QTreeView:
@@ -167,7 +170,7 @@ class CollectionsPresenter(QObject):
 
     def _make_collection_item(self, col: Collection) -> QStandardItem:
         col_item = QStandardItem(col.name)
-        col_item.setData(col.id, Qt.UserRole)
+        col_item.setData(col.id, Qt.ItemDataRole.UserRole)
         col_item.setEditable(False)
         if "collection" in self._icons:
             col_item.setIcon(self._icons["collection"])
@@ -175,11 +178,19 @@ class CollectionsPresenter(QObject):
 
     def _make_request_item(self, req: RequestData) -> QStandardItem:
         req_item = QStandardItem(f"{req.method} {req.name}")
-        req_item.setData(req, Qt.UserRole)
+        req_item.setData(req, Qt.ItemDataRole.UserRole)
         req_item.setEditable(False)
         if req.method in self._icons:
             req_item.setIcon(self._icons[req.method])
         return req_item
+
+    def _make_websocket_item(self, ws: WebSocketConnection) -> QStandardItem:
+        ws_item = QStandardItem(f"ws {ws.name}")
+        ws_item.setData(ws, Qt.ItemDataRole.UserRole)
+        ws_item.setEditable(False)
+        if "websocket" in self._icons:
+            ws_item.setIcon(self._icons["websocket"])
+        return ws_item
 
     def _expand_collection_if_saved(self, collection_id: str, col_item: QStandardItem) -> None:
         if collection_id in self._state_manager.get_expanded_collections():
@@ -188,7 +199,10 @@ class CollectionsPresenter(QObject):
     def refresh_tree(self) -> None:
         """Rebuilds tree model from RequestManager in-memory collections."""
         collections = self._request_manager.get_collections()
-        req_count = sum(len(col.requests) for col in collections)
+        req_count = sum(
+            len(col.requests) + len(getattr(col, "websockets", []))
+            for col in collections
+        )
         if try_incremental_tree_refresh(self._collection_items_by_id, collections):
             log_tree_refresh(len(collections), req_count, incremental=True)
             return
@@ -198,6 +212,8 @@ class CollectionsPresenter(QObject):
             col_item = self._make_collection_item(col)
             for req in col.requests:
                 col_item.appendRow(self._make_request_item(req))
+            for ws in getattr(col, "websockets", []):
+                col_item.appendRow(self._make_websocket_item(ws))
             self._model.appendRow(col_item)
             self._collection_items_by_id[col.id] = col_item
         log_tree_refresh(len(collections), req_count, incremental=False)
@@ -298,7 +314,7 @@ class CollectionsPresenter(QObject):
 
     def _on_collection_clicked(self, index) -> None:
         item = self._model.itemFromIndex(index)
-        data = item.data(Qt.UserRole)
+        data = item.data(Qt.ItemDataRole.UserRole)
         if isinstance(data, RequestData):
             logger.info(
                 "collection_request_opened request_id=%s request_name=%s",
@@ -306,6 +322,13 @@ class CollectionsPresenter(QObject):
                 data.name,
             )
             self.open_request_in_tab.emit(copy_request_for_isolated_tab(data))
+        elif isinstance(data, WebSocketConnection):
+            logger.info(
+                "collection_websocket_opened ws_id=%s ws_name=%s",
+                data.id,
+                data.name,
+            )
+            self.open_websocket_in_tab.emit(data)
         else:
             if self._view.isExpanded(index):
                 self._view.collapse(index)
@@ -334,10 +357,16 @@ class CollectionsPresenter(QObject):
         for row in range(self._model.rowCount()):
             col_item = self._model.item(row)
             for child_row in range(col_item.rowCount()):
-                req_item = col_item.child(child_row)
-                data = req_item.data(Qt.UserRole)
+                child_item = col_item.child(child_row)
+                data = child_item.data(Qt.ItemDataRole.UserRole)
                 if item_type == "request" and isinstance(data, RequestData) and data.id == item_id:
-                    return req_item
+                    return child_item
+                if (
+                    item_type == "websocket"
+                    and isinstance(data, WebSocketConnection)
+                    and data.id == item_id
+                ):
+                    return child_item
         return None
 
     def _is_collection_item(self, index) -> bool:
@@ -345,12 +374,12 @@ class CollectionsPresenter(QObject):
         item = self._model.itemFromIndex(index)
         if item is None:
             return False
-        return isinstance(item.data(Qt.UserRole), str)
+        return isinstance(item.data(Qt.ItemDataRole.UserRole), str)
 
     def _on_tree_expanded(self, index) -> None:
         if not self._is_collection_item(index):
             return
-        collection_id = self._model.itemFromIndex(index).data(Qt.UserRole)
+        collection_id = self._model.itemFromIndex(index).data(Qt.ItemDataRole.UserRole)
         current = self._state_manager.get_expanded_collections()
         if collection_id not in current:
             current.append(collection_id)
@@ -359,7 +388,7 @@ class CollectionsPresenter(QObject):
     def _on_tree_collapsed(self, index) -> None:
         if not self._is_collection_item(index):
             return
-        collection_id = self._model.itemFromIndex(index).data(Qt.UserRole)
+        collection_id = self._model.itemFromIndex(index).data(Qt.ItemDataRole.UserRole)
         current = self._state_manager.get_expanded_collections()
         if collection_id in current:
             current.remove(collection_id)

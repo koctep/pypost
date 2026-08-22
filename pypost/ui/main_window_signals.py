@@ -14,6 +14,9 @@ def wire_presenter_signals(window: MainWindow) -> None:
     """Connect collections, tabs, env, and history panel cross-presenter signals."""
     window.collections.open_request_in_tab.connect(window.tabs.add_new_tab)
     window.collections.open_request_in_isolated_tab.connect(window.tabs.add_new_tab)
+    window.collections.open_websocket_in_tab.connect(
+        lambda conn: window.tabs.open_websocket_tab(conn)
+    )
     window.collections.collections_changed.connect(window.env.load_environments)
     window.collections.collections_changed.connect(window.mcp_controls.refresh_tools)
     window.collections.request_renamed.connect(window.tabs.rename_request_tabs)

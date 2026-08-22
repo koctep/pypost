@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem
 
 from pypost.models.models import Collection, RequestData
+from pypost.models.websocket import WebSocketConnection
 
 
 def log_tree_refresh(collection_count: int, request_count: int, *, incremental: bool) -> None:
@@ -31,11 +32,18 @@ def try_incremental_tree_refresh(
 
     for col in collections:
         col_item = collection_items_by_id.get(col.id)
-        if col_item is None or col_item.rowCount() != len(col.requests):
+        ws_list = getattr(col, "websockets", [])
+        expected_count = len(col.requests) + len(ws_list)
+        if col_item is None or col_item.rowCount() != expected_count:
             return False
         for row, req in enumerate(col.requests):
-            data = col_item.child(row).data(Qt.UserRole)
+            data = col_item.child(row).data(Qt.ItemDataRole.UserRole)
             if not isinstance(data, RequestData) or data.id != req.id:
+                return False
+        offset = len(col.requests)
+        for row, ws in enumerate(ws_list):
+            data = col_item.child(offset + row).data(Qt.ItemDataRole.UserRole)
+            if not isinstance(data, WebSocketConnection) or data.id != ws.id:
                 return False
 
     for col in collections:
@@ -44,6 +52,11 @@ def try_incremental_tree_refresh(
         for row, req in enumerate(col.requests):
             req_item = col_item.child(row)
             req_item.setText(f"{req.method} {req.name}")
-            req_item.setData(req, Qt.UserRole)
+            req_item.setData(req, Qt.ItemDataRole.UserRole)
+        offset = len(col.requests)
+        for row, ws in enumerate(getattr(col, "websockets", [])):
+            ws_item = col_item.child(offset + row)
+            ws_item.setText(f"ws {ws.name}")
+            ws_item.setData(ws, Qt.ItemDataRole.UserRole)
 
     return True

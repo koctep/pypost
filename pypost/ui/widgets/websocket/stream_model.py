@@ -50,6 +50,10 @@ class StreamListModel(QAbstractListModel):
         """Return the underlying MessageStream instance."""
         return self._stream
 
+    def get_entry(self, row: int) -> StreamEntry:
+        """Return the StreamEntry at the specified row index."""
+        return self._stream[row]
+
     def rowCount(
         self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
     ) -> int:

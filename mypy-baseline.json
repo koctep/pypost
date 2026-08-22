@@ -1,5 +1,5 @@
 {
-  "error_count": 210,
+  "error_count": 201,
   "errors": [
     {
       "code": "arg-type",
@@ -503,52 +503,7 @@
     },
     {
       "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collection_tree_incremental.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collection_tree_incremental.py"
-    },
-    {
-      "code": "attr-defined",
       "message": "\"type[Qt]\" has no attribute \"CustomContextMenu\"",
-      "path": "pypost/ui/presenters/collections_presenter.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collections_presenter.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collections_presenter.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collections_presenter.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collections_presenter.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collections_presenter.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collections_presenter.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
       "path": "pypost/ui/presenters/collections_presenter.py"
     },
     {

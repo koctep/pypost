@@ -195,3 +195,57 @@ def test_widget_ids_are_locale_independent_literals() -> None:
         assert name.isascii()
         assert " " not in name
         assert name == name.lower()
+
+
+def test_websocket_tab_exposes_role_object_names(
+    qapp: QApplication,
+    agent_e2e_session: AgentAppSession,
+) -> None:
+    """WS-4: WebSocket session tab surfaces expose documented WS_* objectNames."""
+    from pypost.models.websocket import WebSocketConnection
+    from pypost.ui.widgets.websocket import WebSocketTab
+    from pypost.ui.widget_ids import (
+        WS_TAB_PAGE,
+        WS_URL_INPUT,
+        WS_CONNECT_BUTTON,
+        WS_STATE_BADGE,
+        WS_PARAMS_TABLE,
+        WS_HEADERS_TABLE,
+        WS_SUBPROTOCOLS_INPUT,
+        WS_STREAM_VIEW,
+        WS_COMPOSER_EDIT,
+        WS_SEND_MESSAGE_BUTTON,
+        WS_LOCK_NOTICE,
+        WS_DETAIL_TABS,
+    )
+
+    window = agent_e2e_session.window
+    assert window.is_ui_ready is True
+    conn = WebSocketConnection(
+        id="ws_spotcheck_1",
+        name="Spotcheck WS",
+        url="ws://127.0.0.1:8080",
+    )
+    ws_tab = window.tabs.open_websocket_tab(conn, save_state=False)
+    qapp.processEvents()
+
+    assert isinstance(ws_tab, WebSocketTab)
+    _assert_id(ws_tab, WS_TAB_PAGE)
+
+    for expected_id in (
+        WS_URL_INPUT,
+        WS_CONNECT_BUTTON,
+        WS_STATE_BADGE,
+        WS_PARAMS_TABLE,
+        WS_HEADERS_TABLE,
+        WS_SUBPROTOCOLS_INPUT,
+        WS_STREAM_VIEW,
+        WS_COMPOSER_EDIT,
+        WS_SEND_MESSAGE_BUTTON,
+        WS_LOCK_NOTICE,
+        WS_DETAIL_TABS,
+    ):
+        found = ws_tab.findChild(QWidget, expected_id)
+        assert found is not None, f"Expected widget '{expected_id}' on WebSocketTab"
+        _assert_id(found, expected_id)
+

@@ -38,6 +38,20 @@ SETTINGS_DIALOG = "pypost_settings_dialog"
 PLUS_TAB_PLACEHOLDER = "pypost_plus_tab_placeholder"
 PLUS_TAB_BUTTON = "pypost_plus_tab_button"
 
+# WebSocket session surfaces (PYPOST-1132 / WS-4).
+WS_TAB_PAGE = "pypost_ws_tab_page"
+WS_URL_INPUT = "pypost_ws_url_input"
+WS_CONNECT_BUTTON = "pypost_ws_connect_button"
+WS_STATE_BADGE = "pypost_ws_state_badge"
+WS_PARAMS_TABLE = "pypost_ws_params_table"
+WS_HEADERS_TABLE = "pypost_ws_headers_table"
+WS_SUBPROTOCOLS_INPUT = "pypost_ws_subprotocols_input"
+WS_STREAM_VIEW = "pypost_ws_stream_view"
+WS_COMPOSER_EDIT = "pypost_ws_composer_edit"
+WS_SEND_MESSAGE_BUTTON = "pypost_ws_send_message_button"
+WS_LOCK_NOTICE = "pypost_ws_lock_notice"
+WS_DETAIL_TABS = "pypost_ws_detail_tabs"
+
 KEY_WIDGET_IDS = (
     MAIN_WINDOW,
     COLLECTION_TREE,
@@ -54,6 +68,18 @@ KEY_WIDGET_IDS = (
     ENV_SELECTOR,
     ENV_MANAGE_BUTTON,
     SETTINGS_BUTTON,
+    WS_TAB_PAGE,
+    WS_URL_INPUT,
+    WS_CONNECT_BUTTON,
+    WS_STATE_BADGE,
+    WS_PARAMS_TABLE,
+    WS_HEADERS_TABLE,
+    WS_SUBPROTOCOLS_INPUT,
+    WS_STREAM_VIEW,
+    WS_COMPOSER_EDIT,
+    WS_SEND_MESSAGE_BUTTON,
+    WS_LOCK_NOTICE,
+    WS_DETAIL_TABS,
 )
 
 

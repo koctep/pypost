@@ -27,7 +27,7 @@ class SessionState(str, Enum):
 class StateDetail:
     """Detailed metadata describing a session state transition or error."""
 
-    message: str
+    message: str = ""
     error_category: Optional[str] = None
     close_code: Optional[int] = None
     reason: Optional[str] = None

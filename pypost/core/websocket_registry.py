@@ -17,9 +17,7 @@ class WebSocketRegistry:
     """In-memory index service managing WebSocket profiles across loaded collections."""
 
     def __init__(
-        self,
-        request_manager: RequestManager,
-        storage: StorageInterface,
+        self, request_manager: RequestManager, storage: Optional[StorageInterface] = None
     ) -> None:
         self.request_manager = request_manager
         self.storage = storage
@@ -53,10 +51,8 @@ class WebSocketRegistry:
     def save_websocket(self, conn: WebSocketConnection, collection_id: str) -> None:
         """Saves a websocket profile to the specified collection."""
         logger.info("save_websocket_started ws_id=%s col_id=%s", conn.id, collection_id)
-        target = next(
-            (c for c in self.request_manager.get_collections() if c.id == collection_id),
-            None,
-        )
+        cols = self.request_manager.get_collections()
+        target = next((c for c in cols if c.id == collection_id), None)
         if not target:
             logger.warning("save_websocket_not_found ws_id=%s col_id=%s", conn.id, collection_id)
             raise ValueError(f"Collection with ID {collection_id} not found")
@@ -71,7 +67,8 @@ class WebSocketRegistry:
         else:
             target.websockets.append(conn)
 
-        self.storage.save_collection(target)
+        if self.storage is not None:
+            self.storage.save_collection(target)
         self._ws_index[conn.id] = (conn, target)
         logger.info("save_websocket_succeeded ws_id=%s col_id=%s", conn.id, collection_id)
 
@@ -88,7 +85,8 @@ class WebSocketRegistry:
             if ws.id == ws_id:
                 del col.websockets[i]
                 break
-        self.storage.save_collection(col)
+        if self.storage is not None:
+            self.storage.save_collection(col)
         self._ws_index.pop(ws_id, None)
         logger.info("delete_websocket_succeeded ws_id=%s collection_id=%s", ws_id, col.id)
         return True
@@ -108,7 +106,8 @@ class WebSocketRegistry:
 
         conn, col = indexed
         conn.name = normalized_name
-        self.storage.save_collection(col)
+        if self.storage is not None:
+            self.storage.save_collection(col)
         logger.info("rename_websocket_succeeded ws_id=%s collection_id=%s", ws_id, col.id)
         return True
 

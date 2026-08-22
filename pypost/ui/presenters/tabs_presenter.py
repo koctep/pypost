@@ -33,6 +33,8 @@ from pypost.core.template_service import TemplateService
 from pypost.core.qt.worker import RequestWorker
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
+from pypost.models.websocket import WebSocketConnection
+from pypost.ui.presenters.websocket_presenter import WebSocketPresenter
 from pypost.ui.request_save_orchestrator import (
     RequestSaveOrchestrator,
     SaveAction,
@@ -43,10 +45,11 @@ from pypost.ui.widget_ids import REQUEST_TABS, set_widget_id
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 from pypost.ui.widgets.tab_header import PLUS_TAB_MARKER, RequestTabHeader
+from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["PLUS_TAB_MARKER", "RequestTab", "TabsPresenter"]
+__all__ = ["PLUS_TAB_MARKER", "RequestTab", "TabsPresenter", "WebSocketTab"]
 
 
 class RequestTab(QWidget):
@@ -150,6 +153,49 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         if save_state:
             self.save_tabs_state()
 
+    def open_websocket_tab(
+        self,
+        connection: WebSocketConnection,
+        save_state: bool = True,
+    ) -> WebSocketTab:
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            if (
+                isinstance(tab, WebSocketTab)
+                and tab.connection_data
+                and tab.connection_data.id == connection.id
+            ):
+                self._tabs.setCurrentWidget(tab)
+                return tab
+
+        presenter = WebSocketPresenter(
+            connection=connection,
+            env_vars=self._current_variables,
+            hidden_keys=self._current_hidden_keys,
+        )
+        tab = WebSocketTab(connection=connection, presenter=presenter)
+        presenter.tab_title_changed.connect(
+            lambda glyph, title, t=tab: self._on_websocket_title_changed(t, glyph, title)
+        )
+
+        name = connection.name if connection.name else "WebSocket"
+        plus_idx = self._header.insert_index_before_plus()
+        if plus_idx >= 0:
+            self._tabs.insertTab(plus_idx, tab, name)
+        else:
+            self._tabs.addTab(tab, name)
+            self._header.ensure_plus_tab()
+        self._tabs.setCurrentWidget(tab)
+
+        if save_state:
+            self.save_tabs_state()
+        return tab
+
+    def _on_websocket_title_changed(self, tab: WebSocketTab, glyph: str, title: str) -> None:
+        idx = self._tabs.indexOf(tab)
+        if idx >= 0:
+            self._header.set_tab_label(idx, f"{glyph} {title}".strip())
+
     def _ensure_current_is_navigable(self, preferred_index: int) -> None:
         """If current is not a request tab, select preferred or last navigable."""
         indices = self._header.navigable_tab_indices()
@@ -163,6 +209,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def close_tab(self, index: int) -> None:
         if self._header.is_plus_tab_index(index):
             return
+        tab = self._tabs.widget(index)
+        if isinstance(tab, WebSocketTab) and hasattr(tab, "presenter"):
+            tab.presenter.teardown()
         self._tabs.removeTab(index)
         if self._request_tab_count() == 0:
             self.add_new_tab(save_state=False)
@@ -173,20 +222,36 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def restore_tabs(self) -> None:
         """Restores tabs from StateManager."""
+        from pypost.core.websocket_registry import WebSocketRegistry
+
         tabs_restored = False
         restored_count = 0
-        for request_id in self._state_manager.get_open_tabs():
-            result = self._request_manager.find_request(request_id)
-            if result:
-                found_request, _ = result
-                self.add_new_tab(
-                    copy_request_for_isolated_tab(found_request),
-                    save_state=False,
-                )
-                tabs_restored = True
-                restored_count += 1
+        storage = getattr(self._request_manager, "storage", None)
+        ws_registry = WebSocketRegistry(self._request_manager, storage)
+        for tab_id in self._state_manager.get_open_tabs():
+            item_match = ws_registry.find_item(tab_id)
+            if item_match is not None:
+                kind, item_data, _ = item_match
+                if kind == "websocket" and isinstance(item_data, WebSocketConnection):
+                    self.open_websocket_tab(item_data, save_state=False)
+                    tabs_restored = True
+                    restored_count += 1
+                elif kind == "request" and isinstance(item_data, RequestData):
+                    self.add_new_tab(copy_request_for_isolated_tab(item_data), save_state=False)
+                    tabs_restored = True
+                    restored_count += 1
             else:
-                logger.warning("restore_tabs_request_not_found request_id=%s", request_id)
+                result = self._request_manager.find_request(tab_id)
+                if result:
+                    found_request, _ = result
+                    self.add_new_tab(
+                        copy_request_for_isolated_tab(found_request),
+                        save_state=False,
+                    )
+                    tabs_restored = True
+                    restored_count += 1
+                else:
+                    logger.warning("restore_tabs_item_not_found item_id=%s", tab_id)
 
         if not tabs_restored:
             self.add_new_tab(save_state=False)
@@ -201,13 +266,15 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id:
                 open_ids.append(tab.request_data.id)
+            elif isinstance(tab, WebSocketTab) and tab.connection_data and tab.connection_data.id:
+                open_ids.append(tab.connection_data.id)
         self._state_manager.set_open_tabs(open_ids)
 
     def on_env_variables_changed(self, variables: dict) -> None:
-        """React to env variable changes and push snapshots into open request tabs.
+        """React to env variable changes and push snapshots into open tabs.
 
         Connected from EnvPresenter.env_variables_changed in main_window_signals.
-        Caches variables for new tabs and calls set_variables on each RequestWidget.
+        Caches variables for new tabs and calls set_variables on each tab.
         See doc/dev/variable_propagation.md.
         """
         self._current_variables = variables
@@ -219,6 +286,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
                 if hasattr(tab.response_view, "set_env_keys"):
                     keys = list(variables.keys()) if variables else None
                     tab.response_view.set_env_keys(keys)
+            elif isinstance(tab, WebSocketTab):
+                if hasattr(tab, "presenter") and hasattr(tab.presenter, "set_variables"):
+                    tab.presenter.set_variables(variables)
 
     def on_env_keys_changed(self, keys: object) -> None:
         """Pushes env key list to all ResponseView widgets."""
@@ -245,6 +315,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             if isinstance(tab, RequestTab):
                 if hasattr(tab.request_editor, "set_hidden_keys"):
                     tab.request_editor.set_hidden_keys(hidden_keys)
+            elif isinstance(tab, WebSocketTab):
+                if hasattr(tab, "presenter") and hasattr(tab.presenter, "set_hidden_keys"):
+                    tab.presenter.set_hidden_keys(hidden_keys)
 
     def rename_request_tabs(self, request_id: str, new_name: str) -> None:
         """Updates tab labels after a request rename."""
@@ -505,7 +578,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         return sum(
             1
             for i in range(self._tabs.count())
-            if isinstance(self._tabs.widget(i), RequestTab)
+            if isinstance(self._tabs.widget(i), (RequestTab, WebSocketTab))
         )
 
     def _index_of_tab(self, tab: RequestTab) -> int | None:

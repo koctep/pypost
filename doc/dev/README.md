@@ -20,6 +20,7 @@ conventions.
 1. [WebSocket Transport Seam and Session Engine (PYPOST-1127)](websocket_session_engine.md)
 1. [WebSocket Message Stream, Codecs, and Transcript Export (PYPOST-1130)](websocket_message_stream.md)
 1. [WebSocket TLS and Connection-Security Policy (PYPOST-1131)](websocket_tls_security.md)
+1. [WebSocket UI Client and Live Stream Inspector (PYPOST-1132)](websocket_ui_client.md)
 1. [TemplateService — central variable substitution](template_service.md)
 1. [Template Expression Functions and Integer Conversion (PYPOST-450, PYPOST-1037, PYPOST-1038)](template_expression_functions.md)
 1. [Variable Propagation](variable_propagation.md)

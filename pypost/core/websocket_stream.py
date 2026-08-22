@@ -39,6 +39,11 @@ class StreamEntry:
     truncated: bool = False
     detail: str = ""
 
+    @property
+    def formatted_payload(self) -> str:
+        """Return masked payload string."""
+        return self.payload
+
 
 @dataclass
 class StreamQuery:
