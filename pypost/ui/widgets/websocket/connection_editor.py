@@ -12,15 +12,20 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
+    QPlainTextEdit,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from pypost.core.websocket_mcp_tools import build_websocket_mcp_preview
+from pypost.core.mcp_tool_contract import format_mcp_tool_contract_preview
 from pypost.core.websocket_transport_protocol import HandshakeTarget
 from pypost.models.websocket import WebSocketConnection
 from pypost.ui.widget_ids import (
@@ -178,7 +183,56 @@ class WebSocketConnectionEditor(QWidget):
         subproto_layout.addStretch()
         self.detail_tabs.addTab(subproto_tab, "Subprotocols")
 
+        # 4. MCP Preview sub-tab
+        mcp_tab = QWidget(self)
+        mcp_layout = QVBoxLayout(mcp_tab)
+        mcp_layout.setContentsMargins(8, 8, 8, 8)
+        mcp_layout.setSpacing(6)
+
+        # Expose as MCP checkbox
+        self.mcp_expose_check = QCheckBox("Expose as MCP Tool", mcp_tab)
+        mcp_layout.addWidget(self.mcp_expose_check)
+
+        # Tool description field
+        desc_row = QHBoxLayout()
+        desc_row.addWidget(QLabel("Tool Description:", mcp_tab))
+        self.mcp_description_edit = QLineEdit(mcp_tab)
+        self.mcp_description_edit.setPlaceholderText("Agent-visible tool description")
+        desc_row.addWidget(self.mcp_description_edit)
+        mcp_layout.addLayout(desc_row)
+
+        # Read-only contract preview
+        mcp_layout.addWidget(QLabel("Agent Contract Preview:", mcp_tab))
+        self.mcp_preview_text = QPlainTextEdit(mcp_tab)
+        self.mcp_preview_text.setReadOnly(True)
+        self.mcp_preview_text.setPlaceholderText(
+            "Enable 'Expose as MCP Tool' to see the generated tool contract."
+        )
+        mcp_layout.addWidget(self.mcp_preview_text)
+
+        self.detail_tabs.addTab(mcp_tab, "MCP")
+
+        # Wire live refresh
+        self.mcp_expose_check.toggled.connect(self._refresh_mcp_preview)
+        self.mcp_description_edit.textChanged.connect(self._refresh_mcp_preview)
+
         main_layout.addWidget(self.detail_tabs)
+
+    def _refresh_mcp_preview(self) -> None:
+        """Regenerate and display the agent contract preview for the current MCP config."""
+        conn = WebSocketConnection(
+            name="preview",
+            expose_as_mcp=self.mcp_expose_check.isChecked(),
+            mcp_description=self.mcp_description_edit.text(),
+            url=self.url_input.text(),
+        )
+        preview = build_websocket_mcp_preview(conn)
+        if preview is None:
+            self.mcp_preview_text.setPlainText(
+                "Enable 'Expose as MCP Tool' to see the generated tool contract."
+            )
+        else:
+            self.mcp_preview_text.setPlainText(format_mcp_tool_contract_preview(preview))
 
     @property
     def is_read_only(self) -> bool:
@@ -221,6 +275,10 @@ class WebSocketConnectionEditor(QWidget):
         self.params_table.set_data(conn.params or {})
         self.headers_table.set_data(conn.headers or {})
         self.subprotocols_input.setText(", ".join(conn.subprotocols or []))
+        # MCP tab
+        self.mcp_expose_check.setChecked(conn.expose_as_mcp)
+        self.mcp_description_edit.setText(conn.mcp_description or "")
+        self._refresh_mcp_preview()
 
     def get_target(self) -> HandshakeTarget:
         """Construct and return resolved HandshakeTarget from editor inputs."""

@@ -185,6 +185,12 @@ class SessionSlots:
         with self._lock:
             return len(self._active_sessions)
 
+    @property
+    def is_full(self) -> bool:
+        """Return True when all concurrency slots are occupied."""
+        with self._lock:
+            return self._max_slots > 0 and len(self._active_sessions) >= self._max_slots
+
     def is_holding_slot(self, session_id: str) -> bool:
         with self._lock:
             return session_id in self._active_sessions

@@ -5,7 +5,7 @@ import errno
 import logging
 import sys
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import List, Optional
 
 import uvicorn
@@ -24,12 +24,15 @@ from pypost.core.server_bind import (
 )
 from pypost.core.template_service import TemplateService
 from pypost.models.models import RequestData
+from pypost.models.websocket import WebSocketConnection
 
 
 logger = logging.getLogger(__name__)
 
 
-def mcp_tools_signature(tools: List[RequestData]) -> tuple[tuple[str, str], ...]:
+def mcp_tools_signature(
+    tools: Sequence[RequestData | WebSocketConnection],
+) -> tuple[tuple[str, str], ...]:
     """Stable fingerprint of exposed MCP tools for change detection."""
     exposed = ((req.id, req.name) for req in tools if req.expose_as_mcp)
     return tuple(sorted(exposed))
@@ -103,7 +106,12 @@ class MCPServerManager(QObject):
         self._hidden_keys_supplier = supplier
         self._impl.set_hidden_keys_supplier(supplier)
 
-    def start_server(self, port: int, tools: List[RequestData], host: str = "127.0.0.1"):
+    def start_server(
+        self,
+        port: int,
+        tools: Sequence[RequestData | WebSocketConnection],
+        host: str = "127.0.0.1",
+    ):
         if self.is_running():
             self.stop_server()
 

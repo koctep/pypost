@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Protocol, runtime_checkable
@@ -40,7 +40,7 @@ class HandshakeTarget:
     """Resolved parameters required to initiate a WebSocket handshake."""
 
     url: str
-    headers: dict[str, str]
+    headers: dict[str, str] = field(default_factory=dict)
     subprotocols: tuple[str, ...] = ()
     max_incoming_message_bytes: int = 16 * 1024 * 1024
     verify_tls: bool = True

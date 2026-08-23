@@ -25,6 +25,7 @@ conventions.
 1. [WebSocket Multi-Format Composer, Saved Presets, and Sequence Runner (PYPOST-1134)](websocket_composer_presets_sequences.md)
 1. [WebSocket Environments, Templating, and Secret Masking (PYPOST-1135)](websocket_environments_templating_and_masking.md)
 1. [WebSocket Settings, Session Ceiling, Metrics, and Logging (PYPOST-1136)](websocket_settings_session_ceiling_and_metrics.md)
+1. [Bounded MCP WebSocket Probe Tool (PYPOST-1137)](websocket_mcp_probe_tool.md)
 1. [TemplateService — central variable substitution](template_service.md)
 1. [Template Expression Functions and Integer Conversion (PYPOST-450, PYPOST-1037, PYPOST-1038)](template_expression_functions.md)
 1. [Variable Propagation](variable_propagation.md)
@@ -103,6 +104,7 @@ conventions.
 1. [CI-safe Jira MCP collection e2e (PYPOST-1053)](jira_mcp_collection_e2e.md)
 1. [Inbound MCP Trust Model (PYPOST-705)](mcp_trust_model.md)
 1. [MCP Secrets Policy](mcp_secrets_policy.md)
+1. [Bounded MCP WebSocket Probe Tool (PYPOST-1137)](websocket_mcp_probe_tool.md)
 1. [UI Action Tools — out-of-process packaging (PYPOST-918)](ui_actions.md)
 1. [jira-mcp example fixtures](
    testing.md#example-fixtures-contract-pypost-1017--pypost-1026--pypost-1047--pypost-1028--pypost-1048--pypost-1050--pypost-1056)

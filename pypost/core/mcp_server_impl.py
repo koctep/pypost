@@ -4,7 +4,7 @@ import json
 import logging
 import time
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Dict, List
 
 from starlette.applications import Starlette
@@ -31,7 +31,14 @@ from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.execute_request_protocol import ExecuteRequestProtocol
 from pypost.core.request_service import ExecutionResult, RequestService
 from pypost.core.template_service import TemplateService
+from pypost.core.websocket_mcp_tools import (
+    build_websocket_mcp_tool_schema,
+    execute_websocket_probe,
+)
 from pypost.models.models import RequestData
+from pypost.models.settings import AppSettings
+from pypost.models.websocket import WebSocketConnection
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +66,7 @@ def format_structured_tool_result(
     hidden_keys: set[str] | None = None,
 ) -> str:
     """Serialize ExecutionResult as agent-facing JSON (status, error, body, optional logs)."""
-    env = env_vars or {}
-    hidden = hidden_keys or set()
+    env, hidden = env_vars or {}, hidden_keys or set()
     body = McpResponseSanitizer.sanitize_body(
         result.response.body, env_vars=env, hidden_keys=hidden
     )
@@ -78,9 +84,7 @@ def format_structured_tool_result(
         payload["error_message"] = result.execution_error.message
         if result.execution_error.detail is not None:
             payload["error_detail"] = McpResponseSanitizer.sanitize_text(
-                result.execution_error.detail,
-                env_vars=env,
-                hidden_keys=hidden,
+                result.execution_error.detail, env_vars=env, hidden_keys=hidden
             )
     return json.dumps(payload, ensure_ascii=False)
 
@@ -94,12 +98,14 @@ class MCPServerImpl:
         variable_supplier: Callable[[], dict[str, str]] | None = None,
         hidden_keys_supplier: Callable[[], set[str]] | None = None,
         activity_log: McpActivityLog | None = None,
+        settings: AppSettings | None = None,
     ):
         self.server = Server(name)
-        self.tools_map: Dict[str, RequestData] = {}
+        self.tools_map: Dict[str, RequestData | WebSocketConnection] = {}
         self._metrics = resolve_metrics(metrics)
         self._activity_log = activity_log
         self._template_service = template_service
+        self._settings = settings
         self._variable_supplier = variable_supplier or (lambda: {})
         self._hidden_keys_supplier = hidden_keys_supplier or (lambda: set())
         self._call_tool_semaphore = asyncio.Semaphore(DEFAULT_MAX_CONCURRENT_MCP_CALLS)
@@ -114,15 +120,15 @@ class MCPServerImpl:
 
     async def list_tools(self) -> List[Tool]:
         tools = []
-        for name, req in self.tools_map.items():
-            schema = self._generate_schema(req)
-            tools.append(
-                Tool(
-                    name=name,
-                    description=tool_description(req),
-                    inputSchema=schema,
+        for name, item in self.tools_map.items():
+            if isinstance(item, WebSocketConnection):
+                schema = build_websocket_mcp_tool_schema(
+                    item, self._template_service, self._hidden_keys_supplier()
                 )
-            )
+                desc = item.mcp_description or f"Sample real-time stream from {item.name}"
+            else:
+                schema, desc = self._generate_schema(item), tool_description(item)
+            tools.append(Tool(name=name, description=desc, inputSchema=schema))
         if self._activity_log is not None:
             self._activity_log.append(McpActivityEntry.new_list_tools(len(tools)))
         return tools
@@ -135,7 +141,24 @@ class MCPServerImpl:
         if name not in self.tools_map:
             raise ValueError(f"Tool {name} not found")
 
-        request_data = self.tools_map[name]
+        item = self.tools_map[name]
+
+        # ── WebSocket probe dispatch ──────────────────────────────────────────
+        if isinstance(item, WebSocketConnection):
+            return await run_in_threadpool(
+                execute_websocket_probe,
+                item,
+                arguments,
+                env_vars=self._variable_supplier(),
+                hidden_keys=self._hidden_keys_supplier(),
+                settings=self._settings,
+                template_service=self._template_service,
+                metrics=self._metrics,
+                activity_log=self._activity_log,
+            )
+
+        # ── HTTP request dispatch ─────────────────────────────────────────────
+        request_data: RequestData = item  # type: ignore[assignment]
         mcp_arg_count = len(arguments or {})
         started = time.perf_counter()
 
@@ -156,49 +179,33 @@ class MCPServerImpl:
             output_text = format_structured_tool_result(
                 result, env_vars=env_vars, hidden_keys=hidden_keys
             )
-            duration_ms = (time.perf_counter() - started) * 1000.0
             has_error = _tool_result_has_error(result)
             outcome = "error" if has_error else "success"
-
-            self._metrics.track_mcp_response_sent(request_data.method, outcome)
-            self._metrics.track_mcp_tool_call_duration(
-                request_data.method, outcome, duration_ms / 1000.0
-            )
-
-            if self._activity_log is not None:
-                detail = None
-                if result.execution_error is not None:
-                    detail = result.execution_error.message
-                self._activity_log.append(
-                    McpActivityEntry.new_call_tool(
-                        name,
-                        outcome=outcome,
-                        mcp_arg_count=mcp_arg_count,
-                        http_status=result.response.status_code,
-                        detail=detail,
-                        duration_ms=duration_ms,
-                    )
-                )
-
-            return [TextContent(type="text", text=output_text)]
+            detail = result.execution_error.message if result.execution_error else None
+            http_status = result.response.status_code
         except Exception as e:
-            duration_ms = (time.perf_counter() - started) * 1000.0
-            # Track MCP response error
-            self._metrics.track_mcp_response_sent(request_data.method, "error")
-            self._metrics.track_mcp_tool_call_duration(
-                request_data.method, "error", duration_ms / 1000.0
-            )
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry.new_call_tool(
-                        name,
-                        outcome="error",
-                        mcp_arg_count=mcp_arg_count,
-                        detail=str(e),
-                        duration_ms=duration_ms,
-                    )
+            output_text = f"Error executing request: {str(e)}"
+            outcome = "error"
+            detail = str(e)
+            http_status = None
+
+        duration_ms = (time.perf_counter() - started) * 1000.0
+        self._metrics.track_mcp_response_sent(request_data.method, outcome)
+        self._metrics.track_mcp_tool_call_duration(
+            request_data.method, outcome, duration_ms / 1000.0
+        )
+        if self._activity_log is not None:
+            self._activity_log.append(
+                McpActivityEntry.new_call_tool(
+                    name,
+                    outcome=outcome,
+                    mcp_arg_count=mcp_arg_count,
+                    http_status=http_status,
+                    detail=detail,
+                    duration_ms=duration_ms,
                 )
-            return [TextContent(type="text", text=f"Error executing request: {str(e)}")]
+            )
+        return [TextContent(type="text", text=output_text)]
 
     def set_variable_supplier(
         self, supplier: Callable[[], dict[str, str]] | None
@@ -217,8 +224,7 @@ class MCPServerImpl:
         hidden_keys: set[str],
         request_data: RequestData | None = None,
     ) -> dict[str, Any]:
-        merged_args = dict(mcp_args or {})
-        defaults_applied = 0
+        merged_args, defaults_applied = dict(mcp_args or {}), 0
         if request_data is not None and request_data.mcp_params:
             for param_name, param_spec in request_data.mcp_params.items():
                 if (
@@ -234,13 +240,8 @@ class MCPServerImpl:
                         param_name,
                         param_spec.default,
                     )
-        # Note: mcp_arg_count reflects the total post-default-injection argument
-        # count (len(merged_args)); the raw caller-supplied count can be recovered via
-        # (mcp_arg_count - defaults_applied_count).
         counts = McpSecretsPolicy.safe_execution_log_fields(
-            len(env_vars),
-            len(hidden_keys),
-            len(merged_args),
+            len(env_vars), len(hidden_keys), len(merged_args)
         )
         logger.debug(
             "mcp_execution_variables_merged env_var_count=%d "
@@ -280,12 +281,13 @@ class MCPServerImpl:
             request_data, variables, hidden_keys=hidden_keys
         )
 
-    def register_tools(self, requests: List[RequestData]):
+    def register_tools(self, requests: Sequence[RequestData | WebSocketConnection]):
+        """Register HTTP requests and WebSocket connections as MCP tools."""
         self.tools_map.clear()
-        for req in requests:
-            if req.expose_as_mcp:
-                tool_name = normalize_mcp_tool_name(req.name)
-                self.tools_map[tool_name] = req
+        for item in requests:
+            if item.expose_as_mcp:
+                pfx = "ws_" if isinstance(item, WebSocketConnection) else ""
+                self.tools_map[f"{pfx}{normalize_mcp_tool_name(item.name)}"] = item
 
     def _generate_schema(self, req: RequestData) -> dict:
         hidden_keys = self._hidden_keys_supplier()
