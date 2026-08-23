@@ -68,6 +68,33 @@ WS_STREAM_DETAIL_WRAP_BUTTON = "pypost_ws_stream_detail_wrap_button"
 WS_STREAM_DETAIL_HEX_BUTTON = "pypost_ws_stream_detail_hex_button"
 WS_STREAM_FOLLOW_TAIL_BADGE = "pypost_ws_stream_follow_tail_badge"
 
+# WebSocket composer & presets surfaces (PYPOST-1134 / WS-6).
+WS_COMPOSER_FORMAT_COMBO = "pypost_ws_composer_format_combo"
+WS_PRESET_COMBO = "pypost_ws_preset_combo"
+WS_PRESET_SAVE_BUTTON = "pypost_ws_preset_save_button"
+WS_SEQUENCE_COMBO = "pypost_ws_sequence_combo"
+WS_SEQUENCE_RUN_BUTTON = "pypost_ws_sequence_run_button"
+WS_SEQUENCE_STOP_BUTTON = "pypost_ws_sequence_stop_button"
+WS_MESSAGES_TAB = "pypost_ws_messages_tab"
+WS_PRESETS_LIST = "pypost_ws_presets_list"
+WS_PRESET_NAME_INPUT = "pypost_ws_preset_name_input"
+WS_PRESET_FORMAT_COMBO = "pypost_ws_preset_format_combo"
+WS_PRESET_PAYLOAD_EDIT = "pypost_ws_preset_payload_edit"
+WS_PRESET_NEW_BUTTON = "pypost_ws_preset_new_button"
+WS_PRESET_DUPLICATE_BUTTON = "pypost_ws_preset_duplicate_button"
+WS_PRESET_DELETE_BUTTON = "pypost_ws_preset_delete_button"
+WS_PRESET_LOAD_BUTTON = "pypost_ws_preset_load_button"
+WS_PRESET_SEND_BUTTON = "pypost_ws_preset_send_button"
+WS_SEQUENCES_LIST = "pypost_ws_sequences_list"
+WS_SEQUENCE_NEW_BUTTON = "pypost_ws_sequence_new_button"
+WS_SEQUENCE_DUPLICATE_BUTTON = "pypost_ws_sequence_duplicate_button"
+WS_SEQUENCE_DELETE_BUTTON = "pypost_ws_sequence_delete_button"
+WS_SEQUENCE_STEPS_TABLE = "pypost_ws_sequence_steps_table"
+WS_SEQUENCE_STEP_ADD_BUTTON = "pypost_ws_sequence_step_add_button"
+WS_SEQUENCE_STEP_REMOVE_BUTTON = "pypost_ws_sequence_step_remove_button"
+WS_SEQUENCE_STEP_UP_BUTTON = "pypost_ws_sequence_step_up_button"
+WS_SEQUENCE_STEP_DOWN_BUTTON = "pypost_ws_sequence_step_down_button"
+
 KEY_WIDGET_IDS = (
     MAIN_WINDOW,
     COLLECTION_TREE,
@@ -111,6 +138,31 @@ KEY_WIDGET_IDS = (
     WS_STREAM_DETAIL_WRAP_BUTTON,
     WS_STREAM_DETAIL_HEX_BUTTON,
     WS_STREAM_FOLLOW_TAIL_BADGE,
+    WS_COMPOSER_FORMAT_COMBO,
+    WS_PRESET_COMBO,
+    WS_PRESET_SAVE_BUTTON,
+    WS_SEQUENCE_COMBO,
+    WS_SEQUENCE_RUN_BUTTON,
+    WS_SEQUENCE_STOP_BUTTON,
+    WS_MESSAGES_TAB,
+    WS_PRESETS_LIST,
+    WS_PRESET_NAME_INPUT,
+    WS_PRESET_FORMAT_COMBO,
+    WS_PRESET_PAYLOAD_EDIT,
+    WS_PRESET_NEW_BUTTON,
+    WS_PRESET_DUPLICATE_BUTTON,
+    WS_PRESET_DELETE_BUTTON,
+    WS_PRESET_LOAD_BUTTON,
+    WS_PRESET_SEND_BUTTON,
+    WS_SEQUENCES_LIST,
+    WS_SEQUENCE_NEW_BUTTON,
+    WS_SEQUENCE_DUPLICATE_BUTTON,
+    WS_SEQUENCE_DELETE_BUTTON,
+    WS_SEQUENCE_STEPS_TABLE,
+    WS_SEQUENCE_STEP_ADD_BUTTON,
+    WS_SEQUENCE_STEP_REMOVE_BUTTON,
+    WS_SEQUENCE_STEP_UP_BUTTON,
+    WS_SEQUENCE_STEP_DOWN_BUTTON,
 )
 
 

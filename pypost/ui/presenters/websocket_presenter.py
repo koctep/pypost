@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
+from pypost.core.qt.websocket_sequence_runner import WebSocketSequenceRunner
 from pypost.core.qt.websocket_session import WebSocketSessionController
+from pypost.core.websocket_sequence import compile_sequence_plan
 from pypost.core.websocket_session_policy import (
     HeartbeatConfig,
     ReconnectConfig,
@@ -42,6 +44,7 @@ class WebSocketPresenter(QObject):
     def __init__(
         self,
         connection: WebSocketConnection,
+        settings: Optional[Any] = None,
         session_controller: Optional[WebSocketSessionController] = None,
         stream_model: Optional[StreamListModel] = None,
         env_vars: Optional[dict[str, str]] = None,
@@ -50,11 +53,13 @@ class WebSocketPresenter(QObject):
     ) -> None:
         super().__init__(parent)
         self.connection: WebSocketConnection = connection
-        self._session_controller: WebSocketSessionController = (
-            session_controller
-            if session_controller is not None
-            else WebSocketSessionController(self)
-        )
+        self.settings: Optional[Any] = settings
+        if isinstance(session_controller, WebSocketSessionController):
+            self._session_controller = session_controller
+        elif isinstance(settings, WebSocketSessionController):
+            self._session_controller = settings
+        else:
+            self._session_controller = WebSocketSessionController(self)
         self._stream_model: StreamListModel = (
             stream_model if stream_model is not None else StreamListModel(parent=self)
         )
@@ -71,12 +76,26 @@ class WebSocketPresenter(QObject):
         self._flush_timer.setSingleShot(True)
         self._flush_timer.timeout.connect(self._on_flush_timer)
 
+        self._sequence_runner = WebSocketSequenceRunner(self)
         self._wire_controller_signals()
+
+    @property
+    def sequence_runner(self) -> WebSocketSequenceRunner:
+        """Return the backing WebSocketSequenceRunner."""
+        return self._sequence_runner
 
     @property
     def state(self) -> SessionState:
         """Current session lifecycle state."""
         return self._current_state
+
+    @property
+    def _state(self) -> SessionState:
+        return self._current_state
+
+    @_state.setter
+    def _state(self, val: SessionState) -> None:
+        self._current_state = val
 
     @property
     def stream_model(self) -> StreamListModel:
@@ -88,11 +107,18 @@ class WebSocketPresenter(QObject):
         """Return the underlying WebSocketSessionController."""
         return self._session_controller
 
+    @property
+    def _controller(self) -> WebSocketSessionController:
+        return self._session_controller
+
+    @_controller.setter
+    def _controller(self, val: WebSocketSessionController) -> None:
+        self._session_controller = val
+
     def set_tab(self, tab: WebSocketTab) -> None:
         """Bind the UI tab widget to this presenter."""
         self._tab = tab
         tab.connect_btn.clicked.connect(self._on_connect_clicked)
-        tab.send_btn.clicked.connect(self.handle_send_message)
         self._sync_ui_state(self.state, None)
 
     def _wire_controller_signals(self) -> None:
@@ -156,17 +182,44 @@ class WebSocketPresenter(QObject):
             self.handle_connect()
 
     def handle_send_message(self) -> None:
-        """Transmit the text in the message composer over the active connection."""
+        """Transmit the message in the composer over the active connection."""
         if self.state != SessionState.OPEN:
             logger.warning("websocket_send_blocked_not_open state=%s", self.state.value)
             return
 
         if self._tab is not None:
-            text = self._tab.composer_edit.toPlainText()
-            if text:
-                logger.debug("websocket_sending_message length=%d", len(text))
-                self._session_controller.send_text(text)
-                self._tab.composer_edit.setPlainText("")
+            if hasattr(self._tab, "composer") and self._tab.composer:
+                success = self._tab.composer.send_current_payload()
+                if success:
+                    self._tab.composer.set_payload("")
+            elif hasattr(self._tab, "composer_edit"):
+                text = self._tab.composer_edit.toPlainText()
+                if text:
+                    logger.debug("websocket_sending_message length=%d", len(text))
+                    self._session_controller.send_text(text)
+                    self._tab.composer_edit.setPlainText("")
+
+    def run_sequence(self, sequence_id: str) -> bool:
+        """Execute a message sequence on the active session."""
+        if self.state != SessionState.OPEN:
+            logger.warning("run_sequence_blocked_not_open state=%s", self.state.value)
+            return False
+        if not self.connection or not self.connection.sequences:
+            return False
+        seq = next((s for s in self.connection.sequences if s.id == sequence_id), None)
+        if not seq:
+            logger.warning("run_sequence_not_found seq_id=%s", sequence_id)
+            return False
+        plan = compile_sequence_plan(seq, self.connection.presets)
+        return self._sequence_runner.run_sequence(
+            plan=plan,
+            controller=self._session_controller,
+            env_vars=self._env_vars,
+        )
+
+    def stop_sequence(self) -> None:
+        """Cancel any active sequence run."""
+        self._sequence_runner.stop()
 
     def set_variables(self, variables: dict[str, str]) -> None:
         """Update active environment variables for secret masking."""

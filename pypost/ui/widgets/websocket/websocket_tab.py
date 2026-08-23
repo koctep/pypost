@@ -12,23 +12,21 @@ from typing import TYPE_CHECKING, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QLabel,
     QPushButton,
     QSplitter,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
 from pypost.models.websocket import WebSocketConnection
 from pypost.ui.widget_ids import (
-    WS_COMPOSER_EDIT,
     WS_CONNECT_BUTTON,
-    WS_SEND_MESSAGE_BUTTON,
     WS_TAB_PAGE,
     set_widget_id,
 )
+from pypost.ui.widgets.websocket.composer import WebSocketComposer
 from pypost.ui.widgets.websocket.connection_editor import WebSocketConnectionEditor
+from pypost.ui.widgets.websocket.presets_panel import WebSocketPresetsPanel
 from pypost.ui.widgets.websocket.state_badge import WebSocketStateBadge
 from pypost.ui.widgets.websocket.stream_view import WebSocketStreamView
 
@@ -92,30 +90,19 @@ class WebSocketTab(QWidget):
         )
         v_splitter.addWidget(self._stream_view)
 
-        # Bottom section: Plain text message composer
-        composer_container = QWidget(v_splitter)
-        composer_layout = QVBoxLayout(composer_container)
-        composer_layout.setContentsMargins(0, 0, 0, 0)
-        composer_layout.setSpacing(4)
+        # Bottom section: Multi-format message composer
+        self._composer = WebSocketComposer(presenter=self.presenter, parent=v_splitter)
+        self.composer_edit = self._composer.payload_edit
+        self.send_btn = self._composer.send_btn
+        v_splitter.addWidget(self._composer)
 
-        composer_header_row = QHBoxLayout()
-        composer_label = QLabel("Message Composer (Plain Text):", composer_container)
-        composer_header_row.addWidget(composer_label)
-        composer_header_row.addStretch()
-
-        self.send_btn = QPushButton("Send Message", composer_container)
-        set_widget_id(self.send_btn, WS_SEND_MESSAGE_BUTTON)
-        self.send_btn.setEnabled(False)
-        composer_header_row.addWidget(self.send_btn)
-
-        composer_layout.addLayout(composer_header_row)
-
-        self.composer_edit = QTextEdit(composer_container)
-        set_widget_id(self.composer_edit, WS_COMPOSER_EDIT)
-        self.composer_edit.setPlaceholderText("Enter message text to send...")
-        composer_layout.addWidget(self.composer_edit)
-
-        v_splitter.addWidget(composer_container)
+        # Messages sub-tab in connection editor detail tabs
+        self._presets_panel = WebSocketPresetsPanel(
+            presenter=self.presenter,
+            composer=self._composer,
+            parent=self._connection_editor.detail_tabs,
+        )
+        self._connection_editor.detail_tabs.addTab(self._presets_panel, "Messages")
 
         v_splitter.setSizes([200, 300, 150])
         main_layout.addWidget(v_splitter)
@@ -134,3 +121,13 @@ class WebSocketTab(QWidget):
     def stream_view(self) -> WebSocketStreamView:
         """Return the embedded WebSocketStreamView widget."""
         return self._stream_view
+
+    @property
+    def composer(self) -> WebSocketComposer:
+        """Return the embedded WebSocketComposer widget."""
+        return self._composer
+
+    @property
+    def presets_panel(self) -> WebSocketPresetsPanel:
+        """Return the embedded WebSocketPresetsPanel widget."""
+        return self._presets_panel

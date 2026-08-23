@@ -69,6 +69,8 @@ flowchart TB
 | `WebSocketStateBadge` | `pypost/ui/widgets/websocket/state_badge.py` | Multi-modal status indicator rendering state glyphs, status text, active subprotocol, and message counts. |
 | `WebSocketConnectionEditor` | `pypost/ui/widgets/websocket/connection_editor.py` | URL entry, query parameter table, request header table, subprotocol inputs, lock notice banner, and dynamic connect button. |
 | `WebSocketStreamView` | `pypost/ui/widgets/websocket/stream_view.py` | Virtualized stream inspector with filtering, search, follow-tail, drop notice banner, and detail pane. See [websocket_stream_inspector.md](websocket_stream_inspector.md). |
+| `WebSocketComposer` | `pypost/ui/widgets/websocket/composer.py` | Multi-format message authoring with real-time validation and quick preset/sequence controls. See [websocket_composer_presets_sequences.md](websocket_composer_presets_sequences.md). |
+| `WebSocketPresetsPanel` | `pypost/ui/widgets/websocket/presets_panel.py` | Messages sub-tab in `WS_DETAIL_TABS` for saved message presets and multi-step sequence management. See [websocket_composer_presets_sequences.md](websocket_composer_presets_sequences.md). |
 | `StreamListModel` | `pypost/ui/widgets/websocket/stream_model.py` | `QAbstractListModel` backing the stream view with 33ms batching, capacity eviction handling, and secret redaction. |
 | `TabsPresenter` | `pypost/ui/presenters/tabs_presenter.py` | Manages tab creation, focus deduplication, tab closure with clean transport teardown, and workspace restoration. |
 | `Widget IDs` | `pypost/ui/widget_ids.py` | Stable `WS_*` identifier constants for automated agent testing and UI hierarchy discovery. |

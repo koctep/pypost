@@ -87,11 +87,20 @@ def validate_format(data: str, format: WsMessageFormat | str) -> tuple[bool, str
         except Exception as exc:
             return False, f"Invalid JSON: {exc}"
     if fmt == WsMessageFormat.HEX:
+        clean = data.strip().replace(" ", "")
+        if len(clean) % 2 != 0:
+            return (
+                False,
+                (
+                    "Invalid hexadecimal payload: odd length "
+                    "(must contain an even number of hex digits)"
+                ),
+            )
         try:
-            bytes.fromhex(data.strip())
+            bytes.fromhex(clean)
             return True, None
         except ValueError:
-            return False, "Invalid hexadecimal payload: odd number of digits or non-hex characters"
+            return False, "Invalid hexadecimal payload: non-hex characters"
     if fmt == WsMessageFormat.BASE64:
         try:
             base64.b64decode(data.strip(), validate=True)
