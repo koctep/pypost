@@ -42,6 +42,9 @@ class MetricsManager(MetricsLifecycle):
     def registry(self):
         return self._registry.registry
 
+    def __getattr__(self, name: str):
+        return getattr(self._registry, name)
+
     def start_server(self, host: str, port: int) -> None:
         self._server.start_server(host, port)
 

@@ -58,6 +58,12 @@ class OtelMetricsTracker:
             callbacks=[self._observe_mcp_server_instance_counts],
             description="Number of configured MCP server instances by lifecycle state",
         )
+        self._websocket_active_sessions_count = 0
+        self._meter.create_observable_gauge(
+            "websocket_active_sessions",
+            callbacks=[self._observe_websocket_active_sessions],
+            description="Instantaneous number of active concurrent WebSocket sessions",
+        )
 
     def _observe_mcp_server_up(self, options) -> Iterator[Observation]:
         yield Observation(self._mcp_server_ready)
@@ -65,6 +71,9 @@ class OtelMetricsTracker:
     def _observe_mcp_server_instance_counts(self, options) -> Iterator[Observation]:
         for state, count in self._mcp_server_instance_counts.items():
             yield Observation(count, attributes={"state": state})
+
+    def _observe_websocket_active_sessions(self, options) -> Iterator[Observation]:
+        yield Observation(self._websocket_active_sessions_count)
 
     def _init_instruments(self) -> None:
         meter = self._meter
@@ -212,6 +221,39 @@ class OtelMetricsTracker:
             description=(
                 "Number of encryption/decryption errors in environment storage flow"
             ),
+        )
+        self._websocket_sessions_opened = meter.create_counter(
+            "websocket_sessions_opened_total",
+            description="Number of WebSocket sessions opened",
+        )
+        self._websocket_sessions_closed = meter.create_counter(
+            "websocket_sessions_closed_total",
+            description="Number of WebSocket sessions closed",
+        )
+        self._websocket_messages = meter.create_counter(
+            "websocket_messages_total",
+            description="Number of WebSocket messages transferred",
+        )
+        self._websocket_message_bytes = meter.create_counter(
+            "websocket_message_bytes_total",
+            description="Total volume of WebSocket payload bytes transferred",
+        )
+        self._websocket_stream_entries_dropped = meter.create_counter(
+            "websocket_stream_entries_dropped_total",
+            description="Number of WebSocket stream entries dropped due to buffer bounds",
+        )
+        self._websocket_reconnect_attempts = meter.create_counter(
+            "websocket_reconnect_attempts_total",
+            description="Number of WebSocket automatic reconnect attempts",
+        )
+        self._websocket_session_start_refused = meter.create_counter(
+            "websocket_session_start_refused_total",
+            description="Number of WebSocket session start attempts refused by concurrency policy",
+        )
+        self._websocket_probe_duration_seconds = meter.create_histogram(
+            "websocket_probe_duration_seconds",
+            description="Duration of MCP WebSocket probe executions in seconds",
+            unit="s",
         )
 
     def track_gui_send_click(self) -> None:
@@ -364,6 +406,39 @@ class OtelMetricsTracker:
     def track_environment_encryption_error(self, stage: str, reason: str) -> None:
         self._environment_encryption_errors_total.add(
             1, {"stage": stage, "reason": reason}
+        )
+
+    def track_websocket_session_opened(self, outcome: str) -> None:
+        self._websocket_sessions_opened.add(1, {"outcome": outcome})
+
+    def track_websocket_session_closed(self, reason: str) -> None:
+        self._websocket_sessions_closed.add(1, {"reason": reason})
+
+    def track_websocket_message(self, direction: str, kind: str) -> None:
+        self._websocket_messages.add(1, {"direction": direction, "kind": kind})
+
+    def track_websocket_message_bytes(self, direction: str, byte_count: int) -> None:
+        self._websocket_message_bytes.add(byte_count, {"direction": direction})
+
+    def track_websocket_stream_entries_dropped(
+        self, reason: str, count: int = 1
+    ) -> None:
+        self._websocket_stream_entries_dropped.add(count, {"reason": reason})
+
+    def track_websocket_reconnect_attempt(self, outcome: str) -> None:
+        self._websocket_reconnect_attempts.add(1, {"outcome": outcome})
+
+    def set_websocket_active_sessions(self, count: int) -> None:
+        self._websocket_active_sessions_count = count
+
+    def track_websocket_session_start_refused(self, reason: str) -> None:
+        self._websocket_session_start_refused.add(1, {"reason": reason})
+
+    def track_websocket_probe_duration(
+        self, outcome: str, duration_seconds: float
+    ) -> None:
+        self._websocket_probe_duration_seconds.record(
+            duration_seconds, {"outcome": outcome}
         )
 
 

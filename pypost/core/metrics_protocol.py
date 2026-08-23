@@ -96,6 +96,28 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_environment_encryption_error(self, stage: str, reason: str) -> None: ...
 
+    def track_websocket_session_opened(self, outcome: str) -> None: ...
+
+    def track_websocket_session_closed(self, reason: str) -> None: ...
+
+    def track_websocket_message(self, direction: str, kind: str) -> None: ...
+
+    def track_websocket_message_bytes(self, direction: str, byte_count: int) -> None: ...
+
+    def track_websocket_stream_entries_dropped(
+        self, reason: str, count: int = 1
+    ) -> None: ...
+
+    def track_websocket_reconnect_attempt(self, outcome: str) -> None: ...
+
+    def set_websocket_active_sessions(self, count: int) -> None: ...
+
+    def track_websocket_session_start_refused(self, reason: str) -> None: ...
+
+    def track_websocket_probe_duration(
+        self, outcome: str, duration_seconds: float
+    ) -> None: ...
+
 
 class NullMetrics:
     """No-op metrics tracker — safe default when observability is not injected."""
@@ -218,6 +240,37 @@ class NullMetrics:
         return None
 
     def track_environment_encryption_error(self, stage: str, reason: str) -> None:
+        return None
+
+    def track_websocket_session_opened(self, outcome: str) -> None:
+        return None
+
+    def track_websocket_session_closed(self, reason: str) -> None:
+        return None
+
+    def track_websocket_message(self, direction: str, kind: str) -> None:
+        return None
+
+    def track_websocket_message_bytes(self, direction: str, byte_count: int) -> None:
+        return None
+
+    def track_websocket_stream_entries_dropped(
+        self, reason: str, count: int = 1
+    ) -> None:
+        return None
+
+    def track_websocket_reconnect_attempt(self, outcome: str) -> None:
+        return None
+
+    def set_websocket_active_sessions(self, count: int) -> None:
+        return None
+
+    def track_websocket_session_start_refused(self, reason: str) -> None:
+        return None
+
+    def track_websocket_probe_duration(
+        self, outcome: str, duration_seconds: float
+    ) -> None:
         return None
 
 

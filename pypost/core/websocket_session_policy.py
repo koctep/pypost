@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 import random
+import threading
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -150,3 +151,98 @@ class WebSocketSessionPolicy:
             config.max_attempts,
         )
         return True
+
+
+@dataclass(frozen=True)
+class SlotAcquireResult:
+    """Result of an atomic session slot acquisition attempt."""
+
+    allowed: bool
+    reason: Optional[str] = None  # "max_concurrent" | "disabled" | None
+    active_count: int = 0
+    limit: int = 8
+
+
+class SessionSlots:
+    """Thread-safe process-wide concurrency ceiling manager for WebSocket sessions."""
+
+    def __init__(self, max_slots: int = 8) -> None:
+        self._max_slots: int = max(0, max_slots)
+        self._active_sessions: set[str] = set()
+        self._lock: threading.Lock = threading.Lock()
+
+    @property
+    def max_slots(self) -> int:
+        with self._lock:
+            return self._max_slots
+
+    def set_max_slots(self, limit: int) -> None:
+        with self._lock:
+            self._max_slots = max(0, limit)
+
+    @property
+    def active_count(self) -> int:
+        with self._lock:
+            return len(self._active_sessions)
+
+    def is_holding_slot(self, session_id: str) -> bool:
+        with self._lock:
+            return session_id in self._active_sessions
+
+    def acquire(self, session_id: str) -> SlotAcquireResult:
+        """Atomically attempt to acquire a session concurrency slot."""
+        with self._lock:
+            if self._max_slots == 0:
+                return SlotAcquireResult(
+                    allowed=False,
+                    reason="disabled",
+                    active_count=len(self._active_sessions),
+                    limit=0,
+                )
+            if session_id in self._active_sessions:
+                return SlotAcquireResult(
+                    allowed=True,
+                    reason=None,
+                    active_count=len(self._active_sessions),
+                    limit=self._max_slots,
+                )
+            if len(self._active_sessions) >= self._max_slots:
+                return SlotAcquireResult(
+                    allowed=False,
+                    reason="max_concurrent",
+                    active_count=len(self._active_sessions),
+                    limit=self._max_slots,
+                )
+            self._active_sessions.add(session_id)
+            return SlotAcquireResult(
+                allowed=True,
+                reason=None,
+                active_count=len(self._active_sessions),
+                limit=self._max_slots,
+            )
+
+    def release(self, session_id: str) -> bool:
+        """Idempotently release a previously acquired session slot."""
+        with self._lock:
+            if session_id in self._active_sessions:
+                self._active_sessions.remove(session_id)
+                return True
+            return False
+
+    def reset(self) -> None:
+        """Reset all active slots (primarily for testing)."""
+        with self._lock:
+            self._active_sessions.clear()
+
+
+_GLOBAL_SESSION_SLOTS = SessionSlots()
+
+
+def get_session_slots() -> SessionSlots:
+    """Return the process-wide SessionSlots coordinator."""
+    return _GLOBAL_SESSION_SLOTS
+
+
+def reset_session_slots() -> None:
+    """Reset the process-wide SessionSlots coordinator state."""
+    _GLOBAL_SESSION_SLOTS.reset()

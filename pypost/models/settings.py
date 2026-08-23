@@ -5,6 +5,7 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, model_validator
 
 from pypost.models.retry import RetryPolicy
+from pypost.models.websocket import HeartbeatPolicy, ReconnectPolicy
 
 ThemeSetting = Literal["system", "light", "dark"]
 
@@ -62,6 +63,15 @@ class AppSettings(BaseModel):
     env_encryption_key_source: Optional[str] = None
     env_encryption_key_source_fallback: Optional[List[str]] = None
     max_response_bytes: int = 52_428_800
+    ws_max_stream_entries: int = 5_000
+    ws_session_memory_budget_bytes: int = 67_108_864
+    ws_max_incoming_message_bytes: int = 8_388_608
+    ws_display_truncate_bytes: int = 262_144
+    ws_default_heartbeat: HeartbeatPolicy = Field(default_factory=HeartbeatPolicy)
+    ws_default_reconnect: ReconnectPolicy = Field(default_factory=ReconnectPolicy)
+    ws_mcp_probe_max_messages: int = 10
+    ws_mcp_probe_max_duration_ms: int = 10_000
+    ws_max_concurrent_sessions: int = 8
 
     @model_validator(mode="after")
     def validate_mcp_server_ports(self) -> "AppSettings":

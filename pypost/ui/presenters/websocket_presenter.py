@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any, Optional
+import uuid
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
@@ -22,6 +23,7 @@ from pypost.core.websocket_session_policy import (
     ReconnectConfig,
     SessionState,
     StateDetail,
+    get_session_slots,
 )
 from pypost.core.websocket_stream import build_stream_entry
 from pypost.core.websocket_transport_protocol import HandshakeTarget
@@ -78,10 +80,15 @@ class WebSocketPresenter(QObject):
         )
         self._tab: Optional[WebSocketTab] = None
         self._current_state: SessionState = self._session_controller.state
+        self._session_id: str = f"sess_{uuid.uuid4().hex[:8]}"
 
         self._pending_entries: list = []
         self._next_seq: int = 1
-        self._truncate_bytes: int = 262_144
+        self._truncate_bytes: int = (
+            getattr(settings, "ws_display_truncate_bytes", 262_144)
+            if settings is not None
+            else 262_144
+        )
 
         self._flush_timer = QTimer(self)
         self._flush_timer.setSingleShot(True)
@@ -166,6 +173,41 @@ class WebSocketPresenter(QObject):
             self.handle_disconnect()
             return
 
+        slots = get_session_slots()
+        if self.settings is not None and hasattr(self.settings, "ws_max_concurrent_sessions"):
+            slots.set_max_slots(self.settings.ws_max_concurrent_sessions)
+
+        acquire_result = slots.acquire(self._session_id)
+        if not acquire_result.allowed:
+            profile_id = self.connection.id if self.connection and self.connection.id else "unknown"
+            logger.warning(
+                "websocket_session_refused profile_id=%s reason=%s active=%d limit=%d",
+                profile_id,
+                acquire_result.reason,
+                acquire_result.active_count,
+                acquire_result.limit,
+            )
+            if self._metrics is not None:
+                if hasattr(self._metrics, "track_websocket_session_start_refused"):
+                    self._metrics.track_websocket_session_start_refused(
+                        reason=acquire_result.reason or "max_concurrent"
+                    )
+            if acquire_result.reason == "disabled":
+                notice_msg = (
+                    f"WebSocket connections are disabled by operator policy "
+                    f"(ws_max_concurrent_sessions={acquire_result.limit})"
+                )
+            else:
+                notice_msg = (
+                    f"{acquire_result.active_count} of {acquire_result.limit} "
+                    f"WebSocket sessions are already open — disconnect one to start another"
+                )
+            self._on_lifecycle_event("refused", notice_msg)
+            return
+
+        if self._metrics is not None and hasattr(self._metrics, "set_websocket_active_sessions"):
+            self._metrics.set_websocket_active_sessions(slots.active_count)
+
         if self._tab is not None:
             raw_url = self._tab.connection_editor.url_input.text().strip()
             raw_params = self._tab.connection_editor.params_table.get_data()
@@ -199,10 +241,16 @@ class WebSocketPresenter(QObject):
 
         merged_url = _merge_url_and_params(resolved_url, resolved_params)
 
+        max_incoming = (
+            getattr(self.settings, "ws_max_incoming_message_bytes", 8_388_608)
+            if self.settings is not None
+            else 8_388_608
+        )
         target = HandshakeTarget(
             url=merged_url,
             headers=resolved_headers,
             subprotocols=resolved_subprotocols,
+            max_incoming_message_bytes=max_incoming,
         )
 
         heartbeat = (
@@ -231,12 +279,19 @@ class WebSocketPresenter(QObject):
         masked_log_url = sanitize_text(
             target.url, env_vars=self._env_vars, hidden_keys=self._hidden_keys
         )
-        logger.info("websocket_connect_initiated url=%s", masked_log_url)
+        profile_id = self.connection.id if self.connection and self.connection.id else "unknown"
+        logger.info(
+            "websocket_connect_initiated session_id=%s profile_id=%s url_masked=%s subprotocols=%d",
+            self._session_id,
+            profile_id,
+            masked_log_url,
+            len(target.subprotocols),
+        )
         self._session_controller.open(target, heartbeat=heartbeat, reconnect=reconnect)
 
     def handle_disconnect(self) -> None:
         """Disconnect or cancel the active session."""
-        logger.info("websocket_disconnect_initiated")
+        logger.info("websocket_disconnect_initiated session_id=%s", self._session_id)
         self._session_controller.close(1000, "user requested disconnect")
 
     def _on_connect_clicked(self) -> None:
@@ -309,6 +364,45 @@ class WebSocketPresenter(QObject):
         except ValueError:
             state = SessionState.IDLE
         self._current_state = state
+
+        if state in (SessionState.IDLE, SessionState.FAILED, SessionState.CLOSED):
+            slots = get_session_slots()
+            slots.release(self._session_id)
+            if self._metrics is not None and hasattr(
+                self._metrics, "set_websocket_active_sessions"
+            ):
+                self._metrics.set_websocket_active_sessions(slots.active_count)
+
+        if state == SessionState.OPEN:
+            logger.info(
+                "websocket_connected session_id=%s subprotocol=%s handshake_ms=%d",
+                self._session_id,
+                "default",
+                0,
+            )
+            if self._metrics is not None and hasattr(
+                self._metrics, "track_websocket_session_opened"
+            ):
+                self._metrics.track_websocket_session_opened(outcome="success")
+        elif state == SessionState.CLOSED:
+            close_code = (
+                detail.close_code
+                if detail and hasattr(detail, "close_code") and detail.close_code is not None
+                else 1000
+            )
+            logger.info(
+                "websocket_closed session_id=%s close_code=%d peer_initiated=%s duration_s=%d",
+                self._session_id,
+                close_code,
+                False,
+                0,
+            )
+            if self._metrics is not None and hasattr(
+                self._metrics, "track_websocket_session_closed"
+            ):
+                reason_str = "clean" if close_code in (1000, 1001) else "peer_close"
+                self._metrics.track_websocket_session_closed(reason=reason_str)
+
         self._sync_ui_state(state, detail)
 
     def _sync_ui_state(self, state: SessionState, detail: Optional[StateDetail]) -> None:
@@ -396,6 +490,20 @@ class WebSocketPresenter(QObject):
             self._flush_timer.start(33)
 
     def _on_session_failed(self, category: str, message: str) -> None:
+        slots = get_session_slots()
+        slots.release(self._session_id)
+        if self._metrics is not None and hasattr(self._metrics, "set_websocket_active_sessions"):
+            self._metrics.set_websocket_active_sessions(slots.active_count)
+        if self._metrics is not None and hasattr(self._metrics, "track_websocket_session_opened"):
+            self._metrics.track_websocket_session_opened(outcome="failure")
+
+        logger.error(
+            "websocket_handshake_failed session_id=%s category=%s detail_len=%d",
+            self._session_id,
+            category,
+            len(message),
+        )
+
         entry = build_stream_entry(
             None,
             env_vars=self._env_vars,
@@ -422,7 +530,11 @@ class WebSocketPresenter(QObject):
 
     def teardown(self) -> None:
         """Teardown session controller and timer resources."""
-        logger.info("websocket_presenter_teardown")
+        logger.info("websocket_presenter_teardown session_id=%s", self._session_id)
+        slots = get_session_slots()
+        slots.release(self._session_id)
+        if self._metrics is not None and hasattr(self._metrics, "set_websocket_active_sessions"):
+            self._metrics.set_websocket_active_sessions(slots.active_count)
         self._flush_timer.stop()
         self._on_flush_timer()
         self._session_controller.close(1000, "tab closed")

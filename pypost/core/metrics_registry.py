@@ -31,6 +31,7 @@ class MetricsRegistry:
         self._init_http_metrics()
         self._init_mcp_metrics()
         self._init_encryption_metrics()
+        self._init_websocket_metrics()
 
     def _init_gui_metrics(self) -> None:
         """Register GUI interaction counters."""
@@ -409,8 +410,97 @@ class MetricsRegistry:
     def track_environment_value_decryption(self) -> None:
         self.environment_value_decryptions_total.inc()
 
+    def _init_websocket_metrics(self) -> None:
+        """Register WebSocket Prometheus counters, gauge, and histogram."""
+        self.websocket_sessions_opened = Counter(
+            "websocket_sessions_opened_total",
+            "Number of WebSocket sessions opened",
+            ["outcome"],
+            registry=self.registry,
+        )
+        self.websocket_sessions_closed = Counter(
+            "websocket_sessions_closed_total",
+            "Number of WebSocket sessions closed",
+            ["reason"],
+            registry=self.registry,
+        )
+        self.websocket_messages = Counter(
+            "websocket_messages_total",
+            "Number of WebSocket messages transferred",
+            ["direction", "kind"],
+            registry=self.registry,
+        )
+        self.websocket_message_bytes = Counter(
+            "websocket_message_bytes_total",
+            "Total volume of WebSocket payload bytes transferred",
+            ["direction"],
+            registry=self.registry,
+        )
+        self.websocket_stream_entries_dropped = Counter(
+            "websocket_stream_entries_dropped_total",
+            "Number of WebSocket stream entries dropped due to buffer bounds",
+            ["reason"],
+            registry=self.registry,
+        )
+        self.websocket_reconnect_attempts = Counter(
+            "websocket_reconnect_attempts_total",
+            "Number of WebSocket automatic reconnect attempts",
+            ["outcome"],
+            registry=self.registry,
+        )
+        self.websocket_active_sessions = Gauge(
+            "websocket_active_sessions",
+            "Instantaneous number of active concurrent WebSocket sessions",
+            registry=self.registry,
+        )
+        self.websocket_session_start_refused = Counter(
+            "websocket_session_start_refused_total",
+            "Number of WebSocket session start attempts refused by concurrency policy",
+            ["reason"],
+            registry=self.registry,
+        )
+        self.websocket_probe_duration_seconds = Histogram(
+            "websocket_probe_duration_seconds",
+            "Duration of MCP WebSocket probe executions in seconds",
+            ["outcome"],
+            registry=self.registry,
+        )
+
     def track_environment_encryption_error(self, stage: str, reason: str) -> None:
         self.environment_encryption_errors_total.labels(
             stage=stage,
             reason=reason,
         ).inc()
+
+    def track_websocket_session_opened(self, outcome: str) -> None:
+        self.websocket_sessions_opened.labels(outcome=outcome).inc()
+
+    def track_websocket_session_closed(self, reason: str) -> None:
+        self.websocket_sessions_closed.labels(reason=reason).inc()
+
+    def track_websocket_message(self, direction: str, kind: str) -> None:
+        self.websocket_messages.labels(direction=direction, kind=kind).inc()
+
+    def track_websocket_message_bytes(self, direction: str, byte_count: int) -> None:
+        self.websocket_message_bytes.labels(direction=direction).inc(byte_count)
+
+    def track_websocket_stream_entries_dropped(
+        self, reason: str, count: int = 1
+    ) -> None:
+        self.websocket_stream_entries_dropped.labels(reason=reason).inc(count)
+
+    def track_websocket_reconnect_attempt(self, outcome: str) -> None:
+        self.websocket_reconnect_attempts.labels(outcome=outcome).inc()
+
+    def set_websocket_active_sessions(self, count: int) -> None:
+        self.websocket_active_sessions.set(count)
+
+    def track_websocket_session_start_refused(self, reason: str) -> None:
+        self.websocket_session_start_refused.labels(reason=reason).inc()
+
+    def track_websocket_probe_duration(
+        self, outcome: str, duration_seconds: float
+    ) -> None:
+        self.websocket_probe_duration_seconds.labels(outcome=outcome).observe(
+            duration_seconds
+        )

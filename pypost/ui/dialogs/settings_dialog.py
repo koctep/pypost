@@ -29,6 +29,7 @@ from pypost.ui.widgets.settings import (
     RetryPolicySection,
     SecurityAlertSection,
     ServerBindSettingsSection,
+    WebSocketSettingsSection,
 )
 from pypost.ui.widgets.settings.encryption_config_section import (  # noqa: F401
     ENCRYPTION_MODE_DEFAULT,
@@ -84,6 +85,7 @@ class SettingsDialog(QDialog):
         )
         retry_policy = RetryPolicySection(current_settings, self)
         security_alert = SecurityAlertSection(current_settings, self)
+        websocket_section = WebSocketSettingsSection(current_settings, self)
 
         self._editor_section = editor
         self._request_section = request
@@ -92,6 +94,7 @@ class SettingsDialog(QDialog):
         self._encryption_migration_section = encryption_migration
         self._retry_policy_section = retry_policy
         self._security_alert_section = security_alert
+        self._websocket_section = websocket_section
 
         self.font_size_spin = editor.font_size_spin
         self.indent_size_spin = editor.indent_size_spin
@@ -139,6 +142,7 @@ class SettingsDialog(QDialog):
         encryption_migration.add_to_form(self.form_layout)
         retry_policy.add_to_form(self.form_layout)
         security_alert.add_to_form(self.form_layout)
+        websocket_section.add_to_form(self.form_layout)
 
         self.layout.addLayout(self.form_layout)
 
@@ -177,6 +181,7 @@ class SettingsDialog(QDialog):
         fields.update(self._encryption_config_section.collect_fields())
         fields.update(self._retry_policy_section.collect_fields(retry_policy))
         fields.update(self._security_alert_section.collect_fields())
+        fields.update(self._websocket_section.collect_fields())
 
         self.new_settings = AppSettings(
             config_version=self.current_settings.config_version,

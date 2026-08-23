@@ -32,10 +32,10 @@ You should see `# HELP` lines and counter names ending in `_total`.
 
 ## Metric inventory
 
-PyPost registers **33 Prometheus instruments** in
-[`pypost/core/metrics_registry.py`](../pypost/core/metrics_registry.py): **30 counters**, **1
-gauge**, and **2 histograms**. Counters and the gauge are monotonic or point-in-time values;
-histograms record MCP tool call and template render durations.
+PyPost registers **44 Prometheus instruments** in
+[`pypost/core/metrics_registry.py`](../pypost/core/metrics_registry.py): **38 counters**, **3
+gauges**, and **3 histograms**. Counters and gauges are monotonic or point-in-time values;
+histograms record MCP tool call, template render, and MCP WebSocket probe durations.
 
 Verify the registration count:
 
@@ -97,6 +97,20 @@ sanitized request origin only, never the rejected value or request data.
 
 The observability server on port 9080 increments `mcp_requests_received_total` and
 `mcp_responses_sent_total` when agents read the `metrics://all` resource.
+
+### WebSocket sessions and streams
+ 
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `websocket_sessions_opened_total` | Counter | `outcome` | Opened WebSocket sessions (`outcome`: `success`, `failure`, `timeout`, `tls_rejected`) |
+| `websocket_sessions_closed_total` | Counter | `reason` | Closed WebSocket sessions (`reason`: `clean`, `peer_close`, `heartbeat_timeout`, `transport_error`, `reconnect_exhausted`, `forced`) |
+| `websocket_messages_total` | Counter | `direction`, `kind` | Transferred WebSocket messages (`direction`: `inbound`, `outbound`; `kind`: `text`, `binary`, `ping`, `pong`) |
+| `websocket_message_bytes_total` | Counter | `direction` | Payload volume in bytes transferred (`direction`: `inbound`, `outbound`) |
+| `websocket_stream_entries_dropped_total` | Counter | `reason` | Stream buffer entries dropped due to bounds (`reason`: `capacity`, `memory_budget`) |
+| `websocket_reconnect_attempts_total` | Counter | `outcome` | Automatic reconnection attempts (`outcome`: `scheduled`, `succeeded`, `exhausted`) |
+| `websocket_active_sessions` | Gauge | — | Instantaneous number of active concurrent WebSocket sessions holding concurrency slots |
+| `websocket_session_start_refused_total` | Counter | `reason` | Session start attempts refused by concurrency policy (`reason`: `max_concurrent`, `disabled`) |
+| `websocket_probe_duration_seconds` | Histogram | `outcome` | MCP WebSocket probe execution wall time in seconds (`outcome`: `success`, `timeout`, `limit_reached`, `error`) |
 
 ### Environment encryption
 

@@ -402,6 +402,26 @@ Treat `endpoint` and webhook `target` as potentially sensitive — see
 | `state_manager_save_debounced` | DEBUG | — | `state_manager` |
 | `state_manager_save_immediate` | DEBUG | — | `state_manager` |
 
+### WebSocket sessions and streams
+
+| Event | Level | Key fields | Module |
+| --- | --- | --- | --- |
+| `websocket_connect_initiated` | INFO | `session_id`, `profile_id`, `url_masked`, `subprotocols` | `websocket_presenter` |
+| `websocket_disconnect_initiated` | INFO | `session_id` | `websocket_presenter` |
+| `websocket_connected` | INFO | `session_id`, `subprotocol`, `handshake_ms` | `websocket_presenter` |
+| `websocket_closed` | INFO | `session_id`, `close_code`, `peer_initiated`, `duration_s` | `websocket_presenter` |
+| `websocket_session_refused` | WARNING | `profile_id`, `reason`, `active`, `limit` | `websocket_presenter` |
+| `websocket_handshake_failed` | ERROR | `session_id`, `category`, `detail_len` | `websocket_presenter` |
+| `websocket_presenter_teardown` | INFO | `session_id` | `websocket_presenter` |
+| `websocket_send_blocked_not_open` | WARNING | `state` | `websocket_presenter` |
+| `websocket_sending_message` | DEBUG | `length` | `websocket_presenter` |
+| `websocket_ephemeral_tls_exception_granted` | WARNING | `session_state` | `websocket_session` |
+| `websocket_ephemeral_tls_exception_revoked` | INFO | `session_state` | `websocket_session` |
+| `websocket_session_failed` | ERROR | `category`, `message`, `detail` | `websocket_session` |
+| `websocket_session_tls_validation_failed` | ERROR | `url`, `error` | `websocket_session` |
+| `websocket_tls_errors_encountered` | WARNING | `count`, `ignored`, `summary` | `websocket_session` |
+| `websocket_transport_ssl_errors_encountered` | WARNING | `count`, `errors` | `websocket_transport` |
+
 ## Legacy Migration
 
 Legacy messages fall into three patterns. **Migrate when touching a file** — no big-bang rewrite

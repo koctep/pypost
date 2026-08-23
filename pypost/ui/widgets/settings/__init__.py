@@ -12,6 +12,7 @@ from pypost.ui.widgets.settings.request_section import RequestSettingsSection
 from pypost.ui.widgets.settings.retry_policy_section import RetryPolicySection
 from pypost.ui.widgets.settings.security_alert_section import SecurityAlertSection
 from pypost.ui.widgets.settings.server_bind_section import ServerBindSettingsSection
+from pypost.ui.widgets.settings.websocket_section import WebSocketSettingsSection
 
 __all__ = [
     "EditorSettingsSection",
@@ -21,4 +22,5 @@ __all__ = [
     "RetryPolicySection",
     "SecurityAlertSection",
     "ServerBindSettingsSection",
+    "WebSocketSettingsSection",
 ]
