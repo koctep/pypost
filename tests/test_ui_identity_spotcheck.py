@@ -205,18 +205,33 @@ def test_websocket_tab_exposes_role_object_names(
     from pypost.models.websocket import WebSocketConnection
     from pypost.ui.widgets.websocket import WebSocketTab
     from pypost.ui.widget_ids import (
+        WS_COMPOSER_EDIT,
+        WS_CONNECT_BUTTON,
+        WS_DETAIL_TABS,
+        WS_HEADERS_TABLE,
+        WS_LOCK_NOTICE,
+        WS_PARAMS_TABLE,
+        WS_SEND_MESSAGE_BUTTON,
+        WS_STATE_BADGE,
+        WS_STREAM_CLEAR_BUTTON,
+        WS_STREAM_CLEAR_FILTER_BUTTON,
+        WS_STREAM_DETAIL,
+        WS_STREAM_DETAIL_COPY_BUTTON,
+        WS_STREAM_DETAIL_HEX_BUTTON,
+        WS_STREAM_DETAIL_SET_VAR_BUTTON,
+        WS_STREAM_DETAIL_WRAP_BUTTON,
+        WS_STREAM_DIRECTION_FILTER,
+        WS_STREAM_DROP_NOTICE,
+        WS_STREAM_EXPORT_BUTTON,
+        WS_STREAM_FOLLOW_TAIL_BADGE,
+        WS_STREAM_KIND_FILTER,
+        WS_STREAM_MATCH_COUNT,
+        WS_STREAM_PAUSE_BUTTON,
+        WS_STREAM_SEARCH_INPUT,
+        WS_STREAM_VIEW,
+        WS_SUBPROTOCOLS_INPUT,
         WS_TAB_PAGE,
         WS_URL_INPUT,
-        WS_CONNECT_BUTTON,
-        WS_STATE_BADGE,
-        WS_PARAMS_TABLE,
-        WS_HEADERS_TABLE,
-        WS_SUBPROTOCOLS_INPUT,
-        WS_STREAM_VIEW,
-        WS_COMPOSER_EDIT,
-        WS_SEND_MESSAGE_BUTTON,
-        WS_LOCK_NOTICE,
-        WS_DETAIL_TABS,
     )
 
     window = agent_e2e_session.window
@@ -244,8 +259,22 @@ def test_websocket_tab_exposes_role_object_names(
         WS_SEND_MESSAGE_BUTTON,
         WS_LOCK_NOTICE,
         WS_DETAIL_TABS,
+        WS_STREAM_SEARCH_INPUT,
+        WS_STREAM_DIRECTION_FILTER,
+        WS_STREAM_KIND_FILTER,
+        WS_STREAM_PAUSE_BUTTON,
+        WS_STREAM_CLEAR_BUTTON,
+        WS_STREAM_EXPORT_BUTTON,
+        WS_STREAM_DROP_NOTICE,
+        WS_STREAM_DETAIL,
+        WS_STREAM_CLEAR_FILTER_BUTTON,
+        WS_STREAM_MATCH_COUNT,
+        WS_STREAM_DETAIL_COPY_BUTTON,
+        WS_STREAM_DETAIL_SET_VAR_BUTTON,
+        WS_STREAM_DETAIL_WRAP_BUTTON,
+        WS_STREAM_DETAIL_HEX_BUTTON,
+        WS_STREAM_FOLLOW_TAIL_BADGE,
     ):
         found = ws_tab.findChild(QWidget, expected_id)
         assert found is not None, f"Expected widget '{expected_id}' on WebSocketTab"
         _assert_id(found, expected_id)
-

@@ -94,36 +94,6 @@ class StreamListModel(QAbstractListModel):
             return entry
         return None
 
-    def _calculate_batch_evictions(
-        self,
-        batch: Sequence[StreamEntry],
-    ) -> tuple[int, int, int]:
-        """Simulate batch insertion to determine eviction counts.
-
-        Returns:
-            (total_evicted, dropped_capacity_count, dropped_memory_budget_count)
-        """
-        temp_entries = list(self._stream._entries)
-        retained = self._stream._retained_bytes
-        dropped_cap = 0
-        dropped_mem = 0
-
-        for entry in batch:
-            cost = len(entry.payload.encode("utf-8"))
-            while len(temp_entries) >= self._stream._max_entries:
-                old = temp_entries.pop(0)
-                retained -= len(old.payload.encode("utf-8"))
-                dropped_cap += 1
-            while temp_entries and (retained + cost > self._stream._memory_budget_bytes):
-                old = temp_entries.pop(0)
-                retained -= len(old.payload.encode("utf-8"))
-                dropped_mem += 1
-            temp_entries.append(entry)
-            retained += cost
-
-        total_evicted = dropped_cap + dropped_mem
-        return total_evicted, dropped_cap, dropped_mem
-
     def append_batch(self, entries: Sequence[StreamEntry]) -> tuple[int, int]:
         """Append a batch of StreamEntries, emitting row removal and insertion signals.
 
@@ -133,16 +103,44 @@ class StreamListModel(QAbstractListModel):
         if not entries:
             return 0, 0
 
-        total_evicted, dropped_cap, dropped_mem = self._calculate_batch_evictions(entries)
+        temp_entries = list(self._stream._entries)
+        retained = self._stream._retained_bytes
+        dropped_cap = 0
+        dropped_mem = 0
+        initial_count = len(temp_entries)
+        initial_remaining = initial_count
 
-        if total_evicted > 0:
-            self.beginRemoveRows(QModelIndex(), 0, total_evicted - 1)
-            for _ in range(total_evicted):
+        for entry in entries:
+            cost = len(entry.payload.encode("utf-8"))
+            while len(temp_entries) >= self._stream._max_entries:
+                old = temp_entries.pop(0)
+                retained -= len(old.payload.encode("utf-8"))
+                dropped_cap += 1
+                if initial_remaining > 0:
+                    initial_remaining -= 1
+            while temp_entries and (retained + cost > self._stream._memory_budget_bytes):
+                old = temp_entries.pop(0)
+                retained -= len(old.payload.encode("utf-8"))
+                dropped_mem += 1
+                if initial_remaining > 0:
+                    initial_remaining -= 1
+            temp_entries.append(entry)
+            retained += cost
+
+        total_evicted = dropped_cap + dropped_mem
+        existing_evicted = initial_count - initial_remaining
+
+        if existing_evicted > 0:
+            self.beginRemoveRows(QModelIndex(), 0, existing_evicted - 1)
+            for _ in range(existing_evicted):
                 old = self._stream._entries.popleft()
                 self._stream._retained_bytes -= len(old.payload.encode("utf-8"))
-            self._stream._dropped_capacity += dropped_cap
-            self._stream._dropped_memory_budget += dropped_mem
             self.endRemoveRows()
+
+        self._stream._dropped_capacity += dropped_cap
+        self._stream._dropped_memory_budget += dropped_mem
+
+        if total_evicted > 0:
             logger.debug(
                 "websocket_stream_model_eviction_signaled evicted=%d "
                 "dropped_capacity=%d dropped_memory_budget=%d total_rows=%d",
@@ -152,12 +150,14 @@ class StreamListModel(QAbstractListModel):
                 len(self._stream._entries),
             )
 
-        old_len = len(self._stream._entries)
-        self.beginInsertRows(QModelIndex(), old_len, old_len + len(entries) - 1)
-        for entry in entries:
-            self._stream._entries.append(entry)
-            self._stream._retained_bytes += len(entry.payload.encode("utf-8"))
-        self.endInsertRows()
+        new_entries_to_insert = temp_entries[initial_remaining:]
+        if new_entries_to_insert:
+            old_len = len(self._stream._entries)
+            self.beginInsertRows(QModelIndex(), old_len, old_len + len(new_entries_to_insert) - 1)
+            for entry in new_entries_to_insert:
+                self._stream._entries.append(entry)
+                self._stream._retained_bytes += len(entry.payload.encode("utf-8"))
+            self.endInsertRows()
 
         logger.debug(
             "websocket_stream_model_batch_appended inserted=%d evicted=%d total_rows=%d",

@@ -27,7 +27,7 @@ flowchart TB
         Tab["WebSocketTab<br/>(Main Tab Container)"]
         Badge["WebSocketStateBadge<br/>(Multi-Modal State Indicator)"]
         ConnEditor["WebSocketConnectionEditor<br/>(URL, Params, Headers, Subprotocols)"]
-        StreamView["QListView<br/>(Frame Stream Viewer)"]
+        StreamView["WebSocketStreamView<br/>(Stream Inspector Container)"]
         Composer["WebSocketComposerWidget<br/>(Message Input & Dispatch)"]
         
         Tab --> Badge
@@ -65,9 +65,10 @@ flowchart TB
 | Module | Location | Primary Responsibilities |
 |---|---|---|
 | `WebSocketPresenter` | `pypost/ui/presenters/websocket_presenter.py` | Coordinates UI signals with `WebSocketSessionController`, validates send operations, applies secret masking, manages 33ms batch queue, and coordinates session teardown. |
-| `WebSocketTab` | `pypost/ui/widgets/websocket/websocket_tab.py` | Root widget containing state header, connection configuration editor, stream list view, and message composer. |
+| `WebSocketTab` | `pypost/ui/widgets/websocket/websocket_tab.py` | Root widget containing state header, connection configuration editor, stream inspector view, and message composer. |
 | `WebSocketStateBadge` | `pypost/ui/widgets/websocket/state_badge.py` | Multi-modal status indicator rendering state glyphs, status text, active subprotocol, and message counts. |
 | `WebSocketConnectionEditor` | `pypost/ui/widgets/websocket/connection_editor.py` | URL entry, query parameter table, request header table, subprotocol inputs, lock notice banner, and dynamic connect button. |
+| `WebSocketStreamView` | `pypost/ui/widgets/websocket/stream_view.py` | Virtualized stream inspector with filtering, search, follow-tail, drop notice banner, and detail pane. See [websocket_stream_inspector.md](websocket_stream_inspector.md). |
 | `StreamListModel` | `pypost/ui/widgets/websocket/stream_model.py` | `QAbstractListModel` backing the stream view with 33ms batching, capacity eviction handling, and secret redaction. |
 | `TabsPresenter` | `pypost/ui/presenters/tabs_presenter.py` | Manages tab creation, focus deduplication, tab closure with clean transport teardown, and workspace restoration. |
 | `Widget IDs` | `pypost/ui/widget_ids.py` | Stable `WS_*` identifier constants for automated agent testing and UI hierarchy discovery. |

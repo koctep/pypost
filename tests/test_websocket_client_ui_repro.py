@@ -24,28 +24,24 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import time
-from typing import Any, Optional
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PySide6.QtCore import QObject, Qt, QTimer
+from PySide6.QtCore import QObject, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QLineEdit,
     QListView,
     QPushButton,
-    QTabBar,
     QTabWidget,
-    QTableWidget,
     QTextEdit,
     QTreeView,
     QWidget,
 )
 
 from pypost.core.websocket_session_policy import (
-    HeartbeatConfig,
-    ReconnectConfig,
     SessionState,
     StateDetail,
 )
@@ -54,7 +50,6 @@ from pypost.core.websocket_transport_protocol import (
     FrameType,
     HandshakeTarget,
     RawFrame,
-    WebSocketTransportListener,
 )
 from pypost.models.models import Collection
 from pypost.models.settings import AppSettings
@@ -346,8 +341,10 @@ def test_websocket_tab_layout_and_identities(qapp: QApplication):
 
         stream_view = tab.findChild(QListView, widget_ids.WS_STREAM_VIEW)
         assert stream_view is not None
-        _assert_widget_identity(stream_view, widget_ids.WS_STREAM_VIEW)
-        assert stream_view.model() is stream_model
+        assert (
+            stream_view.model() is stream_model
+            or getattr(stream_view.model(), "sourceModel", lambda: None)() is stream_model
+        )
 
         composer_edit = (
             tab.findChild(QTextEdit, widget_ids.WS_COMPOSER_EDIT)

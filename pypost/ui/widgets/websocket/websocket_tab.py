@@ -13,7 +13,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
-    QListView,
     QPushButton,
     QSplitter,
     QTextEdit,
@@ -26,12 +25,12 @@ from pypost.ui.widget_ids import (
     WS_COMPOSER_EDIT,
     WS_CONNECT_BUTTON,
     WS_SEND_MESSAGE_BUTTON,
-    WS_STREAM_VIEW,
     WS_TAB_PAGE,
     set_widget_id,
 )
 from pypost.ui.widgets.websocket.connection_editor import WebSocketConnectionEditor
 from pypost.ui.widgets.websocket.state_badge import WebSocketStateBadge
+from pypost.ui.widgets.websocket.stream_view import WebSocketStreamView
 
 if TYPE_CHECKING:
     from pypost.ui.presenters.websocket_presenter import WebSocketPresenter
@@ -85,22 +84,13 @@ class WebSocketTab(QWidget):
         self._connection_editor = WebSocketConnectionEditor(v_splitter)
         v_splitter.addWidget(self._connection_editor)
 
-        # Middle section: Chronological message stream list view
-        stream_container = QWidget(v_splitter)
-        stream_layout = QVBoxLayout(stream_container)
-        stream_layout.setContentsMargins(0, 0, 0, 0)
-        stream_layout.setSpacing(2)
-
-        stream_header = QLabel("Messages & Lifecycle Stream:", stream_container)
-        stream_layout.addWidget(stream_header)
-
-        self._stream_view = QListView(stream_container)
-        set_widget_id(self._stream_view, WS_STREAM_VIEW)
-        self._stream_view.setModel(self.presenter.stream_model)
-        self._stream_view.setUniformItemSizes(True)
-        stream_layout.addWidget(self._stream_view)
-
-        v_splitter.addWidget(stream_container)
+        # Middle section: Stream inspector view
+        self._stream_view = WebSocketStreamView(
+            stream_model=self.presenter.stream_model,
+            presenter=self.presenter,
+            parent=v_splitter,
+        )
+        v_splitter.addWidget(self._stream_view)
 
         # Bottom section: Plain text message composer
         composer_container = QWidget(v_splitter)
@@ -141,6 +131,6 @@ class WebSocketTab(QWidget):
         return self._state_badge
 
     @property
-    def stream_view(self) -> QListView:
-        """Return the embedded stream QListView."""
+    def stream_view(self) -> WebSocketStreamView:
+        """Return the embedded WebSocketStreamView widget."""
         return self._stream_view

@@ -51,6 +51,22 @@ WS_COMPOSER_EDIT = "pypost_ws_composer_edit"
 WS_SEND_MESSAGE_BUTTON = "pypost_ws_send_message_button"
 WS_LOCK_NOTICE = "pypost_ws_lock_notice"
 WS_DETAIL_TABS = "pypost_ws_detail_tabs"
+# WebSocket stream inspector surfaces (PYPOST-1133 / WS-5).
+WS_STREAM_SEARCH_INPUT = "pypost_ws_stream_search_input"
+WS_STREAM_DIRECTION_FILTER = "pypost_ws_stream_direction_filter"
+WS_STREAM_KIND_FILTER = "pypost_ws_stream_kind_filter"
+WS_STREAM_PAUSE_BUTTON = "pypost_ws_stream_pause_button"
+WS_STREAM_CLEAR_BUTTON = "pypost_ws_stream_clear_button"
+WS_STREAM_EXPORT_BUTTON = "pypost_ws_stream_export_button"
+WS_STREAM_DROP_NOTICE = "pypost_ws_stream_drop_notice"
+WS_STREAM_DETAIL = "pypost_ws_stream_detail"
+WS_STREAM_CLEAR_FILTER_BUTTON = "pypost_ws_stream_clear_filter_button"
+WS_STREAM_MATCH_COUNT = "pypost_ws_stream_match_count"
+WS_STREAM_DETAIL_COPY_BUTTON = "pypost_ws_stream_detail_copy_button"
+WS_STREAM_DETAIL_SET_VAR_BUTTON = "pypost_ws_stream_detail_set_var_button"
+WS_STREAM_DETAIL_WRAP_BUTTON = "pypost_ws_stream_detail_wrap_button"
+WS_STREAM_DETAIL_HEX_BUTTON = "pypost_ws_stream_detail_hex_button"
+WS_STREAM_FOLLOW_TAIL_BADGE = "pypost_ws_stream_follow_tail_badge"
 
 KEY_WIDGET_IDS = (
     MAIN_WINDOW,
@@ -80,6 +96,21 @@ KEY_WIDGET_IDS = (
     WS_SEND_MESSAGE_BUTTON,
     WS_LOCK_NOTICE,
     WS_DETAIL_TABS,
+    WS_STREAM_SEARCH_INPUT,
+    WS_STREAM_DIRECTION_FILTER,
+    WS_STREAM_KIND_FILTER,
+    WS_STREAM_PAUSE_BUTTON,
+    WS_STREAM_CLEAR_BUTTON,
+    WS_STREAM_EXPORT_BUTTON,
+    WS_STREAM_DROP_NOTICE,
+    WS_STREAM_DETAIL,
+    WS_STREAM_CLEAR_FILTER_BUTTON,
+    WS_STREAM_MATCH_COUNT,
+    WS_STREAM_DETAIL_COPY_BUTTON,
+    WS_STREAM_DETAIL_SET_VAR_BUTTON,
+    WS_STREAM_DETAIL_WRAP_BUTTON,
+    WS_STREAM_DETAIL_HEX_BUTTON,
+    WS_STREAM_FOLLOW_TAIL_BADGE,
 )
 
 
