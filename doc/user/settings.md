@@ -23,6 +23,22 @@ When retries are exhausted you can:
 - Post to a webhook URL, optionally with an authorization header (stored carefully; the
   field uses password echo and does not re-display the saved value)
 
+## WebSocket
+
+Configure concurrency ceilings, buffer limits, heartbeats, reconnection, and MCP probe defaults:
+
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `ws_max_concurrent_sessions` | `10` | Maximum simultaneous open WebSocket connections |
+| `ws_max_stream_buffer_bytes` | `10485760` | Maximum stream buffer memory per tab (10 MB) |
+| `ws_heartbeat_interval_sec` | `30.0` | Interval between ping heartbeat frames (seconds) |
+| `ws_heartbeat_timeout_sec` | `10.0` | Timeout waiting for pong response (seconds) |
+| `ws_reconnect_max_attempts` | `5` | Maximum automatic reconnect retries |
+| `ws_reconnect_backoff_base_sec` | `1.0` | Initial exponential backoff delay (seconds) |
+| `ws_reconnect_backoff_max_sec` | `60.0` | Maximum backoff delay cap (seconds) |
+| `ws_mcp_probe_max_duration_sec` | `30.0` | Default probe duration for AI agent tools |
+| `ws_mcp_probe_max_messages` | `100` | Default probe frame ceiling for AI agent tools |
+
 ## MCP and metrics servers
 
 | Setting | Default |

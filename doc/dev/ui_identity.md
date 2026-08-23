@@ -70,6 +70,21 @@ Production UI must not import `pypost.agent`. Agents import constants from
 | `SETTINGS_DIALOG` | `pypost_settings_dialog` | Settings dialog (modal; not in KEY catalog) |
 | `PLUS_TAB_PLACEHOLDER` | `pypost_plus_tab_placeholder` | Trailing + tab page (not in KEY catalog) |
 | `PLUS_TAB_BUTTON` | `pypost_plus_tab_button` | Embedded `+` button on plus chrome (not in KEY catalog) |
+| `WS_TAB_PAGE` | `pypost_ws_tab_page` | WebSocket tab page (per tab) |
+| `WS_URL_INPUT` | `pypost_ws_url_input` | WebSocket URL input (per tab) |
+| `WS_CONNECT_BUTTON` | `pypost_ws_connect_button` | WebSocket Connect/Disconnect button (per tab) |
+| `WS_STATE_BADGE` | `pypost_ws_state_badge` | WebSocket state status badge (per tab) |
+| `WS_PARAMS_TABLE` | `pypost_ws_params_table` | WebSocket query parameters table (per tab) |
+| `WS_HEADERS_TABLE` | `pypost_ws_headers_table` | WebSocket handshake headers table (per tab) |
+| `WS_SUBPROTOCOLS_INPUT` | `pypost_ws_subprotocols_input` | WebSocket subprotocols input (per tab) |
+| `WS_STREAM_VIEW` | `pypost_ws_stream_view` | WebSocket live stream viewer (per tab) |
+| `WS_COMPOSER_EDIT` | `pypost_ws_composer_edit` | WebSocket message composer editor (per tab) |
+| `WS_SEND_MESSAGE_BUTTON` | `pypost_ws_send_message_button` | WebSocket send message button (per tab) |
+| `WS_STREAM_SEARCH_INPUT` | `pypost_ws_stream_search_input` | WebSocket stream search input (per tab) |
+| `WS_STREAM_DIRECTION_FILTER` | `pypost_ws_stream_direction_filter` | WebSocket direction filter combo (per tab) |
+| `WS_STREAM_KIND_FILTER` | `pypost_ws_stream_kind_filter` | WebSocket frame kind filter combo (per tab) |
+| `WS_STREAM_CLEAR_BUTTON` | `pypost_ws_stream_clear_button` | WebSocket clear stream button (per tab) |
+| `WS_STREAM_EXPORT_BUTTON` | `pypost_ws_stream_export_button` | WebSocket export stream button (per tab) |
 
 ## API / Usage
 

@@ -93,7 +93,7 @@ above and the [platform notes](#platform-specific-distribution-notes) below.
 | G4 | **Re-linking / replacement** — bundle layout allows substituting user-built PySide6/Qt shared libraries where technically feasible (see platform notes) | Release engineer | Packaging doc or smoke test replacing one Qt `.so`/`.dylib`/`.dll` |
 | G5 | **Transitive inventory** — `LICENSES/transitive.csv` regenerated from the production lock used to build the binary; `make check-license-inventory` passes | Maintainer | Committed CSV + CI green |
 | G6 | **Version record** — exact `PySide6`, Qt, and Python versions bundled are recorded in release notes and build metadata | Release engineer | Release notes / SBOM / build log |
-| G7 | **Platform matrix** — each target OS/format (macOS `.dmg`, Windows `.msi`/`.exe`, Linux Flatpak/AppImage/deb) reviewed against the platform table below | Release engineer + counsel | Per-platform checklist sign-off |
+| G7 | **Platform matrix & WSS smoke** — each target OS/format (macOS `.dmg`, Windows `.msi`/`.exe`, Linux Flatpak/AppImage/deb) reviewed against platform table with per-platform `wss://` TLS smoke verification | Release engineer + counsel | Per-platform checklist sign-off and `wss://` smoke log |
 | G8 | **Downstream clarity** — README or release page states who is **conveying** the combined work and where to obtain LGPL components | Maintainer | Published release page |
 
 ### Maintainer workflow
@@ -163,6 +163,7 @@ Before tagging a binary release, verify on each platform:
    bundled versions.
 5. At least one documented method to replace bundled Qt shared libraries (or counsel-approved
    alternative) has been tested or reviewed.
+6. Per-platform `wss://` secure WebSocket smoke test passes against native OS TLS trust stores.
 
 ## Transitive license inventory (PYPOST-809)
 

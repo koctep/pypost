@@ -26,6 +26,7 @@ conventions.
 1. [WebSocket Environments, Templating, and Secret Masking (PYPOST-1135)](websocket_environments_templating_and_masking.md)
 1. [WebSocket Settings, Session Ceiling, Metrics, and Logging (PYPOST-1136)](websocket_settings_session_ceiling_and_metrics.md)
 1. [Bounded MCP WebSocket Probe Tool (PYPOST-1137)](websocket_mcp_probe_tool.md)
+1. [WebSocket Subsystem Architecture (PYPOST-1138)](websocket_architecture.md)
 1. [TemplateService — central variable substitution](template_service.md)
 1. [Template Expression Functions and Integer Conversion (PYPOST-450, PYPOST-1037, PYPOST-1038)](template_expression_functions.md)
 1. [Variable Propagation](variable_propagation.md)

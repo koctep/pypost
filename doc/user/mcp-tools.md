@@ -76,6 +76,23 @@ Successful `call_tool` results are a **JSON envelope** in the text payload (`sta
 `error`, `body`, optional `logs`) — not the raw HTTP body alone. Agents should parse JSON
 before reading the upstream response. See [MCP Integration](../mcp_integration.md).
 
+## WebSocket probe tools
+
+PyPost allows exposing saved WebSocket profiles as bounded MCP probe tools for AI agents:
+
+1. Open a saved WebSocket profile, check **MCP Tool**, and configure its description on the
+   **MCP** tab.
+2. Configure bounded execution safeguards:
+   - `max_duration_sec`: Maximum seconds to keep the socket open (default: 30s).
+   - `max_messages`: Maximum number of frames to capture before auto-closing (default: 100).
+   - `stop_when`: Optional regex string matching inbound frame payloads to stop early.
+3. When called by an AI agent, PyPost connects in a background worker, runs initial message
+   sequences if configured, captures incoming/outgoing frames within the bounds, and returns
+   a structured JSON transcript.
+4. Hidden environment secrets are masked in the transcript before delivery to the agent.
+
+See [WebSocket Guide](websocket.md) for session details.
+
 ## In-app helpers
 
 - **MCP Servers…** — add, edit, start, stop, remove, inspect tools, and inspect activity

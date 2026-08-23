@@ -37,6 +37,14 @@ pypost/
 │   ├── encryption_migration.py
 │   ├── key_provider.py, key_source_constants.py
 │   ├── key_sources/        # Keyring, env, file, chain, factory, registry
+│   ├── websocket_client.py # WebSocket transport seam (QWebSocketClientTransport)
+│   ├── websocket_session.py # WebSocket connection session & state machine
+│   ├── websocket_stream.py # Bounded ring buffer & drop accounting
+│   ├── websocket_codecs.py # Message codecs (Text, JSON, Binary Hex/Base64)
+│   ├── websocket_export.py # Transcript export (JSON, NDJSON, CSV)
+│   ├── websocket_session_slots.py # Concurrency limit (SessionSlots)
+│   ├── websocket_templating.py, websocket_tls.py
+│   ├── mcp_websocket_probe.py # Bounded MCP WebSocket probe runner
 │   ├── mcp_server_impl.py  # Starlette routes, tool list/call
 │   ├── mcp_client_service.py   # Outbound MCP protocol client
 │   ├── mcp_secrets_policy.py, mcp_activity_log.py, mcp_tool_contract.py
@@ -66,9 +74,10 @@ pypost/
 │   ├── main_window_signals.py
 │   ├── mcp_server_controller.py  # MCP persistence/lifecycle (PYPOST-1071)
 │   ├── presenters/         # CollectionsPresenter, TabsPresenter, EnvPresenter,
-│   │                       # McpControlsPresenter
+│   │                       # McpControlsPresenter, WebSocketPresenter
 │   ├── dialogs/            # Settings, Save, Env, MCP activity, hotkeys, about
-│   ├── widgets/            # RequestEditor, ResponseView, HistoryPanel, body editor
+│   ├── widgets/            # RequestEditor, ResponseView, HistoryPanel, body editor,
+│   │                       # WebSocketTab, WebSocketStreamView, WebSocketComposer
 │   │   ├── mixins.py       # VariableHoverMixin and shared tooltip logic
 │   │   ├── environments/   # Environment list and variables widgets
 │   │   ├── fold/           # Body editor code folding
@@ -166,6 +175,9 @@ The application uses classes (often Pydantic models or dataclasses) to define st
 - **Encryption**: `key_sources/` resolves encryption keys (keyring, env, file, chain);
   `encryption_migration_worker.py` migrates encrypted environments on a background thread.
   See [environment_encryption_at_rest.md](environment_encryption_at_rest.md).
+- **WebSocket Subsystem**: Manages WebSocket connection sessions, lifecycle state transitions,
+  bounded ring buffer streaming, frame codecs (Text, JSON, Binary), sequence execution, sensitive
+  secret masking, and bounded MCP probe tools. See [websocket_architecture.md](websocket_architecture.md).
 
 ### User Interface (`pypost/ui/`)
 

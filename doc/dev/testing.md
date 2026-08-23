@@ -1784,6 +1784,28 @@ Dedicated unit test modules cover the decoupled MCP presentation and lifecycle l
 
 Both modules define module-level 30s timeouts (`pytestmark = pytest.mark.timeout(30)`).
 
+### WebSocket test strategy and mock server fixture (PYPOST-1129 / PYPOST-1138)
+
+WebSocket subsystem testing spans pure unit tests (Qt-free), Qt integration tests, and scripted
+mock WebSocket server tests:
+
+1. **Pure Unit Tests (Qt-free)**:
+   - `tests/test_websocket_stream.py` — ring buffer capacity, byte limit accounting, eviction order, drop counting.
+   - `tests/test_websocket_codecs.py` — UTF-8, JSON formatting/validation, and Hex/Base64 binary codec encoding/decoding.
+   - `tests/test_websocket_export.py` — JSON, NDJSON, and CSV stream transcript export serialization.
+   - `tests/test_websocket_session_slots.py` — concurrent session slot acquisition and release limits.
+   - `tests/test_websocket_templating.py` — template variable resolution and sensitive secret masking.
+
+2. **Qt Integration and UI Tests**:
+   - `tests/test_websocket_client.py` — transport seam and `QWebSocketClientTransport` lifecycle.
+   - `tests/test_websocket_session.py` — connection state machine, heartbeats, and reconnect backoff.
+   - `tests/test_websocket_tab.py`, `tests/test_websocket_stream_view.py`, `tests/test_websocket_composer.py` — UI presenters and widget wiring.
+
+3. **Scripted Mock WebSocket Server Fixture**:
+   - `tests/fixtures/websocket_server.py` (`websocket_server` fixture) provides an in-process, deterministic WebSocket server supporting programmed scripted frame sequences, ping/pong validation, error simulation, and subprotocol negotiation.
+   - Tests execute headlessly with `QT_QPA_PLATFORM=offscreen`.
+   - Every test module declares an explicit timeout (e.g., `pytestmark = pytest.mark.timeout(30)`).
+
 ### Documentation sync (PYPOST-371)
 
 Agent timeout, Qt, caplog, and run commands in `.cursor/lsr/do-testing.md` must stay aligned

@@ -1,31 +1,38 @@
 # Collections
 
-Collections group related requests (for example by API or project) in the left sidebar.
+Collections group related requests and WebSocket profiles (for example by API or project)
+in the left sidebar.
 
-## Save a request
+## Save a request or WebSocket profile
 
-1. Configure the request in a tab.
-2. Open **Actions** (to the right of **Send**) and choose **Save**, or press `Ctrl+S`.
+1. Configure the request or WebSocket profile in a tab.
+2. Open **Actions** (to the right of **Send** / **Connect**) and choose **Save**, or press `Ctrl+S`.
 3. In the dialog, pick an existing collection or create a new one.
-4. Confirm. The request appears in the sidebar tree.
+4. Confirm. The item appears in the sidebar tree.
 
 **Save As…** (`Ctrl+Shift+S`) always creates a new entry and leaves the original unchanged.
 
-Settings may ask you to confirm before overwriting an existing saved request.
+Settings may ask you to confirm before overwriting an existing saved item.
 
-## Open a request
+> [!WARNING]
+> **Collection Downgrade Caveat:** Collections containing WebSocket profiles (`websockets` array)
+> will lose their WebSocket configurations if opened and saved in older versions of PyPost that
+> only support HTTP requests. Older versions do not preserve unrecognized fields upon saving.
+> Always back up your collections before opening them in older PyPost versions.
 
-- Click a request in the sidebar to open it in the editor (behavior depends on your click
-  settings).
-- Right-click a request and choose **New tab** to open a separate editable copy without
+## Open an item
+
+- Click a request or WebSocket profile in the sidebar to open it in the editor (behavior
+  depends on your click settings).
+- Right-click an item and choose **New tab** to open a separate editable copy without
   replacing the current tab.
 
 Expand/collapse state of collections is remembered across sessions.
 
 ## Import a collection
 
-Instead of recreating a teammate's requests by hand, you can bring a whole collection —
-with all of its requests — in from a file:
+Instead of recreating a teammate's requests and WebSocket profiles by hand, you can bring a whole
+collection in from a file:
 
 1. Click **Import Collection…** below the collection tree in the sidebar.
 2. Pick a JSON file. It can contain:
@@ -47,15 +54,23 @@ with all of its requests — in from a file:
          "body": "{\"amount\": 100}",
          "body_type": "json"
        }
+     ],
+     "websockets": [
+       {
+         "name": "Live transaction stream",
+         "url": "wss://{{host}}/transactions/stream",
+         "headers": { "Authorization": "Bearer {{token}}" },
+         "subprotocols": ["v1.events"]
+       }
      ]
    }
    ```
 
-   Only `name` is required. `requests` defaults to empty, and every request field
-   (`method`, `url`, `headers`, `params`, `body`, `body_type`, `post_script`, retry
-   policy, and the MCP tool fields `expose_as_mcp`, `mcp_description`, `mcp_params`) is
-   optional and carried through when present. `id` is optional — PyPost assigns a new one
-   if it is missing or already in use.
+   Only `name` is required. `requests` and `websockets` default to empty, and every field
+   (`method`, `url`, `headers`, `params`, `body`, `body_type`, `post_script`, presets,
+   sequences, retry policy, and MCP tool fields `expose_as_mcp`, `mcp_description`,
+   `mcp_params`) is optional and carried through when present. `id` is optional — PyPost assigns
+   a new one if it is missing or already in use.
 3. If an imported collection's name matches one you already have, you are asked, per name,
    to **Overwrite** the existing one, **Keep Both** (the import is added as
    `Copy of <name>`, disambiguated further if that name is also taken), or **Skip** it.

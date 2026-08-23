@@ -36,6 +36,17 @@ Global shortcuts accessible from any view:
 | Switch to Body | `Ctrl+B` | Activates Request Body tab |
 | Switch to Script | `Ctrl+T` | Activates Post-Request Script tab |
 
+## WebSocket session
+
+| Action | Shortcut | Description |
+| ------ | -------- | ----------- |
+| Connect / Disconnect | `F5` / `Ctrl+Enter` | Toggles connection state from URL bar |
+| Send Message | `Ctrl+Enter` | Sends active message from Composer |
+| Save Profile | `Ctrl+S` | Saves WebSocket profile to collection |
+| Save As Profile | `Ctrl+Shift+S` | Saves draft to a new collection profile |
+| Format JSON | `Ctrl+Shift+F` | Formats and validates JSON payload |
+| Focus URL Bar | `Ctrl+L` / `Alt+D` | Highlights WebSocket URL input |
+
 ## Body editor & response viewer shortcuts
 
 Context-sensitive shortcuts active when specific panes have focus:

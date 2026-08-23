@@ -50,8 +50,8 @@ or delete.
 
 ## Workspace (right)
 
-Tabs with request editors. Each tab holds one draft request (method, URL, params,
-headers, body, script, optional MCP metadata).
+Tabs with request and WebSocket editors. Each tab holds one draft request or active WebSocket
+session (method/mode, URL, params, headers, body/composer, stream viewer, optional MCP metadata).
 
 - Click **+** or press `Ctrl+N` to open a new tab
 - Close with `Ctrl+W`
@@ -67,6 +67,23 @@ From top to bottom in a typical layout:
 
 **Actions** includes **Save As...**, **Save**, and **Copy cURL**.
 
+## WebSocket editor
+
+For WebSocket tabs, the layout provides a bi-directional session manager:
+
+1. Connection bar: Target URL (`ws://` / `wss://`), **Connect** / **Disconnect** button, and
+   connection state badge (`DISCONNECTED`, `CONNECTING`, `CONNECTED`, etc.).
+2. Handshake configuration tabs: **Params** (query parameters), **Headers** (custom handshake
+   headers), and **Subprotocols** (negotiated subprotocols).
+3. Split workspace:
+   - **Stream Inspector** (top): Live log of inbound and outbound frames with direction/kind
+     filtering, search, auto-scroll tailing, payload inspection, and export (JSON, NDJSON, CSV).
+   - **Composer & Messages** (bottom): Multi-format payload editor (Text, JSON, Binary),
+     **Send Message** button, saved message presets, and automated test sequences.
+
+See [WebSocket Guide](websocket.md) for full details.
+
 ## Settings
 
 Open with `Ctrl+,` or `F12`. See [Settings](settings.md).
+
