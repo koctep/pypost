@@ -686,7 +686,7 @@ class TestWebSocketStreamExport:
         assert "# Dropped entries: capacity=0, memory_budget=0" in text
 
         # Line assertions
-        assert '[2026-08-22T11:00:00.000Z] [in] [15B] {"status":"ok"}' in text
+        assert '[2026-08-22T11:00:00.000Z] [in] [15B] {"status": "ok"}' in text
         assert "[2026-08-22T11:00:01.000Z] [out] [2000B] [TRUNCATED] truncated data..." in text
         assert "[2026-08-22T11:00:02.000Z] [none] [0B] [lifecycle] Disconnected (code 1000)" in text
 

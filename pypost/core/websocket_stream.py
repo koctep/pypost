@@ -11,7 +11,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
-from typing import Iterable, Mapping
+from typing import Callable, Iterable, Mapping
 
 from pypost.core.websocket_transport_protocol import RawFrame
 
@@ -177,17 +177,20 @@ def _mask_secrets(
     text: str,
     env_vars: Mapping[str, str] | None = None,
     hidden_keys: Iterable[str] | None = None,
-) -> str:
+) -> tuple[str, bool]:
     if not text or not env_vars or not hidden_keys:
-        return text
+        return text, False
     values = [
         env_vars[k]
         for k in hidden_keys
         if k in env_vars and env_vars[k]
     ]
+    masked = False
     for val in sorted(values, key=len, reverse=True):
-        text = text.replace(val, "***")
-    return text
+        if val in text:
+            text = text.replace(val, "***")
+            masked = True
+    return text, masked
 
 
 def build_stream_entry(
@@ -204,6 +207,7 @@ def build_stream_entry(
     byte_size: int | None = None,
     detail: str = "",
     ts_utc: str | None = None,
+    on_mask_applied: Callable[[], None] | None = None,
 ) -> StreamEntry:
     """Construct a masked, display-truncated StreamEntry from frame or explicit data."""
     if direction is not None:
@@ -239,7 +243,7 @@ def build_stream_entry(
     else:
         wire_bytes = len(raw_text.encode("utf-8"))
 
-    sanitized = _mask_secrets(raw_text, env_vars=env_vars, hidden_keys=hidden_keys)
+    sanitized, masked_payload = _mask_secrets(raw_text, env_vars=env_vars, hidden_keys=hidden_keys)
 
     if wire_bytes > truncate_bytes:
         truncated = True
@@ -259,11 +263,22 @@ def build_stream_entry(
     else:
         ts_val = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
-    sanitized_detail = (
-        _mask_secrets(detail, env_vars=env_vars, hidden_keys=hidden_keys)
-        if detail
-        else ""
-    )
+    if detail:
+        sanitized_detail, masked_detail = _mask_secrets(
+            detail, env_vars=env_vars, hidden_keys=hidden_keys
+        )
+    else:
+        sanitized_detail, masked_detail = "", False
+
+    if (
+        (masked_payload or masked_detail)
+        and on_mask_applied is not None
+        and callable(on_mask_applied)
+    ):
+        try:
+            on_mask_applied()
+        except Exception as exc:
+            logger.debug("websocket_stream_on_mask_applied_failed error=%s", exc)
 
     return StreamEntry(
         seq=seq,

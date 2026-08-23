@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Set, Tuple
 
-from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QTableWidget, QToolTip
+from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QTableWidget, QTextEdit, QToolTip
 
 from pypost.ui.widgets.mixins import (
     VariableHoverLocator,
@@ -33,6 +33,21 @@ class VariableAwarePlainTextEdit(VariableHoverMixin, QPlainTextEdit):
 
     def __init__(self, parent=None):
         QPlainTextEdit.__init__(self, parent)
+        VariableHoverMixin.__init__(self)
+        self._hover_line_scoped_scan = True
+
+    def _get_text_at_cursor(self, event) -> Tuple[str, int]:
+        cursor = self.cursorForPosition(event.position().toPoint())
+        text = self.toPlainText()
+        index = cursor.position()
+        return text, index
+
+
+class VariableAwareTextEdit(VariableHoverMixin, QTextEdit):
+    """QTextEdit with variable tooltip support."""
+
+    def __init__(self, parent=None):
+        QTextEdit.__init__(self, parent)
         VariableHoverMixin.__init__(self)
         self._hover_line_scoped_scan = True
 

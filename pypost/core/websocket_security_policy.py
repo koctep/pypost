@@ -117,9 +117,10 @@ def classify_endpoint_security(url: str, verify_tls: bool = True) -> HostSecurit
         else:
             classification = HostSecurityClassification.PLAINTEXT_REMOTE
 
+    from pypost.core.sensitive_text_sanitizer import sanitize_text
     logger.debug(
         "websocket_endpoint_security_classified url=%s verify_tls=%s classification=%s",
-        url,
+        sanitize_text(url),
         verify_tls,
         classification.value,
     )

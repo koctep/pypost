@@ -5,9 +5,9 @@ import re
 
 TEMPLATE_PLACEHOLDER_PATTERN = re.compile(r"\{\{\s*(.*?)\s*\}\}")
 
-# Plain ``{{name}}`` tokens without inner whitespace — fast hover lookup (PYPOST-113).
+# Plain ``{{name}}`` tokens with optional inner whitespace — fast hover lookup (PYPOST-113).
 # Capture allows digit-leading names; ``FunctionExpressionResolver`` uses stricter rules.
-PLAIN_VARIABLE_PATTERN = re.compile(r"\{\{([a-zA-Z0-9_]+)\}\}")
+PLAIN_VARIABLE_PATTERN = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
 
 
 def tokenize_template_expressions(content: str) -> list[str]:

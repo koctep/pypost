@@ -15,11 +15,11 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QPushButton,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from pypost.core.template_service import TemplateService
 from pypost.core.websocket_codec import encode_payload, validate_format
 from pypost.core.websocket_session_policy import SessionState
 from pypost.models.websocket import (
@@ -37,6 +37,7 @@ from pypost.ui.widget_ids import (
     WS_SEQUENCE_STOP_BUTTON,
     set_widget_id,
 )
+from pypost.ui.widgets.variable_aware_widgets import VariableAwareTextEdit
 
 if TYPE_CHECKING:
     from pypost.ui.presenters.websocket_presenter import WebSocketPresenter
@@ -59,10 +60,25 @@ class WebSocketComposer(QWidget):
         self._current_format: WsMessageFormat = WsMessageFormat.TEXT
         self._validation_error: Optional[str] = None
         self._is_valid: bool = True
+        self._variables: dict[str, str] = {}
+        self._hidden_keys: set[str] = set()
+        self._template_service: TemplateService = TemplateService()
 
         self._init_ui()
         self._sync_presets_and_sequences()
         self._revalidate()
+
+    def set_variables(self, variables: dict[str, str]) -> None:
+        """Store active environment variables snapshot and propagate to editor."""
+        self._variables = dict(variables)
+        if hasattr(self.payload_edit, "set_variables"):
+            self.payload_edit.set_variables(variables)
+
+    def set_hidden_keys(self, hidden_keys: set[str]) -> None:
+        """Store active hidden keys snapshot and propagate to editor."""
+        self._hidden_keys = set(hidden_keys)
+        if hasattr(self.payload_edit, "set_hidden_keys"):
+            self.payload_edit.set_hidden_keys(hidden_keys)
 
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -127,7 +143,7 @@ class WebSocketComposer(QWidget):
         layout.addLayout(control_bar)
 
         # Payload editor
-        self.payload_edit = QTextEdit(self)
+        self.payload_edit = VariableAwareTextEdit(self)
         set_widget_id(self.payload_edit, WS_COMPOSER_EDIT)
         self.payload_edit.setPlaceholderText("Enter message payload...")
         self.payload_edit.textChanged.connect(self._revalidate)
@@ -286,17 +302,34 @@ class WebSocketComposer(QWidget):
                 logger.warning("composer_send_blocked_not_open state=%s", state)
                 return False
 
-        if not self.is_payload_valid():
+        raw_payload = self.get_payload()
+        active_vars = (
+            getattr(self.presenter, "_env_vars", self._variables)
+            if self.presenter is not None
+            else self._variables
+        )
+        if active_vars and "{{" in raw_payload:
+            try:
+                resolved_payload = self._template_service.render_string(
+                    raw_payload, active_vars
+                )
+            except Exception as exc:
+                logger.debug("composer_template_render_failed error=%s", exc)
+                resolved_payload = raw_payload
+        else:
+            resolved_payload = raw_payload
+
+        is_valid, err = validate_format(resolved_payload, self._current_format)
+        if not is_valid:
             logger.warning(
                 "composer_send_blocked_invalid_format format=%s error=%s",
                 self._current_format.value,
-                self.get_validation_error(),
+                err,
             )
             return False
 
-        payload = self.get_payload()
         try:
-            encoded = encode_payload(payload, self._current_format)
+            encoded = encode_payload(resolved_payload, self._current_format)
         except Exception as exc:
             logger.error(
                 "composer_encode_failed format=%s error=%s",

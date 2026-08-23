@@ -185,6 +185,36 @@ class WebSocketConnectionEditor(QWidget):
         """Return True if connection fields are locked."""
         return self._read_only
 
+    def set_variables(self, variables: dict[str, str]) -> None:
+        """Propagate environment variables to inputs and tables."""
+        self.url_input.set_variables(variables)
+        self.subprotocols_input.set_variables(variables)
+        self.params_table.set_variables(variables)
+        self.headers_table.set_variables(variables)
+
+    def set_hidden_keys(self, hidden_keys: set[str]) -> None:
+        """Propagate hidden keys to inputs and tables."""
+        self.url_input.set_hidden_keys(hidden_keys)
+        self.subprotocols_input.set_hidden_keys(hidden_keys)
+        self.params_table.set_hidden_keys(hidden_keys)
+        self.headers_table.set_hidden_keys(hidden_keys)
+
+    def set_data(
+        self,
+        url: str = "",
+        headers: Optional[dict[str, str]] = None,
+        params: Optional[dict[str, str]] = None,
+        subprotocols: Optional[list[str]] = None,
+    ) -> None:
+        """Set editor input values from raw parameters."""
+        self.url_input.setText(url)
+        if headers is not None:
+            self.headers_table.set_data(headers)
+        if params is not None:
+            self.params_table.set_data(params)
+        if subprotocols is not None:
+            self.subprotocols_input.setText(", ".join(subprotocols))
+
     def load_connection(self, conn: WebSocketConnection) -> None:
         """Populate editor fields from a WebSocketConnection profile."""
         self.url_input.setText(conn.url or "")

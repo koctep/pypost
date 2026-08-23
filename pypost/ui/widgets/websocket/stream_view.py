@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.sensitive_text_sanitizer import sanitize_text
 from pypost.core.websocket_stream import (
     MessageStream,
     StreamEntry,
@@ -318,10 +319,20 @@ class StreamDetailPane(QWidget):
         self._is_wrap: bool = True
         self._is_hex_mode: bool = False
         self._is_truncated_flag: bool = False
+        self._env_vars: dict[str, str] = {}
+        self._hidden_keys: set[str] = set()
 
         self._init_ui()
         if parent is None:
             self.show()
+
+    def set_variables(self, variables: dict[str, str]) -> None:
+        """Update environment variables snapshot for egress sanitization."""
+        self._env_vars = dict(variables)
+
+    def set_hidden_keys(self, hidden_keys: set[str]) -> None:
+        """Update hidden keys snapshot for egress sanitization."""
+        self._hidden_keys = set(hidden_keys)
 
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -462,8 +473,11 @@ class StreamDetailPane(QWidget):
         else:
             text_to_copy = self._editor.toPlainText()
 
-        QApplication.clipboard().setText(text_to_copy)
-        logger.debug("websocket_detail_payload_copied length=%d", len(text_to_copy))
+        sanitized_text = sanitize_text(
+            text_to_copy, env_vars=self._env_vars, hidden_keys=self._hidden_keys
+        )
+        QApplication.clipboard().setText(sanitized_text)
+        logger.debug("websocket_detail_payload_copied length=%d", len(sanitized_text))
 
     def _on_set_variable_clicked(self) -> None:
         cursor = self._editor.textCursor()
@@ -859,10 +873,25 @@ class WebSocketStreamView(QWidget):
             if path:
                 self.export_text(path)
 
+    def set_variables(self, variables: dict[str, str]) -> None:
+        """Propagate environment variables to child detail pane."""
+        self._detail_pane.set_variables(variables)
+
+    def set_hidden_keys(self, hidden_keys: set[str]) -> None:
+        """Propagate hidden keys to child detail pane."""
+        self._detail_pane.set_hidden_keys(hidden_keys)
+
     def export_json(self, path: Path | str) -> None:
         """Export stream to a JSON transcript file."""
         try:
-            export_stream_to_json_file(Path(path), self._stream_model.stream)
+            env_vars = getattr(self.presenter, "_env_vars", self._detail_pane._env_vars)
+            hidden_keys = getattr(self.presenter, "_hidden_keys", self._detail_pane._hidden_keys)
+            export_stream_to_json_file(
+                Path(path),
+                self._stream_model.stream,
+                env_vars=env_vars,
+                hidden_keys=hidden_keys,
+            )
         except Exception as exc:
             logger.error("websocket_stream_json_export_failed path=%s error=%s", path, exc)
             raise
@@ -870,7 +899,14 @@ class WebSocketStreamView(QWidget):
     def export_text(self, path: Path | str) -> None:
         """Export stream to a Plain Text transcript file."""
         try:
-            export_stream_to_text_file(Path(path), self._stream_model.stream)
+            env_vars = getattr(self.presenter, "_env_vars", self._detail_pane._env_vars)
+            hidden_keys = getattr(self.presenter, "_hidden_keys", self._detail_pane._hidden_keys)
+            export_stream_to_text_file(
+                Path(path),
+                self._stream_model.stream,
+                env_vars=env_vars,
+                hidden_keys=hidden_keys,
+            )
         except Exception as exc:
             logger.error("websocket_stream_text_export_failed path=%s error=%s", path, exc)
             raise

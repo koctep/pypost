@@ -106,7 +106,10 @@ def compile_sequence_plan(
                 display_name = preset.name
                 fmt = preset.format
                 raw_payload = preset.payload
-                valid, err = validate_format(raw_payload, fmt)
+                if "{{" not in raw_payload:
+                    valid, err = validate_format(raw_payload, fmt)
+                else:
+                    valid, err = True, None
                 if not valid:
                     overall_is_valid = False
                     logger.warning(
@@ -139,7 +142,10 @@ def compile_sequence_plan(
             display_name = "<inline>"
             fmt = step.format
             raw_payload = step.inline_payload
-            valid, err = validate_format(raw_payload, fmt)
+            if "{{" not in raw_payload:
+                valid, err = validate_format(raw_payload, fmt)
+            else:
+                valid, err = True, None
             if not valid:
                 overall_is_valid = False
                 logger.warning(

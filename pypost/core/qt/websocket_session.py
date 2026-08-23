@@ -9,6 +9,7 @@ from typing import Callable, Optional
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from pypost.core.qt.websocket_transport import QtWebSocketTransport
+from pypost.core.sensitive_text_sanitizer import sanitize_text
 from pypost.core.websocket_security_policy import (
     TlsCertificateError,
     classify_endpoint_security,
@@ -129,10 +130,11 @@ class WebSocketSessionController(QObject):
         )
         self.security_classification_changed.emit(classification.value)
 
+        masked_url = sanitize_text(effective_target.url)
         logger.info(
             "Opening WebSocket session to %s (verify_tls=%s, security=%s, "
             "heartbeat=%.1fs, reconnect=%s, ephemeral_trust=%s)",
-            effective_target.url,
+            masked_url,
             effective_target.verify_tls,
             classification.value,
             self._heartbeat_config.interval_seconds,
@@ -147,7 +149,7 @@ class WebSocketSessionController(QObject):
 
         self._transition_to(
             SessionState.CONNECTING,
-            StateDetail(message=f"Connecting to {effective_target.url}"),
+            StateDetail(message=f"Connecting to {masked_url}"),
         )
 
         self._transport = self._transport_factory()

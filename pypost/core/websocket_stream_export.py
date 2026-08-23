@@ -9,9 +9,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import logging
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 from pypost.core.export_file_writer import write_json_export_file
+from pypost.core.sensitive_text_sanitizer import sanitize_text
 from pypost.core.websocket_stream import MessageStream
 
 logger = logging.getLogger(__name__)
@@ -32,8 +33,11 @@ class WebSocketExportError(Exception):
 def format_json_transcript(
     stream: MessageStream,
     metadata: Mapping[str, Any] | None = None,
+    *,
+    env_vars: Mapping[str, str] | None = None,
+    hidden_keys: Iterable[str] | None = None,
 ) -> dict[str, Any]:
-    """Format stream entries and drop metadata as a JSON-serializable dictionary."""
+    """Format stream entries and metadata as a JSON dictionary with Tier 2 sanitization."""
     exported_at = (
         metadata.get("exported_at")
         if metadata and "exported_at" in metadata
@@ -54,10 +58,14 @@ def format_json_transcript(
             "kind": e.kind,
             "direction": e.direction,
             "payload_format": e.payload_format,
-            "payload": e.payload,
+            "payload": sanitize_text(e.payload, env_vars=env_vars, hidden_keys=hidden_keys),
             "byte_size": e.byte_size,
             "truncated": e.truncated,
-            "detail": e.detail,
+            "detail": (
+                sanitize_text(e.detail, env_vars=env_vars, hidden_keys=hidden_keys)
+                if e.detail
+                else ""
+            ),
         }
         for e in stream.snapshot()
     ]
@@ -71,8 +79,11 @@ def format_json_transcript(
 def format_text_transcript(
     stream: MessageStream,
     metadata: Mapping[str, Any] | None = None,
+    *,
+    env_vars: Mapping[str, str] | None = None,
+    hidden_keys: Iterable[str] | None = None,
 ) -> str:
-    """Format stream entries as a human-readable plain text transcript."""
+    """Format stream entries as a human-readable text transcript with Tier 2 sanitization."""
     exported_at = (
         metadata.get("exported_at")
         if metadata and "exported_at" in metadata
@@ -96,7 +107,8 @@ def format_text_transcript(
         else:
             content = e.payload
         if content:
-            parts.append(content)
+            sanitized_content = sanitize_text(content, env_vars=env_vars, hidden_keys=hidden_keys)
+            parts.append(sanitized_content)
         lines.append(" ".join(parts))
     return "\n".join(lines) + "\n"
 
@@ -105,9 +117,14 @@ def export_stream_to_json_file(
     path: Path,
     stream: MessageStream,
     metadata: Mapping[str, Any] | None = None,
+    *,
+    env_vars: Mapping[str, str] | None = None,
+    hidden_keys: Iterable[str] | None = None,
 ) -> None:
-    """Export stream to a JSON transcript file on disk."""
-    payload = format_json_transcript(stream, metadata=metadata)
+    """Export stream to a JSON transcript file on disk with Tier 2 sanitization."""
+    payload = format_json_transcript(
+        stream, metadata=metadata, env_vars=env_vars, hidden_keys=hidden_keys
+    )
     write_json_export_file(path, payload, error_cls=WebSocketExportError)
     logger.info(
         "websocket_stream_json_exported path=%s entries_count=%d "
@@ -123,11 +140,16 @@ def export_stream_to_text_file(
     path: Path,
     stream: MessageStream,
     metadata: Mapping[str, Any] | None = None,
+    *,
+    env_vars: Mapping[str, str] | None = None,
+    hidden_keys: Iterable[str] | None = None,
 ) -> None:
-    """Export stream to a UTF-8 plain text transcript file."""
+    """Export stream to a UTF-8 plain text transcript file with Tier 2 sanitization."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        content = format_text_transcript(stream, metadata=metadata)
+        content = format_text_transcript(
+            stream, metadata=metadata, env_vars=env_vars, hidden_keys=hidden_keys
+        )
         path.write_text(content, encoding="utf-8")
         logger.info(
             "websocket_stream_text_exported path=%s entries_count=%d "

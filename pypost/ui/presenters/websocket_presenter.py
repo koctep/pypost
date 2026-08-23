@@ -14,6 +14,8 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from pypost.core.qt.websocket_sequence_runner import WebSocketSequenceRunner
 from pypost.core.qt.websocket_session import WebSocketSessionController
+from pypost.core.sensitive_text_sanitizer import sanitize_text
+from pypost.core.template_service import TemplateService
 from pypost.core.websocket_sequence import compile_sequence_plan
 from pypost.core.websocket_session_policy import (
     HeartbeatConfig,
@@ -24,6 +26,7 @@ from pypost.core.websocket_session_policy import (
 from pypost.core.websocket_stream import build_stream_entry
 from pypost.core.websocket_transport_protocol import HandshakeTarget
 from pypost.models.websocket import WebSocketConnection
+from pypost.ui.widgets.websocket.connection_editor import _merge_url_and_params
 from pypost.ui.widgets.websocket.state_badge import STATE_GLYPHS
 from pypost.ui.widgets.websocket.stream_model import StreamListModel
 
@@ -49,6 +52,8 @@ class WebSocketPresenter(QObject):
         stream_model: Optional[StreamListModel] = None,
         env_vars: Optional[dict[str, str]] = None,
         hidden_keys: Optional[set[str]] = None,
+        template_service: Optional[TemplateService] = None,
+        metrics: Optional[Any] = None,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
@@ -65,6 +70,12 @@ class WebSocketPresenter(QObject):
         )
         self._env_vars: dict[str, str] = dict(env_vars) if env_vars is not None else {}
         self._hidden_keys: set[str] = set(hidden_keys) if hidden_keys is not None else set()
+        self._metrics: Optional[Any] = metrics
+        self._template_service: TemplateService = (
+            template_service
+            if template_service is not None
+            else TemplateService(metrics=metrics)
+        )
         self._tab: Optional[WebSocketTab] = None
         self._current_state: SessionState = self._session_controller.state
 
@@ -119,7 +130,27 @@ class WebSocketPresenter(QObject):
         """Bind the UI tab widget to this presenter."""
         self._tab = tab
         tab.connect_btn.clicked.connect(self._on_connect_clicked)
+        self._propagate_variables_to_tab()
         self._sync_ui_state(self.state, None)
+
+    def _propagate_variables_to_tab(self) -> None:
+        if self._tab is None:
+            return
+        if hasattr(self._tab, "connection_editor") and self._tab.connection_editor:
+            if hasattr(self._tab.connection_editor, "set_variables"):
+                self._tab.connection_editor.set_variables(self._env_vars)
+            if hasattr(self._tab.connection_editor, "set_hidden_keys"):
+                self._tab.connection_editor.set_hidden_keys(self._hidden_keys)
+        if hasattr(self._tab, "composer") and self._tab.composer:
+            if hasattr(self._tab.composer, "set_variables"):
+                self._tab.composer.set_variables(self._env_vars)
+            if hasattr(self._tab.composer, "set_hidden_keys"):
+                self._tab.composer.set_hidden_keys(self._hidden_keys)
+        if hasattr(self._tab, "stream_view") and self._tab.stream_view:
+            if hasattr(self._tab.stream_view, "set_variables"):
+                self._tab.stream_view.set_variables(self._env_vars)
+            if hasattr(self._tab.stream_view, "set_hidden_keys"):
+                self._tab.stream_view.set_hidden_keys(self._hidden_keys)
 
     def _wire_controller_signals(self) -> None:
         self._session_controller.state_changed.connect(self._on_state_changed)
@@ -130,20 +161,49 @@ class WebSocketPresenter(QObject):
         self._session_controller.session_failed.connect(self._on_session_failed)
 
     def handle_connect(self) -> None:
-        """Initiate connection to target endpoint."""
+        """Initiate connection to target endpoint with connect-time template resolution."""
         if self.state in (SessionState.CONNECTING, SessionState.RECONNECTING, SessionState.OPEN):
             self.handle_disconnect()
             return
 
         if self._tab is not None:
-            target = self._tab.connection_editor.get_target()
+            raw_url = self._tab.connection_editor.url_input.text().strip()
+            raw_params = self._tab.connection_editor.params_table.get_data()
+            raw_headers = self._tab.connection_editor.headers_table.get_data()
+            subproto_raw = self._tab.connection_editor.subprotocols_input.text()
+            raw_subprotocols = [s.strip() for s in subproto_raw.split(",") if s.strip()]
             self._tab.connection_editor.set_read_only(True)
         else:
-            target = HandshakeTarget(
-                url=self.connection.url or "",
-                headers=self.connection.headers or {},
-                subprotocols=tuple(self.connection.subprotocols or []),
+            raw_url = (self.connection.url or "").strip()
+            raw_params = dict(self.connection.params or {})
+            raw_headers = dict(self.connection.headers or {})
+            raw_subprotocols = list(self.connection.subprotocols or [])
+
+        # Connect-time template resolution (frozen for session duration)
+        resolved_url = self._template_service.render_string(raw_url, self._env_vars)
+        resolved_params = {
+            self._template_service.render_string(k, self._env_vars): (
+                self._template_service.render_string(v, self._env_vars)
             )
+            for k, v in raw_params.items()
+        }
+        resolved_headers = {
+            self._template_service.render_string(k, self._env_vars): (
+                self._template_service.render_string(v, self._env_vars)
+            )
+            for k, v in raw_headers.items()
+        }
+        resolved_subprotocols = tuple(
+            self._template_service.render_string(s, self._env_vars) for s in raw_subprotocols
+        )
+
+        merged_url = _merge_url_and_params(resolved_url, resolved_params)
+
+        target = HandshakeTarget(
+            url=merged_url,
+            headers=resolved_headers,
+            subprotocols=resolved_subprotocols,
+        )
 
         heartbeat = (
             HeartbeatConfig(
@@ -167,7 +227,11 @@ class WebSocketPresenter(QObject):
             else None
         )
 
-        logger.info("websocket_connect_initiated url=%s", target.url)
+        # Invariant: sanitize URL before logging to prevent secret token leaks in logs
+        masked_log_url = sanitize_text(
+            target.url, env_vars=self._env_vars, hidden_keys=self._hidden_keys
+        )
+        logger.info("websocket_connect_initiated url=%s", masked_log_url)
         self._session_controller.open(target, heartbeat=heartbeat, reconnect=reconnect)
 
     def handle_disconnect(self) -> None:
@@ -222,12 +286,22 @@ class WebSocketPresenter(QObject):
         self._sequence_runner.stop()
 
     def set_variables(self, variables: dict[str, str]) -> None:
-        """Update active environment variables for secret masking."""
+        """Update active environment variables and propagate to tab widgets."""
         self._env_vars = dict(variables)
+        self._propagate_variables_to_tab()
 
     def set_hidden_keys(self, hidden_keys: set[str]) -> None:
-        """Update active hidden keys for secret masking."""
+        """Update active hidden keys and propagate to tab widgets."""
         self._hidden_keys = set(hidden_keys)
+        self._propagate_variables_to_tab()
+
+    def _on_mask_applied(self) -> None:
+        """Track metric when secrets are masked on the WebSocket stream."""
+        if self._metrics is not None:
+            if hasattr(self._metrics, "track_hidden_value_mask_applied"):
+                self._metrics.track_hidden_value_mask_applied(surface="websocket")
+            elif hasattr(self._metrics, "hidden_value_masks_applied"):
+                self._metrics.hidden_value_masks_applied.labels(surface="websocket").inc()
 
     def _on_state_changed(self, state_val: str, detail: Any = None) -> None:
         try:
@@ -280,6 +354,7 @@ class WebSocketPresenter(QObject):
             seq=self._next_seq,
             kind="message",
             direction="out",
+            on_mask_applied=self._on_mask_applied,
         )
         self._next_seq += 1
         self._pending_entries.append(entry)
@@ -295,6 +370,7 @@ class WebSocketPresenter(QObject):
             seq=self._next_seq,
             kind="message",
             direction="in",
+            on_mask_applied=self._on_mask_applied,
         )
         self._next_seq += 1
         self._pending_entries.append(entry)
@@ -312,6 +388,7 @@ class WebSocketPresenter(QObject):
             direction="none",
             payload=f"[{event_type.upper()}] {detail}".strip(),
             detail=detail,
+            on_mask_applied=self._on_mask_applied,
         )
         self._next_seq += 1
         self._pending_entries.append(entry)
@@ -329,6 +406,7 @@ class WebSocketPresenter(QObject):
             direction="none",
             payload=f"[FAILED] ({category}) {message}".strip(),
             detail=message,
+            on_mask_applied=self._on_mask_applied,
         )
         self._next_seq += 1
         self._pending_entries.append(entry)

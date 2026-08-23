@@ -155,9 +155,10 @@ class QtWebSocketTransport(WebSocketTransport):
 
     def open(self, target: HandshakeTarget) -> None:
         """Configure socket and open connection to target."""
+        from pypost.core.sensitive_text_sanitizer import sanitize_text
         logger.debug(
             "websocket_transport_open_initiated url=%s max_bytes=%d subprotocols=%s verify_tls=%s",
-            target.url,
+            sanitize_text(target.url),
             target.max_incoming_message_bytes,
             target.subprotocols,
             target.verify_tls,
