@@ -65,11 +65,15 @@ class ScriptedWebSocketServer(QObject):
         self,
         server_name: str = "ScriptedWebSocketServer",
         config: Optional[ServerBehaviorConfig] = None,
+        max_history: Optional[int] = None,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
+        if max_history is not None and max_history < 1:
+            raise ValueError("max_history must be None or a positive integer")
         self.server_name: str = server_name
         self.config: ServerBehaviorConfig = config or ServerBehaviorConfig()
+        self._max_history: Optional[int] = max_history
         self._server: Optional[QWebSocketServer] = None
         self._clients: list[QWebSocket] = []
         self._received_messages: list[str | bytes] = []
@@ -78,8 +82,20 @@ class ScriptedWebSocketServer(QObject):
         self._sent_messages: list[str | bytes] = []
         self._sent_text_messages: list[str] = []
         self._sent_binary_messages: list[bytes] = []
+        self._total_received_count: int = 0
         self._connection_count: int = 0
         self._disconnection_count: int = 0
+
+    @property
+    def max_history(self) -> Optional[int]:
+        """Configured maximum message buffer entries; None means unbounded."""
+        return self._max_history
+
+    def _append_to_buffer(self, buffer: list, item: str | bytes) -> None:
+        """Append to a message buffer and truncate oldest entries when capped."""
+        buffer.append(item)
+        if self._max_history is not None and len(buffer) > self._max_history:
+            del buffer[: len(buffer) - self._max_history]
 
     @property
     def host(self) -> str:
@@ -174,8 +190,8 @@ class ScriptedWebSocketServer(QObject):
     def _send_client_text(self, client: QWebSocket, message: str) -> None:
         """Send text frame to client and record in sent message buffer."""
         client.sendTextMessage(message)
-        self._sent_messages.append(message)
-        self._sent_text_messages.append(message)
+        self._append_to_buffer(self._sent_messages, message)
+        self._append_to_buffer(self._sent_text_messages, message)
         logger.debug(
             "ws_server_text_message_sent name=%s length=%d total_sent=%d",
             self.server_name,
@@ -186,8 +202,8 @@ class ScriptedWebSocketServer(QObject):
     def _send_client_binary(self, client: QWebSocket, message: bytes) -> None:
         """Send binary frame to client and record in sent message buffer."""
         client.sendBinaryMessage(QByteArray(message))
-        self._sent_messages.append(message)
-        self._sent_binary_messages.append(message)
+        self._append_to_buffer(self._sent_messages, message)
+        self._append_to_buffer(self._sent_binary_messages, message)
         logger.debug(
             "ws_server_binary_message_sent name=%s length=%d total_sent=%d",
             self.server_name,
@@ -263,6 +279,7 @@ class ScriptedWebSocketServer(QObject):
         self._sent_messages.clear()
         self._sent_text_messages.clear()
         self._sent_binary_messages.clear()
+        self._total_received_count = 0
         self._connection_count = 0
         self._disconnection_count = 0
         self.config = ServerBehaviorConfig()
@@ -385,8 +402,9 @@ class ScriptedWebSocketServer(QObject):
 
     def _on_text_message_received(self, client: QWebSocket, message: str) -> None:
         """Process incoming text message according to configured behavior."""
-        self._received_messages.append(message)
-        self._received_text_messages.append(message)
+        self._append_to_buffer(self._received_messages, message)
+        self._append_to_buffer(self._received_text_messages, message)
+        self._total_received_count += 1
         logger.debug(
             "ws_server_text_message_received name=%s length=%d total_received=%d",
             self.server_name,
@@ -402,7 +420,7 @@ class ScriptedWebSocketServer(QObject):
         elif self.config.behavior == ServerBehavior.CLOSE_WITH_CODE:
             if (
                 self.config.close_on_message_count is not None
-                and len(self._received_messages) >= self.config.close_on_message_count
+                and self._total_received_count >= self.config.close_on_message_count
             ):
                 client.close(
                     QWebSocketProtocol.CloseCode(self.config.close_code),
@@ -411,8 +429,9 @@ class ScriptedWebSocketServer(QObject):
 
     def _on_binary_message_received(self, client: QWebSocket, message: bytes) -> None:
         """Process incoming binary message according to configured behavior."""
-        self._received_messages.append(message)
-        self._received_binary_messages.append(message)
+        self._append_to_buffer(self._received_messages, message)
+        self._append_to_buffer(self._received_binary_messages, message)
+        self._total_received_count += 1
         logger.debug(
             "ws_server_binary_message_received name=%s length=%d total_received=%d",
             self.server_name,
@@ -428,7 +447,7 @@ class ScriptedWebSocketServer(QObject):
         elif self.config.behavior == ServerBehavior.CLOSE_WITH_CODE:
             if (
                 self.config.close_on_message_count is not None
-                and len(self._received_messages) >= self.config.close_on_message_count
+                and self._total_received_count >= self.config.close_on_message_count
             ):
                 client.close(
                     QWebSocketProtocol.CloseCode(self.config.close_code),

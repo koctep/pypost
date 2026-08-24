@@ -30,7 +30,7 @@ graph TD
     end
 
     subgraph "WebSocket Test Infrastructure (tests/websocket_echo_server.py)"
-        SWS["ScriptedWebSocketServer (QObject)<br/>- start(timeout) / stop(timeout)<br/>- reset() / configure(config)<br/>- send_to_all() / send_to_client() / flood() / drop_clients()<br/>- Diagnostic properties & message buffers"]
+        SWS["ScriptedWebSocketServer (QObject)<br/>- start(timeout) / stop(timeout)<br/>- reset() / configure(config)<br/>- send_to_all() / send_to_client() / flood() / drop_clients()<br/>- max_history (optional buffer cap)<br/>- Diagnostic properties & message buffers"]
         SBC["ServerBehaviorConfig<br/>(Dataclass configuration)"]
         SB["ServerBehavior (Enum)<br/>• ECHO<br/>• REJECT_HANDSHAKE<br/>• SUBPROTOCOL_NEGOTIATE<br/>• SUBPROTOCOL_REFUSE<br/>• CLOSE_WITH_CODE<br/>• SILENT<br/>• FLOOD<br/>• OVERSIZE_MESSAGE<br/>• DROP_CONNECTION<br/>• CUSTOM_CALLBACK"]
     end
@@ -388,6 +388,28 @@ def test_selective_peer_delivery(ws_test_server, qapp):
 
 > **Note:** On disconnect, the harness removes the peer from `clients` and calls `deleteLater()` for prompt Qt object reclamation under connection churn.
 
+### 10. Bounded Message History (`max_history`)
+
+For high-throughput flood or benchmark tests, pass `max_history=N` at construction to cap in-memory received and sent message buffers to the most recent N entries. Older frames are dropped (ring-buffer truncation). Default `None` retains unbounded history until `reset()`.
+
+```python
+from tests.websocket_echo_server import ScriptedWebSocketServer, ServerBehaviorConfig, ServerBehavior
+
+@pytest.mark.timeout(15)
+def test_bounded_benchmark_buffers(qapp):
+    server = ScriptedWebSocketServer(
+        config=ServerBehaviorConfig(behavior=ServerBehavior.SILENT),
+        max_history=1000,
+    )
+    with server:
+        # flood() may emit thousands of frames; buffers retain only the last 1000
+        server.flood(count=5000, size=64)
+        assert len(server.sent_messages) == 1000
+        assert server.max_history == 1000
+```
+
+> **Note:** `max_history` must be `None` or a positive integer. Connection/disconnection counters remain cumulative. Scripted `close_on_message_count` still counts every received frame even when buffers are truncated.
+
 ---
 
 ## Observability & Diagnostic Properties
@@ -412,6 +434,7 @@ def test_selective_peer_delivery(ws_test_server, qapp):
 | `sent_messages` | `list[str \| bytes]` | Chronological buffer of all emitted text and binary message payloads. |
 | `sent_text_messages` | `list[str]` | Filtered chronological list of emitted text frames. |
 | `sent_binary_messages` | `list[bytes]` | Filtered chronological list of emitted binary frames. |
+| `max_history` | `Optional[int]` | Configured buffer cap (`None` = unbounded). Read-only; set at construction. |
 
 ### Resetting Server State
 
@@ -471,5 +494,5 @@ The server emits structured `key=value` debug events via the standard logger `lo
 | Client fails to connect (`isValid() == False`) and timeout expires in `wait_until()` | Active behavior is set to `REJECT_HANDSHAKE`, or Qt event loop is not being processed. | Ensure `wait_until()` is used (which processes Qt events). Check if `server.behavior` was left in `REJECT_HANDSHAKE` from a previous configuration; call `server.reset()` if necessary. |
 | Subprotocol is empty string on client after connection | Server was not configured with `SUBPROTOCOL_NEGOTIATE` or requested subprotocol did not match `supported_subprotocols`. | Configure `ServerBehaviorConfig(behavior=ServerBehavior.SUBPROTOCOL_NEGOTIATE, supported_subprotocols=[...])` before client connects. |
 | `ws_server_origin_auth_evaluated allowed=false` in logs | Handshake rejection behavior is active (`ServerBehavior.REJECT_HANDSHAKE`). | Expected when testing handshake error handling. For normal tests, configure behavior to `ServerBehavior.ECHO`. |
-| High CPU or test timeout during flood tests | Flood count too high for single test timeout window. | Check `@pytest.mark.timeout(...)` on the test. For large bursts, ensure the timeout is at least 15 seconds or mark test with `@pytest.mark.slow`. |
+| High CPU or test timeout during flood tests | Flood count too high for single test timeout window. | Check `@pytest.mark.timeout(...)` on the test. For large bursts, ensure the timeout is at least 15 seconds or mark test with `@pytest.mark.slow`. Consider `max_history=N` to limit buffer memory during extreme benchmarks. |
 | Port conflict or address already in use error | Hardcoded static port was attempted instead of dynamic port `0`. | Always bind with port `0` (`listen(QHostAddress.LocalHost, 0)`). `ScriptedWebSocketServer` binds to port `0` dynamically by default. |

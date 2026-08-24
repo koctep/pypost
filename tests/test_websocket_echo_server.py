@@ -692,3 +692,52 @@ def test_disconnect_invokes_delete_later(qapp) -> None:
     finally:
         client.close()
         server.stop()
+
+
+@pytest.mark.timeout(10)
+def test_max_history_truncates_received_and_sent_buffers(qapp) -> None:
+    """max_history caps received and sent message buffers to the most recent N entries."""
+    server = ScriptedWebSocketServer(
+        config=ServerBehaviorConfig(behavior=ServerBehavior.SILENT),
+        max_history=3,
+    )
+    server.start()
+
+    client = QWebSocket()
+    try:
+        client.open(QUrl(server.url))
+        wait_until(
+            lambda: client.isValid() and len(server.clients) == 1,
+            timeout=5.0,
+            message="Client failed to connect",
+        )
+
+        for index in range(5):
+            expected_msg = f"msg-{index}"
+            client.sendTextMessage(expected_msg)
+            wait_until(
+                lambda exp=expected_msg: server.received_text_messages[-1:] == [exp],
+                timeout=5.0,
+                message=f"Received buffer not truncated after message {index}",
+            )
+
+        assert server.received_text_messages == ["msg-2", "msg-3", "msg-4"]
+        assert server.received_messages == ["msg-2", "msg-3", "msg-4"]
+        assert len(server.received_binary_messages) == 0
+
+        for index in range(5):
+            expected_msg = f"out-{index}"
+            server.send_to_all(expected_msg)
+            wait_until(
+                lambda exp=expected_msg: server.sent_text_messages[-1:] == [exp],
+                timeout=5.0,
+                message=f"Sent buffer not truncated after outbound {index}",
+            )
+
+        assert server.sent_text_messages == ["out-2", "out-3", "out-4"]
+        assert server.sent_messages == ["out-2", "out-3", "out-4"]
+        assert len(server.sent_binary_messages) == 0
+        assert server.max_history == 3
+    finally:
+        client.close()
+        server.stop()
