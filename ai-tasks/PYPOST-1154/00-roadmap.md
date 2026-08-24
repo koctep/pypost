@@ -27,7 +27,8 @@
   - `ai-tasks/PYPOST-1154/60-tech-debt.md`
 - [x] **STEP 8: Dev Docs**
   - `doc/dev/parallel_test_runner.md`, `doc/dev/testing.md`
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - `a0cc9cc3` — `performance(testing): PYPOST-1154 set tuned default WORKERS for parallel tests`
 
 ## Status Legend
 
