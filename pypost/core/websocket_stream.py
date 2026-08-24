@@ -11,13 +11,14 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
-from typing import Callable, Iterable, Mapping
+from typing import Callable, Iterable, Mapping, Sequence
 
 from pypost.core.websocket_transport_protocol import RawFrame
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "BatchEvictionPlan",
     "StreamEntry",
     "StreamQuery",
     "MessageStream",
@@ -43,6 +44,17 @@ class StreamEntry:
     def formatted_payload(self) -> str:
         """Return masked payload string."""
         return self.payload
+
+
+@dataclass(frozen=True)
+class BatchEvictionPlan:
+    """Result of simulating FIFO batch append eviction without mutating the stream."""
+
+    existing_evicted: int
+    dropped_capacity: int
+    dropped_memory_budget: int
+    total_evicted: int
+    entries_to_append: tuple[StreamEntry, ...]
 
 
 @dataclass
@@ -171,6 +183,74 @@ class MessageStream:
 
     def __getitem__(self, index: int) -> StreamEntry:
         return self._entries[index]
+
+    def calculate_batch_evictions(
+        self, entries: Sequence[StreamEntry]
+    ) -> BatchEvictionPlan:
+        """Simulate FIFO dual eviction for a batch append without mutating the buffer."""
+        if not entries:
+            return BatchEvictionPlan(0, 0, 0, 0, ())
+
+        temp_entries = list(self._entries)
+        retained = self._retained_bytes
+        dropped_cap = 0
+        dropped_mem = 0
+        initial_count = len(temp_entries)
+        initial_remaining = initial_count
+
+        for entry in entries:
+            cost = len(entry.payload.encode("utf-8"))
+            while len(temp_entries) >= self._max_entries:
+                old = temp_entries.pop(0)
+                retained -= len(old.payload.encode("utf-8"))
+                dropped_cap += 1
+                if initial_remaining > 0:
+                    initial_remaining -= 1
+            while temp_entries and (retained + cost > self._memory_budget_bytes):
+                old = temp_entries.pop(0)
+                retained -= len(old.payload.encode("utf-8"))
+                dropped_mem += 1
+                if initial_remaining > 0:
+                    initial_remaining -= 1
+            temp_entries.append(entry)
+            retained += cost
+
+        total_evicted = dropped_cap + dropped_mem
+        existing_evicted = initial_count - initial_remaining
+        entries_to_append = tuple(temp_entries[initial_remaining:])
+
+        return BatchEvictionPlan(
+            existing_evicted=existing_evicted,
+            dropped_capacity=dropped_cap,
+            dropped_memory_budget=dropped_mem,
+            total_evicted=total_evicted,
+            entries_to_append=entries_to_append,
+        )
+
+    def remove_front(self, count: int) -> None:
+        """Remove the oldest entries from the buffer and update retained bytes."""
+        for _ in range(count):
+            old = self._entries.popleft()
+            self._retained_bytes -= len(old.payload.encode("utf-8"))
+
+    def record_batch_drops(self, dropped_capacity: int, dropped_memory_budget: int) -> None:
+        """Increment drop counters for a batch eviction plan."""
+        self._dropped_capacity += dropped_capacity
+        self._dropped_memory_budget += dropped_memory_budget
+
+    def append_entries(self, entries: Sequence[StreamEntry]) -> None:
+        """Append entries to the buffer and update retained bytes."""
+        for entry in entries:
+            self._entries.append(entry)
+            self._retained_bytes += len(entry.payload.encode("utf-8"))
+
+    def apply_batch_evictions(self, plan: BatchEvictionPlan) -> None:
+        """Apply a prior batch eviction plan atomically (headless / test convenience)."""
+        if plan.existing_evicted > 0:
+            self.remove_front(plan.existing_evicted)
+        self.record_batch_drops(plan.dropped_capacity, plan.dropped_memory_budget)
+        if plan.entries_to_append:
+            self.append_entries(plan.entries_to_append)
 
 
 def _mask_secrets(

@@ -325,16 +325,18 @@ sequenceDiagram
     participant Ring as MessageStream
 
     Presenter->>Model: append_batch(batch_entries)
-    Model->>Model: _calculate_batch_evictions(batch_entries)
+    Model->>Ring: calculate_batch_evictions(batch_entries)
     
-    opt Eviction needed (total_evicted > 0)
-        Model->>View: beginRemoveRows(QModelIndex(), 0, total_evicted - 1)
-        Model->>Ring: popleft() evicted items & update drop counters
+    opt Eviction needed (existing_evicted > 0)
+        Model->>View: beginRemoveRows(QModelIndex(), 0, existing_evicted - 1)
+        Model->>Ring: remove_front(existing_evicted)
         Model->>View: endRemoveRows()
     end
 
+    Model->>Ring: record_batch_drops(dropped_capacity, dropped_memory_budget)
+
     Model->>View: beginInsertRows(QModelIndex(), old_len, old_len + batch_len - 1)
-    Model->>Ring: append() new batch entries
+    Model->>Ring: append_entries(entries_to_append)
     Model->>View: endInsertRows()
     
     Model-->>Presenter: (inserted_count, evicted_count)
@@ -402,6 +404,38 @@ assert reason == "capacity"
 assert stream.dropped["capacity"] == 1
 assert [e.seq for e in stream.snapshot()] == [2, 3, 4]
 ```
+
+### 2b. Batch Eviction Planning (PYPOST-1141)
+
+`StreamListModel.append_batch` delegates eviction math to `MessageStream.calculate_batch_evictions`
+so the UI model does not access private buffer members:
+
+```python
+from pypost.core.websocket_stream import BatchEvictionPlan, MessageStream, StreamEntry
+
+stream = MessageStream(max_entries=3, memory_budget_bytes=10_000)
+# ... pre-fill stream ...
+
+new_entries = [StreamEntry(...), StreamEntry(...)]
+plan = stream.calculate_batch_evictions(new_entries)
+
+# plan.existing_evicted — rows to remove from front (Qt beginRemoveRows range)
+# plan.dropped_capacity / plan.dropped_memory_budget — per-cause drop counts
+# plan.entries_to_append — new entries to insert after eviction
+
+# Headless atomic apply (UI model splits remove/append for Qt signals):
+stream.apply_batch_evictions(plan)
+```
+
+Public batch mutation helpers used by `StreamListModel`:
+
+| Method | Purpose |
+| --- | --- |
+| `calculate_batch_evictions(entries)` | Side-effect-free FIFO eviction simulation |
+| `remove_front(count)` | Remove oldest entries and update retained bytes |
+| `record_batch_drops(capacity, memory_budget)` | Increment drop counters |
+| `append_entries(entries)` | Append new entries and update retained bytes |
+| `apply_batch_evictions(plan)` | Atomic plan apply (headless convenience) |
 
 ### 3. Querying the Stream
 

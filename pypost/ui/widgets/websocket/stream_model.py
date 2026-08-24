@@ -103,67 +103,39 @@ class StreamListModel(QAbstractListModel):
         if not entries:
             return 0, 0
 
-        temp_entries = list(self._stream._entries)
-        retained = self._stream._retained_bytes
-        dropped_cap = 0
-        dropped_mem = 0
-        initial_count = len(temp_entries)
-        initial_remaining = initial_count
+        plan = self._stream.calculate_batch_evictions(entries)
+        total_evicted = plan.total_evicted
 
-        for entry in entries:
-            cost = len(entry.payload.encode("utf-8"))
-            while len(temp_entries) >= self._stream._max_entries:
-                old = temp_entries.pop(0)
-                retained -= len(old.payload.encode("utf-8"))
-                dropped_cap += 1
-                if initial_remaining > 0:
-                    initial_remaining -= 1
-            while temp_entries and (retained + cost > self._stream._memory_budget_bytes):
-                old = temp_entries.pop(0)
-                retained -= len(old.payload.encode("utf-8"))
-                dropped_mem += 1
-                if initial_remaining > 0:
-                    initial_remaining -= 1
-            temp_entries.append(entry)
-            retained += cost
-
-        total_evicted = dropped_cap + dropped_mem
-        existing_evicted = initial_count - initial_remaining
-
-        if existing_evicted > 0:
-            self.beginRemoveRows(QModelIndex(), 0, existing_evicted - 1)
-            for _ in range(existing_evicted):
-                old = self._stream._entries.popleft()
-                self._stream._retained_bytes -= len(old.payload.encode("utf-8"))
+        if plan.existing_evicted > 0:
+            self.beginRemoveRows(QModelIndex(), 0, plan.existing_evicted - 1)
+            self._stream.remove_front(plan.existing_evicted)
             self.endRemoveRows()
 
-        self._stream._dropped_capacity += dropped_cap
-        self._stream._dropped_memory_budget += dropped_mem
+        self._stream.record_batch_drops(plan.dropped_capacity, plan.dropped_memory_budget)
 
         if total_evicted > 0:
             logger.debug(
                 "websocket_stream_model_eviction_signaled evicted=%d "
                 "dropped_capacity=%d dropped_memory_budget=%d total_rows=%d",
                 total_evicted,
-                dropped_cap,
-                dropped_mem,
-                len(self._stream._entries),
+                plan.dropped_capacity,
+                plan.dropped_memory_budget,
+                len(self._stream),
             )
 
-        new_entries_to_insert = temp_entries[initial_remaining:]
-        if new_entries_to_insert:
-            old_len = len(self._stream._entries)
-            self.beginInsertRows(QModelIndex(), old_len, old_len + len(new_entries_to_insert) - 1)
-            for entry in new_entries_to_insert:
-                self._stream._entries.append(entry)
-                self._stream._retained_bytes += len(entry.payload.encode("utf-8"))
+        if plan.entries_to_append:
+            old_len = len(self._stream)
+            self.beginInsertRows(
+                QModelIndex(), old_len, old_len + len(plan.entries_to_append) - 1
+            )
+            self._stream.append_entries(plan.entries_to_append)
             self.endInsertRows()
 
         logger.debug(
             "websocket_stream_model_batch_appended inserted=%d evicted=%d total_rows=%d",
             len(entries),
             total_evicted,
-            len(self._stream._entries),
+            len(self._stream),
         )
 
         return len(entries), total_evicted
