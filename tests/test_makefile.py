@@ -734,6 +734,18 @@ class TestFastTestTargetRecipe:
         recipe = makefile_target_recipe_body(text, _TEST)
         assert '-m "not slow"' in recipe
 
+    def test_makefile_parallel_runner_passes_workers(self) -> None:
+        """PYPOST-1154: test target always forwards WORKERS to orchestrator."""
+        text = MAKEFILE.read_text(encoding="utf-8")
+        recipe = makefile_target_recipe_body(text, _TEST)
+        assert "scripts/run_parallel_tests.py" in recipe
+        assert "--workers $(WORKERS)" in recipe
+
+    def test_makefile_workers_default_is_computed(self) -> None:
+        """PYPOST-1154: WORKERS default is not empty."""
+        text = MAKEFILE.read_text(encoding="utf-8")
+        assert "default_worker_count" in text
+
     def test_makefile_help_comment_frames_fast_suite(self) -> None:
         text = MAKEFILE.read_text(encoding="utf-8")
         help_text = makefile_target_help_comment(text, _TEST)

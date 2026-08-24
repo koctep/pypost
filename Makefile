@@ -16,7 +16,7 @@ BIN := $(VENV)/bin
 VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
 VENV_TEST_STAMP := $(VENV)/.venv-test-$(PYTHON_VERSION)
 VENV_OTEL_STAMP := $(VENV)/.venv-otel-$(PYTHON_VERSION)
-WORKERS ?=
+WORKERS ?= $(shell PYTHONPATH=. $(PYTHON) -c 'from scripts.run_parallel_tests import default_worker_count; print(default_worker_count())')
 PYTEST_ARGS ?=
 
 help: ## Show available make targets
@@ -156,7 +156,7 @@ run-agent-ui-mcp: $(VENV_MARKER) ## Stdio MCP sidecar for agent UI actions (PYPO
 test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow integration tests)
 	@if [ -f scripts/run_parallel_tests.py ]; then \
 		QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py \
-			$(if $(WORKERS),--workers $(WORKERS)) \
+			--workers $(WORKERS) \
 			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow"); \
 	else \
 		QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
@@ -181,7 +181,7 @@ check-jira-mcp-path-freshness: $(VENV_MARKER) venv-test venv-otel ## Offline jir
 test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage report
 	@if [ -f scripts/run_parallel_tests.py ]; then \
 		QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py --cov \
-			$(if $(WORKERS),--workers $(WORKERS)) \
+			--workers $(WORKERS) \
 			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow"); \
 	else \
 		QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \

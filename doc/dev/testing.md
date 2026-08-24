@@ -23,7 +23,8 @@ make check-jira-mcp-path-freshness  # offline jira_mcp critical REST paths vs ca
 `make test` and `make test-cov` run through the parallel file-level orchestrator
 (`scripts/run_parallel_tests.py`, PYPOST-1149): each `tests/test_*.py` module
 executes in an isolated subprocess with `QT_QPA_PLATFORM=offscreen`. Control
-concurrency with `WORKERS` (for example `make test WORKERS=4`). Full CLI flags,
+concurrency with `WORKERS` (default is tuned automatically; override with
+`make test WORKERS=4`). Full CLI flags,
 coverage combine, JSON reports, and troubleshooting:
 [Parallel Test Runner Orchestrator](parallel_test_runner.md).
 

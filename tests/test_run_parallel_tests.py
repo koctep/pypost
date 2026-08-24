@@ -21,6 +21,7 @@ from scripts.run_parallel_tests import (
     TestDiscovery,
     TestResult,
     TestStatus,
+    default_worker_count,
     get_worker_count,
     main,
     run_parallel_tests,
@@ -114,14 +115,31 @@ def test_cli_parser_separates_runner_and_pytest_args() -> None:
     assert "tests/test_alpha.py" in config.test_targets
 
 
+def test_default_worker_count_io_tuned_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PYPOST-1154: default oversubscribes modestly for I/O-bound subprocess pytest."""
+    monkeypatch.delenv("WORKERS", raising=False)
+    monkeypatch.delenv("PYTEST_WORKERS", raising=False)
+    monkeypatch.setattr("os.cpu_count", lambda: 6)
+    assert default_worker_count() == 8
+    assert get_worker_count(cli_workers=None) == 8
+
+
+def test_default_worker_count_policy_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PYPOST-1154: lock representative default worker counts."""
+    cases = [(2, 4), (4, 6), (6, 8), (8, 10), (16, 16)]
+    for cpu, expected in cases:
+        monkeypatch.setattr("os.cpu_count", lambda c=cpu: c)
+        assert default_worker_count() == expected
+
+
 def test_worker_count_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Worker count precedence: CLI arg > WORKERS env > PYTEST_WORKERS env > cpu_count."""
+    """Worker count precedence: CLI arg > WORKERS env > PYTEST_WORKERS env > default policy."""
     monkeypatch.delenv("WORKERS", raising=False)
     monkeypatch.delenv("PYTEST_WORKERS", raising=False)
 
-    # 1. Fallback to os.cpu_count() or 4
+    # 1. Fallback to default_worker_count()
     default_workers = get_worker_count(cli_workers=None)
-    assert default_workers >= 1
+    assert default_workers == default_worker_count()
 
     # 2. PYTEST_WORKERS env var
     monkeypatch.setenv("PYTEST_WORKERS", "6")

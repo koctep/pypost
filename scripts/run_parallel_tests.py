@@ -85,6 +85,16 @@ class RunnerConfig:
     python_bin: Path
 
 
+def default_worker_count() -> int:
+    """Return tuned default worker count for subprocess pytest parallelism.
+
+    Policy (PYPOST-1154): modest oversubscription for I/O-bound per-file subprocesses,
+    with a ceiling to limit memory pressure from concurrent Qt-heavy workers.
+    """
+    cpu = max(1, os.cpu_count() or 4)
+    return min(cpu + 2, 16)
+
+
 def get_worker_count(cli_workers: int | None = None) -> int:
     """Determine effective worker count following precedence rules.
 
@@ -92,7 +102,7 @@ def get_worker_count(cli_workers: int | None = None) -> int:
     1. Explicit CLI argument (--workers / -n)
     2. WORKERS environment variable
     3. PYTEST_WORKERS environment variable
-    4. os.cpu_count() or 4
+    4. default_worker_count()
     """
     if cli_workers is not None and cli_workers > 0:
         return cli_workers
@@ -106,8 +116,7 @@ def get_worker_count(cli_workers: int | None = None) -> int:
         except ValueError:
             pass
 
-    cpu = os.cpu_count()
-    return max(1, cpu or 4)
+    return default_worker_count()
 
 
 class CLIParser:

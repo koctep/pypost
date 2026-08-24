@@ -46,21 +46,31 @@ Structured logging (`logger.*` on stderr) complements CLI progress on stdout; se
 
 ## Makefile usage
 
-The root `Makefile` defines an optional `WORKERS` variable (empty by default):
+The root `Makefile` defines a `WORKERS` variable with a computed default (not empty):
 
 ```makefile
-WORKERS ?=
+WORKERS ?= $(shell PYTHONPATH=. python3 -c 'from scripts.run_parallel_tests import default_worker_count; print(default_worker_count())')
 ```
+
+Default policy in `default_worker_count()` (PYPOST-1154):
+
+```text
+cpu = max(1, os.cpu_count() or 4)
+workers = min(cpu + 2, 16)
+```
+
+Modest oversubscription for I/O-bound subprocess pytest; cap limits memory from many
+concurrent Qt-heavy workers. On a 6-core host the default is eight workers.
 
 | Target | Orchestrator invocation |
 | --- | --- |
-| `make test` | `scripts/run_parallel_tests.py` + default `-m "not slow"` (unless `PYTEST_ARGS` overrides) |
+| `make test` | `scripts/run_parallel_tests.py --workers $(WORKERS)` + default `-m "not slow"` (unless `PYTEST_ARGS` overrides) |
 | `make test-cov` | Same with `--cov` (combines worker coverage after all files finish) |
 
 Examples:
 
 ```bash
-make test                          # auto worker count (cpu_count or 4)
+make test                          # default workers from policy above
 make test WORKERS=4                # four concurrent subprocesses
 make test-cov WORKERS=8            # parallel run with combined coverage
 make test PYTEST_ARGS='tests/test_foo.py -v'   # single file; PYTEST_ARGS replaces default marker
@@ -91,7 +101,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py [orches
 1. CLI `--workers` / `-n`
 2. Environment variable `WORKERS`
 3. Environment variable `PYTEST_WORKERS`
-4. `max(1, os.cpu_count() or 4)`
+4. `default_worker_count()` — `min(cpu + 2, 16)` where `cpu = max(1, os.cpu_count() or 4)`
 
 ### Pytest passthrough
 
@@ -179,7 +189,7 @@ After completion:
 | Qt singleton / event-loop errors when raising `WORKERS` | Tests running in-process instead of via orchestrator | Use `make test`, not bare `pytest tests/` on the full suite; confirm `scripts/run_parallel_tests.py` exists |
 | Segfault or EGL errors on Linux CI | Missing Qt runtime libraries on runner | CI installs packages via `.github/actions/install-qt-egl-runtime`; see [testing.md § Local vs CI parity](testing.md#local-vs-ci-test-parity-troubleshooting-pypost-723) |
 | All files show SKIPPED, exit 0 | `-k` / `-m` filter matched no tests in some files | Expected (exit code 5 → skipped); tighten or change `PYTEST_ARGS` |
-| `make test` ignores `WORKERS` | Empty or invalid value | Pass `WORKERS=4` (positive integer); invalid env values fall through to cpu count |
+| `make test` ignores `WORKERS` | Override ignored or invalid env | Default is computed at Make parse time; pass `WORKERS=4` to override |
 | Coverage below 70% fails run | Combined report enforces `--cov-fail-under` (default 70 from `pyproject.toml`) | Run `make test-cov`, inspect terminal report; override with `PYTEST_ARGS='--cov-fail-under=0'` only when debugging |
 | Stale `.coverage` or missing combine | Interrupted prior run | Re-run `make test-cov`; orchestrator clears `.coverage_parallel/` and root `.coverage` on start |
 | Single file debug | Full suite parallelism obscures failure | `make test PYTEST_ARGS='tests/test_foo.py -vv --tb=long'` (one subprocess) |
