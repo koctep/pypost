@@ -16,6 +16,7 @@ BIN := $(VENV)/bin
 VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
 VENV_TEST_STAMP := $(VENV)/.venv-test-$(PYTHON_VERSION)
 VENV_OTEL_STAMP := $(VENV)/.venv-otel-$(PYTHON_VERSION)
+WORKERS ?=
 PYTEST_ARGS ?=
 
 help: ## Show available make targets
@@ -153,8 +154,14 @@ run-agent-ui-mcp: $(VENV_MARKER) ## Stdio MCP sidecar for agent UI actions (PYPO
 	QT_QPA_PLATFORM=offscreen PYTHONPATH=. $(BIN)/python -m pypost.agent.ui_actions_mcp
 
 test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow integration tests)
-	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
-		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m "not slow")
+	@if [ -f scripts/run_parallel_tests.py ]; then \
+		QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py \
+			$(if $(WORKERS),--workers $(WORKERS)) \
+			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow"); \
+	else \
+		QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
+			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m "not slow"); \
+	fi
 
 test-slow: $(VENV_MARKER) venv-test venv-otel ## Run slow integration tests only (Makefile install smoke)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
@@ -172,9 +179,15 @@ check-jira-mcp-path-freshness: $(VENV_MARKER) venv-test venv-otel ## Offline jir
 		tests/test_example_fixtures.py::test_jira_mcp_critical_rest_paths_rejects_url_drift -q
 
 test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage report
-	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
-		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
-		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov)
+	@if [ -f scripts/run_parallel_tests.py ]; then \
+		QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py --cov \
+			$(if $(WORKERS),--workers $(WORKERS)) \
+			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow"); \
+	else \
+		QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
+			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
+			--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov); \
+	fi
 
 test-agent-e2e: $(VENV_MARKER) venv-test venv-otel ## Broader agent e2e beyond golden (-m agent_e2e; PYTEST_ARGS overrides)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \

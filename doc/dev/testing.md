@@ -20,6 +20,13 @@ make test-jira-mcp-live  # protected, explicit opt-in Jira MCP smoke (maintainer
 make check-jira-mcp-path-freshness  # offline jira_mcp critical REST paths vs catalog (PYPOST-1030 / PYPOST-1056)
 ```
 
+`make test` and `make test-cov` run through the parallel file-level orchestrator
+(`scripts/run_parallel_tests.py`, PYPOST-1149): each `tests/test_*.py` module
+executes in an isolated subprocess with `QT_QPA_PLATFORM=offscreen`. Control
+concurrency with `WORKERS` (for example `make test WORKERS=4`). Full CLI flags,
+coverage combine, JSON reports, and troubleshooting:
+[Parallel Test Runner Orchestrator](parallel_test_runner.md).
+
 `make test-agent-e2e` is the **primary packaging** path for the **broader**
 agent e2e pack **beyond golden** (PYPOST-922). Agent UI e2e (in-process
 offscreen harness) is documented in [agent_e2e.md](agent_e2e.md). The reusable
