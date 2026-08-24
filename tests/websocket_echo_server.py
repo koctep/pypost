@@ -287,6 +287,21 @@ class ScriptedWebSocketServer(QObject):
                 else:
                     self._send_client_binary(client, message)
 
+    def send_to_client(self, client: QWebSocket, message: str | bytes) -> None:
+        """Send a message to a single connected client without broadcasting."""
+        if client not in self._clients or not client.isValid():
+            return
+        if isinstance(message, str):
+            self._send_client_text(client, message)
+        else:
+            self._send_client_binary(client, message)
+        logger.debug(
+            "ws_server_targeted_message_sent name=%s length=%d total_sent=%d",
+            self.server_name,
+            len(message),
+            len(self._sent_messages),
+        )
+
     def flood(self, count: int, size: int = 1024) -> None:
         """Emit a burst of messages to connected clients for stress testing."""
         logger.debug(
@@ -425,6 +440,7 @@ class ScriptedWebSocketServer(QObject):
         if client in self._clients:
             self._clients.remove(client)
         self._disconnection_count += 1
+        client.deleteLater()
         logger.debug(
             "ws_server_client_disconnected name=%s remaining_clients=%d total_disconnections=%d",
             self.server_name,

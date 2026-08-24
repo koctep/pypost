@@ -30,7 +30,7 @@ graph TD
     end
 
     subgraph "WebSocket Test Infrastructure (tests/websocket_echo_server.py)"
-        SWS["ScriptedWebSocketServer (QObject)<br/>- start(timeout) / stop(timeout)<br/>- reset() / configure(config)<br/>- send_to_all() / flood() / drop_clients()<br/>- Diagnostic properties & message buffers"]
+        SWS["ScriptedWebSocketServer (QObject)<br/>- start(timeout) / stop(timeout)<br/>- reset() / configure(config)<br/>- send_to_all() / send_to_client() / flood() / drop_clients()<br/>- Diagnostic properties & message buffers"]
         SBC["ServerBehaviorConfig<br/>(Dataclass configuration)"]
         SB["ServerBehavior (Enum)<br/>• ECHO<br/>• REJECT_HANDSHAKE<br/>• SUBPROTOCOL_NEGOTIATE<br/>• SUBPROTOCOL_REFUSE<br/>• CLOSE_WITH_CODE<br/>• SILENT<br/>• FLOOD<br/>• OVERSIZE_MESSAGE<br/>• DROP_CONNECTION<br/>• CUSTOM_CALLBACK"]
     end
@@ -74,7 +74,7 @@ graph TD
 | [`ServerBehavior`](file:///home/src/tests/websocket_echo_server.py#L28) | `tests/websocket_echo_server.py` | Enum declaring all supported scripted server behaviors (`ECHO`, `REJECT_HANDSHAKE`, `SUBPROTOCOL_NEGOTIATE`, `SUBPROTOCOL_REFUSE`, `CLOSE_WITH_CODE`, `SILENT`, `FLOOD`, `OVERSIZE_MESSAGE`, `DROP_CONNECTION`, `CUSTOM_CALLBACK`). |
 | [`ServerBehaviorConfig`](file:///home/src/tests/websocket_echo_server.py#L44) | `tests/websocket_echo_server.py` | Dataclass configuring behavior parameters (close codes, reason strings, subprotocol lists, flood counts, oversize bytes, custom callback hooks). |
 | [`ws_test_server`](file:///home/src/tests/conftest.py#L51) | `tests/conftest.py` | Function-scoped pytest fixture that automatically instantiates, starts, yields, and stops a clean `ScriptedWebSocketServer` instance for each test. |
-| [`test_websocket_echo_server.py`](file:///home/src/tests/test_websocket_echo_server.py) | `tests/test_websocket_echo_server.py` | Complete test suite verifying all 10 behaviors, lifecycle management, context managers, leak-free cycles, responsiveness under load, and observability. |
+| [`test_websocket_echo_server.py`](file:///home/src/tests/test_websocket_echo_server.py) | `tests/test_websocket_echo_server.py` | Complete test suite verifying all 10 behaviors, lifecycle management, context managers, leak-free cycles, per-client selective delivery, disconnect cleanup, responsiveness under load, and observability. |
 
 ---
 
@@ -347,6 +347,47 @@ def test_dynamic_custom_callback(ws_test_server, qapp):
     client.close()
 ```
 
+### 9. Targeted Per-Client Message Delivery
+
+Use `send_to_client(server_peer, message)` to deliver a text or binary frame to one connected peer without broadcasting. Pass the **server-side** peer handle from `server.clients` (not the test's outbound `QWebSocket`):
+
+```python
+from tests.websocket_echo_server import ServerBehavior, ServerBehaviorConfig
+
+@pytest.mark.timeout(10)
+def test_selective_peer_delivery(ws_test_server, qapp):
+    ws_test_server.configure(
+        ServerBehaviorConfig(behavior=ServerBehavior.SILENT)
+    )
+
+    client_a = QWebSocket()
+    client_b = QWebSocket()
+    received_a: list[str] = []
+    received_b: list[str] = []
+    client_a.textMessageReceived.connect(received_a.append)
+    client_b.textMessageReceived.connect(received_b.append)
+
+    client_a.open(ws_test_server.url)
+    wait_until(lambda: len(ws_test_server.clients) == 1, timeout=3.0)
+
+    client_b.open(ws_test_server.url)
+    wait_until(lambda: len(ws_test_server.clients) == 2, timeout=3.0)
+
+    # Target first server-side peer only
+    ws_test_server.send_to_client(ws_test_server.clients[0], "peer-specific")
+    wait_until(
+        lambda: received_a == ["peer-specific"] and received_b == [],
+        timeout=3.0,
+        message="Only targeted peer should receive message",
+    )
+
+    assert ws_test_server.sent_text_messages == ["peer-specific"]
+    client_a.close()
+    client_b.close()
+```
+
+> **Note:** On disconnect, the harness removes the peer from `clients` and calls `deleteLater()` for prompt Qt object reclamation under connection churn.
+
 ---
 
 ## Observability & Diagnostic Properties
@@ -397,6 +438,7 @@ The server emits structured `key=value` debug events via the standard logger `lo
 - `ws_server_binary_message_received`: `name=%s length=%d total_received=%d`
 - `ws_server_text_message_sent`: `name=%s length=%d total_sent=%d`
 - `ws_server_binary_message_sent`: `name=%s length=%d total_sent=%d`
+- `ws_server_targeted_message_sent`: `name=%s length=%d total_sent=%d`
 - `ws_server_flood_emitted`: `name=%s count=%d size=%d`
 - `ws_server_clients_dropped`: `name=%s count=%d`
 

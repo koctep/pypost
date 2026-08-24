@@ -8,6 +8,7 @@ responsiveness under load.
 from __future__ import annotations
 
 import time
+from unittest.mock import patch
 
 import pytest
 from PySide6.QtCore import QByteArray, QCoreApplication, QUrl
@@ -593,3 +594,101 @@ def test_observability_structured_logging(qapp, caplog) -> None:
     assert any(msg.startswith("ws_server_text_message_sent ") for msg in messages)
     assert any(msg.startswith("ws_server_client_disconnected ") for msg in messages)
     assert any(msg.startswith("ws_server_stopped ") for msg in messages)
+
+
+@pytest.mark.timeout(10)
+def test_send_to_client_selective_delivery(qapp) -> None:
+    """send_to_client delivers to one peer only; other connected peers are unaffected."""
+    server = ScriptedWebSocketServer(
+        config=ServerBehaviorConfig(behavior=ServerBehavior.SILENT)
+    )
+    server.start()
+
+    client_a = QWebSocket()
+    client_b = QWebSocket()
+    received_a: list[str] = []
+    received_b: list[str] = []
+    received_binary_b: list[bytes] = []
+    client_a.textMessageReceived.connect(received_a.append)
+    client_b.textMessageReceived.connect(received_b.append)
+    client_b.binaryMessageReceived.connect(
+        lambda b: received_binary_b.append(bytes(b))
+    )
+
+    try:
+        client_a.open(QUrl(server.url))
+        wait_until(
+            lambda: client_a.isValid() and len(server.clients) == 1,
+            timeout=5.0,
+            message="Client A failed to connect",
+        )
+
+        client_b.open(QUrl(server.url))
+        wait_until(
+            lambda: client_b.isValid() and len(server.clients) == 2,
+            timeout=5.0,
+            message="Client B failed to connect",
+        )
+
+        # server.clients[0] is the server-side peer for the first connection (client_a).
+        server.send_to_client(server.clients[0], "only-for-one")
+        wait_until(
+            lambda: received_a == ["only-for-one"] and received_b == [],
+            timeout=5.0,
+            message="Selective delivery failed: only first peer should receive",
+        )
+
+        assert server.sent_messages == ["only-for-one"]
+        assert len(server.sent_text_messages) == 1
+
+        binary_payload = b"\xde\xad\xbe\xef"
+        server.send_to_client(server.clients[1], binary_payload)
+        wait_until(
+            lambda: (
+                len(server.sent_binary_messages) == 1
+                and received_binary_b == [binary_payload]
+            ),
+            timeout=5.0,
+            message="Selective binary delivery failed for second peer",
+        )
+        assert received_a == ["only-for-one"]
+        assert received_b == []
+    finally:
+        client_a.close()
+        client_b.close()
+        server.stop()
+
+
+@pytest.mark.timeout(10)
+def test_disconnect_invokes_delete_later(qapp) -> None:
+    """Server schedules disconnected peer reclamation via deleteLater()."""
+    server = ScriptedWebSocketServer(
+        config=ServerBehaviorConfig(behavior=ServerBehavior.SILENT)
+    )
+    server.start()
+
+    client = QWebSocket()
+    try:
+        client.open(QUrl(server.url))
+        wait_until(
+            lambda: client.isValid() and len(server.clients) == 1,
+            timeout=5.0,
+            message="Client failed to connect",
+        )
+
+        server_peer = server.clients[0]
+        with patch.object(
+            server_peer, "deleteLater", wraps=server_peer.deleteLater
+        ) as mock_delete:
+            client.close()
+            wait_until(
+                lambda: server.disconnection_count == 1 and len(server.clients) == 0,
+                timeout=5.0,
+                message="Client disconnection not recorded",
+            )
+            QCoreApplication.processEvents()
+
+        mock_delete.assert_called_once()
+    finally:
+        client.close()
+        server.stop()
