@@ -10,7 +10,9 @@ from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_expression_tokenizer import (
     PLAIN_VARIABLE_PATTERN,
     TEMPLATE_PLACEHOLDER_PATTERN,
+    extract_loose_plain_variable_name,
     extract_plain_variable_name,
+    is_loose_plain_variable_token,
     is_plain_variable_token,
 )
 from pypost.core.template_service import TemplateService
@@ -176,7 +178,7 @@ class VariableHoverResolver:
 
         def replace(match):
             expression = match.group(0)
-            if is_plain_variable_token(expression):
+            if is_plain_variable_token(expression) or is_loose_plain_variable_token(expression):
                 return VariableHoverResolver._resolve_plain_variable(
                     expression,
                     variables,
@@ -196,6 +198,8 @@ class VariableHoverResolver:
         hidden_keys: Optional[Set[str]] = None,
     ) -> str:
         name = extract_plain_variable_name(expression)
+        if name is None:
+            name = extract_loose_plain_variable_name(expression)
         if name is None:
             return expression
         return VariableHoverResolver.get_variable_value(

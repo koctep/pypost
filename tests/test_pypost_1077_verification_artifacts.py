@@ -85,15 +85,15 @@ def test_dialog_audit_report_has_full_discovery_and_coherent_aggregates() -> Non
     issues = check_audit_report_covers(modules)
     if issues:
         errors.extend(issues)
-    if len(modules) != 8 or total_loc(modules) != 1030:
-        errors.append("dialog discovery must contain exactly eight modules totaling 1,030 LOC")
+    if len(modules) != 8 or total_loc(modules) != 1208:
+        errors.append("dialog discovery must contain exactly eight modules totaling 1,208 LOC")
     if not any(
-        module.filename == "mcp_servers_dialog.py" and module.total_lines == 333
+        module.filename == "mcp_servers_dialog.py" and module.total_lines == 446
         for module in modules
     ):
-        errors.append("dialog discovery must include mcp_servers_dialog.py at 333 LOC")
-    if "**Scope:** `pypost/ui/dialogs/` (eight modules, 1,030 LOC total)" not in report:
-        errors.append("scope must state eight modules and 1,030 LOC")
+        errors.append("dialog discovery must include mcp_servers_dialog.py at 446 LOC")
+    if "**Scope:** `pypost/ui/dialogs/` (eight modules, 1,208 LOC total)" not in report:
+        errors.append("scope must state eight modules and 1,208 LOC")
     if set(inventory_rows) != expected_inventory:
         errors.append("module inventory must exactly match discovered filenames and LOC")
     if expected_filenames != {filename for filename, _ in inventory_rows}:

@@ -37,15 +37,17 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 import logging
-import os
+from typing import TYPE_CHECKING
 
 from prometheus_client import generate_latest
 import pytest
 from PySide6.QtWidgets import (
-    QApplication,
     QFormLayout,
     QWidget,
 )
+
+if TYPE_CHECKING:
+    from PySide6.QtWidgets import QApplication
 
 from pypost.core.metrics_registry import MetricsRegistry
 from pypost.core.websocket_session_policy import SessionState
@@ -57,16 +59,6 @@ from pypost.models.websocket import (
 )
 
 pytestmark = pytest.mark.timeout(30)
-
-
-@pytest.fixture(scope="session")
-def qapp() -> QApplication:
-    """Ensure a headless QApplication instance exists for Qt widget/presenter tests."""
-    app = QApplication.instance()
-    if app is None:
-        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-        app = QApplication([])
-    return app
 
 
 # =============================================================================

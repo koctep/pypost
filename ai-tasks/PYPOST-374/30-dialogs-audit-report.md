@@ -1,7 +1,7 @@
 # PYPOST-374: Individual Dialog SOLID Audit Report
 
 **Date:** 2026-06-11
-**Scope:** `pypost/ui/dialogs/` (eight modules, 1,030 LOC total)
+**Scope:** `pypost/ui/dialogs/` (eight modules, 1,208 LOC total)
 **Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)
 **Baseline comparison:** PYPOST-40 grouped inventory ~400 LOC, five dialogs named
 
@@ -28,15 +28,15 @@ complete for the full current scope.
 | Module | LOC | Class | Responsibility | Opened from |
 | --- | ---: | --- | --- | --- |
 | `about_dialog.py` | 43 | `AboutDialog` | Static app information | `main_window.py` |
-| `env_dialog.py` | 109 | `EnvironmentDialog` | Environment manager shell | env presenter |
+| `env_dialog.py` | 112 | `EnvironmentDialog` | Environment manager shell | env presenter |
 | `hotkeys_dialog.py` | 69 | `HotkeysDialog` | Shared shortcut reference table | `main_window.py` |
 | `mcp_activity_dialog.py` | 117 | `McpActivityDialog` | MCP activity viewer | env presenter |
-| `mcp_servers_dialog.py` | 333 | `McpServersDialog` + editor | MCP server manager | main window |
+| `mcp_servers_dialog.py` | 446 | `McpServersDialog` + editor | MCP server manager | main window |
 | `mcp_tools_overview_dialog.py` | 74 | Tool overview | MCP tools | env |
 | `save_dialog.py` | 93 | `SaveRequestDialog` | Save-as picker | save orchestrator |
-| `settings_dialog.py` | 192 | `SettingsDialog` | Settings composition | main window |
+| `settings_dialog.py` | 254 | `SettingsDialog` | Settings composition | main window |
 
-**Total:** 1,030 LOC (vs PYPOST-40 grouped ~400 LOC).
+**Total:** 1,208 LOC (vs PYPOST-40 grouped ~400 LOC).
 
 Regenerate counts: `scripts/audit_dialogs_inventory.py --markdown`
 
@@ -106,7 +106,7 @@ logic risk; direct formatter coverage remains a useful follow-up.
 | ISP | Good | Receives narrow callbacks for configuration, status, lifecycle, and activity |
 | DIP | Good | Uses injected callbacks and collections/environments rather than transport globals |
 
-**Maintainability:** The 333-LOC dialog separates row management from `_McpServerEditor` input
+**Maintainability:** The 446-LOC dialog separates row management from `_McpServerEditor` input
 validation. It exposes activity and tools as read-only views and keeps legacy conversion explicit.
 **Test coverage:** Direct coverage in `tests/test_mcp_servers_dialog.py`.
 
@@ -146,7 +146,7 @@ validation. It exposes activity and tools as read-only views and keeps legacy co
 | ISP | Good | Optional storage and migration dependencies stay scoped to encryption |
 | DIP | Good | Receives storage and migration service seams |
 
-**Maintainability:** At 192 LOC, the dialog delegates form construction, validation, and field
+**Maintainability:** At 254 LOC, the dialog delegates form construction, validation, and field
 collection to dedicated widgets. **Test coverage:** Strong (`test_settings_dialog.py` and
 encryption/migration UI tests).
 

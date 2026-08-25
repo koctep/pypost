@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import logging
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QWidget
 
 from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.models.models import Environment
@@ -16,14 +15,6 @@ from pypost.ui.presenters.mcp_controls_presenter import (
 )
 
 pytestmark = pytest.mark.timeout(30)
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
 
 
 def test_mcp_controls_presenter_widgets_and_initial_state(qapp):
