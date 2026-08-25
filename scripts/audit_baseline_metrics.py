@@ -49,10 +49,13 @@ FILE_CAPS: dict[str, int] = {
     # capped on creation at the ~10% headroom policy (329 measured) so the relocated
     # lines stay measured instead of growing outside the guard.
     "pypost/ui/presenters/mcp_controls_presenter.py": 362,
-    # PYPOST-1054: added the track_mcp_param_default_applied(method) delegation
-    # (Step 6 observability for silently-applied MCP pagination defaults); re-derived
-    # from the new measurement (182) with the file's established tight headroom.
-    "pypost/core/qt/metrics.py": 185,
+    # PYPOST-1146: tracking delegation split into metrics_tracking.py and
+    # metrics_websocket.py; metrics.py cap re-derived from post-extraction measurement (61).
+    "pypost/core/qt/metrics.py": 70,
+    # PYPOST-1146: non-WebSocket explicit delegation mixin; capped at ~10% headroom (130 measured).
+    "pypost/core/qt/metrics_tracking.py": 145,
+    # PYPOST-1146: WebSocket explicit delegation mixin; capped at ~10% headroom (40 measured).
+    "pypost/core/qt/metrics_websocket.py": 45,
     "pypost/ui/widgets/mixins.py": 411,
     "pypost/core/template_service.py": 225,
     # PYPOST-1128: item dispatch extracted to collection_item_dispatch.py;

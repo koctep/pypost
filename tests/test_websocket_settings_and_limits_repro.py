@@ -342,12 +342,11 @@ class TestWebSocketPrometheusMetrics:
         assert 'websocket_session_start_refused_total{reason="disabled"} 1.0' in scrape_text
         assert 'websocket_probe_duration_seconds_count{outcome="success"} 1.0' in scrape_text
 
-    def test_metrics_manager_dynamic_delegation(self, qapp: QApplication) -> None:
-        """MetricsManager in pypost.core.qt.metrics must delegate tracking methods."""
+    def test_metrics_manager_explicit_websocket_delegation(self, qapp: QApplication) -> None:
+        """MetricsManager must expose explicit WebSocket tracking methods (PYPOST-1146)."""
         from pypost.core.qt.metrics import MetricsManager
 
         manager = MetricsManager()
-        # Verify it has tracking methods either directly or via dynamic delegation
         assert hasattr(manager, "track_websocket_session_opened")
         manager.track_websocket_session_opened(outcome="success")
         manager.track_websocket_session_start_refused(reason="max_concurrent")

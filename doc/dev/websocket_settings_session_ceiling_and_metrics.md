@@ -65,7 +65,7 @@ flowchart TB
     WSP -->|"Reads limits from"| Settings
     WSP -->|"Acquires / Releases slot"| Slots
     WSP -->|"Tracks metrics via"| MetricsMgr
-    MetricsMgr -->|"Dynamic delegation (__getattr__)"| MetricsReg
+    MetricsMgr -->|"Explicit mixin delegation"| MetricsReg
     WSP -->|"Controls lifecycle"| SessionCtrl
 ```
 
@@ -81,8 +81,8 @@ flowchart TB
   Core Prometheus registry hosting 9 WebSocket counters, gauge, and histogram
   instruments with low-cardinality label normalization.
 - pypost/core/qt/metrics.py (MetricsManager):
-  Qt-friendly metrics adapter utilizing dynamic __getattr__ delegation to route calls
-  to MetricsRegistry within strict line caps.
+  Qt-friendly metrics facade composing MetricsTrackingMixin and MetricsWebSocketMixin
+  to route calls to MetricsRegistry within strict line caps (PYPOST-1146).
 - pypost/ui/widgets/settings/websocket_section.py (WebSocketSettingsSection):
   Modular Settings dialog section rendering spinbox controls for WebSocket bounds,
   session ceilings, and probe limits.
@@ -195,18 +195,25 @@ the Prometheus HTTP endpoint (`http://127.0.0.1:9080/metrics`) and the MCP `metr
 | `websocket_session_start_refused_total` | Counter | `reason` | Session start attempts refused by concurrency policy (`max_concurrent`, `disabled`). |
 | `websocket_probe_duration_seconds` | Histogram | `outcome` | Probe execution wall time in seconds (`success`, `timeout`, `limit_reached`, `error`). |
 
-### Dynamic Delegation Pattern
+### Explicit Mixin Delegation Pattern
 
-To comply with the strict LOC limit (185 lines) on
+To comply with the strict LOC limit on
 [`pypost/core/qt/metrics.py`](file:///home/src/pypost/core/qt/metrics.py),
-`MetricsManager` delegates metric calls dynamically to its backing `MetricsRegistry`:
+`MetricsManager` composes two mixin modules that declare explicit one-line delegation
+methods (PYPOST-1146):
+
+| Module | Responsibility |
+| --- | --- |
+| [`pypost/core/qt/metrics_tracking.py`](file:///home/src/pypost/core/qt/metrics_tracking.py) | HTTP, GUI, MCP, history, template, and environment metrics |
+| [`pypost/core/qt/metrics_websocket.py`](file:///home/src/pypost/core/qt/metrics_websocket.py) | WebSocket session, message, and probe metrics |
 
 ```python
-def __getattr__(self, name: str) -> Any:
-    if self._registry is not None and hasattr(self._registry, name):
-        return getattr(self._registry, name)
-    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+class MetricsManager(MetricsLifecycle, MetricsTrackingMixin, MetricsWebSocketMixin):
+    ...
 ```
+
+Each `track_websocket_*` / `set_websocket_*` method forwards to the shared
+`MetricsRegistry` instance — no `__getattr__` dynamic delegation.
 
 ---
 
