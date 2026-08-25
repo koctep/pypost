@@ -12,7 +12,7 @@ from enum import Enum, auto
 from typing import Callable, Optional
 
 from PySide6.QtCore import QByteArray, QObject
-from PySide6.QtNetwork import QHostAddress
+from PySide6.QtNetwork import QHostAddress, QSslConfiguration
 from PySide6.QtWebSockets import (
     QWebSocket,
     QWebSocketCorsAuthenticator,
@@ -21,6 +21,7 @@ from PySide6.QtWebSockets import (
 )
 
 from pypost.agent.ui_wait import wait_until
+from tests.tls_test_certs import TlsCertProfile, TlsTestCertificate, build_tls_test_certificate
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ class ScriptedWebSocketServer(QObject):
         server_name: str = "ScriptedWebSocketServer",
         config: Optional[ServerBehaviorConfig] = None,
         max_history: Optional[int] = None,
+        tls_profile: Optional[TlsCertProfile] = None,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
@@ -74,6 +76,8 @@ class ScriptedWebSocketServer(QObject):
         self.server_name: str = server_name
         self.config: ServerBehaviorConfig = config or ServerBehaviorConfig()
         self._max_history: Optional[int] = max_history
+        self._tls_profile: Optional[TlsCertProfile] = tls_profile
+        self._tls_certificate: Optional[TlsTestCertificate] = None
         self._server: Optional[QWebSocketServer] = None
         self._clients: list[QWebSocket] = []
         self._received_messages: list[str | bytes] = []
@@ -111,8 +115,24 @@ class ScriptedWebSocketServer(QObject):
 
     @property
     def url(self) -> str:
-        """Complete WebSocket URL (ws://127.0.0.1:<port>)."""
-        return f"ws://{self.host}:{self.port}"
+        """Complete WebSocket URL (ws:// or wss://127.0.0.1:<port>)."""
+        scheme = "wss" if self.is_tls else "ws"
+        return f"{scheme}://{self.host}:{self.port}"
+
+    @property
+    def is_tls(self) -> bool:
+        """True when the server is configured for secure ``wss://`` transport."""
+        return self._tls_profile is not None
+
+    @property
+    def tls_profile(self) -> Optional[TlsCertProfile]:
+        """Active TLS certificate profile, if any."""
+        return self._tls_profile
+
+    @property
+    def tls_certificate(self) -> Optional[TlsTestCertificate]:
+        """Generated TLS certificate material for the active profile."""
+        return self._tls_certificate
 
     @property
     def is_listening(self) -> bool:
@@ -216,14 +236,30 @@ class ScriptedWebSocketServer(QObject):
         if self._server is not None and self._server.isListening():
             return
 
+        ssl_mode = (
+            QWebSocketServer.SslMode.SecureMode
+            if self._tls_profile is not None
+            else QWebSocketServer.SslMode.NonSecureMode
+        )
         self._server = QWebSocketServer(
             self.server_name,
-            QWebSocketServer.SslMode.NonSecureMode,
+            ssl_mode,
             self,
         )
         self._server.newConnection.connect(self._on_new_connection)
         self._server.originAuthenticationRequired.connect(self._on_origin_auth_required)
         self._apply_subprotocol_config()
+        if self._tls_profile is not None:
+            self._tls_certificate = build_tls_test_certificate(self._tls_profile)
+            ssl_config = QSslConfiguration()
+            ssl_config.setLocalCertificate(self._tls_certificate.certificate)
+            ssl_config.setPrivateKey(self._tls_certificate.private_key)
+            self._server.setSslConfiguration(ssl_config)
+            logger.debug(
+                "ws_server_tls_configured name=%s profile=%s",
+                self.server_name,
+                self._tls_profile.name,
+            )
 
         success = self._server.listen(
             QHostAddress(QHostAddress.SpecialAddress.LocalHost),
@@ -240,11 +276,12 @@ class ScriptedWebSocketServer(QObject):
             message="Server failed to start listening",
         )
         logger.debug(
-            "ws_server_started name=%s host=%s port=%d url=%s",
+            "ws_server_started name=%s host=%s port=%d url=%s tls=%s",
             self.server_name,
             self.host,
             self.port,
             self.url,
+            str(self.is_tls).lower(),
         )
 
     def stop(self, timeout: float = 5.0) -> None:

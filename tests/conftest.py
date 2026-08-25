@@ -60,6 +60,48 @@ def ws_test_server(qapp):
         server.stop()
 
 
+@pytest.fixture
+def wss_test_server(qapp):
+    """Function-scoped secure WebSocket test server with self-signed TLS profile."""
+    from tests.tls_test_certs import TlsCertProfile
+    from tests.websocket_echo_server import ScriptedWebSocketServer
+
+    server = ScriptedWebSocketServer(tls_profile=TlsCertProfile.SELF_SIGNED)
+    server.start()
+    try:
+        yield server
+    finally:
+        server.stop()
+
+
+@pytest.fixture
+def wss_test_server_expired(qapp):
+    """Function-scoped secure WebSocket test server with an expired TLS profile."""
+    from tests.tls_test_certs import TlsCertProfile
+    from tests.websocket_echo_server import ScriptedWebSocketServer
+
+    server = ScriptedWebSocketServer(tls_profile=TlsCertProfile.EXPIRED)
+    server.start()
+    try:
+        yield server
+    finally:
+        server.stop()
+
+
+@pytest.fixture
+def wss_test_server_hostname_mismatch(qapp):
+    """Function-scoped secure WebSocket test server with hostname-mismatch TLS profile."""
+    from tests.tls_test_certs import TlsCertProfile
+    from tests.websocket_echo_server import ScriptedWebSocketServer
+
+    server = ScriptedWebSocketServer(tls_profile=TlsCertProfile.HOSTNAME_MISMATCH)
+    server.start()
+    try:
+        yield server
+    finally:
+        server.stop()
+
+
 def pytest_runtest_setup(item):
     if item.get_closest_marker("timeout") is None:
         pytest.fail(

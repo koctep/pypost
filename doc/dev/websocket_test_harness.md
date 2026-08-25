@@ -14,6 +14,7 @@ Key architectural characteristics include:
 - **Bounded Synchronization**: Integrates with [`pypost.agent.ui_wait.wait_until`](file:///home/src/pypost/agent/ui_wait.py) for deterministic condition polling rather than arbitrary `time.sleep` delays.
 - **Leak-Free Resource Teardown**: Guaranteed socket, port, and timer cleanup across repeated startup/teardown cycles.
 - **Observable Inspection**: Exposes diagnostic properties, cumulative counters, ordered message buffers, and structured `key=value` debug logging.
+- **Live TLS Test Mode (PYPOST-1142)**: Optional `wss://` secure mode with ephemeral self-signed, expired, and hostname-mismatch certificate profiles for end-to-end TLS handshake validation.
 
 ---
 
@@ -25,12 +26,13 @@ Key architectural characteristics include:
 graph TD
     subgraph "Test Suite & Pytest Environment"
         TC["Test Cases (e.g. test_websocket_echo_server.py)"]
-        CONF["conftest.py<br/>• ws_test_server (pytest fixture)"]
+        CONF["conftest.py<br/>• ws_test_server (pytest fixture)<br/>• wss_test_server* (TLS fixtures)"]
         WAIT["pypost.agent.ui_wait.py<br/>• wait_until() (bounded event polling)"]
     end
 
     subgraph "WebSocket Test Infrastructure (tests/websocket_echo_server.py)"
-        SWS["ScriptedWebSocketServer (QObject)<br/>- start(timeout) / stop(timeout)<br/>- reset() / configure(config)<br/>- send_to_all() / send_to_client() / flood() / drop_clients()<br/>- max_history (optional buffer cap)<br/>- Diagnostic properties & message buffers"]
+        SWS["ScriptedWebSocketServer (QObject)<br/>- start(timeout) / stop(timeout)<br/>- reset() / configure(config)<br/>- send_to_all() / send_to_client() / flood() / drop_clients()<br/>- max_history (optional buffer cap)<br/>- tls_profile (optional wss:// mode)<br/>- Diagnostic properties & message buffers"]
+        TTC["tests/tls_test_certs.py<br/>TlsCertProfile + build_tls_test_certificate()"]
         SBC["ServerBehaviorConfig<br/>(Dataclass configuration)"]
         SB["ServerBehavior (Enum)<br/>• ECHO<br/>• REJECT_HANDSHAKE<br/>• SUBPROTOCOL_NEGOTIATE<br/>• SUBPROTOCOL_REFUSE<br/>• CLOSE_WITH_CODE<br/>• SILENT<br/>• FLOOD<br/>• OVERSIZE_MESSAGE<br/>• DROP_CONNECTION<br/>• CUSTOM_CALLBACK"]
     end
@@ -44,6 +46,7 @@ graph TD
         WSC["WebSocketSessionController / QtWebSocketTransport<br/>(Connects to ws://127.0.0.1:<port>)"]
     end
 
+    SWS -->|"Loads certs when tls_profile set"| TTC
     CONF -->|"Yields running instance"| SWS
     TC -->|"Uses fixture"| CONF
     TC -->|"Configures behavior"| SBC
@@ -73,7 +76,13 @@ graph TD
 | [`ScriptedWebSocketServer`](file:///home/src/tests/websocket_echo_server.py#L61) | `tests/websocket_echo_server.py` | Headless `QObject` managing the loopback `QWebSocketServer`, client socket tracking, message buffering, scripted behavior dispatch, flood emission, and bounded startup/teardown. |
 | [`ServerBehavior`](file:///home/src/tests/websocket_echo_server.py#L28) | `tests/websocket_echo_server.py` | Enum declaring all supported scripted server behaviors (`ECHO`, `REJECT_HANDSHAKE`, `SUBPROTOCOL_NEGOTIATE`, `SUBPROTOCOL_REFUSE`, `CLOSE_WITH_CODE`, `SILENT`, `FLOOD`, `OVERSIZE_MESSAGE`, `DROP_CONNECTION`, `CUSTOM_CALLBACK`). |
 | [`ServerBehaviorConfig`](file:///home/src/tests/websocket_echo_server.py#L44) | `tests/websocket_echo_server.py` | Dataclass configuring behavior parameters (close codes, reason strings, subprotocol lists, flood counts, oversize bytes, custom callback hooks). |
-| [`ws_test_server`](file:///home/src/tests/conftest.py#L51) | `tests/conftest.py` | Function-scoped pytest fixture that automatically instantiates, starts, yields, and stops a clean `ScriptedWebSocketServer` instance for each test. |
+| [`ws_test_server`](file:///home/src/tests/conftest.py#L51) | `tests/conftest.py` | Function-scoped pytest fixture that automatically instantiates, starts, yields, and stops a clean plaintext `ScriptedWebSocketServer` instance for each test. |
+| [`wss_test_server`](file:///home/src/tests/conftest.py#L63) | `tests/conftest.py` | Function-scoped secure server fixture with `TlsCertProfile.SELF_SIGNED`. |
+| [`wss_test_server_expired`](file:///home/src/tests/conftest.py#L78) | `tests/conftest.py` | Secure server fixture with an expired certificate profile. |
+| [`wss_test_server_hostname_mismatch`](file:///home/src/tests/conftest.py#L93) | `tests/conftest.py` | Secure server fixture with CN/SAN for `mismatch.example.com` (connect via `127.0.0.1` to trigger mismatch). |
+| [`TlsCertProfile`](file:///home/src/tests/tls_test_certs.py) | `tests/tls_test_certs.py` | Enum of TLS certificate profiles: `SELF_SIGNED`, `EXPIRED`, `HOSTNAME_MISMATCH`. |
+| [`build_tls_test_certificate`](file:///home/src/tests/tls_test_certs.py) | `tests/tls_test_certs.py` | Generates ephemeral Qt-compatible certificate/key material for a profile. |
+| [`test_websocket_tls_echo_server.py`](file:///home/src/tests/test_websocket_tls_echo_server.py) | `tests/test_websocket_tls_echo_server.py` | TLS harness tests: `wss://` startup, profile rejection matrix, echo over secure transport. |
 | [`test_websocket_echo_server.py`](file:///home/src/tests/test_websocket_echo_server.py) | `tests/test_websocket_echo_server.py` | Complete test suite verifying all 10 behaviors, lifecycle management, context managers, leak-free cycles, per-client selective delivery, disconnect cleanup, responsiveness under load, and observability. |
 
 ---
@@ -140,6 +149,49 @@ def test_websocket_echo_roundtrip(ws_test_server, qapp):
 
     client.close()
 ```
+
+### TLS Mode (`wss_test_server` fixtures, PYPOST-1142)
+
+Secure mode is opt-in via `tls_profile` on `ScriptedWebSocketServer` or the `wss_test_server*` pytest fixtures in `tests/conftest.py`:
+
+```python
+import pytest
+from PySide6.QtCore import QUrl
+from PySide6.QtNetwork import QSslConfiguration, QSslSocket
+from PySide6.QtWebSockets import QWebSocket
+from pypost.agent.ui_wait import wait_until
+from tests.tls_test_certs import TlsCertProfile
+from tests.websocket_echo_server import ScriptedWebSocketServer
+
+@pytest.mark.timeout(10)
+def test_wss_rejects_self_signed_by_default(wss_test_server, qapp):
+    ssl_errors = []
+    client = QWebSocket()
+    client.sslErrors.connect(lambda errs: ssl_errors.extend(errs))
+    client.open(QUrl(wss_test_server.url))
+    wait_until(lambda: bool(ssl_errors), timeout=5.0, message="Expected TLS rejection")
+    assert any("self-signed" in e.errorString().lower() for e in ssl_errors)
+    client.abort()
+
+@pytest.mark.timeout(10)
+def test_wss_echo_with_verify_none(wss_test_server, qapp):
+    received = []
+    client = QWebSocket()
+    ssl_config = QSslConfiguration.defaultConfiguration()
+    ssl_config.setPeerVerifyMode(QSslSocket.PeerVerifyMode.VerifyNone)
+    client.setSslConfiguration(ssl_config)
+    client.textMessageReceived.connect(received.append)
+    client.open(QUrl(wss_test_server.url))
+    wait_until(lambda: client.isValid(), timeout=5.0)
+    client.sendTextMessage("ping")
+    wait_until(lambda: received == ["ping"], timeout=5.0)
+    client.abort()
+
+# Direct construction with a specific profile:
+server = ScriptedWebSocketServer(tls_profile=TlsCertProfile.EXPIRED)
+```
+
+Available fixtures: `wss_test_server` (self-signed), `wss_test_server_expired`, `wss_test_server_hostname_mismatch`.
 
 ### 2. Context Manager Usage
 
@@ -496,3 +548,5 @@ The server emits structured `key=value` debug events via the standard logger `lo
 | `ws_server_origin_auth_evaluated allowed=false` in logs | Handshake rejection behavior is active (`ServerBehavior.REJECT_HANDSHAKE`). | Expected when testing handshake error handling. For normal tests, configure behavior to `ServerBehavior.ECHO`. |
 | High CPU or test timeout during flood tests | Flood count too high for single test timeout window. | Check `@pytest.mark.timeout(...)` on the test. For large bursts, ensure the timeout is at least 15 seconds or mark test with `@pytest.mark.slow`. Consider `max_history=N` to limit buffer memory during extreme benchmarks. |
 | Port conflict or address already in use error | Hardcoded static port was attempted instead of dynamic port `0`. | Always bind with port `0` (`listen(QHostAddress.LocalHost, 0)`). `ScriptedWebSocketServer` binds to port `0` dynamically by default. |
+| `wss://` client fails with `SslHandshakeFailedError` | Default peer verification rejects harness self-signed/expired/mismatch certificates. | Expected for TLS policy tests. For echo/harness tests, set `QSslSocket.PeerVerifyMode.VerifyNone` on the test client only. For production paths, use `grant_ephemeral_tls_exception()` on `WebSocketSessionController`. |
+| Hostname mismatch test does not fail | Client connected using `localhost` URL while cert is for `mismatch.example.com`. | Connect to `wss://127.0.0.1:<port>` when using `wss_test_server_hostname_mismatch`. |
