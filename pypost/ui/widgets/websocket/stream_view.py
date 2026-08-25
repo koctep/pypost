@@ -884,8 +884,16 @@ class WebSocketStreamView(QWidget):
     def export_json(self, path: Path | str) -> None:
         """Export stream to a JSON transcript file."""
         try:
-            env_vars = getattr(self.presenter, "_env_vars", self._detail_pane._env_vars)
-            hidden_keys = getattr(self.presenter, "_hidden_keys", self._detail_pane._hidden_keys)
+            env_vars = (
+                self.presenter.env_vars
+                if self.presenter is not None
+                else self._detail_pane._env_vars
+            )
+            hidden_keys = (
+                self.presenter.hidden_keys
+                if self.presenter is not None
+                else self._detail_pane._hidden_keys
+            )
             export_stream_to_json_file(
                 Path(path),
                 self._stream_model.stream,
@@ -899,8 +907,16 @@ class WebSocketStreamView(QWidget):
     def export_text(self, path: Path | str) -> None:
         """Export stream to a Plain Text transcript file."""
         try:
-            env_vars = getattr(self.presenter, "_env_vars", self._detail_pane._env_vars)
-            hidden_keys = getattr(self.presenter, "_hidden_keys", self._detail_pane._hidden_keys)
+            env_vars = (
+                self.presenter.env_vars
+                if self.presenter is not None
+                else self._detail_pane._env_vars
+            )
+            hidden_keys = (
+                self.presenter.hidden_keys
+                if self.presenter is not None
+                else self._detail_pane._hidden_keys
+            )
             export_stream_to_text_file(
                 Path(path),
                 self._stream_model.stream,

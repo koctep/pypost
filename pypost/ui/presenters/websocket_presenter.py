@@ -126,6 +126,16 @@ class WebSocketPresenter(QObject):
         return self._session_controller
 
     @property
+    def env_vars(self) -> dict[str, str]:
+        """Active environment variables snapshot (read-only copy)."""
+        return dict(self._env_vars)
+
+    @property
+    def hidden_keys(self) -> set[str]:
+        """Hidden variable keys for the active environment (read-only copy)."""
+        return set(self._hidden_keys)
+
+    @property
     def _controller(self) -> WebSocketSessionController:
         return self._session_controller
 

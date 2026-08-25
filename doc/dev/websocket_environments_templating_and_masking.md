@@ -72,7 +72,7 @@ flowchart TD
 
 | Module | Location | Primary Responsibilities |
 |---|---|---|
-| [`WebSocketPresenter`](file:///home/src/pypost/ui/presenters/websocket_presenter.py) | `pypost/ui/presenters/websocket_presenter.py` | Holds environment snapshot (`_env_vars`, `_hidden_keys`), resolves connect-time parameters and send-time payloads via `TemplateService`, coordinates Tier 1 masking, propagates variables to UI widgets, and emits `hidden_value_masks_applied_total{surface="websocket"}` telemetry. |
+| [`WebSocketPresenter`](file:///home/src/pypost/ui/presenters/websocket_presenter.py) | `pypost/ui/presenters/websocket_presenter.py` | Holds environment snapshot (`env_vars`, `hidden_keys` read-only properties backed by `_env_vars` / `_hidden_keys`), resolves connect-time parameters and send-time payloads via `TemplateService`, coordinates Tier 1 masking, propagates variables to UI widgets, and emits `hidden_value_masks_applied_total{surface="websocket"}` telemetry. |
 | [`build_stream_entry`](file:///home/src/pypost/core/websocket_stream.py) | `pypost/core/websocket_stream.py` | Pure builder function applying Tier 1 exact hidden-secret masking (`_mask_secrets`), payload size truncation, and invoking `on_mask_applied` callback when secrets are replaced. |
 | [`SensitiveTextSanitizer`](file:///home/src/pypost/core/sensitive_text_sanitizer.py) | `pypost/core/sensitive_text_sanitizer.py` | Pure Tier 2 heuristic secret sanitization engine (`sanitize_text`), matching regex patterns (Bearer tokens, API keys, JWTs) and exact hidden keys. |
 | [`WebSocketStreamExport`](file:///home/src/pypost/core/websocket_stream_export.py) | `pypost/core/websocket_stream_export.py` | Dual-format transcript exporter (JSON & Plain Text) applying Tier 2 `sanitize_text` to all exported lines, payloads, details, and metadata. |
@@ -271,6 +271,10 @@ presenter.handle_connect()
 # Dynamically update variables when workspace environment switches
 presenter.set_variables({"WS_BASE_URL": "wss://prod.example.com", "WS_SECRET_TOKEN": "prod_sec_999"})
 presenter.set_hidden_keys({"WS_SECRET_TOKEN"})
+
+# Read active snapshots via public properties (defensive copies)
+active_vars = presenter.env_vars
+active_hidden = presenter.hidden_keys
 ```
 
 ### 2. Exporting Dual-Format Transcripts with Tier 2 Sanitization

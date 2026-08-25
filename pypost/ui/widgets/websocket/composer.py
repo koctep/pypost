@@ -304,7 +304,7 @@ class WebSocketComposer(QWidget):
 
         raw_payload = self.get_payload()
         active_vars = (
-            getattr(self.presenter, "_env_vars", self._variables)
+            self.presenter.env_vars
             if self.presenter is not None
             else self._variables
         )
