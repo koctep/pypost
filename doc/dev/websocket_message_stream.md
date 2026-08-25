@@ -291,6 +291,16 @@ Exports human-readable text logs suitable for email, bug reports, and clipboard 
 [2026-08-22T11:40:02.100Z] [in] [1048576B] [TRUNCATED] {"feed":"market_depth","data":"..."}
 ```
 
+### 3. UI Async File Export (`WebSocketStreamExportWorker`)
+
+Stream inspector file export from [`WebSocketStreamView`](file:///home/src/pypost/ui/widgets/websocket/stream_view.py) runs off the GUI thread (PYPOST-1144):
+
+1. **GUI thread:** capture `stream.snapshot()`, drop counters, and environment snapshots via `_resolve_export_env()`.
+2. **Worker thread:** [`WebSocketStreamExportWorker`](file:///home/src/pypost/core/qt/websocket_stream_export_worker.py) formats and writes using [`StreamExportSnapshot`](file:///home/src/pypost/core/websocket_stream_export.py) (immutable duck-type of `MessageStream` for core helpers).
+3. **Completion:** `export_completed` / `export_failed` signals return to the view; Export button re-enables after `QThread.finished`.
+
+`WebSocketStreamView.is_export_busy()` guards overlapping exports. Core helpers (`export_stream_to_json_file`, `export_stream_to_text_file`) remain synchronous and Qt-free for headless callers.
+
 ---
 
 ## Virtualized Qt List Model (`StreamListModel`)

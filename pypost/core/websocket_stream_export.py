@@ -13,7 +13,7 @@ from typing import Any, Iterable, Mapping
 
 from pypost.core.export_file_writer import write_json_export_file
 from pypost.core.sensitive_text_sanitizer import sanitize_text
-from pypost.core.websocket_stream import MessageStream
+from pypost.core.websocket_stream import MessageStream, StreamEntry
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,33 @@ __all__ = [
 
 class WebSocketExportError(Exception):
     """Raised when formatting or writing a WebSocket transcript export fails."""
+
+
+class StreamExportSnapshot:
+    """Immutable stream view for off-thread transcript export (PYPOST-1144)."""
+
+    __slots__ = ("_entries", "_dropped")
+
+    def __init__(
+        self,
+        entries: Iterable[StreamEntry],
+        dropped: Mapping[str, int],
+    ) -> None:
+        self._entries = tuple(entries)
+        self._dropped = {
+            "capacity": int(dropped.get("capacity", 0)),
+            "memory_budget": int(dropped.get("memory_budget", 0)),
+        }
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    def snapshot(self) -> tuple[StreamEntry, ...]:
+        return self._entries
+
+    @property
+    def dropped(self) -> dict[str, int]:
+        return dict(self._dropped)
 
 
 def format_json_transcript(

@@ -50,6 +50,7 @@ from pypost.core.websocket_stream import (
 from pypost.models.websocket import WebSocketConnection
 from pypost.ui import widget_ids
 from pypost.ui.widgets.websocket.stream_model import StreamListModel
+from tests.helpers.process_until import process_until
 
 pytestmark = pytest.mark.timeout(30)
 
@@ -804,7 +805,9 @@ def test_stream_view_transcript_export_actions(tmp_path: Path, qapp: QApplicatio
         text_file = tmp_path / "export.txt"
 
         stream_view.export_json(json_file)
+        process_until(lambda: json_file.exists(), timeout_ms=10_000)
         stream_view.export_text(text_file)
+        process_until(lambda: text_file.exists(), timeout_ms=10_000)
 
         assert json_file.exists()
         assert text_file.exists()

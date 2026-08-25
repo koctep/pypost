@@ -47,15 +47,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.qt.websocket_stream_export_worker import WebSocketStreamExportWorker
 from pypost.core.sensitive_text_sanitizer import sanitize_text
 from pypost.core.websocket_stream import (
     MessageStream,
     StreamEntry,
     StreamQuery,
-)
-from pypost.core.websocket_stream_export import (
-    export_stream_to_json_file,
-    export_stream_to_text_file,
 )
 from pypost.ui.widget_ids import (
     WS_STREAM_CLEAR_BUTTON,
@@ -82,6 +79,9 @@ if TYPE_CHECKING:
     from pypost.ui.presenters.websocket_presenter import WebSocketPresenter
 
 logger = logging.getLogger(__name__)
+
+# Short join after QThread.finished so native cleanup completes before GC/delete
+_WORKER_FINISH_WAIT_MS = 100
 
 __all__ = [
     "StreamFilterProxyModel",
@@ -538,6 +538,7 @@ class WebSocketStreamView(QWidget):
         self._proxy_model.setSourceModel(self._stream_model)
         self._is_paused: bool = False
         self._unread_count: int = 0
+        self._export_worker: WebSocketStreamExportWorker | None = None
 
         self._init_ui()
         self._wire_signals()
@@ -854,6 +855,9 @@ class WebSocketStreamView(QWidget):
             self._drop_notice.setVisible(False)
 
     def _on_export_menu_requested(self) -> None:
+        if self.is_export_busy():
+            logger.info("websocket_stream_export_skipped reason=busy")
+            return
         menu = QMenu(self)
         json_act = menu.addAction("Export as JSON Transcript...")
         text_act = menu.addAction("Export as Plain Text Transcript...")
@@ -881,48 +885,88 @@ class WebSocketStreamView(QWidget):
         """Propagate hidden keys to child detail pane."""
         self._detail_pane.set_hidden_keys(hidden_keys)
 
+    def is_export_busy(self) -> bool:
+        """Return True while a transcript export worker is running."""
+        return self._export_worker is not None and self._export_worker.isRunning()
+
+    def _resolve_export_env(self) -> tuple[dict[str, str], set[str]]:
+        env_vars = (
+            self.presenter.env_vars
+            if self.presenter is not None
+            else self._detail_pane._env_vars
+        )
+        hidden_keys = (
+            self.presenter.hidden_keys
+            if self.presenter is not None
+            else self._detail_pane._hidden_keys
+        )
+        return dict(env_vars), set(hidden_keys)
+
+    def _set_export_busy(self, busy: bool) -> None:
+        self._export_btn.setEnabled(not busy)
+
+    def _start_export(self, path: Path | str, export_format: str) -> None:
+        if self.is_export_busy():
+            logger.info("websocket_stream_export_skipped reason=busy format=%s", export_format)
+            return
+
+        export_path = Path(path)
+        stream = self._stream_model.stream
+        entries = stream.snapshot()
+        dropped = dict(stream.dropped)
+        env_vars, hidden_keys = self._resolve_export_env()
+
+        worker = WebSocketStreamExportWorker(
+            export_path,
+            entries,
+            dropped,
+            export_format,
+            env_vars=env_vars,
+            hidden_keys=hidden_keys,
+        )
+        worker.export_completed.connect(self._on_export_completed)
+        worker.export_failed.connect(self._on_export_failed)
+        worker.finished.connect(self._on_export_worker_finished)
+        self._export_worker = worker
+        self._set_export_busy(True)
+        worker.start()
+        logger.info(
+            "websocket_stream_export_started format=%s path=%s entries_count=%d",
+            export_format,
+            export_path,
+            len(entries),
+        )
+
+    def _on_export_completed(self, path: str, export_format: str) -> None:
+        logger.info(
+            "websocket_stream_export_completed format=%s path=%s",
+            export_format,
+            path,
+        )
+
+    def _on_export_failed(self, export_format: str, error: object) -> None:
+        logger.error(
+            "websocket_stream_%s_export_failed error=%s",
+            export_format,
+            error,
+        )
+
+    def _on_export_worker_finished(self) -> None:
+        finished = self._export_worker
+        self._export_worker = None
+        self._set_export_busy(False)
+        if finished is not None:
+            finished.deleteLater()
+            if not finished.wait(_WORKER_FINISH_WAIT_MS):
+                logger.warning(
+                    "websocket_stream_export_worker_finish_wait_timeout wait_ms=%d",
+                    _WORKER_FINISH_WAIT_MS,
+                )
+
     def export_json(self, path: Path | str) -> None:
-        """Export stream to a JSON transcript file."""
-        try:
-            env_vars = (
-                self.presenter.env_vars
-                if self.presenter is not None
-                else self._detail_pane._env_vars
-            )
-            hidden_keys = (
-                self.presenter.hidden_keys
-                if self.presenter is not None
-                else self._detail_pane._hidden_keys
-            )
-            export_stream_to_json_file(
-                Path(path),
-                self._stream_model.stream,
-                env_vars=env_vars,
-                hidden_keys=hidden_keys,
-            )
-        except Exception as exc:
-            logger.error("websocket_stream_json_export_failed path=%s error=%s", path, exc)
-            raise
+        """Export stream to a JSON transcript file on a background worker thread."""
+        self._start_export(path, "json")
 
     def export_text(self, path: Path | str) -> None:
-        """Export stream to a Plain Text transcript file."""
-        try:
-            env_vars = (
-                self.presenter.env_vars
-                if self.presenter is not None
-                else self._detail_pane._env_vars
-            )
-            hidden_keys = (
-                self.presenter.hidden_keys
-                if self.presenter is not None
-                else self._detail_pane._hidden_keys
-            )
-            export_stream_to_text_file(
-                Path(path),
-                self._stream_model.stream,
-                env_vars=env_vars,
-                hidden_keys=hidden_keys,
-            )
-        except Exception as exc:
-            logger.error("websocket_stream_text_export_failed path=%s error=%s", path, exc)
-            raise
+        """Export stream to a Plain Text transcript file on a background worker thread."""
+        self._start_export(path, "text")

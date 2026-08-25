@@ -77,10 +77,8 @@ class TestConsumerModulesUsePublicProperties:
         assert "presenter.env_vars" in source
 
     def test_stream_view_export_does_not_getattr_private_env(self) -> None:
-        json_source = inspect.getsource(stream_view_module.WebSocketStreamView.export_json)
-        text_source = inspect.getsource(stream_view_module.WebSocketStreamView.export_text)
-        for source in (json_source, text_source):
-            assert 'getattr(self.presenter, "_env_vars"' not in source
-            assert 'getattr(self.presenter, "_hidden_keys"' not in source
-            assert "presenter.env_vars" in source
-            assert "presenter.hidden_keys" in source
+        source = inspect.getsource(stream_view_module.WebSocketStreamView._resolve_export_env)
+        assert 'getattr(self.presenter, "_env_vars"' not in source
+        assert 'getattr(self.presenter, "_hidden_keys"' not in source
+        assert "presenter.env_vars" in source
+        assert "presenter.hidden_keys" in source
