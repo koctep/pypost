@@ -25,7 +25,7 @@
 - [x] **STEP 8: Dev Docs**
   - `doc/dev/websocket_ui_client.md` — Planned: blank-tab WebSocket mode section
 - [x] **COMMIT: Commit Changes**
-  - `af0212ae` — documentation(websocket): PYPOST-1156 research WebSocket tab mode UX
+  - `6fe22673` — documentation(websocket): PYPOST-1156 research WebSocket tab mode UX
 
 ## Implementation Stories (Epic PYPOST-1155 — created in Step 2)
 
