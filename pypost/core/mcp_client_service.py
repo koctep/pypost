@@ -30,6 +30,7 @@ class MCPClientService:
         url: str,
         operation: str,
         call_params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> ResponseData:
         """
         Run MCP operation (list_tools or call_tool) against the given MCP endpoint.
@@ -38,18 +39,25 @@ class MCPClientService:
             url: Streamable HTTP MCP URL (e.g. http://localhost:1080/mcp).
             operation: "list_tools" or "call_tool".
             call_params: For call_tool, {"name": str, "arguments": dict}.
+            headers: Optional outbound HTTP headers for the Streamable HTTP client.
 
         Returns:
             ResponseData with JSON body (tools list or call result) or error message.
         """
         start_time = time.time()
-        logger.debug("mcp_operation_start url=%s operation=%s", url, operation)
+        logger.debug(
+            "mcp_operation_start url=%s operation=%s header_count=%d",
+            url,
+            operation,
+            len(headers or {}),
+        )
         try:
             result = anyio.run(
                 self._run_with_timeout,
                 url,
                 operation,
                 call_params or {},
+                dict(headers or {}),
             )
         except TimeoutError as exc:
             logger.error(
@@ -137,18 +145,23 @@ class MCPClientService:
         url: str,
         operation: str,
         call_params: dict[str, Any],
+        headers: dict[str, str],
     ) -> str | dict:
         with anyio.fail_after(MCP_TOTAL_TIMEOUT):
-            return await self._run_async(url, operation, call_params)
+            return await self._run_async(url, operation, call_params, headers)
 
     async def _run_async(
         self,
         url: str,
         operation: str,
         call_params: dict[str, Any],
+        headers: dict[str, str],
     ) -> str | dict:
         timeout = httpx.Timeout(MCP_CONNECT_TIMEOUT, read=MCP_READ_TIMEOUT)
-        async with create_mcp_http_client(timeout=timeout) as http_client:
+        async with create_mcp_http_client(
+            headers=headers,
+            timeout=timeout,
+        ) as http_client:
             async with streamable_http_client(
                 url, http_client=http_client
             ) as (read_stream, write_stream, _get_session_id):

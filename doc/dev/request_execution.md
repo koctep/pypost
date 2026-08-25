@@ -22,7 +22,8 @@ before dispatch.
 was removed because it duplicated work without adding behavior beyond what the HTTP/MCP paths
 already perform.
 
-MCP requests render URL and body once each in `RequestService._execute_mcp()`.
+MCP requests render URL, headers, and body in `RequestService._execute_mcp()`.
+Resolved headers are forwarded to `MCPClientService.run` (PYPOST-1173).
 
 **Inbound MCP tools (PYPOST-550):** When an external agent calls `call_tool`, `MCPServerImpl`
 merges the configured endpoint environment's snapshot with `mcp.request` tool arguments before
@@ -165,7 +166,9 @@ request_data)` use the captured tab directly. `_find_tab_for_sender` was removed
 
 ### MCP transport exceptions (PYPOST-411)
 
-`MCPClientService.run()` maps httpx exceptions from the MCP SSE client to `ExecutionError`:
+`MCPClientService.run()` accepts optional `headers` and passes them to
+`create_mcp_http_client`. It maps httpx exceptions from the MCP SSE client to
+`ExecutionError`:
 
 | Exception | `ErrorCategory` |
 |-----------|-----------------|

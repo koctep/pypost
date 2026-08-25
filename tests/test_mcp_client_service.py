@@ -3,7 +3,7 @@ import pytest
 
 import json
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 
@@ -110,3 +110,80 @@ class MCPClientServiceTests(unittest.TestCase):
                 service.run("http://localhost:1080/mcp", "list_tools", None)
 
         self.assertEqual(ctx.exception.category, ErrorCategory.UNKNOWN)
+
+    def test_run_passes_headers_to_create_mcp_http_client(self):
+        """run() forwards user headers to create_mcp_http_client (not the transport)."""
+        service = MCPClientService()
+        headers = {"Authorization": "Bearer secret"}
+        mock_session = AsyncMock()
+        tools_result = MagicMock()
+        tools_result.model_dump.return_value = {"tools": [{"name": "echo"}]}
+        mock_session.list_tools.return_value = tools_result
+
+        with (
+            patch(
+                "pypost.core.mcp_client_service.create_mcp_http_client"
+            ) as mock_create,
+            patch(
+                "pypost.core.mcp_client_service.streamable_http_client"
+            ) as mock_streamable,
+            patch(
+                "pypost.core.mcp_client_service.ClientSession"
+            ) as mock_session_cls,
+        ):
+            mock_create.return_value.__aenter__ = AsyncMock(return_value=MagicMock())
+            mock_create.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_streamable.return_value.__aenter__ = AsyncMock(
+                return_value=(MagicMock(), MagicMock(), MagicMock())
+            )
+            mock_streamable.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_session_cls.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = service.run(
+                "http://localhost:1080/mcp",
+                "list_tools",
+                None,
+                headers=headers,
+            )
+
+        self.assertEqual(200, result.status_code)
+        mock_create.assert_called_once()
+        self.assertEqual(headers, mock_create.call_args.kwargs["headers"])
+        self.assertIn("timeout", mock_create.call_args.kwargs)
+
+    def test_run_logs_header_count_not_values(self):
+        """mcp_operation_start logs header_count; never logs header values."""
+        service = MCPClientService()
+        secret = "Bearer super-secret-token"
+        with patch.object(
+            service, "_run_async", new_callable=AsyncMock, return_value={"tools": []}
+        ):
+            with self.assertLogs(
+                "pypost.core.mcp_client_service", level="DEBUG"
+            ) as captured:
+                service.run(
+                    "http://localhost:1080/mcp",
+                    "list_tools",
+                    None,
+                    headers={"Authorization": secret},
+                )
+        joined = "\n".join(captured.output)
+        self.assertIn("mcp_operation_start", joined)
+        self.assertIn("header_count=1", joined)
+        self.assertNotIn(secret, joined)
+        self.assertNotIn("Bearer", joined)
+
+    def test_run_logs_zero_header_count_when_headers_omitted(self):
+        """mcp_operation_start reports header_count=0 when headers are omitted."""
+        service = MCPClientService()
+        with patch.object(
+            service, "_run_async", new_callable=AsyncMock, return_value={"tools": []}
+        ):
+            with self.assertLogs(
+                "pypost.core.mcp_client_service", level="DEBUG"
+            ) as captured:
+                service.run("http://localhost:1080/mcp", "list_tools", None)
+        joined = "\n".join(captured.output)
+        self.assertIn("header_count=0", joined)

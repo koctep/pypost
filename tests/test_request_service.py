@@ -30,6 +30,18 @@ def _make_http_result(status=200, body="OK", url="http://x", headers=None):
     )
 
 
+def _mcp_run_headers(mock_run: MagicMock) -> dict[str, str] | None:
+    """Return headers passed to mcp_client.run (keyword or 4th positional)."""
+    call = mock_run.call_args
+    if call is None:
+        return None
+    if "headers" in call.kwargs:
+        return call.kwargs["headers"]
+    if len(call.args) >= 4:
+        return call.args[3]
+    return None
+
+
 class TestRequestServiceExecuteHTTP(unittest.TestCase):
     def setUp(self):
         self.svc = RequestService(metrics=MagicMock())
@@ -116,6 +128,31 @@ class TestRequestServiceMCP(unittest.TestCase):
         req = RequestData(method="MCP", url="http://x")
         self.svc.execute(req)
         self.svc.http_client.send_request.assert_not_called()
+
+    def test_execute_mcp_forwards_resolved_headers_to_mcp_client(self):
+        """Method MCP Send forwards environment-resolved headers to mcp_client.run."""
+        self.svc.mcp_client.run.return_value = _make_response(200)
+        req = RequestData(
+            method="MCP",
+            url="http://x",
+            headers={"Authorization": "Bearer {{token}}"},
+        )
+        result = self.svc.execute(req, variables={"token": "secret"})
+        self.assertEqual(200, result.response.status_code)
+        self.svc.mcp_client.run.assert_called_once()
+        self.assertEqual(
+            {"Authorization": "Bearer secret"},
+            _mcp_run_headers(self.svc.mcp_client.run),
+        )
+
+    def test_execute_mcp_forwards_empty_headers_to_mcp_client(self):
+        """Method MCP Send with no headers still calls run with an empty mapping."""
+        self.svc.mcp_client.run.return_value = _make_response(200)
+        req = RequestData(method="MCP", url="http://x")
+        result = self.svc.execute(req)
+        self.assertEqual(200, result.response.status_code)
+        self.svc.mcp_client.run.assert_called_once()
+        self.assertEqual({}, _mcp_run_headers(self.svc.mcp_client.run))
 
 
 class TestRequestServiceInjection(unittest.TestCase):

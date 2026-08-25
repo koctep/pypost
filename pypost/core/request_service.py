@@ -131,7 +131,7 @@ class RequestService:
                 pass
 
         self._metrics.track_request_sent(request.method)
-        response = self.mcp_client.run(url, operation, call_params)
+        response = self.mcp_client.run(url, operation, call_params, headers=resolved_headers)
         self._metrics.track_response_received(request.method, str(response.status_code))
         if headers_callback:
             headers_callback(response.status_code, response.headers)

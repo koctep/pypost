@@ -267,7 +267,7 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `mcp_server_start_failed` | ERROR/exception | `host`, `port`, `message` | `qt/mcp_server` |
 | `mcp_server_unexpected_exit` | WARNING | — | `qt/mcp_server` |
 | `mcp_tools_changed` | INFO | `tool_count`, `restarting` | `qt/mcp_server` |
-| `mcp_operation_start` | DEBUG | `url`, `operation` | `mcp_client_service` |
+| `mcp_operation_start` | DEBUG | `url`, `operation`, `header_count` | `mcp_client_service` |
 | `mcp_operation_success` | DEBUG | `url`, `operation`, `elapsed` | `mcp_client_service` |
 | `mcp_operation_failed` | ERROR | `url`, `operation`, `category`, `detail` | `mcp_client_service` |
 
@@ -527,6 +527,7 @@ prefix to match the new event name.
 | `url`, `endpoint` | Use masked/sanitized forms at WARNING+; DEBUG may include full URLs |
 | `key_id` | Safe to log; never log key values |
 | MCP args | Log counts only (`mcp_arg_count`), never argument values |
+| MCP outbound headers | Log counts only (`header_count`); never keys or values |
 | Webhook auth | Never logged; `webhook=true/false` flag only |
 
 Full matrix: [security_audit.md](security_audit.md) and

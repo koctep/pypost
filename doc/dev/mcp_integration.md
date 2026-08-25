@@ -1082,9 +1082,11 @@ HTTP method **MCP** path.
 
 *   Outbound MCP is only available as HTTP method **MCP** on `RequestEditor` — raw JSON body
     conventions for `list_tools` / `call_tool`, not a dedicated editor.
-*   `RequestService._execute_mcp` renders URL and headers from templates but passes **only the
-    URL** to `MCPClientService.run` — environment/auth headers do not reach the upstream MCP
-    HTTP client (fixed in MCP-TM-5).
+*   `RequestService._execute_mcp` renders URL and headers from templates and passes the
+    URL plus resolved headers to `MCPClientService.run` (PYPOST-1173). Those headers
+    reach `create_mcp_http_client` on the existing method-MCP path. MCP-TM-5
+    (PYPOST-1167) still owns outbound headers for the planned MCP Client tab (not
+    shipped).
 *   Inbound surfaces are **unchanged** by this epic: **MCP Servers…**, **Expose as MCP Tool** /
     **MCP Tool** checkbox, and the HTTP editor **MCP** sub-tab for inbound tool exposure remain
     as documented above. See also [MCP Reverse Proxy](mcp_proxy.md) for inbound bridge mode.
