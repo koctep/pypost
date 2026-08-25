@@ -1054,13 +1054,18 @@ See `ai-tasks/PYPOST-20/40-tech-debt.md` for more details.
 Research story [PYPOST-1164](https://pypost.atlassian.net/browse/PYPOST-1164) (Epic
 [PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155)) specifies a dedicated **MCP
 Client** workspace editor as the third `TabProtocol` peer to HTTP `RequestTab` and
-`WebSocketTab`. Users choose **HTTP Request** | **WebSocket** | **MCP Client** from the
-blank-tab protocol picker (`Ctrl+N`, tab-bar **+**, close-last-tab fallback) delivered by
-WS-TM-1 (PYPOST-1157), then connect to a remote MCP server, browse `list_tools` results, and
+`WebSocketTab`. Users will choose **HTTP Request** | **WebSocket** | **MCP Client** from the
+blank-tab protocol picker. WS-TM-1 ([PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157))
+shipped `Ctrl+N` and tab-bar **+** with HTTP vs WebSocket only; close-last-tab picker
+reuse is [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159). See
+[new_tab_protocol_picker.md](new_tab_protocol_picker.md). MCP-TM-1
+([PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165)) adds the **MCP Client**
+item. Users then connect to a remote MCP server, browse `list_tools` results, and
 invoke tools with schema-guided forms — not via the HTTP request method dropdown.
 
 **Architecture:** [`ai-tasks/PYPOST-1164/20-architecture.md`](../../ai-tasks/PYPOST-1164/20-architecture.md)
-— recommended Option A (extend `NewTabProtocolPicker` with a third menu item),
+— recommended Option A (extend `NewTabProtocolPicker` with a third menu item;
+[PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165)),
 `TabProtocol.MCP_CLIENT`, `McpClientConnection` / `McpClientTab` / `McpClientPresenter`,
 convert-on-open migration for legacy `method: "MCP"` collection items, and retirement of the
 HTTP method **MCP** path.

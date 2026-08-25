@@ -78,7 +78,7 @@ classDiagram
 | Presenter | File | Primary Responsibility |
 |---|---|---|
 | [`CollectionsPresenter`](file:///home/src/pypost/ui/presenters/collections_presenter.py) | `pypost/ui/presenters/collections_presenter.py` | Collection tree navigation, drag-and-drop hierarchy, import/export dialogs, item renaming, and deletion. |
-| [`TabsPresenter`](file:///home/src/pypost/ui/presenters/tabs_presenter.py) | `pypost/ui/presenters/tabs_presenter.py` | Request tab lifecycle (open, close, dirty state, save, duplicate), request execution delegation to worker threads. |
+| [`TabsPresenter`](file:///home/src/pypost/ui/presenters/tabs_presenter.py) | `pypost/ui/presenters/tabs_presenter.py` | Request/WebSocket tab lifecycle (open, close, dirty state, save); blank-tab protocol picker (`handle_new_tab` → `open_blank_tab`); request execution delegation to worker threads. See [new_tab_protocol_picker.md](new_tab_protocol_picker.md). |
 | [`HistoryPresenter`](file:///home/src/pypost/ui/presenters/history_presenter.py) | `pypost/ui/presenters/history_presenter.py` | Request execution history panel, search, filtering, and execution recall. |
 | [`EnvPresenter`](file:///home/src/pypost/ui/presenters/env_presenter.py) | `pypost/ui/presenters/env_presenter.py` | Environment selection, loading/saving environments (sync and async encrypted gateway), variable snapshots, and new-variable flow validation. |
 | [`McpControlsPresenter`](file:///home/src/pypost/ui/presenters/mcp_controls_presenter.py) | `pypost/ui/presenters/mcp_controls_presenter.py` | MCP UI status controls, tools overview dialog, activity log viewer, MCP Servers management dialog, and scoped tool list refreshes. |

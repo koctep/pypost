@@ -15,7 +15,10 @@ except ImportError:  # pragma: no cover - exercised when dependency is absent.
     Observation = Any  # type: ignore[assignment,misc]
     MeterProvider = Any  # type: ignore[assignment,misc]
 
-from pypost.core.metrics_registry import _normalize_new_tab_source
+from pypost.core.metrics_registry import (
+    _normalize_new_tab_protocol,
+    _normalize_new_tab_source,
+)
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.models.errors import ErrorCategory
 
@@ -265,9 +268,14 @@ class OtelMetricsTracker:
     def track_gui_save_as_action(self, source: str) -> None:
         self._gui_save_as_actions.add(1, {"source": source})
 
-    def track_gui_new_tab_action(self, source: str) -> None:
+    def track_gui_new_tab_action(
+        self, source: str, protocol: str = "unknown"
+    ) -> None:
         normalized = _normalize_new_tab_source(source)
-        self._gui_new_tab_actions.add(1, {"source": normalized})
+        normalized_protocol = _normalize_new_tab_protocol(protocol)
+        self._gui_new_tab_actions.add(
+            1, {"source": normalized, "protocol": normalized_protocol}
+        )
 
     def track_gui_copy_curl_action(self) -> None:
         self._gui_copy_curl_actions.add(1)

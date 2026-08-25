@@ -13,9 +13,18 @@ from pypost.core.request_persisted_fields import (
 )
 from pypost.ui.hotkeys import register_hotkey
 from pypost.ui.presenters.tab_dirty import is_tab_dirty
-from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab, PLUS_TAB_MARKER
+from pypost.ui.presenters.tabs_presenter import (
+    PLUS_TAB_MARKER,
+    RequestTab,
+    TabsPresenter,
+    WebSocketTab,
+)
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
+from pypost.ui.widgets.new_tab_protocol_picker import (
+    NewTabProtocolPicker,
+    TabProtocol,
+)
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -83,7 +92,13 @@ class TestTabsPresenter(unittest.TestCase):
         rm = FakeRequestManager(requests)
         sm = FakeStateManager(open_tabs)
         settings = AppSettings()
-        return TabsPresenter(rm, sm, settings, metrics=MagicMock())
+        return TabsPresenter(
+            rm,
+            sm,
+            settings,
+            metrics=MagicMock(),
+            protocol_picker=lambda *_a, **_k: TabProtocol.HTTP,
+        )
 
     def test_widget_is_qtab_widget(self):
         from PySide6.QtWidgets import QTabWidget
@@ -1060,5 +1075,174 @@ class TestTabsPresenterHiddenKeysForwarding(unittest.TestCase):
                 "RequestWorker must receive hidden_keys from _current_hidden_keys",
             )
 
+
+@pytest.mark.usefixtures("qapp")
+class TestHandleNewTabProtocolPicker(unittest.TestCase):
+    """PYPOST-1157: picker before editor; HTTP default; cancel is a no-op."""
+
+    def _make_presenter(self, protocol_picker=None):
+        return TabsPresenter(
+            FakeRequestManager(),
+            FakeStateManager(),
+            AppSettings(),
+            metrics=MagicMock(),
+            protocol_picker=protocol_picker,
+        )
+
+    def _editor_tabs(self, presenter):
+        tabs = []
+        for i in range(presenter.widget.count()):
+            widget = presenter.widget.widget(i)
+            if isinstance(widget, (RequestTab, WebSocketTab)):
+                tabs.append(widget)
+        return tabs
+
+    def _assert_new_tab_metric(self, mock_track, source, protocol):
+        mock_track.assert_called()
+        args, kwargs = mock_track.call_args
+        got_source = args[0] if args else kwargs.get("source")
+        if len(args) > 1:
+            got_protocol = args[1]
+        else:
+            got_protocol = kwargs.get("protocol")
+        self.assertEqual(got_source, source)
+        self.assertEqual(got_protocol, protocol)
+
+    def test_handle_new_tab_shows_protocol_picker(self):
+        order = []
+
+        def picker(*_args, **_kwargs):
+            order.append("picker")
+            return TabProtocol.HTTP
+
+        p = self._make_presenter(protocol_picker=picker)
+        orig_add = p.add_new_tab
+
+        def wrapped_add(*args, **kwargs):
+            order.append("editor")
+            return orig_add(*args, **kwargs)
+
+        p.add_new_tab = wrapped_add
+        p.handle_new_tab("shortcut")
+        self.assertIn("picker", order)
+        self.assertEqual(order[0], "picker")
+
+        order.clear()
+        p.handle_new_tab("plus_button")
+        self.assertIn("picker", order)
+        self.assertEqual(order[0], "picker")
+
+    def test_handle_new_tab_http_is_default_first_item(self):
+        menu = NewTabProtocolPicker().build_menu()
+        labels = [action.text().replace("&", "") for action in menu.actions()]
+        self.assertEqual(labels, ["HTTP Request", "WebSocket"])
+        self.assertIs(menu.activeAction(), menu.actions()[0])
+
+    def test_handle_new_tab_cancel_does_not_create_tab(self):
+        p = self._make_presenter(protocol_picker=lambda *_a, **_k: None)
+        before_count = p.widget.count()
+        before_current = p.widget.currentWidget()
+        before_editors = [id(w) for w in self._editor_tabs(p)]
+        p._metrics.track_gui_new_tab_action.reset_mock()
+        p.handle_new_tab("shortcut")
+        self.assertEqual(p.widget.count(), before_count)
+        self.assertIs(p.widget.currentWidget(), before_current)
+        self.assertEqual(
+            [id(w) for w in self._editor_tabs(p)],
+            before_editors,
+        )
+        p._metrics.track_gui_new_tab_action.assert_not_called()
+
+    def test_handle_new_tab_cancel_logs_source_without_metric(self):
+        p = self._make_presenter(protocol_picker=lambda *_a, **_k: None)
+        p._metrics.track_gui_new_tab_action.reset_mock()
+        logger_name = "pypost.ui.presenters.tabs_presenter"
+        with self.assertLogs(logger_name, level="INFO") as caplog:
+            p.handle_new_tab("shortcut")
+        joined = "\n".join(caplog.output)
+        self.assertIn("new_tab_action_triggered source=shortcut", joined)
+        self.assertIn("new_tab_action_cancelled source=shortcut", joined)
+        self.assertNotIn("new_tab_action_completed", joined)
+        self.assertNotIn("url=", joined)
+        p._metrics.track_gui_new_tab_action.assert_not_called()
+
+    def test_handle_new_tab_confirm_logs_source_and_protocol(self):
+        logger_name = "pypost.ui.presenters.tabs_presenter"
+        p_http = self._make_presenter(
+            protocol_picker=lambda *_a, **_k: TabProtocol.HTTP,
+        )
+        with self.assertLogs(logger_name, level="INFO") as caplog:
+            p_http.handle_new_tab("shortcut")
+        http_logs = "\n".join(caplog.output)
+        self.assertIn("new_tab_action_triggered source=shortcut", http_logs)
+        self.assertIn(
+            "new_tab_action_completed source=shortcut protocol=http",
+            http_logs,
+        )
+        self.assertNotIn("new_tab_action_cancelled", http_logs)
+        self.assertNotIn("url=", http_logs)
+
+        p_ws = self._make_presenter(
+            protocol_picker=lambda *_a, **_k: TabProtocol.WEBSOCKET,
+        )
+        with self.assertLogs(logger_name, level="INFO") as caplog:
+            p_ws.handle_new_tab("plus_button")
+        ws_logs = "\n".join(caplog.output)
+        self.assertIn("new_tab_action_triggered source=plus_button", ws_logs)
+        self.assertIn(
+            "new_tab_action_completed source=plus_button protocol=websocket",
+            ws_logs,
+        )
+        self.assertNotIn("new_tab_action_cancelled", ws_logs)
+        self.assertNotIn("url=", ws_logs)
+
+    def test_handle_new_tab_websocket_confirm_opens_ws_blank_not_request_tab(
+        self,
+    ):
+        def picker(*_a, **_k):
+            return TabProtocol.WEBSOCKET
+
+        p = self._make_presenter(protocol_picker=picker)
+        with patch.object(p, "open_websocket_tab") as mock_open_saved:
+            p.handle_new_tab("plus_button")
+        current = p.widget.currentWidget()
+        self.assertNotIsInstance(current, RequestTab)
+        self.assertIsInstance(current, WebSocketTab)
+        mock_open_saved.assert_not_called()
+
+    def test_handle_new_tab_http_confirm_opens_request_tab(self):
+        calls = []
+
+        def picker(*_a, **_k):
+            calls.append(True)
+            return TabProtocol.HTTP
+
+        p = self._make_presenter(protocol_picker=picker)
+        p.handle_new_tab("shortcut")
+        self.assertEqual(len(calls), 1)
+        current = p.widget.currentWidget()
+        self.assertIsInstance(current, RequestTab)
+        index = p.widget.indexOf(current)
+        self.assertEqual(p.widget.tabText(index), "New Request")
+
+    def test_open_blank_tab_records_source_and_protocol(self):
+        p = self._make_presenter()
+        p._metrics.track_gui_new_tab_action.reset_mock()
+        p.open_blank_tab(TabProtocol.HTTP, "shortcut")
+        self._assert_new_tab_metric(
+            p._metrics.track_gui_new_tab_action,
+            "shortcut",
+            "http",
+        )
+        p._metrics.track_gui_new_tab_action.reset_mock()
+        p.open_blank_tab(TabProtocol.WEBSOCKET, "plus_button")
+        self._assert_new_tab_metric(
+            p._metrics.track_gui_new_tab_action,
+            "plus_button",
+            "websocket",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
+

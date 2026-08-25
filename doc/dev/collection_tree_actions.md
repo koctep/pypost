@@ -10,6 +10,11 @@ right-click context-menu behavior for the collections tree: **New tab** (request
 `CollectionsPresenter` wires the tree view to this class and keeps tree loading, navigation,
 and expand/collapse state.
 
+Collections **New tab** does not show `NewTabProtocolPicker`. It copies a saved HTTP
+request into an isolated tab and records `gui_new_tab_actions_total` with
+`source=collections_context` and default `protocol=unknown`. Blank-tab picker
+(`Ctrl+N` / **+**): [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
+
 ## Architecture
 
 ```mermaid

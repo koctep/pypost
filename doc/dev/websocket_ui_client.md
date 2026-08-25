@@ -72,7 +72,7 @@ flowchart TB
 | `WebSocketComposer` | `pypost/ui/widgets/websocket/composer.py` | Multi-format message authoring with real-time validation and quick preset/sequence controls. See [websocket_composer_presets_sequences.md](websocket_composer_presets_sequences.md). |
 | `WebSocketPresetsPanel` | `pypost/ui/widgets/websocket/presets_panel.py` | Messages sub-tab in `WS_DETAIL_TABS` for saved message presets and multi-step sequence management. See [websocket_composer_presets_sequences.md](websocket_composer_presets_sequences.md). |
 | `StreamListModel` | `pypost/ui/widgets/websocket/stream_model.py` | `QAbstractListModel` backing the stream view with 33ms batching, capacity eviction handling, and secret redaction. |
-| `TabsPresenter` | `pypost/ui/presenters/tabs_presenter.py` | Manages tab creation, focus deduplication, tab closure with clean transport teardown, and workspace restoration. |
+| `TabsPresenter` | `pypost/ui/presenters/tabs_presenter.py` | Manages tab creation (including blank-tab protocol picker), focus deduplication, tab closure with clean transport teardown, and workspace restoration. See [new_tab_protocol_picker.md](new_tab_protocol_picker.md). |
 | `Widget IDs` | `pypost/ui/widget_ids.py` | Stable `WS_*` identifier constants for automated agent testing and UI hierarchy discovery. |
 
 ---
@@ -148,31 +148,30 @@ Before stream entries are added to the list model:
 
 ---
 
-## Planned: blank-tab WebSocket mode (PYPOST-1156)
+## Blank-tab WebSocket entry (PYPOST-1157)
 
-Research story [PYPOST-1156](https://pypost.atlassian.net/browse/PYPOST-1156) (Epic
-[PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155)) specifies the missing blank-tab
-path: users should choose HTTP Request vs WebSocket when opening a new workspace tab (`Ctrl+N`,
-tab-bar **+**, close-last-tab fallback), not only via Collections or session restore.
+WS-TM-1 shipped the blank-tab protocol picker: `Ctrl+N` and tab-bar **+**
+show **HTTP Request** vs **WebSocket** before any editor is created.
+Confirming WebSocket calls `add_blank_websocket_tab()` (placeholder
+`WebSocketTab`; not `open_websocket_tab`). Developer details:
+[new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 
-**Architecture:** [`ai-tasks/PYPOST-1156/20-architecture.md`](../../ai-tasks/PYPOST-1156/20-architecture.md)
-— recommended Option A (popup `QMenu` protocol picker), `open_blank_tab(protocol, source)`,
-`add_blank_websocket_tab()`, draft tabs excluded from session restore until first save.
+Saved profiles still open via `open_websocket_tab(profile)` from
+Collections and session restore.
 
-**Implementation stories** (not yet shipped):
+**Remaining implementation stories:**
 
 | Story | Jira | Summary |
 | --- | --- | --- |
-| WS-TM-1 | [PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157) | Blank-tab protocol selector UX + metrics `protocol` label |
 | WS-TM-2 | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) | Blank WebSocket draft tab |
-| WS-TM-3 | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) | Tab entry-point parity |
+| WS-TM-3 | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) | Tab entry-point parity (close-last-tab picker) |
 | WS-TM-4 | [PYPOST-1160](https://pypost.atlassian.net/browse/PYPOST-1160) | Collections WebSocket menu parity |
 | WS-TM-5 | [PYPOST-1161](https://pypost.atlassian.net/browse/PYPOST-1161) | WebSocket save-to-collection flow |
 | WS-TM-6 | [PYPOST-1162](https://pypost.atlassian.net/browse/PYPOST-1162) | Context-aware WebSocket shortcuts |
 | WS-TM-7 | [PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163) | User documentation alignment |
 
-Until these land, **`open_websocket_tab(profile)` from Collections** (and session restore)
-remains the only way to open a WebSocket editor tab.
+Epic research:
+[`ai-tasks/PYPOST-1156/20-architecture.md`](../../ai-tasks/PYPOST-1156/20-architecture.md).
 
 ---
 
@@ -181,7 +180,12 @@ remains the only way to open a WebSocket editor tab.
 `TabsPresenter` manages WebSocket tab lifecycles:
 
 1. **Tab Opening**:
-   - `open_websocket_tab(profile)` creates a new `WebSocketTab` or focuses an existing tab if the profile ID is already open.
+   - `open_websocket_tab(profile)` creates a new `WebSocketTab` or
+     focuses an existing tab if the profile ID is already open
+     (Collections / restore).
+   - Blank WebSocket tabs from the protocol picker use
+     `add_blank_websocket_tab()` (no id dedup). See
+     [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 2. **Deterministic Teardown**:
    - Closing a tab invokes `WebSocketPresenter.teardown()`, which immediately terminates active network sockets, cancels pending batch timers, and releases stream resources.
 3. **Workspace Restoration**:

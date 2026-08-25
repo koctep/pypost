@@ -23,7 +23,8 @@ This design reduces UI clutter and allows adding more actions in the same menu l
   - Receives `save_requested` and `save_as_requested` from each `RequestWidget`.
   - Delegates persistence to `RequestSaveOrchestrator` and updates tab state/signals.
   - Composes `RequestTabHeader` for tab-bar controls; routes `Ctrl+N` to
-    `handle_new_tab(source=...)`.
+    `handle_new_tab(source=...)`. Blank-tab protocol picker and routing:
+    [new_tab_protocol_picker.md](new_tab_protocol_picker.md) (PYPOST-1157).
 - **`RequestSaveOrchestrator` (`pypost/ui/request_save_orchestrator.py`)**:
   - Owns save/save-as dialogs, overwrite/stale confirmations, and `RequestManager` calls.
   - Returns `SaveResult` for the presenter to apply tab updates.
@@ -34,20 +35,25 @@ This design reduces UI clutter and allows adding more actions in the same menu l
   - Collects GUI action metrics:
     - `gui_send_clicks_total`
     - `gui_save_actions_total{source=<menu|shortcut>}`
-    - `gui_new_tab_actions_total{source=<plus_button|shortcut|collections_context|unknown>}`
+    - `gui_new_tab_actions_total{source, protocol}` — `source` is
+      `plus_button` / `shortcut` / `collections_context` / `unknown`;
+      `protocol` is `http` / `websocket` / `unknown`
 
 High-level flow:
 1. User clicks `Actions -> Save` or presses `Ctrl+S`.
 2. `RequestWidget.on_save(source=...)` updates request data and emits `save_requested`.
 3. `TabsPresenter` calls `RequestSaveOrchestrator.save_request` and emits `request_saved`.
 
-New-tab flow:
+New-tab flow (`Ctrl+N` and **+** share one choose-then-open path):
 1. User clicks the embedded `+` `QPushButton` (primary), clicks plus-tab chrome outside the
    button (fallback), or presses `Ctrl+N`.
 1. `RequestTabHeader` emits `new_tab_requested` (`plus_btn.clicked` or `_on_tab_bar_clicked`).
-1. `TabsPresenter.handle_new_tab(source=...)` logs source and request-tab count before action.
-1. `MetricsManager.track_gui_new_tab_action(source)` increments labeled metric.
-1. `TabsPresenter.add_new_tab()` inserts and selects a new request tab before the plus placeholder.
+1. `TabsPresenter.handle_new_tab(source=...)` logs `new_tab_action_triggered`, then shows
+   `NewTabProtocolPicker` **before** any editor is created.
+1. Cancel (Esc / click away) → `new_tab_action_cancelled`; no tab, no metric.
+1. Confirm → `open_blank_tab(protocol, source)` logs `new_tab_action_completed`, increments
+   `gui_new_tab_actions_total{source, protocol}`, then HTTP → `add_new_tab()` or
+   WebSocket → `add_blank_websocket_tab()` (not `open_websocket_tab`).
 
 Save-as flow:
 1. User clicks `Actions -> Save As...` or presses `Ctrl+Shift+S`.
@@ -107,13 +113,29 @@ Records a labeled counter increment for save action source.
 
 ### `TabsPresenter.handle_new_tab(source: str = "unknown")`
 
-Centralized new-tab entry point used by both keyboard and plus-tab flows.
+Centralized blank-tab entry for keyboard and plus-tab flows. Does **not**
+create a tab until the protocol picker returns a choice.
 
-- **source**: trigger origin (`plus_button`, `shortcut`, `collections_context`, fallback `unknown`).
+- **source**: trigger origin (`plus_button`, `shortcut`, fallback `unknown`).
+  Collections **New tab** does not call this method (see
+  [collection_tree_actions.md](collection_tree_actions.md)).
 - **Behavior**:
   1. Writes INFO log `new_tab_action_triggered source=<source> tabs_before=<count>`.
-  1. Increments metric `gui_new_tab_actions_total{source=<source>}`.
-  1. Calls `add_new_tab()` once (inserts before the plus placeholder tab).
+  1. Calls injectable `protocol_picker` (default `NewTabProtocolPicker().prompt`).
+  1. `None` (cancel) → INFO `new_tab_action_cancelled`; return (no tab, no metric).
+  1. Choice → `open_blank_tab(protocol, source)`.
+
+Full picker, routing, and test-injection notes:
+[new_tab_protocol_picker.md](new_tab_protocol_picker.md).
+
+### `TabsPresenter.open_blank_tab(protocol: TabProtocol, source: str)`
+
+Single routing API after a completed picker choice.
+
+- **Behavior**:
+  1. INFO `new_tab_action_completed source=<source> protocol=<http|websocket>`.
+  1. Increments `gui_new_tab_actions_total{source, protocol}`.
+  1. WebSocket → `add_blank_websocket_tab()`; HTTP → `add_new_tab()`.
 
 ### Plus placeholder tab (`RequestTabHeader.ensure_plus_tab()`)
 
@@ -147,11 +169,19 @@ by request id before calling this helper.
 
 MainWindow delegate — forwards to `TabsPresenter.handle_new_tab()`.
 
-### `MetricsManager.track_gui_new_tab_action(source: str)`
+### `MetricsManager.track_gui_new_tab_action(source: str, protocol: str = "unknown")`
 
-Records a labeled counter increment for new-tab trigger source. The metrics registry
-normalizes `source` via `_normalize_new_tab_source`: allowed labels are `plus_button`,
-`shortcut`, `collections_context`, and `unknown`; any other string is recorded as `unknown`.
+Records a labeled counter increment for a **completed** new-tab action. The
+metrics registry normalizes `source` via `_normalize_new_tab_source` and
+`protocol` via `_normalize_new_tab_protocol`.
+
+- **source**: `plus_button`, `shortcut`, `collections_context`, `unknown`
+  (any other string → `unknown`).
+- **protocol**: `http`, `websocket`, `unknown` (any other string → `unknown`).
+- Picker confirm passes `protocol.value`. Cancel does not call this method.
+- Collections **New tab** still uses the default `protocol="unknown"`.
+- Prometheus serializes labels alphabetically, e.g.
+  `{protocol="http",source="plus_button"}`.
 
 ### `MetricsManager.track_gui_save_as_action(source: str)`
 
@@ -178,6 +208,11 @@ both click paths:
   — matches user clicks on the visible widget wired via `plus_btn.clicked`.
 - **Fallback**: `tabBarClicked.emit(plus_idx)` — covers `_on_tab_bar_clicked` when the user
   clicks plus-tab chrome outside the embedded button.
+
+Presenter construction injects `protocol_picker=lambda *_a, **_k: TabProtocol.HTTP`
+so plus-click tests do not hang on live `QMenu.exec()`. Picker behavior lives in
+`TestHandleNewTabProtocolPicker` and `tests/test_new_tab_protocol_picker.py`
+([new_tab_protocol_picker.md](new_tab_protocol_picker.md)).
 
 | Test | Behavior verified |
 | ---- | ----------------- |
@@ -308,9 +343,15 @@ QT_QPA_PLATFORM=offscreen python -m pytest \
   `QPushButton`.
 - Fallback only: `_on_tab_bar_clicked` handles `tabBarClicked` on the plus index for chrome
   clicks outside the button — not sufficient alone when users click the embedded widget.
-- Verify `handle_new_tab("plus_button")` still calls `add_new_tab()` (not an early return path).
+- Verify `handle_new_tab("plus_button")` reaches the picker, then `open_blank_tab`.
+  Dismissing the picker creates no tab (not a wiring bug). Tests must inject
+  `protocol_picker`; live `QMenu.exec()` hangs CI.
 
 ### New-tab metrics are missing
 
 - Ensure `gui_new_tab_actions_total` is registered in `MetricsManager._init_metrics()`.
-- Trigger at least one `Ctrl+N` and one `+` click before checking `/metrics`.
+- Confirm a **completed** choice (HTTP or WebSocket). Cancel does not increment.
+- Scrape text includes both labels, alphabetically:
+  `gui_new_tab_actions_total{protocol="http",source="shortcut"}`.
+- Trigger at least one confirmed `Ctrl+N` and one confirmed `+` click before
+  checking `/metrics`.

@@ -157,7 +157,9 @@ def test_track_gui_new_tab_action_normalizes_unknown_source(otel_reader):
     tracker.track_gui_new_tab_action("custom_source")
     assert (
         _counter_value(
-            reader, "gui_new_tab_actions_total", {"source": "unknown"}
+            reader,
+            "gui_new_tab_actions_total",
+            {"source": "unknown", "protocol": "unknown"},
         )
         == 1
     )

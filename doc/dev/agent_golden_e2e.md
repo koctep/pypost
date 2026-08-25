@@ -79,14 +79,19 @@ per-tab role ids cannot satisfy either wait. Sibling Send scenarios may still
 walk the panel snapshot — see
 [response-panel helpers](agent_e2e_response_panel.md).
 
-**Plus-tab create (PYPOST-921):** when restore does not leave a blank request
-tab, agents click `PLUS_TAB_BUTTON` (`pypost_plus_tab_button`, the embedded
-`+` on the trailing plus chrome — not `PLUS_TAB_PLACEHOLDER`). Covered by
+**Plus-tab create (PYPOST-921 / PYPOST-1157):** when restore does not leave a
+blank request tab, agents click `PLUS_TAB_BUTTON` (`pypost_plus_tab_button`,
+the embedded `+` on the trailing plus chrome — not `PLUS_TAB_PLACEHOLDER`).
+`+` now shows the protocol picker before creating a tab. Golden e2e injects
+HTTP (`session.window.tabs._protocol_picker = lambda *_a, **_k: TabProtocol.HTTP`)
+so live `QMenu.exec()` does not hang. Covered by
 `test_agent_golden_plus_tab_create_when_no_blank_tab`: strip request tabs
-without presenter close, then `ui_click(PLUS_TAB_BUTTON)`, then the same fill /
-Send / shared status+body settle. The strip step must follow the
+without presenter close, inject the picker, then `ui_click(PLUS_TAB_BUTTON)`,
+then the same fill / Send / shared status+body settle. The strip step must
+follow the
 [removeTab orphan hazard](#tab-strip-hazards-removetab-orphans) pattern; prefer
 current-tab roots for fill/click/wait after create (shared role ids across tabs).
+Picker contract: [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 
 ## Tab-strip hazards: removeTab orphans
 
@@ -212,7 +217,9 @@ Plus-tab create when no blank tab (PYPOST-921):
 1. Ready session, then strip all `RequestTab` pages using the
    [safe strip pattern](#tab-strip-hazards-removetab-orphans) so only the plus
    placeholder remains.
-2. `ui_click(PLUS_TAB_BUTTON)` — creates a blank request tab via plus chrome.
+2. Inject HTTP `protocol_picker` on `session.window.tabs` (never live
+   `QMenu.exec()`). Then `ui_click(PLUS_TAB_BUTTON)` — creates a blank
+   request tab via plus chrome.
 3. Continue with fill / Send / status+body settle as above; all successful
    fill, Send, and wait actions remain current-tab scoped.
 
@@ -319,7 +326,8 @@ Offscreen is set by `make test-agent-e2e` / `make test` and by
 | | display-form body (`indent=2`), not compact snapshot JSON. |
 | Missing control | `UiTargetNotFoundError` / interactable errors from actions. |
 | | Confirm blank tab restore and `is_ui_ready`. |
-| Plus-tab create fails | Confirm `PLUS_TAB_BUTTON` (not placeholder). Strip must |
+| Plus-tab create fails | Confirm `PLUS_TAB_BUTTON` (not placeholder). Inject HTTP |
+| | `protocol_picker` before click (live `QMenu.exec()` hangs). Strip must |
 | | follow [removeTab orphan hazard](#tab-strip-hazards-removetab-orphans) |
 | | (`deleteLater` + `processEvents`). Prefer current-tab fill/click/wait. |
 | Wrong tab after strip | Orphan role ids — see |

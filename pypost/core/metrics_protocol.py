@@ -17,7 +17,9 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_gui_save_as_action(self, source: str) -> None: ...
 
-    def track_gui_new_tab_action(self, source: str) -> None: ...
+    def track_gui_new_tab_action(
+        self, source: str, protocol: str = "unknown"
+    ) -> None: ...
 
     def track_gui_copy_curl_action(self) -> None: ...
 
@@ -131,7 +133,9 @@ class NullMetrics:
     def track_gui_save_as_action(self, source: str) -> None:
         return None
 
-    def track_gui_new_tab_action(self, source: str) -> None:
+    def track_gui_new_tab_action(
+        self, source: str, protocol: str = "unknown"
+    ) -> None:
         return None
 
     def track_gui_copy_curl_action(self) -> None:

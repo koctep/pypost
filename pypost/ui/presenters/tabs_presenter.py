@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -42,6 +43,10 @@ from pypost.ui.request_save_orchestrator import (
 )
 from pypost.ui.theme.json_syntax_theme import resolve_json_syntax_colors
 from pypost.ui.widget_ids import REQUEST_TABS, set_widget_id
+from pypost.ui.widgets.new_tab_protocol_picker import (
+    NewTabProtocolPicker,
+    TabProtocol,
+)
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 from pypost.ui.widgets.tab_header import PLUS_TAB_MARKER, RequestTabHeader
@@ -96,6 +101,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         history_manager: HistoryManager | None = None,
         template_service: TemplateService | None = None,
         alert_manager: AlertManager | None = None,
+        protocol_picker: Callable[..., TabProtocol | None] | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -103,6 +109,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._state_manager = state_manager
         self._settings = settings
         self._metrics = resolve_metrics(metrics)
+        self._protocol_picker = protocol_picker or NewTabProtocolPicker().prompt
         self._history_manager = history_manager
         self._template_service = template_service
         self._alert_manager = alert_manager
@@ -167,7 +174,17 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             ):
                 self._tabs.setCurrentWidget(tab)
                 return tab
+        return self._insert_websocket_tab(connection, save_state=save_state)
 
+    def add_blank_websocket_tab(self, *, save_state: bool = True) -> WebSocketTab:
+        return self._insert_websocket_tab(WebSocketConnection(), save_state=save_state)
+
+    def _insert_websocket_tab(
+        self,
+        connection: WebSocketConnection,
+        *,
+        save_state: bool = True,
+    ) -> WebSocketTab:
         presenter = WebSocketPresenter(
             connection=connection,
             env_vars=self._current_variables,
@@ -387,7 +404,22 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def handle_new_tab(self, source: str = "unknown") -> None:
         tabs_before = self._request_tab_count()
         logger.info("new_tab_action_triggered source=%s tabs_before=%d", source, tabs_before)
-        self._metrics.track_gui_new_tab_action(source)
+        protocol = self._protocol_picker(self._tabs)
+        if protocol is None:
+            logger.info("new_tab_action_cancelled source=%s", source)
+            return
+        self.open_blank_tab(protocol, source)
+
+    def open_blank_tab(self, protocol: TabProtocol, source: str) -> None:
+        logger.info(
+            "new_tab_action_completed source=%s protocol=%s",
+            source,
+            protocol.value,
+        )
+        self._metrics.track_gui_new_tab_action(source, protocol=protocol.value)
+        if protocol == TabProtocol.WEBSOCKET:
+            self.add_blank_websocket_tab()
+            return
         self.add_new_tab()
 
     def handle_close_tab(self) -> None:

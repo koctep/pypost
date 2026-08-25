@@ -30,6 +30,11 @@ tag_action(
 )
 ```
 
+`handle_new_tab("shortcut")` shows the blank-tab protocol picker before
+creating a tab. See [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
+User-facing hotkey copy is
+[PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163).
+
 ### Multiple keys, one handler
 
 Pass all keys in `keys`. The first is set on the `QAction`; alternates use `QShortcut`:

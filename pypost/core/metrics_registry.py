@@ -10,11 +10,18 @@ from pypost.models.errors import ErrorCategory
 _NEW_TAB_ACTION_SOURCES = frozenset(
     {"plus_button", "shortcut", "unknown", "collections_context"}
 )
+_NEW_TAB_PROTOCOLS = frozenset({"http", "websocket", "unknown"})
 
 
 def _normalize_new_tab_source(source: str) -> str:
     if source in _NEW_TAB_ACTION_SOURCES:
         return source
+    return "unknown"
+
+
+def _normalize_new_tab_protocol(protocol: str) -> str:
+    if protocol in _NEW_TAB_PROTOCOLS:
+        return protocol
     return "unknown"
 
 
@@ -56,7 +63,7 @@ class MetricsRegistry:
         self.gui_new_tab_actions = Counter(
             "gui_new_tab_actions_total",
             "Number of times New Tab action was triggered in GUI",
-            ["source"],
+            ["source", "protocol"],
             registry=self.registry,
         )
         self.gui_copy_curl_actions = Counter(
@@ -273,9 +280,14 @@ class MetricsRegistry:
     def track_gui_save_as_action(self, source: str) -> None:
         self.gui_save_as_actions.labels(source=source).inc()
 
-    def track_gui_new_tab_action(self, source: str) -> None:
+    def track_gui_new_tab_action(
+        self, source: str, protocol: str = "unknown"
+    ) -> None:
         normalized = _normalize_new_tab_source(source)
-        self.gui_new_tab_actions.labels(source=normalized).inc()
+        normalized_protocol = _normalize_new_tab_protocol(protocol)
+        self.gui_new_tab_actions.labels(
+            source=normalized, protocol=normalized_protocol
+        ).inc()
 
     def track_gui_copy_curl_action(self) -> None:
         self.gui_copy_curl_actions.inc()

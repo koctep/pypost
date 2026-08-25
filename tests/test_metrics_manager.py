@@ -62,15 +62,21 @@ class TestMetricsManagerGuiTracking(unittest.TestCase):
         mm.track_gui_new_tab_action("plus_button")
         mm.track_gui_new_tab_action("shortcut")
         out = _scrape(mm)
-        self.assertIn('gui_new_tab_actions_total{source="plus_button"} 1.0', out)
-        self.assertIn('gui_new_tab_actions_total{source="shortcut"} 1.0', out)
+        self.assertIn(
+            'gui_new_tab_actions_total{protocol="unknown",source="plus_button"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'gui_new_tab_actions_total{protocol="unknown",source="shortcut"} 1.0',
+            out,
+        )
 
     def test_track_gui_new_tab_action_collections_context(self):
         mm = MetricsManager()
         mm.track_gui_new_tab_action("collections_context")
         out = _scrape(mm)
         self.assertIn(
-            'gui_new_tab_actions_total{source="collections_context"} 1.0',
+            'gui_new_tab_actions_total{protocol="unknown",source="collections_context"} 1.0',
             out,
         )
 
@@ -78,8 +84,25 @@ class TestMetricsManagerGuiTracking(unittest.TestCase):
         mm = MetricsManager()
         mm.track_gui_new_tab_action("test_source")
         out = _scrape(mm)
-        self.assertIn('gui_new_tab_actions_total{source="unknown"} 1.0', out)
+        self.assertIn(
+            'gui_new_tab_actions_total{protocol="unknown",source="unknown"} 1.0',
+            out,
+        )
         self.assertNotIn('source="test_source"', out)
+
+    def test_track_gui_new_tab_action_records_protocol(self):
+        mm = MetricsManager()
+        mm.track_gui_new_tab_action("shortcut", protocol="http")
+        mm.track_gui_new_tab_action("plus_button", protocol="websocket")
+        out = _scrape(mm)
+        self.assertIn(
+            'gui_new_tab_actions_total{protocol="http",source="shortcut"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'gui_new_tab_actions_total{protocol="websocket",source="plus_button"} 1.0',
+            out,
+        )
 
     def test_track_gui_method_body_autoswitch(self):
         mm = MetricsManager()

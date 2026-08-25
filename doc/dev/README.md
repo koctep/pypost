@@ -75,6 +75,7 @@ conventions.
 ### Request and response UI
 
 1. [Request Actions](request_actions.md)
+1. [Blank-tab protocol picker (PYPOST-1157)](new_tab_protocol_picker.md)
 1. [Open Request in Isolated Tab](open_request_in_isolated_tab.md)
 1. [Response Streaming Display (PYPOST-887)](response-streaming-display.md)
 1. [Response Body Search](response_search.md)

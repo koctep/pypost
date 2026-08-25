@@ -29,6 +29,7 @@ from pypost.ui.widget_ids import (
     SEND_BUTTON,
     URL_INPUT,
 )
+from pypost.ui.widgets.new_tab_protocol_picker import TabProtocol
 from tests.helpers.agent_e2e_response_panel import response_panel_excerpt
 from tests.helpers.agent_e2e_send_settle import wait_response_after_send
 
@@ -69,6 +70,11 @@ def _strip_request_tabs(session: AgentAppSession, qapp: QApplication) -> None:
     assert not any(
         isinstance(tabs.widget(i), RequestTab) for i in range(tabs.count())
     )
+
+
+def _inject_http_protocol_picker(session: AgentAppSession) -> None:
+    """Avoid QMenu.exec() hang in plus-click e2e (PYPOST-1157)."""
+    session.window.tabs._protocol_picker = lambda *_a, **_k: TabProtocol.HTTP
 
 
 def _golden_fill_send_and_settle(session: AgentAppSession) -> None:
@@ -113,6 +119,7 @@ def test_agent_golden_plus_tab_create_when_no_blank_tab(
     assert session.window.is_ui_ready is True
     _strip_request_tabs(session, qapp)
 
+    _inject_http_protocol_picker(session)
     session.ui_click(PLUS_TAB_BUTTON)
     qapp.processEvents()
     assert isinstance(session.current_request_tab(), RequestTab)

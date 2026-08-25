@@ -20,8 +20,10 @@ class MetricsTrackingMixin:
     def track_gui_save_as_action(self, source: str) -> None:
         self._registry.track_gui_save_as_action(source)
 
-    def track_gui_new_tab_action(self, source: str) -> None:
-        self._registry.track_gui_new_tab_action(source)
+    def track_gui_new_tab_action(
+        self, source: str, protocol: str = "unknown"
+    ) -> None:
+        self._registry.track_gui_new_tab_action(source, protocol)
 
     def track_gui_copy_curl_action(self) -> None:
         self._registry.track_gui_copy_curl_action()

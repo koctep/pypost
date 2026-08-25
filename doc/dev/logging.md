@@ -385,6 +385,8 @@ Treat `endpoint` and webhook `target` as potentially sensitive — see
 | Event | Level | Key fields | Module |
 | --- | --- | --- | --- |
 | `new_tab_action_triggered` | INFO | `source`, `tabs_before` | `tabs_presenter` |
+| `new_tab_action_cancelled` | INFO | `source` | `tabs_presenter` |
+| `new_tab_action_completed` | INFO | `source`, `protocol` | `tabs_presenter` |
 | `restore_tabs_completed` | INFO | `restored_count` | `tabs_presenter` |
 | `copy_curl_success` | INFO | `request_id`, `length` | `tabs_presenter` |
 | `save_as_flow_started` | INFO | `source_request_id` | save orchestrator |
