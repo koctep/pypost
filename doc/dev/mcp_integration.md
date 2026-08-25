@@ -1046,3 +1046,48 @@ The preview refreshes when MCP metadata or template-bearing fields change and wh
     `startAt` params with defaults (50, 0) matching the other list endpoints (PYPOST-1091).
 
 See `ai-tasks/PYPOST-20/40-tech-debt.md` for more details.
+
+---
+
+## Planned: MCP client tab mode (PYPOST-1164)
+
+Research story [PYPOST-1164](https://pypost.atlassian.net/browse/PYPOST-1164) (Epic
+[PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155)) specifies a dedicated **MCP
+Client** workspace editor as the third `TabProtocol` peer to HTTP `RequestTab` and
+`WebSocketTab`. Users choose **HTTP Request** | **WebSocket** | **MCP Client** from the
+blank-tab protocol picker (`Ctrl+N`, tab-bar **+**, close-last-tab fallback) delivered by
+WS-TM-1 (PYPOST-1157), then connect to a remote MCP server, browse `list_tools` results, and
+invoke tools with schema-guided forms — not via the HTTP request method dropdown.
+
+**Architecture:** [`ai-tasks/PYPOST-1164/20-architecture.md`](../../ai-tasks/PYPOST-1164/20-architecture.md)
+— recommended Option A (extend `NewTabProtocolPicker` with a third menu item),
+`TabProtocol.MCP_CLIENT`, `McpClientConnection` / `McpClientTab` / `McpClientPresenter`,
+convert-on-open migration for legacy `method: "MCP"` collection items, and retirement of the
+HTTP method **MCP** path.
+
+**Implementation stories** (not yet shipped):
+
+| Story | Jira | Summary |
+| --- | --- | --- |
+| MCP-TM-1 | [PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165) | Extend protocol picker with **MCP Client** |
+| MCP-TM-2 | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) | Blank MCP Client draft tab shell |
+| MCP-TM-3 | [PYPOST-1169](https://pypost.atlassian.net/browse/PYPOST-1169) | Tool discovery (`list_tools`) and browser UI |
+| MCP-TM-4 | [PYPOST-1170](https://pypost.atlassian.net/browse/PYPOST-1170) | Interactive `call_tool` + response pane |
+| MCP-TM-5 | [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) | Outbound headers + environment templating |
+| MCP-TM-6 | [PYPOST-1171](https://pypost.atlassian.net/browse/PYPOST-1171) | Migrate/remove HTTP method **MCP** |
+| MCP-TM-7 | [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) | Collections save/open + context menu parity |
+| MCP-TM-8 | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) | User documentation alignment |
+
+**Current state (until MCP-TM-1 … MCP-TM-8 land):**
+
+*   Outbound MCP is only available as HTTP method **MCP** on `RequestEditor` — raw JSON body
+    conventions for `list_tools` / `call_tool`, not a dedicated editor.
+*   `RequestService._execute_mcp` renders URL and headers from templates but passes **only the
+    URL** to `MCPClientService.run` — environment/auth headers do not reach the upstream MCP
+    HTTP client (fixed in MCP-TM-5).
+*   Inbound surfaces are **unchanged** by this epic: **MCP Servers…**, **Expose as MCP Tool** /
+    **MCP Tool** checkbox, and the HTTP editor **MCP** sub-tab for inbound tool exposure remain
+    as documented above. See also [MCP Reverse Proxy](mcp_proxy.md) for inbound bridge mode.
+
+Until these land, **`method: "MCP"` requests** (e.g. `examples/collections/mcp.json`) and
+inbound MCP server tooling remain the only outbound/inbound MCP paths in the GUI.
