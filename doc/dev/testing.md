@@ -1802,6 +1802,7 @@ mock WebSocket server tests:
    - `tests/test_websocket_codecs.py` — UTF-8, JSON formatting/validation, and Hex/Base64 binary codec encoding/decoding.
    - `tests/test_websocket_export.py` — JSON, NDJSON, and CSV stream transcript export serialization.
    - `tests/test_websocket_session_slots.py` — concurrent session slot acquisition and release limits.
+   - `tests/test_session_slots_stress.py` — high-concurrency (64-worker) SessionSlots stress benchmarks (PYPOST-1147).
    - `tests/test_websocket_templating.py` — template variable resolution and sensitive secret masking.
 
 2. **Qt Integration and UI Tests**:
