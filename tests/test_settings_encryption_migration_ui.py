@@ -120,10 +120,10 @@ class TestSettingsDialogEncryptionMigration:
         storage = MagicMock(spec=StorageManager)
         dlg = SettingsDialog(AppSettings(), storage=storage)
         try:
-            assert dlg.form_layout.indexOf(dlg.encryption_migration_section_label) >= 0
-            assert dlg.form_layout.indexOf(dlg.verify_encryption_btn) >= 0
-            assert dlg.form_layout.indexOf(dlg.reencrypt_environments_btn) >= 0
-            assert dlg.form_layout.indexOf(dlg.encrypt_plaintext_btn) >= 0
+            assert dlg.form_layout_index_of(dlg.encryption_migration_section_label) >= 0
+            assert dlg.form_layout_index_of(dlg.verify_encryption_btn) >= 0
+            assert dlg.form_layout_index_of(dlg.reencrypt_environments_btn) >= 0
+            assert dlg.form_layout_index_of(dlg.encrypt_plaintext_btn) >= 0
             assert dlg.verify_encryption_btn.isEnabled()
             assert dlg.reencrypt_environments_btn.isEnabled()
             assert dlg.encrypt_plaintext_btn.isEnabled()

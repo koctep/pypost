@@ -38,8 +38,7 @@ class TestSettingsDialogRequestTimeout:
     def test_request_timeout_spin_is_on_form_layout(self, qapp):
         dlg = SettingsDialog(AppSettings())
         try:
-            assert dlg.timeout_spin.parent() is dlg
-            assert dlg.form_layout.indexOf(dlg.timeout_spin) >= 0
+            assert dlg.form_layout_index_of(dlg.timeout_spin) >= 0
         finally:
             dlg.close()
 
@@ -63,8 +62,7 @@ class TestSettingsDialogTheme:
     def test_theme_combo_is_on_form_layout(self, qapp):
         dlg = SettingsDialog(AppSettings())
         try:
-            assert dlg.theme_combo.parent() is dlg
-            assert dlg.form_layout.indexOf(dlg.theme_combo) >= 0
+            assert dlg.form_layout_index_of(dlg.theme_combo) >= 0
         finally:
             dlg.close()
 
@@ -88,8 +86,7 @@ class TestSettingsDialogLogHiddenKeyNames:
     def test_log_hidden_key_names_checkbox_on_form(self, qapp):
         dlg = SettingsDialog(AppSettings())
         try:
-            assert dlg.log_hidden_key_names_check.parent() is dlg
-            assert dlg.form_layout.indexOf(dlg.log_hidden_key_names_check) >= 0
+            assert dlg.form_layout_index_of(dlg.log_hidden_key_names_check) >= 0
         finally:
             dlg.close()
 
@@ -114,27 +111,30 @@ class TestSettingsDialogSecurityLoggingSection:
         dlg = SettingsDialog(AppSettings())
         try:
             assert dlg.security_logging_section_label.text() == "Security / Logging"
-            assert dlg.form_layout.indexOf(dlg.security_logging_section_label) >= 0
+            assert dlg.form_layout_index_of(dlg.security_logging_section_label) >= 0
         finally:
             dlg.close()
 
-    def test_security_logging_fields_grouped_after_retry_policy(self, qapp):
+    def test_security_alert_fields_ordered_on_security_tab(self, qapp):
         dlg = SettingsDialog(AppSettings())
         try:
-            retry_idx = dlg.form_layout.indexOf(dlg.retryable_codes_edit)
-            header_idx = dlg.form_layout.indexOf(dlg.security_logging_section_label)
-            hidden_idx = dlg.form_layout.indexOf(dlg.log_hidden_key_names_check)
-            log_path_idx = dlg.form_layout.indexOf(dlg.alert_log_path_edit)
-            webhook_idx = dlg.form_layout.indexOf(dlg.alert_webhook_url_edit)
-            auth_idx = dlg.form_layout.indexOf(dlg.alert_webhook_auth_edit)
+            security_page = dlg.settings_tabs.widget(3)
+            form = dlg.tab_form_layout(security_page)
+            header_idx = form.indexOf(dlg.security_logging_section_label)
+            hidden_idx = form.indexOf(dlg.log_hidden_key_names_check)
+            log_path_idx = form.indexOf(dlg.alert_log_path_edit)
+            webhook_idx = form.indexOf(dlg.alert_webhook_url_edit)
+            auth_idx = form.indexOf(dlg.alert_webhook_auth_edit)
             assert (
-                retry_idx
-                < header_idx
+                header_idx
                 < hidden_idx
                 < log_path_idx
                 < webhook_idx
                 < auth_idx
             )
+            requests_page = dlg.settings_tabs.widget(1)
+            requests_form = dlg.tab_form_layout(requests_page)
+            assert requests_form.indexOf(dlg.retryable_codes_edit) >= 0
         finally:
             dlg.close()
 
@@ -180,7 +180,7 @@ class TestSettingsDialogAlertSettings:
         try:
             assert dlg.alert_webhook_auth_edit.text() == ""
             assert dlg.alert_webhook_auth_edit.placeholderText() == WEBHOOK_AUTH_KEEP_PLACEHOLDER
-            assert dlg.form_layout.indexOf(dlg.alert_webhook_auth_clear_check) >= 0
+            assert dlg.form_layout_index_of(dlg.alert_webhook_auth_clear_check) >= 0
         finally:
             dlg.close()
 
@@ -188,7 +188,7 @@ class TestSettingsDialogAlertSettings:
         dlg = SettingsDialog(AppSettings())
         try:
             assert dlg.alert_webhook_auth_edit.placeholderText() == WEBHOOK_AUTH_NEW_PLACEHOLDER
-            assert dlg.form_layout.indexOf(dlg.alert_webhook_auth_clear_check) < 0
+            assert dlg.form_layout_index_of(dlg.alert_webhook_auth_clear_check) < 0
         finally:
             dlg.close()
 

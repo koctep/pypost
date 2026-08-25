@@ -22,11 +22,10 @@ class TestSettingsDialogEnvironmentEncryption:
     def test_encryption_controls_on_form(self, qapp):
         dlg = SettingsDialog(AppSettings())
         try:
-            assert dlg.env_encryption_mode_combo.parent() is dlg
-            assert dlg.form_layout.indexOf(dlg.env_encryption_mode_combo) >= 0
-            assert dlg.form_layout.indexOf(dlg.env_encryption_key_source_combo) >= 0
+            assert dlg.form_layout_index_of(dlg.env_encryption_mode_combo) >= 0
+            assert dlg.form_layout_index_of(dlg.env_encryption_key_source_combo) >= 0
             assert (
-                dlg.form_layout.indexOf(
+                dlg.form_layout_index_of(
                     dlg.env_encryption_key_source_fallback_edit,
                 )
                 >= 0

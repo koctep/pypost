@@ -35,6 +35,7 @@ ENV_IMPORT_BUTTON = "pypost_env_import_button"
 ENV_EXPORT_BUTTON = "pypost_env_export_button"
 SETTINGS_BUTTON = "pypost_settings_button"
 SETTINGS_DIALOG = "pypost_settings_dialog"
+SETTINGS_TABS = "pypost_settings_tabs"
 PLUS_TAB_PLACEHOLDER = "pypost_plus_tab_placeholder"
 PLUS_TAB_BUTTON = "pypost_plus_tab_button"
 

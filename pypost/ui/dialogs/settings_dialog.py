@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QVBoxLayout
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from pypost.core.encryption_migration import EncryptionMigrationService
 from pypost.core.key_source_constants import (  # noqa: F401
@@ -42,9 +49,23 @@ from pypost.ui.widgets.settings.security_alert_section import (  # noqa: F401
     WEBHOOK_AUTH_NEW_PLACEHOLDER,
     _resolve_webhook_auth_header,
 )
-from pypost.ui.widget_ids import SETTINGS_DIALOG, set_widget_id
+from pypost.ui.widget_ids import SETTINGS_DIALOG, SETTINGS_TABS, set_widget_id
 
 logger = logging.getLogger(__name__)
+
+SETTINGS_TAB_LABELS: tuple[str, ...] = (
+    "General",
+    "Requests & Retries",
+    "Network",
+    "Security & Alerts",
+    "Encryption",
+)
+
+
+def _make_tab_page() -> tuple[QWidget, QFormLayout]:
+    page = QWidget()
+    form = QFormLayout(page)
+    return page, form
 
 
 class SettingsDialog(QDialog):
@@ -59,14 +80,13 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         set_widget_id(self, SETTINGS_DIALOG)
         self.setWindowTitle("Settings")
-        self.resize(400, 400)
+        self.resize(520, 480)
         self.current_settings = current_settings
         self.new_settings = None
         self._storage = storage
         self._migration_worker = None
 
         self.layout = QVBoxLayout(self)
-        self.form_layout = QFormLayout()
 
         editor = EditorSettingsSection(current_settings, self)
         request = RequestSettingsSection(current_settings, self)
@@ -134,22 +154,59 @@ class SettingsDialog(QDialog):
 
         self._migration_service = encryption_migration._migration_service
 
-        editor.add_to_form(self.form_layout)
-        request.add_timeout_to_form(self.form_layout)
-        server_bind.add_to_form(self.form_layout)
-        request.add_confirm_overwrite_to_form(self.form_layout)
-        encryption_config.add_to_form(self.form_layout)
-        encryption_migration.add_to_form(self.form_layout)
-        retry_policy.add_to_form(self.form_layout)
-        security_alert.add_to_form(self.form_layout)
-        websocket_section.add_to_form(self.form_layout)
+        general_page, general_form = _make_tab_page()
+        requests_page, requests_form = _make_tab_page()
+        network_page, network_form = _make_tab_page()
+        security_page, security_form = _make_tab_page()
+        encryption_page, encryption_form = _make_tab_page()
 
-        self.layout.addLayout(self.form_layout)
+        editor.add_to_form(general_form)
+        request.add_timeout_to_form(requests_form)
+        request.add_confirm_overwrite_to_form(requests_form)
+        retry_policy.add_to_form(requests_form)
+        server_bind.add_to_form(network_form)
+        websocket_section.add_to_form(network_form)
+        security_alert.add_to_form(security_form)
+        encryption_config.add_to_form(encryption_form)
+        encryption_migration.add_to_form(encryption_form)
+
+        self._tab_pages = (
+            general_page,
+            requests_page,
+            network_page,
+            security_page,
+            encryption_page,
+        )
+        self._tab_form_layouts = (
+            general_form,
+            requests_form,
+            network_form,
+            security_form,
+            encryption_form,
+        )
+
+        self.settings_tabs = QTabWidget(self)
+        set_widget_id(self.settings_tabs, SETTINGS_TABS)
+        for page, label in zip(self._tab_pages, SETTINGS_TAB_LABELS, strict=True):
+            self.settings_tabs.addTab(page, label)
+
+        self.layout.addWidget(self.settings_tabs)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         self.layout.addWidget(self.buttons)
+
+    def tab_form_layout(self, page: QWidget) -> QFormLayout:
+        index = self._tab_pages.index(page)
+        return self._tab_form_layouts[index]
+
+    def form_layout_index_of(self, widget: QWidget) -> int:
+        for form in self._tab_form_layouts:
+            index = form.indexOf(widget)
+            if index >= 0:
+                return index
+        return -1
 
     def _encryption_settings_from_form(self) -> AppSettings:
         return self._encryption_config_section.encryption_settings_from_form(

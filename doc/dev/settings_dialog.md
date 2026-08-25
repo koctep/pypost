@@ -6,24 +6,39 @@ The Settings dialog (`pypost/ui/dialogs/settings_dialog.py`) persists applicatio
 preferences to `settings.json` via `ConfigManager`.
 
 Since PYPOST-598, the dialog is a **thin coordinator** that composes domain section builders
-under `pypost/ui/widgets/settings/`. Callers and tests still import `SettingsDialog` from
+under `pypost/ui/widgets/settings/`. Since PYPOST-1145, sections are grouped into categorized
+`QTabWidget` pages. Callers and tests still import `SettingsDialog` from
 `settings_dialog.py`; widget attributes remain on the dialog instance for backward-compatible
 test access.
 
-### Architecture (PYPOST-598)
+### Tabbed layout (PYPOST-1145)
+
+`SettingsDialog` hosts a `settings_tabs` `QTabWidget` (`SETTINGS_TABS` /
+`pypost_settings_tabs`) with Save/Cancel below the tab strip.
+
+| Tab | Sections | User-guide alignment |
+| --- | --- | --- |
+| **General** | `EditorSettingsSection` | Editor and appearance |
+| **Requests & Retries** | `RequestSettingsSection`, `RetryPolicySection` | Requests; retries |
+| **Network** | `ServerBindSettingsSection`, `WebSocketSettingsSection` | MCP/metrics; WebSocket |
+| **Security & Alerts** | `SecurityAlertSection` | Retries and alerts (logging/webhook) |
+| **Encryption** | `EncryptionConfigSection`, `EncryptionMigrationSection` | Environment encryption |
+
+Tests locate widgets across tabs via `form_layout_index_of(widget)` or
+`tab_form_layout(page)` for per-tab ordering assertions.
+
+### Section modules (PYPOST-598)
 
 | Module | Domain |
 | --- | --- |
-| `editor_section.py` | Application font size, JSON indent |
+| `editor_section.py` | Application font size, JSON indent, theme |
 | `request_section.py` | Request timeout, confirm-before-overwrite |
 | `server_bind_section.py` | MCP/metrics host and port, bind validation |
 | `encryption_config_section.py` | Environment encryption mode, key source, fallback |
 | `encryption_migration_section.py` | Verify / re-encrypt / encrypt-plaintext actions |
 | `retry_policy_section.py` | Default retry policy, retryable status codes |
 | `security_alert_section.py` | Security/logging header, hidden-key logging, alerts |
-
-Form rows are assembled in legacy order. Request and server-bind rows are **interleaved**:
-timeout before MCP/metrics, confirm-overwrite after (see `SettingsDialog.__init__`).
+| `websocket_section.py` | WebSocket limits, heartbeat, reconnect, probe defaults |
 
 `accept()` orchestrates validation (`server_bind`, `retry_policy`) then merges
 `collect_fields()` from each section into one `AppSettings`.
@@ -126,6 +141,10 @@ Direct ConfigManager round-trip (without dialog): `TestConfigManagerPersistence.
 - `TestSettingsDialogRetryableCodesValidation` — blocked save + warning on invalid codes
   (PYPOST-444)
 - `TestResolveWebhookAuthHeader` — pure helper unit tests
+
+`tests/test_settings_dialog_tabbed_layout.py` (PYPOST-1145):
+
+- Tab labels, `SETTINGS_TABS` identity, and per-tab section placement
 
 `tests/test_settings_persistence.py`:
 
