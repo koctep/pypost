@@ -148,6 +148,34 @@ Before stream entries are added to the list model:
 
 ---
 
+## Planned: blank-tab WebSocket mode (PYPOST-1156)
+
+Research story [PYPOST-1156](https://pypost.atlassian.net/browse/PYPOST-1156) (Epic
+[PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155)) specifies the missing blank-tab
+path: users should choose HTTP Request vs WebSocket when opening a new workspace tab (`Ctrl+N`,
+tab-bar **+**, close-last-tab fallback), not only via Collections or session restore.
+
+**Architecture:** [`ai-tasks/PYPOST-1156/20-architecture.md`](../../ai-tasks/PYPOST-1156/20-architecture.md)
+— recommended Option A (popup `QMenu` protocol picker), `open_blank_tab(protocol, source)`,
+`add_blank_websocket_tab()`, draft tabs excluded from session restore until first save.
+
+**Implementation stories** (not yet shipped):
+
+| Story | Jira | Summary |
+| --- | --- | --- |
+| WS-TM-1 | [PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157) | Blank-tab protocol selector UX + metrics `protocol` label |
+| WS-TM-2 | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) | Blank WebSocket draft tab |
+| WS-TM-3 | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) | Tab entry-point parity |
+| WS-TM-4 | [PYPOST-1160](https://pypost.atlassian.net/browse/PYPOST-1160) | Collections WebSocket menu parity |
+| WS-TM-5 | [PYPOST-1161](https://pypost.atlassian.net/browse/PYPOST-1161) | WebSocket save-to-collection flow |
+| WS-TM-6 | [PYPOST-1162](https://pypost.atlassian.net/browse/PYPOST-1162) | Context-aware WebSocket shortcuts |
+| WS-TM-7 | [PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163) | User documentation alignment |
+
+Until these land, **`open_websocket_tab(profile)` from Collections** (and session restore)
+remains the only way to open a WebSocket editor tab.
+
+---
+
 ## Tab Lifecycle and Deterministic Teardown
 
 `TabsPresenter` manages WebSocket tab lifecycles:
