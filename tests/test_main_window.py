@@ -323,28 +323,44 @@ class TestMainWindow(unittest.TestCase):
         metrics = MagicMock()
         template_service = MagicMock()
         config_manager = MagicMock()
-        
-        with patch("pypost.ui.main_window.CollectionsPresenter") as MockCollections, \
-             patch("pypost.ui.main_window.TabsPresenter") as MockTabs, \
-             patch("pypost.ui.main_window.EnvPresenter") as MockEnv:
-            
-            from PySide6.QtWidgets import QWidget, QTabWidget
-            
-            mock_collections = MockCollections.return_value
+        history_manager = MagicMock()
+        mock_collections = MagicMock()
+        mock_tabs = MagicMock()
+        mock_env = MagicMock()
+        with (
+            patch("pypost.ui.main_window.StorageManager"),
+            patch("pypost.ui.main_window.ConfigManager"),
+            patch("pypost.ui.main_window.RequestManager"),
+            patch("pypost.ui.main_window.StateManager") as mock_sm,
+            patch("pypost.ui.mcp_server_controller.MCPServerManager"),
+            patch(
+                "pypost.ui.main_window.CollectionsPresenter",
+                return_value=mock_collections,
+            ),
+            patch("pypost.ui.main_window.TabsPresenter", return_value=mock_tabs),
+            patch("pypost.ui.main_window.EnvPresenter", return_value=mock_env),
+            patch("pypost.ui.main_window.MainWindow._create_menu_bar"),
+            patch("pypost.ui.main_window.MainWindow._setup_shortcuts"),
+            patch("pypost.ui.main_window.MainWindow.apply_settings"),
+            patch(
+                "pypost.ui.main_window.resolve_encryption_enabled",
+                return_value=False,
+            ),
+        ):
+            mock_sm.return_value.settings = AppSettings()
             mock_collections.panel = QWidget()
-            
-            mock_tabs = MockTabs.return_value
-            mock_tabs.widget = QTabWidget()
-            
-            mock_env = MockEnv.return_value
+            mock_tabs.widget = QWidget()
             mock_env.widget = QWidget()
-            
-            window = MainWindow(metrics=metrics, template_service=template_service, config_manager=config_manager)
-            
+            window = MainWindow(
+                metrics=metrics,
+                template_service=template_service,
+                config_manager=config_manager,
+                history_manager=history_manager,
+            )
+
             with patch.object(window.statusBar(), "showMessage") as mock_show_message:
-                # Emit the signal from the history panel
                 window.history_panel.curl_copied.emit()
-                
+
                 mock_show_message.assert_called_once_with("Copied to clipboard", 3000)
 
 if __name__ == "__main__":
