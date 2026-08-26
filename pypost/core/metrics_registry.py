@@ -8,7 +8,7 @@ from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 from pypost.models.errors import ErrorCategory
 
 _NEW_TAB_ACTION_SOURCES = frozenset(
-    {"plus_button", "shortcut", "unknown", "collections_context"}
+    {"plus_button", "shortcut", "unknown", "collections_context", "last_tab"}
 )
 _NEW_TAB_PROTOCOLS = frozenset({"http", "websocket", "mcp_client", "unknown"})
 

@@ -1590,6 +1590,161 @@ class TestHandleNewTabProtocolPicker(unittest.TestCase):
         self.assertEqual(menu.actions()[0].data(), TabProtocol.HTTP)
 
 
+@pytest.mark.usefixtures("qapp")
+class TestCloseLastTabProtocolPicker(unittest.TestCase):
+    """PYPOST-1159: last-tab close uses handle_new_tab, not silent HTTP."""
+
+    def _make_presenter(self, protocol_picker=None):
+        return TabsPresenter(
+            FakeRequestManager(),
+            FakeStateManager(),
+            AppSettings(),
+            metrics=MagicMock(),
+            protocol_picker=protocol_picker,
+        )
+
+    def _assert_new_tab_metric(self, mock_track, source, protocol):
+        mock_track.assert_called()
+        args, kwargs = mock_track.call_args
+        got_source = args[0] if args else kwargs.get("source")
+        if len(args) > 1:
+            got_protocol = args[1]
+        else:
+            got_protocol = kwargs.get("protocol")
+        self.assertEqual(got_source, source)
+        self.assertEqual(got_protocol, protocol)
+
+    def test_close_last_tab_uses_protocol_picker(self):
+        order = []
+
+        def picker(*_args, **_kwargs):
+            order.append("picker")
+            return TabProtocol.HTTP
+
+        p = self._make_presenter(protocol_picker=picker)
+        p.add_new_tab()
+        orig_add = p.add_new_tab
+
+        def wrapped_add(*args, **kwargs):
+            order.append("editor")
+            return orig_add(*args, **kwargs)
+
+        p.add_new_tab = wrapped_add
+        with patch.object(
+            p, "handle_new_tab", wraps=p.handle_new_tab,
+        ) as mock_handle:
+            p.close_tab(0)
+        mock_handle.assert_called_once_with("last_tab")
+        self.assertIn("picker", order)
+        self.assertEqual(order[0], "picker")
+
+    def test_close_last_tab_http_confirm_opens_request_tab(self):
+        calls = []
+
+        def picker(*_a, **_k):
+            calls.append(True)
+            return TabProtocol.HTTP
+
+        p = self._make_presenter(protocol_picker=picker)
+        p.add_new_tab()
+        p._metrics.track_gui_new_tab_action.reset_mock()
+        p.close_tab(0)
+        self.assertEqual(len(calls), 1)
+        current = p.widget.currentWidget()
+        self.assertIsInstance(current, RequestTab)
+        index = p.widget.indexOf(current)
+        self.assertEqual(p.widget.tabText(index), "New Request")
+        self._assert_new_tab_metric(
+            p._metrics.track_gui_new_tab_action,
+            "last_tab",
+            "http",
+        )
+
+    def test_close_last_tab_websocket_confirm_opens_ws_draft(self):
+        def picker(*_a, **_k):
+            return TabProtocol.WEBSOCKET
+
+        p = self._make_presenter(protocol_picker=picker)
+        p.add_new_tab()
+        with patch.object(p, "open_websocket_tab") as mock_open_saved:
+            p.close_tab(0)
+        current = p.widget.currentWidget()
+        self.assertNotIsInstance(current, RequestTab)
+        self.assertIsInstance(current, WebSocketTab)
+        mock_open_saved.assert_not_called()
+
+    def test_close_last_tab_cancel_creates_no_replacement(self):
+        p = self._make_presenter(
+            protocol_picker=lambda *_a, **_k: None,
+        )
+        p.add_new_tab()
+        p._metrics.track_gui_new_tab_action.reset_mock()
+        p.close_tab(0)
+        self.assertEqual(p._request_tab_count(), 0)
+        p._metrics.track_gui_new_tab_action.assert_not_called()
+
+    def test_close_non_last_tab_does_not_show_picker(self):
+        calls = []
+
+        def picker(*_a, **_k):
+            calls.append(True)
+            return TabProtocol.HTTP
+
+        p = self._make_presenter(protocol_picker=picker)
+        p.add_new_tab()
+        p.add_new_tab()
+        self.assertEqual(p._request_tab_count(), 2)
+        p.close_tab(0)
+        self.assertEqual(len(calls), 0)
+        self.assertEqual(p._request_tab_count(), 1)
+
+    def test_close_dirty_last_websocket_draft_keep_skips_picker(self):
+        calls = []
+
+        def picker(*_a, **_k):
+            calls.append(True)
+            return TabProtocol.HTTP
+
+        p = self._make_presenter(protocol_picker=picker)
+        tab = p.add_blank_websocket_tab()
+        tab.connection_editor.url_input.setText("ws://example.com/stream")
+        idx = p.widget.indexOf(tab)
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+        with patch(prompt_path, return_value=False) as prompt:
+            p.close_tab(idx)
+        prompt.assert_called_once()
+        self.assertEqual(len(calls), 0)
+        self.assertEqual(p.widget.indexOf(tab), idx)
+
+    def test_close_dirty_last_websocket_draft_discard_then_picker(self):
+        order = []
+
+        def picker(*_a, **_k):
+            order.append("picker")
+            return TabProtocol.HTTP
+
+        p = self._make_presenter(protocol_picker=picker)
+        tab = p.add_blank_websocket_tab()
+        tab.connection_editor.url_input.setText("ws://example.com/stream")
+        idx = p.widget.indexOf(tab)
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+
+        def prompt_discard(*_a, **_k):
+            order.append("discard")
+            return True
+
+        with patch(prompt_path, side_effect=prompt_discard):
+            p.close_tab(idx)
+        self.assertIn("picker", order)
+        self.assertEqual(order[0], "discard")
+        self.assertEqual(order[1], "picker")
+        self.assertEqual(p.widget.indexOf(tab), -1)
+
+
 if __name__ == "__main__":
     unittest.main()
 

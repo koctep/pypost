@@ -50,7 +50,7 @@ rg 'Counter\(|Histogram\(|Gauge\(' pypost/core/metrics_registry.py | wc -l
 | `gui_send_clicks_total` | Counter | — | Send button clicked in the request editor |
 | `gui_save_actions_total` | Counter | `source` | Save action triggered (`menu`, `shortcut`, `overwrite`, `new`, …) |
 | `gui_save_as_actions_total` | Counter | `source` | Save As action triggered (`menu`, `shortcut`, …) |
-| `gui_new_tab_actions_total` | Counter | `source`, `protocol` | Completed new-tab choice. `source`: `plus_button`, `shortcut`, `collections_context`, `unknown`. `protocol`: `http`, `websocket`, `mcp_client`, `unknown`. Picker cancel does not increment. |
+| `gui_new_tab_actions_total` | Counter | `source`, `protocol` | Completed new-tab choice. `source`: `plus_button`, `shortcut`, `collections_context`, `last_tab`, `unknown`. `protocol`: `http`, `websocket`, `mcp_client`, `unknown`. Picker cancel does not increment. |
 | `gui_copy_curl_actions_total` | Counter | — | Copy as cURL action triggered |
 | `gui_collection_delete_actions_total` | Counter | `item_type`, `status` | Collection tree delete flow (`item_type`: `request`, `collection`; `status`: `selected`, `cancelled`, `succeeded`, `not_found`, `error`) |
 | `gui_collection_rename_actions_total` | Counter | `item_type`, `status` | Collection tree rename flow (same `item_type` values; `status`: `selected`, `cancelled`, `rejected_empty`, `succeeded`, `not_found`, `error`) |

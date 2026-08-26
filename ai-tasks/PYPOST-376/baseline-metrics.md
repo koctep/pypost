@@ -29,7 +29,7 @@
 | `pypost/ui/presenters/collections_presenter.py` | — | 395 | 403 |
 | `pypost/ui/presenters/env_presenter.py` | — | 381 | 432 |
 | `pypost/ui/presenters/mcp_controls_presenter.py` | — | 329 | 362 |
-| `pypost/ui/presenters/tabs_presenter.py` | — | 779 | 785 |
+| `pypost/ui/presenters/tabs_presenter.py` | — | 770 | 785 |
 | `pypost/ui/widgets/mixins.py` | — | 396 | 411 |
 
 Regenerate: `.venv/bin/python scripts/audit_baseline_metrics.py --markdown ai-tasks/PYPOST-376/baseline-metrics.md`

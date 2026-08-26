@@ -56,6 +56,7 @@ and [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168)
 flowchart TB
     CtrlN["Ctrl+N → handle_new_tab shortcut"]
     PlusBtn["Tab-bar + → handle_new_tab plus_button"]
+    LastTab["Close last tab → handle_new_tab last_tab"]
     HandleNew["handle_new_tab(source)"]
     Picker["NewTabProtocolPicker.prompt"]
     OpenBlank["open_blank_tab(protocol, source)"]
@@ -67,6 +68,7 @@ flowchart TB
 
     CtrlN --> HandleNew
     PlusBtn --> HandleNew
+    LastTab --> HandleNew
     HandleNew --> Picker
     Picker -->|None cancel| HandleNew
     Picker -->|HTTP WS or MCP_CLIENT| OpenBlank
@@ -85,7 +87,7 @@ flowchart TB
 | `Ctrl+N` / **+**, cancel | `handle_new_tab` returns | Unchanged | None |
 | Collections / restore WS | `open_websocket_tab(conn)` | Saved `WebSocketTab` | Unchanged |
 | Collections **New tab** HTTP | `add_new_tab(copy)` | Isolated `RequestTab` | `collections_context` + `protocol=unknown` |
-| Close last tab | `add_new_tab(save_state=False)` | HTTP blank | Unchanged (PYPOST-1159) |
+| Close last tab | `handle_new_tab("last_tab")` → `open_blank_tab` | HTTP / WS / MCP draft, or none on cancel | `source=last_tab` + `protocol` |
 | HTTP method **MCP** Send | `RequestService._execute_mcp` | Existing HTTP editor | Unchanged (MCP-TM-6) |
 
 `add_blank_websocket_tab` builds `WebSocketConnection()` +
@@ -108,7 +110,7 @@ are omitted from `save_tabs_state` until MCP-TM-7
 | Topic | Owner |
 | --- | --- |
 | Blank WebSocket draft persist, dirty-close | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) (shipped) |
-| Close-last-tab / empty-workspace picker | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) |
+| Close-last-tab / empty-workspace picker | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) (shipped — [last_tab_protocol_picker.md](last_tab_protocol_picker.md)) |
 | MCP Client draft shell (URL, Connect, tools) | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) (shipped) |
 | MCP Client Headers + `execute_outbound` | [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) (shipped) |
 | User documentation rewrite (MCP Client) | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) |
@@ -156,7 +158,8 @@ returns `None` (looks like cancel).
 
 ### `TabsPresenter.handle_new_tab(source: str = "unknown")`
 
-Shared entry for `Ctrl+N` (`shortcut`) and **+** (`plus_button`).
+Shared entry for `Ctrl+N` (`shortcut`), **+** (`plus_button`), and
+last-tab empty-workspace replacement (`last_tab`).
 
 1. INFO `new_tab_action_triggered source=<source> tabs_before=<count>`.
 1. `protocol = self._protocol_picker(self._tabs)`.
@@ -177,8 +180,9 @@ Single routing API after a completed choice.
 HTTP remains the final fallback for `TabProtocol.HTTP` only. Do not
 treat every non-WebSocket confirm as HTTP.
 
-Later entry points (PYPOST-1159) should call this after a choice, not
-duplicate factories.
+Last-tab close (`last_tab`) and future entry points should call this
+after a choice, not duplicate factories. See
+[last_tab_protocol_picker.md](last_tab_protocol_picker.md).
 
 ### `TabsPresenter.add_blank_websocket_tab(*, save_state: bool = True) -> WebSocketTab`
 
@@ -263,7 +267,7 @@ gui_new_tab_actions_total{protocol="mcp_client",source="shortcut"}
 
 | Label | Allowed values |
 | --- | --- |
-| `source` | `plus_button`, `shortcut`, `collections_context`, `unknown` |
+| `source` | `plus_button`, `shortcut`, `last_tab`, `collections_context`, `unknown` |
 | `protocol` | `http`, `websocket`, `mcp_client`, `unknown` |
 
 Normalization: any other string becomes `unknown`. Picker confirm
@@ -342,8 +346,9 @@ Cancel never increments. Collections **New tab** uses
 
 ### Close-last-tab does not show the picker
 
-Intentional. `close_tab` still calls `add_new_tab(save_state=False)`
-when `_request_tab_count() == 0`. Picker reuse is PYPOST-1159. The MCP
+Should not happen after PYPOST-1159. Empty strip must call
+`handle_new_tab("last_tab")` via `close_workspace_tab`. See
+[last_tab_protocol_picker.md](last_tab_protocol_picker.md). The MCP
 draft **is** counted so an MCP-only strip is not treated as empty.
 
 ### MCP Client tab has no URL bar / Connect

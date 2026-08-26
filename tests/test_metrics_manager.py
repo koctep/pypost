@@ -80,6 +80,19 @@ class TestMetricsManagerGuiTracking(unittest.TestCase):
             out,
         )
 
+    def test_track_gui_new_tab_action_last_tab_source(self):
+        mm = MetricsManager()
+        mm.track_gui_new_tab_action("last_tab", protocol="http")
+        out = _scrape(mm)
+        self.assertIn(
+            'gui_new_tab_actions_total{protocol="http",source="last_tab"} 1.0',
+            out,
+        )
+        self.assertNotIn(
+            'gui_new_tab_actions_total{protocol="http",source="unknown"}',
+            out,
+        )
+
     def test_track_gui_new_tab_action_invalid_source_maps_to_unknown(self):
         mm = MetricsManager()
         mm.track_gui_new_tab_action("test_source")

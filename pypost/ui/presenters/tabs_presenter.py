@@ -26,9 +26,9 @@ from pypost.core.request_persisted_fields import (
     snapshot_persisted_fields,
 )
 from pypost.ui.presenters.tab_dirty import is_tab_dirty
+from pypost.ui.presenters.tabs_presenter_close import close_workspace_tab
 from pypost.ui.presenters.tabs_presenter_draft import (
-    collect_persistable_open_tab_ids, confirm_close_websocket_draft,
-    websocket_id_is_saved,
+    collect_persistable_open_tab_ids, websocket_id_is_saved,
 )
 from pypost.ui.presenters.tabs_presenter_worker import TabsPresenterWorkerHandlers
 from pypost.core.history_manager import HistoryManager
@@ -251,24 +251,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             self._tabs.setCurrentIndex(preferred)
 
     def close_tab(self, index: int) -> None:
-        if self._header.is_plus_tab_index(index):
-            return
-        tab = self._tabs.widget(index)
-        if not confirm_close_websocket_draft(
-            self._tabs, tab, prompt_close=prompt_unsaved_draft_tab_close,
-            websocket_id_is_saved=lambda i: websocket_id_is_saved(self._request_manager, i),
-        ):
-            return
-        presenter = getattr(tab, "presenter", None)
-        teardown = getattr(presenter, "teardown", None)
-        if callable(teardown):
-            teardown()
-        self._tabs.removeTab(index)
-        if self._request_tab_count() == 0:
-            self.add_new_tab(save_state=False)
-        else:
-            self._ensure_current_is_navigable(max(0, index - 1))
-        self.save_tabs_state()
+        close_workspace_tab(
+            self, index, prompt_close=prompt_unsaved_draft_tab_close,
+        )
 
     def restore_tabs(self) -> None:
         """Restores tabs from StateManager."""
