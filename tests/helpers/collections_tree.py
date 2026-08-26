@@ -13,6 +13,7 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QAbstractItemDelegate, QApplication, QLineEdit, QTreeView
 
 from pypost.models.models import Collection, RequestData
+from pypost.models.websocket import WebSocketConnection
 from pypost.ui.delegates.collection_item_rename_delegate import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
 from tests.helpers.qt_item_view import detach_item_view_model
@@ -20,8 +21,23 @@ from tests.helpers.qt_item_view import detach_item_view_model
 _QMENU_PATCH = "pypost.ui.presenters.collection_tree_actions.QMenu"
 
 
-def make_collection(col_id: str, name: str, requests=None) -> Collection:
-    return Collection(id=col_id, name=name, requests=requests or [])
+def make_collection(
+    col_id: str,
+    name: str,
+    requests=None,
+    *,
+    websockets=None,
+) -> Collection:
+    return Collection(
+        id=col_id,
+        name=name,
+        requests=requests or [],
+        websockets=websockets or [],
+    )
+
+
+def make_websocket(ws_id: str, name: str, **kwargs) -> WebSocketConnection:
+    return WebSocketConnection(id=ws_id, name=name, **kwargs)
 
 
 def make_request(req_id: str, name: str, method: str = "GET") -> RequestData:
@@ -50,6 +66,9 @@ class FakeRequestManager:
         if item_type == "request":
             for col in self.collections:
                 col.requests = [req for req in col.requests if req.id != item_id]
+        elif item_type == "websocket":
+            for col in self.collections:
+                col.websockets = [ws for ws in col.websockets if ws.id != item_id]
         elif item_type == "collection":
             self.collections = [col for col in self.collections if col.id != item_id]
         return True
@@ -70,6 +89,12 @@ class FakeRequestManager:
                 if col.id == item_id:
                     col.name = normalized
                     return True
+        elif item_type == "websocket":
+            for col in self.collections:
+                for ws in col.websockets:
+                    if ws.id == item_id:
+                        ws.name = normalized
+                        return True
         return False
 
 
@@ -166,6 +191,8 @@ class IsolatedTreeActions:
     emit_request_renamed: MagicMock = field(default_factory=MagicMock)
     emit_requests_deleted: MagicMock = field(default_factory=MagicMock)
     emit_open_isolated_tab: MagicMock = field(default_factory=MagicMock)
+    emit_open_isolated_websocket_tab: MagicMock = field(default_factory=MagicMock)
+    emit_websockets_deleted: MagicMock = field(default_factory=MagicMock)
     export_collection: MagicMock = field(default_factory=MagicMock)
     refresh_tree: MagicMock = field(default_factory=MagicMock)
     restore_tree_state: MagicMock = field(default_factory=MagicMock)
@@ -180,6 +207,12 @@ class IsolatedTreeActions:
                 req_item = col_item.child(child_row)
                 data = req_item.data(Qt.UserRole)
                 if item_type == "request" and isinstance(data, RequestData) and data.id == item_id:
+                    return req_item
+                if (
+                    item_type == "websocket"
+                    and isinstance(data, WebSocketConnection)
+                    and data.id == item_id
+                ):
                     return req_item
         return None
 
@@ -207,6 +240,11 @@ class IsolatedTreeActions:
                 req_item.setData(req, Qt.UserRole)
                 req_item.setEditable(False)
                 col_item.appendRow(req_item)
+            for ws in col.websockets:
+                ws_item = QStandardItem(f"ws {ws.name}")
+                ws_item.setData(ws, Qt.UserRole)
+                ws_item.setEditable(False)
+                col_item.appendRow(ws_item)
             self.model.appendRow(col_item)
             self._collection_items_by_id[col.id] = col_item
 

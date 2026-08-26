@@ -128,6 +128,37 @@ def prompt_unsaved_draft_tab_close(parent: QWidget, tab_title: str) -> bool:
     return box.clickedButton() is discard_btn
 
 
+def prompt_deleted_websocket_profile_tab_close(
+    parent: QWidget,
+    tab_title: str,
+    *,
+    has_unsaved_edits: bool,
+    has_active_connection: bool,
+) -> bool:
+    """Return True to close the tab and end the session; False to keep the tab open."""
+    if has_unsaved_edits and has_active_connection:
+        detail = (
+            "unsaved edits and an active connection that will be disconnected"
+        )
+    elif has_unsaved_edits:
+        detail = "unsaved edits that will be lost"
+    else:
+        detail = "an active connection that will be disconnected"
+    message = (
+        f"The WebSocket profile '{tab_title}' was deleted from Collections. "
+        f"This tab has {detail}. Close the tab anyway?"
+    )
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle("WebSocket profile deleted")
+    box.setText(message)
+    keep_btn = box.addButton("Keep the tab", QMessageBox.ButtonRole.RejectRole)
+    close_btn = box.addButton("Close tab", QMessageBox.ButtonRole.AcceptRole)
+    box.setDefaultButton(keep_btn)
+    box.exec()
+    return box.clickedButton() is close_btn
+
+
 def prompt_clean_sibling_tab_reload(parent: QWidget, name: str) -> bool:
     """Ask whether to load the latest persisted copy when a clean sibling tab saved."""
     message = (

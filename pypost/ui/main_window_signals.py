@@ -17,11 +17,17 @@ def wire_presenter_signals(window: MainWindow) -> None:
     window.collections.open_websocket_in_tab.connect(
         lambda conn: window.tabs.open_websocket_tab(conn)
     )
+    window.collections.open_websocket_in_isolated_tab.connect(
+        lambda conn: window.tabs.open_websocket_isolated_tab(conn)
+    )
     window.collections.collections_changed.connect(window.env.load_environments)
     window.collections.collections_changed.connect(window.mcp_controls.refresh_tools)
     window.collections.request_renamed.connect(window.tabs.rename_request_tabs)
+    window.collections.websocket_renamed.connect(window.tabs.rename_websocket_tabs)
     window.collections.requests_deleted.connect(window.tabs.close_tabs_for_request_ids)
+    window.collections.websockets_deleted.connect(window.tabs.close_tabs_for_websocket_ids)
     window.collections.requests_deleted.connect(window.mcp_controls.refresh_tools)
+    window.collections.websockets_deleted.connect(window.mcp_controls.refresh_tools)
     window.env.env_variables_changed.connect(window.tabs.on_env_variables_changed)
     window.env.env_keys_changed.connect(window.tabs.on_env_keys_changed)
     window.env.env_hidden_keys_changed.connect(

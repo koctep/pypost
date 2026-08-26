@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pypost.core.request_persisted_fields import persisted_fields_equal
 from pypost.core.websocket_persisted_fields import (
     factory_websocket_draft,
+    persisted_websocket_fields_equal,
     websocket_draft_fields_equal,
 )
 from pypost.models.websocket import WebSocketConnection
@@ -53,3 +54,12 @@ def is_websocket_draft_dirty(tab: WebSocketTab) -> bool:
     """True when editor-visible fields differ from new-profile factory defaults."""
     current = _connection_from_websocket_tab(tab)
     return not websocket_draft_fields_equal(current, factory_websocket_draft())
+
+
+def is_websocket_saved_tab_dirty(tab: WebSocketTab) -> bool:
+    """True when a saved-profile tab differs from its adopted persisted baseline."""
+    baseline = tab.persisted_baseline
+    if baseline is None:
+        return False
+    current = _connection_from_websocket_tab(tab)
+    return not persisted_websocket_fields_equal(current, baseline)

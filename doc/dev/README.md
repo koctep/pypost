@@ -61,6 +61,7 @@ conventions.
 1. [Shared JSON Export Root Policy (PYPOST-1010)](json_export_root.md)
 1. [WebSocket Connection Profile Model, Persistence, and Interchange (PYPOST-1128)](websocket_persistence_and_interchange.md)
 1. [Collection Tree Actions](collection_tree_actions.md)
+1. [Collections WebSocket Context Menu (PYPOST-1160)](websocket_collections_menu.md)
 1. [Collection Tree Performance](collection_tree_performance.md)
 1. [Collection Item Delete](collection_item_delete.md)
 1. [Collection Item Rename](collection_item_rename.md)

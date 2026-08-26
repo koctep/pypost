@@ -13,6 +13,7 @@ from tests.helpers.collections_tree import (
     close_isolated_tree_actions,
     make_collection,
     make_request,
+    make_websocket,
     patch_view_context_menu,
 )
 
@@ -256,6 +257,90 @@ class TestCollectionTreeActionsIsolated(unittest.TestCase):
         mock_warning.assert_called_once_with(harness.view)
         self.assertEqual(req.name, "Old Name")
         self.assertIsNone(harness.actions.pending_rename)
+
+
+@pytest.mark.usefixtures("qapp")
+class TestCollectionTreeActionsWebSocket(unittest.TestCase):
+    """PYPOST-1160: WebSocket collections context-menu parity (red until Step 4)."""
+
+    def test_websocket_menu_offers_new_tab_export_rename_delete(self):
+        """Right-click WS row builds menu with New tab, Export, Rename, Delete."""
+        ws = make_websocket("ws-1", "Live Feed")
+        col = make_collection("c1", "Streams", websockets=[ws])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        ws_item = harness.model.item(0).child(0)
+        with patch_view_context_menu(
+            harness.view,
+            ws_item.index(),
+            [MagicMock(), MagicMock(), MagicMock(), MagicMock()],
+            None,
+        ) as mock_menu:
+            harness.actions.show_context_menu(QPoint(0, 0))
+        labels = [call.args[0] for call in mock_menu.addAction.call_args_list]
+        self.assertEqual(
+            labels,
+            ["New tab", BUTTON_EXPORT_COLLECTION, "Rename", "Delete"],
+        )
+
+    @patch(
+        "pypost.ui.presenters.collection_tree_actions.copy_websocket_for_isolated_tab",
+        create=True,
+    )
+    def test_websocket_new_tab_emits_isolated_open_with_protocol_metric(
+        self, mock_copy,
+    ):
+        """New tab copies WS profile, emits isolated open, records websocket metric."""
+        ws = make_websocket("ws-1", "Live Feed")
+        copied = make_websocket("ws-1", "Live Feed")
+        mock_copy.return_value = copied
+        col = make_collection("c1", "Streams", websockets=[ws])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        harness.actions._emit_open_isolated_websocket_tab = (
+            harness.emit_open_isolated_websocket_tab
+        )
+        ws_item = harness.model.item(0).child(0)
+        new_tab_action = MagicMock()
+        with patch_view_context_menu(
+            harness.view,
+            ws_item.index(),
+            [new_tab_action, MagicMock(), MagicMock(), MagicMock()],
+            new_tab_action,
+        ):
+            harness.actions.show_context_menu(QPoint(0, 0))
+        mock_copy.assert_called_once_with(ws)
+        harness.emit_open_isolated_websocket_tab.assert_called_once_with(copied)
+        harness.metrics.track_gui_new_tab_action.assert_called_once_with(
+            "collections_context",
+            protocol="websocket",
+        )
+
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_delete_websocket_emits_websockets_deleted(self, mock_confirm_delete):
+        """Confirmed websocket delete emits profile id list for tab closure."""
+        ws = make_websocket("ws-1", "Live Feed")
+        col = make_collection("c1", "Streams", websockets=[ws])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        harness.actions._emit_websockets_deleted = harness.emit_websockets_deleted
+        mock_confirm_delete.return_value = True
+        harness.actions.handle_delete("ws-1", "websocket", "ws Live Feed")
+        harness.emit_websockets_deleted.assert_called_once_with(["ws-1"])
+
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_delete_collection_emits_all_websocket_ids(self, mock_confirm_delete):
+        """Deleting a collection emits all contained websocket profile ids."""
+        ws1 = make_websocket("ws-1", "Feed A")
+        ws2 = make_websocket("ws-2", "Feed B")
+        col = make_collection("c1", "Streams", websockets=[ws1, ws2])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        harness.actions._emit_websockets_deleted = harness.emit_websockets_deleted
+        mock_confirm_delete.return_value = True
+        harness.actions.handle_delete("c1", "collection", "Streams")
+        harness.emit_websockets_deleted.assert_called_once_with(["ws-1", "ws-2"])
+
 
 if __name__ == "__main__":
     unittest.main()

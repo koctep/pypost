@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from pypost.ui.collection_item_dialogs import (
     prompt_clean_sibling_tab_reload,
     prompt_dirty_sibling_tab_reload,
+    prompt_deleted_websocket_profile_tab_close,
     prompt_unsaved_draft_tab_close,
 )
 
@@ -25,8 +26,16 @@ from pypost.core.request_persisted_fields import (
     persisted_fields_equal,
     snapshot_persisted_fields,
 )
+from pypost.core.websocket_persisted_fields import snapshot_websocket_persisted_fields
 from pypost.ui.presenters.tab_dirty import is_tab_dirty
 from pypost.ui.presenters.tabs_presenter_close import close_workspace_tab
+from pypost.ui.presenters.tabs_presenter_request_close import (
+    close_tabs_for_request_ids as close_tabs_for_request_ids_helper,
+)
+from pypost.ui.presenters.tabs_presenter_ws_close import (
+    close_tabs_for_websocket_ids as close_tabs_for_websocket_ids_ws,
+    rename_websocket_tabs as rename_websocket_tabs_ws,
+)
 from pypost.ui.presenters.tabs_presenter_draft import (
     collect_persistable_open_tab_ids, websocket_id_is_saved,
 )
@@ -184,6 +193,15 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
                 return tab
         return self._insert_websocket_tab(connection, save_state=save_state)
 
+    def open_websocket_isolated_tab(
+        self,
+        connection: WebSocketConnection,
+        *,
+        save_state: bool = True,
+    ) -> WebSocketTab:
+        """Always insert a new WebSocket tab; never focus-dedup by profile id."""
+        return self._insert_websocket_tab(connection, save_state=save_state)
+
     def add_blank_websocket_tab(self, *, save_state: bool = True) -> WebSocketTab:
         return self._insert_websocket_tab(WebSocketConnection(), save_state=save_state)
 
@@ -218,6 +236,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             hidden_keys=self._current_hidden_keys,
         )
         tab = WebSocketTab(connection=connection, presenter=presenter)
+        if websocket_id_is_saved(self._request_manager, connection.id):
+            tab.persisted_baseline = snapshot_websocket_persisted_fields(connection)
         presenter.tab_title_changed.connect(
             lambda glyph, title, t=tab: self._on_websocket_title_changed(t, glyph, title)
         )
@@ -368,33 +388,22 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             ):
                 tab.persisted_baseline.name = new_name
 
+    def rename_websocket_tabs(self, ws_id: str, new_name: str) -> None:
+        rename_websocket_tabs_ws(self, ws_id, new_name)
+
     def close_tabs_for_request_ids(self, request_ids: list) -> None:
-        """Closes tabs that reference deleted collection requests."""
-        if not request_ids:
-            return
-        ids_to_close = set(request_ids)
-        indices_to_close = []
-        for i in range(self._tabs.count()):
-            tab = self._tabs.widget(i)
-            if (
-                isinstance(tab, RequestTab)
-                and tab.request_data
-                and tab.request_data.id in ids_to_close
-            ):
-                indices_to_close.append(i)
-        for index in reversed(indices_to_close):
-            self._tabs.removeTab(index)
-        if self._request_tab_count() == 0:
-            self.add_new_tab(save_state=False)
-        elif indices_to_close:
-            # Qt removeTab can land on trailing +; keep focus on a request tab.
-            preferred = max(0, min(indices_to_close) - 1)
-            self._ensure_current_is_navigable(preferred)
-        self.save_tabs_state()
-        logger.info(
-            "close_tabs_for_deleted_requests closed_count=%d request_ids=%s",
-            len(indices_to_close),
-            sorted(ids_to_close),
+        close_tabs_for_request_ids_helper(self, request_ids)
+
+    def close_tabs_for_websocket_ids(
+        self,
+        ws_ids: list[str],
+        *,
+        prompt: Callable[[QWidget, str, bool, bool], bool] | None = None,
+    ) -> None:
+        close_tabs_for_websocket_ids_ws(
+            self,
+            ws_ids,
+            prompt=prompt or prompt_deleted_websocket_profile_tab_close,
         )
 
     def set_alert_manager(self, alert_manager: AlertManager | None) -> None:

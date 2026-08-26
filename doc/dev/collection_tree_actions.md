@@ -3,16 +3,20 @@
 ## Overview
 
 `CollectionTreeActions` (`pypost/ui/presenters/collection_tree_actions.py`) owns
-right-click context-menu behavior for the collections tree: **New tab** (requests only),
-**Export Collection…** (collection or parent of a request; PYPOST-1013), **Rename**, and
+right-click context-menu behavior for the collections tree: **New tab** (HTTP requests and
+saved WebSocket profiles — [PYPOST-1160](websocket_collections_menu.md)), **Export
+Collection…** (collection or parent of a request; PYPOST-1013), **Rename**, and
 **Delete**. It also handles the inline rename editor lifecycle and delete confirmation flow.
 
 `CollectionsPresenter` wires the tree view to this class and keeps tree loading, navigation,
 and expand/collapse state.
 
 Collections **New tab** does not show `NewTabProtocolPicker`. It copies a saved HTTP
-request into an isolated tab and records `gui_new_tab_actions_total` with
-`source=collections_context` and default `protocol=unknown`. Blank-tab picker
+request or WebSocket profile into an isolated tab and records
+`gui_new_tab_actions_total` with `source=collections_context`. HTTP rows still use
+default `protocol=unknown`; WebSocket rows record `protocol=websocket` (PYPOST-1160).
+WebSocket isolated tabs, rename tab sync, and delete-close prompts:
+[websocket_collections_menu.md](websocket_collections_menu.md). Blank-tab picker
 (`Ctrl+N` / **+**): [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 
 ## Architecture
@@ -75,6 +79,7 @@ Menu order (PYPOST-1013):
 |----------|---------|
 | Collection | **Export Collection…**, Rename, Delete |
 | Request | New tab, **Export Collection…**, Rename, Delete |
+| WebSocket profile | New tab, **Export Collection…**, Rename, Delete |
 
 **Export Collection…** is omitted when the optional `export_collection` callback is
 `None` (isolated rename/delete harnesses). Production always injects it. Choosing export
@@ -150,6 +155,9 @@ main window, save dialog, save orchestrator, and settings dialog helpers.
 | `emit_request_renamed` | After request rename |
 | `emit_requests_deleted` | After delete with affected request IDs |
 | `emit_open_isolated_tab` | After **New tab** on a request |
+| `emit_open_isolated_websocket_tab` | After **New tab** on a WebSocket profile (PYPOST-1160) |
+| `emit_websocket_renamed` | After WebSocket profile rename |
+| `emit_websockets_deleted` | After delete with affected WebSocket profile IDs |
 | `export_collection` | Optional clicked-index export (PYPOST-1013) |
 
 ## Configuration
@@ -175,7 +183,7 @@ After PYPOST-1013, mocked menu helpers take `action_count` as the **full** menu 
 | `action_count` | Row | Action list |
 |----------------|-----|-------------|
 | `3` (default) | Collection | `[Export, Rename, Delete]` |
-| `4` | Request | `[New tab, Export, Rename, Delete]` |
+| `4` | Request / WebSocket | `[New tab, Export, Rename, Delete]` |
 
 Rename/delete suites pass `action_count=3` or `4` so they still select Rename/Delete by
 position after Export was inserted.

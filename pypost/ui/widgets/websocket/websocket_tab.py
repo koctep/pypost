@@ -51,6 +51,7 @@ class WebSocketTab(QWidget):
         set_widget_id(self, WS_TAB_PAGE)
         self.connection_data: WebSocketConnection = connection
         self.presenter: WebSocketPresenter = presenter
+        self.persisted_baseline: WebSocketConnection | None = None
 
         self._init_ui()
         self._connection_editor.load_connection(connection)

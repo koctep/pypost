@@ -37,10 +37,13 @@ class CollectionsPresenter(QObject):
     open_request_in_tab = Signal(object)  # payload: RequestData (deep copy for new tab)
     open_request_in_isolated_tab = Signal(object)  # payload: RequestData (deep copy)
     open_websocket_in_tab = Signal(object)  # payload: WebSocketConnection
+    open_websocket_in_isolated_tab = Signal(object)  # payload: WebSocketConnection (deep copy)
     collections_changed = Signal()  # after create / delete / rename
     collections_loaded = Signal()  # after async startup load completes
     request_renamed = Signal(str, str)  # (request_id, new_name)
+    websocket_renamed = Signal(str, str)  # (ws_id, new_name)
     requests_deleted = Signal(list)  # request IDs whose tabs should close
+    websockets_deleted = Signal(list)  # websocket profile IDs whose tabs should close
 
     def __init__(
         self,
@@ -102,6 +105,9 @@ class CollectionsPresenter(QObject):
             emit_request_renamed=self.request_renamed.emit,
             emit_requests_deleted=self.requests_deleted.emit,
             emit_open_isolated_tab=self.open_request_in_isolated_tab.emit,
+            emit_open_isolated_websocket_tab=self.open_websocket_in_isolated_tab.emit,
+            emit_websocket_renamed=self.websocket_renamed.emit,
+            emit_websockets_deleted=self.websockets_deleted.emit,
             export_collection=self._export_collection_at_index,
         )
         self._view.setItemDelegate(

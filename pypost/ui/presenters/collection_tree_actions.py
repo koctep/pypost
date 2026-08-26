@@ -13,7 +13,9 @@ from pypost.core.collection_messages import BUTTON_EXPORT_COLLECTION
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_manager import RequestManager
 from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
+from pypost.core.websocket_persisted_fields import copy_websocket_for_isolated_tab
 from pypost.models.models import RequestData
+from pypost.models.websocket import WebSocketConnection
 from pypost.ui.collection_item_dialogs import (
     confirm_delete,
     show_delete_failure,
@@ -44,6 +46,9 @@ class CollectionTreeActions:
         emit_request_renamed: Callable[[str, str], None],
         emit_requests_deleted: Callable[[list], None],
         emit_open_isolated_tab: Callable[[RequestData], None],
+        emit_open_isolated_websocket_tab: Callable[[WebSocketConnection], None] | None = None,
+        emit_websocket_renamed: Callable[[str, str], None] | None = None,
+        emit_websockets_deleted: Callable[[list], None] | None = None,
         export_collection: Callable[[QModelIndex], None] | None = None,
     ) -> None:
         self._view = view
@@ -58,6 +63,11 @@ class CollectionTreeActions:
         self._emit_request_renamed = emit_request_renamed
         self._emit_requests_deleted = emit_requests_deleted
         self._emit_open_isolated_tab = emit_open_isolated_tab
+        self._emit_open_isolated_websocket_tab = (
+            emit_open_isolated_websocket_tab or (lambda _conn: None)
+        )
+        self._emit_websocket_renamed = emit_websocket_renamed or (lambda _id, _name: None)
+        self._emit_websockets_deleted = emit_websockets_deleted or (lambda _ids: None)
         self._export_collection = export_collection
         self._pending_rename: dict | None = None
 
@@ -83,6 +93,11 @@ class CollectionTreeActions:
             new_tab_action.setToolTip(
                 "Open a separate copy of this request; edits in other tabs won't apply here."
             )
+        elif item_type == "websocket" and isinstance(data, WebSocketConnection):
+            new_tab_action = menu.addAction("New tab")
+            new_tab_action.setToolTip(
+                "Open a separate copy of this WebSocket profile; other tabs keep their own session."
+            )
 
         export_action = None
         export_collection = self._export_collection
@@ -94,13 +109,27 @@ class CollectionTreeActions:
         selected_action = menu.exec(self._view.viewport().mapToGlobal(pos))
 
         if new_tab_action and selected_action == new_tab_action:
-            logger.info(
-                "collection_request_open_new_tab request_id=%s request_name=%s",
-                data.id,
-                data.name,
-            )
-            self._metrics.track_gui_new_tab_action("collections_context")
-            self._emit_open_isolated_tab(copy_request_for_isolated_tab(data))
+            if item_type == "request" and isinstance(data, RequestData):
+                logger.info(
+                    "collection_request_open_new_tab request_id=%s request_name=%s",
+                    data.id,
+                    data.name,
+                )
+                self._metrics.track_gui_new_tab_action("collections_context")
+                self._emit_open_isolated_tab(copy_request_for_isolated_tab(data))
+            elif item_type == "websocket" and isinstance(data, WebSocketConnection):
+                logger.info(
+                    "collection_websocket_open_new_tab ws_id=%s ws_name=%s",
+                    data.id,
+                    data.name,
+                )
+                self._metrics.track_gui_new_tab_action(
+                    "collections_context",
+                    protocol="websocket",
+                )
+                self._emit_open_isolated_websocket_tab(
+                    copy_websocket_for_isolated_tab(data),
+                )
             return
 
         if (
@@ -262,12 +291,15 @@ class CollectionTreeActions:
 
         if item_type == "request":
             self._emit_request_renamed(item_id, new_name)
+        elif item_type == "websocket":
+            self._emit_websocket_renamed(item_id, new_name)
 
         self._finish_rename_tree_update(item_id, item_type, item, new_name=new_name)
         self._emit_collections_changed()
 
     def handle_delete(self, item_id: str, item_type: str, item_label: str) -> None:
         affected_request_ids = self._affected_request_ids(item_id, item_type)
+        affected_websocket_ids = self._affected_websocket_ids(item_id, item_type)
         try:
             deleted = self._request_manager.delete_collection_item(item_id, item_type)
         except Exception as exc:
@@ -299,6 +331,8 @@ class CollectionTreeActions:
         self._metrics.track_gui_collection_delete_action(item_type, "succeeded")
         if affected_request_ids:
             self._emit_requests_deleted(affected_request_ids)
+        if affected_websocket_ids:
+            self._emit_websockets_deleted(affected_websocket_ids)
         if not self._remove_item(item_id, item_type):
             self._refresh_tree()
             self._restore_tree_state()
@@ -308,6 +342,8 @@ class CollectionTreeActions:
         data = item.data(Qt.UserRole)
         if isinstance(data, RequestData):
             return "request", data.id, item.text(), data
+        if isinstance(data, WebSocketConnection):
+            return "websocket", data.id, item.text(), data
         if isinstance(data, str):
             return "collection", data, item.text(), data
         return None, None, item.text(), data
@@ -320,6 +356,10 @@ class CollectionTreeActions:
                 for req in col.requests:
                     if req.id == item_id:
                         return f"{req.method} {req.name}"
+            if item_type == "websocket":
+                for ws in col.websockets:
+                    if ws.id == item_id:
+                        return f"ws {ws.name}"
         return None
 
     def _sync_rename_tree_item(
@@ -338,6 +378,13 @@ class CollectionTreeActions:
                         if req.id == item_id:
                             item.setData(req, Qt.UserRole)
                             item.setText(f"{req.method} {req.name}")
+                            return
+            elif item_type == "websocket":
+                for col in self._request_manager.get_collections():
+                    for ws in col.websockets:
+                        if ws.id == item_id:
+                            item.setData(ws, Qt.UserRole)
+                            item.setText(f"ws {ws.name}")
                             return
             else:
                 item.setText(new_name)
@@ -375,4 +422,13 @@ class CollectionTreeActions:
             for col in self._request_manager.get_collections():
                 if col.id == item_id:
                     return [req.id for req in col.requests]
+        return []
+
+    def _affected_websocket_ids(self, item_id: str, item_type: str) -> list[str]:
+        if item_type == "websocket":
+            return [item_id]
+        if item_type == "collection":
+            for col in self._request_manager.get_collections():
+                if col.id == item_id:
+                    return [ws.id for ws in col.websockets]
         return []

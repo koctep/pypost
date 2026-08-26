@@ -175,7 +175,7 @@ class RequestManager:
 
     def delete_collection_item(self, item_id: str, item_type: str) -> bool:
         """Deletes a collection item by type."""
-        ctx = ItemDispatchContext(request_manager=self)
+        ctx = self._item_dispatch_context()
         return dispatch_delete_item(ctx, item_id, item_type, strategies=self._item_strategies)
 
     def rename_request(self, request_id: str, new_name: str) -> bool:
@@ -234,7 +234,15 @@ class RequestManager:
 
     def rename_collection_item(self, item_id: str, item_type: str, new_name: str) -> bool:
         """Renames a collection item by type."""
-        ctx = ItemDispatchContext(request_manager=self)
+        ctx = self._item_dispatch_context()
         return dispatch_rename_item(
             ctx, item_id, item_type, new_name, strategies=self._item_strategies
+        )
+
+    def _item_dispatch_context(self) -> ItemDispatchContext:
+        from pypost.core.websocket_registry import WebSocketRegistry
+
+        return ItemDispatchContext(
+            request_manager=self,
+            websocket_registry=WebSocketRegistry(self, self.storage),
         )

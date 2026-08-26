@@ -1745,6 +1745,96 @@ class TestCloseLastTabProtocolPicker(unittest.TestCase):
         self.assertEqual(p.widget.indexOf(tab), -1)
 
 
+@pytest.mark.usefixtures("qapp")
+class TestTabsPresenterWebSocketCollections(unittest.TestCase):
+    """PYPOST-1160: WebSocket isolated tab open, rename, and delete-close (red until Step 4)."""
+
+    def _make_presenter(self):
+        return TabsPresenter(
+            FakeRequestManager(),
+            FakeStateManager(),
+            AppSettings(),
+            metrics=MagicMock(),
+            protocol_picker=lambda *_a, **_k: TabProtocol.HTTP,
+        )
+
+    def _websocket_tab_count(self, presenter: TabsPresenter) -> int:
+        return sum(
+            1
+            for i in range(presenter.widget.count())
+            if isinstance(presenter.widget.widget(i), WebSocketTab)
+        )
+
+    def test_open_websocket_isolated_tab_always_inserts_second_tab(self):
+        """Isolated open always inserts a new tab even when profile is already open."""
+        p = self._make_presenter()
+        conn = WebSocketConnection(id="ws-1", name="Live Feed")
+        tab_a = p.open_websocket_tab(conn)
+        tab_b = p.open_websocket_isolated_tab(conn.model_copy(deep=True))
+        self.assertIsNot(tab_a, tab_b)
+        self.assertEqual(tab_a.connection_data.id, tab_b.connection_data.id)
+        self.assertEqual(self._websocket_tab_count(p), 2)
+
+    def test_open_websocket_isolated_tabs_have_independent_presenters(self):
+        """Isolated tabs from the same profile id have distinct session controllers."""
+        p = self._make_presenter()
+        conn = WebSocketConnection(id="ws-1", name="Live Feed")
+        copy_a = conn.model_copy(deep=True)
+        copy_b = conn.model_copy(deep=True)
+        tab_a = p.open_websocket_isolated_tab(copy_a)
+        tab_b = p.open_websocket_isolated_tab(copy_b)
+        self.assertNotEqual(tab_a.presenter._session_id, tab_b.presenter._session_id)
+        self.assertIsNot(tab_a.presenter._session_controller, tab_b.presenter._session_controller)
+
+    def test_rename_websocket_tabs_updates_labels(self):
+        """rename_websocket_tabs updates all matching WebSocketTab header labels."""
+        p = self._make_presenter()
+        conn = WebSocketConnection(id="ws-1", name="Old Name")
+        p.open_websocket_tab(conn)
+        p.open_websocket_isolated_tab(conn.model_copy(deep=True))
+        p.rename_websocket_tabs("ws-1", "Renamed")
+        labels = [
+            p.widget.tabText(i)
+            for i in range(p.widget.count())
+            if isinstance(p.widget.widget(i), WebSocketTab)
+        ]
+        self.assertEqual(labels, ["Renamed", "Renamed"])
+
+    def test_close_tabs_for_websocket_ids_silent_when_clean_idle(self):
+        """Idle, non-dirty saved websocket tab closes without a delete prompt."""
+        p = self._make_presenter()
+        conn = WebSocketConnection(
+            id="ws-1",
+            name="Clean Feed",
+            url="wss://example.com/stream",
+        )
+        tab = p.open_websocket_tab(conn, save_state=False)
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_deleted_websocket_profile_tab_close"
+        )
+        with patch(prompt_path, create=True) as prompt:
+            p.close_tabs_for_websocket_ids(["ws-1"])
+        prompt.assert_not_called()
+        self.assertEqual(p.widget.indexOf(tab), -1)
+        self.assertEqual(self._websocket_tab_count(p), 0)
+
+    def test_close_tabs_for_websocket_ids_prompts_when_connected(self):
+        """Active websocket session triggers delete prompt; cancel keeps the tab."""
+        from pypost.core.websocket_session_policy import SessionState
+
+        p = self._make_presenter()
+        conn = WebSocketConnection(id="ws-1", name="Active Feed")
+        tab = p.open_websocket_tab(conn, save_state=False)
+        tab.presenter._state = SessionState.OPEN
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_deleted_websocket_profile_tab_close"
+        )
+        with patch(prompt_path, create=True, return_value=False) as prompt:
+            p.close_tabs_for_websocket_ids(["ws-1"])
+        prompt.assert_called_once()
+        self.assertGreaterEqual(p.widget.indexOf(tab), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
 
