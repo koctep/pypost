@@ -89,7 +89,8 @@ None added by this task. Inbound MCP proxy and local server health metrics remai
 - [x] Confirmed no production code changed in PYPOST-1164
 - [x] Metrics extension requirements documented in `20-architecture.md` R-3 and child story
   acceptance criteria (MCP-TM-1, MCP-TM-3, MCP-TM-4)
-- [x] Owning stories identified with proposed test locations (no Jira links — Phase D)
+- [x] Owning stories identified with proposed test locations ([PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165),
+  [PYPOST-1169](https://pypost.atlassian.net/browse/PYPOST-1169), [PYPOST-1170](https://pypost.atlassian.net/browse/PYPOST-1170))
 - [x] No logging or metrics obligation silently dropped — deferred items named explicitly
 
 ## Notes

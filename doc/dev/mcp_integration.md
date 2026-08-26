@@ -1052,10 +1052,40 @@ See `ai-tasks/PYPOST-20/40-tech-debt.md` for more details.
 ## Planned: MCP client tab mode (PYPOST-1164)
 
 Research story [PYPOST-1164](https://pypost.atlassian.net/browse/PYPOST-1164) (Epic
-[PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155)) specifies a dedicated **MCP
-Client** workspace editor as the third `TabProtocol` peer to HTTP `RequestTab` and
+[PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155) —
+**Tab protocol modes — blank-tab protocol selector**, **option (a)** in
+[PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174); MCP Client stories stay
+on this epic) specifies a dedicated **MCP Client** workspace editor as the
+third `TabProtocol` peer to HTTP `RequestTab` and
 `WebSocketTab`. Users choose **HTTP Request** | **WebSocket** | **MCP Client** from the
-blank-tab protocol picker. WS-TM-1 ([PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157))
+blank-tab protocol picker.
+
+### Epic placement (PYPOST-1174)
+
+**Overview.** Blank-tab HTTP, WebSocket, and MCP Client work shares one epic:
+[PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155). PYPOST-1174
+chose option **(a)**: keep that parent, use a protocol-neutral title, and
+stop treating labels as WebSocket-only. Option **(b)** (a sibling MCP epic
+and reparent of PYPOST-1165 … PYPOST-1172) is rejected.
+
+**Architecture.** One Jira parent. WS-TM, MCP-TM (1165–1172), later MCP-TM,
+and related debt children stay linked. PYPOST-1174 itself stays **outside**
+the epic (planning fix, not tab delivery). See
+[`ai-tasks/PYPOST-1174/20-architecture.md`](../../ai-tasks/PYPOST-1174/20-architecture.md).
+
+**Usage.** Filter the board by epic PYPOST-1155 for all blank-tab protocol
+modes. Do not look for a second MCP Client epic.
+
+**Configuration.** Jira on PYPOST-1155: summary (and Epic Name if used)
+`Tab protocol modes — blank-tab protocol selector`. Labels: keep
+`websocket` if present; add `mcp`, `ux`, and `documentation` if missing.
+No PyPost environment variables.
+
+**Troubleshooting.** If a `websocket`-only filter hides MCP Client stories,
+check the epic labels include `mcp`. If children 1165–1172 are missing from
+the epic, they were reparented in error — restore PYPOST-1155 as parent.
+
+WS-TM-1 ([PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157))
 shipped `Ctrl+N` and tab-bar **+**; MCP-TM-1
 ([PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165)) added the **MCP Client**
 item (`TabProtocol.MCP_CLIENT` / `mcp_client`, stub `McpClientTab`). MCP-TM-2

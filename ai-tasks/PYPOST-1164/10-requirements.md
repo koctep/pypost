@@ -2,7 +2,9 @@
 
 ## Goals
 
-Epic [PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155) (blank-tab protocol selector)
+Epic [PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155)
+(**Tab protocol modes — blank-tab protocol selector**, option (a) in
+[PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174))
 adds a user-facing choice between HTTP Request and WebSocket when opening a workspace tab
 ([PYPOST-1156](https://pypost.atlassian.net/browse/PYPOST-1156) research, implementation stories
 PYPOST-1157 … PYPOST-1163). During that research, user feedback identified a third protocol gap:
@@ -71,7 +73,10 @@ PYPOST-1164 is done when:
 4. Competitive/pattern notes and protocol-picker UX options are captured (business level).
 5. Relationship to PYPOST-1157 … PYPOST-1163 blank-tab `TabProtocol` work is stated (product
    level — detailed architecture is Step 2).
-6. Child implementation stories are proposed as a markdown table (Jira creation deferred).
+6. Child implementation stories are proposed as a markdown table and created in
+   Jira as [PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165) …
+   [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) (mapping in
+   `00-roadmap.md`).
 7. `ai-tasks/PYPOST-1164/10-requirements.md` and `00-roadmap.md` exist and Step 1 remains
    `[/]` pending orchestrator review.
 
@@ -208,8 +213,10 @@ introduce blank-tab protocol selection with two choices today: **HTTP Request** 
    MCP Client drafts excluded from startup restore until first save (proposal — Step 2 confirms).
 6. **Metrics attribution** (`track_gui_new_tab_action(source, protocol)`) should gain an
    `mcp_client` protocol label when WS-TM-1 metrics work lands.
-7. **Epic placement**: PYPOST-1164 is linked under PYPOST-1155 in Jira; child stories may live
-   in PYPOST-1155 or a sibling epic — Step 2 / epic planning decides.
+7. **Epic placement**: PYPOST-1164 and MCP-TM children live under PYPOST-1155.
+   [PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174) chose **option (a)**:
+   rename that epic to **Tab protocol modes — blank-tab protocol selector** (not a
+   sibling MCP epic).
 
 ### Doc / Code Gap Analysis
 
@@ -368,13 +375,20 @@ delivered by PYPOST-1157. Options B/C/D are inferior or explicitly rejected.
   a child story explicitly expands scope.
 - `MCPClientService` is the starting backend but likely insufficient alone (headers, SSE, session
   lifecycle) — Step 2 addresses extension vs replacement.
-- Epic PYPOST-1155 title says "WebSocket"; MCP Client stories may warrant epic rename or sibling
-  epic — planning decision, not blocking research.
+- Epic PYPOST-1155 title historically said "WebSocket". Placement is **option (a)**
+  ([PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174)): keep children here;
+  rename to **Tab protocol modes — blank-tab protocol selector**. Not a sibling epic.
 
 ### Proposed Child Story Breakdown (follow-up implementation epic)
 
-Stories use provisional IDs **MCP-TM-1 … MCP-TM-8** until Jira issues are created. Suggested
-epic: extend PYPOST-1155 or new "Tab protocol modes" epic — Step 2 decides.
+Provisional IDs **MCP-TM-1 … MCP-TM-8** map to
+[PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165) …
+[PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172);
+see `00-roadmap.md` for the story-to-key mapping (keys were issued out of
+story order).
+Epic placement — extend PYPOST-1155 vs a "Tab protocol modes" sibling — was open in
+Step 2. [PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174) closed it as
+**option (a)**: same epic, renamed **Tab protocol modes — blank-tab protocol selector**.
 
 | Story | Summary | Depends on | Acceptance criteria (summary) |
 | --- | --- | --- | --- |
@@ -416,7 +430,9 @@ MCP-TM-6 → MCP-TM-7 → MCP-TM-8 (MCP-TM-5 can parallel MCP-TM-3 once MCP-TM-2
 ## References
 
 - [PYPOST-1164](https://pypost.atlassian.net/browse/PYPOST-1164) — this research story
-- [PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155) — parent epic (blank-tab protocol selector)
+- [PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155) — parent epic
+  (**Tab protocol modes — blank-tab protocol selector**; option (a), PYPOST-1174)
+- [PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174) — epic rename and labels
 - [PYPOST-1156](https://pypost.atlassian.net/browse/PYPOST-1156) — WebSocket tab mode research (template)
 - [PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157) … [PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163) — TabProtocol / WS-TM stories
 - `doc/dev/mcp_integration.md`, `doc/dev/mcp_proxy.md`

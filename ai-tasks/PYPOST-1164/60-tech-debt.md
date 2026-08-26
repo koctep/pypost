@@ -5,8 +5,11 @@
 PYPOST-1164 is a research and decomposition story with no production code — Steps 3, 4, and 5
 each confirmed that fact. This step records **pre-existing product/code debt discovered during the
 MCP UX audit** and routes it to the child implementation stories (MCP-TM-1 … MCP-TM-8) proposed
-in Step 2. Jira issue creation is deferred to Phase D — tables below use provisional story IDs
-only, with no browse links.
+in Step 2. The child stories were created in Jira during Phase D, before
+commit: MCP-TM-1 … MCP-TM-8 are
+[PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165) …
+[PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172), and the
+Follow-up Tasks table below carries their browse links.
 
 ## Shortcuts Taken
 
@@ -22,8 +25,15 @@ only, with no browse links.
 4. **Stretch capabilities explicitly deferred.** SSE upstream transport (MCP-TM-9), prompts/resources
    panes (MCP-TM-10), protocol trace viewer (MCP-TM-11), and stdio client (MCP-TM-12) are noted
    in requirements but excluded from the v1 epic estimate.
-5. **Jira child stories not created in this task.** MCP-TM-1 … MCP-TM-8 remain provisional IDs
-   until Phase D epic planning — decomposition is complete at the Markdown level only.
+5. **Epic placement decided as option (a).** MCP-TM-1 … MCP-TM-8 were created under Epic
+   [PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155). The rename-vs-sibling
+   call was deferred twice (`20-architecture.md` L160, L511). Closed in
+   [PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174): keep this parent;
+   title **Tab protocol modes — blank-tab protocol selector**; labels not websocket-only.
+6. **MCP Client hotkeys deferred without an owner.** `20-architecture.md` L155 and L510 push
+   them to "post-v1 unless bundled — document in MCP-TM-8", but MCP-TM-8 is a documentation
+   story and the stretch list (MCP-TM-9 … MCP-TM-12) omits them. Now tracked in
+   [PYPOST-1175](https://pypost.atlassian.net/browse/PYPOST-1175).
 
 ## Code Quality Issues
 
@@ -49,7 +59,7 @@ Notable gaps in the **current** codebase (to be closed by child stories):
 
 | Gap | Owner |
 | --- | --- |
-| No test proving `_execute_mcp` forwards headers to MCP HTTP client | MCP-TM-5 |
+| No test proving `_execute_mcp` forwards headers to MCP HTTP client | [PYPOST-1173](https://pypost.atlassian.net/browse/PYPOST-1173), then MCP-TM-5 |
 | No `McpClientTab` / presenter integration tests | MCP-TM-2 … MCP-TM-4 |
 | No migration test for `method: "MCP"` collection open | MCP-TM-6 |
 | No collections context-menu tests for `McpClientConnection` | MCP-TM-7 |
@@ -64,7 +74,8 @@ exposure (NFR-4) — defer to MCP-TM-3/4 implementation.
 ## Follow-up Tasks
 
 Pre-existing debt discovered during research, mapped to child stories under Epic
-[PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155):
+[PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155)
+(**Tab protocol modes — blank-tab protocol selector**, option (a) / PYPOST-1174):
 
 | Debt area | Description | Owner |
 | --- | --- | --- |
@@ -74,13 +85,26 @@ Pre-existing debt discovered during research, mapped to child stories under Epic
 | Tool discovery UI | No `list_tools` browser for remote servers | [PYPOST-1169](https://pypost.atlassian.net/browse/PYPOST-1169) (MCP-TM-3) |
 | Outbound operation metrics | No `mcp_client_connect_total` / `list_tools` / `call_tool` counters | [PYPOST-1169](https://pypost.atlassian.net/browse/PYPOST-1169), [PYPOST-1170](https://pypost.atlassian.net/browse/PYPOST-1170) (MCP-TM-3, MCP-TM-4) |
 | Schema-guided `call_tool` | No invoke form or structured result pane for outbound client | [PYPOST-1170](https://pypost.atlassian.net/browse/PYPOST-1170) (MCP-TM-4) |
-| Header forwarding / auth gap | `_execute_mcp` and `MCPClientService` drop outbound headers | [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) (MCP-TM-5) |
+| Header forwarding / auth gap | `_execute_mcp` and `MCPClientService` drop outbound headers | [PYPOST-1173](https://pypost.atlassian.net/browse/PYPOST-1173) (immediate fix on the current method-MCP path), [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) (MCP-TM-5, new editor) |
 | HTTP method MCP removal | Method combo entry and `_execute_mcp` dispatch still present | [PYPOST-1171](https://pypost.atlassian.net/browse/PYPOST-1171) (MCP-TM-6) |
 | Legacy collection migration | `method: "MCP"` items (e.g. `examples/collections/mcp.json`) open as HTTP tabs | [PYPOST-1171](https://pypost.atlassian.net/browse/PYPOST-1171) (MCP-TM-6) |
 | Collections save/open parity | No `mcp_clients[]` collection field or tree item type | [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) (MCP-TM-7) |
 | Context menu parity | `_resolve_item_target` cannot resolve `McpClientConnection` | [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) (MCP-TM-7) |
 | User documentation | Outbound client workflow undocumented; method MCP over-documented | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) (MCP-TM-8) |
 | Inbound/outbound copy clarity | **MCP Servers** vs **MCP Client** vs **Expose as MCP Tool** labels | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) (MCP-TM-8) |
+
+### Follow-ups raised by independent review (2026-08-25)
+
+Filed outside Epic [PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155) because they are
+not blocked by the MCP Client tab work:
+
+| Item | Description | Ticket |
+| --- | --- | --- |
+| Outbound header drop | Live defect on the shipped method-MCP path: resolved headers never reach `MCPClientService.run`, and History records headers that were not sent. Previously reachable only via MCP-TM-5, which sits behind three unstarted stories. | [PYPOST-1173](https://pypost.atlassian.net/browse/PYPOST-1173) (Debt, High, 3 SP) |
+| Epic placement | Option (a): keep MCP stories on PYPOST-1155; rename that epic (not a sibling). | [PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174) |
+| MCP Client hotkeys | Deferred "post-v1" with no owning story and no stretch row; `_current_tab()` will no-op shortcuts on MCP tabs exactly as it does on WebSocket tabs. | [PYPOST-1175](https://pypost.atlassian.net/browse/PYPOST-1175) (Story, Medium, 3 SP) |
+
+PYPOST-1174 epic title: **Tab protocol modes — blank-tab protocol selector**.
 
 ### New debt surfaced by this research (documentation)
 

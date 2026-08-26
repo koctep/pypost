@@ -8,7 +8,7 @@
 ## Step Status
 
 - [x] **STEP 1: Requirements Gathering and Documentation**
-  - `ai-tasks/PYPOST-1164/10-requirements.md` — MCP UX surface audit, doc/code gaps, competitive notes, MCP client tab mode functional requirements, child story breakdown (markdown table; Jira creation deferred)
+  - `ai-tasks/PYPOST-1164/10-requirements.md` — MCP UX surface audit, doc/code gaps, competitive notes, MCP client tab mode functional requirements, child story breakdown (markdown table; Jira stories [PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165) … [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) created in Phase D)
 - [x] **STEP 2: High-Level Architecture Design**
   - `ai-tasks/PYPOST-1164/20-architecture.md` — UX options for protocol picker extension, TabProtocol relationship to PYPOST-1157…1163, architecture sketch, child story SP breakdown, proposed red tests
 - [x] **STEP 3: Failing Repro Test**
@@ -23,9 +23,16 @@
   - `ai-tasks/PYPOST-1164/60-tech-debt.md` — pre-existing debt mapped to PYPOST-1165…1172
 - [x] **STEP 8: Dev Docs**
   - `doc/dev/mcp_integration.md` — Planned: MCP client tab mode (PYPOST-1164) section
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - `00529749` — documentation(mcp): PYPOST-1164 research MCP client tab mode UX
 
 ## Implementation Stories (Epic PYPOST-1155 — Phase D)
+
+Epic [PYPOST-1155](https://pypost.atlassian.net/browse/PYPOST-1155) is the **shared**
+blank-tab protocol-mode parent (**option (a)**, closed in
+[PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174)). Jira summary (and Epic
+Name if used): **Tab protocol modes — blank-tab protocol selector**. MCP-TM stories
+stay under this epic; no sibling MCP epic.
 
 | Story | Jira | SP | Summary |
 | --- | --- | --- | --- |
@@ -37,6 +44,20 @@
 | MCP-TM-6 | [PYPOST-1171](https://pypost.atlassian.net/browse/PYPOST-1171) | 5 | Migrate/remove HTTP method MCP |
 | MCP-TM-7 | [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) | 5 | Collections save/open + context menu parity |
 | MCP-TM-8 | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) | 2 | User documentation alignment |
+
+**Total:** 35 SP. Jira keys were issued out of story order — use the table above as the mapping.
+
+## Follow-ups from Independent Review (2026-08-25)
+
+Filed outside Epic PYPOST-1155 because they are not blocked by the MCP Client tab work:
+
+| Ticket | Type | SP | Summary |
+| --- | --- | --- | --- |
+| [PYPOST-1173](https://pypost.atlassian.net/browse/PYPOST-1173) | Debt (High) | 3 | Forward resolved headers from `_execute_mcp` to `MCPClientService` — live defect on the shipped method-MCP path |
+| [PYPOST-1174](https://pypost.atlassian.net/browse/PYPOST-1174) | Debt (Medium) | 3 | Option (a): rename PYPOST-1155; keep MCP children |
+| [PYPOST-1175](https://pypost.atlassian.net/browse/PYPOST-1175) | Story (Medium) | 3 | MCP-TM-9: context-aware MCP Client shortcuts (hotkey deferral had no owner) |
+
+PYPOST-1174 rename target: **Tab protocol modes — blank-tab protocol selector**.
 
 ## Status Legend
 
