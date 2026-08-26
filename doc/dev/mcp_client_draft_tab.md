@@ -87,7 +87,7 @@ as shipped in PYPOST-1165. See
   text. Image/audio blocks are `[image content]` / `[audio content]`.
 - **`TabsPresenter`**: thin factory + duck-typed close teardown and env
   fan-out. Chrome must not live in `tabs_presenter.py` (LOC cap 785;
-  **779 / 785**). PYPOST-1169 and PYPOST-1170 do **not** edit this file.
+  **785 / 785**). PYPOST-1169 and PYPOST-1170 do **not** edit this file.
 
 ```mermaid
 flowchart TB
@@ -297,22 +297,29 @@ and hidden-key masking (`********`) reuse the HTTP widgets. See
 
 | Kind | Written to `open_tabs`? | Restored? |
 | --- | --- | --- |
-| HTTP / WebSocket tabs with ids | Yes | If collection/registry finds the id |
-| Blank WebSocket draft | Yes (UUID written); restore often misses | Unchanged |
+| HTTP tabs with ids | Yes | If collection finds the id |
+| Saved WebSocket profile | **Yes** (id in `WebSocketRegistry`) | Yes (`open_websocket_tab`) |
+| Blank WebSocket draft | **No** (registry-gated omit) | **No** (see draft lifecycle doc) |
 | Blank MCP Client draft | **No** | **No** — no `restore_tabs` MCP branch |
 | Saved MCP Client profile | MCP-TM-7 | MCP-TM-7 |
 
-`save_tabs_state` appends `RequestTab.request_data.id` and
-`WebSocketTab.connection_data.id` only. Restart with only unsaved MCP
-Client drafts follows the empty-workspace path and opens blank HTTP
+`save_tabs_state` appends `RequestTab.request_data.id` and **saved**
+`WebSocketTab.connection_data.id` only (PYPOST-1158 registry gate).
+Unsaved WebSocket drafts are omitted the same way MCP Client drafts
+are, but the WS predicate is registry membership — not "omit every
+`WebSocketTab`". Restart with only unsaved MCP Client drafts follows
+the empty-workspace path and opens blank HTTP
 (`restore_tabs_no_saved_tabs`). That is FR-3, not a new picker.
 
 ### Teardown
 
 `close_tab` duck-types `tab.presenter.teardown` when callable. One path
-covers `WebSocketTab` and `McpClientTab`. Teardown bumps generation,
-drops the worker, clears tools, invoke chrome, and the result pane, and
-is idempotent when never connected.
+covers `WebSocketTab` and `McpClientTab`. For **unsaved dirty WebSocket
+drafts**, `confirm_close_websocket_draft` may prompt Discard / Keep
+before teardown ([websocket_draft_tab.md](websocket_draft_tab.md)).
+MCP Client drafts have no dirty-close prompt. Teardown bumps
+generation, drops the worker, clears tools, invoke chrome, and the
+result pane, and is idempotent when never connected.
 
 `_request_tab_count` already includes `McpClientTab`. Closing the last
 HTTP tab while an MCP Client tab remains must not treat the strip as
@@ -547,9 +554,10 @@ growth this story). GUI tests inject `metrics=` on the presenter.
 
 ### `TabsPresenter.close_tab(index)`
 
-Plus-tab index is ignored. Otherwise `teardown()` if present, then
-`removeTab`. Empty strip still opens HTTP via
-`add_new_tab(save_state=False)` (PYPOST-1159).
+Plus-tab index is ignored. Unsaved dirty WebSocket drafts may prompt
+Discard / Keep first ([websocket_draft_tab.md](websocket_draft_tab.md)).
+Otherwise `teardown()` if present, then `removeTab`. Empty strip still
+opens HTTP via `add_new_tab(save_state=False)` (PYPOST-1159).
 
 ## Configuration
 
@@ -678,9 +686,11 @@ not via sync `execute_outbound` from Connect.
 
 ### Draft reappears after restart
 
-`save_tabs_state` must not append `tab.connection_data.id`. A WebSocket
-copy-paste that writes the UUID then hopes restore misses the collection
-item fails FR-3. Look at `StateManager.get_open_tabs()`.
+`save_tabs_state` must not append `tab.connection_data.id` for MCP
+Client drafts. WebSocket drafts use a **registry gate** (omit unsaved
+ids, persist saved ids) rather than omitting every `WebSocketTab` —
+see [websocket_draft_tab.md](websocket_draft_tab.md). Look at
+`StateManager.get_open_tabs()`.
 
 ### Close does not call `teardown`
 
@@ -727,7 +737,8 @@ from the GUI thread.
 
 Chrome belongs in `pypost/ui/widgets/mcp_client/` and
 `mcp_client_presenter.py`. Extract shared insert-before-plus before
-growing the presenter. Current snapshot:
+growing the presenter. Current snapshot is **785 / 785**. Historical
+PYPOST-376 baseline:
 `ai-tasks/PYPOST-376/baseline-metrics.md` (**779 / 785**). Headroom is
 tracked as PYPOST-1184. PYPOST-1169 and PYPOST-1170 must not edit this
 file.
@@ -775,6 +786,7 @@ make test PYTEST_ARGS="tests/test_mcp_client_tab.py \
 ## Related
 
 - [Blank-tab protocol picker](new_tab_protocol_picker.md)
+- [Blank WebSocket draft tab lifecycle](websocket_draft_tab.md)
 - [UI widget identity](ui_identity.md)
 - [Logging event names](logging.md)
 - [Prometheus monitoring](../prometheus_monitoring.md)

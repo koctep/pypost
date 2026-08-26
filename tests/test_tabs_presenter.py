@@ -1,7 +1,8 @@
-import pytest
-
+import logging
 import unittest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtTest import QTest
@@ -22,6 +23,7 @@ from pypost.ui.presenters.tabs_presenter import (
 from pypost.models.mcp_client import McpClientConnection
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
+from pypost.models.websocket import WebSocketConnection
 from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.new_tab_protocol_picker import (
     NewTabProtocolPicker,
@@ -901,6 +903,215 @@ class TestTabsPresenter(unittest.TestCase):
         idx = p.widget.indexOf(tab)
         p.close_tab(idx)
         teardown.assert_called_once()
+
+    def test_save_tabs_state_omits_unsaved_websocket_draft(self):
+        p = self._make_presenter()
+        tab = p.add_blank_websocket_tab()
+        draft_id = tab.connection_data.id
+        self.assertNotIn(draft_id, p._state_manager.get_open_tabs())
+        self.assertIsInstance(tab.connection_data, WebSocketConnection)
+
+        restorer = self._make_presenter(open_tabs=[draft_id])
+        restorer.restore_tabs()
+        saw_http = False
+        for i in range(restorer.widget.count()):
+            widget = restorer.widget.widget(i)
+            self.assertNotIsInstance(widget, WebSocketTab)
+            if isinstance(widget, RequestTab):
+                saw_http = True
+        self.assertTrue(saw_http)
+
+    def test_close_dirty_websocket_draft_prompts_discard_or_keep(self):
+        p = self._make_presenter()
+        tab = p.add_blank_websocket_tab()
+        tab.connection_editor.url_input.setText("ws://example.com/stream")
+        idx = p.widget.indexOf(tab)
+        presenter = tab.presenter
+        teardown = MagicMock()
+        presenter.teardown = teardown
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+
+        with patch(prompt_path, return_value=False) as prompt:
+            p.close_tab(idx)
+        prompt.assert_called_once()
+        self.assertEqual(p.widget.indexOf(tab), idx)
+        teardown.assert_not_called()
+
+        with patch(prompt_path, return_value=True) as prompt:
+            p.close_tab(idx)
+        prompt.assert_called_once()
+        teardown.assert_called_once()
+        self.assertEqual(p.widget.indexOf(tab), -1)
+
+    def test_two_blank_websocket_tabs_do_not_merge(self):
+        p = self._make_presenter()
+        tab_a = p.add_blank_websocket_tab()
+        tab_b = p.add_blank_websocket_tab()
+        self.assertIsNot(tab_a, tab_b)
+        idx_a = p.widget.indexOf(tab_a)
+        idx_b = p.widget.indexOf(tab_b)
+        self.assertNotEqual(idx_a, idx_b)
+        self.assertEqual(p.widget.tabText(idx_a), "New WebSocket")
+        self.assertEqual(p.widget.tabText(idx_b), "New WebSocket")
+        self.assertEqual(tab_a.connection_editor.url_input.text(), "")
+        self.assertEqual(tab_b.connection_editor.url_input.text(), "")
+
+    def test_open_websocket_tab_still_dedups_saved_profile(self):
+        p = self._make_presenter()
+        conn = WebSocketConnection(id="ws-saved-dedup", name="Saved Feed")
+        first = p.open_websocket_tab(conn)
+        second = p.open_websocket_tab(conn)
+        self.assertIs(first, second)
+        ws_tabs = [
+            p.widget.widget(i)
+            for i in range(p.widget.count())
+            if isinstance(p.widget.widget(i), WebSocketTab)
+        ]
+        self.assertEqual(len(ws_tabs), 1)
+
+    def test_save_tabs_state_still_persists_saved_websocket_id(self):
+        from pypost.models.models import Collection
+
+        p = self._make_presenter()
+        conn = WebSocketConnection(
+            id="ws-saved-persist",
+            name="Saved Feed",
+            url="wss://example.com/stream",
+        )
+        p._request_manager.collections.append(
+            Collection(name="Streams", websockets=[conn])
+        )
+        p.open_websocket_tab(conn)
+        p.save_tabs_state()
+        self.assertIn("ws-saved-persist", p._state_manager.get_open_tabs())
+
+    def test_close_clean_websocket_draft_does_not_prompt(self):
+        p = self._make_presenter()
+        tab = p.add_blank_websocket_tab()
+        idx = p.widget.indexOf(tab)
+        presenter = tab.presenter
+        teardown = MagicMock()
+        presenter.teardown = teardown
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+        with patch(prompt_path, return_value=False) as prompt:
+            p.close_tab(idx)
+        prompt.assert_not_called()
+        teardown.assert_called_once()
+        self.assertEqual(p.widget.indexOf(tab), -1)
+
+
+_DRAFT_LOGGER = "pypost.ui.presenters.tabs_presenter_draft"
+
+
+@pytest.mark.usefixtures("qapp")
+class TestWebsocketDraftObservability:
+    def _make_presenter(self):
+        return TabsPresenter(
+            FakeRequestManager(),
+            FakeStateManager(),
+            AppSettings(),
+            metrics=MagicMock(),
+            protocol_picker=lambda *_a, **_k: TabProtocol.HTTP,
+        )
+
+    def test_save_tabs_state_logs_omitted_websocket_draft_id(self, caplog):
+        p = self._make_presenter()
+        with caplog.at_level(logging.INFO, logger=_DRAFT_LOGGER):
+            tab = p.add_blank_websocket_tab()
+        draft_id = tab.connection_data.id
+        messages = [r.message for r in caplog.records]
+        omit = f"websocket_draft_omitted_from_open_tabs connection_id={draft_id}"
+        assert omit in messages
+        assert any(
+            "websocket_open_tabs_filter omitted_draft_count=1" in m
+            and "persisted_ws_count=0" in m
+            for m in messages
+        )
+        assert not any("url=" in m for m in messages)
+        assert not any("headers=" in m for m in messages)
+
+    def test_save_tabs_state_logs_persisted_saved_websocket_id(self, caplog):
+        from pypost.models.models import Collection
+
+        p = self._make_presenter()
+        conn = WebSocketConnection(
+            id="ws-saved-persist-log",
+            name="Saved Feed",
+            url="wss://example.com/stream",
+        )
+        p._request_manager.collections.append(
+            Collection(name="Streams", websockets=[conn])
+        )
+        p.open_websocket_tab(conn, save_state=False)
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger=_DRAFT_LOGGER):
+            p.save_tabs_state()
+        messages = [r.message for r in caplog.records]
+        persist = (
+            "websocket_saved_tab_persisted_in_open_tabs "
+            "connection_id=ws-saved-persist-log"
+        )
+        assert persist in messages
+        assert any(
+            "websocket_open_tabs_filter omitted_draft_count=0" in m
+            and "persisted_ws_count=1" in m
+            for m in messages
+        )
+        assert not any("url=" in m for m in messages)
+        assert not any("wss://example.com" in m for m in messages)
+
+    def test_close_dirty_websocket_draft_logs_keep_and_discard(self, caplog):
+        p = self._make_presenter()
+        tab = p.add_blank_websocket_tab()
+        tab.connection_editor.url_input.setText("ws://example.com/stream")
+        idx = p.widget.indexOf(tab)
+        draft_id = tab.connection_data.id
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+        with caplog.at_level(logging.INFO, logger=_DRAFT_LOGGER):
+            with patch(prompt_path, return_value=False):
+                p.close_tab(idx)
+        keep = (
+            f"websocket_draft_dirty_close_prompt connection_id={draft_id} "
+            "choice=keep"
+        )
+        assert keep in [r.message for r in caplog.records]
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger=_DRAFT_LOGGER):
+            with patch(prompt_path, return_value=True):
+                p.close_tab(idx)
+        messages = [r.message for r in caplog.records]
+        discard = (
+            f"websocket_draft_dirty_close_prompt connection_id={draft_id} "
+            "choice=discard"
+        )
+        assert discard in messages
+        assert not any("url=" in m for m in messages)
+        assert not any("ws://example.com" in m for m in messages)
+
+    def test_close_clean_websocket_draft_logs_without_prompt(self, caplog):
+        p = self._make_presenter()
+        tab = p.add_blank_websocket_tab()
+        idx = p.widget.indexOf(tab)
+        draft_id = tab.connection_data.id
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger=_DRAFT_LOGGER):
+            with patch(prompt_path, return_value=False) as prompt:
+                p.close_tab(idx)
+        prompt.assert_not_called()
+        messages = [r.message for r in caplog.records]
+        clean = f"websocket_draft_clean_close connection_id={draft_id}"
+        assert clean in messages
+        assert not any("websocket_draft_dirty_close_prompt" in m for m in messages)
+        assert not any("url=" in m for m in messages)
 
 
 @pytest.mark.usefixtures("qapp")

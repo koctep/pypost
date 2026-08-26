@@ -11,6 +11,7 @@ Tests full loopback interactions against local ScriptedWebSocketServer:
 from __future__ import annotations
 
 import time
+from unittest.mock import patch
 
 import pytest
 from PySide6.QtWidgets import (
@@ -170,5 +171,9 @@ def test_agent_e2e_websocket_full_loopback(
         # 8. Close tab
         tab_index = window.tabs.widget.indexOf(ws_tab)
         assert tab_index >= 0
-        window.tabs.close_tab(tab_index)
+        with patch(
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close",
+            return_value=True,
+        ):
+            window.tabs.close_tab(tab_index)
         qapp.processEvents()

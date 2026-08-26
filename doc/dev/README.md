@@ -76,6 +76,7 @@ conventions.
 
 1. [Request Actions](request_actions.md)
 1. [Blank-tab protocol picker (PYPOST-1157 / PYPOST-1165)](new_tab_protocol_picker.md)
+1. [Blank WebSocket draft tab lifecycle (PYPOST-1158)](websocket_draft_tab.md)
 1. [MCP Client draft tab (PYPOST-1166–1170)](mcp_client_draft_tab.md)
 1. [Open Request in Isolated Tab](open_request_in_isolated_tab.md)
 1. [Response Streaming Display (PYPOST-887)](response-streaming-display.md)

@@ -11,6 +11,9 @@ workspace editor is created. The user chooses **HTTP Request** (default),
 (not HTTP). Chrome (URL, Connect / Disconnect, empty tools, restore
 omission, close teardown) is [mcp_client_draft_tab.md](mcp_client_draft_tab.md)
 ([PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166)).
+WebSocket draft persist and dirty-close:
+[websocket_draft_tab.md](websocket_draft_tab.md)
+([PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158)).
 Dismissing the menu creates no tab and emits no new-tab
 metric.
 
@@ -88,7 +91,9 @@ flowchart TB
 `add_blank_websocket_tab` builds `WebSocketConnection()` +
 `WebSocketPresenter` + `WebSocketTab` and inserts before the plus tab.
 It must **not** call `open_websocket_tab` (that API dedups by saved
-connection id and is the Collections/restore path).
+connection id and is the Collections/restore path). Unsaved draft ids
+are omitted from `save_tabs_state`; dirty close prompts Discard / Keep:
+[websocket_draft_tab.md](websocket_draft_tab.md).
 
 `add_blank_mcp_client_tab` constructs `McpClientConnection()` +
 `McpClientPresenter` + `McpClientTab` and inserts before the plus tab
@@ -102,11 +107,14 @@ are omitted from `save_tabs_state` until MCP-TM-7
 
 | Topic | Owner |
 | --- | --- |
-| Blank WebSocket draft editor, default name, session-restore exclusion | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) |
+| Blank WebSocket draft persist, dirty-close | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) (shipped) |
 | Close-last-tab / empty-workspace picker | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) |
 | MCP Client draft shell (URL, Connect, tools) | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) (shipped) |
 | MCP Client Headers + `execute_outbound` | [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) (shipped) |
 | User documentation rewrite (MCP Client) | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) |
+
+PYPOST-1158 lifecycle details:
+[websocket_draft_tab.md](websocket_draft_tab.md).
 
 ## API / Usage
 
@@ -176,7 +184,8 @@ duplicate factories.
 
 Blank WebSocket workspace tab. Fresh `WebSocketConnection()` (unique
 UUID, name `"New WebSocket"`, empty URL). Inserts before the plus tab,
-same as `add_new_tab`.
+same as `add_new_tab`. Persist omit and dirty-close:
+[websocket_draft_tab.md](websocket_draft_tab.md).
 
 ### `TabsPresenter.add_blank_mcp_client_tab(*, save_state: bool = True) -> McpClientTab`
 
@@ -315,7 +324,8 @@ data returns `None` (looks like cancel).
 ### Two blank WebSocket tabs collapse into one
 
 `open_websocket_tab` dedups by `connection.id`. Blank tabs must use
-`add_blank_websocket_tab` (fresh UUID each time).
+`add_blank_websocket_tab` (fresh UUID each time). Draft persist and
+dirty-close: [websocket_draft_tab.md](websocket_draft_tab.md).
 
 ### New-tab metric missing after a picker confirm
 

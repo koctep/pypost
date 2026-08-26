@@ -49,8 +49,10 @@ until file size or write latency becomes a measured problem.
 ### Managed fields
 
 - `expanded_collections` — collection tree expansion ids
-- `open_tabs` — open HTTP request and WebSocket tab ids (unsaved MCP Client
-  drafts are omitted; see [mcp_client_draft_tab.md](mcp_client_draft_tab.md))
+- `open_tabs` — open HTTP request ids and **saved** WebSocket profile
+  ids. Unsaved WebSocket drafts are omitted (registry gate; see
+  [websocket_draft_tab.md](websocket_draft_tab.md)). Unsaved MCP Client
+  drafts are omitted (see [mcp_client_draft_tab.md](mcp_client_draft_tab.md))
 - `last_environment_id` — last selected environment
 
 ### Public methods
@@ -89,6 +91,8 @@ Debounce interval: `_UI_STATE_SAVE_DEBOUNCE_MS = 300` in `pypost/core/state_mana
 - [architecture.md](architecture.md) — core module overview
 - [collection_tree_actions.md](collection_tree_actions.md) — tree expand persistence
 - [testing.md](testing.md) — `TestStateManagerPersistence` run commands
+- [websocket_draft_tab.md](websocket_draft_tab.md) — registry-gated WS `open_tabs`
+- [mcp_client_draft_tab.md](mcp_client_draft_tab.md) — MCP Client draft omit
 
 ## Troubleshooting
 
@@ -97,6 +101,7 @@ Debounce interval: `_UI_STATE_SAVE_DEBOUNCE_MS = 300` in `pypost/core/state_mana
 | Test expects immediate disk write after `set_*` | Debounce defers write | Call `flush_pending_save()` or process Qt event loop until timer fires |
 | Preference change not visible in UI | Wrong object reference | Ensure code uses `MainWindow.settings`, not a copied `AppSettings` |
 | UI state lost on normal quit | Flush not called | Verify `MainWindow.handle_exit()` calls `flush_pending_save()` |
+| Unsaved WS draft id in `open_tabs` | Persist skipped registry gate | Omit ids not in `WebSocketRegistry` |
 | Settings dialog change overwritten | Saving UI state after dialog | Settings path uses immediate save; UI fields should not reset preferences |
 
 ## Future work (non-blocking)

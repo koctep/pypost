@@ -1,9 +1,9 @@
 """Unit tests for collection item QMessageBox helpers."""
 
-import pytest
-
 import unittest
 from unittest.mock import patch
+
+import pytest
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 
@@ -16,6 +16,7 @@ from pypost.ui.collection_item_dialogs import (
     confirm_re_encrypt_environments,
     prompt_clean_sibling_tab_reload,
     prompt_dirty_sibling_tab_reload,
+    prompt_unsaved_draft_tab_close,
     show_copy_environment_duplicate_name_error,
     show_copy_environment_empty_name_error,
     show_delete_failure,
@@ -135,6 +136,25 @@ class TestCollectionItemDialogs(unittest.TestCase):
         mock_box.clickedButton.return_value = dismiss_btn
         self.assertFalse(prompt_clean_sibling_tab_reload(self.parent, "Shared"))
 
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox")
+    def test_prompt_unsaved_draft_tab_close_discard(self, mock_mb):
+        mock_box = mock_mb.return_value
+        keep_btn = object()
+        discard_btn = object()
+        mock_box.addButton.side_effect = [keep_btn, discard_btn]
+        mock_box.clickedButton.return_value = discard_btn
+        self.assertTrue(prompt_unsaved_draft_tab_close(self.parent, "New WebSocket"))
+        mock_box.exec.assert_called_once()
+
+    @patch("pypost.ui.collection_item_dialogs.QMessageBox")
+    def test_prompt_unsaved_draft_tab_close_keep(self, mock_mb):
+        mock_box = mock_mb.return_value
+        keep_btn = object()
+        discard_btn = object()
+        mock_box.addButton.side_effect = [keep_btn, discard_btn]
+        mock_box.clickedButton.return_value = keep_btn
+        self.assertFalse(prompt_unsaved_draft_tab_close(self.parent, "New WebSocket"))
+
     @patch("pypost.ui.collection_item_dialogs.QMessageBox.question")
     def test_confirm_delete_environment_returns_true_on_yes(self, mock_question):
         mock_question.return_value = QMessageBox.StandardButton.Yes
@@ -211,6 +231,7 @@ class TestCollectionItemDialogs(unittest.TestCase):
             "Error",
             "Please enter a request name",
         )
+
 
 if __name__ == "__main__":
     unittest.main()

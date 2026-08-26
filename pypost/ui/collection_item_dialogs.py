@@ -51,6 +51,7 @@ from pypost.core.environment_messages import (
 _RENAME_TITLE = "Rename Error"
 _DELETE_TITLE = "Delete Error"
 _SAVED_REQUEST_CHANGED_TITLE = "Saved Request Changed"
+_UNSAVED_DRAFT_CLOSE_TITLE = "Unsaved Changes"
 
 
 def confirm_delete(parent: QWidget, item_label: str) -> bool:
@@ -108,6 +109,23 @@ def prompt_dirty_sibling_tab_reload(parent: QWidget, name: str) -> bool:
     box.setDefaultButton(keep_btn)
     box.exec()
     return box.clickedButton() is load_btn
+
+
+def prompt_unsaved_draft_tab_close(parent: QWidget, tab_title: str) -> bool:
+    """Return True to discard changes and close; False to keep the tab open."""
+    message = (
+        f"'{tab_title}' has unsaved changes. Discard them and close the tab, "
+        "or keep the tab open?"
+    )
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle(_UNSAVED_DRAFT_CLOSE_TITLE)
+    box.setText(message)
+    keep_btn = box.addButton("Keep the tab", QMessageBox.ButtonRole.RejectRole)
+    discard_btn = box.addButton("Discard", QMessageBox.ButtonRole.AcceptRole)
+    box.setDefaultButton(keep_btn)
+    box.exec()
+    return box.clickedButton() is discard_btn
 
 
 def prompt_clean_sibling_tab_reload(parent: QWidget, name: str) -> bool:

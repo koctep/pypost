@@ -415,6 +415,11 @@ Treat `endpoint` and webhook `target` as potentially sensitive — see
 | `new_tab_action_cancelled` | INFO | `source` | `tabs_presenter` |
 | `new_tab_action_completed` | INFO | `source`, `protocol` | `tabs_presenter` |
 | `restore_tabs_completed` | INFO | `restored_count` | `tabs_presenter` |
+| `websocket_draft_omitted_from_open_tabs` | INFO | `connection_id` | `tabs_presenter_draft` |
+| `websocket_saved_tab_persisted_in_open_tabs` | INFO | `connection_id` | `tabs_presenter_draft` |
+| `websocket_open_tabs_filter` | INFO | `omitted_draft_count`, `persisted_ws_count` | `tabs_presenter_draft` |
+| `websocket_draft_dirty_close_prompt` | INFO | `connection_id`, `choice` | `tabs_presenter_draft` |
+| `websocket_draft_clean_close` | INFO | `connection_id` | `tabs_presenter_draft` |
 | `copy_curl_success` | INFO | `request_id`, `length` | `tabs_presenter` |
 | `save_as_flow_started` | INFO | `source_request_id` | save orchestrator |
 | `save_request_new_succeeded` | INFO | `request_id`, `name`, `collection_id` | save orchestrator |

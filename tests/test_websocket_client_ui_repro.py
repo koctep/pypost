@@ -56,7 +56,6 @@ from pypost.models.settings import AppSettings
 from pypost.models.websocket import WebSocketConnection
 from pypost.ui.widgets.websocket.stream_model import StreamListModel
 
-# The following imports will raise ModuleNotFoundError / ImportError until implemented in Step 4:
 from pypost.ui import widget_ids
 from pypost.ui.widgets.websocket.state_badge import WebSocketStateBadge
 from pypost.ui.widgets.websocket.connection_editor import WebSocketConnectionEditor
@@ -615,10 +614,11 @@ def test_tabs_presenter_focus_on_duplicate_profile(qapp: QApplication):
 
 def test_tabs_presenter_close_websocket_tab_calls_teardown(qapp: QApplication):
     """Verify closing a WebSocketTab polymorphically triggers teardown (FR-7)."""
+    conn = _make_sample_connection()
     rm = FakeRequestManager()
+    rm.collections = [Collection(name="Streams", websockets=[conn])]
     sm = FakeStateManager()
     tabs_p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
-    conn = _make_sample_connection()
 
     try:
         tab = tabs_p.open_websocket_tab(conn)

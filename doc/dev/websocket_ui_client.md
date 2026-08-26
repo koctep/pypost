@@ -72,7 +72,7 @@ flowchart TB
 | `WebSocketComposer` | `pypost/ui/widgets/websocket/composer.py` | Multi-format message authoring with real-time validation and quick preset/sequence controls. See [websocket_composer_presets_sequences.md](websocket_composer_presets_sequences.md). |
 | `WebSocketPresetsPanel` | `pypost/ui/widgets/websocket/presets_panel.py` | Messages sub-tab in `WS_DETAIL_TABS` for saved message presets and multi-step sequence management. See [websocket_composer_presets_sequences.md](websocket_composer_presets_sequences.md). |
 | `StreamListModel` | `pypost/ui/widgets/websocket/stream_model.py` | `QAbstractListModel` backing the stream view with 33ms batching, capacity eviction handling, and secret redaction. |
-| `TabsPresenter` | `pypost/ui/presenters/tabs_presenter.py` | Manages tab creation (including blank-tab protocol picker), focus deduplication, tab closure with clean transport teardown, and workspace restoration. See [new_tab_protocol_picker.md](new_tab_protocol_picker.md). |
+| `TabsPresenter` | `pypost/ui/presenters/tabs_presenter.py` | Tab create/close, blank-tab picker, registry-gated WS persist, dirty-close for unsaved drafts, teardown, restore. See [new_tab_protocol_picker.md](new_tab_protocol_picker.md) and [websocket_draft_tab.md](websocket_draft_tab.md). |
 | `Widget IDs` | `pypost/ui/widget_ids.py` | Stable `WS_*` identifier constants for automated agent testing and UI hierarchy discovery. |
 
 ---
@@ -148,17 +148,23 @@ Before stream entries are added to the list model:
 
 ---
 
-## Blank-tab WebSocket entry (PYPOST-1157)
+## Blank-tab WebSocket entry (PYPOST-1157 / PYPOST-1158)
 
 WS-TM-1 shipped the blank-tab protocol picker. MCP-TM-1
 ([PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165)) added
 **MCP Client** as the third item. `Ctrl+N` and tab-bar **+** show
 **HTTP Request** (default), **WebSocket**, then **MCP Client** before
 any editor is created. Confirming WebSocket calls
-`add_blank_websocket_tab()` (placeholder `WebSocketTab`; not
+`add_blank_websocket_tab()` (full `WebSocketTab`; not
 `open_websocket_tab`). Confirming MCP Client opens a draft
 `McpClientTab` ([mcp_client_draft_tab.md](mcp_client_draft_tab.md)).
 Picker details: [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
+
+WS-TM-2 ([PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158))
+owns draft **lifecycle**: registry-gated `save_tabs_state` (omit unsaved
+ids; persist saved ids) and Discard/Keep on dirty unsaved close. Editor
+chrome is unchanged. Details:
+[websocket_draft_tab.md](websocket_draft_tab.md).
 
 Saved profiles still open via `open_websocket_tab(profile)` from
 Collections and session restore.
@@ -167,7 +173,7 @@ Collections and session restore.
 
 | Story | Jira | Summary |
 | --- | --- | --- |
-| WS-TM-2 | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) | Blank WebSocket draft tab |
+| WS-TM-2 | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) | Blank WebSocket draft lifecycle (**shipped**) |
 | WS-TM-3 | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) | Tab entry-point parity (close-last-tab picker) |
 | WS-TM-4 | [PYPOST-1160](https://pypost.atlassian.net/browse/PYPOST-1160) | Collections WebSocket menu parity |
 | WS-TM-5 | [PYPOST-1161](https://pypost.atlassian.net/browse/PYPOST-1161) | WebSocket save-to-collection flow |
@@ -189,11 +195,21 @@ Epic research:
      (Collections / restore).
    - Blank WebSocket tabs from the protocol picker use
      `add_blank_websocket_tab()` (no id dedup). See
-     [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
-2. **Deterministic Teardown**:
+     [new_tab_protocol_picker.md](new_tab_protocol_picker.md) and
+     [websocket_draft_tab.md](websocket_draft_tab.md).
+2. **Session persist**:
+   - `save_tabs_state` appends a WebSocket id only when
+     `WebSocketRegistry.find_websocket(id)` finds a collection profile.
+     Unsaved draft UUIDs are omitted so they do not restore.
+3. **Dirty-close (unsaved drafts only)**:
+   - If the tab is not in the registry and editor fields differ from
+     factory defaults, `prompt_unsaved_draft_tab_close` offers
+     **Discard** or **Keep the tab**. Keep skips teardown. Saved
+     profiles and factory-clean drafts close without the prompt.
+4. **Deterministic Teardown**:
    - Closing a tab invokes `WebSocketPresenter.teardown()`, which immediately terminates active network sockets, cancels pending batch timers, and releases stream resources.
-3. **Workspace Restoration**:
-   - `restore_tabs()` safely instantiates saved WebSocket profiles in an `IDLE` disconnected state on application launch.
+5. **Workspace Restoration**:
+   - `restore_tabs()` safely instantiates saved WebSocket profiles in an `IDLE` disconnected state on application launch. Draft ids must not appear in `open_tabs`.
 
 ---
 
@@ -204,3 +220,4 @@ Epic research:
 | `tests/test_websocket_client_ui_repro.py` | 23 comprehensive unit tests verifying widget hierarchies, state badges, locking, presenters, secret masking, and batching. | `.venv/bin/pytest tests/test_websocket_client_ui_repro.py` |
 | `tests/test_agent_e2e_websocket.py` | End-to-end loopback integration test driving the full agent UI session. | `.venv/bin/pytest tests/test_agent_e2e_websocket.py` |
 | `tests/test_ui_identity_spotcheck.py` | Validates `WS_*` objectName identity preservation across theme changes and multi-tab scenarios. | `.venv/bin/pytest tests/test_ui_identity_spotcheck.py` |
+| `tests/test_tabs_presenter.py` | Blank WS draft omit from `open_tabs`, dirty Discard/Keep, saved-id persist, no-merge, INFO logs. | `make test PYTEST_ARGS="tests/test_tabs_presenter.py -k websocket_draft -v"` |

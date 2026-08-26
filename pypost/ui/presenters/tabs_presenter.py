@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from pypost.ui.collection_item_dialogs import (
     prompt_clean_sibling_tab_reload,
     prompt_dirty_sibling_tab_reload,
+    prompt_unsaved_draft_tab_close,
 )
 
 from pypost.core.alert_manager import AlertManager
@@ -25,6 +26,10 @@ from pypost.core.request_persisted_fields import (
     snapshot_persisted_fields,
 )
 from pypost.ui.presenters.tab_dirty import is_tab_dirty
+from pypost.ui.presenters.tabs_presenter_draft import (
+    collect_persistable_open_tab_ids, confirm_close_websocket_draft,
+    websocket_id_is_saved,
+)
 from pypost.ui.presenters.tabs_presenter_worker import TabsPresenterWorkerHandlers
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
@@ -249,6 +254,11 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         if self._header.is_plus_tab_index(index):
             return
         tab = self._tabs.widget(index)
+        if not confirm_close_websocket_draft(
+            self._tabs, tab, prompt_close=prompt_unsaved_draft_tab_close,
+            websocket_id_is_saved=lambda i: websocket_id_is_saved(self._request_manager, i),
+        ):
+            return
         presenter = getattr(tab, "presenter", None)
         teardown = getattr(presenter, "teardown", None)
         if callable(teardown):
@@ -257,7 +267,6 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         if self._request_tab_count() == 0:
             self.add_new_tab(save_state=False)
         else:
-            # Qt removeTab can land on trailing +; keep focus on a request tab.
             self._ensure_current_is_navigable(max(0, index - 1))
         self.save_tabs_state()
 
@@ -302,13 +311,10 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def save_tabs_state(self) -> None:
         """Persists open tab IDs to StateManager."""
-        open_ids = []
-        for i in range(self._tabs.count()):
-            tab = self._tabs.widget(i)
-            if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id:
-                open_ids.append(tab.request_data.id)
-            elif isinstance(tab, WebSocketTab) and tab.connection_data and tab.connection_data.id:
-                open_ids.append(tab.connection_data.id)
+        open_ids = collect_persistable_open_tab_ids(
+            self._tabs,
+            websocket_id_is_saved=lambda i: websocket_id_is_saved(self._request_manager, i),
+        )
         self._state_manager.set_open_tabs(open_ids)
 
     def on_env_variables_changed(self, variables: dict) -> None:
