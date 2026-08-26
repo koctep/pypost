@@ -2,15 +2,19 @@
 
 ## Create a request
 
-1. Press `Ctrl+N` or click **+** on the tab bar.
-2. Choose a method: **GET**, **POST**, **PUT**, **DELETE**, **PATCH**, or **MCP**.
-   Use **MCP** when calling MCP endpoints from PyPost itself.
+1. Press `Ctrl+N` or click **+** on the tab bar, then choose **HTTP Request** from the
+   protocol picker.
+2. Choose a method: **GET**, **POST**, **PUT**, **DELETE**, or **PATCH**.
 3. Enter the URL. You can use environment variables, for example `{{ host }}/users`.
 4. Configure **Params**, **Headers**, and **Body** as needed.
 5. Click **Send**, or press `F5` / `Ctrl+Enter`.
 
 Focus the URL bar with `Ctrl+L` or `Alt+D`. Switch editor tabs with `Ctrl+P` (Params),
 `Ctrl+H` (Headers), `Ctrl+B` (Body), `Ctrl+T` (Script).
+
+> **Outbound MCP:** To connect to a remote MCP server, list its tools, and invoke them
+> interactively, use an **MCP Client** workspace tab — not an HTTP method. See the
+> [MCP Client Guide](mcp-client.md).
 
 ## Parameters and headers
 
@@ -71,5 +75,9 @@ the active environment. See [History and Copy cURL](history-and-curl.md).
 ## MCP Tool checkbox
 
 Check **MCP Tool** next to the URL bar to expose this saved request to AI agents. Configure
-description and parameters on the **MCP** tab, then save. Details:
+description and parameters on the **MCP** tab, then save. This is an **inbound** MCP surface
+(PyPost exposes the request to agents). Details:
 [MCP Tools for AI Agents](mcp-tools.md).
+
+For **outbound** MCP (calling remote servers from PyPost), use the
+[MCP Client Guide](mcp-client.md) instead.

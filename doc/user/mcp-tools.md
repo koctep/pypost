@@ -1,5 +1,25 @@
 # MCP Tools for AI Agents
 
+PyPost supports MCP in two directions. This guide covers **inbound** MCP only — exposing
+saved HTTP requests and WebSocket profiles as tools that a **local AI agent** can call.
+For **outbound** MCP (PyPost connects to a remote server, lists tools, and invokes them),
+use the [MCP Client Guide](mcp-client.md) instead.
+
+## Inbound vs outbound
+
+| Direction | User goal | Primary UI |
+| --- | --- | --- |
+| **Inbound** (this guide) | Agent calls saved items | **MCP Tool**, **MCP** tab, **MCP Servers…** |
+| **Outbound** | PyPost calls a remote MCP server | **MCP Client** tab (`Ctrl+N` → **MCP Client**) |
+
+Do not confuse:
+
+- **MCP Servers…** / **MCP Server Tools…** — manage **inbound** endpoints PyPost hosts for
+  agents.
+- **MCP Client** tab — **outbound** client that calls upstream MCP servers over HTTP.
+
+## Inbound overview
+
 PyPost can expose saved HTTP requests as **MCP tools** for a local AI agent (Cursor,
 Claude Desktop, and similar). You mark requests in the UI — you do not write an MCP
 server by hand.

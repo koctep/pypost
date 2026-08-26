@@ -785,6 +785,8 @@ make test PYTEST_ARGS="tests/test_mcp_client_tab.py \
 
 ## Related
 
+- [MCP Client user guide](../user/mcp-client.md) — outbound connect, list, invoke (PYPOST-1168;
+  contract tests in `tests/test_mcp_tab_mode_user_docs.py`)
 - [Blank-tab protocol picker](new_tab_protocol_picker.md)
 - [Blank WebSocket draft tab lifecycle](websocket_draft_tab.md)
 - [UI widget identity](ui_identity.md)

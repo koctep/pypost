@@ -50,8 +50,9 @@ or delete.
 
 ## Workspace (right)
 
-Tabs with request and WebSocket editors. Each tab holds one draft request or active WebSocket
-session (method/mode, URL, params, headers, body/composer, stream viewer, optional MCP metadata).
+Tabs with HTTP request, WebSocket, and MCP Client editors. Each tab holds one draft or saved
+profile: HTTP method/URL/body, an active WebSocket session, or an outbound MCP Client
+connection (URL, headers, tool browser, invoke form).
 
 - Click **+** or press `Ctrl+N` to open the **protocol picker** and choose **HTTP Request**,
   **WebSocket**, or **MCP Client** before a new tab is created
@@ -84,6 +85,26 @@ For WebSocket tabs, the layout provides a bi-directional session manager:
      **Send Message** button, saved message presets, and automated test sequences.
 
 See [WebSocket Guide](websocket.md) for full details.
+
+## MCP Client editor
+
+For **MCP Client** tabs (outbound MCP — PyPost calls a remote server), the layout provides
+connect → discover → invoke workflow:
+
+1. Connection bar: Target URL (Streamable HTTP, for example `http://127.0.0.1:1080/mcp`),
+   **Connect** / **Disconnect** / **Refresh**, and connection state badge.
+2. **Headers** table: Outbound request headers with `{{ variable }}` templating (for example
+   `Authorization`).
+3. Split workspace:
+   - **Tool browser** (left): Remote tools from `list_tools` after Connect; click to select.
+   - **Invoke column** (right): Schema-guided argument form or raw JSON editor, **Invoke**
+     button, and structured result pane with elapsed time.
+
+See [MCP Client Guide](mcp-client.md) for full details.
+
+This editor is separate from **inbound** MCP surfaces: the **MCP Tool** checkbox and **MCP**
+sub-tab on HTTP requests expose tools to agents; **MCP Servers…** runs local endpoints for
+agents. See [MCP Tools for AI Agents](mcp-tools.md).
 
 ## Settings
 
