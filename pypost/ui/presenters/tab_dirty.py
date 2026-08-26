@@ -26,10 +26,15 @@ def is_tab_dirty(tab: RequestTab) -> bool:
     return not persisted_fields_equal(ui_data, baseline)
 
 
-def _connection_from_websocket_tab(tab: WebSocketTab) -> WebSocketConnection:
-    """Build a WebSocketConnection snapshot from editor-visible draft fields."""
+def connection_snapshot_from_tab(tab: WebSocketTab) -> WebSocketConnection:
+    """Editor-visible persisted fields at save time (FR-1.3).
+
+    Handshake and MCP chrome come from the connection editor; presets and
+    sequences prefer the live ``presenter.connection`` (composer mutations).
+    """
     editor = tab.connection_editor
     source = tab.connection_data
+    live = getattr(tab.presenter, "connection", None) or source
     raw_sub = editor.subprotocols_input.text()
     subprotocols = [part.strip() for part in raw_sub.split(",") if part.strip()]
     return WebSocketConnection(
@@ -41,18 +46,24 @@ def _connection_from_websocket_tab(tab: WebSocketTab) -> WebSocketConnection:
         subprotocols=subprotocols,
         expose_as_mcp=editor.mcp_expose_check.isChecked(),
         mcp_description=editor.mcp_description_edit.text(),
-        mcp_params=source.mcp_params,
-        mcp_probe_preset_id=source.mcp_probe_preset_id,
-        mcp_probe_max_messages=source.mcp_probe_max_messages,
-        mcp_probe_max_duration_ms=source.mcp_probe_max_duration_ms,
-        presets=list(source.presets),
-        sequences=list(source.sequences),
+        mcp_params=getattr(live, "mcp_params", source.mcp_params),
+        mcp_probe_preset_id=getattr(
+            live, "mcp_probe_preset_id", source.mcp_probe_preset_id
+        ),
+        mcp_probe_max_messages=getattr(
+            live, "mcp_probe_max_messages", source.mcp_probe_max_messages
+        ),
+        mcp_probe_max_duration_ms=getattr(
+            live, "mcp_probe_max_duration_ms", source.mcp_probe_max_duration_ms
+        ),
+        presets=list(getattr(live, "presets", source.presets) or []),
+        sequences=list(getattr(live, "sequences", source.sequences) or []),
     )
 
 
 def is_websocket_draft_dirty(tab: WebSocketTab) -> bool:
     """True when editor-visible fields differ from new-profile factory defaults."""
-    current = _connection_from_websocket_tab(tab)
+    current = connection_snapshot_from_tab(tab)
     return not websocket_draft_fields_equal(current, factory_websocket_draft())
 
 
@@ -61,5 +72,5 @@ def is_websocket_saved_tab_dirty(tab: WebSocketTab) -> bool:
     baseline = tab.persisted_baseline
     if baseline is None:
         return False
-    current = _connection_from_websocket_tab(tab)
+    current = connection_snapshot_from_tab(tab)
     return not persisted_websocket_fields_equal(current, baseline)

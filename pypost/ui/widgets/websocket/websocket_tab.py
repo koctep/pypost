@@ -9,16 +9,22 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QMenu,
     QPushButton,
     QSplitter,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
+from pypost.core.metrics_protocol import resolve_metrics
 from pypost.models.websocket import WebSocketConnection
+from pypost.ui.hotkeys import tag_action
+from pypost.ui.presenters.tab_dirty import connection_snapshot_from_tab
 from pypost.ui.widget_ids import (
     WS_CONNECT_BUTTON,
     WS_TAB_PAGE,
@@ -41,6 +47,9 @@ __all__ = ["WebSocketTab"]
 class WebSocketTab(QWidget):
     """Top-level workspace tab container for an active WebSocket session."""
 
+    save_requested = Signal(WebSocketConnection)
+    save_as_requested = Signal(WebSocketConnection)
+
     def __init__(
         self,
         connection: WebSocketConnection,
@@ -52,8 +61,10 @@ class WebSocketTab(QWidget):
         self.connection_data: WebSocketConnection = connection
         self.presenter: WebSocketPresenter = presenter
         self.persisted_baseline: WebSocketConnection | None = None
+        self.stale_persisted = False
 
         self._init_ui()
+        self._setup_save_shortcuts()
         self._connection_editor.load_connection(connection)
         self.presenter.set_tab(self)
 
@@ -73,6 +84,19 @@ class WebSocketTab(QWidget):
         self._state_badge = WebSocketStateBadge(self)
         header_row.addWidget(self._state_badge)
         header_row.addStretch()
+
+        self.actions_btn = QToolButton(self)
+        self.actions_btn.setText("Actions")
+        self.actions_btn.setPopupMode(QToolButton.InstantPopup)
+        self.actions_menu = QMenu(self.actions_btn)
+        self.save_as_action = QAction("Save As...", self)
+        self.save_as_action.triggered.connect(self.handle_save_as_menu_action)
+        self.actions_menu.addAction(self.save_as_action)
+        self.save_action = QAction("Save", self)
+        self.save_action.triggered.connect(self.handle_save_menu_action)
+        self.actions_menu.addAction(self.save_action)
+        self.actions_btn.setMenu(self.actions_menu)
+        header_row.addWidget(self.actions_btn)
 
         main_layout.addLayout(header_row)
 
@@ -132,3 +156,53 @@ class WebSocketTab(QWidget):
     def presets_panel(self) -> WebSocketPresetsPanel:
         """Return the embedded WebSocketPresetsPanel widget."""
         return self._presets_panel
+
+    def _setup_save_shortcuts(self) -> None:
+        self.save_action.setShortcut(QKeySequence("Ctrl+S"))
+        self.save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.addAction(self.save_action)
+        self.addAction(self.save_as_action)
+        tag_action(
+            self.save_action,
+            section="WebSocket Session",
+            order=2,
+            keys=("Ctrl+S",),
+            label="Save WebSocket Profile",
+        )
+        tag_action(
+            self.save_as_action,
+            section="WebSocket Session",
+            order=3,
+            keys=("Ctrl+Shift+S",),
+            label="Save As WebSocket Profile",
+        )
+
+    def _emit_save(self, source: str) -> None:
+        logger.info("ws_save_action_triggered source=%s", source)
+        resolve_metrics(getattr(self.presenter, "_metrics", None)).track_gui_save_action(
+            source
+        )
+        snapshot = connection_snapshot_from_tab(self)
+        self.connection_data = snapshot
+        self.save_requested.emit(snapshot)
+
+    def _emit_save_as(self, source: str) -> None:
+        logger.info("ws_save_as_action_triggered source=%s", source)
+        resolve_metrics(getattr(self.presenter, "_metrics", None)).track_gui_save_as_action(
+            source
+        )
+        snapshot = connection_snapshot_from_tab(self)
+        self.connection_data = snapshot
+        self.save_as_requested.emit(snapshot)
+
+    def handle_save_request_shortcut(self) -> None:
+        self._emit_save("shortcut")
+
+    def handle_save_menu_action(self) -> None:
+        self._emit_save("menu")
+
+    def handle_save_as_shortcut(self) -> None:
+        self._emit_save_as("shortcut")
+
+    def handle_save_as_menu_action(self) -> None:
+        self._emit_save_as("menu")

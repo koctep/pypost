@@ -248,6 +248,32 @@ class CollectionsPresenter(QObject):
         )
         return True
 
+    def add_saved_websocket_to_tree(
+        self, ws: WebSocketConnection, collection_id: str
+    ) -> bool:
+        """Insert a newly saved WebSocket profile without rebuilding the full tree model."""
+        col_item = self._find_collection_item(collection_id, "collection")
+        if col_item is None:
+            for col in self._request_manager.get_collections():
+                if col.id == collection_id:
+                    return self._insert_collection_into_tree(col)
+            logger.warning(
+                "add_saved_websocket_to_tree_failed reason=collection_not_found"
+                " collection_id=%s ws_id=%s",
+                collection_id,
+                ws.id,
+            )
+            return False
+
+        col_item.appendRow(self._make_websocket_item(ws))
+        self._expand_collection_if_saved(collection_id, col_item)
+        logger.info(
+            "add_saved_websocket_to_tree_completed collection_id=%s ws_id=%s",
+            collection_id,
+            ws.id,
+        )
+        return True
+
     def _insert_collection_into_tree(self, collection: Collection) -> bool:
         if self._find_collection_item(collection.id, "collection") is not None:
             return False

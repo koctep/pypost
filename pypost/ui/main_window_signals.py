@@ -41,6 +41,12 @@ def wire_presenter_signals(window: MainWindow) -> None:
     window.tabs.request_save_as_completed.connect(
         window.collections.add_saved_request_to_tree,
     )
+    window.tabs.websocket_saved.connect(window.collections.refresh_tree)
+    window.tabs.websocket_saved.connect(window.collections.restore_tree_state)
+    window.tabs.websocket_saved.connect(window.mcp_controls.refresh_tools)
+    window.tabs.websocket_save_as_completed.connect(
+        window.collections.add_saved_websocket_to_tree,
+    )
     window.tabs.request_executed.connect(window.history_panel.refresh)
     window.history_panel.load_into_editor.connect(window.tabs.load_request_from_history)
     window.history_panel.curl_copied.connect(

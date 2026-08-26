@@ -106,8 +106,10 @@ not widget class.
 Dirty = editor-visible fields differ from a new `WebSocketConnection()`
 (name, URL, params, headers, subprotocols, MCP flags/text, presets,
 sequences). A live connection with no field edits is **not** dirty.
-There is no `WebSocketTab.persisted_baseline` yet; PYPOST-1161 save can
-adopt a snapshot later. The dialog has **no Save / Save As** path.
+Collection-backed tabs set `persisted_baseline` on insert; profile save
+(PYPOST-1161) updates baseline after success — see
+[websocket_save_flow.md](websocket_save_flow.md). The draft-close dialog has
+**no Save / Save As** path (use Actions menu or Ctrl+S on the tab).
 
 `tabs_presenter.py` stays at **785 / 785** LOC
 (`scripts/audit_baseline_metrics.py`). Persist and close helpers must

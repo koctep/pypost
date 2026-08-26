@@ -12,6 +12,7 @@ from tests.helpers.collections_tree import (
     FakeStateManager,
     make_collection,
     make_request,
+    make_websocket,
     patch_rename_context_menu,
     patch_view_context_menu,
 )
@@ -430,6 +431,27 @@ class TestCollectionsPresenter(unittest.TestCase):
 
         index = presenter._model.item(0).index()
         self.assertTrue(presenter.widget.isExpanded(index))
+
+    def test_add_saved_websocket_to_tree_appends_ws_row(self):
+        """PYPOST-1161: Save As incremental tree insert for WebSocket profiles."""
+        col = make_collection("c1", "Streams")
+        presenter = self._make_presenter([col])
+        presenter.load_collections()
+        new_ws = make_websocket("ws2", "Live Feed")
+        col.websockets.append(new_ws)
+
+        self.assertTrue(
+            hasattr(presenter, "add_saved_websocket_to_tree"),
+            "CollectionsPresenter.add_saved_websocket_to_tree missing (PYPOST-1161)",
+        )
+
+        with patch.object(presenter, "refresh_tree") as mock_refresh:
+            added = presenter.add_saved_websocket_to_tree(new_ws, "c1")
+
+        self.assertTrue(added)
+        self.assertEqual(presenter._model.item(0).rowCount(), 1)
+        self.assertEqual(presenter._model.item(0).child(0).text(), "ws Live Feed")
+        mock_refresh.assert_not_called()
 
     @patch("pypost.ui.presenters.collection_tree_actions.show_rename_empty_name_error")
     def test_rename_empty_name_shows_warning(self, mock_warning):

@@ -27,7 +27,8 @@ from pypost.core.request_persisted_fields import (
     snapshot_persisted_fields,
 )
 from pypost.core.websocket_persisted_fields import snapshot_websocket_persisted_fields
-from pypost.ui.presenters.tab_dirty import is_tab_dirty
+from pypost.core.websocket_registry import WebSocketRegistry
+from pypost.ui.presenters.tab_dirty import connection_snapshot_from_tab, is_tab_dirty
 from pypost.ui.presenters.tabs_presenter_close import close_workspace_tab
 from pypost.ui.presenters.tabs_presenter_request_close import (
     close_tabs_for_request_ids as close_tabs_for_request_ids_helper,
@@ -57,6 +58,7 @@ from pypost.ui.request_save_orchestrator import (
     SaveAction,
     StaleCheckContext,
 )
+from pypost.ui.websocket_save_orchestrator import WebSocketSaveOrchestrator
 from pypost.ui.theme.json_syntax_theme import resolve_json_syntax_colors
 from pypost.ui.widget_ids import REQUEST_TABS, set_widget_id
 from pypost.ui.widgets.mcp_client import McpClientTab
@@ -108,6 +110,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     request_save_as_completed = Signal(RequestData, str)  # request, collection_id
     request_persisted = Signal(str, RequestData, RequestTab)  # id, snapshot, source_tab
     request_executed = Signal()  # emitted after each completed request
+    websocket_saved = Signal()  # after WS profile save, triggers collections tree refresh
+    websocket_save_as_completed = Signal(WebSocketConnection, str)  # connection, collection_id
+    websocket_persisted = Signal(str, WebSocketConnection, WebSocketTab)
 
     def __init__(
         self,
@@ -133,6 +138,14 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         logger.debug("TabsPresenter: alert_manager_injected=%s", alert_manager is not None)
         self._save_orchestrator = RequestSaveOrchestrator(
             request_manager,
+            state_manager,
+            settings,
+            metrics=metrics,
+        )
+        storage = getattr(request_manager, "storage", None)
+        self._ws_registry = WebSocketRegistry(request_manager, storage)
+        self._ws_save_orchestrator = WebSocketSaveOrchestrator(
+            self._ws_registry,
             state_manager,
             settings,
             metrics=metrics,
@@ -234,6 +247,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             connection=connection,
             env_vars=self._current_variables,
             hidden_keys=self._current_hidden_keys,
+            metrics=self._metrics,
         )
         tab = WebSocketTab(connection=connection, presenter=presenter)
         if websocket_id_is_saved(self._request_manager, connection.id):
@@ -241,6 +255,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         presenter.tab_title_changed.connect(
             lambda glyph, title, t=tab: self._on_websocket_title_changed(t, glyph, title)
         )
+        self._wire_websocket_tab_signals(tab)
 
         name = connection.name if connection.name else "WebSocket"
         plus_idx = self._header.insert_index_before_plus()
@@ -548,6 +563,14 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._wire_tab_signals(tab)
         return tab
 
+    def _wire_websocket_tab_signals(self, tab: WebSocketTab) -> None:
+        tab.save_requested.connect(
+            lambda conn, t=tab: self._handle_save_websocket(t, conn)
+        )
+        tab.save_as_requested.connect(
+            lambda conn, t=tab: self._handle_save_as_websocket(t, conn)
+        )
+
     def _wire_tab_signals(self, tab: RequestTab) -> None:
         """Connects tab's internal signals to self."""
         tab.request_editor.send_requested.connect(
@@ -646,7 +669,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             )
         )
 
-    def _index_of_tab(self, tab: RequestTab) -> int | None:
+    def _index_of_tab(self, tab: RequestTab | WebSocketTab) -> int | None:
         for i in range(self._tabs.count()):
             if self._tabs.widget(i) is tab:
                 return i
@@ -716,6 +739,75 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         tab.request_data = request
         tab.persisted_baseline = snapshot_persisted_fields(request)
         tab.stale_persisted = False
+
+    def _stale_context_for_websocket_tab(
+        self, source_tab: WebSocketTab
+    ) -> StaleCheckContext | None:
+        return StaleCheckContext(
+            persisted_baseline=source_tab.persisted_baseline,
+            stale_persisted=source_tab.stale_persisted,
+        )
+
+    def _apply_ws_save_result_to_tab(
+        self, tab: WebSocketTab, connection: WebSocketConnection
+    ) -> None:
+        tab.connection_data = connection
+        tab.persisted_baseline = snapshot_websocket_persisted_fields(connection)
+        tab.stale_persisted = False
+        tab.presenter.connection = connection
+        tab.connection_editor.load_connection(connection)
+
+    def _handle_save_websocket(
+        self, source_tab: WebSocketTab, connection: WebSocketConnection
+    ) -> None:
+        snapshot = connection_snapshot_from_tab(source_tab)
+        result = self._ws_save_orchestrator.save_profile(
+            snapshot,
+            self._tabs,
+            stale_context=self._stale_context_for_websocket_tab(source_tab),
+        )
+        if result.action == SaveAction.CANCELLED:
+            return
+
+        if result.action == SaveAction.OVERWRITE:
+            saved = result.request
+            if saved is None:
+                logger.error(
+                    "ws_save_overwrite_failed reason=missing_snapshot ws_id=%s",
+                    connection.id,
+                )
+                return
+            self._apply_ws_save_result_to_tab(source_tab, saved)
+            self.websocket_persisted.emit(connection.id, saved, source_tab)
+            tab_index = self._index_of_tab(source_tab)
+            if tab_index is not None:
+                self._header.set_tab_label(tab_index, saved.name)
+            self.websocket_saved.emit()
+            return
+
+        if result.action == SaveAction.CREATED_NEW and result.request is not None:
+            tab_index = self._index_of_tab(source_tab)
+            if tab_index is not None:
+                self._header.set_tab_label(tab_index, result.request.name)
+            self._apply_ws_save_result_to_tab(source_tab, result.request)
+            self.save_tabs_state()
+            self.websocket_saved.emit()
+
+    def _handle_save_as_websocket(
+        self, source_tab: WebSocketTab, connection: WebSocketConnection
+    ) -> None:
+        snapshot = connection_snapshot_from_tab(source_tab)
+        result = self._ws_save_orchestrator.save_as_profile(snapshot, self._tabs)
+        if result.action != SaveAction.SAVE_AS or result.request is None:
+            return
+
+        new_conn = result.request
+        tab_index = self._index_of_tab(source_tab)
+        if tab_index is not None:
+            self._header.set_tab_label(tab_index, new_conn.name)
+        self._apply_ws_save_result_to_tab(source_tab, new_conn)
+        self.save_tabs_state()
+        self.websocket_save_as_completed.emit(new_conn, result.collection_id or "")
 
     def _handle_save_request(self, source_tab: RequestTab, request_data: RequestData) -> None:
         result = self._save_orchestrator.save_request(

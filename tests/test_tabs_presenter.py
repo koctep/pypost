@@ -1835,6 +1835,104 @@ class TestTabsPresenterWebSocketCollections(unittest.TestCase):
         self.assertGreaterEqual(p.widget.indexOf(tab), 0)
 
 
+@pytest.mark.usefixtures("qapp")
+class TestWebsocketSaveSignals(unittest.TestCase):
+    """PYPOST-1161: TabsPresenter WebSocket save / save-as signal wiring (red until Step 4)."""
+
+    def _make_presenter(self):
+        from pypost.models.models import Collection
+
+        rm = FakeRequestManager()
+        sm = FakeStateManager()
+        rm.collections = [Collection(id="c1", name="Streams", websockets=[])]
+        return TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock()), rm, sm
+
+    def test_websocket_save_emits_websocket_saved(self):
+        p, _rm, sm = self._make_presenter()
+        tab = p.add_blank_websocket_tab(save_state=False)
+        draft_id = tab.connection_data.id
+
+        self.assertTrue(
+            hasattr(p, "websocket_saved"),
+            "TabsPresenter.websocket_saved signal missing (PYPOST-1161)",
+        )
+        self.assertTrue(
+            hasattr(p, "_handle_save_websocket"),
+            "TabsPresenter._handle_save_websocket missing (PYPOST-1161)",
+        )
+
+        saved_received = []
+        p.websocket_saved.connect(lambda: saved_received.append(True))
+        mock_dialog = MagicMock()
+        mock_dialog.exec.return_value = True
+        mock_dialog.selected_collection_id = "c1"
+        mock_dialog.new_collection_name = ""
+        mock_dialog.request_name = "Saved Feed"
+
+        with patch(
+            "pypost.ui.websocket_save_orchestrator.SaveRequestDialog",
+            return_value=mock_dialog,
+        ):
+            p._handle_save_websocket(tab, tab.connection_data)
+
+        self.assertEqual(saved_received, [True])
+        self.assertEqual(tab.connection_data.name, "Saved Feed")
+        self.assertEqual(tab.connection_data.id, draft_id)
+        self.assertIn(draft_id, sm.get_open_tabs())
+
+    def test_websocket_save_as_emits_save_as_completed(self):
+        from pypost.models.models import Collection
+
+        source = WebSocketConnection(
+            id="ws-src",
+            name="Source",
+            url="wss://original.example.com",
+        )
+        col = Collection(id="c1", name="Streams", websockets=[source])
+        rm = FakeRequestManager()
+        rm.collections = [col]
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        tab = p.open_websocket_tab(source, save_state=False)
+
+        self.assertTrue(
+            hasattr(p, "websocket_save_as_completed"),
+            "TabsPresenter.websocket_save_as_completed signal missing (PYPOST-1161)",
+        )
+        self.assertTrue(
+            hasattr(p, "_handle_save_as_websocket"),
+            "TabsPresenter._handle_save_as_websocket missing (PYPOST-1161)",
+        )
+
+        save_as_received = []
+        saved_received = []
+        p.websocket_save_as_completed.connect(
+            lambda conn, collection_id: save_as_received.append(
+                (conn.id, conn.name, collection_id)
+            )
+        )
+        p.websocket_saved.connect(lambda: saved_received.append(True))
+
+        mock_dialog = MagicMock()
+        mock_dialog.exec.return_value = True
+        mock_dialog.selected_collection_id = "c1"
+        mock_dialog.new_collection_name = ""
+        mock_dialog.request_name = "Copy"
+
+        with patch(
+            "pypost.ui.websocket_save_orchestrator.SaveRequestDialog",
+            return_value=mock_dialog,
+        ):
+            p._handle_save_as_websocket(tab, tab.connection_data)
+
+        self.assertEqual(len(save_as_received), 1)
+        self.assertNotEqual(save_as_received[0][0], "ws-src")
+        self.assertEqual(save_as_received[0][1], "Copy")
+        self.assertEqual(save_as_received[0][2], "c1")
+        self.assertEqual(saved_received, [])
+        self.assertEqual(tab.connection_data.name, "Copy")
+        self.assertNotEqual(tab.connection_data.id, "ws-src")
+
+
 if __name__ == "__main__":
     unittest.main()
 
