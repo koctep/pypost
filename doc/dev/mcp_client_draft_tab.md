@@ -273,8 +273,9 @@ the worker calls `run` with fields already resolved. Sync
 `execute_outbound` stays for tests. Live Invoke uses the worker, not
 this method.
 
-HTTP method **MCP** already forwards resolved headers through
-`RequestService._execute_mcp` (PYPOST-1173). Do not re-wire that path.
+Legacy HTTP method **MCP** collection items convert on open via
+`pypost/core/mcp_client_migration.py` (PYPOST-1171); outbound calls
+no longer go through `RequestService`.
 Do not edit inbound `pypost/core/qt/mcp_server.py`.
 
 Ctrl+H (`handle_switch_to_headers_global`) stays on `RequestTab` only.

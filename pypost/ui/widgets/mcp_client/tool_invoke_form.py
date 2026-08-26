@@ -136,6 +136,26 @@ class McpClientToolInvokeForm(QWidget):
             return self._collect_json()
         return self._collect_form()
 
+    def apply_arguments(self, arguments: dict[str, Any]) -> None:
+        """Pre-fill argument editors (legacy MCP migration or saved state)."""
+        if not self._has_tool:
+            return
+        if self._kind == ArgSchemaKind.NO_ARGS:
+            return
+        if self._kind == ArgSchemaKind.JSON_ONLY or self._use_json.isChecked():
+            self._json.setPlainText(json.dumps(arguments, indent=2))
+            return
+        for name, (spec, editor) in self._fields.items():
+            if name not in arguments:
+                continue
+            value = arguments[name]
+            if isinstance(editor, QLineEdit):
+                editor.setText("" if value is None else str(value))
+            elif isinstance(editor, QCheckBox):
+                editor.setChecked(bool(value))
+            elif isinstance(editor, QComboBox):
+                editor.setCurrentText("" if value is None else str(value))
+
     def _sync_mode_widgets(self) -> None:
         if self._kind != ArgSchemaKind.SIMPLE_FORM:
             return

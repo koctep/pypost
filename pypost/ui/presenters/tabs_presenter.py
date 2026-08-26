@@ -48,6 +48,7 @@ from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.core.template_service import TemplateService
 from pypost.core.qt.worker import RequestWorker
+from pypost.core.mcp_client_migration import is_legacy_mcp_request, request_data_to_mcp_client
 from pypost.models.mcp_client import McpClientConnection
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
@@ -172,6 +173,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         return self._tabs
 
     def add_new_tab(self, request_data: RequestData | None = None, save_state: bool = True) -> None:
+        if request_data is not None and is_legacy_mcp_request(request_data):
+            self.open_legacy_mcp_request_tab(request_data, save_state=save_state)
+            return
         if request_data is not None:
             request_data = copy_request_for_isolated_tab(request_data)
         tab = self._create_request_tab(request_data)
@@ -220,18 +224,53 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         return self._insert_websocket_tab(WebSocketConnection(), save_state=save_state)
 
     def add_blank_mcp_client_tab(self, *, save_state: bool = True) -> McpClientTab:
-        connection = McpClientConnection()
+        return self._insert_mcp_client_tab(McpClientConnection(), save_state=save_state)
+
+    def open_mcp_client_tab(
+        self,
+        connection: McpClientConnection,
+        *,
+        save_state: bool = True,
+    ) -> McpClientTab:
+        for i in range(self._tabs.count()):
+            tab = self._tabs.widget(i)
+            if (
+                isinstance(tab, McpClientTab)
+                and tab.connection_data
+                and tab.connection_data.id == connection.id
+            ):
+                self._tabs.setCurrentWidget(tab)
+                return tab
+        return self._insert_mcp_client_tab(connection, save_state=save_state)
+
+    def open_legacy_mcp_request_tab(
+        self,
+        request: RequestData,
+        *,
+        save_state: bool = True,
+    ) -> McpClientTab:
+        """Open a legacy method:MCP collection item as an MCP Client tab."""
+        connection = request_data_to_mcp_client(request)
+        return self.open_mcp_client_tab(connection, save_state=save_state)
+
+    def _insert_mcp_client_tab(
+        self,
+        connection: McpClientConnection,
+        *,
+        save_state: bool = True,
+    ) -> McpClientTab:
         presenter = McpClientPresenter(
             connection,
             env_vars=self._current_variables,
             hidden_keys=self._current_hidden_keys,
         )
         tab = McpClientTab(connection, presenter)
+        name = connection.name if connection.name else "New MCP Client"
         plus_idx = self._header.insert_index_before_plus()
         if plus_idx >= 0:
-            self._tabs.insertTab(plus_idx, tab, "New MCP Client")
+            self._tabs.insertTab(plus_idx, tab, name)
         else:
-            self._tabs.addTab(tab, "New MCP Client")
+            self._tabs.addTab(tab, name)
             self._header.ensure_plus_tab()
         self._tabs.setCurrentWidget(tab)
         if save_state:

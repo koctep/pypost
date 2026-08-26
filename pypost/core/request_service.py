@@ -11,7 +11,6 @@ from pypost.core.alert_manager import AlertManager, AlertPayload
 from pypost.core.history_manager import HistoryManager
 from pypost.core.http_client import HTTPClient, ResolvedRequestFields
 from pypost.core.http_client_protocol import HTTPClientProtocol
-from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.script_executor import ScriptExecutor
 from pypost.core.sensitive_data_masking_policy import SensitiveDataMaskingPolicy
@@ -53,7 +52,6 @@ class RequestService:
         alert_manager: AlertManager | None = None,
         default_retry_policy: RetryPolicy | None = None,
         http_client: HTTPClientProtocol | None = None,
-        mcp_client: MCPClientService | None = None,
         max_response_bytes: int | None = None,
     ) -> None:
         self._metrics = resolve_metrics(metrics)
@@ -91,51 +89,6 @@ class RequestService:
                 template_service=self._template_service,
                 max_response_bytes=cap,
             )
-        if mcp_client is not None:
-            self.mcp_client = mcp_client
-            logger.debug(
-                "RequestService: using injected MCPClientService id=%d", id(mcp_client)
-            )
-        else:
-            self.mcp_client = MCPClientService()
-
-    def _execute_mcp(
-        self,
-        request: RequestData,
-        variables: Dict[str, Any],
-        headers_callback: Callable[[int, Dict], None] | None,
-    ) -> tuple[ResponseData, ResolvedRequestFields]:
-        url = self._template_service.render_string(request.url, variables)
-        body = self._template_service.render_string(request.body, variables).strip()
-        resolved_headers = {
-            self._template_service.render_string(k, variables): (
-                self._template_service.render_string(v, variables)
-            )
-            for k, v in request.headers.items()
-        }
-        resolved = ResolvedRequestFields(url=url, headers=resolved_headers, body=body)
-
-        operation = "list_tools"
-        call_params: Dict[str, Any] | None = None
-
-        if body:
-            try:
-                parsed = json.loads(body)
-                if isinstance(parsed, dict) and "name" in parsed:
-                    operation = "call_tool"
-                    call_params = {
-                        "name": parsed["name"],
-                        "arguments": parsed.get("arguments") or {},
-                    }
-            except json.JSONDecodeError:
-                pass
-
-        self._metrics.track_request_sent(request.method)
-        response = self.mcp_client.run(url, operation, call_params, headers=resolved_headers)
-        self._metrics.track_response_received(request.method, str(response.status_code))
-        if headers_callback:
-            headers_callback(response.status_code, response.headers)
-        return response, resolved
 
     def _execute_http_with_retry(
         self,
@@ -418,20 +371,15 @@ class RequestService:
         # 1. Execute request, catching structured errors
         resolved_fields: ResolvedRequestFields | None = None
         try:
-            if request.method == "MCP":
-                response, resolved_fields = self._execute_mcp(
-                    request, variables, headers_callback
-                )
-            else:
-                response, resolved_fields = self._execute_http_with_retry(
-                    request,
-                    variables,
-                    stream_callback,
-                    stop_flag,
-                    headers_callback,
-                    retry_callback,
-                    request_name or request.name,
-                )
+            response, resolved_fields = self._execute_http_with_retry(
+                request,
+                variables,
+                stream_callback,
+                stop_flag,
+                headers_callback,
+                retry_callback,
+                request_name or request.name,
+            )
         except ExecutionError as exc:
             logger.error(
                 "request_execution_failed method=%s url=%r category=%s detail=%s",

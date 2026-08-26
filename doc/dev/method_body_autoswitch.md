@@ -8,7 +8,7 @@ to navigate to the body input after choosing a method that typically carries a r
 
 Behaviour:
 - Selecting POST or PUT switches the detail tab to **Body**.
-- Selecting any other method (GET, DELETE, PATCH, MCP) does **not** change the active tab.
+- Selecting any other method (GET, DELETE, PATCH) does **not** change the active tab.
 - The auto-switch only fires on explicit user interaction via the method combo box.
 - Loading a saved request (regardless of method) does **not** trigger the switch.
 

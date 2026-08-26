@@ -1118,11 +1118,11 @@ docs — not via the HTTP request method dropdown.
 | MCP-TM-3 (shipped) | [PYPOST-1169](https://pypost.atlassian.net/browse/PYPOST-1169) | Live `list_tools` + browser |
 | MCP-TM-4 (shipped) | [PYPOST-1170](https://pypost.atlassian.net/browse/PYPOST-1170) | Interactive `call_tool` + response pane |
 | MCP-TM-5 (shipped) | [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) | Outbound headers + environment templating |
-| MCP-TM-6 | [PYPOST-1171](https://pypost.atlassian.net/browse/PYPOST-1171) | Migrate/remove HTTP method **MCP** |
+| MCP-TM-6 (shipped) | [PYPOST-1171](https://pypost.atlassian.net/browse/PYPOST-1171) | Migrate/remove HTTP method **MCP** |
 | MCP-TM-7 | [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) | Collections save/open + context menu parity |
 | MCP-TM-8 | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) | User documentation alignment |
 
-**Current state (until MCP-TM-6 … MCP-TM-8 land):**
+**Current state (MCP-TM-6 shipped; MCP-TM-7 … MCP-TM-8 remain):**
 
 *   `Ctrl+N` / **+** include **MCP Client**; confirm opens a draft `McpClientTab`
     (not HTTP) with URL, Headers table, Connect / Disconnect / Refresh, state
@@ -1132,19 +1132,15 @@ docs — not via the HTTP request method dropdown.
     resolve + worker with `operation="call_tool"` and `kind=invoke`. Failed
     invoke stays Connected and keeps tools. See
     [mcp_client_draft_tab.md](mcp_client_draft_tab.md).
-*   HTTP method **MCP** on `RequestEditor` remains the raw JSON `list_tools` /
-    `call_tool` path until MCP-TM-6. Sync
-    `McpClientPresenter.execute_outbound` stays for tests; live Invoke does
-    not call it.
-*   `RequestService._execute_mcp` renders URL and headers from templates and
-    passes them to `MCPClientService.run` (PYPOST-1173). MCP-TM-5 (PYPOST-1167)
-    shipped the same resolve + `headers=` contract on the MCP Client presenter.
+*   HTTP method **MCP** is **removed** from `RequestEditor`. Legacy collection
+    items with `method: "MCP"` convert on open via
+    `request_data_to_mcp_client` → `TabsPresenter.open_legacy_mcp_request_tab`.
+*   `RequestService` executes HTTP only; `_execute_mcp` is removed (PYPOST-1171).
 *   Inbound surfaces are **unchanged** by this epic: **MCP Servers…**,
     **Expose as MCP Tool** / **MCP Tool** checkbox, and the HTTP editor **MCP**
     sub-tab for inbound tool exposure remain as documented above. See also
     [MCP Reverse Proxy](mcp_proxy.md) for inbound bridge mode.
 
-Until MCP-TM-6 … MCP-TM-8 land, **`method: "MCP"` requests** (e.g.
-`examples/collections/mcp.json`) remain a GUI path for outbound
-**invoke**. The dedicated tab now also invokes listed tools. Inbound MCP
-server tooling is unchanged.
+**Legacy `method: "MCP"` requests** (e.g. `examples/collections/mcp.json`) open
+as MCP Client tabs. Collections persist as `mcp_clients[]` is MCP-TM-7
+([PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172)).

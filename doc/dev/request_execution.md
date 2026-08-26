@@ -22,8 +22,9 @@ before dispatch.
 was removed because it duplicated work without adding behavior beyond what the HTTP/MCP paths
 already perform.
 
-MCP requests render URL, headers, and body in `RequestService._execute_mcp()`.
-Resolved headers are forwarded to `MCPClientService.run` (PYPOST-1173).
+`RequestService.execute()` routes all requests through the HTTP client path.
+Outbound MCP uses the MCP Client tab (`McpClientPresenter` + worker), not
+`RequestService`.
 
 **Inbound MCP tools (PYPOST-550):** When an external agent calls `call_tool`, `MCPServerImpl`
 merges the configured endpoint environment's snapshot with `mcp.request` tool arguments before

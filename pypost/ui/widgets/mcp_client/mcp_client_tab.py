@@ -171,6 +171,10 @@ class McpClientTab(QWidget):
         """Return the current argument object or raise ArgValidationError."""
         return self._invoke_form.collect_arguments()
 
+    def apply_invoke_arguments(self, arguments: dict[str, Any]) -> None:
+        """Pre-fill invoke argument editors from migration mapping."""
+        self._invoke_form.apply_arguments(arguments)
+
     def set_invoke_in_progress(self) -> None:
         """Show in-flight chrome in the result pane."""
         self._result_view.set_in_progress()

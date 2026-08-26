@@ -30,23 +30,11 @@ def _make_http_result(status=200, body="OK", url="http://x", headers=None):
     )
 
 
-def _mcp_run_headers(mock_run: MagicMock) -> dict[str, str] | None:
-    """Return headers passed to mcp_client.run (keyword or 4th positional)."""
-    call = mock_run.call_args
-    if call is None:
-        return None
-    if "headers" in call.kwargs:
-        return call.kwargs["headers"]
-    if len(call.args) >= 4:
-        return call.args[3]
-    return None
-
 
 class TestRequestServiceExecuteHTTP(unittest.TestCase):
     def setUp(self):
         self.svc = RequestService(metrics=MagicMock())
         self.svc.http_client = MagicMock()
-        self.svc.mcp_client = MagicMock()
 
     def test_execute_http_success_returns_execution_result(self):
         self.svc.http_client.send_request.return_value = _make_http_result(200)
@@ -83,7 +71,6 @@ class TestRequestServicePostScript(unittest.TestCase):
     def setUp(self):
         self.svc = RequestService(metrics=MagicMock())
         self.svc.http_client = MagicMock()
-        self.svc.mcp_client = MagicMock()
         self.svc.http_client.send_request.return_value = _make_http_result(200)
 
     def test_execute_post_script_populates_logs_and_variables(self):
@@ -111,50 +98,6 @@ class TestRequestServicePostScript(unittest.TestCase):
         self.assertEqual("SyntaxError", result.execution_error.detail)
 
 
-class TestRequestServiceMCP(unittest.TestCase):
-    def setUp(self):
-        self.svc = RequestService(metrics=MagicMock(), template_service=TemplateService())
-        self.svc.http_client = MagicMock()
-        self.svc.mcp_client = MagicMock()
-
-    def test_execute_mcp_request_delegates_to_mcp_client(self):
-        self.svc.mcp_client.run.return_value = _make_response(200)
-        req = RequestData(method="MCP", url="http://x")
-        result = self.svc.execute(req)
-        self.assertEqual(200, result.response.status_code)
-
-    def test_execute_mcp_does_not_call_http_client(self):
-        self.svc.mcp_client.run.return_value = _make_response(200)
-        req = RequestData(method="MCP", url="http://x")
-        self.svc.execute(req)
-        self.svc.http_client.send_request.assert_not_called()
-
-    def test_execute_mcp_forwards_resolved_headers_to_mcp_client(self):
-        """Method MCP Send forwards environment-resolved headers to mcp_client.run."""
-        self.svc.mcp_client.run.return_value = _make_response(200)
-        req = RequestData(
-            method="MCP",
-            url="http://x",
-            headers={"Authorization": "Bearer {{token}}"},
-        )
-        result = self.svc.execute(req, variables={"token": "secret"})
-        self.assertEqual(200, result.response.status_code)
-        self.svc.mcp_client.run.assert_called_once()
-        self.assertEqual(
-            {"Authorization": "Bearer secret"},
-            _mcp_run_headers(self.svc.mcp_client.run),
-        )
-
-    def test_execute_mcp_forwards_empty_headers_to_mcp_client(self):
-        """Method MCP Send with no headers still calls run with an empty mapping."""
-        self.svc.mcp_client.run.return_value = _make_response(200)
-        req = RequestData(method="MCP", url="http://x")
-        result = self.svc.execute(req)
-        self.assertEqual(200, result.response.status_code)
-        self.svc.mcp_client.run.assert_called_once()
-        self.assertEqual({}, _mcp_run_headers(self.svc.mcp_client.run))
-
-
 class TestRequestServiceInjection(unittest.TestCase):
     def test_injected_template_service_forwarded_to_http_client(self):
         """TemplateService passed to RequestService is the same instance in http_client."""
@@ -175,12 +118,6 @@ class TestRequestServiceInjection(unittest.TestCase):
         svc = RequestService(http_client=mock_http)
         self.assertIs(mock_http, svc.http_client)
 
-    def test_injected_mcp_client_is_used(self):
-        """An MCPClientService passed at construction is stored, not recreated."""
-        mock_mcp = MagicMock()
-        svc = RequestService(mcp_client=mock_mcp)
-        self.assertIs(mock_mcp, svc.mcp_client)
-
 
 class TestRequestServiceHistory(unittest.TestCase):
     def setUp(self):
@@ -191,7 +128,6 @@ class TestRequestServiceHistory(unittest.TestCase):
             template_service=TemplateService(),
         )
         self.svc.http_client = MagicMock()
-        self.svc.mcp_client = MagicMock()
         self.svc.http_client.send_request.return_value = _make_http_result(200)
 
     def test_history_entry_recorded_after_execute(self):
@@ -321,7 +257,6 @@ class TestRequestServiceErrorHandling(unittest.TestCase):
             metrics=MagicMock(), template_service=TemplateService()
         )
         self.svc.http_client = MagicMock()
-        self.svc.mcp_client = MagicMock()
 
     def test_execution_error_from_http_client_returns_execution_result(self):
         exc = ExecutionError(category=ErrorCategory.NETWORK, message="no conn")

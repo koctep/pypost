@@ -95,6 +95,10 @@ class McpClientPresenter:
         self._bridge: _OutboundResultBridge | None = None
         self._catalog: dict[str, McpRemoteTool] = {}
         self._selected_name: str | None = None
+        self._pending_tool_name: str | None = connection.last_tool_name
+        self._pending_tool_arguments: dict[str, Any] = dict(
+            connection.last_tool_arguments or {},
+        )
 
     @property
     def state(self) -> McpClientSessionState:
@@ -356,6 +360,15 @@ class McpClientPresenter:
         self._catalog = {tool.name: tool for tool in tools}
         if self._tab is not None:
             self._tab.set_tools([(tool.name, tool.description) for tool in tools])
+        pending_name = self._pending_tool_name
+        pending_args = self._pending_tool_arguments
+        if pending_name is not None and pending_name in self._catalog:
+            self._pending_tool_name = None
+            self._pending_tool_arguments = {}
+            self.select_tool(pending_name)
+            if pending_args and self._tab is not None:
+                self._tab.apply_invoke_arguments(pending_args)
+            return
         if previous is not None and previous in self._catalog:
             self._selected_name = previous
             if self._tab is not None:

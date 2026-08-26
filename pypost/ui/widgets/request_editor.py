@@ -94,7 +94,7 @@ class RequestWidget(QWidget):
 
         self.method_combo = QComboBox()
         set_widget_id(self.method_combo, METHOD_COMBO)
-        self.method_combo.addItems(["GET", "POST", "PUT", "DELETE", "PATCH", "MCP"])
+        self.method_combo.addItems(["GET", "POST", "PUT", "DELETE", "PATCH"])
         self.method_combo.setCurrentText(self.request_data.method)
         self.method_combo.currentTextChanged.connect(self._on_method_changed)
 
@@ -253,12 +253,7 @@ class RequestWidget(QWidget):
         self._refresh_mcp_preview()
 
     def _on_method_changed(self, method: str):
-        if method == "MCP":
-            self.body_edit.setPlaceholderText(
-                "Empty = list tools. JSON {name, arguments} = call tool."
-            )
-        else:
-            self.body_edit.setPlaceholderText("")
+        self.body_edit.setPlaceholderText("")
         if not self._loading and method in ("POST", "PUT"):
             self.detail_tabs.setCurrentWidget(self.body_tab)
             self._metrics.track_gui_method_body_autoswitch(method)

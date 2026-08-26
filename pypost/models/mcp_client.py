@@ -40,3 +40,5 @@ class McpClientConnection(BaseModel):
     name: str = "New MCP Client"
     url: str = ""
     headers: dict[str, str] = Field(default_factory=dict)
+    last_tool_name: str | None = None
+    last_tool_arguments: dict[str, Any] = Field(default_factory=dict)

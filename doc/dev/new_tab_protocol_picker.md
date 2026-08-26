@@ -88,7 +88,7 @@ flowchart TB
 | Collections / restore WS | `open_websocket_tab(conn)` | Saved `WebSocketTab` | Unchanged |
 | Collections **New tab** HTTP | `add_new_tab(copy)` | Isolated `RequestTab` | `collections_context` + `protocol=unknown` |
 | Close last tab | `handle_new_tab("last_tab")` → `open_blank_tab` | HTTP / WS / MCP draft, or none on cancel | `source=last_tab` + `protocol` |
-| HTTP method **MCP** Send | `RequestService._execute_mcp` | Existing HTTP editor | Unchanged (MCP-TM-6) |
+| Collections legacy `method: "MCP"` | `open_legacy_mcp_request_tab` | `McpClientTab` (convert-on-open) | Unchanged |
 
 `add_blank_websocket_tab` builds `WebSocketConnection()` +
 `WebSocketPresenter` + `WebSocketTab` and inserts before the plus tab.
