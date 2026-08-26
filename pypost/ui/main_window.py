@@ -32,7 +32,12 @@ from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed
 from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
-from pypost.ui.hotkeys import register_hotkey, register_hotkey_group, tag_action
+from pypost.ui.hotkeys import (
+    register_hotkey,
+    register_hotkey_documentation,
+    register_hotkey_group,
+    tag_action,
+)
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.main_window_signals import wire_presenter_signals
 from pypost.ui.mcp_server_controller import McpServerSettingsController
@@ -332,6 +337,35 @@ class MainWindow(QMainWindow):
             keys=("Ctrl+T",),
             slot=self.tabs.handle_switch_to_script_global,
             order=8,
+        )
+        register_hotkey_documentation(
+            self,
+            section="WebSocket Session",
+            label="Connect / Disconnect",
+            keys=("F5", "Ctrl+Return"),
+            order=1,
+        )
+        register_hotkey_documentation(
+            self,
+            section="WebSocket Session",
+            label="Send Message",
+            keys=("Ctrl+Return",),
+            order=2,
+        )
+        register_hotkey_documentation(
+            self,
+            section="WebSocket Session",
+            label="Focus URL Bar",
+            keys=("Ctrl+L", "Alt+D"),
+            order=4,
+        )
+        register_hotkey(
+            self,
+            section="WebSocket Session",
+            label="Format JSON",
+            keys=("Ctrl+Shift+F",),
+            slot=self.tabs.handle_websocket_format_json_global,
+            order=5,
         )
 
     def _alert_settings_changed(

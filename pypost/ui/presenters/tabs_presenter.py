@@ -40,6 +40,7 @@ from pypost.ui.presenters.tabs_presenter_ws_close import (
 from pypost.ui.presenters.tabs_presenter_draft import (
     collect_persistable_open_tab_ids, websocket_id_is_saved,
 )
+from pypost.ui.presenters import tabs_presenter_hotkeys as tab_hotkeys
 from pypost.ui.presenters.tabs_presenter_worker import TabsPresenterWorkerHandlers
 from pypost.core.history_manager import HistoryManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
@@ -499,40 +500,38 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         if 0 <= index < self._tabs.count() and not self._header.is_plus_tab_index(index):
             self._tabs.setCurrentIndex(index)
 
+    def active_tab_kind(self) -> TabProtocol | None:
+        return tab_hotkeys.active_tab_kind(self)
+
     def handle_send_request_global(self) -> None:
-        tab = self._current_tab()
-        if tab:
-            tab.request_editor.on_send()
+        tab_hotkeys.handle_send_request_global(self)
+
+    def handle_websocket_connect_global(self) -> None:
+        tab_hotkeys.handle_websocket_connect_global(self)
+
+    def handle_websocket_send_global(self) -> None:
+        tab_hotkeys.handle_websocket_send_global(self)
+
+    def handle_websocket_format_json_global(self) -> None:
+        tab_hotkeys.handle_websocket_format_json_global(self)
 
     def handle_focus_url(self) -> None:
-        tab = self._current_tab()
-        if tab:
-            tab.request_editor.url_input.setFocus()
-            tab.request_editor.url_input.selectAll()
+        tab_hotkeys.handle_focus_url(self)
 
     def handle_switch_to_params_global(self) -> None:
-        tab = self._current_tab()
-        if tab:
-            tab.request_editor.detail_tabs.setCurrentIndex(0)
+        tab_hotkeys.handle_switch_to_params_global(self)
 
     def handle_switch_to_headers_global(self) -> None:
-        tab = self._current_tab()
-        if tab:
-            tab.request_editor.detail_tabs.setCurrentIndex(1)
+        tab_hotkeys.handle_switch_to_headers_global(self)
 
     def handle_switch_to_body_global(self) -> None:
-        tab = self._current_tab()
-        if tab:
-            tab.request_editor.detail_tabs.setCurrentIndex(2)
+        tab_hotkeys.handle_switch_to_body_global(self)
 
     def handle_switch_to_script_global(self) -> None:
-        tab = self._current_tab()
-        if tab:
-            tab.request_editor.detail_tabs.setCurrentIndex(3)
+        tab_hotkeys.handle_switch_to_script_global(self)
 
     def _current_tab(self) -> RequestTab | None:
-        tab = self._tabs.currentWidget()
-        return tab if isinstance(tab, RequestTab) else None
+        return tab_hotkeys.current_request_tab(self)
 
     def _create_request_tab(self, request_data: RequestData | None) -> RequestTab:
         """Creates a RequestTab and wires all per-tab signals."""

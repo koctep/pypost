@@ -63,6 +63,7 @@ conventions.
 1. [Collection Tree Actions](collection_tree_actions.md)
 1. [Collections WebSocket Context Menu (PYPOST-1160)](websocket_collections_menu.md)
 1. [WebSocket Save-to-Collection Flow (PYPOST-1161)](websocket_save_flow.md)
+1. [WebSocket Session Hotkeys (PYPOST-1162)](websocket_hotkeys.md)
 1. [Collection Tree Performance](collection_tree_performance.md)
 1. [Collection Item Delete](collection_item_delete.md)
 1. [Collection Item Rename](collection_item_rename.md)

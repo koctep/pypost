@@ -14,7 +14,7 @@ ALT_KEYS_PROPERTY = "pypost_hotkey_alt_keys"
 COLLAPSE_PROPERTY = "pypost_hotkey_collapse_keys"
 LABEL_PROPERTY = "pypost_hotkey_label"
 
-SECTION_ORDER = ("General", "Tabs", "Request Editor")
+SECTION_ORDER = ("General", "Tabs", "Request Editor", "WebSocket Session")
 
 
 def format_shortcut_display(keys: Sequence[str], *, collapse: bool = False) -> str:
@@ -96,6 +96,29 @@ def tag_action(
             action.setProperty(ALT_KEYS_PROPERTY, list(extra))
     if collapse_keys:
         action.setProperty(COLLAPSE_PROPERTY, True)
+
+
+def register_hotkey_documentation(
+    parent: QWidget,
+    *,
+    section: str,
+    label: str,
+    keys: tuple[str, ...],
+    order: int,
+    collapse_keys: bool = False,
+) -> QAction:
+    """Register a help-dialog row without binding shortcuts (display only)."""
+    action = QAction(label, parent)
+    tag_action(
+        action,
+        section=section,
+        order=order,
+        keys=keys,
+        collapse_keys=collapse_keys,
+        label=label,
+    )
+    parent.addAction(action)
+    return action
 
 
 def register_hotkey(

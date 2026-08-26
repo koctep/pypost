@@ -6,6 +6,7 @@ real-time syntax validation, quick preset/sequence controls, and dispatch action
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING, Optional
 
@@ -290,6 +291,22 @@ class WebSocketComposer(QWidget):
         logger.info("composer_sequence_stop_clicked")
         if self.presenter and hasattr(self.presenter, "stop_sequence"):
             self.presenter.stop_sequence()
+
+    def format_json_payload(self) -> None:
+        """Pretty-print composer payload when format is JSON and text parses."""
+        if self._current_format != WsMessageFormat.JSON:
+            self.set_format(WsMessageFormat.JSON)
+        raw = self.get_payload().strip()
+        if not raw:
+            return
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            logger.warning("composer_format_json_failed error=%s", exc)
+            return
+        formatted = json.dumps(parsed, indent=2)
+        self.set_payload(formatted)
+        self._revalidate()
 
     def send_current_payload(self) -> bool:
         """Transmit current composer payload over the active connection."""
