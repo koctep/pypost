@@ -1058,10 +1058,13 @@ Client** workspace editor as the third `TabProtocol` peer to HTTP `RequestTab` a
 blank-tab protocol picker. WS-TM-1 ([PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157))
 shipped `Ctrl+N` and tab-bar **+**; MCP-TM-1
 ([PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165)) added the **MCP Client**
-item (`TabProtocol.MCP_CLIENT` / `mcp_client`, stub `McpClientTab`). Close-last-tab picker
-reuse is [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159). See
-[new_tab_protocol_picker.md](new_tab_protocol_picker.md). Remaining stories add connect /
-`list_tools` / `call_tool` chrome — not via the HTTP request method dropdown.
+item (`TabProtocol.MCP_CLIENT` / `mcp_client`, stub `McpClientTab`). MCP-TM-2
+([PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166)) filled that tab with
+draft chrome. Close-last-tab picker reuse is
+[PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159). See
+[new_tab_protocol_picker.md](new_tab_protocol_picker.md) and
+[mcp_client_draft_tab.md](mcp_client_draft_tab.md). Remaining stories add live
+`list_tools` / `call_tool` — not via the HTTP request method dropdown.
 
 **Architecture:** [`ai-tasks/PYPOST-1164/20-architecture.md`](../../ai-tasks/PYPOST-1164/20-architecture.md)
 — Option A (extend `NewTabProtocolPicker` with a third menu item;
@@ -1075,7 +1078,7 @@ HTTP method **MCP** path.
 | Story | Jira | Summary |
 | --- | --- | --- |
 | MCP-TM-1 (shipped) | [PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165) | Extend protocol picker with **MCP Client** (stub tab; metrics `protocol=mcp_client`) |
-| MCP-TM-2 | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) | Blank MCP Client draft tab shell |
+| MCP-TM-2 (shipped) | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) | Blank MCP Client draft tab shell |
 | MCP-TM-3 | [PYPOST-1169](https://pypost.atlassian.net/browse/PYPOST-1169) | Tool discovery (`list_tools`) and browser UI |
 | MCP-TM-4 | [PYPOST-1170](https://pypost.atlassian.net/browse/PYPOST-1170) | Interactive `call_tool` + response pane |
 | MCP-TM-5 | [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) | Outbound headers + environment templating |
@@ -1083,10 +1086,12 @@ HTTP method **MCP** path.
 | MCP-TM-7 | [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) | Collections save/open + context menu parity |
 | MCP-TM-8 | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) | User documentation alignment |
 
-**Current state (until MCP-TM-2 … MCP-TM-8 land):**
+**Current state (until MCP-TM-3 … MCP-TM-8 land):**
 
-*   `Ctrl+N` / **+** include **MCP Client**; confirm opens a stub `McpClientTab` (not HTTP).
-    URL bar, Connect / Disconnect, and tool browser remain PYPOST-1166.
+*   `Ctrl+N` / **+** include **MCP Client**; confirm opens a draft `McpClientTab` (not HTTP)
+    with URL, Connect / Disconnect, disconnected state, and an empty tool browser.
+    Connect is local chrome (no `MCPClientService`). See
+    [mcp_client_draft_tab.md](mcp_client_draft_tab.md).
 *   Outbound MCP operations are still only available as HTTP method **MCP** on `RequestEditor` — raw JSON body
     conventions for `list_tools` / `call_tool`, not a dedicated editor.
 *   `RequestService._execute_mcp` renders URL and headers from templates and passes the
@@ -1098,6 +1103,6 @@ HTTP method **MCP** path.
     **MCP Tool** checkbox, and the HTTP editor **MCP** sub-tab for inbound tool exposure remain
     as documented above. See also [MCP Reverse Proxy](mcp_proxy.md) for inbound bridge mode.
 
-Until MCP-TM-2 … MCP-TM-8 land, **`method: "MCP"` requests** (e.g. `examples/collections/mcp.json`)
-remain the only **operational** outbound MCP path in the GUI (the picker stub does not connect).
-Inbound MCP server tooling is unchanged.
+Until MCP-TM-3 … MCP-TM-8 land, **`method: "MCP"` requests** (e.g. `examples/collections/mcp.json`)
+remain the only **operational** outbound MCP path in the GUI (the draft tab Connect does not
+talk to a server). Inbound MCP server tooling is unchanged.

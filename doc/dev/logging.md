@@ -270,6 +270,14 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `mcp_operation_start` | DEBUG | `url`, `operation`, `header_count` | `mcp_client_service` |
 | `mcp_operation_success` | DEBUG | `url`, `operation`, `elapsed` | `mcp_client_service` |
 | `mcp_operation_failed` | ERROR | `url`, `operation`, `category`, `detail` | `mcp_client_service` |
+| `mcp_client_connect_initiated` | INFO | `connection_id` | `mcp_client_presenter` |
+| `mcp_client_disconnect_initiated` | INFO | `connection_id` | `mcp_client_presenter` |
+| `mcp_client_presenter_teardown` | INFO | `connection_id` | `mcp_client_presenter` |
+
+Draft-tab Connect / Disconnect / teardown (PYPOST-1166) log `connection_id`
+only — never URL text. Live `mcp_operation_*` events belong to HTTP method
+**MCP** (`MCPClientService`), not the draft tab. See
+[mcp_client_draft_tab.md](mcp_client_draft_tab.md).
 
 #### MCP endpoint persistence and lifecycle (PYPOST-1071)
 

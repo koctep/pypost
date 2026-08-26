@@ -40,6 +40,11 @@ PLUS_TAB_PLACEHOLDER = "pypost_plus_tab_placeholder"
 PLUS_TAB_BUTTON = "pypost_plus_tab_button"
 NEW_TAB_PROTOCOL_MENU = "pypost_new_tab_protocol_menu"
 MCP_CLIENT_TAB_PAGE = "pypost_mcp_client_tab_page"
+MCP_CLIENT_URL_INPUT = "pypost_mcp_client_url_input"
+MCP_CLIENT_CONNECT_BUTTON = "pypost_mcp_client_connect_button"
+MCP_CLIENT_DISCONNECT_BUTTON = "pypost_mcp_client_disconnect_button"
+MCP_CLIENT_STATE_BADGE = "pypost_mcp_client_state_badge"
+MCP_CLIENT_TOOL_BROWSER = "pypost_mcp_client_tool_browser"
 
 # WebSocket session surfaces (PYPOST-1132 / WS-4).
 WS_TAB_PAGE = "pypost_ws_tab_page"

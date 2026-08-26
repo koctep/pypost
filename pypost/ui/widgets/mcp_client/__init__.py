@@ -1,4 +1,4 @@
-"""MCP Client workspace widgets (picker stub until PYPOST-1166)."""
+"""MCP Client workspace widgets."""
 
 from __future__ import annotations
 

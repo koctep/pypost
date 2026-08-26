@@ -55,7 +55,7 @@ New-tab flow (`Ctrl+N` and **+** share one choose-then-open path):
 1. Confirm → `open_blank_tab(protocol, source)` logs `new_tab_action_completed`, increments
    `gui_new_tab_actions_total{source, protocol}`, then HTTP → `add_new_tab()`,
    WebSocket → `add_blank_websocket_tab()` (not `open_websocket_tab`), or
-   MCP Client → `add_blank_mcp_client_tab()` (stub `McpClientTab`, not HTTP).
+   MCP Client → `add_blank_mcp_client_tab()` (draft `McpClientTab`, not HTTP).
 
 Save-as flow:
 1. User clicks `Actions -> Save As...` or presses `Ctrl+Shift+S`.

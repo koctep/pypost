@@ -19,6 +19,7 @@ from pypost.ui.presenters.tabs_presenter import (
     TabsPresenter,
     WebSocketTab,
 )
+from pypost.models.mcp_client import McpClientConnection
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 from pypost.ui.widgets.mcp_client import McpClientTab
@@ -837,6 +838,47 @@ class TestTabsPresenter(unittest.TestCase):
             "https://saved-elsewhere.example.com",
         )
         self.assertFalse(tab_b.stale_persisted)
+
+    def test_add_blank_mcp_client_tab_creates_draft(self):
+        p = self._make_presenter()
+        tab = p.add_blank_mcp_client_tab()
+        idx = p.widget.indexOf(tab)
+        self.assertIsInstance(tab, McpClientTab)
+        self.assertNotIsInstance(tab, RequestTab)
+        self.assertNotIsInstance(tab, WebSocketTab)
+        self.assertEqual(p.widget.tabText(idx), "New MCP Client")
+        self.assertEqual(tab.connection_data.url, "")
+        self.assertEqual(
+            tab.connection_data.name,
+            "New MCP Client",
+        )
+        self.assertIsInstance(tab.connection_data, McpClientConnection)
+
+    def test_save_tabs_state_omits_unsaved_mcp_client_draft(self):
+        p = self._make_presenter()
+        tab = p.add_blank_mcp_client_tab()
+        draft_id = tab.connection_data.id
+        self.assertNotIn(draft_id, p._state_manager.get_open_tabs())
+        self.assertIsInstance(tab.connection_data, McpClientConnection)
+
+        restorer = self._make_presenter(open_tabs=[draft_id])
+        restorer.restore_tabs()
+        for i in range(restorer.widget.count()):
+            self.assertNotIsInstance(
+                restorer.widget.widget(i),
+                McpClientTab,
+            )
+
+    def test_close_tab_calls_mcp_client_presenter_teardown(self):
+        p = self._make_presenter()
+        tab = p.add_blank_mcp_client_tab()
+        presenter = tab.presenter
+        teardown = MagicMock()
+        presenter.teardown = teardown
+        idx = p.widget.indexOf(tab)
+        p.close_tab(idx)
+        teardown.assert_called_once()
+
 
 @pytest.mark.usefixtures("qapp")
 

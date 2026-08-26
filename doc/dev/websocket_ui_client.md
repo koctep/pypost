@@ -156,9 +156,9 @@ WS-TM-1 shipped the blank-tab protocol picker. MCP-TM-1
 **HTTP Request** (default), **WebSocket**, then **MCP Client** before
 any editor is created. Confirming WebSocket calls
 `add_blank_websocket_tab()` (placeholder `WebSocketTab`; not
-`open_websocket_tab`). Confirming MCP Client opens a stub
-`McpClientTab` (chrome is PYPOST-1166). Developer details:
-[new_tab_protocol_picker.md](new_tab_protocol_picker.md).
+`open_websocket_tab`). Confirming MCP Client opens a draft
+`McpClientTab` ([mcp_client_draft_tab.md](mcp_client_draft_tab.md)).
+Picker details: [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 
 Saved profiles still open via `open_websocket_tab(profile)` from
 Collections and session restore.

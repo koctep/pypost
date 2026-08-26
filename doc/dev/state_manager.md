@@ -49,7 +49,8 @@ until file size or write latency becomes a measured problem.
 ### Managed fields
 
 - `expanded_collections` — collection tree expansion ids
-- `open_tabs` — open request tab ids
+- `open_tabs` — open HTTP request and WebSocket tab ids (unsaved MCP Client
+  drafts are omitted; see [mcp_client_draft_tab.md](mcp_client_draft_tab.md))
 - `last_environment_id` — last selected environment
 
 ### Public methods

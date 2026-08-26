@@ -7,8 +7,11 @@ workspace editor is created. The user chooses **HTTP Request** (default),
 **WebSocket**, or **MCP Client**. Confirming HTTP opens a blank
 `RequestTab`. Confirming WebSocket opens a blank `WebSocketTab` via
 `add_blank_websocket_tab` (not the Collections/restore path). Confirming
-**MCP Client** opens a stub `McpClientTab` via `add_blank_mcp_client_tab`
-(not HTTP). Dismissing the menu creates no tab and emits no new-tab
+**MCP Client** opens a draft `McpClientTab` via `add_blank_mcp_client_tab`
+(not HTTP). Chrome (URL, Connect / Disconnect, empty tools, restore
+omission, close teardown) is [mcp_client_draft_tab.md](mcp_client_draft_tab.md)
+([PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166)).
+Dismissing the menu creates no tab and emits no new-tab
 metric.
 
 WS-TM-1 ([PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157))
@@ -31,9 +34,9 @@ and [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168)
 - **`TabProtocol`**: enum values `http` / `websocket` / `mcp_client` —
   the same strings used as metrics `protocol` labels.
 - **`McpClientTab`** (`pypost/ui/widgets/mcp_client/mcp_client_tab.py`):
-  stub workspace page (label `"MCP Client"`, widget id
-  `MCP_CLIENT_TAB_PAGE`). Draft chrome (URL bar, Connect / Disconnect,
-  tool browser) is [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166).
+  draft workspace page (widget id `MCP_CLIENT_TAB_PAGE`). Factory wires
+  `McpClientConnection` + `McpClientPresenter`. See
+  [mcp_client_draft_tab.md](mcp_client_draft_tab.md).
 - **`TabsPresenter.handle_new_tab(source)`**: logs
   `new_tab_action_triggered`, calls the injectable picker, then either
   returns (cancel) or `open_blank_tab(protocol, source)`.
@@ -56,7 +59,7 @@ flowchart TB
     Metrics["track_gui_new_tab_action(source, protocol)"]
     AddHTTP["add_new_tab() → RequestTab"]
     AddWS["add_blank_websocket_tab() → WebSocketTab"]
-    AddMCP["add_blank_mcp_client_tab() → McpClientTab stub"]
+    AddMCP["add_blank_mcp_client_tab() → McpClientTab draft"]
     SavedWS["open_websocket_tab(conn) Collections/restore"]
 
     CtrlN --> HandleNew
@@ -75,7 +78,7 @@ flowchart TB
 | --- | --- | --- | --- |
 | `Ctrl+N` / **+**, HTTP | `open_blank_tab(HTTP, source)` | Blank `RequestTab` | `source` + `protocol=http` |
 | `Ctrl+N` / **+**, WebSocket | `open_blank_tab(WEBSOCKET, source)` | Blank `WebSocketTab` | `source` + `protocol=websocket` |
-| `Ctrl+N` / **+**, MCP Client | `open_blank_tab(MCP_CLIENT, source)` | Stub `McpClientTab` | `source` + `protocol=mcp_client` |
+| `Ctrl+N` / **+**, MCP Client | `open_blank_tab(MCP_CLIENT, source)` | Draft `McpClientTab` | `source` + `protocol=mcp_client` |
 | `Ctrl+N` / **+**, cancel | `handle_new_tab` returns | Unchanged | None |
 | Collections / restore WS | `open_websocket_tab(conn)` | Saved `WebSocketTab` | Unchanged |
 | Collections **New tab** HTTP | `add_new_tab(copy)` | Isolated `RequestTab` | `collections_context` + `protocol=unknown` |
@@ -87,11 +90,13 @@ flowchart TB
 It must **not** call `open_websocket_tab` (that API dedups by saved
 connection id and is the Collections/restore path).
 
-`add_blank_mcp_client_tab` constructs `McpClientTab()` and inserts
-before the plus tab with title `"New MCP Client"`. It must **not** call
-`add_new_tab` or `open_websocket_tab`. `_request_tab_count` includes
-`McpClientTab` so close-last-tab does not treat an MCP-only strip as
-empty. Session restore of the stub is out of scope (PYPOST-1166).
+`add_blank_mcp_client_tab` constructs `McpClientConnection()` +
+`McpClientPresenter` + `McpClientTab` and inserts before the plus tab
+with title `"New MCP Client"`. It must **not** call `add_new_tab` or
+`open_websocket_tab`. `_request_tab_count` includes `McpClientTab` so
+close-last-tab does not treat an MCP-only strip as empty. Unsaved drafts
+are omitted from `save_tabs_state` until MCP-TM-7
+([mcp_client_draft_tab.md](mcp_client_draft_tab.md)).
 
 ### Out of scope
 
@@ -99,11 +104,8 @@ empty. Session restore of the stub is out of scope (PYPOST-1166).
 | --- | --- |
 | Blank WebSocket draft editor, default name, session-restore exclusion | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) |
 | Close-last-tab / empty-workspace picker | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) |
-| MCP Client draft shell (URL, Connect, tools) | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) |
+| MCP Client draft shell (URL, Connect, tools) | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) (shipped) |
 | User documentation rewrite (MCP Client) | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) |
-
-MCP-TM-1 confirm is a **stub** `McpClientTab` (FR-4.4). Full draft-editor
-chrome is PYPOST-1166.
 
 ## API / Usage
 
@@ -177,17 +179,22 @@ same as `add_new_tab`.
 
 ### `TabsPresenter.add_blank_mcp_client_tab(*, save_state: bool = True) -> McpClientTab`
 
-Blank MCP Client workspace tab (stub until PYPOST-1166). Fresh
-`McpClientTab()` — no presenter, no `McpClientConnection`, no MCP SDK.
-Inserts before the plus tab with title `"New MCP Client"`.
+Blank MCP Client **draft** workspace tab. Fresh `McpClientConnection()` +
+`McpClientPresenter` + `McpClientTab`. Inserts before the plus tab with
+title `"New MCP Client"`. No MCP SDK. Draft chrome, restore omission, and
+`close_tab` teardown:
+[mcp_client_draft_tab.md](mcp_client_draft_tab.md).
 
 ### `McpClientTab`
 
 ```python
 class McpClientTab(QWidget):
-    """Blank MCP Client workspace page (placeholder until PYPOST-1166)."""
-
-    def __init__(self, parent: QWidget | None = None) -> None: ...
+    def __init__(
+        self,
+        connection: McpClientConnection,
+        presenter: McpClientPresenter,
+        parent: QWidget | None = None,
+    ) -> None: ...
 ```
 
 Re-exported from `pypost.ui.widgets.mcp_client`. Page widget id:
@@ -276,7 +283,7 @@ Widget ids (`pypost/ui/widget_ids.py`):
 
 - `NEW_TAB_PROTOCOL_MENU` = `pypost_new_tab_protocol_menu`
 - `PLUS_TAB_BUTTON` = `pypost_plus_tab_button` (anchor lookup)
-- `MCP_CLIENT_TAB_PAGE` = `pypost_mcp_client_tab_page` (stub page)
+- `MCP_CLIENT_TAB_PAGE` = `pypost_mcp_client_tab_page` (draft page)
 
 ## Troubleshooting
 
@@ -326,12 +333,12 @@ Cancel never increments. Collections **New tab** uses
 
 Intentional. `close_tab` still calls `add_new_tab(save_state=False)`
 when `_request_tab_count() == 0`. Picker reuse is PYPOST-1159. The MCP
-stub **is** counted so an MCP-only strip is not treated as empty.
+draft **is** counted so an MCP-only strip is not treated as empty.
 
 ### MCP Client tab has no URL bar / Connect
 
-Intentional. PYPOST-1165 ships choice + identity + metrics. Chrome is
-PYPOST-1166.
+Should not happen after PYPOST-1166. Chrome, widget ids, and teardown:
+[mcp_client_draft_tab.md](mcp_client_draft_tab.md).
 
 ### User docs still omit **MCP Client**
 

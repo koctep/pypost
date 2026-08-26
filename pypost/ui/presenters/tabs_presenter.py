@@ -32,9 +32,11 @@ from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.core.template_service import TemplateService
 from pypost.core.qt.worker import RequestWorker
+from pypost.models.mcp_client import McpClientConnection
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 from pypost.models.websocket import WebSocketConnection
+from pypost.ui.presenters.mcp_client_presenter import McpClientPresenter
 from pypost.ui.presenters.websocket_presenter import WebSocketPresenter
 from pypost.ui.request_save_orchestrator import (
     RequestSaveOrchestrator,
@@ -181,7 +183,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         return self._insert_websocket_tab(WebSocketConnection(), save_state=save_state)
 
     def add_blank_mcp_client_tab(self, *, save_state: bool = True) -> McpClientTab:
-        tab = McpClientTab()
+        connection = McpClientConnection()
+        presenter = McpClientPresenter(connection)
+        tab = McpClientTab(connection, presenter)
         plus_idx = self._header.insert_index_before_plus()
         if plus_idx >= 0:
             self._tabs.insertTab(plus_idx, tab, "New MCP Client")
@@ -241,8 +245,10 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         if self._header.is_plus_tab_index(index):
             return
         tab = self._tabs.widget(index)
-        if isinstance(tab, WebSocketTab) and hasattr(tab, "presenter"):
-            tab.presenter.teardown()
+        presenter = getattr(tab, "presenter", None)
+        teardown = getattr(presenter, "teardown", None)
+        if callable(teardown):
+            teardown()
         self._tabs.removeTab(index)
         if self._request_tab_count() == 0:
             self.add_new_tab(save_state=False)
