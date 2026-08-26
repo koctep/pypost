@@ -78,6 +78,9 @@ class MetricsTrackingMixin:
     def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
         self._registry.track_mcp_client_list_tools(result, operation)
 
+    def track_mcp_client_call_tool(self, result: str) -> None:
+        self._registry.track_mcp_client_call_tool(result)
+
     def track_history_entry_appended(self, method: str) -> None:
         self._registry.track_history_entry_appended(method)
 
@@ -103,26 +106,19 @@ class MetricsTrackingMixin:
         self._registry.track_request_retry_exhaustion(endpoint)
 
     def track_template_expression_render_attempt(
-        self,
-        render_path: str,
-        outcome: str,
+        self, render_path: str, outcome: str,
     ) -> None:
         self._registry.track_template_expression_render_attempt(render_path, outcome)
 
     def track_template_expression_validation_failure(
-        self,
-        render_path: str,
-        code: str,
-        function_name: str | None = None,
+        self, render_path: str, code: str, function_name: str | None = None,
     ) -> None:
         self._registry.track_template_expression_validation_failure(
             render_path, code, function_name
         )
 
     def track_template_expression_render_duration(
-        self,
-        render_path: str,
-        duration_seconds: float,
+        self, render_path: str, duration_seconds: float,
     ) -> None:
         self._registry.track_template_expression_render_duration(
             render_path, duration_seconds

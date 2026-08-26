@@ -67,11 +67,13 @@ class McpClientConnectionBar(QWidget):
         state: McpClientSessionState,
         *,
         list_in_flight: bool = False,
+        invoke_in_flight: bool = False,
     ) -> None:
         """Update badge text and Connect / Disconnect / Refresh gating."""
         self.state_badge.setText(_STATE_LABELS.get(state, "Disconnected"))
         is_connected = state == McpClientSessionState.CONNECTED
         is_connecting = state == McpClientSessionState.CONNECTING
-        self.connect_btn.setEnabled((not list_in_flight) and (not is_connected))
+        busy = list_in_flight or invoke_in_flight
+        self.connect_btn.setEnabled((not busy) and (not is_connected))
         self.disconnect_btn.setEnabled(is_connected or is_connecting)
-        self.refresh_btn.setEnabled(is_connected and not list_in_flight)
+        self.refresh_btn.setEnabled(is_connected and not busy)

@@ -17,7 +17,7 @@
 | `pypost/core/http_client.py` | 198 | 381 | 418 |
 | `pypost/core/mcp_server_impl.py` | 231 | 314 | 325 |
 | `pypost/core/qt/metrics.py` | 286 | 61 | 70 |
-| `pypost/core/qt/metrics_tracking.py` | — | 138 | 145 |
+| `pypost/core/qt/metrics_tracking.py` | — | 140 | 145 |
 | `pypost/core/qt/metrics_websocket.py` | — | 40 | 45 |
 | `pypost/core/qt/worker.py` | 57 | 180 | 180 |
 | `pypost/core/request_manager.py` | 201 | 240 | 264 |

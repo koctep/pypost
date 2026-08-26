@@ -13,8 +13,10 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QPlainTextEdit,
     QPushButton,
     QTableWidgetItem,
+    QTextEdit,
     QWidget,
 )
 
@@ -24,9 +26,14 @@ from pypost.models.response import ResponseData
 from pypost.ui import widget_ids
 from pypost.ui.presenters.mcp_client_presenter import McpClientPresenter
 from pypost.ui.widget_ids import (
+    MCP_CLIENT_ARG_FORM,
+    MCP_CLIENT_ARG_JSON,
+    MCP_CLIENT_ELAPSED_LABEL,
     MCP_CLIENT_ERROR_LABEL,
     MCP_CLIENT_HEADERS_TABLE,
+    MCP_CLIENT_INVOKE_BUTTON,
     MCP_CLIENT_REFRESH_BUTTON,
+    MCP_CLIENT_RESULT_PANE,
     MCP_CLIENT_TAB_PAGE,
     METHOD_COMBO,
 )
@@ -37,6 +44,7 @@ pytestmark = pytest.mark.timeout(30)
 
 _MCP_URL = "http://127.0.0.1:1080/mcp"
 _CONNECT_SETTLE_S = 5.0
+_INVOKE_SETTLE_S = 5.0
 
 
 def _build_draft_tab(
@@ -72,8 +80,15 @@ def _widget_text(widget: QWidget) -> str:
     text_fn = getattr(widget, "text", None)
     if callable(text_fn):
         parts.append(str(text_fn()))
+    plain_fn = getattr(widget, "toPlainText", None)
+    if callable(plain_fn):
+        parts.append(str(plain_fn()))
     for label in widget.findChildren(QLabel):
         parts.append(label.text())
+    for edit in widget.findChildren(QPlainTextEdit):
+        parts.append(edit.toPlainText())
+    for edit in widget.findChildren(QTextEdit):
+        parts.append(edit.toPlainText())
     return " ".join(parts)
 
 
@@ -226,7 +241,7 @@ def test_presenter_logs_connect_disconnect_teardown(caplog, qapp) -> None:
 
 
 def _tools_response(
-    tools: list[dict[str, str]] | None = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> ResponseData:
     if tools is None:
         tools = [{"name": "echo", "description": "Echo tool"}]
@@ -568,3 +583,461 @@ def test_connect_and_refresh_record_outbound_metrics(qapp) -> None:
         'mcp_client_list_tools_total{operation="refresh",result="error"} 1.0'
         in scrape
     )
+
+
+_ECHO_INPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {"text": {"type": "string"}},
+    "required": ["text"],
+}
+_NESTED_INPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "payload": {
+            "type": "object",
+            "properties": {"k": {"type": "integer"}},
+        },
+    },
+}
+
+
+def _echo_tool_entry() -> dict[str, Any]:
+    return {
+        "name": "echo",
+        "description": "Echo tool",
+        "inputSchema": dict(_ECHO_INPUT_SCHEMA),
+    }
+
+
+def _nested_tool_entry() -> dict[str, Any]:
+    return {
+        "name": "wrap",
+        "description": "Wrap payload",
+        "inputSchema": dict(_NESTED_INPUT_SCHEMA),
+    }
+
+
+def _call_tool_response(
+    *,
+    elapsed: float = 0.12,
+    body_obj: dict[str, Any] | None = None,
+) -> ResponseData:
+    payload = json.dumps(
+        body_obj
+        if body_obj is not None
+        else {"content": [{"type": "text", "text": "hello"}]},
+    )
+    return ResponseData(
+        status_code=200,
+        headers={},
+        body=payload,
+        elapsed_time=elapsed,
+        size=len(payload),
+    )
+
+
+def _run_operation(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
+    operation = kwargs.get("operation")
+    if operation is None and len(args) >= 2:
+        operation = args[1]
+    if operation is None:
+        return None
+    return str(operation)
+
+
+def _run_call_params(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> dict[str, Any] | None:
+    params = kwargs.get("call_params")
+    if params is None and len(args) >= 3:
+        params = args[2]
+    if not isinstance(params, dict):
+        return None
+    return params
+
+
+def _call_tool_invocations(
+    mock_client: MagicMock,
+) -> list[tuple[tuple[Any, ...], dict[str, Any]]]:
+    found: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    for call in mock_client.run.call_args_list:
+        args, kwargs = call
+        if _run_operation(args, kwargs) == "call_tool":
+            found.append((args, kwargs))
+    return found
+
+
+def _list_then_call_run(
+    *args: Any,
+    **kwargs: Any,
+) -> ResponseData:
+    operation = _run_operation(args, kwargs)
+    if operation == "list_tools":
+        return _tools_response([_echo_tool_entry()])
+    if operation == "call_tool":
+        return _call_tool_response()
+    raise AssertionError(f"unexpected MCP operation {operation!r}")
+
+
+def _select_tool_row(tab: QWidget, index: int = 0) -> None:
+    tools = _tool_browser(tab)
+    assert _tool_item_count(tools) > index
+    if isinstance(tools, QListWidget):
+        tools.setCurrentRow(index)
+        return
+    setter = getattr(tools, "setCurrentRow", None)
+    if callable(setter):
+        setter(index)
+        return
+    raise AssertionError(
+        "MCP Client tool browser must support selecting a row, "
+        f"got {type(tools).__name__}"
+    )
+
+
+def _click_invoke(tab: McpClientTab) -> None:
+    button = tab.findChild(QPushButton, MCP_CLIENT_INVOKE_BUTTON)
+    assert button is not None, (
+        "MCP Client chrome must include an Invoke control "
+        f"with id {MCP_CLIENT_INVOKE_BUTTON}"
+    )
+    assert button.text().replace("&", "") == "Invoke"
+    button.click()
+
+
+def _set_editor_text(widget: QWidget, text: str) -> None:
+    for name in ("setPlainText", "setText"):
+        setter = getattr(widget, name, None)
+        if callable(setter):
+            setter(text)
+            return
+    raise AssertionError(
+        f"argument editor {type(widget).__name__} has no setText/setPlainText"
+    )
+
+
+def _fill_echo_arguments(tab: QWidget, value: str) -> None:
+    form = tab.findChild(QWidget, MCP_CLIENT_ARG_FORM)
+    if form is not None:
+        url_id = widget_ids.MCP_CLIENT_URL_INPUT
+        for line in form.findChildren(QLineEdit):
+            if line.objectName() == url_id:
+                continue
+            line.setText(value)
+            return
+    json_edit = tab.findChild(QWidget, MCP_CLIENT_ARG_JSON)
+    if json_edit is not None:
+        _set_editor_text(json_edit, json.dumps({"text": value}))
+        return
+    raise AssertionError(
+        "MCP Client invoke column must expose a schema form "
+        f"({MCP_CLIENT_ARG_FORM}) or JSON editor ({MCP_CLIENT_ARG_JSON})"
+    )
+
+
+def _result_blob(tab: QWidget) -> str:
+    parts: list[str] = []
+    pane = tab.findChild(QWidget, MCP_CLIENT_RESULT_PANE)
+    if pane is not None:
+        parts.append(_widget_text(pane))
+    elapsed = tab.findChild(QWidget, MCP_CLIENT_ELAPSED_LABEL)
+    if elapsed is not None:
+        parts.append(_widget_text(elapsed))
+    return " ".join(parts)
+
+
+def _elapsed_visible(blob: str) -> bool:
+    lowered = blob.lower()
+    return (
+        "0.12" in lowered
+        or "120" in lowered
+        or "elapsed" in lowered
+    )
+
+
+def _wait_invoke_result(tab: McpClientTab) -> None:
+    wait_until(
+        lambda: bool(_result_blob(tab).strip()),
+        timeout=_INVOKE_SETTLE_S,
+        message="Invoke did not populate the result pane",
+        condition_name="mcp_client_invoke_result",
+    )
+
+
+def test_invoke_call_tool_displays_structured_result(caplog, qapp) -> None:
+    """FR-1 / FR-3 / FR-4: Invoke runs call_tool and shows content + elapsed."""
+    from pypost.core.metrics_registry import MetricsRegistry
+    from prometheus_client import generate_latest
+
+    registry = MetricsRegistry()
+    mock_client = MagicMock()
+    mock_client.run.side_effect = _list_then_call_run
+    tab = _build_draft_tab(
+        mcp_client=mock_client,
+        url=_MCP_URL,
+        metrics=registry,
+    )
+    _click_connect(tab)
+    _wait_connect_settled(tab, mock_client)
+    wait_until(
+        lambda: _tool_item_count(_tool_browser(tab)) == 1,
+        timeout=_CONNECT_SETTLE_S,
+        message="Connect did not list echo",
+        condition_name="mcp_client_echo_listed",
+    )
+    _select_tool_row(tab, 0)
+    assert tab.findChild(QPushButton, MCP_CLIENT_INVOKE_BUTTON) is not None, (
+        "MCP Client chrome must include an Invoke control "
+        f"with id {MCP_CLIENT_INVOKE_BUTTON}"
+    )
+    _fill_echo_arguments(tab, "hello")
+    logger_name = "pypost.ui.presenters.mcp_client_presenter"
+    with caplog.at_level(logging.INFO, logger=logger_name):
+        _click_invoke(tab)
+        _wait_invoke_result(tab)
+
+    calls = _call_tool_invocations(mock_client)
+    assert calls, "Invoke must call run with operation call_tool"
+    args, kwargs = calls[-1]
+    params = _run_call_params(args, kwargs)
+    assert params is not None
+    assert params.get("name") == "echo"
+    arguments = params.get("arguments")
+    assert isinstance(arguments, dict)
+    assert arguments.get("text") == "hello"
+    assert "headers" in kwargs
+    assert isinstance(kwargs["headers"], dict)
+
+    pane = tab.findChild(QWidget, MCP_CLIENT_RESULT_PANE)
+    assert pane is not None, (
+        f"MCP Client must include a result pane with id {MCP_CLIENT_RESULT_PANE}"
+    )
+    blob = _result_blob(tab)
+    assert "hello" in blob.lower()
+    assert _elapsed_visible(blob)
+    assert _is_connected_badge(tab)
+    assert tab.objectName() == MCP_CLIENT_TAB_PAGE
+    assert tab.findChild(QWidget, METHOD_COMBO) is None
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == logger_name
+    ]
+    connection_id = tab.connection_data.id
+    assert any(
+        "mcp_client_call_tool_initiated" in msg
+        and f"connection_id={connection_id}" in msg
+        and "kind=invoke" in msg
+        for msg in messages
+    )
+    assert any(
+        "mcp_client_call_tool_succeeded" in msg
+        and f"connection_id={connection_id}" in msg
+        and "kind=invoke" in msg
+        for msg in messages
+    )
+    joined = " ".join(messages)
+    assert "hello" not in joined
+    assert "echo" not in joined.lower()
+    assert "http://" not in joined
+    assert "headers" not in joined.lower()
+    assert "arguments" not in joined.lower()
+    scrape = generate_latest(registry.registry).decode("utf-8")
+    assert 'mcp_client_call_tool_total{result="success"} 1.0' in scrape
+    assert "mcp_requests_received_total{" not in scrape
+
+
+def test_invoke_error_keeps_connected_and_tools(caplog, qapp) -> None:
+    """FR-5: failed Invoke stays Connected and keeps the discovered tools."""
+    from pypost.core.metrics_registry import MetricsRegistry
+    from prometheus_client import generate_latest
+
+    invoke_error = ExecutionError(
+        category=ErrorCategory.NETWORK,
+        message="Could not invoke MCP tool.",
+        detail="token=super-secret-token",
+    )
+
+    def _run(*args: Any, **kwargs: Any) -> ResponseData:
+        if _run_operation(args, kwargs) == "call_tool":
+            raise invoke_error
+        return _tools_response([_echo_tool_entry()])
+
+    mock_client = MagicMock()
+    mock_client.run.side_effect = _run
+    registry = MetricsRegistry()
+    tab = _build_draft_tab(
+        mcp_client=mock_client,
+        env_vars={"token": "super-secret-token"},
+        hidden_keys={"token"},
+        url=_MCP_URL,
+        metrics=registry,
+    )
+    _click_connect(tab)
+    _wait_connect_settled(tab, mock_client)
+    wait_until(
+        lambda: _tool_item_count(_tool_browser(tab)) == 1,
+        timeout=_CONNECT_SETTLE_S,
+        message="Connect did not list echo",
+        condition_name="mcp_client_echo_listed_before_invoke_error",
+    )
+    _select_tool_row(tab, 0)
+    assert tab.findChild(QPushButton, MCP_CLIENT_INVOKE_BUTTON) is not None, (
+        "MCP Client chrome must include an Invoke control "
+        f"with id {MCP_CLIENT_INVOKE_BUTTON}"
+    )
+    _fill_echo_arguments(tab, "hello")
+    logger_name = "pypost.ui.presenters.mcp_client_presenter"
+    with caplog.at_level(logging.ERROR, logger=logger_name):
+        _click_invoke(tab)
+        wait_until(
+            lambda: (
+                "could not invoke" in _result_blob(tab).lower()
+                or "could not invoke" in _error_text(tab).lower()
+                or bool(_result_blob(tab).strip())
+            ),
+            timeout=_INVOKE_SETTLE_S,
+            message="Invoke error did not become visible",
+            condition_name="mcp_client_invoke_error_visible",
+        )
+
+    assert _is_connected_badge(tab)
+    assert not _is_failed_or_disconnected_badge(tab)
+    assert _tool_item_count(_tool_browser(tab)) == 1
+    combined = f"{_result_blob(tab)} {_error_text(tab)}"
+    assert combined.strip()
+    assert "super-secret-token" not in combined
+    assert "echo" in _tool_visible_blob(_tool_browser(tab)).lower()
+    error_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == logger_name
+    ]
+    assert any("mcp_client_call_tool_failed" in msg for msg in error_messages)
+    joined = " ".join(error_messages)
+    assert "super-secret-token" not in joined
+    assert "headers" not in joined.lower()
+    assert _MCP_URL not in joined
+    assert "hello" not in joined
+    scrape = generate_latest(registry.registry).decode("utf-8")
+    assert 'mcp_client_call_tool_total{result="error"} 1.0' in scrape
+    assert "mcp_requests_received_total{" not in scrape
+
+
+def test_invoke_result_masks_hidden_values_in_content(qapp) -> None:
+    """FR-3.6 / NFR-4: CallToolResult content and structuredContent are sanitized."""
+    secret = "super-secret-token"
+
+    def _run(*args: Any, **kwargs: Any) -> ResponseData:
+        if _run_operation(args, kwargs) == "call_tool":
+            return _call_tool_response(
+                body_obj={
+                    "content": [
+                        {"type": "text", "text": f"echo token={secret}"},
+                    ],
+                    "structuredContent": {
+                        "note": secret,
+                        "ok": True,
+                    },
+                },
+            )
+        return _tools_response([_echo_tool_entry()])
+
+    mock_client = MagicMock()
+    mock_client.run.side_effect = _run
+    tab = _build_draft_tab(
+        mcp_client=mock_client,
+        env_vars={"token": secret},
+        hidden_keys={"token"},
+        url=_MCP_URL,
+    )
+    _click_connect(tab)
+    _wait_connect_settled(tab, mock_client)
+    wait_until(
+        lambda: _tool_item_count(_tool_browser(tab)) == 1,
+        timeout=_CONNECT_SETTLE_S,
+        message="Connect did not list echo",
+        condition_name="mcp_client_echo_listed_before_result_sanitize",
+    )
+    _select_tool_row(tab, 0)
+    _fill_echo_arguments(tab, "hello")
+    _click_invoke(tab)
+    _wait_invoke_result(tab)
+
+    blob = _result_blob(tab)
+    assert "echo token=" in blob.lower()
+    assert secret not in blob
+    assert "***" in blob
+    assert _is_connected_badge(tab)
+
+
+def test_nested_schema_json_fallback_invokes_object_arguments(qapp) -> None:
+    """FR-2.3: nested inputSchema uses JSON fallback; arguments are a dict."""
+
+    def _run(*args: Any, **kwargs: Any) -> ResponseData:
+        if _run_operation(args, kwargs) == "call_tool":
+            return _call_tool_response()
+        return _tools_response([_nested_tool_entry()])
+
+    mock_client = MagicMock()
+    mock_client.run.side_effect = _run
+    tab = _build_draft_tab(mcp_client=mock_client, url=_MCP_URL)
+    _click_connect(tab)
+    _wait_connect_settled(tab, mock_client)
+    wait_until(
+        lambda: _tool_item_count(_tool_browser(tab)) == 1,
+        timeout=_CONNECT_SETTLE_S,
+        message="Connect did not list wrap",
+        condition_name="mcp_client_wrap_listed",
+    )
+    _select_tool_row(tab, 0)
+    json_edit = tab.findChild(QWidget, MCP_CLIENT_ARG_JSON)
+    assert json_edit is not None, (
+        "Nested schemas must expose a JSON argument editor "
+        f"with id {MCP_CLIENT_ARG_JSON}"
+    )
+    _set_editor_text(json_edit, '{"payload": {"k": 1}}')
+    _click_invoke(tab)
+    _wait_invoke_result(tab)
+
+    calls = _call_tool_invocations(mock_client)
+    assert calls
+    params = _run_call_params(*calls[-1])
+    assert params is not None
+    assert params.get("name") == "wrap"
+    arguments = params.get("arguments")
+    assert isinstance(arguments, dict)
+    assert arguments.get("payload") == {"k": 1}
+
+
+def test_empty_required_form_field_does_not_call_tool(qapp) -> None:
+    """FR-2.6: empty required form field blocks Invoke; run is not called."""
+    from pypost.core.metrics_registry import MetricsRegistry
+    from prometheus_client import generate_latest
+
+    registry = MetricsRegistry()
+    mock_client = MagicMock()
+    mock_client.run.side_effect = _list_then_call_run
+    tab = _build_draft_tab(
+        mcp_client=mock_client,
+        url=_MCP_URL,
+        metrics=registry,
+    )
+    _click_connect(tab)
+    _wait_connect_settled(tab, mock_client)
+    wait_until(
+        lambda: _tool_item_count(_tool_browser(tab)) == 1,
+        timeout=_CONNECT_SETTLE_S,
+        message="Connect did not list echo",
+        condition_name="mcp_client_echo_listed_for_required_block",
+    )
+    _select_tool_row(tab, 0)
+    run_count = mock_client.run.call_count
+    _click_invoke(tab)
+    assert not _call_tool_invocations(mock_client)
+    assert mock_client.run.call_count == run_count
+    combined = f"{_result_blob(tab)} {_error_text(tab)}"
+    assert combined.strip()
+    scrape = generate_latest(registry.registry).decode("utf-8")
+    assert "mcp_client_call_tool_total{" not in scrape

@@ -263,6 +263,12 @@ class MetricsRegistry:
             ["result", "operation"],
             registry=self.registry,
         )
+        self.mcp_client_call_tool = Counter(
+            "mcp_client_call_tool_total",
+            "Outbound MCP Client call_tool outcomes (not inbound MCP traffic)",
+            ["result"],
+            registry=self.registry,
+        )
 
     def _init_encryption_metrics(self) -> None:
         """Register environment encryption counters."""
@@ -363,6 +369,9 @@ class MetricsRegistry:
             result=result,
             operation=operation,
         ).inc()
+
+    def track_mcp_client_call_tool(self, result: str) -> None:
+        self.mcp_client_call_tool.labels(result=result).inc()
 
     def track_history_entry_appended(self, method: str) -> None:
         self.history_entries_appended.labels(method=method).inc()

@@ -175,6 +175,13 @@ class OtelMetricsTracker:
                 "Outbound MCP Client list_tools outcomes by Connect or Refresh"
             ),
         )
+        self._mcp_client_call_tool = meter.create_counter(
+            "mcp_client_call_tool_total",
+            description=(
+                "Outbound MCP Client call_tool outcomes "
+                "(not inbound MCP server traffic)"
+            ),
+        )
         self._history_entries_appended = meter.create_counter(
             "history_entries_appended_total",
             description="Number of request history entries recorded",
@@ -359,6 +366,9 @@ class OtelMetricsTracker:
         self._mcp_client_list_tools.add(
             1, {"result": result, "operation": operation}
         )
+
+    def track_mcp_client_call_tool(self, result: str) -> None:
+        self._mcp_client_call_tool.add(1, {"result": result})
 
     def track_history_entry_appended(self, method: str) -> None:
         self._history_entries_appended.add(1, {"method": method})

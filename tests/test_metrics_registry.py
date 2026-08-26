@@ -81,6 +81,15 @@ class TestMetricsRegistryMcpCounters(unittest.TestCase):
             out,
         )
 
+    def test_track_mcp_client_call_tool(self):
+        reg = MetricsRegistry()
+        reg.track_mcp_client_call_tool("success")
+        reg.track_mcp_client_call_tool("error")
+        out = _scrape(reg)
+        self.assertIn('mcp_client_call_tool_total{result="success"} 1.0', out)
+        self.assertIn('mcp_client_call_tool_total{result="error"} 1.0', out)
+        self.assertNotIn("mcp_requests_received_total{", out)
+
 
 class TestMetricsRegistryTemplateRenderDuration(unittest.TestCase):
     def test_track_template_expression_render_duration(self):

@@ -281,15 +281,22 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `mcp_client_outbound_fields_resolved` | DEBUG | `connection_id`, `header_count` | `mcp_client_presenter` |
 | `mcp_client_outbound_worker_started` | DEBUG | `generation`, `kind` | `mcp_client_worker` |
 | `mcp_client_outbound_worker_unexpected` | ERROR | `generation`, `kind` | `mcp_client_worker` |
+| `mcp_client_call_tool_initiated` | INFO | `connection_id`, `kind` | `mcp_client_presenter` |
+| `mcp_client_call_tool_succeeded` | INFO | `connection_id`, `kind` | `mcp_client_presenter` |
+| `mcp_client_call_tool_failed` | ERROR | `connection_id`, `kind` | `mcp_client_presenter` |
+| `mcp_client_call_tool_ignored` | DEBUG | `reason` | `mcp_client_presenter` |
 
-Draft-tab Connect / Refresh / Disconnect / teardown log `connection_id`
-and (for list outcomes) `kind` / `tool_count` only — never URL text,
-header maps, secrets, or tool names, and never the substring `headers`
-on INFO. Resolve DEBUG (PYPOST-1167) logs `header_count` only.
+Draft-tab Connect / Refresh / Invoke / Disconnect / teardown log
+`connection_id` and (for list outcomes) `kind` / `tool_count` only —
+never URL text, header maps, secrets, tool names, or argument payloads,
+and never the substring `headers` on INFO. Resolve DEBUG (PYPOST-1167)
+logs `header_count` only. Invoke DEBUG ignore uses a `reason` token
+(`in_flight`, `not_connected`, `no_selection`, `validation`, `stale`).
 `mcp_operation_*` still come from `MCPClientService` (method **MCP** Send
-and worker `run`). Outbound counters are `mcp_client_connect_total` and
-`mcp_client_list_tools_total` (not inbound `mcp_requests_received_total`).
-See [mcp_client_draft_tab.md](mcp_client_draft_tab.md).
+and worker `run`). Outbound counters are `mcp_client_connect_total`,
+`mcp_client_list_tools_total`, and `mcp_client_call_tool_total` (not
+inbound `mcp_requests_received_total`). See
+[mcp_client_draft_tab.md](mcp_client_draft_tab.md).
 
 #### MCP endpoint persistence and lifecycle (PYPOST-1071)
 

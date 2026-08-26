@@ -48,6 +48,11 @@ MCP_CLIENT_TOOL_BROWSER = "pypost_mcp_client_tool_browser"
 MCP_CLIENT_HEADERS_TABLE = "pypost_mcp_client_headers_table"
 MCP_CLIENT_REFRESH_BUTTON = "pypost_mcp_client_refresh_button"
 MCP_CLIENT_ERROR_LABEL = "pypost_mcp_client_error_label"
+MCP_CLIENT_INVOKE_BUTTON = "pypost_mcp_client_invoke_button"
+MCP_CLIENT_ARG_FORM = "pypost_mcp_client_arg_form"
+MCP_CLIENT_ARG_JSON = "pypost_mcp_client_arg_json"
+MCP_CLIENT_RESULT_PANE = "pypost_mcp_client_result_pane"
+MCP_CLIENT_ELAPSED_LABEL = "pypost_mcp_client_elapsed_label"
 
 # WebSocket session surfaces (PYPOST-1132 / WS-4).
 WS_TAB_PAGE = "pypost_ws_tab_page"

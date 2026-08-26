@@ -80,6 +80,11 @@ Production UI must not import `pypost.agent`. Agents import constants from
 | `MCP_CLIENT_ERROR_LABEL` | `pypost_mcp_client_error_label` | MCP Client status/error line (per tab; not KEY) |
 | `MCP_CLIENT_TOOL_BROWSER` | `pypost_mcp_client_tool_browser` | Remote-tool `QListWidget` (per tab; not KEY) |
 | `MCP_CLIENT_HEADERS_TABLE` | `pypost_mcp_client_headers_table` | MCP Client Headers table (per tab; not KEY) |
+| `MCP_CLIENT_INVOKE_BUTTON` | `pypost_mcp_client_invoke_button` | MCP Client Invoke (per tab; not KEY) |
+| `MCP_CLIENT_ARG_FORM` | `pypost_mcp_client_arg_form` | Schema argument form (per tab; not KEY) |
+| `MCP_CLIENT_ARG_JSON` | `pypost_mcp_client_arg_json` | JSON argument editor (per tab; not KEY) |
+| `MCP_CLIENT_RESULT_PANE` | `pypost_mcp_client_result_pane` | Invoke result body (per tab; not KEY) |
+| `MCP_CLIENT_ELAPSED_LABEL` | `pypost_mcp_client_elapsed_label` | Invoke elapsed time (per tab; not KEY) |
 | `WS_TAB_PAGE` | `pypost_ws_tab_page` | WebSocket tab page (per tab) |
 | `WS_URL_INPUT` | `pypost_ws_url_input` | WebSocket URL input (per tab) |
 | `WS_CONNECT_BUTTON` | `pypost_ws_connect_button` | WebSocket Connect/Disconnect button (per tab) |

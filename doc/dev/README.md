@@ -76,7 +76,7 @@ conventions.
 
 1. [Request Actions](request_actions.md)
 1. [Blank-tab protocol picker (PYPOST-1157 / PYPOST-1165)](new_tab_protocol_picker.md)
-1. [MCP Client draft tab (PYPOST-1166 / PYPOST-1167 / PYPOST-1169)](mcp_client_draft_tab.md)
+1. [MCP Client draft tab (PYPOST-1166–1170)](mcp_client_draft_tab.md)
 1. [Open Request in Isolated Tab](open_request_in_isolated_tab.md)
 1. [Response Streaming Display (PYPOST-887)](response-streaming-display.md)
 1. [Response Body Search](response_search.md)
@@ -96,7 +96,7 @@ conventions.
 ### MCP
 
 1. [MCP Integration](mcp_integration.md)
-1. [MCP Client draft tab (PYPOST-1166 / PYPOST-1167 / PYPOST-1169)](mcp_client_draft_tab.md)
+1. [MCP Client draft tab (PYPOST-1166–1170)](mcp_client_draft_tab.md)
 1. [MCP Reverse Proxy (PYPOST-1092)](mcp_proxy.md)
 1. [Multiple independent MCP servers (PYPOST-1044)](mcp_server_registry.md)
 1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
