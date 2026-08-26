@@ -53,7 +53,9 @@ or delete.
 Tabs with request and WebSocket editors. Each tab holds one draft request or active WebSocket
 session (method/mode, URL, params, headers, body/composer, stream viewer, optional MCP metadata).
 
-- Click **+** or press `Ctrl+N` to open a new tab
+- Click **+** or press `Ctrl+N` to open the **protocol picker** and choose **HTTP Request**,
+  **WebSocket**, or **MCP Client** before a new tab is created
+- Closing the last tab shows the same protocol picker (cancel leaves an empty workspace)
 - Close with `Ctrl+W`
 - Switch tabs with `Ctrl+Tab` / `Ctrl+Shift+Tab`, or `Alt+1` … `Alt+9`
 

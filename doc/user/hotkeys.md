@@ -17,7 +17,7 @@ Global shortcuts accessible from any view:
 
 | Action | Shortcut | Description |
 | ------ | -------- | ----------- |
-| New Tab | `Ctrl+N` | Opens a new draft request tab |
+| New Tab | `Ctrl+N` | Opens the protocol picker (HTTP Request, WebSocket, or MCP Client) |
 | Close Tab | `Ctrl+W` | Closes the active tab |
 | Next Tab | `Ctrl+Tab` | Cycles forward through open tabs |
 | Previous Tab | `Ctrl+Shift+Tab` | Cycles backward through open tabs |
@@ -38,14 +38,20 @@ Global shortcuts accessible from any view:
 
 ## WebSocket session
 
+Active when a WebSocket tab is focused. **Help → Hotkeys** lists **Save WebSocket Profile**
+and **Save As WebSocket Profile** only while a WebSocket tab exists in the workspace.
+
 | Action | Shortcut | Description |
 | ------ | -------- | ----------- |
-| Connect / Disconnect | `F5` / `Ctrl+Enter` | Toggles connection state from URL bar |
-| Send Message | `Ctrl+Enter` | Sends active message from Composer |
-| Save Profile | `Ctrl+S` | Saves WebSocket profile to collection |
-| Save As Profile | `Ctrl+Shift+S` | Saves draft to a new collection profile |
-| Format JSON | `Ctrl+Shift+F` | Formats and validates JSON payload |
-| Focus URL Bar | `Ctrl+L` / `Alt+D` | Highlights WebSocket URL input |
+| Connect / Disconnect | `F5` / `Ctrl+Enter` | Connect from URL bar; Send when Composer is focused |
+| Send Message | `Ctrl+Enter` | Sends the active message from the Composer |
+| Save WebSocket Profile | `Ctrl+S` | Saves the WebSocket profile to a collection |
+| Save As WebSocket Profile | `Ctrl+Shift+S` | Saves to a new collection profile |
+| Focus URL Bar | `Ctrl+L` / `Alt+D` | Highlights the WebSocket URL input |
+| Format JSON | `Ctrl+Shift+F` | Formats and validates JSON in the Composer |
+
+Request-editor shortcuts (Params, Headers, Body, Script) do nothing when a WebSocket tab is
+active.
 
 ## Body editor & response viewer shortcuts
 

@@ -178,7 +178,7 @@ Collections and session restore.
 | WS-TM-4 | [PYPOST-1160](https://pypost.atlassian.net/browse/PYPOST-1160) | Collections WebSocket menu parity |
 | WS-TM-5 | [PYPOST-1161](https://pypost.atlassian.net/browse/PYPOST-1161) | WebSocket save-to-collection flow (**shipped** — [websocket_save_flow.md](websocket_save_flow.md)) |
 | WS-TM-6 | [PYPOST-1162](https://pypost.atlassian.net/browse/PYPOST-1162) | Context-aware WebSocket shortcuts |
-| WS-TM-7 | [PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163) | User documentation alignment |
+| WS-TM-7 | [PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163) | User documentation alignment (**shipped** — `doc/user/websocket.md`, `interface.md`, `hotkeys.md`, `collections.md`; contract tests in `tests/test_websocket_tab_mode_user_docs.py`) |
 
 Epic research:
 [`ai-tasks/PYPOST-1156/20-architecture.md`](../../ai-tasks/PYPOST-1156/20-architecture.md).

@@ -10,7 +10,13 @@ for AI assistants.
 
 To create and configure a WebSocket connection:
 
-1. Open a new tab and select the **WebSocket** mode (or click a saved WebSocket profile).
+1. Open a WebSocket workspace tab:
+   - **New blank tab:** Press `Ctrl+N` or click the tab-bar **+**, then choose **WebSocket**
+     from the protocol picker. A draft tab titled **New WebSocket** opens with an empty URL
+     field.
+   - **Saved profile:** Click a WebSocket profile (`ws <name>`) in the Collections sidebar, or
+     right-click it and choose **New tab** for an isolated editable copy (see
+     [Collections](collections.md)).
 2. Enter the target endpoint URL (`ws://` or secure `wss://`).
 3. Under the connection details tabs:
    - **Params**: Configure query parameters appended to the connection URL.

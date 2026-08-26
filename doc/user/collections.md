@@ -22,10 +22,15 @@ Settings may ask you to confirm before overwriting an existing saved item.
 
 ## Open an item
 
-- Click a request or WebSocket profile in the sidebar to open it in the editor (behavior
-  depends on your click settings).
-- Right-click an item and choose **New tab** to open a separate editable copy without
-  replacing the current tab.
+- Click a request or WebSocket profile in the sidebar to open or focus it in the workspace
+  (behavior depends on your click settings). Left-click on a WebSocket profile reuses one tab
+  per saved profile id.
+- Right-click a request or WebSocket profile and choose **New tab** to open a **separate
+  editable copy** without replacing the current tab:
+  - **HTTP requests** — isolated copy of the saved request (same semantics as before).
+  - **WebSocket profiles** — isolated copy with its own live session; edits can be saved back
+    to the same collection profile with **Save** (`Ctrl+S`) or forked with **Save As…**
+    (`Ctrl+Shift+S`). See [WebSocket Guide](websocket.md).
 
 Expand/collapse state of collections is remembered across sessions.
 
