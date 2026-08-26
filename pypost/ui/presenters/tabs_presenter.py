@@ -43,6 +43,7 @@ from pypost.ui.request_save_orchestrator import (
 )
 from pypost.ui.theme.json_syntax_theme import resolve_json_syntax_colors
 from pypost.ui.widget_ids import REQUEST_TABS, set_widget_id
+from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.new_tab_protocol_picker import (
     NewTabProtocolPicker,
     TabProtocol,
@@ -178,6 +179,19 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def add_blank_websocket_tab(self, *, save_state: bool = True) -> WebSocketTab:
         return self._insert_websocket_tab(WebSocketConnection(), save_state=save_state)
+
+    def add_blank_mcp_client_tab(self, *, save_state: bool = True) -> McpClientTab:
+        tab = McpClientTab()
+        plus_idx = self._header.insert_index_before_plus()
+        if plus_idx >= 0:
+            self._tabs.insertTab(plus_idx, tab, "New MCP Client")
+        else:
+            self._tabs.addTab(tab, "New MCP Client")
+            self._header.ensure_plus_tab()
+        self._tabs.setCurrentWidget(tab)
+        if save_state:
+            self.save_tabs_state()
+        return tab
 
     def _insert_websocket_tab(
         self,
@@ -420,6 +434,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         if protocol == TabProtocol.WEBSOCKET:
             self.add_blank_websocket_tab()
             return
+        if protocol == TabProtocol.MCP_CLIENT:
+            self.add_blank_mcp_client_tab()
+            return
         self.add_new_tab()
 
     def handle_close_tab(self) -> None:
@@ -610,7 +627,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         return sum(
             1
             for i in range(self._tabs.count())
-            if isinstance(self._tabs.widget(i), (RequestTab, WebSocketTab))
+            if isinstance(
+                self._tabs.widget(i), (RequestTab, WebSocketTab, McpClientTab)
+            )
         )
 
     def _index_of_tab(self, tab: RequestTab) -> int | None:

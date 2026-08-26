@@ -104,6 +104,19 @@ class TestMetricsManagerGuiTracking(unittest.TestCase):
             out,
         )
 
+    def test_track_gui_new_tab_action_records_mcp_client_protocol(self):
+        mm = MetricsManager()
+        mm.track_gui_new_tab_action("shortcut", protocol="mcp_client")
+        out = _scrape(mm)
+        self.assertIn(
+            'gui_new_tab_actions_total{protocol="mcp_client",source="shortcut"} 1.0',
+            out,
+        )
+        self.assertNotIn(
+            'gui_new_tab_actions_total{protocol="unknown",source="shortcut"}',
+            out,
+        )
+
     def test_track_gui_method_body_autoswitch(self):
         mm = MetricsManager()
         mm.track_gui_method_body_autoswitch("POST")

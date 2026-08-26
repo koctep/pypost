@@ -24,7 +24,8 @@ This design reduces UI clutter and allows adding more actions in the same menu l
   - Delegates persistence to `RequestSaveOrchestrator` and updates tab state/signals.
   - Composes `RequestTabHeader` for tab-bar controls; routes `Ctrl+N` to
     `handle_new_tab(source=...)`. Blank-tab protocol picker and routing:
-    [new_tab_protocol_picker.md](new_tab_protocol_picker.md) (PYPOST-1157).
+    [new_tab_protocol_picker.md](new_tab_protocol_picker.md)
+    (PYPOST-1157 / PYPOST-1165).
 - **`RequestSaveOrchestrator` (`pypost/ui/request_save_orchestrator.py`)**:
   - Owns save/save-as dialogs, overwrite/stale confirmations, and `RequestManager` calls.
   - Returns `SaveResult` for the presenter to apply tab updates.
@@ -37,7 +38,7 @@ This design reduces UI clutter and allows adding more actions in the same menu l
     - `gui_save_actions_total{source=<menu|shortcut>}`
     - `gui_new_tab_actions_total{source, protocol}` — `source` is
       `plus_button` / `shortcut` / `collections_context` / `unknown`;
-      `protocol` is `http` / `websocket` / `unknown`
+      `protocol` is `http` / `websocket` / `mcp_client` / `unknown`
 
 High-level flow:
 1. User clicks `Actions -> Save` or presses `Ctrl+S`.
@@ -52,8 +53,9 @@ New-tab flow (`Ctrl+N` and **+** share one choose-then-open path):
    `NewTabProtocolPicker` **before** any editor is created.
 1. Cancel (Esc / click away) → `new_tab_action_cancelled`; no tab, no metric.
 1. Confirm → `open_blank_tab(protocol, source)` logs `new_tab_action_completed`, increments
-   `gui_new_tab_actions_total{source, protocol}`, then HTTP → `add_new_tab()` or
-   WebSocket → `add_blank_websocket_tab()` (not `open_websocket_tab`).
+   `gui_new_tab_actions_total{source, protocol}`, then HTTP → `add_new_tab()`,
+   WebSocket → `add_blank_websocket_tab()` (not `open_websocket_tab`), or
+   MCP Client → `add_blank_mcp_client_tab()` (stub `McpClientTab`, not HTTP).
 
 Save-as flow:
 1. User clicks `Actions -> Save As...` or presses `Ctrl+Shift+S`.
@@ -133,9 +135,10 @@ Full picker, routing, and test-injection notes:
 Single routing API after a completed picker choice.
 
 - **Behavior**:
-  1. INFO `new_tab_action_completed source=<source> protocol=<http|websocket>`.
+  1. INFO `new_tab_action_completed source=<source> protocol=<http|websocket|mcp_client>`.
   1. Increments `gui_new_tab_actions_total{source, protocol}`.
-  1. WebSocket → `add_blank_websocket_tab()`; HTTP → `add_new_tab()`.
+  1. WebSocket → `add_blank_websocket_tab()`; MCP Client →
+     `add_blank_mcp_client_tab()`; HTTP → `add_new_tab()`.
 
 ### Plus placeholder tab (`RequestTabHeader.ensure_plus_tab()`)
 
@@ -158,7 +161,10 @@ Layout-managed `+` control using Qt tab-bar APIs:
   (prefer the previous request tab; fall back to the last navigable). Both single close
   (`close_tab`, PYPOST-824) and bulk close (`close_tabs_for_request_ids`, PYPOST-831)
   share that helper. Bulk preferred index is left of the leftmost closed tab.
-- Use `_request_tab_count()` (or filter `RequestTab` widgets) instead of raw `QTabWidget.count()`.
+- Use `_request_tab_count()` instead of raw `QTabWidget.count()`. That helper
+  counts `RequestTab`, `WebSocketTab`, and `McpClientTab`. Do not filter
+  `RequestTab` widgets only: an MCP-only strip would count as empty and
+  close-last-tab would auto-open HTTP.
 
 ### `RequestTabHeader.set_tab_label(index, label)`
 
@@ -177,7 +183,8 @@ metrics registry normalizes `source` via `_normalize_new_tab_source` and
 
 - **source**: `plus_button`, `shortcut`, `collections_context`, `unknown`
   (any other string → `unknown`).
-- **protocol**: `http`, `websocket`, `unknown` (any other string → `unknown`).
+- **protocol**: `http`, `websocket`, `mcp_client`, `unknown` (any other
+  string → `unknown`).
 - Picker confirm passes `protocol.value`. Cancel does not call this method.
 - Collections **New tab** still uses the default `protocol="unknown"`.
 - Prometheus serializes labels alphabetically, e.g.
@@ -350,7 +357,7 @@ QT_QPA_PLATFORM=offscreen python -m pytest \
 ### New-tab metrics are missing
 
 - Ensure `gui_new_tab_actions_total` is registered in `MetricsManager._init_metrics()`.
-- Confirm a **completed** choice (HTTP or WebSocket). Cancel does not increment.
+- Confirm a **completed** choice (HTTP, WebSocket, or MCP Client). Cancel does not increment.
 - Scrape text includes both labels, alphabetically:
   `gui_new_tab_actions_total{protocol="http",source="shortcut"}`.
 - Trigger at least one confirmed `Ctrl+N` and one confirmed `+` click before

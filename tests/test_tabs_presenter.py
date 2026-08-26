@@ -21,6 +21,7 @@ from pypost.ui.presenters.tabs_presenter import (
 )
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
+from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.new_tab_protocol_picker import (
     NewTabProtocolPicker,
     TabProtocol,
@@ -1135,7 +1136,10 @@ class TestHandleNewTabProtocolPicker(unittest.TestCase):
     def test_handle_new_tab_http_is_default_first_item(self):
         menu = NewTabProtocolPicker().build_menu()
         labels = [action.text().replace("&", "") for action in menu.actions()]
-        self.assertEqual(labels, ["HTTP Request", "WebSocket"])
+        self.assertEqual(
+            labels,
+            ["HTTP Request", "WebSocket", "MCP Client"],
+        )
         self.assertIs(menu.activeAction(), menu.actions()[0])
 
     def test_handle_new_tab_cancel_does_not_create_tab(self):
@@ -1241,6 +1245,73 @@ class TestHandleNewTabProtocolPicker(unittest.TestCase):
             "plus_button",
             "websocket",
         )
+
+    def test_handle_new_tab_mcp_client_confirm_opens_mcp_tab_not_http(self):
+        def picker(*_a, **_k):
+            return TabProtocol.MCP_CLIENT
+
+        for source in ("shortcut", "plus_button"):
+            p = self._make_presenter(protocol_picker=picker)
+            orig_add = p.add_new_tab
+            add_http_calls = []
+
+            def wrapped_add(*args, **kwargs):
+                add_http_calls.append(True)
+                return orig_add(*args, **kwargs)
+
+            p.add_new_tab = wrapped_add
+            with patch.object(p, "open_websocket_tab") as mock_open_saved:
+                p.handle_new_tab(source)
+            current = p.widget.currentWidget()
+            self.assertNotIsInstance(current, RequestTab)
+            self.assertNotIsInstance(current, WebSocketTab)
+            self.assertIsInstance(current, McpClientTab)
+            self.assertEqual(add_http_calls, [])
+            mock_open_saved.assert_not_called()
+
+    def test_open_blank_tab_mcp_client_does_not_fall_through_to_http(self):
+        p = self._make_presenter()
+        orig_add = p.add_new_tab
+        add_http_calls = []
+
+        def wrapped_add(*args, **kwargs):
+            add_http_calls.append(True)
+            return orig_add(*args, **kwargs)
+
+        p.add_new_tab = wrapped_add
+        p.open_blank_tab(TabProtocol.MCP_CLIENT, "shortcut")
+        current = p.widget.currentWidget()
+        self.assertNotIsInstance(current, RequestTab)
+        self.assertNotIsInstance(current, WebSocketTab)
+        self.assertIsInstance(current, McpClientTab)
+        self.assertEqual(add_http_calls, [])
+
+    def test_open_blank_tab_records_mcp_client_protocol(self):
+        def picker(*_a, **_k):
+            return TabProtocol.MCP_CLIENT
+
+        for source in ("shortcut", "plus_button"):
+            p = self._make_presenter(protocol_picker=picker)
+            p._metrics.track_gui_new_tab_action.reset_mock()
+            p.handle_new_tab(source)
+            self.assertIsInstance(p.widget.currentWidget(), McpClientTab)
+            self._assert_new_tab_metric(
+                p._metrics.track_gui_new_tab_action,
+                source,
+                "mcp_client",
+            )
+
+    def test_handle_new_tab_http_is_still_first_default(self):
+        menu = NewTabProtocolPicker().build_menu()
+        labels = [
+            action.text().replace("&", "") for action in menu.actions()
+        ]
+        self.assertEqual(
+            labels,
+            ["HTTP Request", "WebSocket", "MCP Client"],
+        )
+        self.assertIs(menu.activeAction(), menu.actions()[0])
+        self.assertEqual(menu.actions()[0].data(), TabProtocol.HTTP)
 
 
 if __name__ == "__main__":

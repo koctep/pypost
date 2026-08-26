@@ -71,6 +71,7 @@ Production UI must not import `pypost.agent`. Agents import constants from
 | `PLUS_TAB_PLACEHOLDER` | `pypost_plus_tab_placeholder` | Trailing + tab page (not in KEY catalog) |
 | `PLUS_TAB_BUTTON` | `pypost_plus_tab_button` | Embedded `+` button on plus chrome (not in KEY catalog) |
 | `NEW_TAB_PROTOCOL_MENU` | `pypost_new_tab_protocol_menu` | Blank-tab protocol picker `QMenu` (PYPOST-1157; not in KEY catalog) |
+| `MCP_CLIENT_TAB_PAGE` | `pypost_mcp_client_tab_page` | MCP Client stub tab page (per tab; PYPOST-1165; not in KEY catalog) |
 | `WS_TAB_PAGE` | `pypost_ws_tab_page` | WebSocket tab page (per tab) |
 | `WS_URL_INPUT` | `pypost_ws_url_input` | WebSocket URL input (per tab) |
 | `WS_CONNECT_BUTTON` | `pypost_ws_connect_button` | WebSocket Connect/Disconnect button (per tab) |

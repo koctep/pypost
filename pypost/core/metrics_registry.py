@@ -10,7 +10,7 @@ from pypost.models.errors import ErrorCategory
 _NEW_TAB_ACTION_SOURCES = frozenset(
     {"plus_button", "shortcut", "unknown", "collections_context"}
 )
-_NEW_TAB_PROTOCOLS = frozenset({"http", "websocket", "unknown"})
+_NEW_TAB_PROTOCOLS = frozenset({"http", "websocket", "mcp_client", "unknown"})
 
 
 def _normalize_new_tab_source(source: str) -> str:

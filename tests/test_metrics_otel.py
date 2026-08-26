@@ -163,3 +163,30 @@ def test_track_gui_new_tab_action_normalizes_unknown_source(otel_reader):
         )
         == 1
     )
+
+
+def test_track_gui_new_tab_action_records_mcp_client_protocol(otel_reader):
+    reader, provider = otel_reader
+    tracker = OtelMetricsTracker(
+        meter=provider.get_meter("new-tab-mcp-client-test"),
+    )
+    unknown_before = _counter_value(
+        reader,
+        "gui_new_tab_actions_total",
+        {"source": "shortcut", "protocol": "unknown"},
+    )
+    tracker.track_gui_new_tab_action("shortcut", protocol="mcp_client")
+    assert (
+        _counter_value(
+            reader,
+            "gui_new_tab_actions_total",
+            {"source": "shortcut", "protocol": "mcp_client"},
+        )
+        == 1
+    )
+    unknown_after = _counter_value(
+        reader,
+        "gui_new_tab_actions_total",
+        {"source": "shortcut", "protocol": "unknown"},
+    )
+    assert unknown_after == unknown_before

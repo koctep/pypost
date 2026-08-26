@@ -16,6 +16,7 @@ class TabProtocol(str, Enum):
 
     HTTP = "http"
     WEBSOCKET = "websocket"
+    MCP_CLIENT = "mcp_client"
 
 
 def _anchor_point(parent: QWidget | None) -> QPoint:
@@ -27,7 +28,7 @@ def _anchor_point(parent: QWidget | None) -> QPoint:
 
 
 class NewTabProtocolPicker:
-    """Option A QMenu: HTTP Request first (default), then WebSocket."""
+    """Option A QMenu: HTTP Request first (default), then WebSocket, then MCP Client."""
 
     def build_menu(self, parent: QWidget | None = None) -> QMenu:
         menu = QMenu(parent)
@@ -36,6 +37,8 @@ class NewTabProtocolPicker:
         http_action.setData(TabProtocol.HTTP)
         websocket_action = menu.addAction("WebSocket")
         websocket_action.setData(TabProtocol.WEBSOCKET)
+        mcp_action = menu.addAction("MCP Client")
+        mcp_action.setData(TabProtocol.MCP_CLIENT)
         menu.setActiveAction(http_action)
         return menu
 
@@ -53,8 +56,9 @@ class NewTabProtocolPicker:
         if chosen is None:
             return None
         data = chosen.data()
-        if data == TabProtocol.HTTP:
-            return TabProtocol.HTTP
-        if data == TabProtocol.WEBSOCKET:
-            return TabProtocol.WEBSOCKET
-        return None
+        if data is None:
+            return None
+        try:
+            return TabProtocol(data)
+        except ValueError:
+            return None

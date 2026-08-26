@@ -150,10 +150,14 @@ Before stream entries are added to the list model:
 
 ## Blank-tab WebSocket entry (PYPOST-1157)
 
-WS-TM-1 shipped the blank-tab protocol picker: `Ctrl+N` and tab-bar **+**
-show **HTTP Request** vs **WebSocket** before any editor is created.
-Confirming WebSocket calls `add_blank_websocket_tab()` (placeholder
-`WebSocketTab`; not `open_websocket_tab`). Developer details:
+WS-TM-1 shipped the blank-tab protocol picker. MCP-TM-1
+([PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165)) added
+**MCP Client** as the third item. `Ctrl+N` and tab-bar **+** show
+**HTTP Request** (default), **WebSocket**, then **MCP Client** before
+any editor is created. Confirming WebSocket calls
+`add_blank_websocket_tab()` (placeholder `WebSocketTab`; not
+`open_websocket_tab`). Confirming MCP Client opens a stub
+`McpClientTab` (chrome is PYPOST-1166). Developer details:
 [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 
 Saved profiles still open via `open_websocket_tab(profile)` from

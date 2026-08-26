@@ -39,6 +39,7 @@ SETTINGS_TABS = "pypost_settings_tabs"
 PLUS_TAB_PLACEHOLDER = "pypost_plus_tab_placeholder"
 PLUS_TAB_BUTTON = "pypost_plus_tab_button"
 NEW_TAB_PROTOCOL_MENU = "pypost_new_tab_protocol_menu"
+MCP_CLIENT_TAB_PAGE = "pypost_mcp_client_tab_page"
 
 # WebSocket session surfaces (PYPOST-1132 / WS-4).
 WS_TAB_PAGE = "pypost_ws_tab_page"
