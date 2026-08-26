@@ -53,6 +53,10 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_mcp_param_default_applied(self, method: str) -> None: ...
 
+    def track_mcp_client_connect(self, result: str) -> None: ...
+
+    def track_mcp_client_list_tools(self, result: str, operation: str) -> None: ...
+
     def track_history_entry_appended(self, method: str) -> None: ...
 
     def track_history_load_into_editor(self) -> None: ...
@@ -183,6 +187,12 @@ class NullMetrics:
         return None
 
     def track_mcp_param_default_applied(self, method: str) -> None:
+        return None
+
+    def track_mcp_client_connect(self, result: str) -> None:
+        return None
+
+    def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
         return None
 
     def track_history_entry_appended(self, method: str) -> None:

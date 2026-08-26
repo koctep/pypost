@@ -162,6 +162,19 @@ class OtelMetricsTracker:
                 "default because the caller omitted them"
             ),
         )
+        self._mcp_client_connect = meter.create_counter(
+            "mcp_client_connect_total",
+            description=(
+                "Outbound MCP Client Connect outcomes "
+                "(not inbound MCP server traffic)"
+            ),
+        )
+        self._mcp_client_list_tools = meter.create_counter(
+            "mcp_client_list_tools_total",
+            description=(
+                "Outbound MCP Client list_tools outcomes by Connect or Refresh"
+            ),
+        )
         self._history_entries_appended = meter.create_counter(
             "history_entries_appended_total",
             description="Number of request history entries recorded",
@@ -338,6 +351,14 @@ class OtelMetricsTracker:
 
     def track_mcp_param_default_applied(self, method: str) -> None:
         self._mcp_param_defaults_applied.add(1, {"method": method})
+
+    def track_mcp_client_connect(self, result: str) -> None:
+        self._mcp_client_connect.add(1, {"result": result})
+
+    def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
+        self._mcp_client_list_tools.add(
+            1, {"result": result, "operation": operation}
+        )
 
     def track_history_entry_appended(self, method: str) -> None:
         self._history_entries_appended.add(1, {"method": method})

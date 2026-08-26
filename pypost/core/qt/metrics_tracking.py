@@ -72,6 +72,12 @@ class MetricsTrackingMixin:
     def track_mcp_param_default_applied(self, method: str) -> None:
         self._registry.track_mcp_param_default_applied(method)
 
+    def track_mcp_client_connect(self, result: str) -> None:
+        self._registry.track_mcp_client_connect(result)
+
+    def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
+        self._registry.track_mcp_client_list_tools(result, operation)
+
     def track_history_entry_appended(self, method: str) -> None:
         self._registry.track_history_entry_appended(method)
 

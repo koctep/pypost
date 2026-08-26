@@ -265,8 +265,9 @@ passes `protocol.value` (`http` / `websocket` / `mcp_client`). Without
 default `protocol=unknown`. Cancel does not increment.
 
 No payload fields (URL, headers, body) — there is no URL yet. Outbound
-MCP operation counters (`connect` / `list_tools` / `call_tool`) are
-not part of this picker story.
+MCP Client Connect / Refresh counters live on the draft tab (see
+[mcp_client_draft_tab.md](mcp_client_draft_tab.md)). `call_tool` counters
+are MCP-TM-4, not this picker story.
 
 See [Prometheus Monitoring](../prometheus_monitoring.md) for the
 operator inventory.

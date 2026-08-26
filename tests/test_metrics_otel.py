@@ -87,6 +87,21 @@ def test_track_mcp_param_default_applied_increments_counter(otel_reader):
     )
 
 
+def test_track_mcp_client_connect_and_list_tools_increments_counters(otel_reader):
+    reader, provider = otel_reader
+    tracker = OtelMetricsTracker(meter=provider.get_meter("mcp-client-outbound-test"))
+    tracker.track_mcp_client_connect("success")
+    tracker.track_mcp_client_list_tools("error", "refresh")
+    assert _counter_value(
+        reader, "mcp_client_connect_total", {"result": "success"}
+    ) == 1
+    assert _counter_value(
+        reader,
+        "mcp_client_list_tools_total",
+        {"result": "error", "operation": "refresh"},
+    ) == 1
+
+
 def test_track_mcp_tool_call_duration_records_histogram(otel_reader):
     reader, provider = otel_reader
     tracker = OtelMetricsTracker(meter=provider.get_meter("histogram-test"))

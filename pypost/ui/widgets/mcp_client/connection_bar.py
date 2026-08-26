@@ -1,4 +1,4 @@
-"""MCP Client draft connection bar (URL, Connect, Disconnect, state)."""
+"""MCP Client draft connection bar (URL, Connect, Disconnect, Refresh, state)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from pypost.models.mcp_client import McpClientSessionState
 from pypost.ui.widget_ids import (
     MCP_CLIENT_CONNECT_BUTTON,
     MCP_CLIENT_DISCONNECT_BUTTON,
+    MCP_CLIENT_REFRESH_BUTTON,
     MCP_CLIENT_STATE_BADGE,
     MCP_CLIENT_URL_INPUT,
     set_widget_id,
@@ -25,6 +26,7 @@ _STATE_LABELS = {
     McpClientSessionState.DISCONNECTED: "Disconnected",
     McpClientSessionState.CONNECTING: "Connecting",
     McpClientSessionState.CONNECTED: "Connected",
+    McpClientSessionState.FAILED: "Failed",
 }
 
 
@@ -50,10 +52,26 @@ class McpClientConnectionBar(QWidget):
         set_widget_id(self.disconnect_btn, MCP_CLIENT_DISCONNECT_BUTTON)
         layout.addWidget(self.disconnect_btn)
 
+        self.refresh_btn = QPushButton("Refresh", self)
+        set_widget_id(self.refresh_btn, MCP_CLIENT_REFRESH_BUTTON)
+        layout.addWidget(self.refresh_btn)
+
         self.state_badge = QLabel("Disconnected", self)
         set_widget_id(self.state_badge, MCP_CLIENT_STATE_BADGE)
         layout.addWidget(self.state_badge)
 
-    def set_session_state(self, state: McpClientSessionState) -> None:
-        """Update the visible disconnected / connecting / connected label."""
+        self.set_session_state(McpClientSessionState.DISCONNECTED)
+
+    def set_session_state(
+        self,
+        state: McpClientSessionState,
+        *,
+        list_in_flight: bool = False,
+    ) -> None:
+        """Update badge text and Connect / Disconnect / Refresh gating."""
         self.state_badge.setText(_STATE_LABELS.get(state, "Disconnected"))
+        is_connected = state == McpClientSessionState.CONNECTED
+        is_connecting = state == McpClientSessionState.CONNECTING
+        self.connect_btn.setEnabled((not list_in_flight) and (not is_connected))
+        self.disconnect_btn.setEnabled(is_connected or is_connecting)
+        self.refresh_btn.setEnabled(is_connected and not list_in_flight)

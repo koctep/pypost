@@ -58,6 +58,29 @@ class TestMetricsRegistryMcpCounters(unittest.TestCase):
         out = _scrape(reg)
         self.assertIn('mcp_param_defaults_applied_total{method="GET"} 2.0', out)
 
+    def test_track_mcp_client_connect(self):
+        reg = MetricsRegistry()
+        reg.track_mcp_client_connect("success")
+        reg.track_mcp_client_connect("error")
+        out = _scrape(reg)
+        self.assertIn('mcp_client_connect_total{result="success"} 1.0', out)
+        self.assertIn('mcp_client_connect_total{result="error"} 1.0', out)
+        self.assertNotIn("mcp_requests_received_total{", out)
+
+    def test_track_mcp_client_list_tools(self):
+        reg = MetricsRegistry()
+        reg.track_mcp_client_list_tools("success", "connect")
+        reg.track_mcp_client_list_tools("error", "refresh")
+        out = _scrape(reg)
+        self.assertIn(
+            'mcp_client_list_tools_total{operation="connect",result="success"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'mcp_client_list_tools_total{operation="refresh",result="error"} 1.0',
+            out,
+        )
+
 
 class TestMetricsRegistryTemplateRenderDuration(unittest.TestCase):
     def test_track_template_expression_render_duration(self):

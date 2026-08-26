@@ -75,7 +75,9 @@ Production UI must not import `pypost.agent`. Agents import constants from
 | `MCP_CLIENT_URL_INPUT` | `pypost_mcp_client_url_input` | MCP Client URL field (per tab; not KEY) |
 | `MCP_CLIENT_CONNECT_BUTTON` | `pypost_mcp_client_connect_button` | MCP Client Connect (per tab; not KEY) |
 | `MCP_CLIENT_DISCONNECT_BUTTON` | `pypost_mcp_client_disconnect_button` | MCP Client Disconnect (per tab; not KEY) |
+| `MCP_CLIENT_REFRESH_BUTTON` | `pypost_mcp_client_refresh_button` | MCP Client Refresh (per tab; not KEY) |
 | `MCP_CLIENT_STATE_BADGE` | `pypost_mcp_client_state_badge` | MCP Client state label (per tab; not KEY) |
+| `MCP_CLIENT_ERROR_LABEL` | `pypost_mcp_client_error_label` | MCP Client status/error line (per tab; not KEY) |
 | `MCP_CLIENT_TOOL_BROWSER` | `pypost_mcp_client_tool_browser` | Remote-tool `QListWidget` (per tab; not KEY) |
 | `MCP_CLIENT_HEADERS_TABLE` | `pypost_mcp_client_headers_table` | MCP Client Headers table (per tab; not KEY) |
 | `WS_TAB_PAGE` | `pypost_ws_tab_page` | WebSocket tab page (per tab) |

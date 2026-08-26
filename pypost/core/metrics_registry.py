@@ -251,6 +251,18 @@ class MetricsRegistry:
             ["method"],
             registry=self.registry,
         )
+        self.mcp_client_connect = Counter(
+            "mcp_client_connect_total",
+            "Outbound MCP Client Connect outcomes (not inbound MCP server traffic)",
+            ["result"],
+            registry=self.registry,
+        )
+        self.mcp_client_list_tools = Counter(
+            "mcp_client_list_tools_total",
+            "Outbound MCP Client list_tools outcomes by Connect or Refresh",
+            ["result", "operation"],
+            registry=self.registry,
+        )
 
     def _init_encryption_metrics(self) -> None:
         """Register environment encryption counters."""
@@ -342,6 +354,15 @@ class MetricsRegistry:
 
     def track_mcp_param_default_applied(self, method: str) -> None:
         self.mcp_param_defaults_applied.labels(method=method).inc()
+
+    def track_mcp_client_connect(self, result: str) -> None:
+        self.mcp_client_connect.labels(result=result).inc()
+
+    def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
+        self.mcp_client_list_tools.labels(
+            result=result,
+            operation=operation,
+        ).inc()
 
     def track_history_entry_appended(self, method: str) -> None:
         self.history_entries_appended.labels(method=method).inc()

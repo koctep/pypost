@@ -271,16 +271,25 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `mcp_operation_success` | DEBUG | `url`, `operation`, `elapsed` | `mcp_client_service` |
 | `mcp_operation_failed` | ERROR | `url`, `operation`, `category`, `detail` | `mcp_client_service` |
 | `mcp_client_connect_initiated` | INFO | `connection_id` | `mcp_client_presenter` |
+| `mcp_client_refresh_initiated` | INFO | `connection_id` | `mcp_client_presenter` |
 | `mcp_client_disconnect_initiated` | INFO | `connection_id` | `mcp_client_presenter` |
 | `mcp_client_presenter_teardown` | INFO | `connection_id` | `mcp_client_presenter` |
+| `mcp_client_list_tools_succeeded` | INFO | `connection_id`, `kind`, `tool_count` | `mcp_client_presenter` |
+| `mcp_client_list_rejected` | WARNING | `connection_id`, `kind`, `reason` | `mcp_client_presenter` |
+| `mcp_client_list_tools_failed` | ERROR | `connection_id`, `kind` | `mcp_client_presenter` |
+| `mcp_client_list_tools_ignored` | DEBUG | `connection_id`, `kind` | `mcp_client_presenter` |
 | `mcp_client_outbound_fields_resolved` | DEBUG | `connection_id`, `header_count` | `mcp_client_presenter` |
+| `mcp_client_outbound_worker_started` | DEBUG | `generation`, `kind` | `mcp_client_worker` |
+| `mcp_client_outbound_worker_unexpected` | ERROR | `generation`, `kind` | `mcp_client_worker` |
 
-Draft-tab Connect / Disconnect / teardown (PYPOST-1166) log `connection_id`
-only — never URL text and never the substring `headers`. Resolve DEBUG
-(PYPOST-1167) logs `header_count` only (no keys, values, URL, or env map).
+Draft-tab Connect / Refresh / Disconnect / teardown log `connection_id`
+and (for list outcomes) `kind` / `tool_count` only — never URL text,
+header maps, secrets, or tool names, and never the substring `headers`
+on INFO. Resolve DEBUG (PYPOST-1167) logs `header_count` only.
 `mcp_operation_*` still come from `MCPClientService` (method **MCP** Send
-and MCP Client `execute_outbound`). See
-[mcp_client_draft_tab.md](mcp_client_draft_tab.md).
+and worker `run`). Outbound counters are `mcp_client_connect_total` and
+`mcp_client_list_tools_total` (not inbound `mcp_requests_received_total`).
+See [mcp_client_draft_tab.md](mcp_client_draft_tab.md).
 
 #### MCP endpoint persistence and lifecycle (PYPOST-1071)
 

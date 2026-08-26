@@ -14,11 +14,12 @@ __all__ = ["McpClientConnection", "McpClientSessionState"]
 
 
 class McpClientSessionState(str, Enum):
-    """Local chrome session state (live initialize is MCP-TM-3)."""
+    """Outbound discovery chrome: failed Connect uses FAILED, not CONNECTED."""
 
     DISCONNECTED = "disconnected"
     CONNECTING = "connecting"
     CONNECTED = "connected"
+    FAILED = "failed"
 
 
 class McpClientConnection(BaseModel):

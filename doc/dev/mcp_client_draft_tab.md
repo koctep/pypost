@@ -1,4 +1,4 @@
-# MCP Client draft tab (PYPOST-1166 / PYPOST-1167)
+# MCP Client draft tab (PYPOST-1166 / PYPOST-1167 / PYPOST-1169)
 
 ## Overview
 
@@ -7,20 +7,29 @@ fills the PYPOST-1165 placeholder **inside the same tab kind**. Confirming
 **MCP Client** from `Ctrl+N` / **+** still calls
 `TabsPresenter.add_blank_mcp_client_tab()` and still yields `McpClientTab`,
 not `RequestTab` or `WebSocketTab`. The page is an unsaved outbound
-draft editor: URL bar, **Headers** table, **Connect** and **Disconnect**,
-a disconnected state badge, and an empty remote-tool list.
+draft editor: URL bar, **Headers** table, **Connect**, **Disconnect**,
+**Refresh**, a state badge, an in-tab status/error line, and a remote-tool
+list.
 
 MCP-TM-5 ([PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167))
 adds the Headers table (parity with HTTP Headers), environment
 templating on URL and header names/values, and
-`McpClientPresenter.execute_outbound`. That method is the only MCP
-Client path that must call `MCPClientService.run(..., headers=)`.
+`McpClientPresenter.execute_outbound`. That method remains the **sync**
+header-aware API (resolve then `MCPClientService.run(..., headers=)`).
+Tests and later invoke (MCP-TM-4) may call it on the GUI thread.
 
-Connect is **local chrome**. `connect_requested` does not call
-`MCPClientService`. Live initialize and `list_tools` are
-[PYPOST-1169](https://pypost.atlassian.net/browse/PYPOST-1169) (MCP-TM-3)
-and **must** call `execute_outbound` so resolved headers cannot be
-dropped. Collections save/open is
+MCP-TM-3 ([PYPOST-1169](https://pypost.atlassian.net/browse/PYPOST-1169))
+makes **Connect** and **Refresh** live `list_tools`. The GUI thread runs
+`resolve_outbound_fields`; a presenter-owned `McpClientOutboundWorker`
+calls `MCPClientService.run` with the already-resolved URL and headers.
+Success fills `McpClientToolBrowser` with tool **name** and
+**description**. Connect failure leaves **Failed** chrome and an empty
+list. Refresh failure stays **Connected**, keeps last-known (stale)
+tools, and shows in-tab error chrome that must not match failed Connect.
+
+Invoke, schema forms, and the result pane remain MCP-TM-4
+([PYPOST-1170](https://pypost.atlassian.net/browse/PYPOST-1170)).
+Collections save/open is
 [PYPOST-1172](https://pypost.atlassian.net/browse/PYPOST-1172) (MCP-TM-7).
 User Guide copy is
 [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) — do not
@@ -37,25 +46,33 @@ as shipped in PYPOST-1165. See
   `headers={}`). Not on `Collection.mcp_clients` (that field does not
   exist yet). MCP-TM-7 persists headers.
 - **`McpClientSessionState`**: `disconnected` (initial), `connecting`
-  (reserved for MCP-TM-3), `connected` (local chrome only).
-- **`McpClientPresenter`**: Connect / Disconnect / teardown stay local.
-  Owns `set_variables` / `set_hidden_keys`, `resolve_outbound_fields`,
-  and `execute_outbound`. Lazy-imports `MCPClientService` only when
-  execute runs (inject `mcp_client=` in tests).
-- **`McpClientTab`**: hosts the connection bar, Headers table, and empty
-  tool browser. Exposes `connection_data` and `presenter` like
-  `WebSocketTab`. Page id `MCP_CLIENT_TAB_PAGE`.
+  (Connect in flight only), `connected` (last successful discovery),
+  `failed` (failed Connect only). Refresh in flight stays `connected`.
+- **`McpClientPresenter`**: Connect / Refresh / Disconnect / teardown.
+  Owns `set_variables` / `set_hidden_keys`, `resolve_outbound_fields`
+  (GUI thread), sync `execute_outbound`, generation + `_list_in_flight`,
+  and Connect vs Refresh apply paths. Optional `metrics=` (factory does
+  not inject; `tabs_presenter.py` stays untouched). Lazy-imports
+  `MCPClientService` when a list runs (inject `mcp_client=` in tests).
+- **`McpClientOutboundWorker`**: one-shot `QThread`. Calls
+  `run(url, "list_tools", call_params, headers=)` with values captured
+  on the GUI thread. No Qt widgets, no `resolve_outbound_fields`, no
+  `execute_outbound`. Stamps `generation` and `kind` (`connect` /
+  `refresh`) on the result signals.
+- **`McpClientTab`**: hosts the connection bar, status/error label,
+  Headers table, and tool browser. Exposes `connection_data` and
+  `presenter` like `WebSocketTab`. Page id `MCP_CLIENT_TAB_PAGE`.
 - **`McpClientConnectionBar`**: URL `VariableAwareLineEdit`, **Connect**,
-  **Disconnect**, state `QLabel`.
+  **Disconnect**, **Refresh**, state `QLabel`.
 - **`McpClientHeadersTable`**: `VariableAwareTableWidget` Key/Value
   editor with a trailing empty row. Not `RequestEditor.KeyValueTable`
   and not `WebSocketKeyValueTable`.
-- **`McpClientToolBrowser`**: labeled **Remote tools**; empty
-  `QListWidget`. MCP-TM-3 fills this widget. Not inbound
+- **`McpClientToolBrowser`**: labeled **Remote tools**; inner
+  `QListWidget` filled by `set_tools`. Not inbound
   `McpToolsOverviewDialog`.
 - **`TabsPresenter`**: thin factory + duck-typed close teardown and env
   fan-out. Chrome must not live in `tabs_presenter.py` (LOC cap 785;
-  **779 / 785** after PYPOST-1167).
+  **779 / 785**). PYPOST-1169 does **not** edit this file.
 
 ```mermaid
 flowchart TB
@@ -65,13 +82,15 @@ flowchart TB
     Conn["McpClientConnection"]
     Pres["McpClientPresenter"]
     Tab["McpClientTab"]
-    Bar["URL VariableAware Connect Disconnect"]
+    Bar["URL Connect Disconnect Refresh"]
     Hdr["McpClientHeadersTable"]
-    Tools["Empty tool browser"]
+    Tools["Tool browser name and description"]
     Save["save_tabs_state skips MCP drafts"]
     Close["close_tab → presenter.teardown"]
-    Exec["execute_outbound"]
+    Resolve["GUI resolve_outbound_fields"]
+    Worker["McpClientOutboundWorker"]
     Svc["MCPClientService.run headers="]
+    Exec["execute_outbound sync API"]
 
     Picker --> OpenBlank
     OpenBlank --> Factory
@@ -84,29 +103,86 @@ flowchart TB
     Tab --> Pres
     Factory --> Save
     Close --> Pres
+    Pres --> Resolve
+    Resolve --> Worker
+    Worker --> Svc
     Pres --> Exec
     Exec --> Svc
 ```
 
+### Live Connect and Refresh (PYPOST-1169)
+
+Connect is **not** local chrome. `connect_requested` resolves on the GUI
+thread and starts a worker `list_tools`. `CONNECTED` means last
+successful discovery, not a held `ClientSession`. Each `run` still
+initialize + list + close (MCP-TM-4 may add a session holder).
+
+Connect success (including `{"tools": []}`) is Connected with a new list.
+Connect failure (empty URL, network, timeout, auth, protocol) is Failed
+with an empty list. Refresh failure stays Connected with last-known tools.
+
+| Outcome | Session | Tools | Chrome |
+| --- | --- | --- | --- |
+| Connect success | Connected | New list | Clear error |
+| Connect failure | **Failed** | **Empty** | Error; not Connected |
+| Refresh success | Connected | New list | Clear error |
+| Refresh failure | **Connected** | **Stale list** | Error; not Failed |
+| Disconnect / teardown | Disconnected | Empty | Clear error |
+
+In-flight is **not** the session enum:
+
+| Action in flight | Session enum | Progress chrome | Buttons |
+| --- | --- | --- | --- |
+| Connect | `CONNECTING` | Connecting badge | Disable Connect and Refresh |
+| Refresh | **`CONNECTED`** | In-tab **Refreshing tools...** | Disable Refresh (and Connect) |
+| Idle after success | `CONNECTED` | Clear status | Refresh enabled |
+| Idle after failed Connect | `FAILED` | Connect error | Refresh disabled |
+
+Late worker results apply Connect vs Refresh policy from the **kind
+stamped when the worker started**. Stale generation (Disconnect,
+teardown, superseded list) is ignored and does not increment counters.
+
+**Parse:** `json.loads(response.body)` → `tools` list. Each row:
+`name = str(item.get("name") or "")`,
+`description = str(item.get("description") or "")`. Skip empty names.
+Missing `tools` key or unparseable JSON is failure (`invalid_tools`),
+not empty success. `{"tools": []}` is success. `inputSchema` is unused
+(MCP-TM-4). First page only (no `nextCursor` loop).
+
+**Empty URL:** after resolve, `resolved_url.strip() == ""` → do not call
+`run`. Message **Enter a server URL.** Connect → Failed + empty tools.
+Refresh with empty URL is still Refresh failure: stay Connected, keep
+tools, show the same message.
+
+**Error text:** `ExecutionError.message` (or unexpected fallback) through
+`sanitize_text(..., env_vars, hidden_keys)`. Do not log the message,
+URL, or headers.
+
+Do not reuse `TabsPresenter` / `RequestWorker`. Do not call the current
+`execute_outbound` body on the worker (`resolve_outbound_fields` reads
+Qt widgets).
+
 ### Headers table and outbound templating (PYPOST-1167)
 
 Headers belong on MCP Client chrome, not on HTTP method **MCP** and not
-in `tabs_presenter.py`. The table sits under the connection bar and
-above the tool browser. Edits write `connection_data.headers` in memory.
+in `tabs_presenter.py`. The table sits under the connection bar / status
+line and above the tool browser. Edits write `connection_data.headers`
+in memory.
 
 Resolution uses `TemplateService.render_string` (HTTP parity, **not**
 `resolve_proxy_headers`). Missing env vars leave the original `{{ }}`
 text. Empty table → `headers={}`. Header **names and values** both
 render.
 
-`execute_outbound(operation, call_params=None)`:
+`execute_outbound(operation, call_params=None)` (sync, GUI thread):
 
 1. Sync URL and headers from the tab when bound.
 2. Render URL and each header key/value with the env snapshot.
 3. Call `MCPClientService.run(url, operation, call_params, headers=)`.
 
-Connect does **not** run that path. MCP-TM-3 / MCP-TM-4 must call
-`execute_outbound` (or equivalent) for `list_tools` / `call_tool`.
+Live Connect/Refresh use the same resolve + `headers=` contract, but
+the worker calls `run` with fields already resolved. Sync
+`execute_outbound` stays for tests and later invoke.
 
 HTTP method **MCP** already forwards resolved headers through
 `RequestService._execute_mcp` (PYPOST-1173). Do not re-wire that path.
@@ -145,9 +221,8 @@ Client drafts follows the empty-workspace path and opens blank HTTP
 ### Teardown
 
 `close_tab` duck-types `tab.presenter.teardown` when callable. One path
-covers `WebSocketTab` and `McpClientTab`. Teardown is idempotent when
-`_session` is already `None`. Do not skip teardown because Connect is
-still a no-network stub (Postman disconnect-leak lesson).
+covers `WebSocketTab` and `McpClientTab`. Teardown bumps generation,
+drops the worker, clears tools, and is idempotent when never connected.
 
 `_request_tab_count` already includes `McpClientTab`. Closing the last
 HTTP tab while an MCP Client tab remains must not treat the strip as
@@ -176,6 +251,7 @@ class McpClientPresenter:
         hidden_keys: set[str] | None = None,
         template_service: TemplateService | None = None,
         mcp_client: MCPClientService | None = None,
+        metrics: MetricsTrackerProtocol | None = None,
     ) -> None: ...
     def set_tab(self, tab: McpClientTab) -> None: ...
     def set_variables(self, variables: dict[str, str]) -> None: ...
@@ -187,6 +263,7 @@ class McpClientPresenter:
         call_params: dict[str, Any] | None = None,
     ) -> ResponseData: ...
     def connect_requested(self) -> None: ...
+    def refresh_requested(self) -> None: ...
     def disconnect_requested(self) -> None: ...
     def teardown(self) -> None: ...
 ```
@@ -196,15 +273,56 @@ class McpClientPresenter:
 - **`resolve_outbound_fields`**: `render_string` on URL and header
   names/values. Empty headers → `{}`. Missing vars leave placeholders.
   DEBUG `mcp_client_outbound_fields_resolved` logs `connection_id` and
-  `header_count` only (no keys, values, URL, or env map).
+  `header_count` only (no keys, values, URL, or env map). **GUI thread
+  only.**
 - **`execute_outbound`**: resolve, then
-  `run(url, operation, call_params, headers=resolved)`. Inject
-  `mcp_client` in tests; production lazy-imports `MCPClientService`.
-- **`connect_requested`**: copies URL and headers from the tab, sets
-  `_session`, state `CONNECTED`. Does not call `MCPClientService`. Empty
-  URL is allowed (no validation this story).
-- **`disconnect_requested` / `teardown`**: `_session = None`, state
-  `DISCONNECTED`, then `_sync_ui`.
+  `run(url, operation, call_params, headers=resolved)` on the **calling**
+  thread. Inject `mcp_client` in tests; production lazy-imports
+  `MCPClientService`. Do not call this from `McpClientOutboundWorker`.
+- **`connect_requested`**: ignore if `_list_in_flight` or already
+  `CONNECTED`. Else `_start_list(kind=connect)`: resolve, empty-URL
+  reject, `CONNECTING`, worker `run(..., "list_tools", headers=)`.
+- **`refresh_requested`**: ignore unless `CONNECTED` and not in flight.
+  Else `_start_list(kind=refresh)`: stay `CONNECTED`, in-tab progress,
+  same worker `list_tools`.
+- **`disconnect_requested` / `teardown`**: bump generation, `_session =
+  None`, `DISCONNECTED`, clear tools and status, drop worker, then
+  `_sync_ui`.
+
+### `McpClientOutboundWorker`
+
+```python
+class McpClientOutboundWorker(QThread):
+    finished_ok = Signal(int, str, object)
+    finished_error = Signal(int, str, object)
+
+    def __init__(
+        self,
+        client: MCPClientService,
+        url: str,
+        headers: dict[str, str],
+        operation: str,
+        call_params: dict[str, Any] | None,
+        generation: int,
+        kind: str,
+    ) -> None: ...
+```
+
+Signals carry `(generation, kind, ResponseData | ExecutionError)`.
+Unexpected exceptions emit a sanitized `ExecutionError` and ERROR
+`mcp_client_outbound_worker_unexpected generation=%s kind=%s` (no URL).
+
+### `McpClientToolBrowser`
+
+```python
+class McpClientToolBrowser(QWidget):
+    def set_tools(self, tools: list[tuple[str, str]]) -> None: ...
+    def clear_tools(self) -> None: ...
+```
+
+Each row is `"{name} - {description}"` when description is non-empty,
+else `name`. Tooltip is the description. Widget id
+`MCP_CLIENT_TOOL_BROWSER` stays on the inner `QListWidget`.
 
 ### `McpClientHeadersTable`
 
@@ -234,6 +352,15 @@ class McpClientTab(QWidget):
     def set_variables(self, variables: dict[str, str]) -> None: ...
     def set_hidden_keys(self, hidden_keys: set[str]) -> None: ...
     def headers_data(self) -> dict[str, str]: ...
+    def set_session_state(
+        self,
+        state: McpClientSessionState,
+        *,
+        list_in_flight: bool = False,
+    ) -> None: ...
+    def set_status_text(self, text: str) -> None: ...
+    def set_tools(self, tools: list[tuple[str, str]]) -> None: ...
+    def clear_tools(self) -> None: ...
 ```
 
 There is no one-arg `McpClientTab()` ctor. Tests and the factory pass
@@ -244,7 +371,8 @@ connection and presenter.
 Builds `McpClientConnection()` + `McpClientPresenter` (with cached env
 kwargs) + `McpClientTab`, inserts before the plus tab with title
 **New MCP Client**, optionally calls `save_tabs_state` (which still
-omits the draft id).
+omits the draft id). Does **not** pass `metrics=` (785 LOC cap; no
+growth this story). GUI tests inject `metrics=` on the presenter.
 
 ### `TabsPresenter.close_tab(index)`
 
@@ -256,20 +384,43 @@ Plus-tab index is ignored. Otherwise `teardown()` if present, then
 
 No settings or environment variables for the draft shell.
 
-Observability (no URL dumps, no header maps, no secrets):
+Observability (no URL dumps, no header maps, no secrets, no tool names):
 
-| Event | When |
-| --- | --- |
-| `mcp_client_connect_initiated connection_id=%s` | Connect clicked |
-| `mcp_client_disconnect_initiated connection_id=%s` | Disconnect clicked |
-| `mcp_client_presenter_teardown connection_id=%s` | `close_tab` teardown |
-| `mcp_client_outbound_fields_resolved connection_id=%s header_count=%d` | After resolve (DEBUG) |
-| `mcp_operation_start ... header_count=%d` | `MCPClientService.run` (DEBUG; PYPOST-1173) |
+| Event | Level | When |
+| --- | --- | --- |
+| `mcp_client_connect_initiated` | INFO | Connect clicked (`connection_id`) |
+| `mcp_client_refresh_initiated` | INFO | Refresh clicked (`connection_id`) |
+| `mcp_client_disconnect_initiated` | INFO | Disconnect clicked (`connection_id`) |
+| `mcp_client_presenter_teardown` | INFO | `close_tab` teardown (`connection_id`) |
+| `mcp_client_list_tools_succeeded` | INFO | Parsed tools (`kind`, `tool_count`) |
+| `mcp_client_list_rejected` | WARNING | Empty resolved URL; no `run` |
+| `mcp_client_list_tools_failed` | ERROR | Worker error or `reason=invalid_tools` |
+| `mcp_client_list_tools_ignored` | DEBUG | Stale generation |
+| `mcp_client_outbound_fields_resolved` | DEBUG | After resolve (`header_count`) |
+| `mcp_client_outbound_worker_started` | DEBUG | Worker `run` start |
+| `mcp_client_outbound_worker_unexpected` | ERROR | Uncaught worker exception |
+| `mcp_operation_start` | DEBUG | `MCPClientService.run` (`header_count`) |
 
-Connect INFO must not mention `headers`. Resolve logs **count** only.
-No new Prometheus counters. Picker still increments
-`gui_new_tab_actions_total{protocol=mcp_client}`. Outbound
-`connect` / `list_tools` / `call_tool` counters are MCP-TM-3 / TM-4.
+Connect / Refresh INFO must not mention `headers`, URL, or tool names.
+Resolve logs **count** only. Failure ERROR does not log the exception
+message (hidden env values must not leak).
+
+Outbound Prometheus counters (distinct from inbound
+`mcp_requests_received_total`):
+
+| Metric | Labels | Meaning |
+| --- | --- | --- |
+| `mcp_client_connect_total` | `result` | Connect settle only (`success` / `error`) |
+| `mcp_client_list_tools_total` | `result`, `operation` | Connect or Refresh settle |
+
+Stale worker results do not increment counters. `call_tool` counters
+remain MCP-TM-4. Factory does not wire `TabsPresenter._metrics`; scrape
+of live GUI Connect waits on a later `metrics=` injection
+([PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184) / Step 7
+note). Tests inject `MetricsRegistry`.
+
+Picker still increments
+`gui_new_tab_actions_total{protocol=mcp_client}`.
 
 Widget ids (`pypost/ui/widget_ids.py`), scoped to the current tab:
 
@@ -279,13 +430,16 @@ Widget ids (`pypost/ui/widget_ids.py`), scoped to the current tab:
 | `MCP_CLIENT_URL_INPUT` | `pypost_mcp_client_url_input` |
 | `MCP_CLIENT_CONNECT_BUTTON` | `pypost_mcp_client_connect_button` |
 | `MCP_CLIENT_DISCONNECT_BUTTON` | `pypost_mcp_client_disconnect_button` |
+| `MCP_CLIENT_REFRESH_BUTTON` | `pypost_mcp_client_refresh_button` |
 | `MCP_CLIENT_STATE_BADGE` | `pypost_mcp_client_state_badge` |
+| `MCP_CLIENT_ERROR_LABEL` | `pypost_mcp_client_error_label` |
 | `MCP_CLIENT_TOOL_BROWSER` | `pypost_mcp_client_tool_browser` |
 | `MCP_CLIENT_HEADERS_TABLE` | `pypost_mcp_client_headers_table` |
 
 `MCP_CLIENT_TOOL_BROWSER` is on the inner `QListWidget`, not the wrapper.
 Tests `findChild` that list. User-visible badge text is **Disconnected** /
-**Connecting** / **Connected**. URL placeholder is
+**Connecting** / **Connected** / **Failed**. Status line shows sanitized
+errors or **Refreshing tools...**. URL placeholder is
 `http://127.0.0.1:1080/mcp`.
 
 ## Troubleshooting
@@ -304,20 +458,39 @@ current `McpClientTab`. Chrome lives in
 `pypost/ui/widgets/mcp_client/`, not `tabs_presenter.py`. Do not reuse
 `RequestEditor` or WebSocket handshake tables.
 
-### `{{ var }}` not resolved on execute
+### `{{ var }}` not resolved on Connect
 
 Env must reach the presenter via factory kwargs or duck-typed
-`set_variables`. Resolution runs only in `resolve_outbound_fields` /
-`execute_outbound`, not on Connect. Hover preview uses the same
+`set_variables`. Live Connect/Refresh call `resolve_outbound_fields` on
+the GUI thread before the worker. Hover preview uses the same
 variable-aware widgets as HTTP. Missing vars stay as `{{ }}` (HTTP
 parity, not proxy fail-fast).
 
 ### Outbound call has no headers
 
-MCP-TM-3 must call `execute_outbound`, not `MCPClientService.run`
-directly. Empty table is a keyword `headers={}`. Method **MCP** Send
-is a separate path (`_execute_mcp`); keep PYPOST-1173 tests green
-instead of rewriting it.
+Connect/Refresh must pass already-resolved `headers=` into
+`MCPClientService.run` (empty table is `headers={}`). Do not call `run`
+from the worker without resolving first. Method **MCP** Send is a
+separate path (`_execute_mcp`); keep PYPOST-1173 tests green instead of
+rewriting it.
+
+### Connect looks Connected with an empty list after a network error
+
+Failed Connect must be `FAILED` + empty tools + error on
+`MCP_CLIENT_ERROR_LABEL`. If the badge is Connected, the worker likely
+applied Refresh policy, or Connect never ran `list_tools`.
+
+### Refresh failure looks like failed Connect
+
+Refresh must stay `CONNECTED`, keep previous rows, and show error while
+the badge stays **Connected**. Do not share a single “clear tools and
+disconnect” handler with Connect.
+
+### GUI freezes on Connect
+
+`MCPClientService.run` uses `anyio.run` and can block up to 25s. It
+must run on `McpClientOutboundWorker`, not on the Qt main thread and
+not via sync `execute_outbound` from Connect.
 
 ### Draft reappears after restart
 
@@ -331,42 +504,45 @@ item fails FR-3. Look at `StateManager.get_open_tabs()`.
 `isinstance(tab, WebSocketTab)` only. INFO
 `mcp_client_presenter_teardown connection_id=...` should appear.
 
-### Connect talks to a live MCP server
-
-The Connect **button** must not. Patch `MCPClientService.run` when
-testing `execute_outbound`; Connect never calls it. Local **Connected**
-with an empty tool list is expected until MCP-TM-3.
-
 ### Tool browser has inbound catalog tools
 
 Wrong surface. Use `McpClientToolBrowser`, not
-`McpToolsOverviewDialog`. Count must be zero until `list_tools`.
+`McpToolsOverviewDialog`. Rows come from outbound `list_tools` JSON.
 
 ### `tabs_presenter.py` exceeds 785 LOC
 
-Chrome belongs in `pypost/ui/widgets/mcp_client/`. Extract shared
-insert-before-plus before growing the presenter. Current snapshot:
-`ai-tasks/PYPOST-376/baseline-metrics.md` (**779 / 785** after
-PYPOST-1167). Headroom is tracked as PYPOST-1184.
+Chrome belongs in `pypost/ui/widgets/mcp_client/` and
+`mcp_client_presenter.py`. Extract shared insert-before-plus before
+growing the presenter. Current snapshot:
+`ai-tasks/PYPOST-376/baseline-metrics.md` (**779 / 785**). Headroom is
+tracked as PYPOST-1184. PYPOST-1169 must not edit this file.
 
-### User docs still omit the draft chrome
+### User docs still omit live Connect / Refresh
 
-Intentional. [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168).
+Intentional for this story.
+[PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168).
 
 ## Tests
 
 - `tests/test_tabs_presenter.py`: draft factory, `open_tabs` omission,
   `close_tab` teardown, env kwargs / duck-typed fan-out.
-- `tests/test_mcp_client_tab.py`: chrome + widget ids (including
-  Headers table); empty tools; INFO connect / disconnect / teardown
-  without URL dumps or the substring `headers`.
+- `tests/test_mcp_client_tab.py`: chrome + widget ids (Refresh, error
+  label); Connect fills name/description; Connect error → Failed + empty
+  tools; Refresh failure → Connected + stale list; resolved URL/headers
+  forwarded into `run`; INFO omits URL / `headers` / secrets; outbound
+  metrics.
 - `tests/test_mcp_client_presenter.py`: `execute_outbound` forwards
   resolved URL and headers (and empty `headers={}`); resolve DEBUG
   logs `header_count`, not values.
+- `tests/test_metrics_registry.py` / `tests/test_metrics_otel.py`:
+  `track_mcp_client_connect`, `track_mcp_client_list_tools`.
 - PYPOST-1173 regression (method **MCP**):
   `test_execute_mcp_forwards_resolved_headers_to_mcp_client`,
   `test_execute_mcp_forwards_empty_headers_to_mcp_client`,
   `test_run_passes_headers_to_create_mcp_http_client`.
+
+GUI tests mock `MCPClientService.run` (no live MCP server). Module
+`pytestmark = pytest.mark.timeout(30)`.
 
 Run:
 
@@ -379,6 +555,7 @@ make test PYTEST_ARGS="tests/test_mcp_client_tab.py tests/test_mcp_client_presen
 - [Blank-tab protocol picker](new_tab_protocol_picker.md)
 - [UI widget identity](ui_identity.md)
 - [Logging event names](logging.md)
+- [Prometheus monitoring](../prometheus_monitoring.md)
 - [TemplateService](template_service.md)
 - [Variable propagation](variable_propagation.md)
 - [State manager](state_manager.md)

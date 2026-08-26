@@ -98,6 +98,21 @@ sanitized request origin only, never the rejected value or request data.
 The observability server on port 9080 increments `mcp_requests_received_total` and
 `mcp_responses_sent_total` when agents read the `metrics://all` resource.
 
+### MCP Client (outbound discovery)
+
+These counters are **outbound** Connect / Refresh `list_tools` on the MCP
+Client tab. Do not sum them with inbound `mcp_requests_received_total`.
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `mcp_client_connect_total` | Counter | `result` | Connect settle (`success` / `error`) |
+| `mcp_client_list_tools_total` | Counter | `result`, `operation` | Connect or Refresh settle |
+
+`McpClientPresenter` records them via optional `metrics=`. The blank-tab
+factory does not inject `TabsPresenter._metrics` (785 LOC cap). Tests
+inject `MetricsRegistry`. See
+[mcp_client_draft_tab.md](dev/mcp_client_draft_tab.md).
+
 ### WebSocket sessions and streams
  
 | Metric | Type | Labels | Meaning |

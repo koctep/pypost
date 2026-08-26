@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.models.mcp_client import McpClientConnection
 from pypost.models.response import ResponseData
 from pypost.ui.presenters.mcp_client_presenter import McpClientPresenter
@@ -100,3 +101,41 @@ def test_resolve_outbound_fields_logs_header_count_not_values(caplog) -> None:
     assert "Authorization" not in joined
     assert "{{token}}" not in joined
     assert "{{host}}" not in joined
+
+
+def test_empty_url_connect_records_error_metrics_without_run() -> None:
+    """Empty URL Connect increments outbound error counters and never calls run."""
+    mock_client = MagicMock()
+    metrics = MagicMock(spec=MetricsTrackerProtocol)
+    presenter = McpClientPresenter(
+        McpClientConnection(url=""),
+        mcp_client=mock_client,
+        metrics=metrics,
+    )
+    presenter.connect_requested()
+    mock_client.run.assert_not_called()
+    metrics.track_mcp_client_connect.assert_called_once_with("error")
+    metrics.track_mcp_client_list_tools.assert_called_once_with("error", "connect")
+
+
+def test_refresh_initiated_log_omits_url_and_headers(caplog) -> None:
+    """Refresh INFO is connection_id only (no URL, secrets, or headers)."""
+    presenter = McpClientPresenter(
+        McpClientConnection(url="http://127.0.0.1:1080/mcp"),
+    )
+    logger_name = "pypost.ui.presenters.mcp_client_presenter"
+    with caplog.at_level(logging.INFO, logger=logger_name):
+        presenter.refresh_requested()
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == logger_name
+    ]
+    assert any(
+        "mcp_client_refresh_initiated" in msg
+        and f"connection_id={presenter.connection.id}" in msg
+        for msg in messages
+    )
+    joined = " ".join(messages)
+    assert "http://" not in joined
+    assert "headers" not in joined.lower()

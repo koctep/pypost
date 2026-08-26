@@ -30,6 +30,8 @@ def test_null_metrics_track_methods_are_no_ops():
     metrics.track_request_sent("GET")
     metrics.track_request_error(ErrorCategory.NETWORK)
     metrics.set_mcp_server_up(True)
+    metrics.track_mcp_client_connect("success")
+    metrics.track_mcp_client_list_tools("error", "connect")
 
 
 def test_resolve_metrics_returns_null_metrics_when_none():
