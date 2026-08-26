@@ -184,7 +184,11 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def add_blank_mcp_client_tab(self, *, save_state: bool = True) -> McpClientTab:
         connection = McpClientConnection()
-        presenter = McpClientPresenter(connection)
+        presenter = McpClientPresenter(
+            connection,
+            env_vars=self._current_variables,
+            hidden_keys=self._current_hidden_keys,
+        )
         tab = McpClientTab(connection, presenter)
         plus_idx = self._header.insert_index_before_plus()
         if plus_idx >= 0:
@@ -323,9 +327,10 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
                 if hasattr(tab.response_view, "set_env_keys"):
                     keys = list(variables.keys()) if variables else None
                     tab.response_view.set_env_keys(keys)
-            elif isinstance(tab, WebSocketTab):
-                if hasattr(tab, "presenter") and hasattr(tab.presenter, "set_variables"):
-                    tab.presenter.set_variables(variables)
+            else:
+                setter = getattr(getattr(tab, "presenter", None), "set_variables", None)
+                if callable(setter):
+                    setter(variables)
 
     def on_env_keys_changed(self, keys: object) -> None:
         """Pushes env key list to all ResponseView widgets."""
@@ -352,9 +357,12 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             if isinstance(tab, RequestTab):
                 if hasattr(tab.request_editor, "set_hidden_keys"):
                     tab.request_editor.set_hidden_keys(hidden_keys)
-            elif isinstance(tab, WebSocketTab):
-                if hasattr(tab, "presenter") and hasattr(tab.presenter, "set_hidden_keys"):
-                    tab.presenter.set_hidden_keys(hidden_keys)
+            else:
+                setter = getattr(
+                    getattr(tab, "presenter", None), "set_hidden_keys", None
+                )
+                if callable(setter):
+                    setter(hidden_keys)
 
     def rename_request_tabs(self, request_id: str, new_name: str) -> None:
         """Updates tab labels after a request rename."""

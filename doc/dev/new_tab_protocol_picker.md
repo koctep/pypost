@@ -105,6 +105,7 @@ are omitted from `save_tabs_state` until MCP-TM-7
 | Blank WebSocket draft editor, default name, session-restore exclusion | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) |
 | Close-last-tab / empty-workspace picker | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) |
 | MCP Client draft shell (URL, Connect, tools) | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) (shipped) |
+| MCP Client Headers + `execute_outbound` | [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) (shipped) |
 | User documentation rewrite (MCP Client) | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) |
 
 ## API / Usage

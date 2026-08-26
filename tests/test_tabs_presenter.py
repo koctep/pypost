@@ -323,6 +323,29 @@ class TestTabsPresenter(unittest.TestCase):
         p.on_env_hidden_keys_changed(hidden_keys)
         tab.request_editor.set_hidden_keys.assert_called_once_with(hidden_keys)
 
+    def test_on_env_variables_changed_updates_mcp_client_tab(self):
+        p = self._make_presenter()
+        tab = p.add_blank_mcp_client_tab()
+        variables = {"host": "127.0.0.1:1080"}
+        p.on_env_variables_changed(variables)
+        self.assertEqual(tab.presenter._env_vars, variables)
+        self.assertEqual(tab.url_input._variables, variables)
+
+    def test_on_env_hidden_keys_changed_updates_mcp_client_tab(self):
+        p = self._make_presenter()
+        tab = p.add_blank_mcp_client_tab()
+        hidden_keys = {"token"}
+        p.on_env_hidden_keys_changed(hidden_keys)
+        self.assertEqual(tab.presenter._hidden_keys, hidden_keys)
+        self.assertEqual(tab.url_input._hidden_keys, hidden_keys)
+
+    def test_add_blank_mcp_client_tab_receives_cached_env(self):
+        p = self._make_presenter()
+        variables = {"host": "example.test"}
+        p.on_env_variables_changed(variables)
+        tab = p.add_blank_mcp_client_tab()
+        self.assertEqual(tab.presenter._env_vars, variables)
+
     def test_on_script_output_rejects_invalid_error_payload(self):
         p = self._make_presenter()
         p.add_new_tab()

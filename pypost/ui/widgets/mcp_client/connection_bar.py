@@ -5,7 +5,6 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QWidget,
 )
@@ -18,6 +17,7 @@ from pypost.ui.widget_ids import (
     MCP_CLIENT_URL_INPUT,
     set_widget_id,
 )
+from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit
 
 __all__ = ["McpClientConnectionBar"]
 
@@ -37,7 +37,7 @@ class McpClientConnectionBar(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        self.url_input = QLineEdit(self)
+        self.url_input = VariableAwareLineEdit(self)
         self.url_input.setPlaceholderText("http://127.0.0.1:1080/mcp")
         set_widget_id(self.url_input, MCP_CLIENT_URL_INPUT)
         layout.addWidget(self.url_input, 1)

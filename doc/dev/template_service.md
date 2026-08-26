@@ -55,7 +55,8 @@ expression policy and test matrix.
 | Consumer | File | Method | Notes |
 | --- | --- | --- | --- |
 | HTTP transport | `http_client.py` | `render_string` | URL, header/param keys and values, body |
-| Request orchestration | `request_service.py` | `render_string` | MCP/history URL and body |
+| Request orchestration | `request_service.py` | `render_string` | MCP/history URL, headers, and body |
+| MCP Client outbound | `mcp_client_presenter.py` | `render_string` | Draft URL and header names/values |
 | Copy as cURL | `curl_generator.py` | `render_string` | Injected service from caller |
 | History masking | `sensitive_data_masking_policy.py` | `render_string` | Masked and raw render paths |
 | MCP secrets | `mcp_secrets_policy.py` | `parse` | AST variable discovery |

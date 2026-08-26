@@ -45,6 +45,7 @@ MCP_CLIENT_CONNECT_BUTTON = "pypost_mcp_client_connect_button"
 MCP_CLIENT_DISCONNECT_BUTTON = "pypost_mcp_client_disconnect_button"
 MCP_CLIENT_STATE_BADGE = "pypost_mcp_client_state_badge"
 MCP_CLIENT_TOOL_BROWSER = "pypost_mcp_client_tool_browser"
+MCP_CLIENT_HEADERS_TABLE = "pypost_mcp_client_headers_table"
 
 # WebSocket session surfaces (PYPOST-1132 / WS-4).
 WS_TAB_PAGE = "pypost_ws_tab_page"

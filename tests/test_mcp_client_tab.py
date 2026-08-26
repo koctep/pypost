@@ -9,13 +9,18 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QTableWidgetItem,
     QWidget,
 )
 
 from pypost.models.mcp_client import McpClientConnection
 from pypost.ui import widget_ids
 from pypost.ui.presenters.mcp_client_presenter import McpClientPresenter
-from pypost.ui.widget_ids import MCP_CLIENT_TAB_PAGE, METHOD_COMBO
+from pypost.ui.widget_ids import (
+    MCP_CLIENT_HEADERS_TABLE,
+    MCP_CLIENT_TAB_PAGE,
+    METHOD_COMBO,
+)
 from pypost.ui.widgets.mcp_client.mcp_client_tab import McpClientTab
 
 pytestmark = pytest.mark.timeout(30)
@@ -117,6 +122,45 @@ def test_draft_shell_has_url_connect_disconnect_state_and_empty_tools(
     assert (
         widget_ids.MCP_CLIENT_TOOL_BROWSER == "pypost_mcp_client_tool_browser"
     )
+
+
+def test_mcp_client_tab_has_headers_table(qapp) -> None:
+    """FR-1: MCP Client draft chrome includes an editable Headers table."""
+    tab = _build_draft_tab()
+    assert tab.objectName() == MCP_CLIENT_TAB_PAGE
+    assert tab.findChild(QWidget, METHOD_COMBO) is None
+
+    headers_id = MCP_CLIENT_HEADERS_TABLE
+    assert headers_id == "pypost_mcp_client_headers_table"
+    table = tab.findChild(QWidget, headers_id)
+    assert table is not None, (
+        "MCP Client draft must include a Headers table "
+        f"with id {headers_id}"
+    )
+
+    label_text = " ".join(
+        label.text() for label in tab.findChildren(QLabel)
+    ).lower()
+    assert "headers" in label_text, (
+        "MCP Client draft must show a user-visible Headers label"
+    )
+
+    get_data = getattr(table, "get_data", None)
+    assert callable(get_data)
+    last = table.rowCount() - 1
+    assert last >= 0
+    table.setItem(last, 0, QTableWidgetItem("Authorization"))
+    table.setItem(last, 1, QTableWidgetItem("Bearer {{token}}"))
+    assert table.rowCount() == last + 2
+    assert get_data()["Authorization"] == "Bearer {{token}}"
+
+    table.setItem(0, 0, QTableWidgetItem(""))
+    table.setItem(0, 1, QTableWidgetItem(""))
+    assert "Authorization" not in get_data()
+
+    tools = tab.findChild(QWidget, widget_ids.MCP_CLIENT_TOOL_BROWSER)
+    assert tools is not None
+    assert _tool_item_count(tools) == 0
 
 
 def test_presenter_logs_connect_disconnect_teardown(caplog, qapp) -> None:

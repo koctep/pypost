@@ -22,8 +22,9 @@ class McpClientSessionState(str, Enum):
 
 
 class McpClientConnection(BaseModel):
-    """Unsaved outbound MCP Client draft identity and URL."""
+    """Unsaved outbound MCP Client draft identity, URL, and headers."""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "New MCP Client"
     url: str = ""
+    headers: dict[str, str] = Field(default_factory=dict)

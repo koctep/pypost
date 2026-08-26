@@ -91,7 +91,11 @@ Main components:
     direct `to_int(...)` is mapped to `ExecutionError(TEMPLATE)` and stops the
     request before `session.request`.
 - `pypost/core/request_service.py` (`RequestService`)
-  - MCP/history paths render URL and body only (headers/params are not in the MCP model).
+  - MCP/history paths render URL, headers, and body
+    (`_execute_mcp` / PYPOST-1173).
+- `pypost/ui/presenters/mcp_client_presenter.py` (`McpClientPresenter`)
+  - MCP Client draft URL and header names/values via
+    `resolve_outbound_fields` (PYPOST-1167).
 
 ### Context coverage matrix
 
@@ -103,14 +107,18 @@ name/value columns are separate render/hover surfaces.
 | Request URL | `RequestWidget.url_input` | `HTTPClient` → `render_string(url)` | `VariableAwareLineEdit` → `VariableHoverHelper` |
 | Header names | `RequestWidget.headers_table` key column | `render_string(k)` per row | Table cell hover |
 | Header values | `RequestWidget.headers_table` value column | `render_string(v)` per row | Table cell hover |
+| MCP Client URL | `McpClientConnectionBar.url_input` | `McpClientPresenter.resolve_outbound_fields` | `VariableAwareLineEdit` |
+| MCP Client header names | `McpClientHeadersTable` key column | `render_string(k)` per row | Table cell hover |
+| MCP Client header values | `McpClientHeadersTable` value column | `render_string(v)` per row | Table cell hover |
 | Param names | `RequestWidget.params_table` key column | `render_string(k)` per row | Table cell hover |
 | Param values | `RequestWidget.params_table` value column | `render_string(v)` per row | Table cell hover |
 | Request body | `RequestWidget.body_edit` | `render_string(body)` | `CodeEditor` hover mixin |
 | Hover preview | All editors above | N/A (preview only) | `VariableHoverHelper.resolve_text` |
 
-UI propagation: `env_presenter.py` → `tabs_presenter.py` → `RequestWidget` supplies variable
-maps and hidden keys to editors. Expression parsing happens only in core modules, not in
-presenters.
+UI propagation: `env_presenter.py` → `tabs_presenter.py` → `RequestWidget` or
+duck-typed `McpClientPresenter` / `WebSocketPresenter` supplies variable maps
+and hidden keys to editors. Expression parsing happens only in core modules,
+not in presenters.
 
 ## Usage/API
 
