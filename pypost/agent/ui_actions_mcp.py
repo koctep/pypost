@@ -1,7 +1,8 @@
 """Out-of-process stdio MCP bridge for agent UI actions (PYPOST-952).
 
-Dedicated MCP server wrapping ``pypost.agent.ui_actions`` via ``AgentAppSession``.
-Never mounted on product ``MCPServerImpl``.
+Dedicated MCP server wrapping ``pypost.agent.ui_actions`` via a duck-typed
+``UiDriveSession`` (spawn ``AgentAppSession`` or attach client). Never mounted
+on product ``MCPServerImpl``.
 """
 
 from __future__ import annotations
@@ -18,8 +19,10 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 from PySide6.QtCore import QCoreApplication, Qt
 
+from pypost.agent.attach_ipc import AttachClientSession, AttachUnboundError
 from pypost.agent.lifecycle import AgentAppSession
 from pypost.agent.ui_actions import UiActionError
+from pypost.agent.ui_drive import UiDriveSession
 
 logger = logging.getLogger(__name__)
 
@@ -139,10 +142,16 @@ def _bool_arg(arguments: dict[str, Any], key: str, default: bool = False) -> boo
     return bool(value)
 
 
+def _process_events() -> None:
+    app = QCoreApplication.instance()
+    if app is not None:
+        app.processEvents()
+
+
 class AgentUiActionsMcpServer:
     """MCP tool catalog for agent UI drive — separate from product MCPServerImpl."""
 
-    def __init__(self, session: AgentAppSession) -> None:
+    def __init__(self, session: UiDriveSession) -> None:
         self._session = session
         self._schemas = _tool_schemas()
         self.server = Server(SERVER_NAME)
@@ -165,7 +174,9 @@ class AgentUiActionsMcpServer:
             for name in sorted(AGENT_UI_MCP_TOOL_NAMES)
         ]
 
-    async def call_tool(self, name: str, arguments: dict[str, Any] | None) -> list[TextContent]:
+    async def call_tool(
+        self, name: str, arguments: dict[str, Any] | None
+    ) -> list[TextContent]:
         if name not in AGENT_UI_MCP_TOOL_NAMES:
             raise ValueError(f"Tool {name} not found")
         args = arguments or {}
@@ -175,7 +186,7 @@ class AgentUiActionsMcpServer:
             args.get("widget_id"),
             str(_bool_arg(args, "in_current_tab")).lower(),
         )
-        QCoreApplication.processEvents()
+        _process_events()
         try:
             self._dispatch_sync(name, args)
         except UiActionError as exc:
@@ -190,7 +201,7 @@ class AgentUiActionsMcpServer:
             payload = {"ok": False, "error": str(exc)}
             return [TextContent(type="text", text=json.dumps(payload))]
         finally:
-            QCoreApplication.processEvents()
+            _process_events()
         return [TextContent(type="text", text=json.dumps({"ok": True}))]
 
     def _dispatch_sync(self, name: str, args: dict[str, Any]) -> None:
@@ -234,7 +245,7 @@ class AgentUiActionsMcpServer:
         raise ValueError(f"Unhandled tool: {name}")
 
 
-async def _serve_stdio(session: AgentAppSession) -> None:
+async def _serve_stdio(session: UiDriveSession) -> None:
     bridge = AgentUiActionsMcpServer(session)
     init_options = bridge.server.create_initialization_options()
     logger.info("agent_ui_mcp_stdio_listening server=%s", SERVER_NAME)
@@ -243,9 +254,25 @@ async def _serve_stdio(session: AgentAppSession) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Launch AgentAppSession and serve UI-action MCP over stdio."""
+    """Serve UI-action MCP over stdio (spawn-session default or ``--attach``)."""
     parser = argparse.ArgumentParser(
         description="PyPost agent UI actions MCP sidecar (stdio; PYPOST-952).",
+    )
+    parser.add_argument(
+        "--attach",
+        action="store_true",
+        help=(
+            "Bind to an already-running desktop attach host via local IPC "
+            "(do not spawn AgentAppSession)."
+        ),
+    )
+    parser.add_argument(
+        "--attach-endpoint",
+        default=None,
+        help=(
+            "AF_UNIX path for --attach (default: per-user well-known path "
+            "or PYPOST_AGENT_UI_ATTACH_ENDPOINT)."
+        ),
     )
     parser.add_argument(
         "--no-offscreen",
@@ -264,15 +291,51 @@ def main(argv: list[str] | None = None) -> None:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
         stream=sys.stderr,
     )
-    session = AgentAppSession(
+    if parsed.attach:
+        _run_attach(parsed.attach_endpoint)
+        return
+    _run_spawn_session(
         offscreen=not parsed.no_offscreen,
         ready_timeout=parsed.ready_timeout,
+    )
+
+
+def _run_attach(endpoint: str | None) -> None:
+    session = AttachClientSession(endpoint=endpoint)
+    logger.info(
+        "agent_ui_mcp_attach_starting endpoint=%s",
+        session.endpoint,
+    )
+    try:
+        session.connect()
+    except AttachUnboundError as exc:
+        logger.error(
+            "agent_ui_mcp_attach_failed endpoint=%s error=%s",
+            session.endpoint,
+            type(exc).__name__,
+        )
+        raise SystemExit(1) from exc
+    try:
+        logger.info("agent_ui_mcp_attach_ready endpoint=%s", session.endpoint)
+        asyncio.run(_serve_stdio(session))
+    finally:
+        session.detach()
+        logger.info(
+            "agent_ui_mcp_attach_ended endpoint=%s",
+            session.endpoint,
+        )
+
+
+def _run_spawn_session(*, offscreen: bool, ready_timeout: float) -> None:
+    session = AgentAppSession(
+        offscreen=offscreen,
+        ready_timeout=ready_timeout,
     )
     try:
         session.start()
         logger.info(
             "agent_ui_mcp_session_ready offscreen=%s",
-            str(not parsed.no_offscreen).lower(),
+            str(offscreen).lower(),
         )
         asyncio.run(_serve_stdio(session))
     finally:

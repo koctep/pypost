@@ -10,8 +10,8 @@ Two **session paths** are valid on this surface:
 
 | Path | Session ownership | Typical use |
 | --- | --- | --- |
-| **Spawn-session** (shipped) | Sidecar owns `AgentAppSession` | Empty/offscreen; not live desktop |
-| **Attach** (soft contract) | Bind to already-running desktop | Drive the live interactive UI |
+| **Spawn-session** (default) | Sidecar owns `AgentAppSession` | Empty/offscreen; not live desktop |
+| **Attach** (`--attach`) | Bind to already-running desktop | Drive the live interactive UI |
 
 Attach does **not** replace spawn-session. Choose attach when you need UI tools
 to apply to a desktop the operator already has open; choose spawn-session for a
@@ -25,21 +25,52 @@ Trust: [mcp_trust_model.md](mcp_trust_model.md). Lifecycle:
 
 | Component | Role |
 | --- | --- |
-| `pypost/agent/ui_actions_mcp.py` | MCP Server + stdio `main()` |
+| `pypost/agent/ui_actions_mcp.py` | MCP Server + stdio `main()` (spawn or `--attach`) |
 | `AgentUiActionsMcpServer` | `list_tools` / `call_tool` for ui_* primitives |
+| `pypost/agent/ui_drive.py` | `UiDriveSession` protocol + `MainWindowUiDrive` |
 | `AgentAppSession` | Spawn-session: launches Qt app, ready wait, ui_* |
+| `pypost/agent/attach_ipc.py` | AF_UNIX host + client; NDJSON wire protocol |
+| `AgentUiAttachHost` | Desktop listener; GUI-thread `ui_*` dispatch |
+| `AttachClientSession` | Sidecar attach client (`UiDriveSession`) |
+| `pypost/main.py` | Starts/stops host around interactive `app.exec()` |
 | `MCPServerImpl` | Product HTTP tools only — **no UI-action tools** |
 
 ```mermaid
 flowchart LR
   Client[MCP client] -->|stdio| Sidecar[pypost-agent-ui-mcp]
   Sidecar --> Bridge[AgentUiActionsMcpServer]
-  Bridge --> Session[AgentAppSession]
-  Session --> Actions[ui_actions]
+  Bridge --> Proto[UiDriveSession]
+  Proto -->|spawn| Session[AgentAppSession]
+  Proto -->|attach| AttClient[AttachClientSession]
+  AttClient -->|AF_UNIX NDJSON| Host[AgentUiAttachHost]
+  Main[interactive main] --> Host
+  Host --> Drive[MainWindowUiDrive]
+  Drive --> Actions[ui_actions]
+  Session --> Actions
   Client -->|HTTP /mcp| Product[MCPServerImpl]
 ```
 
 Server name: `pypost-agent-ui` (distinct from default product `pypost-server`).
+
+### Local IPC (AF_UNIX)
+
+MCP clients always **spawn** the stdio sidecar. Attach cannot turn the desktop
+into that stdio child, so the sidecar binds a **side-channel** into the live
+Qt process:
+
+1. Interactive `main()` constructs `AgentUiAttachHost(window)` after show,
+   calls `start()` before `app.exec()`, and `stop()` in `finally`.
+2. The host binds a per-user AF_UNIX socket, accepts peers on a daemon thread,
+   and marshals `ui_*` onto the QApplication thread via a queued Qt signal.
+3. Sidecar `--attach` creates `AttachClientSession`, handshakes, then serves
+   the same `ui_*` MCP catalog; each tool call is one NDJSON request/reply.
+4. `detach` closes the binding; neither process exits by default. Host stop
+   removes the socket file and closes peers (host-exit outcome).
+
+Wire format: one JSON object per line. Ops: `handshake` (version `1`),
+`detach`, `ui_click`, `ui_fill`, `ui_select`, `ui_send_key`. Replies are
+`{"ok": true, ...}` or `{"ok": false, "error": "..."}`. Fill **text** is
+never logged on either side.
 
 ## Spawn-session path
 
@@ -96,22 +127,43 @@ session the sidecar fully owns (typical automation / CI).
 
 ### Operator procedure (product level)
 
-High-level steps only (no CLI flag or wire-format dump — mechanism is
-ATTACH-2):
-
-1. Start (or keep) desktop PyPost open on the same machine.
+1. Start (or keep) desktop PyPost open on the same machine (interactive
+   `main` starts the local attach host after show).
 2. Configure the MCP client for the agent-UI sidecar surface (not product
    `MCPServerImpl`).
-3. Choose **attach** so UI tools bind to that live desktop.
+3. Run the sidecar with **`--attach`** (optional `--attach-endpoint` or
+   `PYPOST_AGENT_UI_ATTACH_ENDPOINT` to override the per-user AF_UNIX path).
 4. On **attach success**, `ui_*` calls apply to the bound desktop.
 5. End the binding with **detach** when finished, or stop when **host exit** /
    **sidecar exit** ends the binding (see lifecycle below).
 
-**Capability note (FR12):** Runtime attach lands in
-[PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207) (ATTACH-2).
-Until that capability ships, treat this section as the **soft contract** for
-operators and implementers; spawn-session remains the runnable path today.
-Verification: [PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208)
+### Client configuration (attach example)
+
+```json
+{
+  "mcpServers": {
+    "pypost-agent-ui": {
+      "command": "pypost-agent-ui-mcp",
+      "args": ["--attach"]
+    }
+  }
+}
+```
+
+Optional override (CLI or env; same well-known default as the desktop host):
+
+```bash
+pypost-agent-ui-mcp --attach --attach-endpoint /path/to/pypost-agent-ui-attach.sock
+# or: PYPOST_AGENT_UI_ATTACH_ENDPOINT=/path/to/... pypost-agent-ui-mcp --attach
+```
+
+Do **not** set `QT_QPA_PLATFORM=offscreen` for attach — the sidecar has no
+local Qt app; the desktop already owns the GUI thread.
+
+**Capability note:** Runtime attach is shipped
+([PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207) / ATTACH-2).
+Spawn-session remains the default when `--attach` is omitted. Broader
+verification matrix: [PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208)
 (ATTACH-3). Epic: [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991).
 
 ## Trust boundary
@@ -127,19 +179,62 @@ Details: [mcp_trust_model.md](mcp_trust_model.md).
 
 ## Attach lifecycle
 
-Product-level outcomes (soft contract; mechanism deferred to ATTACH-2):
+Product-level outcomes (ATTACH-1 soft contract):
 
-| Outcome | Operator-visible meaning |
-| --- | --- |
-| **Attach success** | Bound; agent-UI MCP UI tools apply to the live desktop |
-| **Attach fail** | Not bound; failure is operator-visible at product level |
-| **Detach** | Binding ends; neither path forces kill of the other by default |
-| **Host exit** | Desktop ends; attach binding ends (sidecar/client may remain) |
-| **Sidecar exit** | Sidecar ends; desktop is not implied destroyed |
+| Outcome | Meaning | Mechanism |
+| --- | --- | --- |
+| **Attach success** | Bound to live desktop | Handshake OK; attach ready log |
+| **Attach fail** | Unbound; no silent spawn | `AttachUnboundError` → exit 1 |
+| **Detach** | Binding ends; peers continue | Client `detach` + socket close |
+| **Host exit** | Desktop ends; socket gone | `AgentUiAttachHost.stop()` |
+| **Sidecar exit** | Sidecar ends; host listens | `session.detach()` in finally |
 
 Spawn-session lifecycle (sidecar-owned launch → ready → shutdown) remains in
-[agent_lifecycle.md](agent_lifecycle.md). Attach bind/unbind and exit
-outcomes are cross-linked there.
+[agent_lifecycle.md](agent_lifecycle.md).
+
+## API / Usage (attach modules)
+
+### `default_attach_endpoint() -> str`
+
+Per-user AF_UNIX path. Honors `PYPOST_AGENT_UI_ATTACH_ENDPOINT`, else
+`$XDG_RUNTIME_DIR/pypost-agent-ui-attach.sock`, else
+`/tmp/pypost-agent-ui-attach-<uid>.sock`.
+
+### `AgentUiAttachHost(window, endpoint=None)`
+
+Desktop host. Interactive `main` owns the instance.
+
+| Method | Behavior |
+| --- | --- |
+| `start()` | Bind/listen AF_UNIX; accept loop on daemon thread |
+| `stop()` | Stop accept; close peers; unlink socket file |
+| `endpoint` | Bound path (property) |
+
+### `AttachClientSession(endpoint=None, *, connect_timeout=2.0)`
+
+Sidecar-side `UiDriveSession`.
+
+| Method | Behavior |
+| --- | --- |
+| `connect()` | Connect + handshake, or raise `AttachUnboundError` |
+| `detach()` / `shutdown()` | Send `detach`, close socket (host stays up) |
+| `ui_*` | Proxy the four catalog ops over NDJSON |
+
+Composition-root pattern (already in `main`):
+
+```python
+from pypost.agent.attach_ipc import AgentUiAttachHost
+
+attach_host = AgentUiAttachHost(composed.window)
+attach_host.start()
+try:
+    exit_code = app.exec()
+finally:
+    attach_host.stop()
+```
+
+Do **not** import `pypost.agent` from `MainWindow` or presenters — only the
+composition root may start the host.
 
 ## Tool catalog
 
@@ -159,27 +254,44 @@ Widget ids: [ui_identity.md](ui_identity.md).
 
 ## Configuration
 
-| Flag | Default | Purpose |
+| Flag / env | Default | Purpose |
 | --- | --- | --- |
-| `--no-offscreen` | offscreen on | Allow on-screen Qt platform |
-| `--ready-timeout` | 30 | Seconds to wait for UI ready |
+| `--no-offscreen` | offscreen on | Allow on-screen Qt platform (spawn-session) |
+| `--ready-timeout` | 30 | Seconds to wait for UI ready (spawn-session) |
+| `--attach` | off | Bind to desktop attach host (no spawn) |
+| `--attach-endpoint` | per-user path | Override AF_UNIX path for attach |
+| `PYPOST_AGENT_UI_ATTACH_ENDPOINT` | unset | Env override for the well-known AF_UNIX path |
 
 Logging goes to **stderr** (stdio is MCP transport). Tool calls log at DEBUG;
 fill **text is never logged** (same policy as in-process ui_actions).
 
-Configuration above applies to the **spawn-session** entry. Attach bind
-options (if any) are owned by ATTACH-2 when capability ships.
+Default endpoint: `$XDG_RUNTIME_DIR/pypost-agent-ui-attach.sock`, or
+`/tmp/pypost-agent-ui-attach-<uid>.sock` when `XDG_RUNTIME_DIR` is unset.
+
+## Observability (attach)
+
+Key structured events (`event_name key=value`). Full catalog:
+[logging.md](logging.md).
+
+| Phase | Events |
+| --- | --- |
+| Host lifecycle | `agent_ui_attach_host_started` / `_stopped` / `_start_failed` |
+| Composition root | `agent_ui_attach_host_lifecycle action=start\|stop\|start_failed` |
+| Bind | `agent_ui_attach_bound` / `agent_ui_attach_bind_failed` |
+| Peers | `agent_ui_attach_client_accepted` / `_closed`; handshake / detach |
+| Sidecar | `agent_ui_mcp_attach_starting` / `_ready` / `_failed` / `_ended` |
+| UI dispatch | `agent_ui_attach_ui_dispatch` (DEBUG); `_failed` / `_timeout` |
+
+Prometheus metrics are **not** used for attach IPC (agent-UI policy).
 
 ## Limitations
 
-- **Spawn-session (shipped):** Sidecar **owns** its own `AgentAppSession`
+- **Spawn-session (default):** Sidecar **owns** its own `AgentAppSession`
   (empty/offscreen by default). That path does not bind to an already-running
   desktop.
-- **Attach path (ATTACH-1 contract):** Documented above (path choice, trust,
-  lifecycle). Runtime attach capability is
-  [PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207); tests as
-  feasible are [PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208).
-  Soft contract under epic
+- **Attach path:** Cooperative local AF_UNIX host in interactive desktop
+  plus sidecar `--attach`. Broader CI/manual matrix is
+  [PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208). Epic
   [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991).
 - **Stdio only** — no separate loopback Streamable HTTP port for agent-UI MCP
   in this release.
@@ -200,13 +312,21 @@ options (if any) are owned by ATTACH-2 when capability ships.
   this via `TestMCPServerImpl.test_list_tools_excludes_agent_ui_action_names` in
   `tests/test_mcp_server_impl.py` (PYPOST-953).
 - **Expected live desktop, got empty/offscreen session** — You are on
-  **spawn-session**. Attach (bind to an already-open desktop) is the soft
-  contract above; runtime bind ships in
-  [PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207). Until then,
-  spawn-session cannot drive the operator’s open window.
+  **spawn-session** (default). Use `pypost-agent-ui-mcp --attach` with the
+  interactive desktop running so the sidecar binds the local attach host.
+- **Attach fails / unbound** — Ensure interactive PyPost is running (host
+  starts from `main`), endpoint matches (`--attach-endpoint` /
+  `PYPOST_AGENT_UI_ATTACH_ENDPOINT`), and check sidecar stderr for
+  `agent_ui_mcp_attach_failed` / `agent_ui_attach_bind_failed`. Desktop
+  logs `agent_ui_attach_host_started` when the host is listening.
+- **Host start fails** — Grep `agent_ui_attach_host_start_failed` or
+  `agent_ui_attach_host_lifecycle action=start_failed` (bind/listen OSError;
+  stale socket path permissions).
+- **UI action times out over attach** — Host waits ≤30s for GUI-thread
+  dispatch; look for `agent_ui_attach_ui_timeout` on the desktop logger.
 - **Thought attach replaced spawn-session** — Both paths remain valid. Use
-  spawn-session for isolated/CI sessions; use attach when the live desktop
-  must be the target (once ATTACH-2 lands).
+  spawn-session for isolated/CI sessions; use `--attach` when the live
+  desktop must be the target.
 - **Looking for attach flags on product MCP** — Attach stays on the agent-UI
   sidecar surface, not `MCPServerImpl`. See Trust boundary and
   [mcp_trust_model.md](mcp_trust_model.md).
@@ -229,10 +349,15 @@ options (if any) are owned by ATTACH-2 when capability ships.
 ```bash
 # Sidecar module + packaging
 make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -v'
-make test-agent-e2e PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py::test_stdio_sidecar_lists_ui_action_tools -v'
+make test-agent-e2e \
+  PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py::test_stdio_sidecar_lists_ui_action_tools -v'
+
+# Attach CLI + host/client IPC (PYPOST-1207)
+make test PYTEST_ARGS='tests/test_agent_ui_attach.py -v'
 
 # Product MCP catalog must exclude ui_* tools (PYPOST-953)
-make test PYTEST_ARGS='tests/test_mcp_server_impl.py::TestMCPServerImpl::test_list_tools_excludes_agent_ui_action_names -v'
+make test PYTEST_ARGS=\
+  'tests/test_mcp_server_impl.py -k test_list_tools_excludes_agent_ui -v'
 ```
 
-Attach verification is owned by ATTACH-3 / PYPOST-1208 — not claimed here.
+Broader attach matrix: ATTACH-3 / PYPOST-1208.

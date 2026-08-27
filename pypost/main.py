@@ -147,7 +147,31 @@ def main() -> None:
     composed = compose_app()
     composed.window.show()
 
-    exit_code = app.exec()
+    from pypost.agent.attach_ipc import AgentUiAttachHost
+
+    attach_host = AgentUiAttachHost(composed.window)
+    logger.info(
+        "agent_ui_attach_host_lifecycle action=start endpoint=%s",
+        attach_host.endpoint,
+    )
+    try:
+        attach_host.start()
+    except OSError as exc:
+        logger.error(
+            "agent_ui_attach_host_lifecycle action=start_failed "
+            "endpoint=%s error=%s",
+            attach_host.endpoint,
+            type(exc).__name__,
+        )
+        raise
+    try:
+        exit_code = app.exec()
+    finally:
+        logger.info(
+            "agent_ui_attach_host_lifecycle action=stop endpoint=%s",
+            attach_host.endpoint,
+        )
+        attach_host.stop()
 
     logger.info("app_shutdown")
     composed.mcp_registry.stop_all()

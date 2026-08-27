@@ -107,6 +107,33 @@ different call sites.
 | `agent_e2e_failure_artifacts_failed` | WARNING | `nodeid`, `error` | `fixtures/agent_e2e_failure` |
 | `*_source` | DEBUG | `source=injected\|new` | composition-root injectors |
 
+### Agent-UI attach IPC (PYPOST-1207)
+
+Local AF_UNIX attach host/client for the agent-UI sidecar. Logging-only
+(no Prometheus). See [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md).
+
+| Event | Level | Key fields | Module |
+| --- | --- | --- | --- |
+| `agent_ui_attach_host_lifecycle` | INFO/ERROR | `action`, `endpoint` (+ `error`) | `main` |
+| `agent_ui_attach_host_started` | INFO | `endpoint` | `agent/attach_ipc` |
+| `agent_ui_attach_host_stopped` | INFO | `endpoint` | `agent/attach_ipc` |
+| `agent_ui_attach_host_start_failed` | ERROR | `endpoint`, `error` | `agent/attach_ipc` |
+| `agent_ui_attach_client_accepted` | INFO | `endpoint`, `peers` | `agent/attach_ipc` |
+| `agent_ui_attach_client_closed` | INFO | `endpoint`, `peers` | `agent/attach_ipc` |
+| `agent_ui_attach_handshake_ok` | INFO | `endpoint`, `version` | `agent/attach_ipc` |
+| `agent_ui_attach_detach_received` | INFO | `endpoint` | `agent/attach_ipc` |
+| `agent_ui_attach_bound` | INFO | `endpoint` | `agent/attach_ipc` |
+| `agent_ui_attach_detached` | INFO | `endpoint` | `agent/attach_ipc` |
+| `agent_ui_attach_bind_failed` | WARNING | `endpoint`, `reason`, `error` | `agent/attach_ipc` |
+| `agent_ui_attach_unknown_op` | WARNING | `endpoint`, `op` | `agent/attach_ipc` |
+| `agent_ui_attach_ui_dispatch` | DEBUG | `op`, `widget_id`, `in_current_tab` | `agent/attach_ipc` |
+| `agent_ui_attach_ui_failed` | INFO | `op`, `widget_id`, `error` | `agent/attach_ipc` |
+| `agent_ui_attach_ui_timeout` | WARNING | `op`, `widget_id` | `agent/attach_ipc` |
+| `agent_ui_mcp_attach_starting` | INFO | `endpoint` | `agent/ui_actions_mcp` |
+| `agent_ui_mcp_attach_ready` | INFO | `endpoint` | `agent/ui_actions_mcp` |
+| `agent_ui_mcp_attach_failed` | ERROR | `endpoint`, `error` | `agent/ui_actions_mcp` |
+| `agent_ui_mcp_attach_ended` | INFO | `endpoint` | `agent/ui_actions_mcp` |
+
 Agent session contract and ready-gate semantics:
 [agent_lifecycle.md](agent_lifecycle.md). Packaging fixtures emit
 `agent_e2e_fixture_ready` after ready ([agent_e2e.md](agent_e2e.md));

@@ -61,7 +61,11 @@ when a harness already configured logging.
 ### Dependency rules
 
 - `pypost.agent` may depend on `pypost.main` / UI / core.
-- Production UI must **not** depend on `pypost.agent` (one-way).
+- Production UI (`MainWindow`, presenters, widgets) must **not** depend on
+  `pypost.agent` (one-way).
+- Interactive `main()` (composition root) **may** start
+  `AgentUiAttachHost` from `pypost.agent.attach_ipc` — that is not a UI
+  import of the agent package.
 
 ## API / Usage
 
@@ -219,24 +223,33 @@ see [UI settle / wait helpers](ui_wait.md). Gate: `tests/test_ui_wait.py`.
 - **Display / segfault in CI** — Set `QT_QPA_PLATFORM=offscreen` before Qt
   import (`offscreen=True` or `make test`).
 
-## Attach bind / unbind (ATTACH-1)
+## Attach bind / unbind (ATTACH-1 / ATTACH-2)
 
 `AgentAppSession` above is the **spawn-session / harness** path: the agent
 owns launch → ready → shutdown of its own app instance.
 
 **Attach** binds agent-UI MCP to an **already-running desktop** instead. That
-path does not replace spawn-session. Soft-contract outcomes:
+path does not replace spawn-session.
+
+| Layer | Behavior |
+| --- | --- |
+| Composition root | `main()` starts `AgentUiAttachHost` after show; stops in `finally` |
+| Transport | Local AF_UNIX + NDJSON (`pypost.agent.attach_ipc`) |
+| Sidecar | `pypost-agent-ui-mcp --attach` (no `AgentAppSession.start`) |
+| GUI thread | Host marshals `ui_*` onto the QApplication thread |
 
 | Outcome | Meaning |
 | --- | --- |
 | **Attach success** | Bound; UI tools apply to the live desktop |
-| **Attach fail** | Not bound; desktop not driven via attach |
+| **Attach fail** | Not bound; sidecar exits nonzero (no silent spawn) |
 | **Detach** | Binding ends; no default forced kill of the other |
-| **Host exit** | Desktop ends; binding ends (sidecar/client may remain) |
-| **Sidecar exit** | Sidecar ends; desktop is not implied destroyed |
+| **Host exit** | Desktop ends; socket removed (sidecar/client may remain) |
+| **Sidecar exit** | Sidecar ends; desktop host keeps listening |
 
-Full operator narrative: [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md).
-Runtime attach: [PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207).
+Operator narrative, CLI, and API:
+[agent_ui_actions_mcp.md](agent_ui_actions_mcp.md). Shipped capability:
+[PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207). Full matrix:
+[PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208).
 
 ## Out of scope (siblings)
 
@@ -258,6 +271,6 @@ Attach capability / tests: PYPOST-1207 / PYPOST-1208.
 | [ui_actions.md](ui_actions.md) | Click / fill / select / key; out-of-process MCP packaging (918) |
 | [ui_wait.md](ui_wait.md) | Settle waits after actions |
 | [agent_golden_e2e.md](agent_golden_e2e.md) | Golden request/response product flow (838) |
-| [logging.md](logging.md) | Event catalog including agent session events |
+| [logging.md](logging.md) | Event catalog (agent session + attach IPC) |
 | [testing.md](testing.md) | Suite timeouts and CI guardrails |
 | [architecture.md](architecture.md) | Broader app structure |

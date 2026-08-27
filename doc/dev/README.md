@@ -148,6 +148,7 @@ conventions.
 1. [UI Widget Identity (PYPOST-834)](ui_identity.md)
 1. [UI State Snapshot (PYPOST-835)](ui_snapshot.md)
 1. [UI Action Tools (PYPOST-836; out-of-process packaging PYPOST-918)](ui_actions.md)
+1. [Agent UI Actions MCP (PYPOST-952; attach PYPOST-1207)](agent_ui_actions_mcp.md)
 1. [UI Settle / Wait Helpers (PYPOST-837)](ui_wait.md)
 1. [Agent Golden E2E (PYPOST-838)](agent_golden_e2e.md)
 1. [Agent E2E Product Dialog Settle (PYPOST-919)](agent_dialog_settle.md)
