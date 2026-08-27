@@ -260,11 +260,11 @@ subprotocols, or `WebSocketConnection` dumps:
 | --- | --- |
 | `websocket_draft_omitted_from_open_tabs` | Unsaved WS id not written (`connection_id`) |
 | `websocket_saved_tab_persisted_in_open_tabs` | Collection-backed WS id appended |
-| `websocket_open_tabs_filter` | WS totals (`omitted_draft_count`, `persisted_ws_count`) |
+| `open_tabs_filter` | Aggregate totals (`omitted_draft_count`, `persisted_ws_count`, `persisted_mcp_count`) |
 | `websocket_draft_dirty_close_prompt` | Discard/Keep (`connection_id`, `choice`) |
 | `websocket_draft_clean_close` | Unsaved factory-clean draft closed |
 
-`websocket_open_tabs_filter` is emitted when either count is non-zero.
+`open_tabs_filter` is emitted when any of those counts is non-zero.
 
 No new Prometheus instruments. Blank-tab **creation** still uses
 `gui_new_tab_actions_total{protocol=websocket}` from PYPOST-1157.

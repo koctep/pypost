@@ -1027,8 +1027,9 @@ class TestWebsocketDraftObservability:
         omit = f"websocket_draft_omitted_from_open_tabs connection_id={draft_id}"
         assert omit in messages
         assert any(
-            "websocket_open_tabs_filter omitted_draft_count=1" in m
+            "open_tabs_filter omitted_draft_count=1" in m
             and "persisted_ws_count=0" in m
+            and "persisted_mcp_count=0" in m
             for m in messages
         )
         assert not any("url=" in m for m in messages)
@@ -1057,8 +1058,9 @@ class TestWebsocketDraftObservability:
         )
         assert persist in messages
         assert any(
-            "websocket_open_tabs_filter omitted_draft_count=0" in m
+            "open_tabs_filter omitted_draft_count=0" in m
             and "persisted_ws_count=1" in m
+            and "persisted_mcp_count=0" in m
             for m in messages
         )
         assert not any("url=" in m for m in messages)
