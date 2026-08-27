@@ -11,7 +11,10 @@ from pypost.core.mcp_client_registry import McpClientRegistry
 from pypost.core.request_manager import RequestManager
 from pypost.core.websocket_registry import WebSocketRegistry
 from pypost.ui.collection_item_dialogs import prompt_unsaved_draft_tab_close
-from pypost.ui.presenters.tab_dirty import is_websocket_draft_dirty
+from pypost.ui.presenters.tab_dirty import (
+    is_request_draft_dirty,
+    is_websocket_draft_dirty,
+)
 from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
 
@@ -122,6 +125,43 @@ def confirm_close_websocket_draft(
     logger.info(
         "websocket_draft_dirty_close_prompt connection_id=%s choice=%s",
         conn.id,
+        "discard" if discarded else "keep",
+    )
+    return discarded
+
+
+def confirm_close_request_draft(
+    parent: QWidget,
+    tab: object,
+    *,
+    request_id_is_saved: Callable[[str], bool] | None = None,
+    prompt_close: PromptClose | None = None,
+) -> bool:
+    """Return True if close_tab should proceed (not dirty, saved, or user discarded)."""
+    from pypost.ui.presenters.tabs_presenter import RequestTab
+
+    if not isinstance(tab, RequestTab):
+        return True
+    req = tab.request_data or getattr(
+        getattr(tab, "request_editor", None), "request_data", None
+    )
+    req_id = getattr(req, "id", None) or "request-draft"
+    if tab.persisted_baseline is not None:
+        return True
+    if req is not None and request_id_is_saved is not None and request_id_is_saved(req.id):
+        return True
+    if not is_request_draft_dirty(tab):
+        logger.info(
+            "request_draft_clean_close request_id=%s",
+            req_id,
+        )
+        return True
+    closer = prompt_close if prompt_close is not None else prompt_unsaved_draft_tab_close
+    title = (req.name if req and req.name else None) or "New Request"
+    discarded = closer(parent, title)
+    logger.info(
+        "request_draft_dirty_close_prompt request_id=%s choice=%s",
+        req_id,
         "discard" if discarded else "keep",
     )
     return discarded

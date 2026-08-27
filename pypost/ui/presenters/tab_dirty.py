@@ -9,7 +9,11 @@ from pypost.core.mcp_client_persisted_fields import (
     persisted_mcp_client_fields_equal,
     mcp_client_draft_fields_equal,
 )
-from pypost.core.request_persisted_fields import persisted_fields_equal
+from pypost.core.request_persisted_fields import (
+    factory_request_draft,
+    persisted_fields_equal,
+    request_draft_fields_equal,
+)
 from pypost.core.websocket_persisted_fields import (
     factory_websocket_draft,
     persisted_websocket_fields_equal,
@@ -24,11 +28,17 @@ if TYPE_CHECKING:
     from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
 
 
+def is_request_draft_dirty(tab: RequestTab) -> bool:
+    """True when editor-visible fields differ from new-request factory defaults."""
+    ui_data = tab.request_editor.get_request_data_from_ui()
+    return not request_draft_fields_equal(ui_data, factory_request_draft())
+
+
 def is_tab_dirty(tab: RequestTab) -> bool:
     """Return True when the tab editor differs from its adopted persisted baseline."""
     baseline = tab.persisted_baseline
     if baseline is None:
-        return False
+        return is_request_draft_dirty(tab)
     ui_data = tab.request_editor.get_request_data_from_ui()
     return not persisted_fields_equal(ui_data, baseline)
 

@@ -1098,6 +1098,81 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertIn("ws-saved-mixed", open_tabs)
         self.assertNotIn(draft_tab.connection_data.id, open_tabs)
 
+    def test_close_dirty_http_draft_prompts_discard_or_keep(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        tab.request_editor.url_input.setText("https://example.com/api/test")
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+
+        with patch(prompt_path, return_value=False) as prompt:
+            p.close_tab(0)
+        prompt.assert_called_once()
+        self.assertEqual(p.widget.indexOf(tab), 0)
+
+        with patch(prompt_path, return_value=True) as prompt:
+            p.close_tab(0)
+        prompt.assert_called_once()
+        self.assertEqual(p.widget.indexOf(tab), -1)
+
+    def test_close_clean_http_draft_does_not_prompt(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+        with patch(prompt_path, return_value=False) as prompt:
+            p.close_tab(0)
+        prompt.assert_not_called()
+        self.assertEqual(p.widget.indexOf(tab), -1)
+
+    def test_is_request_draft_dirty_editor_snapshots(self):
+        from pypost.ui.presenters.tab_dirty import is_request_draft_dirty
+
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        self.assertFalse(is_request_draft_dirty(tab))
+
+        # URL edit
+        tab.request_editor.url_input.setText("https://example.com")
+        self.assertTrue(is_request_draft_dirty(tab))
+        tab.request_editor.url_input.setText("")
+        self.assertFalse(is_request_draft_dirty(tab))
+
+        # Method edit
+        tab.request_editor.method_combo.setCurrentText("POST")
+        self.assertTrue(is_request_draft_dirty(tab))
+        tab.request_editor.method_combo.setCurrentText("GET")
+        self.assertFalse(is_request_draft_dirty(tab))
+
+        # Body edit
+        tab.request_editor.body_edit.setPlainText("{\"hello\": \"world\"}")
+        self.assertTrue(is_request_draft_dirty(tab))
+        tab.request_editor.body_edit.setPlainText("")
+        self.assertFalse(is_request_draft_dirty(tab))
+
+        # Params table edit
+        tab.request_editor.params_table.set_data({"q": "search"})
+        self.assertTrue(is_request_draft_dirty(tab))
+        tab.request_editor.params_table.set_data({})
+        self.assertFalse(is_request_draft_dirty(tab))
+
+        # Headers table edit
+        tab.request_editor.headers_table.set_data({"Accept": "application/json"})
+        self.assertTrue(is_request_draft_dirty(tab))
+        tab.request_editor.headers_table.set_data({})
+        self.assertFalse(is_request_draft_dirty(tab))
+
+        # MCP check edit
+        tab.request_editor.mcp_check.setChecked(True)
+        self.assertTrue(is_request_draft_dirty(tab))
+        tab.request_editor.mcp_check.setChecked(False)
+        self.assertFalse(is_request_draft_dirty(tab))
+
 
 _DRAFT_LOGGER = "pypost.ui.presenters.tabs_presenter_draft"
 
@@ -1208,6 +1283,56 @@ class TestWebsocketDraftObservability:
         clean = f"websocket_draft_clean_close connection_id={draft_id}"
         assert clean in messages
         assert not any("websocket_draft_dirty_close_prompt" in m for m in messages)
+        assert not any("url=" in m for m in messages)
+
+    def test_close_dirty_http_draft_logs_keep_and_discard(self, caplog):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        tab.request_editor.url_input.setText("https://example.com/api")
+        req_id = tab.request_editor.request_data.id
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger=_DRAFT_LOGGER):
+            with patch(prompt_path, return_value=False):
+                p.close_tab(0)
+        keep = (
+            f"request_draft_dirty_close_prompt request_id={req_id} "
+            "choice=keep"
+        )
+        assert keep in [r.message for r in caplog.records]
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger=_DRAFT_LOGGER):
+            with patch(prompt_path, return_value=True):
+                p.close_tab(0)
+        messages = [r.message for r in caplog.records]
+        discard = (
+            f"request_draft_dirty_close_prompt request_id={req_id} "
+            "choice=discard"
+        )
+        assert discard in messages
+        assert not any("url=" in m for m in messages)
+        assert not any("https://example.com" in m for m in messages)
+
+    def test_close_clean_http_draft_logs_without_prompt(self, caplog):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        req_id = tab.request_editor.request_data.id
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger=_DRAFT_LOGGER):
+            with patch(prompt_path, return_value=False) as prompt:
+                p.close_tab(0)
+        prompt.assert_not_called()
+        messages = [r.message for r in caplog.records]
+        clean = f"request_draft_clean_close request_id={req_id}"
+        assert clean in messages
+        assert not any("request_draft_dirty_close_prompt" in m for m in messages)
         assert not any("url=" in m for m in messages)
 
 

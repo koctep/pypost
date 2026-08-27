@@ -52,3 +52,20 @@ def persisted_fields_equal(a: RequestData, b: RequestData) -> bool:
         if getattr(a, field_name) != getattr(b, field_name):
             return False
     return True
+
+
+_FACTORY_DRAFT_ID = "request-factory-draft"
+_DRAFT_FIELD_NAMES = _PERSISTED_FIELD_NAMES
+
+
+def factory_request_draft() -> RequestData:
+    """Return ``RequestData()`` with a stable dummy id for comparisons."""
+    return RequestData(id=_FACTORY_DRAFT_ID)
+
+
+def request_draft_fields_equal(a: RequestData, b: RequestData) -> bool:
+    """Return True when two requests match on draft-visible editor fields."""
+    for field_name in _DRAFT_FIELD_NAMES:
+        if getattr(a, field_name) != getattr(b, field_name):
+            return False
+    return True

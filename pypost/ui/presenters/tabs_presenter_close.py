@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pypost.ui.collection_item_dialogs import prompt_unsaved_draft_tab_close
 from pypost.ui.presenters.tabs_presenter_draft import (
     PromptClose,
+    confirm_close_request_draft,
     confirm_close_websocket_draft,
     websocket_id_is_saved,
 )
@@ -34,6 +35,15 @@ def close_workspace_tab(
         prompt_close=closer,
         websocket_id_is_saved=lambda item_id: websocket_id_is_saved(
             presenter._request_manager, item_id
+        ),
+    ):
+        return
+    if not confirm_close_request_draft(
+        presenter._tabs,
+        tab,
+        prompt_close=closer,
+        request_id_is_saved=lambda item_id: (
+            presenter._request_manager.find_request(item_id) is not None
         ),
     ):
         return
