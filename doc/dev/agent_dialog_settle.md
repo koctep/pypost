@@ -186,6 +186,15 @@ that diagnostic ticket — it makes the defect visible and regression-checked:
   CI selection, same convention as other opt-in-only scenarios; it costs
   ~25-40s wall time (25 children at the measured baseline).
 
+Mitigation follow-up is ticketed under epic
+[PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115):
+[PYPOST-1209](https://pypost.atlassian.net/browse/PYPOST-1209) (evaluation
+contract / baseline),
+[PYPOST-1210](https://pypost.atlassian.net/browse/PYPOST-1210) (pin attempt),
+[PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211) (app-side +
+settlement). Evaluation contract, pin outcome, and marker/docs settlement
+belong to those children — not expanded here.
+
 Run it explicitly:
 
 ```bash
@@ -300,4 +309,8 @@ exception path (`step` + modal scalars), not new production metrics. Catalog:
 - [ai-tasks/PYPOST-1040/20-architecture.md](../../ai-tasks/PYPOST-1040/20-architecture.md) —
   full crash investigation: root cause, ablation experiments, reproduction evidence
 - [ai-tasks/PYPOST-1040/60-tech-debt.md](../../ai-tasks/PYPOST-1040/60-tech-debt.md) —
-  tech-debt disposition and mitigation-attempt follow-up ([PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115))
+  tech-debt disposition; mitigation children under
+  [PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115):
+  [PYPOST-1209](https://pypost.atlassian.net/browse/PYPOST-1209) /
+  [PYPOST-1210](https://pypost.atlassian.net/browse/PYPOST-1210) /
+  [PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211)
