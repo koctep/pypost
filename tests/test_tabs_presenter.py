@@ -24,6 +24,7 @@ from pypost.models.mcp_client import McpClientConnection
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 from pypost.models.websocket import WebSocketConnection
+from pypost.ui.widget_ids import MCP_CLIENT_TAB_PAGE
 from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.new_tab_protocol_picker import (
     NewTabProtocolPicker,
@@ -76,10 +77,14 @@ class FakeStateManager:
         self._expanded = ids
 
 def _request_tab_count(presenter: TabsPresenter) -> int:
+    """Count workspace tabs that keep the strip non-empty (matches production)."""
     return sum(
         1
         for i in range(presenter.widget.count())
-        if isinstance(presenter.widget.widget(i), RequestTab)
+        if isinstance(
+            presenter.widget.widget(i),
+            (RequestTab, WebSocketTab, McpClientTab),
+        )
     )
 
 def _plus_tab_index(presenter: TabsPresenter) -> int:
@@ -1564,6 +1569,45 @@ class TestHandleNewTabProtocolPicker(unittest.TestCase):
         self.assertIsInstance(current, McpClientTab)
         self.assertEqual(add_http_calls, [])
 
+    def test_open_blank_tab_mcp_client_sets_title_new_mcp_client(self):
+        """PYPOST-1183: blank MCP open sets strip title New MCP Client."""
+        p = self._make_presenter()
+        p.open_blank_tab(TabProtocol.MCP_CLIENT, "shortcut")
+        current = p.widget.currentWidget()
+        self.assertIsInstance(current, McpClientTab)
+        index = p.widget.indexOf(current)
+        self.assertEqual(p.widget.tabText(index), "New MCP Client")
+
+    def test_open_blank_tab_mcp_client_sets_widget_id(self):
+        """PYPOST-1183: blank MCP open keeps MCP_CLIENT_TAB_PAGE identity."""
+        p = self._make_presenter()
+        p.open_blank_tab(TabProtocol.MCP_CLIENT, "shortcut")
+        current = p.widget.currentWidget()
+        self.assertIsInstance(current, McpClientTab)
+        self.assertEqual(current.objectName(), MCP_CLIENT_TAB_PAGE)
+        self.assertEqual(current.objectName(), "pypost_mcp_client_tab_page")
+
+    def test_request_tab_count_helper_counts_mcp_client(self):
+        """PYPOST-1183 FR-4: suite helper counts MCP like production."""
+        p = self._make_presenter()
+        p.add_blank_mcp_client_tab()
+        self.assertGreaterEqual(_request_tab_count(p), 1)
+        self.assertEqual(_request_tab_count(p), p._request_tab_count())
+
+        p.add_new_tab()
+        self.assertEqual(_request_tab_count(p), 2)
+        self.assertEqual(_request_tab_count(p), p._request_tab_count())
+
+        http_idx = next(
+            i
+            for i in range(p.widget.count())
+            if isinstance(p.widget.widget(i), RequestTab)
+        )
+        p.close_tab(http_idx)
+        self.assertGreaterEqual(_request_tab_count(p), 1)
+        self.assertEqual(_request_tab_count(p), p._request_tab_count())
+        self.assertIsInstance(p.widget.currentWidget(), McpClientTab)
+
     def test_open_blank_tab_records_mcp_client_protocol(self):
         def picker(*_a, **_k):
             return TabProtocol.MCP_CLIENT
@@ -1699,6 +1743,44 @@ class TestCloseLastTabProtocolPicker(unittest.TestCase):
         p.close_tab(0)
         self.assertEqual(len(calls), 0)
         self.assertEqual(p._request_tab_count(), 1)
+
+    def test_close_last_http_with_mcp_remaining_does_not_auto_open_http(self):
+        """PYPOST-1183: closing last HTTP while MCP remains skips last_tab."""
+        p = self._make_presenter(
+            protocol_picker=lambda *_a, **_k: TabProtocol.HTTP,
+        )
+        p.add_new_tab()
+        mcp_tab = p.add_blank_mcp_client_tab()
+        http_idx = next(
+            i
+            for i in range(p.widget.count())
+            if isinstance(p.widget.widget(i), RequestTab)
+        )
+        self.assertEqual(p._request_tab_count(), 2)
+        self.assertEqual(_request_tab_count(p), 2)
+
+        orig_add = p.add_new_tab
+        add_http_calls = []
+
+        def wrapped_add(*args, **kwargs):
+            add_http_calls.append(True)
+            return orig_add(*args, **kwargs)
+
+        p.add_new_tab = wrapped_add
+        with patch.object(
+            p, "handle_new_tab", wraps=p.handle_new_tab,
+        ) as mock_handle:
+            p.close_tab(http_idx)
+
+        mock_handle.assert_not_called()
+        self.assertEqual(add_http_calls, [])
+        self.assertIs(p.widget.currentWidget(), mcp_tab)
+        self.assertIsInstance(p.widget.currentWidget(), McpClientTab)
+        for i in range(p.widget.count()):
+            self.assertNotIsInstance(p.widget.widget(i), RequestTab)
+        self.assertGreaterEqual(p._request_tab_count(), 1)
+        self.assertGreaterEqual(_request_tab_count(p), 1)
+        self.assertEqual(_request_tab_count(p), p._request_tab_count())
 
     def test_close_dirty_last_websocket_draft_keep_skips_picker(self):
         calls = []

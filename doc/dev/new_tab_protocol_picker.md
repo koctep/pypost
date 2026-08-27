@@ -1,4 +1,4 @@
-# Blank-tab protocol picker (PYPOST-1157, PYPOST-1165, PYPOST-1180)
+# Blank-tab protocol picker (PYPOST-1157, PYPOST-1165, PYPOST-1180, PYPOST-1183)
 
 ## Overview
 
@@ -23,9 +23,14 @@ shipped the picker with two items. MCP-TM-1
 the third item. [PYPOST-1180](https://pypost.atlassian.net/browse/PYPOST-1180)
 closed verification debt: hermetic unit proofs that `prompt()` maps
 HTTP / WebSocket / dismiss (same mocked-`exec` pattern as MCP Client).
-Production mapping was already correct; no product change. The picker
-is Option A: a popup `QMenu` with **HTTP Request** first and
-`setActiveAction` so Enter still confirms HTTP.
+[PYPOST-1183](https://pypost.atlassian.net/browse/PYPOST-1183) locks
+the blank MCP Client stub contract from the `open_blank_tab` path: strip
+title **New MCP Client**, page identity `pypost_mcp_client_tab_page`,
+and suite `_request_tab_count` aligned with production
+(`RequestTab` / `WebSocketTab` / `McpClientTab`). Production behavior was
+already correct; no product change. The picker is Option A: a popup
+`QMenu` with **HTTP Request** first and `setActiveAction` so Enter still
+confirms HTTP.
 
 User-facing copy of `Ctrl+N` / **+** is
 [PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163) (WebSocket)
@@ -104,9 +109,15 @@ are omitted from `save_tabs_state`; dirty close prompts Discard / Keep:
 `add_blank_mcp_client_tab` constructs `McpClientConnection()` +
 `McpClientPresenter` + `McpClientTab` and inserts before the plus tab
 with title `"New MCP Client"`. It must **not** call `add_new_tab` or
-`open_websocket_tab`. `_request_tab_count` includes `McpClientTab` so
-close-last-tab does not treat an MCP-only strip as empty. Unsaved drafts
-are omitted from `save_tabs_state` until MCP-TM-7
+`open_websocket_tab`. Production `_request_tab_count` includes
+`McpClientTab` so close-last-tab does not treat an MCP-only strip as
+empty (last-HTTP-close-with-MCP-remaining:
+[last_tab_protocol_picker.md](last_tab_protocol_picker.md)). The suite
+helper in `tests/test_tabs_presenter.py` mirrors that tuple
+(`RequestTab`, `WebSocketTab`, `McpClientTab`) so a production drop of
+MCP from the count cannot hide behind a narrower test helper
+([PYPOST-1183](https://pypost.atlassian.net/browse/PYPOST-1183)).
+Unsaved drafts are omitted from `save_tabs_state` until MCP-TM-7
 ([mcp_client_draft_tab.md](mcp_client_draft_tab.md)).
 
 ### Out of scope
@@ -115,6 +126,7 @@ are omitted from `save_tabs_state` until MCP-TM-7
 | --- | --- |
 | Blank WebSocket draft persist, dirty-close | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) (shipped) |
 | Close-last-tab / empty-workspace picker | [PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159) (shipped — [last_tab_protocol_picker.md](last_tab_protocol_picker.md)) |
+| MCP Client stub title / identity / count proofs | [PYPOST-1183](https://pypost.atlassian.net/browse/PYPOST-1183) (shipped — verification debt; see Tests) |
 | MCP Client draft shell (URL, Connect, tools) | [PYPOST-1166](https://pypost.atlassian.net/browse/PYPOST-1166) (shipped) |
 | MCP Client Headers + `execute_outbound` | [PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) (shipped) |
 | User documentation rewrite (MCP Client) | [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168) |
@@ -339,6 +351,14 @@ fallback. Assert current page is `McpClientTab`, not `RequestTab` or
 `WebSocketTab`. Also confirm `prompt()` maps the third action; unmapped
 data returns `None` (looks like cancel).
 
+### Blank MCP Client title or widget id drifted
+
+After `open_blank_tab(TabProtocol.MCP_CLIENT, ...)`, strip text must be
+**New MCP Client** and `current.objectName()` must be
+`MCP_CLIENT_TAB_PAGE` (`pypost_mcp_client_tab_page`). Factory-only
+asserts are not enough — lock the blank-open path
+([PYPOST-1183](https://pypost.atlassian.net/browse/PYPOST-1183)).
+
 ### Two blank WebSocket tabs collapse into one
 
 `open_websocket_tab` dedups by `connection.id`. Blank tabs must use
@@ -381,12 +401,19 @@ the source of truth for the three-item picker until that story lands.
 | --- | --- |
 | `tests/test_new_tab_protocol_picker.py` | Three labels, HTTP first + active, third is MCP Client; hermetic `prompt()` maps HTTP (`actions()[0]`), WebSocket (`actions()[1]`), MCP Client (`actions()[2]`), and dismiss → `None` via mocked `menu.exec` (PYPOST-1180); no live `exec()` |
 | `TestHandleNewTabProtocolPicker` in `tests/test_tabs_presenter.py` | Picker before editor; HTTP/WS/MCP confirm; MCP ≠ HTTP; cancel; metrics `protocol=mcp_client` |
+| `test_open_blank_tab_mcp_client_sets_title_new_mcp_client` | After `open_blank_tab(MCP_CLIENT)`, strip `tabText` is **New MCP Client** (PYPOST-1183) |
+| `test_open_blank_tab_mcp_client_sets_widget_id` | After blank MCP open, page `objectName` is `pypost_mcp_client_tab_page` (PYPOST-1183) |
+| `test_request_tab_count_helper_counts_mcp_client` | Suite `_request_tab_count` counts MCP (and matches production) including after last-HTTP close (PYPOST-1183) |
 | Plus-click tests in `tests/test_tabs_presenter.py` | Inject HTTP picker so **+** does not hang |
 | `test_track_gui_new_tab_action_records_mcp_client_protocol` | Prometheus + OTel allow-list records `mcp_client`, not `unknown` |
 | `test_agent_golden_plus_tab_create_when_no_blank_tab` | Patches `_protocol_picker` before `ui_click(PLUS_TAB_BUTTON)` |
 
+Last-HTTP-close-with-MCP-remaining (no auto-open HTTP) lives under
+`TestCloseLastTabProtocolPicker` — see
+[last_tab_protocol_picker.md](last_tab_protocol_picker.md).
+
 Run:
 
 ```bash
-make test PYTEST_ARGS="tests/test_new_tab_protocol_picker.py tests/test_tabs_presenter.py tests/test_metrics_manager.py tests/test_metrics_otel.py -k 'HandleNewTabProtocolPicker or plus_tab or new_tab or mcp_client' -v"
+make test PYTEST_ARGS="tests/test_new_tab_protocol_picker.py tests/test_tabs_presenter.py tests/test_metrics_manager.py tests/test_metrics_otel.py -k 'HandleNewTabProtocolPicker or plus_tab or new_tab or mcp_client or request_tab_count_helper_counts_mcp or close_last_http_with_mcp_remaining' -v"
 ```

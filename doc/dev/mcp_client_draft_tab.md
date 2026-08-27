@@ -325,7 +325,13 @@ result pane, and is idempotent when never connected.
 
 `_request_tab_count` already includes `McpClientTab`. Closing the last
 HTTP tab while an MCP Client tab remains must not treat the strip as
-empty and auto-open HTTP.
+empty and auto-open HTTP. Blank-open title (**New MCP Client**), page
+identity (`MCP_CLIENT_TAB_PAGE` / `pypost_mcp_client_tab_page`), and
+that last-HTTP-close-with-MCP edge are locked by hermetic presenter
+proofs in `tests/test_tabs_presenter.py`
+([PYPOST-1183](https://pypost.atlassian.net/browse/PYPOST-1183); see
+[new_tab_protocol_picker.md](new_tab_protocol_picker.md) and
+[last_tab_protocol_picker.md](last_tab_protocol_picker.md)).
 
 ## API / Usage
 
@@ -558,8 +564,11 @@ no growth this story). GUI tests inject `metrics=` on the presenter.
 
 Plus-tab index is ignored. Unsaved dirty WebSocket drafts may prompt
 Discard / Keep first ([websocket_draft_tab.md](websocket_draft_tab.md)).
-Otherwise `teardown()` if present, then `removeTab`. Empty strip still
-opens HTTP via `add_new_tab(save_state=False)` (PYPOST-1159).
+Otherwise `teardown()` if present, then `removeTab`. Empty strip calls
+`handle_new_tab("last_tab")` (protocol picker; not silent
+`add_new_tab`) — see
+[last_tab_protocol_picker.md](last_tab_protocol_picker.md)
+(PYPOST-1159).
 
 ## Configuration
 
@@ -642,7 +651,10 @@ URL placeholder is `http://127.0.0.1:1080/mcp`.
 
 Assert `isinstance(current, McpClientTab)` and
 `findChild(..., METHOD_COMBO) is None`. Routing must hit
-`add_blank_mcp_client_tab()` before the HTTP fallback. Details:
+`add_blank_mcp_client_tab()` before the HTTP fallback. Also assert
+strip title **New MCP Client** and
+`objectName == pypost_mcp_client_tab_page` after
+`open_blank_tab(MCP_CLIENT)` (PYPOST-1183). Details:
 [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 
 ### Headers table missing
@@ -753,7 +765,12 @@ Intentional for this story.
 ## Tests
 
 - `tests/test_tabs_presenter.py`: draft factory, `open_tabs` omission,
-  `close_tab` teardown, env kwargs / duck-typed fan-out.
+  `close_tab` teardown, env kwargs / duck-typed fan-out; PYPOST-1183
+  blank-open proofs (`test_open_blank_tab_mcp_client_sets_title_new_mcp_client`,
+  `test_open_blank_tab_mcp_client_sets_widget_id`), suite count alignment
+  (`test_request_tab_count_helper_counts_mcp_client`), and
+  last-HTTP-close-with-MCP
+  (`test_close_last_http_with_mcp_remaining_does_not_auto_open_http`).
 - `tests/test_mcp_client_tab.py`: chrome + widget ids (Refresh, error
   label, Invoke, form, JSON, result, elapsed); Connect fills
   name/description; Connect error → Failed + empty tools; Refresh
@@ -761,7 +778,8 @@ Intentional for this story.
   result + elapsed; invoke error stays Connected with tools; nested
   schema JSON fallback; empty required field does not `run`; result
   sanitizer; INFO omits URL / `headers` / secrets / arguments; outbound
-  metrics.
+  metrics. Construction `objectName == MCP_CLIENT_TAB_PAGE` remains
+  complementary to the presenter blank-open identity proof.
 - `tests/test_mcp_client_arg_schema.py`: Qt-free classifier
   (`simple_form` / `json_only` / `no_args`).
 - `tests/test_mcp_client_presenter.py`: `execute_outbound` forwards
@@ -790,6 +808,7 @@ make test PYTEST_ARGS="tests/test_mcp_client_tab.py \
 - [MCP Client user guide](../user/mcp-client.md) — outbound connect, list, invoke (PYPOST-1168;
   contract tests in `tests/test_mcp_tab_mode_user_docs.py`)
 - [Blank-tab protocol picker](new_tab_protocol_picker.md)
+- [Last-tab close protocol picker](last_tab_protocol_picker.md)
 - [Blank WebSocket draft tab lifecycle](websocket_draft_tab.md)
 - [UI widget identity](ui_identity.md)
 - [Logging event names](logging.md)

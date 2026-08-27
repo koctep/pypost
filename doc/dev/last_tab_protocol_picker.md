@@ -1,4 +1,4 @@
-# Last-tab close protocol picker (PYPOST-1159)
+# Last-tab close protocol picker (PYPOST-1159, PYPOST-1183)
 
 ## Overview
 
@@ -14,6 +14,12 @@ Now, when `_request_tab_count() == 0` after a close, the product calls
 `open_blank_tab` routing as keyboard and **+**. Dismissing the menu leaves
 the workspace empty (plus chrome only). Session **restore** of saved HTTP
 and WebSocket profiles is unchanged and never shows the picker.
+
+`_request_tab_count` includes `RequestTab`, `WebSocketTab`, and
+`McpClientTab`. Closing the **last HTTP** tab while an MCP Client stub
+remains must **not** enter `handle_new_tab("last_tab")` or auto-open a
+blank HTTP tab — the MCP stub keeps the strip non-empty
+([PYPOST-1183](https://pypost.atlassian.net/browse/PYPOST-1183)).
 
 Picker details: [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 WebSocket draft persist and dirty-close:
@@ -65,6 +71,7 @@ flowchart TB
 | Path | Picker? | Replacement |
 | --- | --- | --- |
 | Close last workspace tab | **Yes** (`last_tab`) | HTTP / WebSocket / MCP draft, or **none** on cancel |
+| Close last HTTP while MCP Client remains | No | MCP stub stays; no auto HTTP |
 | Close non-last tab | No | None |
 | Dirty unsaved WS draft, **Keep** | No | Tab stays |
 | Dirty unsaved WS draft, **Discard** on last tab | Yes (after remove) | Same as last-tab row |
@@ -144,6 +151,14 @@ See [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 Should not happen. Only `_request_tab_count() == 0` after `removeTab`
 triggers the picker.
 
+### Closing last HTTP while MCP remains opens a new HTTP tab
+
+Should not happen. Production `_request_tab_count` must include
+`McpClientTab`. After `removeTab` on the HTTP index, count stays ≥ 1,
+so `handle_new_tab("last_tab")` is skipped. Locked by
+`test_close_last_http_with_mcp_remaining_does_not_auto_open_http`
+([PYPOST-1183](https://pypost.atlassian.net/browse/PYPOST-1183)).
+
 ### Dirty WebSocket draft shows picker on **Keep**
 
 Discard / Keep runs first. **Keep** returns before `removeTab`; picker
@@ -169,11 +184,13 @@ Register `last_tab` in `_NEW_TAB_ACTION_SOURCES` and pass
 | Test | Behavior verified |
 | --- | --- |
 | `TestCloseLastTabProtocolPicker` in `tests/test_tabs_presenter.py` | Picker on last close; HTTP/WS confirm; cancel empty; non-last skip; dirty WS keep/discard |
+| `test_close_last_http_with_mcp_remaining_does_not_auto_open_http` | HTTP + MCP open → close HTTP → no `handle_new_tab`, no new `RequestTab`; MCP remains (PYPOST-1183) |
+| `test_request_tab_count_helper_counts_mcp_client` | Suite helper counts MCP like production (shared with blank-open proofs — [new_tab_protocol_picker.md](new_tab_protocol_picker.md)) |
 | `test_track_gui_new_tab_action_last_tab_source` in `tests/test_metrics_manager.py` | Prometheus `source=last_tab` |
 
 Run:
 
 ```bash
-make test PYTEST_ARGS="tests/test_tabs_presenter.py -k CloseLastTabProtocolPicker -v"
+make test PYTEST_ARGS="tests/test_tabs_presenter.py -k 'CloseLastTabProtocolPicker or close_last_http_with_mcp_remaining or request_tab_count_helper_counts_mcp' -v"
 make test PYTEST_ARGS="tests/test_metrics_manager.py -k last_tab -v"
 ```
