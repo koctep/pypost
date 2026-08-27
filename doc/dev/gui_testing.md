@@ -293,6 +293,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | Test hangs (general) | Add timeout marker; bound waits; prefer `wait_until` (no nested `exec()`) |
 | Missing timeout marker | `conftest.py` fails setup — add `pytestmark` or per-function marker |
 | ELF `core` file in repo root | Native crash (SIGSEGV), not a Python exception. Delete the file; do not commit. Repo-root `/core` is gitignored. Run tests via `make test` or set `QT_QPA_PLATFORM=offscreen`. If it recurs, capture `lldb -c core --batch -o bt` and file a ticket with Python/PySide6 versions. See [PYPOST-429 investigation](../../ai-tasks/PYPOST-429/investigation-report.md). |
+| Large-batch `apply_theme` segfault | Ticketed under epic [PYPOST-1117](https://pypost.atlassian.net/browse/PYPOST-1117): [PYPOST-1212](https://pypost.atlassian.net/browse/PYPOST-1212) (repro), [PYPOST-1213](https://pypost.atlassian.net/browse/PYPOST-1213) (diagnosis), [PYPOST-1214](https://pypost.atlassian.net/browse/PYPOST-1214) (mitigation + CI ownership). Repro, diagnosis, and mitigation/CI prose belong to those children — not expanded here. |
 
 ## Agent UI e2e (in-process)
 
