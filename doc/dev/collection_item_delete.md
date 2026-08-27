@@ -27,7 +27,13 @@ The goal is to allow direct cleanup from the tree without extra navigation.
   - Owns deletion business logic:
     - `delete_request(request_id)`
     - `delete_collection(collection_id)`
-    - `delete_collection_item(item_id, item_type)`
+    - `delete_collection_item(item_id, item_type)` — builds
+      `ItemDispatchContext` and dispatches by `item_type`
+- **Strategy dispatch** (`collection_item_dispatch.py` /
+  `collection_item_strategies.py`):
+  - Type → handler via `DEFAULT_COLLECTION_ITEM_STRATEGIES`
+  - Handlers must unpack `_unpack_context` as a **3-tuple** (see
+    [Collection Item Strategies](collection_item_strategies.md))
 - **`StorageManager` (`pypost/core/storage.py`)**:
   - Persists collection changes and can remove collection files:
     - `delete_collection(collection_id, collection_name=...)`
@@ -56,11 +62,15 @@ Executes delete flow and applies UI refresh behavior.
 
 ### `RequestManager.delete_collection_item(item_id: str, item_type: str) -> bool`
 
-Type-based delete dispatch.
+Type-based delete dispatch via `ItemDispatchContext` and strategy handlers.
 
-- `item_type == "request"` -> `delete_request(...)`
-- `item_type == "collection"` -> `delete_collection(...)`
+- `"request"` / `"collection"` → request-manager persistence (handlers unpack
+  `manager, _, _` from `_unpack_context`)
+- `"websocket"` / `"mcp_client"` → registry-backed delete when registries are set
 - Unsupported type returns `False`
+
+See [Collection Item Strategies](collection_item_strategies.md) for the
+3-tuple unpack contract.
 
 ### Index-assisted delete (PYPOST-340)
 
@@ -99,6 +109,12 @@ Observability relies on existing global metrics server configuration:
 - Check confirmation dialog was not cancelled.
 - Check logs for `collection_item_delete_*` messages in `collection_tree_actions`.
 - Confirm item carries valid `Qt.UserRole` data (`RequestData` or collection ID string).
+
+### Delete fails with `ValueError: too many values to unpack (expected 2)`
+
+A strategy handler unpacked `_unpack_context` as two values. All handlers must
+use the 3-tuple contract — see
+[Collection Item Strategies](collection_item_strategies.md).
 
 ### Delete appears successful but item returns after reload
 

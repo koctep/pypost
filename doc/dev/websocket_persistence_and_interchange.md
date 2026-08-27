@@ -142,6 +142,7 @@ To adhere to strict module LOC limits (Single Responsibility Principle), collect
 class ItemDispatchContext:
     request_manager: RequestManager
     websocket_registry: Optional[WebSocketRegistry] = None
+    mcp_client_registry: Optional[McpClientRegistry] = None
 
 def delete_collection_item(
     context: ItemDispatchContext,
@@ -165,6 +166,13 @@ Item operations are dispatched polymorphically via `DEFAULT_COLLECTION_ITEM_STRA
 - `"collection"`: Deletes or renames entire collection via `RequestManager`.
 - `"request"`: Deletes or renames HTTP `RequestData` via `RequestManager`.
 - `"websocket"`: Deletes or renames `WebSocketConnection` via `WebSocketRegistry`.
+- `"mcp_client"`: Deletes or renames MCP client entries via `McpClientRegistry`.
+
+`_unpack_context` returns a **3-tuple**
+`(RequestManager, WebSocketRegistry | None, McpClientRegistry | None)`.
+Every handler must unpack three values (e.g. `manager, _, _` for
+collection/request). See
+[Collection Item Strategies](collection_item_strategies.md).
 
 ---
 

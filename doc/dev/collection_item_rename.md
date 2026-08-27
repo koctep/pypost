@@ -27,7 +27,13 @@ The goal is to allow quick in-place renaming directly in the tree.
   - Owns rename business logic:
     - `rename_request(request_id, new_name)`
     - `rename_collection(collection_id, new_name)`
-    - `rename_collection_item(item_id, item_type, new_name)`
+    - `rename_collection_item(item_id, item_type, new_name)` — builds
+      `ItemDispatchContext` and dispatches by `item_type`
+- **Strategy dispatch** (`collection_item_dispatch.py` /
+  `collection_item_strategies.py`):
+  - Type → handler via `DEFAULT_COLLECTION_ITEM_STRATEGIES`
+  - Handlers must unpack `_unpack_context` as a **3-tuple** (see
+    [Collection Item Strategies](collection_item_strategies.md))
 - **`StorageManager` (`pypost/core/storage.py`)**:
   - Persists renamed collections/requests via `save_collection(...)`.
   - For collection rename, old name file is removed and new file is saved.
@@ -83,11 +89,16 @@ from the model.
 
 ### `RequestManager.rename_collection_item(item_id: str, item_type: str, new_name: str) -> bool`
 
-Type-based rename dispatch.
+Type-based rename dispatch via `ItemDispatchContext` and strategy handlers.
 
-- `item_type == "request"` -> `rename_request(...)`
-- `item_type == "collection"` -> `rename_collection(...)`
+- `"request"` / `"collection"` → request-manager persistence (handlers unpack
+  `manager, _, _` from `_unpack_context`)
+- `"websocket"` / `"mcp_client"` → registry-backed rename when registries are set
+- Empty/whitespace names are rejected by the underlying rename methods
 - Unsupported type returns `False`
+
+See [Collection Item Strategies](collection_item_strategies.md) for the
+3-tuple unpack contract.
 
 ## Configuration
 
@@ -110,6 +121,12 @@ Observability relies on existing global metrics server configuration:
 - Check logs for `collection_item_rename_*` messages in `collection_tree_actions`.
 - Confirm item has valid `Qt.UserRole` payload (`RequestData` or collection ID).
 - Check write permissions for collection storage path.
+
+### Rename fails with `ValueError: too many values to unpack (expected 2)`
+
+A strategy handler unpacked `_unpack_context` as two values. All handlers must
+use the 3-tuple contract — see
+[Collection Item Strategies](collection_item_strategies.md).
 
 ### Empty names are not accepted
 

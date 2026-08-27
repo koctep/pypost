@@ -39,22 +39,22 @@ def _unpack_context(
 
 
 def _collection_delete(ctx: Any, item_id: str) -> bool:
-    manager, _ = _unpack_context(ctx)
+    manager, _, _ = _unpack_context(ctx)
     return manager.delete_collection(item_id)
 
 
 def _collection_rename(ctx: Any, item_id: str, new_name: str) -> bool:
-    manager, _ = _unpack_context(ctx)
+    manager, _, _ = _unpack_context(ctx)
     return manager.rename_collection(item_id, new_name)
 
 
 def _request_delete(ctx: Any, item_id: str) -> bool:
-    manager, _ = _unpack_context(ctx)
+    manager, _, _ = _unpack_context(ctx)
     return manager.delete_request(item_id)
 
 
 def _request_rename(ctx: Any, item_id: str, new_name: str) -> bool:
-    manager, _ = _unpack_context(ctx)
+    manager, _, _ = _unpack_context(ctx)
     return manager.rename_request(item_id, new_name)
 
 
