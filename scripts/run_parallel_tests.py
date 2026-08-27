@@ -36,6 +36,7 @@ class TestStatus(str, Enum):
     PASSED = "passed"
     FAILED = "failed"
     SKIPPED = "skipped"
+    TIMED_OUT = "timed_out"
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,7 @@ class RunnerConfig:
     pytest_args: list[str]
     repo_root: Path
     python_bin: Path
+    worker_timeout: float = 30.0
 
 
 def default_worker_count() -> int:
@@ -119,6 +121,32 @@ def get_worker_count(cli_workers: int | None = None) -> int:
     return default_worker_count()
 
 
+DEFAULT_WORKER_TIMEOUT = 30.0
+
+
+def get_worker_timeout(cli_timeout: float | None = None) -> float:
+    """Determine effective per-worker timeout following precedence rules.
+
+    Precedence:
+    1. Explicit CLI argument (--worker-timeout)
+    2. WORKER_TIMEOUT environment variable
+    3. DEFAULT_WORKER_TIMEOUT (30 seconds)
+    """
+    if cli_timeout is not None and cli_timeout > 0:
+        return cli_timeout
+
+    timeout_env = os.environ.get("WORKER_TIMEOUT")
+    if timeout_env:
+        try:
+            val = float(timeout_env.strip())
+            if val > 0:
+                return val
+        except ValueError:
+            pass
+
+    return DEFAULT_WORKER_TIMEOUT
+
+
 class CLIParser:
     """CLI argument parser separating orchestrator options and pytest passthrough flags."""
 
@@ -134,6 +162,7 @@ class CLIParser:
             repo_root = Path.cwd()
 
         cli_workers: int | None = None
+        cli_worker_timeout: float | None = None
         enable_coverage = False
         report_json_path: Path | None = None
         test_targets: list[str] = []
@@ -153,6 +182,15 @@ class CLIParser:
                 i += 1
             elif arg.startswith("-n") and len(arg) > 2 and arg[2:].isdigit():
                 cli_workers = int(arg[2:])
+                i += 1
+            elif arg == "--worker-timeout":
+                if i + 1 < len(args):
+                    cli_worker_timeout = float(args[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            elif arg.startswith("--worker-timeout="):
+                cli_worker_timeout = float(arg.split("=", 1)[1])
                 i += 1
             elif arg == "--cov":
                 enable_coverage = True
@@ -198,6 +236,7 @@ class CLIParser:
                 i += 1
 
         workers = get_worker_count(cli_workers)
+        worker_timeout = get_worker_timeout(cli_worker_timeout)
         python_bin = Path(sys.executable)
 
         return RunnerConfig(
@@ -208,6 +247,7 @@ class CLIParser:
             pytest_args=pytest_args,
             repo_root=repo_root,
             python_bin=python_bin,
+            worker_timeout=worker_timeout,
         )
 
 
@@ -292,13 +332,52 @@ class SubprocessTestExecutor:
             cmd.extend(["--cov-report=", "--cov-fail-under=0"])
 
         start_time = time.perf_counter()
-        proc = subprocess.run(
-            cmd,
-            cwd=str(self.config.repo_root),
-            env=env,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=str(self.config.repo_root),
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=self.config.worker_timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            duration = time.perf_counter() - start_time
+            try:
+                rel_file = str(test_file.relative_to(self.config.repo_root))
+            except ValueError:
+                rel_file = str(test_file)
+            stdout = ""
+            if exc.stdout is not None:
+                stdout = (
+                    exc.stdout.decode("utf-8", errors="replace")
+                    if isinstance(exc.stdout, bytes)
+                    else exc.stdout
+                )
+            stderr = ""
+            if exc.stderr is not None:
+                stderr = (
+                    exc.stderr.decode("utf-8", errors="replace")
+                    if isinstance(exc.stderr, bytes)
+                    else exc.stderr
+                )
+            timeout_note = (
+                f"worker timed out after {self.config.worker_timeout}s"
+            )
+            stderr = f"{stderr}\n{timeout_note}".strip()
+            logger.warning(
+                "worker_timeout file=%s timeout_seconds=%s",
+                rel_file,
+                self.config.worker_timeout,
+            )
+            return TestResult(
+                test_file=rel_file,
+                status=TestStatus.TIMED_OUT,
+                exit_code=-9,
+                duration_seconds=duration,
+                stdout=stdout,
+                stderr=stderr,
+            )
         duration = time.perf_counter() - start_time
 
         if proc.returncode == 0:
@@ -525,7 +604,11 @@ def run_parallel_tests(config: RunnerConfig) -> RunSummary:
     wall_clock_seconds = time.perf_counter() - start_wall_clock
     cumulative_duration = sum(r.duration_seconds for r in results)
     passed_count = sum(1 for r in results if r.status == TestStatus.PASSED)
-    failed_count = sum(1 for r in results if r.status == TestStatus.FAILED)
+    failed_count = sum(
+        1
+        for r in results
+        if r.status in (TestStatus.FAILED, TestStatus.TIMED_OUT)
+    )
     skipped_count = sum(1 for r in results if r.status == TestStatus.SKIPPED)
 
     slowest = sorted(
@@ -555,17 +638,27 @@ def run_parallel_tests(config: RunnerConfig) -> RunSummary:
         else:
             logger.info("coverage_report_completed fail_under=%d", fail_under)
 
-    failed_results = [r for r in results if r.status == TestStatus.FAILED]
+    failed_results = [
+        r for r in results if r.status in (TestStatus.FAILED, TestStatus.TIMED_OUT)
+    ]
     if failed_results:
         sep = "=" * 80
         print(f"\n{sep[:35]} FAILURES {sep[:35]}", flush=True)  # noqa: T201
         for r in failed_results:
-            logger.error(
-                "test_file_failed file=%s exit_code=%d duration_seconds=%.2f",
-                r.test_file,
-                r.exit_code,
-                r.duration_seconds,
-            )
+            if r.status == TestStatus.TIMED_OUT:
+                logger.error(
+                    "test_file_timed_out file=%s exit_code=%d duration_seconds=%.2f",
+                    r.test_file,
+                    r.exit_code,
+                    r.duration_seconds,
+                )
+            else:
+                logger.error(
+                    "test_file_failed file=%s exit_code=%d duration_seconds=%.2f",
+                    r.test_file,
+                    r.exit_code,
+                    r.duration_seconds,
+                )
             title = f" FAILURES: {r.test_file} "
             pad_left = (80 - len(title)) // 2
             pad_right = 80 - len(title) - pad_left

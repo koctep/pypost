@@ -17,6 +17,9 @@ VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
 VENV_TEST_STAMP := $(VENV)/.venv-test-$(PYTHON_VERSION)
 VENV_OTEL_STAMP := $(VENV)/.venv-otel-$(PYTHON_VERSION)
 WORKERS ?= $(shell PYTHONPATH=. $(PYTHON) -c 'from scripts.run_parallel_tests import default_worker_count; print(default_worker_count())')
+# Suite files (e.g. makefile smoke) often exceed the script default of 30s; override via
+# WORKER_TIMEOUT=N make test. Script/CLI default remains 30 when invoked without Make.
+WORKER_TIMEOUT ?= 120
 PYTEST_ARGS ?=
 
 help: ## Show available make targets
@@ -157,6 +160,7 @@ test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow i
 	@if [ -f scripts/run_parallel_tests.py ]; then \
 		QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py \
 			--workers $(WORKERS) \
+			--worker-timeout $(WORKER_TIMEOUT) \
 			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow"); \
 	else \
 		QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
@@ -182,6 +186,7 @@ test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage rep
 	@if [ -f scripts/run_parallel_tests.py ]; then \
 		QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py --cov \
 			--workers $(WORKERS) \
+			--worker-timeout $(WORKER_TIMEOUT) \
 			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow"); \
 	else \
 		QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \

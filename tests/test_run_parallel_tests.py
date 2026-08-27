@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -576,4 +578,69 @@ def test_parallel_runner_logs_coverage_threshold_warning(
         "coverage_threshold_failed" in record.getMessage()
         and "fail_under=70" in record.getMessage()
         for record in warning_records
+    )
+
+
+def test_hung_worker_under_timeout_yields_timed_out(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Hung worker under short worker_timeout yields TIMED_OUT and failed run.
+
+    Mocks ``subprocess.run`` raising ``TimeoutExpired`` so the suite stays
+    bounded while asserting status, structured ``worker_timeout`` log, and
+    non-success summary.
+    """
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_hang.py").write_text(
+        "import pytest\n"
+        "import time\n"
+        "pytestmark = pytest.mark.timeout(10)\n"
+        "def test_never_finishes():\n"
+        "    time.sleep(120)\n",
+        encoding="utf-8",
+    )
+
+    config = RunnerConfig(
+        workers=1,
+        enable_coverage=False,
+        report_json_path=None,
+        test_targets=["tests/test_hang.py"],
+        pytest_args=[],
+        repo_root=tmp_path,
+        python_bin=Path(sys.executable),
+        worker_timeout=1.0,
+    )
+
+    def fake_subprocess_run(
+        *args: Any,
+        **kwargs: Any,
+    ) -> subprocess.CompletedProcess[str]:
+        timeout = kwargs.get("timeout")
+        cmd = args[0] if args else kwargs.get("args", [])
+        if timeout is not None:
+            raise subprocess.TimeoutExpired(cmd=cmd, timeout=float(timeout))
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+    with (
+        caplog.at_level(logging.WARNING),
+        patch(
+            "scripts.run_parallel_tests.subprocess.run",
+            side_effect=fake_subprocess_run,
+        ),
+    ):
+        summary = run_parallel_tests(config)
+
+    assert summary.is_success is False
+    assert any(r.status == TestStatus.TIMED_OUT for r in summary.results)
+    assert any(
+        "worker_timeout" in record.getMessage()
+        and "timeout_seconds=" in record.getMessage()
+        for record in caplog.records
     )
