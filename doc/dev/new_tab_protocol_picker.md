@@ -1,4 +1,4 @@
-# Blank-tab protocol picker (PYPOST-1157, PYPOST-1165)
+# Blank-tab protocol picker (PYPOST-1157, PYPOST-1165, PYPOST-1180)
 
 ## Overview
 
@@ -20,8 +20,12 @@ metric.
 WS-TM-1 ([PYPOST-1157](https://pypost.atlassian.net/browse/PYPOST-1157))
 shipped the picker with two items. MCP-TM-1
 ([PYPOST-1165](https://pypost.atlassian.net/browse/PYPOST-1165)) added
-the third item. The picker is Option A: a popup `QMenu` with **HTTP
-Request** first and `setActiveAction` so Enter still confirms HTTP.
+the third item. [PYPOST-1180](https://pypost.atlassian.net/browse/PYPOST-1180)
+closed verification debt: hermetic unit proofs that `prompt()` maps
+HTTP / WebSocket / dismiss (same mocked-`exec` pattern as MCP Client).
+Production mapping was already correct; no product change. The picker
+is Option A: a popup `QMenu` with **HTTP Request** first and
+`setActiveAction` so Enter still confirms HTTP.
 
 User-facing copy of `Ctrl+N` / **+** is
 [PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163) (WebSocket)
@@ -139,7 +143,7 @@ Constructs the menu without showing it.
   via `set_widget_id`.
 - Action `data()` is `TabProtocol.HTTP` / `WEBSOCKET` / `MCP_CLIENT`.
 
-Unit-test chrome here. Do **not** call `exec()` in CI.
+Unit-test chrome here. Do **not** call live `exec()` in CI.
 
 ### `NewTabProtocolPicker.prompt(parent=None, *, anchor=None) -> TabProtocol | None`
 
@@ -252,8 +256,10 @@ session.window.tabs._protocol_picker = (
 )
 ```
 
-Picker unit tests (`tests/test_new_tab_protocol_picker.py`) use
-`build_menu()` only.
+Picker unit tests (`tests/test_new_tab_protocol_picker.py`) cover
+`build_menu()` chrome and hermetic `prompt()` outcome mapping. They
+mock instance `menu.exec` after `build_menu` (via `_install_fake_exec`)
+and never call live `QMenu.exec()`.
 
 ### `track_gui_new_tab_action(source, protocol="unknown")`
 
@@ -304,8 +310,9 @@ Widget ids (`pypost/ui/widget_ids.py`):
 ### Tests hang after `Ctrl+N` or **+**
 
 Live `QMenu.exec()` blocks the Qt event loop. Inject `protocol_picker`
-(or patch `_protocol_picker` on a live session). Never call
-`prompt()` / `exec()` in CI.
+(or patch `_protocol_picker` on a live session). Never call live
+`exec()` in CI. Hermetic `prompt()` tests mock instance `menu.exec`
+after `build_menu` instead (see `tests/test_new_tab_protocol_picker.py`).
 
 The same hang appears when a unit test closes the **last** workspace tab
 without injecting `protocol_picker` on `TabsPresenter` construction
@@ -372,7 +379,7 @@ the source of truth for the three-item picker until that story lands.
 
 | Test | Behavior verified |
 | --- | --- |
-| `tests/test_new_tab_protocol_picker.py` | Three labels, HTTP first + active, third is MCP Client; `prompt()` maps `MCP_CLIENT`; no live `exec()` |
+| `tests/test_new_tab_protocol_picker.py` | Three labels, HTTP first + active, third is MCP Client; hermetic `prompt()` maps HTTP (`actions()[0]`), WebSocket (`actions()[1]`), MCP Client (`actions()[2]`), and dismiss → `None` via mocked `menu.exec` (PYPOST-1180); no live `exec()` |
 | `TestHandleNewTabProtocolPicker` in `tests/test_tabs_presenter.py` | Picker before editor; HTTP/WS/MCP confirm; MCP ≠ HTTP; cancel; metrics `protocol=mcp_client` |
 | Plus-click tests in `tests/test_tabs_presenter.py` | Inject HTTP picker so **+** does not hang |
 | `test_track_gui_new_tab_action_records_mcp_client_protocol` | Prometheus + OTel allow-list records `mcp_client`, not `unknown` |
