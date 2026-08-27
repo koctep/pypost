@@ -51,8 +51,6 @@ from pypost.ui.presenters.tabs_presenter_draft import (
     collect_persistable_open_tab_ids,
     make_mcp_client_saved_predicate,
     make_websocket_saved_predicate,
-    mcp_client_id_is_saved,
-    websocket_id_is_saved,
 )
 from pypost.ui.presenters import tabs_presenter_hotkeys as tab_hotkeys
 from pypost.ui.presenters.tabs_presenter_worker import TabsPresenterWorkerHandlers
@@ -299,7 +297,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             hidden_keys=self._current_hidden_keys,
         )
         tab = McpClientTab(connection, presenter)
-        if mcp_client_id_is_saved(self._request_manager, connection.id):
+        if make_mcp_client_saved_predicate(self._request_manager)(connection.id):
             tab.persisted_baseline = snapshot_mcp_client_persisted_fields(connection)
         self._wire_mcp_client_tab_signals(tab)
         name = connection.name if connection.name else "New MCP Client"
@@ -327,7 +325,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             metrics=self._metrics,
         )
         tab = WebSocketTab(connection=connection, presenter=presenter)
-        if websocket_id_is_saved(self._request_manager, connection.id):
+        if make_websocket_saved_predicate(self._request_manager)(connection.id):
             tab.persisted_baseline = snapshot_websocket_persisted_fields(connection)
         presenter.tab_title_changed.connect(
             lambda glyph, title, t=tab: self._on_websocket_title_changed(t, glyph, title)
