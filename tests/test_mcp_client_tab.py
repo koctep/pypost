@@ -267,6 +267,16 @@ def _click_connect(tab: McpClientTab) -> None:
     button.click()
 
 
+def _click_disconnect(tab: McpClientTab) -> None:
+    """Activate Disconnect via the Disconnect control (not presenter-direct)."""
+    button = tab.findChild(
+        QPushButton,
+        widget_ids.MCP_CLIENT_DISCONNECT_BUTTON,
+    )
+    assert button is not None
+    button.click()
+
+
 def _refresh_button(tab: QWidget) -> QPushButton | None:
     return tab.findChild(QPushButton, MCP_CLIENT_REFRESH_BUTTON)
 
@@ -292,6 +302,14 @@ def _is_connected_badge(tab: QWidget) -> bool:
         and "connecting" not in text
         and "failed" not in text
     )
+
+
+def _is_disconnected_badge(tab: QWidget) -> bool:
+    """True when the state badge shows Disconnected / idle (not Connected)."""
+    text = _state_text(tab)
+    if _is_connected_badge(tab):
+        return False
+    return any(token in text for token in ("disconnected", "idle"))
 
 
 def _is_failed_or_disconnected_badge(tab: QWidget) -> bool:
@@ -349,6 +367,43 @@ def _wait_connect_settled(tab: McpClientTab, mock_client: MagicMock) -> None:
         message="Connect did not settle (badge, tools, or error)",
         condition_name="mcp_client_connect_settled",
     )
+
+
+def test_click_connect_updates_badge_to_connected_hermetic(qapp) -> None:
+    """FR-1 / FR-2: Connect control → Connected badge under injected mock client."""
+    mock_client = MagicMock()
+    mock_client.run.return_value = _tools_response()
+    tab = _build_draft_tab(mcp_client=mock_client)
+    _set_url(tab, _MCP_URL)
+    _click_connect(tab)
+    _wait_connect_settled(tab, mock_client)
+
+    assert _is_connected_badge(tab)
+    # Hermetic: outbound work went only through the injected mock (no live server).
+    mock_client.run.assert_called()
+    _args, kwargs = mock_client.run.call_args
+    assert "list_tools" in _args or kwargs.get("operation") == "list_tools"
+
+
+def test_click_disconnect_returns_badge_to_disconnected(qapp) -> None:
+    """FR-3: Disconnect control after Connected returns Disconnected badge."""
+    mock_client = MagicMock()
+    mock_client.run.return_value = _tools_response()
+    tab = _build_draft_tab(mcp_client=mock_client)
+    _set_url(tab, _MCP_URL)
+    _click_connect(tab)
+    _wait_connect_settled(tab, mock_client)
+    assert _is_connected_badge(tab)
+
+    _click_disconnect(tab)
+    wait_until(
+        lambda: _is_disconnected_badge(tab),
+        timeout=_CONNECT_SETTLE_S,
+        message="Disconnect did not return badge to Disconnected",
+        condition_name="mcp_client_disconnect_badge",
+    )
+    assert _is_disconnected_badge(tab)
+    assert not _is_connected_badge(tab)
 
 
 def test_connect_lists_tools_in_browser(qapp) -> None:

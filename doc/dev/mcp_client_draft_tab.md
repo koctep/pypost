@@ -1,4 +1,4 @@
-# MCP Client draft tab (PYPOST-1166–1170)
+# MCP Client draft tab (PYPOST-1166–1170, PYPOST-1185)
 
 ## Overview
 
@@ -40,6 +40,12 @@ rewrite `doc/user/` here.
 Picker identity and `gui_new_tab_actions_total{protocol=mcp_client}` stay
 as shipped in PYPOST-1165. See
 [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
+
+PYPOST-1185 closes verification debt from PYPOST-1166 follow-up 7:
+hermetic GUI proofs that clicking **Connect** / **Disconnect** updates
+the connection-state badge without a live MCP server. Production chrome
+was already correct (no-op); the durable signal is in
+`tests/test_mcp_client_tab.py` (see Tests below).
 
 ## Architecture
 
@@ -762,6 +768,14 @@ this file.
 Intentional for this story.
 [PYPOST-1168](https://pypost.atlassian.net/browse/PYPOST-1168).
 
+### Connect / Disconnect badge proofs fail under CI
+
+Prefer the PYPOST-1185 chrome tests over presenter-direct calls. Assert
+`_click_connect` / `_click_disconnect` and badge helpers, with
+`mcp_client=` injected. Do not require a live MCP server. If Connect
+never reaches Connected, check worker settlement (`wait_until` +
+`_CONNECT_SETTLE_S`) and that Disconnect stays disabled until Connected.
+
 ## Tests
 
 - `tests/test_tabs_presenter.py`: draft factory, `open_tabs` omission,
@@ -793,14 +807,49 @@ Intentional for this story.
   `test_execute_mcp_forwards_empty_headers_to_mcp_client`,
   `test_run_passes_headers_to_create_mcp_http_client`.
 
-GUI tests mock `MCPClientService.run` (no live MCP server). Module
-`pytestmark = pytest.mark.timeout(30)`.
+### Hermetic Connect / Disconnect badge button paths (PYPOST-1185)
+
+Live Connect already mocks `MCPClientService.run` (no live MCP server).
+PYPOST-1185 adds focused **button → badge** proofs so chrome wiring
+cannot hide behind tool-list or presenter-direct asserts:
+
+- `_click_connect` / `_click_disconnect` — `QPushButton.click()` on
+  controls (not presenter entry points).
+- `_is_connected_badge` / `_is_disconnected_badge` — badge text only
+  (Disconnected/idle vs Connected).
+- `test_click_connect_updates_badge_to_connected_hermetic` — FR-1 /
+  FR-2: Connect → **Connected**; inject `mcp_client=`.
+- `test_click_disconnect_returns_badge_to_disconnected` — FR-3: after
+  hermetic Connect, Disconnect → **Disconnected**.
+
+Hermetic isolation means inject a `MagicMock` (or fake) via
+`_build_draft_tab(mcp_client=...)` so CI never opens sockets. Successful
+Connect may call the injected client's `run`; that is expected under
+live Connect. Do **not** freeze “never call `run` on success” as a
+product rule.
+
+Presenter logging tests that call `connect_requested` /
+`disconnect_requested` directly remain complementary; they do **not**
+replace the button-path proofs. Tool-browser Connect tests still assert
+Connected as a side effect; the chrome tests above are the FR-1 / FR-3
+signal that must stay green if tools asserts change.
+
+Module `pytestmark = pytest.mark.timeout(30)`. Settlement uses bounded
+`wait_until(..., timeout=_CONNECT_SETTLE_S)`.
 
 Run:
 
 ```bash
 make test PYTEST_ARGS="tests/test_mcp_client_tab.py \
   tests/test_mcp_client_presenter.py tests/test_mcp_client_arg_schema.py -v"
+```
+
+Targeted badge button-path only:
+
+```bash
+make test PYTEST_ARGS="tests/test_mcp_client_tab.py -k \
+  'click_connect_updates_badge_to_connected_hermetic or \
+  click_disconnect_returns_badge_to_disconnected' -v"
 ```
 
 ## Related
