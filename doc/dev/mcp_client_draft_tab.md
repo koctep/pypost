@@ -1,4 +1,4 @@
-# MCP Client draft tab (PYPOST-1166–1170, PYPOST-1185)
+# MCP Client draft tab (PYPOST-1166–1170, PYPOST-1185, PYPOST-1186)
 
 ## Overview
 
@@ -47,6 +47,11 @@ the connection-state badge without a live MCP server. Production chrome
 was already correct (no-op); the durable signal is in
 `tests/test_mcp_client_tab.py` (see Tests below).
 
+PYPOST-1186 extracts the Headers empty-row Key/Value editor into shared
+`EmptyRowKeyValueTable` (HTTP / WS / MCP wrappers). MCP still must not
+import `request_editor`. See
+[empty_row_key_value_table.md](empty_row_key_value_table.md).
+
 ## Architecture
 
 - **`McpClientConnection`** (`pypost/models/mcp_client.py`): in-memory
@@ -81,9 +86,12 @@ was already correct (no-op); the durable signal is in
 - **`McpClientConnectionBar`**: URL `VariableAwareLineEdit`, **Connect**,
   **Disconnect**, **Refresh**, state `QLabel`. Invoke in flight disables
   Connect and Refresh; Disconnect stays allowed.
-- **`McpClientHeadersTable`**: `VariableAwareTableWidget` Key/Value
-  editor with a trailing empty row. Not `RequestEditor.KeyValueTable`
-  and not `WebSocketKeyValueTable`.
+- **`McpClientHeadersTable`**: thin wrapper around shared
+  `EmptyRowKeyValueTable` (`strip_keys=True`). Imports
+  `pypost.ui.widgets.empty_row_key_value_table` only — not
+  `request_editor`. See
+  [empty_row_key_value_table.md](empty_row_key_value_table.md)
+  (PYPOST-1186).
 - **`McpClientToolBrowser`**: labeled **Remote tools**; inner
   `QListWidget` filled by `set_tools`. Emits `tool_selected` with the
   name stored in `UserRole`. Not inbound `McpToolsOverviewDialog`.
@@ -505,15 +513,18 @@ Elapsed text is `Elapsed: {elapsed_s:g} s` on
 ### `McpClientHeadersTable`
 
 ```python
-class McpClientHeadersTable(VariableAwareTableWidget):
-    def set_data(self, data: dict[str, str]) -> None: ...
-    def get_data(self) -> dict[str, str]: ...
+class McpClientHeadersTable(EmptyRowKeyValueTable):
+    def __init__(self, parent: QWidget | None = None) -> None: ...
+    # Inherited: set_data / get_data / set_read_only (MCP does not lock)
 ```
 
+- Subclasses shared `EmptyRowKeyValueTable` with `strip_keys=True`
+  ([empty_row_key_value_table.md](empty_row_key_value_table.md)).
 - Columns **Key** / **Value**. Filling the last row adds a new empty
   row. `get_data()` drops rows with an empty name (after strip).
 - Widget id `MCP_CLIENT_HEADERS_TABLE`
   (`pypost_mcp_client_headers_table`). User-visible label **Headers**.
+- Must not import `pypost.ui.widgets.request_editor` (FR-5).
 
 ### `McpClientTab`
 

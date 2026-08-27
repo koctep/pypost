@@ -11,11 +11,9 @@ from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QCheckBox,
     QFrame,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
@@ -37,10 +35,8 @@ from pypost.ui.widget_ids import (
     WS_URL_INPUT,
     set_widget_id,
 )
-from pypost.ui.widgets.variable_aware_widgets import (
-    VariableAwareLineEdit,
-    VariableAwareTableWidget,
-)
+from pypost.ui.widgets.empty_row_key_value_table import EmptyRowKeyValueTable
+from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit
 
 logger = logging.getLogger(__name__)
 
@@ -62,55 +58,11 @@ def _merge_url_and_params(raw_url: str, params: dict[str, str]) -> str:
     return urlunparse(parsed._replace(query=encoded_query))
 
 
-class WebSocketKeyValueTable(VariableAwareTableWidget):
-    """Editable key-value table for WebSocket query parameters and handshake headers."""
+class WebSocketKeyValueTable(EmptyRowKeyValueTable):
+    """WS Params/Headers table; strips keys and supports set_read_only (FR-3)."""
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(1, 2, parent)
-        self.setHorizontalHeaderLabels(["Key", "Value"])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.itemChanged.connect(self._on_item_changed)
-
-    def _on_item_changed(self, item) -> None:
-        if item.row() == self.rowCount() - 1 and item.text():
-            self.setRowCount(self.rowCount() + 1)
-
-    def set_data(self, data: dict[str, str]) -> None:
-        """Populate table rows from dictionary."""
-        self.blockSignals(True)
-        try:
-            self.setRowCount(len(data) + 1)
-            for i, (k, v) in enumerate(data.items()):
-                from PySide6.QtWidgets import QTableWidgetItem
-                self.setItem(i, 0, QTableWidgetItem(k))
-                self.setItem(i, 1, QTableWidgetItem(v))
-            from PySide6.QtWidgets import QTableWidgetItem
-            self.setItem(self.rowCount() - 1, 0, QTableWidgetItem(""))
-            self.setItem(self.rowCount() - 1, 1, QTableWidgetItem(""))
-        finally:
-            self.blockSignals(False)
-
-    def get_data(self) -> dict[str, str]:
-        """Extract key-value dictionary from non-empty rows."""
-        data: dict[str, str] = {}
-        for i in range(self.rowCount()):
-            key_item = self.item(i, 0)
-            val_item = self.item(i, 1)
-            if key_item and key_item.text().strip():
-                data[key_item.text().strip()] = val_item.text() if val_item else ""
-        return data
-
-    def set_read_only(self, read_only: bool) -> None:
-        """Toggle edit triggers on the table."""
-        if read_only:
-            self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        else:
-            self.setEditTriggers(
-                QAbstractItemView.EditTrigger.DoubleClicked
-                | QAbstractItemView.EditTrigger.SelectedClicked
-                | QAbstractItemView.EditTrigger.EditKeyPressed
-                | QAbstractItemView.EditTrigger.AnyKeyPressed
-            )
+        super().__init__(parent, strip_keys=True)
 
 
 class WebSocketConnectionEditor(QWidget):

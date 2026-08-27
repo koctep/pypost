@@ -39,7 +39,8 @@ from pypost.ui.widgets.code_editor import CodeEditor
 from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.mixins import VariableHoverResolver, push_snapshot_to_widgets
-from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit, VariableAwareTableWidget
+from pypost.ui.widgets.empty_row_key_value_table import EmptyRowKeyValueTable
+from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit
 from pypost.ui.widget_ids import (
     METHOD_COMBO,
     REQUEST_BODY_EDIT,
@@ -638,29 +639,8 @@ class McpParamsTable(QTableWidget):
         return params
 
 
-class KeyValueTable(VariableAwareTableWidget):
-    def __init__(self):
-        super().__init__(1, 2)
-        self.setHorizontalHeaderLabels(["Key", "Value"])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.itemChanged.connect(self.on_item_changed)
+class KeyValueTable(EmptyRowKeyValueTable):
+    """HTTP Params/Headers table; preserves unstripped key collect (FR-2)."""
 
-    def on_item_changed(self, item):
-        if item.row() == self.rowCount() - 1:
-            if item.text():
-                self.setRowCount(self.rowCount() + 1)
-
-    def set_data(self, data: dict):
-        self.setRowCount(len(data) + 1)
-        for i, (k, v) in enumerate(data.items()):
-            self.setItem(i, 0, QTableWidgetItem(k))
-            self.setItem(i, 1, QTableWidgetItem(v))
-
-    def get_data(self) -> dict:
-        data = {}
-        for i in range(self.rowCount()):
-            key_item = self.item(i, 0)
-            val_item = self.item(i, 1)
-            if key_item and key_item.text():
-                data[key_item.text()] = val_item.text() if val_item else ""
-        return data
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent, strip_keys=False)
