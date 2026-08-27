@@ -173,6 +173,12 @@ settle helpers
 (`wait_for_widget` / `enabled` / `text` / `snapshot`) live in
 [ui_wait.md](ui_wait.md). For TCP listen readiness, use
 `wait_for_port` from `tests/helpers/mcp_live_server.py`.
+Ephemeral ports for live MCP / manager tests come from `free_port()`, which
+delegates to `allocate_tcp_port` in `tests/helpers/port_allocation.py`
+(PYPOST-1178): cross-process `fcntl.flock` + counter file under
+`PYPOST_TEST_PORT_LOCK` (default `/tmp/pypost-test-port.lock`), base 35000,
+span 25000, bind probe, fallback to port 0. Prefer `free_port()` /
+`allocate_tcp_port` over ad-hoc `bind(..., 0)` when workers may run in parallel.
 
 To drive pytest **yield fixtures** outside a request (e.g. mocked packaging caplog proofs),
 use `tests/helpers/fixture_drive.py` (`unwrap_yield_fixture`, `run_yield_fixture`,
@@ -835,7 +841,7 @@ duplicate scope: prior tickets already cover the intent.
 | Live HTTP `/metrics` scrape after uvicorn start | `tests/test_metrics_server_integration.py` | Integration | PYPOST-169; real socket bind + urllib GET |
 | Live metrics MCP resource round-trip | `tests/test_metrics_server_integration.py` | Integration | PYPOST-563; Streamable HTTP and SSE |
 | RequestWidget GUI action counters | `tests/test_request_editor_gui_metrics.py` | Integration | PYPOST-170; Send click + Save/Copy cURL scrape |
-| MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556; port busy, listen readiness |
+| MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556 / PYPOST-1178; port busy, listen readiness, tool-set restart wait (`_wait_until_port_bindable`) |
 | MCP and metrics bind host fidelity | `tests/test_server_bind_host_integration.py` | Integration | PYPOST-150; `127.0.0.1`, `0.0.0.0`, `localhost`, `::1` |
 
 PYPOST-154 verified end-to-end port-in-use handling for both MCP and metrics (closes

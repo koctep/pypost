@@ -14,12 +14,11 @@ import uvicorn
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.request_service import ExecutionResult
 from pypost.core.server_bind import drain_pending_tasks
+from tests.helpers.port_allocation import allocate_tcp_port
 
 
 def free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
+    return allocate_tcp_port("127.0.0.1")
 
 
 def wait_for_port(host: str, port: int, timeout: float = 10.0) -> None:

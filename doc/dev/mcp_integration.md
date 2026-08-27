@@ -28,7 +28,7 @@ packaging must use that entry — never register on `MCPServerImpl`. See also
 
 The integration is split into two main layers to bridge the synchronous Qt world and the asynchronous ASGI/Starlette world.
 
-### 1. `MCPServerManager` (`pypost/core/mcp_server.py`)
+### 1. `MCPServerManager` (`pypost/core/qt/mcp_server.py`)
 
 This class acts as the bridge between the PySide6 UI and the background MCP server.
 
@@ -40,6 +40,12 @@ This class acts as the bridge between the PySide6 UI and the background MCP serv
     `startup()` (socket bound and listening), not when the worker thread starts
     (PYPOST-556). Bind failures emit `start_failed(str)` with an operator-facing message and
     `status_changed(False)`.
+*   **Tool-set restart (PYPOST-1178)**: `update_tools()` stops then starts on the same
+    host/port when the exposed-tool signature changes. Between `stop_server()` and
+    `start_server()`, `_wait_until_port_bindable()` polls (default 5.0s, 50ms sleep) until a
+    probe-bind with `SO_REUSEADDR` succeeds. On deadline it logs
+    `mcp_port_still_busy host=… port=…` at WARNING and proceeds; a still-busy port then
+    surfaces via existing `start_failed` / ERROR paths.
 *   **Shutdown**: Handles the complex logic of stopping `uvicorn` from another thread by setting flags and waiting for the thread to join.
 
 ### 2. `MCPServerImpl` (`pypost/core/mcp_server_impl.py`)
@@ -284,7 +290,8 @@ up-to-date tool catalog to connected agents.
     current collection.
 3.  The registry updates only managers whose configuration selected that collection.
     `MCPServerManager.update_tools()` compares its local tool signature and restarts
-    only that endpoint when the signature changed.
+    only that endpoint when the signature changed (stop → `_wait_until_port_bindable` →
+    start on the same host/port; PYPOST-1178).
 4.  The top-bar action becomes **MCP Server Tools…**, which opens a row-specific
     tools view rather than an aggregate catalog.
 
@@ -880,6 +887,7 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 | DEBUG shows `env_var_count=0` | Endpoint's selected environment is empty | Expected when its configured environment has no values; only MCP args resolve |
 | Agent cannot connect | Row is stopped, failed, or client uses the wrong host/port | Inspect the row-specific status/error in MCP Servers |
 | Port busy on MCP start | Another process or configured row owns the port | Choose a globally unique endpoint port; a failed row does not stop peers |
+| `mcp_port_still_busy` after a tools refresh | Prior uvicorn socket not released before same-port restart (or external holder) | Wait is bounded (5s); if start still fails, free the port or restart the row. See PYPOST-1178 |
 | Port busy on metrics start | Another process on `metrics_port` (default 9080) | Dialog on main window open; free port or change Settings |
 | Optional MCP param stays `None`/missing in the template despite a declared `default` | `default` was set on the wrong parameter name, or `request_data` was not passed into `_build_execution_variables` (e.g. a custom caller bypassing `_execute_request_sync`) | Confirm the param key matches the template's `mcp.request.<name>`, and that `_build_execution_variables` is invoked with `request_data=` set (PYPOST-1054) |
 | No `mcp_param_default_applied` log line for a param you expect to default | Caller passed an explicit non-`None` value, or the param's `default` is `None` (undeclared) | Explicit values always win; add a non-`None` `default` in `mcp_params` to enable defaulting |

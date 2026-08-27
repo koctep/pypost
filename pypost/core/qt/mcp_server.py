@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import errno
 import logging
+import socket
 import sys
 import threading
+import time
 from collections.abc import Callable, Sequence
-from typing import List, Optional
 
 import uvicorn
 from PySide6.QtCore import QObject, Signal
@@ -54,9 +55,9 @@ class MCPServerManager(QObject):
         template_service: TemplateService | None = None,
     ):
         super().__init__()
-        self._server_thread: Optional[threading.Thread] = None
+        self._server_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
-        self._server_instance: Optional[uvicorn.Server] = None
+        self._server_instance: uvicorn.Server | None = None
         self._metrics = metrics
         self._template_service = template_service
         self._activity_log = McpActivityLog(on_append=self._emit_activity)
@@ -192,7 +193,7 @@ class MCPServerManager(QObject):
     def is_running(self) -> bool:
         return self._server_thread is not None and self._server_thread.is_alive()
 
-    def update_tools(self, tools: List[RequestData]) -> bool:
+    def update_tools(self, tools: list[RequestData]) -> bool:
         """Restart the server when the exposed tool set changes. Returns True if restarted."""
         signature = mcp_tools_signature(tools)
         if signature == self._tools_signature:
@@ -202,8 +203,29 @@ class MCPServerManager(QObject):
             return False
         logger.info("mcp_tools_changed tool_count=%d restarting=true", len(signature))
         self.stop_server()
+        self._wait_until_port_bindable()
         self.start_server(self._current_port, tools, self._current_host)
         return True
+
+    def _wait_until_port_bindable(self, timeout: float = 5.0) -> None:
+        """Wait until the current host/port can be bound again after stop_server."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.is_running():
+                time.sleep(0.05)
+                continue
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    sock.bind((self._current_host, self._current_port))
+                return
+            except OSError:
+                time.sleep(0.05)
+        logger.warning(
+            "mcp_port_still_busy host=%s port=%d",
+            self._current_host,
+            self._current_port,
+        )
 
     def _notify_started(self) -> None:
         if self._startup_notified or self._stop_event.is_set():

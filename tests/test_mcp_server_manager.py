@@ -6,7 +6,6 @@ import logging
 import warnings
 from unittest.mock import MagicMock, patch
 
-
 import pytest
 
 from pypost.core.mcp_activity_log import McpActivityEntry
@@ -107,6 +106,39 @@ def test_update_tools_restarts_when_exposed_set_changes(qapp):
             lambda: manager.is_running(),
             message="MCP server did not restart after tool update",
         )
+    finally:
+        manager.stop_server()
+
+
+def test_update_tools_restart_waits_until_port_bindable(qapp):
+    """Tool-set restart waits for port readiness then listens again (PYPOST-1178).
+
+    Exercises production ``_wait_until_port_bindable`` between stop and start so
+    the same-port rebind succeeds without ``start_failed`` / EADDRINUSE.
+    """
+    port = free_port()
+    tool_a = RequestData(
+        name="A", id="a", expose_as_mcp=True, method="GET", url="http://a"
+    )
+    tool_b = RequestData(
+        name="B", id="b", expose_as_mcp=True, method="GET", url="http://b"
+    )
+    manager = MCPServerManager()
+    failures: list[str] = []
+    manager.start_failed.connect(failures.append)
+
+    manager.start_server(port, [tool_a], host="127.0.0.1")
+    try:
+        wait_until(lambda: manager.is_listening, message="MCP server did not start")
+        assert manager.update_tools([tool_a, tool_b]) is True
+        wait_until(
+            lambda: bool(failures) or manager.is_listening,
+            message="restart neither listening nor start_failed",
+            timeout=5.0,
+        )
+        assert not failures
+        assert manager.is_listening
+        wait_for_port("127.0.0.1", port)
     finally:
         manager.stop_server()
 

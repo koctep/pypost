@@ -267,6 +267,7 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `mcp_server_start_failed` | ERROR/exception | `host`, `port`, `message` | `qt/mcp_server` |
 | `mcp_server_unexpected_exit` | WARNING | — | `qt/mcp_server` |
 | `mcp_tools_changed` | INFO | `tool_count`, `restarting` | `qt/mcp_server` |
+| `mcp_port_still_busy` | WARNING | `host`, `port` | `qt/mcp_server` |
 | `mcp_operation_start` | DEBUG | `url`, `operation`, `header_count` | `mcp_client_service` |
 | `mcp_operation_success` | DEBUG | `url`, `operation`, `elapsed` | `mcp_client_service` |
 | `mcp_operation_failed` | ERROR | `url`, `operation`, `category`, `detail` | `mcp_client_service` |
