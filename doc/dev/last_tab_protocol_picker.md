@@ -23,8 +23,9 @@ WebSocket draft persist and dirty-close:
 
 - **`close_workspace_tab`**
   (`pypost/ui/presenters/tabs_presenter_close.py`): extracted from
-  `TabsPresenter.close_tab` so `tabs_presenter.py` stays under the 785 LOC
-  cap. Plus-tab guard, dirty WebSocket confirm, teardown, `removeTab`.
+  `TabsPresenter.close_tab` so `tabs_presenter.py` stays under the FILE_CAPS
+  inventory (currently **1059 / 1165**, PYPOST-1194). Plus-tab guard, dirty
+  WebSocket confirm, teardown, `removeTab`.
 - **Empty strip** → `presenter.handle_new_tab("last_tab")` (not
   `add_new_tab`).
 - **Non-empty strip** → `_ensure_current_is_navigable`; no picker, no

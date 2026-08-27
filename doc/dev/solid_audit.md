@@ -110,6 +110,11 @@ the command prints the canonical Markdown to stdout.
 Always run both `--check` and the pytest module after reconciliation. A green cap check alone
 does not prove that the committed snapshot is fresh.
 
+**PYPOST-1194 (2026-08-27):** Raised `FILE_CAPS` for intentional presenter growth —
+`collections_presenter.py` 486 → cap **535**, `tabs_presenter.py` 1059 → cap **1165**
+(`ceil(measured * 1.10)`). Snapshot regenerated. Prefer further `tabs_presenter_*`
+extraction before raising the tabs cap again.
+
 **PYPOST-1082 (2026-08-19):** Retired the four temporary delegating shims on `EnvPresenter`
 (`mcp_status_text`, `mcp_tools_button_text`, `mcp_activity_button_text`, `refresh_mcp_tools`),
 updated its class docstring, exposed the `mcp_controls` property seam on `EnvPresenter` and

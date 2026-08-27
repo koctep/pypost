@@ -86,8 +86,9 @@ as shipped in PYPOST-1165. See
 - **`McpResultView`**: result body + elapsed label. Sanitizes displayed
   text. Image/audio blocks are `[image content]` / `[audio content]`.
 - **`TabsPresenter`**: thin factory + duck-typed close teardown and env
-  fan-out. Chrome must not live in `tabs_presenter.py` (LOC cap 785;
-  **785 / 785**). PYPOST-1169 and PYPOST-1170 do **not** edit this file.
+  fan-out. Chrome must not live in `tabs_presenter.py` (LOC cap **1165**;
+  measured **1059 / 1165**, PYPOST-1194). PYPOST-1169 and PYPOST-1170 do
+  **not** edit this file.
 
 ```mermaid
 flowchart TB
@@ -550,8 +551,8 @@ connection and presenter.
 Builds `McpClientConnection()` + `McpClientPresenter` (with cached env
 kwargs) + `McpClientTab`, inserts before the plus tab with title
 **New MCP Client**, optionally calls `save_tabs_state` (which still
-omits the draft id). Does **not** pass `metrics=` (785 LOC cap; no
-growth this story). GUI tests inject `metrics=` on the presenter.
+omits the draft id). Does **not** pass `metrics=` (FILE_CAPS inventory;
+no growth this story). GUI tests inject `metrics=` on the presenter.
 
 ### `TabsPresenter.close_tab(index)`
 
@@ -734,15 +735,15 @@ Same as Connect: `MCPClientService.run` must stay on
 `McpClientOutboundWorker`. Do not call `execute_outbound("call_tool")`
 from the GUI thread.
 
-### `tabs_presenter.py` exceeds 785 LOC
+### `tabs_presenter.py` exceeds 1165 LOC
 
 Chrome belongs in `pypost/ui/widgets/mcp_client/` and
 `mcp_client_presenter.py`. Extract shared insert-before-plus before
-growing the presenter. Current snapshot is **785 / 785**. Historical
-PYPOST-376 baseline:
-`ai-tasks/PYPOST-376/baseline-metrics.md` (**779 / 785**). Headroom is
-tracked as PYPOST-1184. PYPOST-1169 and PYPOST-1170 must not edit this
-file.
+growing the presenter. Current snapshot is **1059 / 1165** (PYPOST-1194).
+Canonical inventory:
+`ai-tasks/PYPOST-376/baseline-metrics.md`. Prefer extraction before
+raising again (PYPOST-1184). PYPOST-1169 and PYPOST-1170 must not edit
+this file.
 
 ### User docs still omit Invoke
 

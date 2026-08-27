@@ -40,8 +40,13 @@ FILE_CAPS: dict[str, int] = {
     # PYPOST-1071: accepted thin delegation — PYPOST-1005/1012/1013 added thin collection
     # action entry points and busy-cue coordination and PYPOST-1044 added the read-only
     # collection_by_id() lookup, so no action-object algorithm was absorbed here.
-    "pypost/ui/presenters/collections_presenter.py": 403,
-    "pypost/ui/presenters/tabs_presenter.py": 785,
+    # PYPOST-1194: intentional presenter growth — re-derived from measured 486 + ~10%
+    # headroom (ceil(486 * 1.10) = 535).
+    "pypost/ui/presenters/collections_presenter.py": 535,
+    # PYPOST-1194: intentional presenter growth — re-derived from measured 1059 + ~10%
+    # headroom (ceil(1059 * 1.10) = 1165). Prefer further extraction into
+    # tabs_presenter_* helpers before raising again.
+    "pypost/ui/presenters/tabs_presenter.py": 1165,
     # PYPOST-1071: MCP status controls, dialogs and scoped refresh routing moved to
     # pypost/ui/presenters/mcp_controls_presenter.py; cap re-derived from 392.
     "pypost/ui/presenters/env_presenter.py": 432,

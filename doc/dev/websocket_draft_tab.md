@@ -19,8 +19,8 @@ What this story owns:
   fields differ from factory defaults prompts **Discard** or **Keep the
   tab**. Saved profiles and factory-clean drafts skip the prompt.
 - **Helper extraction.** Persist, dirty compare, and the dialog live
-  outside `tabs_presenter.py` so that file stays at the **785 / 785** LOC
-  cap.
+  outside `tabs_presenter.py` so new draft/close logic does not grow the
+  presenter further (current inventory **1059 / 1165**, PYPOST-1194).
 
 Do **not** copy MCP Client's "omit every tab of this kind". Saved
 WebSocket profiles must still restore. User-facing copy is
@@ -111,9 +111,9 @@ Collection-backed tabs set `persisted_baseline` on insert; profile save
 [websocket_save_flow.md](websocket_save_flow.md). The draft-close dialog has
 **no Save / Save As** path (use Actions menu or Ctrl+S on the tab).
 
-`tabs_presenter.py` stays at **785 / 785** LOC
+`tabs_presenter.py` inventory is **1059 / 1165** LOC after PYPOST-1194
 (`scripts/audit_baseline_metrics.py`). Persist and close helpers must
-not grow that file. Headroom is
+still not grow that file when avoidable. Further extraction headroom is
 [PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184).
 
 ## API / Usage
@@ -249,8 +249,9 @@ Factory defaults come from `WebSocketConnection()` (`name="New WebSocket"`,
 `url=""`, empty handshake tables, `expose_as_mcp=False`). URL placeholder
 text is a hint only, not a value.
 
-`tabs_presenter.py` LOC cap: **785**. Do not add persist/close logic
-inline; extend `tabs_presenter_draft.py` or `tab_dirty.py`.
+`tabs_presenter.py` LOC cap: **1165** (measured 1059; PYPOST-1194). Do not
+add persist/close logic inline; extend `tabs_presenter_draft.py` or
+`tab_dirty.py`.
 
 Observability (INFO, `pypost.ui.presenters.tabs_presenter_draft`). Fields
 are `connection_id`, `choice`, and counts only — no URL, headers,
@@ -327,11 +328,12 @@ with an ephemeral UUID. Drafts must never be written. Restore of a
 stale leftover id still logs WARNING and falls through (blank HTTP if
 nothing else restored).
 
-### `tabs_presenter.py` exceeds 785 LOC
+### `tabs_presenter.py` exceeds 1165 LOC
 
 Extract into `tabs_presenter_draft.py` / `tab_dirty.py` /
-`websocket_persisted_fields.py`. Current snapshot is **785 / 785**.
-Further growth is PYPOST-1184.
+`websocket_persisted_fields.py`. Current snapshot is **1059 / 1165**
+(PYPOST-1194). Prefer extraction before raising the cap again
+(PYPOST-1184).
 
 ### User docs still omit draft close / restore
 
