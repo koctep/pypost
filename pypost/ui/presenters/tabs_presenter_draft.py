@@ -23,17 +23,47 @@ logger = logging.getLogger(__name__)
 PromptClose = Callable[[QWidget, str], bool]
 
 
-def websocket_id_is_saved(request_manager: RequestManager, ws_id: str) -> bool:
-    """Return True when *ws_id* resolves to a collection-backed WebSocket profile."""
+def make_websocket_saved_predicate(
+    request_manager: RequestManager,
+) -> Callable[[str], bool]:
+    """Return a predicate backed by a single WebSocketRegistry instance."""
     storage = getattr(request_manager, "storage", None)
     registry = WebSocketRegistry(request_manager, storage)
+    return lambda ws_id: registry.find_websocket(ws_id) is not None
+
+
+def make_mcp_client_saved_predicate(
+    request_manager: RequestManager,
+) -> Callable[[str], bool]:
+    """Return a predicate backed by a single McpClientRegistry instance."""
+    storage = getattr(request_manager, "storage", None)
+    registry = McpClientRegistry(request_manager, storage)
+    return lambda profile_id: registry.find_mcp_client(profile_id) is not None
+
+
+def websocket_id_is_saved(
+    request_manager: RequestManager,
+    ws_id: str,
+    *,
+    registry: WebSocketRegistry | None = None,
+) -> bool:
+    """Return True when *ws_id* resolves to a collection-backed WebSocket profile."""
+    if registry is None:
+        storage = getattr(request_manager, "storage", None)
+        registry = WebSocketRegistry(request_manager, storage)
     return registry.find_websocket(ws_id) is not None
 
 
-def mcp_client_id_is_saved(request_manager: RequestManager, profile_id: str) -> bool:
+def mcp_client_id_is_saved(
+    request_manager: RequestManager,
+    profile_id: str,
+    *,
+    registry: McpClientRegistry | None = None,
+) -> bool:
     """Return True when *profile_id* resolves to a collection-backed MCP Client profile."""
-    storage = getattr(request_manager, "storage", None)
-    registry = McpClientRegistry(request_manager, storage)
+    if registry is None:
+        storage = getattr(request_manager, "storage", None)
+        registry = McpClientRegistry(request_manager, storage)
     return registry.find_mcp_client(profile_id) is not None
 
 

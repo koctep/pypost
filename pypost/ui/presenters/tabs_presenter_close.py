@@ -9,7 +9,7 @@ from pypost.ui.presenters.tabs_presenter_draft import (
     PromptClose,
     confirm_close_request_draft,
     confirm_close_websocket_draft,
-    websocket_id_is_saved,
+    make_websocket_saved_predicate,
 )
 
 if TYPE_CHECKING:
@@ -33,8 +33,8 @@ def close_workspace_tab(
         presenter._tabs,
         tab,
         prompt_close=closer,
-        websocket_id_is_saved=lambda item_id: websocket_id_is_saved(
-            presenter._request_manager, item_id
+        websocket_id_is_saved=make_websocket_saved_predicate(
+            presenter._request_manager
         ),
     ):
         return

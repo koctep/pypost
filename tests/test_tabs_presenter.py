@@ -1173,6 +1173,39 @@ class TestTabsPresenter(unittest.TestCase):
         tab.request_editor.mcp_check.setChecked(False)
         self.assertFalse(is_request_draft_dirty(tab))
 
+    def test_save_tabs_state_constructs_websocket_registry_once(self):
+        from pypost.core.websocket_registry import WebSocketRegistry
+
+        p = self._make_presenter()
+        p.add_blank_websocket_tab(save_state=False)
+        p.add_blank_websocket_tab(save_state=False)
+        p.add_blank_websocket_tab(save_state=False)
+
+        with patch.object(
+            WebSocketRegistry, "__init__", return_value=None
+        ) as mock_init, patch.object(
+            WebSocketRegistry, "find_websocket", return_value=None
+        ):
+            p.save_tabs_state()
+            self.assertEqual(mock_init.call_count, 1)
+
+    def test_close_tab_constructs_websocket_registry_once(self):
+        from pypost.core.websocket_registry import WebSocketRegistry
+
+        p = self._make_presenter()
+        tab1 = p.add_blank_websocket_tab(save_state=False)
+        p.add_blank_websocket_tab(save_state=False)
+        idx = p.widget.indexOf(tab1)
+
+        with patch.object(
+            WebSocketRegistry, "__init__", return_value=None
+        ) as mock_init, patch.object(
+            WebSocketRegistry, "find_websocket", return_value=None
+        ):
+            p.close_tab(idx)
+            # Exactly 1 in close_workspace_tab check + 1 in save_tabs_state after tab removal
+            self.assertEqual(mock_init.call_count, 2)
+
 
 _DRAFT_LOGGER = "pypost.ui.presenters.tabs_presenter_draft"
 

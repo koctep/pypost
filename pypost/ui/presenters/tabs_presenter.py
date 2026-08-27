@@ -49,6 +49,8 @@ from pypost.ui.presenters.tabs_presenter_mcp_close import (
 )
 from pypost.ui.presenters.tabs_presenter_draft import (
     collect_persistable_open_tab_ids,
+    make_mcp_client_saved_predicate,
+    make_websocket_saved_predicate,
     mcp_client_id_is_saved,
     websocket_id_is_saved,
 )
@@ -420,9 +422,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         """Persists open tab IDs to StateManager."""
         open_ids = collect_persistable_open_tab_ids(
             self._tabs,
-            websocket_id_is_saved=lambda i: websocket_id_is_saved(self._request_manager, i),
-            mcp_client_id_is_saved=lambda i: mcp_client_id_is_saved(
-                self._request_manager, i
+            websocket_id_is_saved=make_websocket_saved_predicate(self._request_manager),
+            mcp_client_id_is_saved=make_mcp_client_saved_predicate(
+                self._request_manager
             ),
         )
         self._state_manager.set_open_tabs(open_ids)
