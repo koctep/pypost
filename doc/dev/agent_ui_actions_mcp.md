@@ -97,7 +97,13 @@ fill **text is never logged** (same policy as in-process ui_actions).
 ## Limitations (v1)
 
 - Sidecar **owns** its own `AgentAppSession`; attaching to an already-running
-  desktop PyPost is not supported.
+  desktop PyPost is not supported. Attach follow-up is ticketed under epic
+  [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991):
+  [PYPOST-1206](https://pypost.atlassian.net/browse/PYPOST-1206) (docs/trust/lifecycle),
+  [PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207) (capability),
+  [PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208) (tests as feasible).
+  Documented attach path, trust boundary, and lifecycle belong to PYPOST-1206
+  (ATTACH-1) — not expanded here.
 - **Stdio only** — no separate loopback Streamable HTTP port for agent-UI MCP
   in this release.
 - Default session has empty collections unless you extend launch options in a
