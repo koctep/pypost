@@ -383,6 +383,16 @@ controller.open(HandshakeTarget(url="ws://mock.local", headers={}))
 assert controller.state.value == "Open"
 ```
 
+**UI Connect/Disconnect lifecycle tests** (PYPOST-1181): always call
+`set_transport_factory` with a **silent** double (record `open` target; never
+emit deferred `on_failed`) before `WebSocketPresenter.handle_connect()`.
+Without it, default `QtWebSocketTransport` can resolve sample URLs such as
+`echo.example.com` and overwrite a simulated Open during `processEvents`.
+When constructing `TabsPresenter` in the same suites, also inject a hermetic
+`protocol_picker` so close-last-tab never blocks on a modal menu. See
+[websocket_ui_client.md](websocket_ui_client.md) § Hermetic Connect/Disconnect
+and TabsPresenter isolation.
+
 ---
 
 ## Boundary and Quarantine Constraints
@@ -413,3 +423,4 @@ To maintain modularity, testability, and architectural integrity, the WebSocket 
 | Reconnection terminates with `error_category='reconnect_exhausted'` | Network remains down after `ReconnectConfig.max_attempts` retries. | Check network connectivity. Adjust `ReconnectConfig(max_attempts=...)` or `max_delay_seconds` if longer retry windows are necessary. |
 | `test_websocket_import_isolation.py` fails during test runs | A Python file outside `pypost/core/qt/websocket_transport.py` imported `PySide6.QtWebSockets` directly. | Remove the direct import. Interact with WebSockets through the `WebSocketTransport` protocol seam or `WebSocketSessionController`. |
 | Outgoing frame not sent when invoking `send_text()` or `send_binary()` | Controller is not in `SessionState.OPEN` state (e.g. still `CONNECTING` or `CLOSED`). | Inspect `controller.state`. Ensure `open()` has completed and `state_changed` has emitted `Open` before sending frames. |
+| UI lifecycle test flakes `Connect` vs `Disconnect` after simulated Open | Live `QtWebSocketTransport` DNS/handshake failure delivered during `processEvents`. | Inject `set_transport_factory` with a silent mock before Connect; see [websocket_ui_client.md](websocket_ui_client.md). |

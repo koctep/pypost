@@ -217,7 +217,53 @@ Epic research:
 
 | Test Suite | Purpose | Execution |
 |---|---|---|
-| `tests/test_websocket_client_ui_repro.py` | 23 comprehensive unit tests verifying widget hierarchies, state badges, locking, presenters, secret masking, and batching. | `.venv/bin/pytest tests/test_websocket_client_ui_repro.py` |
-| `tests/test_agent_e2e_websocket.py` | End-to-end loopback integration test driving the full agent UI session. | `.venv/bin/pytest tests/test_agent_e2e_websocket.py` |
-| `tests/test_ui_identity_spotcheck.py` | Validates `WS_*` objectName identity preservation across theme changes and multi-tab scenarios. | `.venv/bin/pytest tests/test_ui_identity_spotcheck.py` |
+| `tests/test_websocket_client_ui_repro.py` | Widget hierarchies, state badges, locking, Connect/Disconnect lifecycle, presenters, secret masking, and TabsPresenter teardown (hermetic — see below). | `make test PYTEST_ARGS="tests/test_websocket_client_ui_repro.py"` |
+| `tests/test_agent_e2e_websocket.py` | End-to-end loopback integration test driving the full agent UI session. | `make test PYTEST_ARGS="tests/test_agent_e2e_websocket.py"` |
+| `tests/test_ui_identity_spotcheck.py` | Validates `WS_*` objectName identity preservation across theme changes and multi-tab scenarios. | `make test PYTEST_ARGS="tests/test_ui_identity_spotcheck.py"` |
 | `tests/test_tabs_presenter.py` | Blank WS draft omit from `open_tabs`, dirty Discard/Keep, saved-id persist, no-merge, INFO logs. | `make test PYTEST_ARGS="tests/test_tabs_presenter.py -k websocket_draft -v"` |
+
+### Hermetic Connect/Disconnect and TabsPresenter isolation (PYPOST-1181)
+
+UI lifecycle tests assert button labels and editor locking. They must **not**
+open live sockets or modal protocol pickers. Without isolation,
+`handle_connect()` builds a real `HandshakeTarget` and the default
+`QtWebSocketTransport` starts DNS/handshake work; a later `processEvents()`
+can deliver `HostNotFoundError` and overwrite a simulated Open back to
+Connect. Closing the last workspace tab can also block on live
+`NewTabProtocolPicker.prompt()` / `QMenu.exec()`.
+
+**Required injections** in `tests/test_websocket_client_ui_repro.py` (and any
+similar presenter unit test):
+
+1. **`WebSocketSessionController.set_transport_factory`** — install a silent
+   mock transport (no network, no deferred `on_failed`) **before**
+   `presenter.handle_connect()`. Drive Open via the listener /
+   `controller.on_opened(...)` path; keep pumping `processEvents` briefly to
+   prove Open survives.
+2. **`TabsPresenter(..., protocol_picker=...)`** — pass a hermetic callable
+   (e.g. always `TabProtocol.HTTP`) on every construction so close-last-tab
+   and plus-tab paths never open a modal picker.
+
+```python
+controller = WebSocketSessionController()
+controller.set_transport_factory(_SilentMockTransport)  # no live DNS
+
+tabs_p = TabsPresenter(
+    rm, sm, AppSettings(),
+    metrics=MagicMock(),
+    protocol_picker=_http_protocol_picker,  # no QMenu.exec()
+)
+```
+
+Engine-level `MockTransport` examples:
+[websocket_session_engine.md](websocket_session_engine.md) §5.
+Picker injection details:
+[new_tab_protocol_picker.md](new_tab_protocol_picker.md).
+Loopback server fixtures (real sockets on `127.0.0.1`) belong in integration
+tests — see [websocket_test_harness.md](websocket_test_harness.md) — not in
+label/lifecycle unit tests.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `assert 'Connect' == 'Disconnect'` after simulated Open | Live transport failure arrived during `processEvents` | `set_transport_factory` with a silent mock before Connect |
+| Suite hang / worker `TIMED_OUT` after closing last tab | Modal `NewTabProtocolPicker` | Inject hermetic `protocol_picker` on `TabsPresenter` |

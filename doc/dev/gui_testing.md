@@ -336,6 +336,21 @@ Run the broader harness pack (beyond golden) with:
 make test-agent-e2e
 ```
 
+### WebSocket UI lifecycle tests (PYPOST-1181)
+
+Presenter Connect/Disconnect and TabsPresenter unit tests must stay
+hermetic:
+
+- Call `WebSocketSessionController.set_transport_factory(...)` with a
+  silent mock **before** `handle_connect()` so Connect never opens live
+  sockets / DNS.
+- Pass `protocol_picker=...` when constructing `TabsPresenter` so
+  close-last-tab never opens a modal picker.
+
+Full guidance: [websocket_ui_client.md](websocket_ui_client.md)
+§ Hermetic Connect/Disconnect and TabsPresenter isolation.
+Engine DI examples: [websocket_session_engine.md](websocket_session_engine.md) §5.
+
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing

@@ -1,9 +1,10 @@
-"""Failing repro tests for WS-4 WebSocket session tab and minimal client (PYPOST-1132).
+"""WebSocket session tab and minimal client UI contract tests (PYPOST-1132 / PYPOST-1181).
 
 Asserts the contract and behavior specified in:
 - `ai-tasks/PYPOST-1132/10-requirements.md`
 - `ai-tasks/PYPOST-1132/20-architecture.md`
 - `ai-tasks/PYPOST-1124/20-architecture.md` (Sections A-3.1, A-5.2, A-5.4, A-13.4, A-14)
+- `ai-tasks/PYPOST-1181/` (hermetic transport + protocol-picker isolation)
 
 Covers:
 1. Automation Widget Identities (`pypost.ui.widget_ids`).
@@ -41,6 +42,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.qt.websocket_session import WebSocketSessionController
 from pypost.core.websocket_session_policy import (
     SessionState,
     StateDetail,
@@ -50,6 +52,7 @@ from pypost.core.websocket_transport_protocol import (
     FrameType,
     HandshakeTarget,
     RawFrame,
+    WebSocketTransportListener,
 )
 from pypost.models.models import Collection
 from pypost.models.settings import AppSettings
@@ -63,8 +66,14 @@ from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
 from pypost.ui.presenters.websocket_presenter import WebSocketPresenter
 from pypost.ui.presenters.tabs_presenter import TabsPresenter
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
+from pypost.ui.widgets.new_tab_protocol_picker import TabProtocol
 
 pytestmark = pytest.mark.timeout(30)
+
+
+def _http_protocol_picker(*_args, **_kwargs) -> TabProtocol:
+    """Hermetic picker: closing the last tab must not open a modal dialog."""
+    return TabProtocol.HTTP
 
 
 # =============================================================================
@@ -369,13 +378,44 @@ def test_websocket_tab_layout_and_identities(qapp: QApplication):
 # =============================================================================
 
 
+class _SilentMockTransport:
+    """Hermetic WebSocketTransport: no network, no deferred failures (PYPOST-1181)."""
+
+    def __init__(self) -> None:
+        self.opened_target: Optional[HandshakeTarget] = None
+
+    def open(self, target: HandshakeTarget) -> None:
+        self.opened_target = target
+
+    def send_text(self, message: str) -> None:
+        pass
+
+    def send_binary(self, payload: bytes) -> None:
+        pass
+
+    def ping(self, payload: bytes = b"") -> None:
+        pass
+
+    def close(self, code: int = 1000, reason: str = "") -> None:
+        pass
+
+    def abort(self) -> None:
+        pass
+
+    def negotiated_subprotocol(self) -> str:
+        return ""
+
+    def set_listener(self, listener: WebSocketTransportListener) -> None:
+        # Protocol surface only; silent mock never emits callbacks.
+        _ = listener
+
+
 def test_presenter_connect_and_disconnect_lifecycle(qapp: QApplication):
     """Verify presenter Connect/Disconnect transitions, button updates, and locking."""
-    from pypost.core.qt.websocket_session import WebSocketSessionController
-
     conn = _make_sample_connection()
     stream_model = StreamListModel()
     controller = WebSocketSessionController()
+    controller.set_transport_factory(_SilentMockTransport)
     presenter = WebSocketPresenter(
         connection=conn, session_controller=controller, stream_model=stream_model
     )
@@ -387,7 +427,7 @@ def test_presenter_connect_and_disconnect_lifecycle(qapp: QApplication):
         assert connect_btn.text() == "Connect"
         assert not send_btn.isEnabled()
 
-        # Connect action initiated
+        # Connect action initiated (hermetic transport — no live DNS/handshake)
         presenter.handle_connect()
         qapp.processEvents()
 
@@ -395,10 +435,13 @@ def test_presenter_connect_and_disconnect_lifecycle(qapp: QApplication):
         assert connect_btn.text() == "Cancel"
         assert tab.connection_editor.is_read_only is True
 
-        # Simulate connection open from controller
-        controller.state_changed.emit(SessionState.OPEN.value, StateDetail(message="Connected"))
+        # Drive Open via listener path (keeps controller.state consistent with UI)
+        controller.on_opened("")
+        qapp.processEvents()
+        # Extra pump: silent mock must not overwrite Open with a late failure
         qapp.processEvents()
 
+        assert controller.state == SessionState.OPEN
         assert connect_btn.text() == "Disconnect"
         assert send_btn.isEnabled()
 
@@ -416,10 +459,69 @@ def test_presenter_connect_and_disconnect_lifecycle(qapp: QApplication):
         controller.deleteLater()
 
 
+def test_presenter_lifecycle_open_overwritten_by_deferred_transport_failure(
+    qapp: QApplication,
+):
+    """PYPOST-1181: Open UI must survive processEvents under hermetic transport.
+
+    Step 3 used DeferredFailTransport to prove the HostNotFound race class.
+    Step 4 isolates via ``_SilentMockTransport`` so no deferred failure can
+    overwrite Open → Disconnect after simulated handshake success.
+    """
+    transports: list[_SilentMockTransport] = []
+
+    def _factory() -> _SilentMockTransport:
+        transport = _SilentMockTransport()
+        transports.append(transport)
+        return transport
+
+    conn = _make_sample_connection()
+    stream_model = StreamListModel()
+    controller = WebSocketSessionController()
+    controller.set_transport_factory(_factory)
+    presenter = WebSocketPresenter(
+        connection=conn, session_controller=controller, stream_model=stream_model
+    )
+    tab = WebSocketTab(connection=conn, presenter=presenter)
+    try:
+        connect_btn = tab.findChild(QPushButton, widget_ids.WS_CONNECT_BUTTON)
+        send_btn = tab.findChild(QPushButton, widget_ids.WS_SEND_MESSAGE_BUTTON)
+
+        assert connect_btn.text() == "Connect"
+        assert not send_btn.isEnabled()
+
+        presenter.handle_connect()
+        qapp.processEvents()
+
+        assert controller.state == SessionState.CONNECTING
+        assert connect_btn.text() == "Cancel"
+        assert tab.connection_editor.is_read_only is True
+        assert transports and transports[-1].opened_target is not None
+
+        controller.on_opened("")
+        assert controller.state == SessionState.OPEN
+        assert connect_btn.text() == "Disconnect"
+        assert send_btn.isEnabled()
+
+        # Bounded pump: silent mock must not deliver late HostNotFound / FAILED.
+        deadline = time.monotonic() + 0.5
+        while time.monotonic() < deadline:
+            qapp.processEvents()
+            assert controller.state == SessionState.OPEN
+            assert connect_btn.text() == "Disconnect"
+            assert send_btn.isEnabled()
+            time.sleep(0.01)
+
+        assert connect_btn.text() == "Disconnect"
+        assert send_btn.isEnabled()
+    finally:
+        tab.deleteLater()
+        presenter.deleteLater()
+        controller.deleteLater()
+
+
 def test_presenter_send_message_guard_and_dispatch(qapp: QApplication):
     """Verify sending message requires Open state and clears composer upon send (FR-6)."""
-    from pypost.core.qt.websocket_session import WebSocketSessionController
-
     conn = _make_sample_connection()
     stream_model = StreamListModel()
     controller = WebSocketSessionController()
@@ -457,8 +559,6 @@ def test_presenter_send_message_guard_and_dispatch(qapp: QApplication):
 
 def test_presenter_secret_masking_and_batched_ingestion(qapp: QApplication):
     """Verify raw frames are masked with hidden_keys and ingested in 33ms batch (RFC A-3.1)."""
-    from pypost.core.qt.websocket_session import WebSocketSessionController
-
     conn = _make_sample_connection()
     stream_model = StreamListModel()
     controller = WebSocketSessionController()
@@ -521,8 +621,6 @@ def test_presenter_secret_masking_and_batched_ingestion(qapp: QApplication):
 
 def test_presenter_teardown_cleans_up(qapp: QApplication):
     """Verify teardown closes controller and stops flush timer."""
-    from pypost.core.qt.websocket_session import WebSocketSessionController
-
     conn = _make_sample_connection()
     stream_model = StreamListModel()
     controller = WebSocketSessionController()
@@ -577,7 +675,9 @@ def test_tabs_presenter_open_websocket_tab(qapp: QApplication):
     """Verify TabsPresenter opens WebSocketTab and syncs badge (FR-1)."""
     rm = FakeRequestManager()
     sm = FakeStateManager()
-    tabs_p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
+    tabs_p = TabsPresenter(
+        rm, sm, AppSettings(), metrics=MagicMock(), protocol_picker=_http_protocol_picker
+    )
     conn = _make_sample_connection(name="Binance Ticker")
 
     tab = tabs_p.open_websocket_tab(conn)
@@ -600,7 +700,9 @@ def test_tabs_presenter_focus_on_duplicate_profile(qapp: QApplication):
     """Verify re-opening already open WebSocket tab focuses it instead of duplicating (FR-1)."""
     rm = FakeRequestManager()
     sm = FakeStateManager()
-    tabs_p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
+    tabs_p = TabsPresenter(
+        rm, sm, AppSettings(), metrics=MagicMock(), protocol_picker=_http_protocol_picker
+    )
     conn = _make_sample_connection(ws_id="ws_unique_1")
 
     try:
@@ -618,7 +720,9 @@ def test_tabs_presenter_close_websocket_tab_calls_teardown(qapp: QApplication):
     rm = FakeRequestManager()
     rm.collections = [Collection(name="Streams", websockets=[conn])]
     sm = FakeStateManager()
-    tabs_p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
+    tabs_p = TabsPresenter(
+        rm, sm, AppSettings(), metrics=MagicMock(), protocol_picker=_http_protocol_picker
+    )
 
     try:
         tab = tabs_p.open_websocket_tab(conn)
@@ -651,7 +755,13 @@ def test_tabs_presenter_restore_tabs_idle_safe(qapp: QApplication):
     sm = FakeStateManager(open_tabs=["ws_persisted_1"])
 
     with patch.object(WebSocketRegistry, "find_item", return_value=("websocket", conn, col)):
-        tabs_p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
+        tabs_p = TabsPresenter(
+            rm,
+            sm,
+            AppSettings(),
+            metrics=MagicMock(),
+            protocol_picker=_http_protocol_picker,
+        )
         try:
             tabs_p.restore_tabs()
             qapp.processEvents()
@@ -668,7 +778,9 @@ def test_tabs_presenter_propagates_env_secrets(qapp: QApplication):
     """Verify TabsPresenter updates env variables and hidden keys on open WebSocket tabs."""
     rm = FakeRequestManager()
     sm = FakeStateManager()
-    tabs_p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
+    tabs_p = TabsPresenter(
+        rm, sm, AppSettings(), metrics=MagicMock(), protocol_picker=_http_protocol_picker
+    )
     conn = _make_sample_connection()
 
     tab = tabs_p.open_websocket_tab(conn)

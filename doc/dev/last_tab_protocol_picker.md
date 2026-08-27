@@ -115,6 +115,12 @@ Tests use the same injection as PYPOST-1157. Never call live
 `QMenu.exec()` in CI. See
 `TestCloseLastTabProtocolPicker` in `tests/test_tabs_presenter.py`.
 
+WebSocket UI repro suites that construct `TabsPresenter` must pass a
+hermetic picker on **every** construction (PYPOST-1181). Closing the last
+tab invokes `handle_new_tab("last_tab")`; a live picker hangs the Qt event
+loop. Details: [websocket_ui_client.md](websocket_ui_client.md)
+§ Hermetic Connect/Disconnect and TabsPresenter isolation.
+
 ## Configuration
 
 No last-tab-specific settings or environment variables.
@@ -125,6 +131,12 @@ No last-tab-specific settings or environment variables.
 
 Empty fallback must call `handle_new_tab("last_tab")`, not
 `add_new_tab(save_state=False)`. Check `tabs_presenter_close.py`.
+
+### Tests hang when closing the last WebSocket tab
+
+`TabsPresenter` was constructed without an injected `protocol_picker`.
+Pass a non-modal callable (e.g. `lambda *_a, **_k: TabProtocol.HTTP`).
+See [new_tab_protocol_picker.md](new_tab_protocol_picker.md).
 
 ### Picker appears when closing a non-last tab
 

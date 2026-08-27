@@ -307,6 +307,13 @@ Live `QMenu.exec()` blocks the Qt event loop. Inject `protocol_picker`
 (or patch `_protocol_picker` on a live session). Never call
 `prompt()` / `exec()` in CI.
 
+The same hang appears when a unit test closes the **last** workspace tab
+without injecting `protocol_picker` on `TabsPresenter` construction
+(PYPOST-1159 / PYPOST-1181). Always pass a hermetic picker in
+`tests/test_websocket_client_ui_repro.py` and similar modules. See
+[websocket_ui_client.md](websocket_ui_client.md) and
+[last_tab_protocol_picker.md](last_tab_protocol_picker.md).
+
 ### Cancel appears to be a bug (no tab)
 
 Dismissing the menu (Esc or click away) is FR-3: no tab, no metric.
