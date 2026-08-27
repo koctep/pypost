@@ -35,7 +35,10 @@ When out-of-process MCP for these primitives is used, the **packaging path** is:
 4. **Attach** (bind to an already-running desktop) stays on the same agent-UI
    MCP surface — never on product `MCPServerImpl`. Shipped AF_UNIX attach
    (ATTACH-2 / [PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207));
-   contract: [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md).
+   contract: [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md). Proven vs
+   manual verification matrix (ATTACH-3 /
+   [PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208)):
+   [Proven vs manual](agent_ui_actions_mcp.md#proven-vs-manual-attach-3--pypost-1208).
 
 Product MCP docs: [mcp_integration.md](mcp_integration.md),
 [mcp_trust_model.md](mcp_trust_model.md). In-process agent e2e packaging
@@ -284,7 +287,8 @@ widgets that already have `objectName` set via `set_widget_id`.
 ## Related
 
 - [Agent UI Actions MCP](agent_ui_actions_mcp.md) — stdio sidecar; spawn vs
-  attach (PYPOST-952 / PYPOST-1207)
+  attach (PYPOST-952 / PYPOST-1207); ATTACH-3 proven vs manual
+  ([PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208))
 - [Agent UI E2E](agent_e2e.md) — umbrella + `make test-agent-e2e`
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog

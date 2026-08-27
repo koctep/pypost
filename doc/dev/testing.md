@@ -840,6 +840,7 @@ duplicate scope: prior tickets already cover the intent.
 | MCP test collection live round-trip | `tests/test_mcp_test_collection_integration.py` | Integration | PYPOST-181; collection tools, `RequestService` mocked |
 | `MCPServerImpl` metrics hooks | `tests/test_mcp_server_impl.py` | Unit | PYPOST-367; `MetricsManager` mocked |
 | Product MCP catalog excludes ui_* tools | `tests/test_mcp_server_impl.py` | Unit | PYPOST-953; `list_tools` name guard vs agent sidecar |
+| Agent-UI attach host/client + CLI | `tests/test_agent_ui_attach.py` | Unit / IPC | ATTACH-3 / PYPOST-1208; see [Proven vs manual](agent_ui_actions_mcp.md#proven-vs-manual-attach-3--pypost-1208) |
 | Metrics `read_resource("metrics://all")` | `tests/test_metrics_manager.py` | Unit | Facade; scrapes `mcp_*_total` after `read_resource` |
 | `MetricsRegistry` MCP counters | `tests/test_metrics_registry.py` | Unit | PYPOST-177; pure `track_mcp_*` scrape assertions |
 | HTTP `/metrics` scrape endpoint | `tests/test_metrics_server_endpoint.py` | Unit | PYPOST-177; `TestClient` on `MetricsServer` ASGI app |
@@ -851,6 +852,19 @@ duplicate scope: prior tickets already cover the intent.
 | RequestWidget GUI action counters | `tests/test_request_editor_gui_metrics.py` | Integration | PYPOST-170; Send click + Save/Copy cURL scrape |
 | MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556 / PYPOST-1178 / PYPOST-1196; port busy, listen readiness, tool-set restart wait (`_wait_until_port_bindable`), join-timeout restart |
 | MCP and metrics bind host fidelity | `tests/test_server_bind_host_integration.py` | Integration | PYPOST-150; `127.0.0.1`, `0.0.0.0`, `localhost`, `::1` |
+
+### Agent-UI attach verification (ATTACH-3 / PYPOST-1208)
+
+Attach proofs (host+client `ui_*`, lifecycle, endpoint override, CLI) live in
+`tests/test_agent_ui_attach.py` under `make test`. What is CI-proven versus
+accepted manual residual gaps is the matrix in
+[agent_ui_actions_mcp.md — Proven vs manual](agent_ui_actions_mcp.md#proven-vs-manual-attach-3--pypost-1208).
+Do not invent capability from that table — it documents verification only
+(capability: ATTACH-2 / PYPOST-1207).
+
+```bash
+make test PYTEST_ARGS='tests/test_agent_ui_attach.py -v'
+```
 
 PYPOST-154 verified end-to-end port-in-use handling for both MCP and metrics (closes
 PYPOST-20 bind-error debt). Implementation is in PYPOST-556 and PYPOST-153; 154 adds shared

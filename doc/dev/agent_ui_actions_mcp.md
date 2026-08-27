@@ -162,9 +162,10 @@ local Qt app; the desktop already owns the GUI thread.
 
 **Capability note:** Runtime attach is shipped
 ([PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207) / ATTACH-2).
-Spawn-session remains the default when `--attach` is omitted. Broader
-verification matrix: [PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208)
-(ATTACH-3). Epic: [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991).
+Spawn-session remains the default when `--attach` is omitted. Attach
+verification matrix (automated vs manual): see **Proven vs manual** under
+Tests ([PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208) /
+ATTACH-3). Epic: [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991).
 
 ## Trust boundary
 
@@ -290,8 +291,8 @@ Prometheus metrics are **not** used for attach IPC (agent-UI policy).
   (empty/offscreen by default). That path does not bind to an already-running
   desktop.
 - **Attach path:** Cooperative local AF_UNIX host in interactive desktop
-  plus sidecar `--attach`. Broader CI/manual matrix is
-  [PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208). Epic
+  plus sidecar `--attach`. Automated vs manual matrix is under Tests
+  ([PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208)). Epic
   [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991).
 - **Stdio only** — no separate loopback Streamable HTTP port for agent-UI MCP
   in this release.
@@ -352,7 +353,7 @@ make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -v'
 make test-agent-e2e \
   PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py::test_stdio_sidecar_lists_ui_action_tools -v'
 
-# Attach CLI + host/client IPC (PYPOST-1207)
+# Attach CLI + host/client IPC (ATTACH-2/3)
 make test PYTEST_ARGS='tests/test_agent_ui_attach.py -v'
 
 # Product MCP catalog must exclude ui_* tools (PYPOST-953)
@@ -360,4 +361,75 @@ make test PYTEST_ARGS=\
   'tests/test_mcp_server_impl.py -k test_list_tools_excludes_agent_ui -v'
 ```
 
-Broader attach matrix: ATTACH-3 / PYPOST-1208.
+### Proven vs manual (ATTACH-3 / PYPOST-1208)
+
+What **automated tests prove** versus **manual residual gaps** for attach.
+Do not treat manual rows as CI-proven. Capability remains ATTACH-2 /
+[PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207); this matrix
+is verification only.
+
+Automated proofs live in `tests/test_agent_ui_attach.py` (module
+`pytestmark` timeout 30; eleven attach tests). Packaging / spawn continuity
+and product-catalog exclusion stay in sibling suites. Discoverability:
+[testing.md](testing.md#agent-ui-attach-verification-attach-3--pypost-1208),
+[ui_actions.md](ui_actions.md), [README.md](README.md).
+
+| Scenario | Coverage |
+| --- | --- |
+| CLI `--attach` accepted | **Automated** |
+| Attach does not call `AgentAppSession.start` | **Automated** |
+| Attach fail unbound (no silent spawn) | **Automated** |
+| Host+client `ui_click` | **Automated** |
+| Host+client `ui_fill` | **Automated** |
+| Host+client `ui_select` | **Automated** |
+| Host+client `ui_send_key` | **Automated** |
+| Detach leaves host listening (rebind) | **Automated** |
+| Host exit → client unbound | **Automated** |
+| Sidecar exit → host still listening | **Automated** |
+| Endpoint override (env / CLI / default) | **Automated** |
+| UI tools off product MCP | **Automated** |
+| Protocol-version reject on mismatch | **Manual** |
+| Concurrent interleaved `ui_*` / multi-client | **Manual** |
+| Stale multi-desktop socket steal | **Manual** |
+
+**Automated proofs** (`tests/test_agent_ui_attach.py` unless noted):
+
+- CLI `--attach` — `test_cli_accepts_attach_mode`
+- No `AgentAppSession.start` —
+  `test_attach_mode_does_not_call_agent_app_session_start`
+- Unbound fail (no silent spawn) —
+  `test_attach_without_host_fails_unbound_not_silent_spawn`
+- `ui_click` — `test_attach_host_client_ui_click_round_trip`
+- `ui_fill` — `test_attach_host_client_ui_fill_sets_line_edit`
+- `ui_select` — `test_attach_host_client_ui_select_sets_combo`
+- `ui_send_key` — `test_attach_host_client_ui_send_key_changes_text`
+- Detach/rebind — `test_attach_detach_leaves_host_listening`
+- Host exit unbound — `test_attach_host_stop_unbinds_client`
+  (models product host-exit as `AgentUiAttachHost.stop()` —
+  unlink + close peers; not `QApplication.exit()` / `quit()`, which would
+  tear down the shared pytest-qt loop)
+- Sidecar exit rebind — `test_attach_sidecar_exit_leaves_host_listening`
+  (abrupt peer socket close without a `detach` op)
+- Endpoint override — `test_attach_endpoint_override_env_and_cli`
+  (env / `default_attach_endpoint()` path resolution; `--attach-endpoint`
+  present in `--help` — not a full stdio MCP serve with overridden argv)
+- UI tools off product MCP —
+  `tests/test_mcp_server_impl.py`
+  (`test_list_tools_excludes_agent_ui_action_names`)
+
+**Manual residual checks:**
+
+- **Protocol-version reject on mismatch** — Handshake version is advisory
+  today
+  ([PYPOST-1218](https://pypost.atlassian.net/browse/PYPOST-1218)).
+  **Check:** connect a client with a mismatched `handshake.version`; expect
+  reject only after 1218 enforces it — today host may still accept. Do not
+  treat advisory accept as a product bug in ATTACH-3.
+- **Concurrent interleaved `ui_*` / multi-client** — **Check:** two sidecars
+  (or clients) bound to one host; interleave `ui_fill` / `ui_click` under
+  load. **Pass:** no crash; actions apply without silent cross-client
+  corruption. Full race stress is out of fast-suite norms.
+- **Stale multi-desktop socket steal** — **Check:** leave a stale AF_UNIX
+  path, start a second desktop host on the same override path. **Pass:**
+  `host.start()` unlinks stale path and binds (or fails loudly); no silent
+  steal of another live peer without operator intent.

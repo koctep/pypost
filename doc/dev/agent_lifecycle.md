@@ -248,8 +248,10 @@ path does not replace spawn-session.
 
 Operator narrative, CLI, and API:
 [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md). Shipped capability:
-[PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207). Full matrix:
-[PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208).
+[PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207). Proven vs
+manual verification matrix (ATTACH-3):
+[PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208) —
+[Proven vs manual](agent_ui_actions_mcp.md#proven-vs-manual-attach-3--pypost-1208).
 
 ## Out of scope (siblings)
 
