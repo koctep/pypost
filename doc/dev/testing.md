@@ -215,6 +215,14 @@ are locked in `tests/test_ui_actions.py`
 use the same error substrings via `seeded_agent_e2e_session`:
 `test_live_collection_tree_missing_option_raises` and
 `test_live_collection_tree_index_out_of_range_raises` (PYPOST-975).
+Parallel-suite flake / Qt–uvicorn race work for
+`test_live_collection_tree_missing_option_raises` is ticketed under epic
+[PYPOST-1188](https://pypost.atlassian.net/browse/PYPOST-1188):
+[PYPOST-1215](https://pypost.atlassian.net/browse/PYPOST-1215) (repro),
+[PYPOST-1216](https://pypost.atlassian.net/browse/PYPOST-1216) (diagnosis),
+[PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217) (fix).
+Repro, diagnosis, and fix prose belong to those children — not expanded
+here. See also [GUI testing Troubleshooting](gui_testing.md#troubleshooting).
 Model-backed `QListView` with no model is locked by
 `test_select_list_view_no_model_raises` (PYPOST-972;
 `item view has no model`).
