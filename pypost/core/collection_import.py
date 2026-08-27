@@ -22,6 +22,7 @@ import uuid
 from pydantic import ValidationError
 
 from pypost.core.collection_messages import (
+    MSG_ENTRY_MCP_CLIENTS_NOT_LIST,
     MSG_ENTRY_MISSING_NAME,
     MSG_ENTRY_REQUESTS_NOT_LIST,
     MSG_ENTRY_WEBSOCKETS_NOT_LIST,
@@ -119,6 +120,9 @@ def _shape_error(record: dict) -> str | None:
     websockets = record.get("websockets")
     if websockets is not None and not isinstance(websockets, list):
         return MSG_ENTRY_WEBSOCKETS_NOT_LIST
+    mcp_clients = record.get("mcp_clients")
+    if mcp_clients is not None and not isinstance(mcp_clients, list):
+        return MSG_ENTRY_MCP_CLIENTS_NOT_LIST
     return None
 
 

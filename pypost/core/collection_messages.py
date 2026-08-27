@@ -40,6 +40,7 @@ MSG_FILE_ENTRY_NOT_OBJECT = "Each collection entry in the file must be a JSON ob
 MSG_ENTRY_MISSING_NAME = 'missing or empty "name" field'
 MSG_ENTRY_REQUESTS_NOT_LIST = 'the "requests" field must be a list'
 MSG_ENTRY_WEBSOCKETS_NOT_LIST = 'the "websockets" field must be a list'
+MSG_ENTRY_MCP_CLIENTS_NOT_LIST = 'the "mcp_clients" field must be a list'
 
 LABEL_UNNAMED_ENTRY = "Entry {index}"
 

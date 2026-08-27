@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Set
 from pydantic import BaseModel, Field
 
 from pypost.models.retry import RetryPolicy
+from pypost.models.mcp_client import McpClientConnection
 from pypost.models.websocket import WebSocketConnection
 
 _MCP_PARAM_TYPES = frozenset(
@@ -94,6 +95,7 @@ class Collection(BaseModel):
     name: str = "New Collection"
     requests: List[RequestData] = Field(default_factory=list)
     websockets: List[WebSocketConnection] = Field(default_factory=list)
+    mcp_clients: List[McpClientConnection] = Field(default_factory=list)
 
 
 class Environment(BaseModel):

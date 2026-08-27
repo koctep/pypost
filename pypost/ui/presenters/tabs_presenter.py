@@ -27,8 +27,14 @@ from pypost.core.request_persisted_fields import (
     snapshot_persisted_fields,
 )
 from pypost.core.websocket_persisted_fields import snapshot_websocket_persisted_fields
+from pypost.core.mcp_client_persisted_fields import snapshot_mcp_client_persisted_fields
 from pypost.core.websocket_registry import WebSocketRegistry
-from pypost.ui.presenters.tab_dirty import connection_snapshot_from_tab, is_tab_dirty
+from pypost.core.mcp_client_registry import McpClientRegistry
+from pypost.ui.presenters.tab_dirty import (
+    connection_snapshot_from_tab,
+    is_tab_dirty,
+    mcp_client_snapshot_from_tab,
+)
 from pypost.ui.presenters.tabs_presenter_close import close_workspace_tab
 from pypost.ui.presenters.tabs_presenter_request_close import (
     close_tabs_for_request_ids as close_tabs_for_request_ids_helper,
@@ -37,8 +43,14 @@ from pypost.ui.presenters.tabs_presenter_ws_close import (
     close_tabs_for_websocket_ids as close_tabs_for_websocket_ids_ws,
     rename_websocket_tabs as rename_websocket_tabs_ws,
 )
+from pypost.ui.presenters.tabs_presenter_mcp_close import (
+    close_tabs_for_mcp_client_ids as close_tabs_for_mcp_client_ids_mcp,
+    rename_mcp_client_tabs as rename_mcp_client_tabs_mcp,
+)
 from pypost.ui.presenters.tabs_presenter_draft import (
-    collect_persistable_open_tab_ids, websocket_id_is_saved,
+    collect_persistable_open_tab_ids,
+    mcp_client_id_is_saved,
+    websocket_id_is_saved,
 )
 from pypost.ui.presenters import tabs_presenter_hotkeys as tab_hotkeys
 from pypost.ui.presenters.tabs_presenter_worker import TabsPresenterWorkerHandlers
@@ -61,6 +73,7 @@ from pypost.ui.request_save_orchestrator import (
     StaleCheckContext,
 )
 from pypost.ui.websocket_save_orchestrator import WebSocketSaveOrchestrator
+from pypost.ui.mcp_client_save_orchestrator import McpClientSaveOrchestrator
 from pypost.ui.theme.json_syntax_theme import resolve_json_syntax_colors
 from pypost.ui.widget_ids import REQUEST_TABS, set_widget_id
 from pypost.ui.widgets.mcp_client import McpClientTab
@@ -115,6 +128,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     websocket_saved = Signal()  # after WS profile save, triggers collections tree refresh
     websocket_save_as_completed = Signal(WebSocketConnection, str)  # connection, collection_id
     websocket_persisted = Signal(str, WebSocketConnection, WebSocketTab)
+    mcp_client_saved = Signal()  # after MCP Client save, triggers collections tree refresh
+    mcp_client_save_as_completed = Signal(McpClientConnection, str)
+    mcp_client_persisted = Signal(str, McpClientConnection, McpClientTab)
 
     def __init__(
         self,
@@ -148,6 +164,13 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._ws_registry = WebSocketRegistry(request_manager, storage)
         self._ws_save_orchestrator = WebSocketSaveOrchestrator(
             self._ws_registry,
+            state_manager,
+            settings,
+            metrics=metrics,
+        )
+        self._mcp_registry = McpClientRegistry(request_manager, storage)
+        self._mcp_save_orchestrator = McpClientSaveOrchestrator(
+            self._mcp_registry,
             state_manager,
             settings,
             metrics=metrics,
@@ -223,6 +246,15 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def add_blank_websocket_tab(self, *, save_state: bool = True) -> WebSocketTab:
         return self._insert_websocket_tab(WebSocketConnection(), save_state=save_state)
 
+    def open_mcp_client_isolated_tab(
+        self,
+        connection: McpClientConnection,
+        *,
+        save_state: bool = True,
+    ) -> McpClientTab:
+        """Always insert a new MCP Client tab; never focus-dedup by profile id."""
+        return self._insert_mcp_client_tab(connection, save_state=save_state)
+
     def add_blank_mcp_client_tab(self, *, save_state: bool = True) -> McpClientTab:
         return self._insert_mcp_client_tab(McpClientConnection(), save_state=save_state)
 
@@ -265,6 +297,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             hidden_keys=self._current_hidden_keys,
         )
         tab = McpClientTab(connection, presenter)
+        if mcp_client_id_is_saved(self._request_manager, connection.id):
+            tab.persisted_baseline = snapshot_mcp_client_persisted_fields(connection)
+        self._wire_mcp_client_tab_signals(tab)
         name = connection.name if connection.name else "New MCP Client"
         plus_idx = self._header.insert_index_before_plus()
         if plus_idx >= 0:
@@ -333,11 +368,13 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def restore_tabs(self) -> None:
         """Restores tabs from StateManager."""
         from pypost.core.websocket_registry import WebSocketRegistry
+        from pypost.core.mcp_client_registry import McpClientRegistry
 
         tabs_restored = False
         restored_count = 0
         storage = getattr(self._request_manager, "storage", None)
         ws_registry = WebSocketRegistry(self._request_manager, storage)
+        mcp_registry = McpClientRegistry(self._request_manager, storage)
         for tab_id in self._state_manager.get_open_tabs():
             item_match = ws_registry.find_item(tab_id)
             if item_match is not None:
@@ -350,18 +387,28 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
                     self.add_new_tab(copy_request_for_isolated_tab(item_data), save_state=False)
                     tabs_restored = True
                     restored_count += 1
-            else:
-                result = self._request_manager.find_request(tab_id)
-                if result:
-                    found_request, _ = result
-                    self.add_new_tab(
-                        copy_request_for_isolated_tab(found_request),
-                        save_state=False,
-                    )
+                continue
+
+            mcp_match = mcp_registry.find_item(tab_id)
+            if mcp_match is not None:
+                kind, item_data, _ = mcp_match
+                if kind == "mcp_client" and isinstance(item_data, McpClientConnection):
+                    self.open_mcp_client_tab(item_data, save_state=False)
                     tabs_restored = True
                     restored_count += 1
-                else:
-                    logger.warning("restore_tabs_item_not_found item_id=%s", tab_id)
+                continue
+
+            result = self._request_manager.find_request(tab_id)
+            if result:
+                found_request, _ = result
+                self.add_new_tab(
+                    copy_request_for_isolated_tab(found_request),
+                    save_state=False,
+                )
+                tabs_restored = True
+                restored_count += 1
+            else:
+                logger.warning("restore_tabs_item_not_found item_id=%s", tab_id)
 
         if not tabs_restored:
             self.add_new_tab(save_state=False)
@@ -374,6 +421,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         open_ids = collect_persistable_open_tab_ids(
             self._tabs,
             websocket_id_is_saved=lambda i: websocket_id_is_saved(self._request_manager, i),
+            mcp_client_id_is_saved=lambda i: mcp_client_id_is_saved(
+                self._request_manager, i
+            ),
         )
         self._state_manager.set_open_tabs(open_ids)
 
@@ -446,6 +496,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def rename_websocket_tabs(self, ws_id: str, new_name: str) -> None:
         rename_websocket_tabs_ws(self, ws_id, new_name)
 
+    def rename_mcp_client_tabs(self, profile_id: str, new_name: str) -> None:
+        rename_mcp_client_tabs_mcp(self, profile_id, new_name)
+
     def close_tabs_for_request_ids(self, request_ids: list) -> None:
         close_tabs_for_request_ids_helper(self, request_ids)
 
@@ -458,6 +511,18 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         close_tabs_for_websocket_ids_ws(
             self,
             ws_ids,
+            prompt=prompt or prompt_deleted_websocket_profile_tab_close,
+        )
+
+    def close_tabs_for_mcp_client_ids(
+        self,
+        profile_ids: list[str],
+        *,
+        prompt: Callable[[QWidget, str, bool, bool], bool] | None = None,
+    ) -> None:
+        close_tabs_for_mcp_client_ids_mcp(
+            self,
+            profile_ids,
             prompt=prompt or prompt_deleted_websocket_profile_tab_close,
         )
 
@@ -607,6 +672,14 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         )
         tab.save_as_requested.connect(
             lambda conn, t=tab: self._handle_save_as_websocket(t, conn)
+        )
+
+    def _wire_mcp_client_tab_signals(self, tab: McpClientTab) -> None:
+        tab.save_requested.connect(
+            lambda conn, t=tab: self._handle_save_mcp_client(t, conn)
+        )
+        tab.save_as_requested.connect(
+            lambda conn, t=tab: self._handle_save_as_mcp_client(t, conn)
         )
 
     def _wire_tab_signals(self, tab: RequestTab) -> None:
@@ -794,6 +867,74 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         tab.stale_persisted = False
         tab.presenter.connection = connection
         tab.connection_editor.load_connection(connection)
+
+    def _stale_context_for_mcp_client_tab(
+        self, source_tab: McpClientTab
+    ) -> StaleCheckContext | None:
+        return StaleCheckContext(
+            persisted_baseline=source_tab.persisted_baseline,
+            stale_persisted=source_tab.stale_persisted,
+        )
+
+    def _apply_mcp_save_result_to_tab(
+        self, tab: McpClientTab, connection: McpClientConnection
+    ) -> None:
+        tab.connection_data = connection
+        tab.persisted_baseline = snapshot_mcp_client_persisted_fields(connection)
+        tab.stale_persisted = False
+        tab.presenter.connection = connection
+
+    def _handle_save_mcp_client(
+        self, source_tab: McpClientTab, connection: McpClientConnection
+    ) -> None:
+        snapshot = mcp_client_snapshot_from_tab(source_tab)
+        result = self._mcp_save_orchestrator.save_profile(
+            snapshot,
+            self._tabs,
+            stale_context=self._stale_context_for_mcp_client_tab(source_tab),
+        )
+        if result.action == SaveAction.CANCELLED:
+            return
+
+        if result.action == SaveAction.OVERWRITE:
+            saved = result.request
+            if saved is None:
+                logger.error(
+                    "mcp_client_save_overwrite_failed reason=missing_snapshot profile_id=%s",
+                    connection.id,
+                )
+                return
+            self._apply_mcp_save_result_to_tab(source_tab, saved)
+            self.mcp_client_persisted.emit(connection.id, saved, source_tab)
+            tab_index = self._index_of_tab(source_tab)
+            if tab_index is not None:
+                self._header.set_tab_label(tab_index, saved.name)
+            self.mcp_client_saved.emit()
+            return
+
+        if result.action == SaveAction.CREATED_NEW and result.request is not None:
+            tab_index = self._index_of_tab(source_tab)
+            if tab_index is not None:
+                self._header.set_tab_label(tab_index, result.request.name)
+            self._apply_mcp_save_result_to_tab(source_tab, result.request)
+            self.save_tabs_state()
+            self.mcp_client_saved.emit()
+
+    def _handle_save_as_mcp_client(
+        self, source_tab: McpClientTab, connection: McpClientConnection
+    ) -> None:
+        snapshot = mcp_client_snapshot_from_tab(source_tab)
+        result = self._mcp_save_orchestrator.save_as_profile(snapshot, self._tabs)
+        if result.action != SaveAction.SAVE_AS or result.request is None:
+            return
+
+        new_conn = result.request
+        tab_index = self._index_of_tab(source_tab)
+        if tab_index is not None:
+            self._header.set_tab_label(tab_index, new_conn.name)
+        self._apply_mcp_save_result_to_tab(source_tab, new_conn)
+        self.save_tabs_state()
+        self.mcp_client_save_as_completed.emit(new_conn, result.collection_id or "")
 
     def _handle_save_websocket(
         self, source_tab: WebSocketTab, connection: WebSocketConnection

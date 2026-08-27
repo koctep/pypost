@@ -240,9 +240,11 @@ class RequestManager:
         )
 
     def _item_dispatch_context(self) -> ItemDispatchContext:
+        from pypost.core.mcp_client_registry import McpClientRegistry
         from pypost.core.websocket_registry import WebSocketRegistry
 
         return ItemDispatchContext(
             request_manager=self,
             websocket_registry=WebSocketRegistry(self, self.storage),
+            mcp_client_registry=McpClientRegistry(self, self.storage),
         )

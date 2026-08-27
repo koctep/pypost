@@ -1,6 +1,6 @@
-"""In-memory outbound MCP Client draft (peer of WebSocketConnection).
+"""Outbound MCP Client profile model (peer of WebSocketConnection).
 
-Not persisted on Collection in PYPOST-1166. MCP-TM-7 adds save/open.
+Saved profiles live on ``Collection.mcp_clients`` (PYPOST-1172).
 """
 
 from __future__ import annotations

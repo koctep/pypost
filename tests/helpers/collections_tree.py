@@ -13,6 +13,7 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QAbstractItemDelegate, QApplication, QLineEdit, QTreeView
 
 from pypost.models.models import Collection, RequestData
+from pypost.models.mcp_client import McpClientConnection
 from pypost.models.websocket import WebSocketConnection
 from pypost.ui.delegates.collection_item_rename_delegate import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_tree_actions import CollectionTreeActions
@@ -27,13 +28,19 @@ def make_collection(
     requests=None,
     *,
     websockets=None,
+    mcp_clients=None,
 ) -> Collection:
     return Collection(
         id=col_id,
         name=name,
         requests=requests or [],
         websockets=websockets or [],
+        mcp_clients=mcp_clients or [],
     )
+
+
+def make_mcp_client(profile_id: str, name: str, **kwargs) -> McpClientConnection:
+    return McpClientConnection(id=profile_id, name=name, **kwargs)
 
 
 def make_websocket(ws_id: str, name: str, **kwargs) -> WebSocketConnection:
@@ -69,6 +76,11 @@ class FakeRequestManager:
         elif item_type == "websocket":
             for col in self.collections:
                 col.websockets = [ws for ws in col.websockets if ws.id != item_id]
+        elif item_type == "mcp_client":
+            for col in self.collections:
+                col.mcp_clients = [
+                    profile for profile in col.mcp_clients if profile.id != item_id
+                ]
         elif item_type == "collection":
             self.collections = [col for col in self.collections if col.id != item_id]
         return True
@@ -94,6 +106,12 @@ class FakeRequestManager:
                 for ws in col.websockets:
                     if ws.id == item_id:
                         ws.name = normalized
+                        return True
+        elif item_type == "mcp_client":
+            for col in self.collections:
+                for profile in col.mcp_clients:
+                    if profile.id == item_id:
+                        profile.name = normalized
                         return True
         return False
 
@@ -192,7 +210,9 @@ class IsolatedTreeActions:
     emit_requests_deleted: MagicMock = field(default_factory=MagicMock)
     emit_open_isolated_tab: MagicMock = field(default_factory=MagicMock)
     emit_open_isolated_websocket_tab: MagicMock = field(default_factory=MagicMock)
+    emit_open_isolated_mcp_client_tab: MagicMock = field(default_factory=MagicMock)
     emit_websockets_deleted: MagicMock = field(default_factory=MagicMock)
+    emit_mcp_clients_deleted: MagicMock = field(default_factory=MagicMock)
     export_collection: MagicMock = field(default_factory=MagicMock)
     refresh_tree: MagicMock = field(default_factory=MagicMock)
     restore_tree_state: MagicMock = field(default_factory=MagicMock)
@@ -211,6 +231,12 @@ class IsolatedTreeActions:
                 if (
                     item_type == "websocket"
                     and isinstance(data, WebSocketConnection)
+                    and data.id == item_id
+                ):
+                    return req_item
+                if (
+                    item_type == "mcp_client"
+                    and isinstance(data, McpClientConnection)
                     and data.id == item_id
                 ):
                     return req_item
@@ -245,6 +271,11 @@ class IsolatedTreeActions:
                 ws_item.setData(ws, Qt.UserRole)
                 ws_item.setEditable(False)
                 col_item.appendRow(ws_item)
+            for profile in col.mcp_clients:
+                mcp_item = QStandardItem(f"mcp {profile.name}")
+                mcp_item.setData(profile, Qt.UserRole)
+                mcp_item.setEditable(False)
+                col_item.appendRow(mcp_item)
             self.model.appendRow(col_item)
             self._collection_items_by_id[col.id] = col_item
 

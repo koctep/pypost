@@ -7,10 +7,12 @@ from collections.abc import Callable
 
 from PySide6.QtWidgets import QTabWidget, QWidget
 
+from pypost.core.mcp_client_registry import McpClientRegistry
 from pypost.core.request_manager import RequestManager
 from pypost.core.websocket_registry import WebSocketRegistry
 from pypost.ui.collection_item_dialogs import prompt_unsaved_draft_tab_close
 from pypost.ui.presenters.tab_dirty import is_websocket_draft_dirty
+from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
 
 logger = logging.getLogger(__name__)
@@ -25,15 +27,25 @@ def websocket_id_is_saved(request_manager: RequestManager, ws_id: str) -> bool:
     return registry.find_websocket(ws_id) is not None
 
 
+def mcp_client_id_is_saved(request_manager: RequestManager, profile_id: str) -> bool:
+    """Return True when *profile_id* resolves to a collection-backed MCP Client profile."""
+    storage = getattr(request_manager, "storage", None)
+    registry = McpClientRegistry(request_manager, storage)
+    return registry.find_mcp_client(profile_id) is not None
+
+
 def collect_persistable_open_tab_ids(
     tabs: QTabWidget,
     *,
     websocket_id_is_saved: Callable[[str], bool],
+    mcp_client_id_is_saved: Callable[[str], bool] | None = None,
 ) -> list[str]:
-    """Collect HTTP ids and saved WebSocket ids; omit MCP Client and WS drafts."""
+    """Collect HTTP ids and saved WebSocket/MCP Client ids; omit drafts."""
     open_ids: list[str] = []
     omitted_draft_count = 0
     persisted_ws_count = 0
+    persisted_mcp_count = 0
+    mcp_saved = mcp_client_id_is_saved or (lambda _id: False)
     for i in range(tabs.count()):
         tab = tabs.widget(i)
         if isinstance(tab, WebSocketTab):
@@ -52,15 +64,33 @@ def collect_persistable_open_tab_ids(
                     conn.id,
                 )
             continue
+        if isinstance(tab, McpClientTab):
+            conn = tab.connection_data
+            if conn and conn.id and mcp_saved(conn.id):
+                open_ids.append(conn.id)
+                persisted_mcp_count += 1
+                logger.info(
+                    "mcp_client_saved_tab_persisted_in_open_tabs profile_id=%s",
+                    conn.id,
+                )
+            elif conn and conn.id:
+                omitted_draft_count += 1
+                logger.info(
+                    "mcp_client_draft_omitted_from_open_tabs profile_id=%s",
+                    conn.id,
+                )
+            continue
         request_data = getattr(tab, "request_data", None)
         req_id = getattr(request_data, "id", None)
         if req_id:
             open_ids.append(req_id)
-    if omitted_draft_count or persisted_ws_count:
+    if omitted_draft_count or persisted_ws_count or persisted_mcp_count:
         logger.info(
-            "websocket_open_tabs_filter omitted_draft_count=%d persisted_ws_count=%d",
+            "open_tabs_filter omitted_draft_count=%d persisted_ws_count=%d"
+            " persisted_mcp_count=%d",
             omitted_draft_count,
             persisted_ws_count,
+            persisted_mcp_count,
         )
     return open_ids
 

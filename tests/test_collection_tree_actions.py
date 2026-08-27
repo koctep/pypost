@@ -12,10 +12,12 @@ from tests.helpers.collections_tree import (
     build_isolated_tree_actions,
     close_isolated_tree_actions,
     make_collection,
+    make_mcp_client,
     make_request,
     make_websocket,
     patch_view_context_menu,
 )
+from pypost.models.mcp_client import McpClientConnection
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -340,6 +342,84 @@ class TestCollectionTreeActionsWebSocket(unittest.TestCase):
         mock_confirm_delete.return_value = True
         harness.actions.handle_delete("c1", "collection", "Streams")
         harness.emit_websockets_deleted.assert_called_once_with(["ws-1", "ws-2"])
+
+
+@pytest.mark.usefixtures("qapp")
+class TestCollectionTreeActionsMcpClient(unittest.TestCase):
+    """PYPOST-1172: MCP Client collections context-menu parity."""
+
+    def test_mcp_client_menu_offers_new_tab_export_rename_delete(self):
+        profile = make_mcp_client("mcp-1", "Upstream")
+        col = make_collection("c1", "MCP", mcp_clients=[profile])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        mcp_item = harness.model.item(0).child(0)
+        with patch_view_context_menu(
+            harness.view,
+            mcp_item.index(),
+            [MagicMock(), MagicMock(), MagicMock(), MagicMock()],
+            None,
+        ) as mock_menu:
+            harness.actions.show_context_menu(QPoint(0, 0))
+        labels = [call.args[0] for call in mock_menu.addAction.call_args_list]
+        self.assertEqual(
+            labels,
+            ["New tab", BUTTON_EXPORT_COLLECTION, "Rename", "Delete"],
+        )
+
+    @patch(
+        "pypost.ui.presenters.collection_tree_actions.copy_mcp_client_for_isolated_tab",
+        create=True,
+    )
+    def test_mcp_client_new_tab_emits_isolated_open_with_protocol_metric(
+        self, mock_copy,
+    ):
+        profile = make_mcp_client("mcp-1", "Upstream")
+        copied = make_mcp_client("mcp-1", "Upstream")
+        mock_copy.return_value = copied
+        col = make_collection("c1", "MCP", mcp_clients=[profile])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        harness.actions._emit_open_isolated_mcp_client_tab = (
+            harness.emit_open_isolated_mcp_client_tab
+        )
+        mcp_item = harness.model.item(0).child(0)
+        new_tab_action = MagicMock()
+        with patch_view_context_menu(
+            harness.view,
+            mcp_item.index(),
+            [new_tab_action, MagicMock(), MagicMock(), MagicMock()],
+            new_tab_action,
+        ):
+            harness.actions.show_context_menu(QPoint(0, 0))
+        mock_copy.assert_called_once_with(profile)
+        harness.emit_open_isolated_mcp_client_tab.assert_called_once_with(copied)
+        harness.metrics.track_gui_new_tab_action.assert_called_once_with(
+            "collections_context",
+            protocol="mcp_client",
+        )
+
+    @patch("pypost.ui.presenters.collection_tree_actions.confirm_delete")
+    def test_delete_mcp_client_emits_mcp_clients_deleted(self, mock_confirm_delete):
+        profile = make_mcp_client("mcp-1", "Upstream")
+        col = make_collection("c1", "MCP", mcp_clients=[profile])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        harness.actions._emit_mcp_clients_deleted = harness.emit_mcp_clients_deleted
+        mock_confirm_delete.return_value = True
+        harness.actions.handle_delete("mcp-1", "mcp_client", "mcp Upstream")
+        harness.emit_mcp_clients_deleted.assert_called_once_with(["mcp-1"])
+
+    def test_resolve_item_target_returns_mcp_client(self):
+        profile = make_mcp_client("mcp-1", "Upstream")
+        col = make_collection("c1", "MCP", mcp_clients=[profile])
+        harness = build_isolated_tree_actions([col])
+        self.addCleanup(close_isolated_tree_actions, harness)
+        item = harness.model.item(0).child(0)
+        item_type, item_id, label, data = harness.actions._resolve_item_target(item)
+        self.assertEqual(item_type, "mcp_client")
+        self.assertEqual(item_id, "mcp-1")
+        self.assertIsInstance(data, McpClientConnection)
 
 
 if __name__ == "__main__":

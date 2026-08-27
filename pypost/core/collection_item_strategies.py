@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
+    from pypost.core.mcp_client_registry import McpClientRegistry
     from pypost.core.request_manager import RequestManager
     from pypost.core.websocket_registry import WebSocketRegistry
 
@@ -23,10 +24,18 @@ class CollectionItemStrategy:
 
 def _unpack_context(
     ctx: Any,
-) -> tuple[RequestManager, WebSocketRegistry | None]:
+) -> tuple[RequestManager, WebSocketRegistry | None, McpClientRegistry | None]:
     if hasattr(ctx, "request_manager"):
-        return ctx.request_manager, getattr(ctx, "websocket_registry", None)
-    return ctx, getattr(ctx, "websocket_registry", None)
+        return (
+            ctx.request_manager,
+            getattr(ctx, "websocket_registry", None),
+            getattr(ctx, "mcp_client_registry", None),
+        )
+    return (
+        ctx,
+        getattr(ctx, "websocket_registry", None),
+        getattr(ctx, "mcp_client_registry", None),
+    )
 
 
 def _collection_delete(ctx: Any, item_id: str) -> bool:
@@ -50,17 +59,31 @@ def _request_rename(ctx: Any, item_id: str, new_name: str) -> bool:
 
 
 def _websocket_delete(ctx: Any, item_id: str) -> bool:
-    _, ws_registry = _unpack_context(ctx)
+    _, ws_registry, _ = _unpack_context(ctx)
     if ws_registry is None:
         return False
     return ws_registry.delete_websocket(item_id)
 
 
 def _websocket_rename(ctx: Any, item_id: str, new_name: str) -> bool:
-    _, ws_registry = _unpack_context(ctx)
+    _, ws_registry, _ = _unpack_context(ctx)
     if ws_registry is None:
         return False
     return ws_registry.rename_websocket(item_id, new_name)
+
+
+def _mcp_client_delete(ctx: Any, item_id: str) -> bool:
+    _, _, mcp_registry = _unpack_context(ctx)
+    if mcp_registry is None:
+        return False
+    return mcp_registry.delete_mcp_client(item_id)
+
+
+def _mcp_client_rename(ctx: Any, item_id: str, new_name: str) -> bool:
+    _, _, mcp_registry = _unpack_context(ctx)
+    if mcp_registry is None:
+        return False
+    return mcp_registry.rename_mcp_client(item_id, new_name)
 
 
 DEFAULT_COLLECTION_ITEM_STRATEGIES: dict[str, CollectionItemStrategy] = {
@@ -75,5 +98,9 @@ DEFAULT_COLLECTION_ITEM_STRATEGIES: dict[str, CollectionItemStrategy] = {
     "websocket": CollectionItemStrategy(
         delete=_websocket_delete,
         rename=_websocket_rename,
+    ),
+    "mcp_client": CollectionItemStrategy(
+        delete=_mcp_client_delete,
+        rename=_mcp_client_rename,
     ),
 }

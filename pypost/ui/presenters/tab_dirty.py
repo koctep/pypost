@@ -4,16 +4,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pypost.core.mcp_client_persisted_fields import (
+    factory_mcp_client_draft,
+    persisted_mcp_client_fields_equal,
+    mcp_client_draft_fields_equal,
+)
 from pypost.core.request_persisted_fields import persisted_fields_equal
 from pypost.core.websocket_persisted_fields import (
     factory_websocket_draft,
     persisted_websocket_fields_equal,
     websocket_draft_fields_equal,
 )
+from pypost.models.mcp_client import McpClientConnection
 from pypost.models.websocket import WebSocketConnection
 
 if TYPE_CHECKING:
     from pypost.ui.presenters.tabs_presenter import RequestTab
+    from pypost.ui.widgets.mcp_client import McpClientTab
     from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
 
 
@@ -74,3 +81,39 @@ def is_websocket_saved_tab_dirty(tab: WebSocketTab) -> bool:
         return False
     current = connection_snapshot_from_tab(tab)
     return not persisted_websocket_fields_equal(current, baseline)
+
+
+def mcp_client_snapshot_from_tab(tab: McpClientTab) -> McpClientConnection:
+    """Editor-visible persisted fields at save time."""
+    source = tab.connection_data
+    presenter = tab.presenter
+    last_tool_name = presenter._selected_name or source.last_tool_name
+    last_tool_arguments = dict(source.last_tool_arguments or {})
+    if last_tool_name is not None:
+        try:
+            last_tool_arguments = tab.collect_invoke_arguments()
+        except Exception:
+            pass
+    return McpClientConnection(
+        id=source.id,
+        name=source.name,
+        url=tab.url_input.text(),
+        headers=tab.headers_data(),
+        last_tool_name=last_tool_name,
+        last_tool_arguments=last_tool_arguments,
+    )
+
+
+def is_mcp_client_draft_dirty(tab: McpClientTab) -> bool:
+    """True when editor-visible fields differ from new-profile factory defaults."""
+    current = mcp_client_snapshot_from_tab(tab)
+    return not mcp_client_draft_fields_equal(current, factory_mcp_client_draft())
+
+
+def is_mcp_client_saved_tab_dirty(tab: McpClientTab) -> bool:
+    """True when a saved-profile tab differs from its adopted persisted baseline."""
+    baseline = tab.persisted_baseline
+    if baseline is None:
+        return False
+    current = mcp_client_snapshot_from_tab(tab)
+    return not persisted_mcp_client_fields_equal(current, baseline)

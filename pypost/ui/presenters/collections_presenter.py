@@ -15,6 +15,7 @@ from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.models import Collection, RequestData
+from pypost.models.mcp_client import McpClientConnection
 from pypost.models.websocket import WebSocketConnection
 from pypost.ui.delegates import CollectionItemRenameDelegate
 from pypost.ui.presenters.collection_export_actions import CollectionExportActions
@@ -38,12 +39,16 @@ class CollectionsPresenter(QObject):
     open_request_in_isolated_tab = Signal(object)  # payload: RequestData (deep copy)
     open_websocket_in_tab = Signal(object)  # payload: WebSocketConnection
     open_websocket_in_isolated_tab = Signal(object)  # payload: WebSocketConnection (deep copy)
+    open_mcp_client_in_tab = Signal(object)  # payload: McpClientConnection
+    open_mcp_client_in_isolated_tab = Signal(object)  # payload: McpClientConnection (deep copy)
     collections_changed = Signal()  # after create / delete / rename
     collections_loaded = Signal()  # after async startup load completes
     request_renamed = Signal(str, str)  # (request_id, new_name)
     websocket_renamed = Signal(str, str)  # (ws_id, new_name)
+    mcp_client_renamed = Signal(str, str)  # (profile_id, new_name)
     requests_deleted = Signal(list)  # request IDs whose tabs should close
     websockets_deleted = Signal(list)  # websocket profile IDs whose tabs should close
+    mcp_clients_deleted = Signal(list)  # MCP Client profile IDs whose tabs should close
 
     def __init__(
         self,
@@ -108,6 +113,9 @@ class CollectionsPresenter(QObject):
             emit_open_isolated_websocket_tab=self.open_websocket_in_isolated_tab.emit,
             emit_websocket_renamed=self.websocket_renamed.emit,
             emit_websockets_deleted=self.websockets_deleted.emit,
+            emit_open_isolated_mcp_client_tab=self.open_mcp_client_in_isolated_tab.emit,
+            emit_mcp_client_renamed=self.mcp_client_renamed.emit,
+            emit_mcp_clients_deleted=self.mcp_clients_deleted.emit,
             export_collection=self._export_collection_at_index,
         )
         self._view.setItemDelegate(
@@ -198,6 +206,14 @@ class CollectionsPresenter(QObject):
             ws_item.setIcon(self._icons["websocket"])
         return ws_item
 
+    def _make_mcp_client_item(self, profile: McpClientConnection) -> QStandardItem:
+        item = QStandardItem(f"mcp {profile.name}")
+        item.setData(profile, Qt.ItemDataRole.UserRole)
+        item.setEditable(False)
+        if "mcp_client" in self._icons:
+            item.setIcon(self._icons["mcp_client"])
+        return item
+
     def _expand_collection_if_saved(self, collection_id: str, col_item: QStandardItem) -> None:
         if collection_id in self._state_manager.get_expanded_collections():
             self._view.setExpanded(col_item.index(), True)
@@ -206,7 +222,9 @@ class CollectionsPresenter(QObject):
         """Rebuilds tree model from RequestManager in-memory collections."""
         collections = self._request_manager.get_collections()
         req_count = sum(
-            len(col.requests) + len(getattr(col, "websockets", []))
+            len(col.requests)
+            + len(getattr(col, "websockets", []))
+            + len(getattr(col, "mcp_clients", []))
             for col in collections
         )
         if try_incremental_tree_refresh(self._collection_items_by_id, collections):
@@ -220,6 +238,8 @@ class CollectionsPresenter(QObject):
                 col_item.appendRow(self._make_request_item(req))
             for ws in getattr(col, "websockets", []):
                 col_item.appendRow(self._make_websocket_item(ws))
+            for profile in getattr(col, "mcp_clients", []):
+                col_item.appendRow(self._make_mcp_client_item(profile))
             self._model.appendRow(col_item)
             self._collection_items_by_id[col.id] = col_item
         log_tree_refresh(len(collections), req_count, incremental=False)
@@ -271,6 +291,32 @@ class CollectionsPresenter(QObject):
             "add_saved_websocket_to_tree_completed collection_id=%s ws_id=%s",
             collection_id,
             ws.id,
+        )
+        return True
+
+    def add_saved_mcp_client_to_tree(
+        self, profile: McpClientConnection, collection_id: str
+    ) -> bool:
+        """Insert a newly saved MCP Client profile without rebuilding the full tree."""
+        col_item = self._find_collection_item(collection_id, "collection")
+        if col_item is None:
+            for col in self._request_manager.get_collections():
+                if col.id == collection_id:
+                    return self._insert_collection_into_tree(col)
+            logger.warning(
+                "add_saved_mcp_client_to_tree_failed reason=collection_not_found"
+                " collection_id=%s profile_id=%s",
+                collection_id,
+                profile.id,
+            )
+            return False
+
+        col_item.appendRow(self._make_mcp_client_item(profile))
+        self._expand_collection_if_saved(collection_id, col_item)
+        logger.info(
+            "add_saved_mcp_client_to_tree_completed collection_id=%s profile_id=%s",
+            collection_id,
+            profile.id,
         )
         return True
 
@@ -361,6 +407,13 @@ class CollectionsPresenter(QObject):
                 data.name,
             )
             self.open_websocket_in_tab.emit(data)
+        elif isinstance(data, McpClientConnection):
+            logger.info(
+                "collection_mcp_client_opened profile_id=%s profile_name=%s",
+                data.id,
+                data.name,
+            )
+            self.open_mcp_client_in_tab.emit(data)
         else:
             if self._view.isExpanded(index):
                 self._view.collapse(index)
@@ -396,6 +449,12 @@ class CollectionsPresenter(QObject):
                 if (
                     item_type == "websocket"
                     and isinstance(data, WebSocketConnection)
+                    and data.id == item_id
+                ):
+                    return child_item
+                if (
+                    item_type == "mcp_client"
+                    and isinstance(data, McpClientConnection)
                     and data.id == item_id
                 ):
                     return child_item

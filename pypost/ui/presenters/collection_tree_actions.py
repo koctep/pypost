@@ -14,6 +14,8 @@ from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.request_manager import RequestManager
 from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.websocket_persisted_fields import copy_websocket_for_isolated_tab
+from pypost.core.mcp_client_persisted_fields import copy_mcp_client_for_isolated_tab
+from pypost.models.mcp_client import McpClientConnection
 from pypost.models.models import RequestData
 from pypost.models.websocket import WebSocketConnection
 from pypost.ui.collection_item_dialogs import (
@@ -47,8 +49,11 @@ class CollectionTreeActions:
         emit_requests_deleted: Callable[[list], None],
         emit_open_isolated_tab: Callable[[RequestData], None],
         emit_open_isolated_websocket_tab: Callable[[WebSocketConnection], None] | None = None,
+        emit_open_isolated_mcp_client_tab: Callable[[McpClientConnection], None] | None = None,
         emit_websocket_renamed: Callable[[str, str], None] | None = None,
         emit_websockets_deleted: Callable[[list], None] | None = None,
+        emit_mcp_client_renamed: Callable[[str, str], None] | None = None,
+        emit_mcp_clients_deleted: Callable[[list], None] | None = None,
         export_collection: Callable[[QModelIndex], None] | None = None,
     ) -> None:
         self._view = view
@@ -66,8 +71,13 @@ class CollectionTreeActions:
         self._emit_open_isolated_websocket_tab = (
             emit_open_isolated_websocket_tab or (lambda _conn: None)
         )
+        self._emit_open_isolated_mcp_client_tab = (
+            emit_open_isolated_mcp_client_tab or (lambda _conn: None)
+        )
         self._emit_websocket_renamed = emit_websocket_renamed or (lambda _id, _name: None)
         self._emit_websockets_deleted = emit_websockets_deleted or (lambda _ids: None)
+        self._emit_mcp_client_renamed = emit_mcp_client_renamed or (lambda _id, _name: None)
+        self._emit_mcp_clients_deleted = emit_mcp_clients_deleted or (lambda _ids: None)
         self._export_collection = export_collection
         self._pending_rename: dict | None = None
 
@@ -97,6 +107,12 @@ class CollectionTreeActions:
             new_tab_action = menu.addAction("New tab")
             new_tab_action.setToolTip(
                 "Open a separate copy of this WebSocket profile; other tabs keep their own session."
+            )
+        elif item_type == "mcp_client" and isinstance(data, McpClientConnection):
+            new_tab_action = menu.addAction("New tab")
+            new_tab_action.setToolTip(
+                "Open a separate copy of this MCP Client profile; "
+                "other tabs keep their own session."
             )
 
         export_action = None
@@ -129,6 +145,19 @@ class CollectionTreeActions:
                 )
                 self._emit_open_isolated_websocket_tab(
                     copy_websocket_for_isolated_tab(data),
+                )
+            elif item_type == "mcp_client" and isinstance(data, McpClientConnection):
+                logger.info(
+                    "collection_mcp_client_open_new_tab profile_id=%s profile_name=%s",
+                    data.id,
+                    data.name,
+                )
+                self._metrics.track_gui_new_tab_action(
+                    "collections_context",
+                    protocol="mcp_client",
+                )
+                self._emit_open_isolated_mcp_client_tab(
+                    copy_mcp_client_for_isolated_tab(data),
                 )
             return
 
@@ -293,6 +322,8 @@ class CollectionTreeActions:
             self._emit_request_renamed(item_id, new_name)
         elif item_type == "websocket":
             self._emit_websocket_renamed(item_id, new_name)
+        elif item_type == "mcp_client":
+            self._emit_mcp_client_renamed(item_id, new_name)
 
         self._finish_rename_tree_update(item_id, item_type, item, new_name=new_name)
         self._emit_collections_changed()
@@ -300,6 +331,7 @@ class CollectionTreeActions:
     def handle_delete(self, item_id: str, item_type: str, item_label: str) -> None:
         affected_request_ids = self._affected_request_ids(item_id, item_type)
         affected_websocket_ids = self._affected_websocket_ids(item_id, item_type)
+        affected_mcp_client_ids = self._affected_mcp_client_ids(item_id, item_type)
         try:
             deleted = self._request_manager.delete_collection_item(item_id, item_type)
         except Exception as exc:
@@ -333,6 +365,8 @@ class CollectionTreeActions:
             self._emit_requests_deleted(affected_request_ids)
         if affected_websocket_ids:
             self._emit_websockets_deleted(affected_websocket_ids)
+        if affected_mcp_client_ids:
+            self._emit_mcp_clients_deleted(affected_mcp_client_ids)
         if not self._remove_item(item_id, item_type):
             self._refresh_tree()
             self._restore_tree_state()
@@ -344,6 +378,8 @@ class CollectionTreeActions:
             return "request", data.id, item.text(), data
         if isinstance(data, WebSocketConnection):
             return "websocket", data.id, item.text(), data
+        if isinstance(data, McpClientConnection):
+            return "mcp_client", data.id, item.text(), data
         if isinstance(data, str):
             return "collection", data, item.text(), data
         return None, None, item.text(), data
@@ -360,6 +396,10 @@ class CollectionTreeActions:
                 for ws in col.websockets:
                     if ws.id == item_id:
                         return f"ws {ws.name}"
+            if item_type == "mcp_client":
+                for profile in col.mcp_clients:
+                    if profile.id == item_id:
+                        return f"mcp {profile.name}"
         return None
 
     def _sync_rename_tree_item(
@@ -385,6 +425,13 @@ class CollectionTreeActions:
                         if ws.id == item_id:
                             item.setData(ws, Qt.UserRole)
                             item.setText(f"ws {ws.name}")
+                            return
+            elif item_type == "mcp_client":
+                for col in self._request_manager.get_collections():
+                    for profile in col.mcp_clients:
+                        if profile.id == item_id:
+                            item.setData(profile, Qt.UserRole)
+                            item.setText(f"mcp {profile.name}")
                             return
             else:
                 item.setText(new_name)
@@ -431,4 +478,13 @@ class CollectionTreeActions:
             for col in self._request_manager.get_collections():
                 if col.id == item_id:
                     return [ws.id for ws in col.websockets]
+        return []
+
+    def _affected_mcp_client_ids(self, item_id: str, item_type: str) -> list[str]:
+        if item_type == "mcp_client":
+            return [item_id]
+        if item_type == "collection":
+            for col in self._request_manager.get_collections():
+                if col.id == item_id:
+                    return [profile.id for profile in col.mcp_clients]
         return []

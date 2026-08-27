@@ -10,6 +10,7 @@ from pypost.core.collection_item_strategies import (
 )
 
 if TYPE_CHECKING:
+    from pypost.core.mcp_client_registry import McpClientRegistry
     from pypost.core.request_manager import RequestManager
     from pypost.core.websocket_registry import WebSocketRegistry
 
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 class ItemDispatchContext:
     request_manager: RequestManager
     websocket_registry: Optional[WebSocketRegistry] = None
+    mcp_client_registry: Optional[McpClientRegistry] = None
 
 
 def delete_collection_item(
