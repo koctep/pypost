@@ -219,18 +219,39 @@ see [UI settle / wait helpers](ui_wait.md). Gate: `tests/test_ui_wait.py`.
 - **Display / segfault in CI** — Set `QT_QPA_PLATFORM=offscreen` before Qt
   import (`offscreen=True` or `make test`).
 
+## Attach bind / unbind (ATTACH-1)
+
+`AgentAppSession` above is the **spawn-session / harness** path: the agent
+owns launch → ready → shutdown of its own app instance.
+
+**Attach** binds agent-UI MCP to an **already-running desktop** instead. That
+path does not replace spawn-session. Soft-contract outcomes:
+
+| Outcome | Meaning |
+| --- | --- |
+| **Attach success** | Bound; UI tools apply to the live desktop |
+| **Attach fail** | Not bound; desktop not driven via attach |
+| **Detach** | Binding ends; no default forced kill of the other |
+| **Host exit** | Desktop ends; binding ends (sidecar/client may remain) |
+| **Sidecar exit** | Sidecar ends; desktop is not implied destroyed |
+
+Full operator narrative: [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md).
+Runtime attach: [PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207).
+
 ## Out of scope (siblings)
 
 Identity (834), snapshots (835), actions (836), and settle waits (837) are
 documented separately — see Related. The composed golden product flow is
 [agent_golden_e2e.md](agent_golden_e2e.md) (838). Broader pack packaging
 (beyond golden): [agent_e2e.md](agent_e2e.md) (`make test-agent-e2e`).
+Attach capability / tests: PYPOST-1207 / PYPOST-1208.
 
 ## Related documentation
 
 | Document | Topic |
 | --- | --- |
 | [agent_e2e.md](agent_e2e.md) | Broader pack primary packaging (`make test-agent-e2e`) |
+| [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md) | Spawn vs attach; attach lifecycle |
 | [gui_testing.md](gui_testing.md) | Offscreen Qt, `wait_until`, GUI test patterns |
 | [ui_identity.md](ui_identity.md) | Stable `objectName` catalog for key controls |
 | [ui_snapshot.md](ui_snapshot.md) | Visible-UI tree for agents after ready |

@@ -8,9 +8,29 @@ PyPost exposes two inbound MCP surfaces when enabled:
 | Metrics (`MetricsServer`) | `127.0.0.1:9080` | Prometheus scrape + observability MCP resources |
 
 Agent UI drive (`pypost.agent.ui_actions`) is **not** a product inbound MCP
-surface. Out-of-process agent-UI MCP (when built) is a separate trust
-boundary; packaging path is documented in [ui_actions.md](ui_actions.md)
-(PYPOST-918). Do not expand request-tool blast radius with UI automation.
+surface. Out-of-process agent-UI MCP is a **separate trust boundary** from
+request-tool MCP; packaging path is documented in
+[ui_actions.md](ui_actions.md) (PYPOST-918). Do not expand request-tool blast
+radius with UI automation — UI tools must never appear on `MCPServerImpl`.
+
+## Agent-UI attach / sidecar (ATTACH-1)
+
+The agent-UI stdio sidecar ([agent_ui_actions_mcp.md](agent_ui_actions_mcp.md))
+can use **spawn-session** (sidecar-owned session) or **attach** (bind to an
+already-running desktop). Attach is a separate surface from product MCP:
+
+| Concern | Guidance |
+| --- | --- |
+| Product MCP | Collection request tools only; no `ui_*` tools |
+| Attach / sidecar | Drives live (or spawned) UI on the agent-UI surface |
+| Local-host posture | Same-machine privilege; treat like local shell access |
+| Surfaces | Do **not** merge agent-UI and product MCP catalogs |
+
+Local-host posture means whoever can run or reach the sidecar can drive the
+bound desktop — not a weaker remote API. Aligns in spirit with the local-trust
+posture below without merging blast radii. Operator path, lifecycle, and soft
+contract: [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md). Capability:
+[PYPOST-1207](https://pypost.atlassian.net/browse/PYPOST-1207).
 
 ## Trust boundary
 

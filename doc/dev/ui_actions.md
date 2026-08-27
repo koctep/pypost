@@ -32,6 +32,10 @@ When out-of-process MCP for these primitives is used, the **packaging path** is:
    **two** MCP servers.
 3. PYPOST-918 documented the path; PYPOST-952 ships the stdio bridge. Optional
    loopback HTTP for agent-UI MCP remains future work.
+4. **Attach** (bind to an already-running desktop) stays on the same agent-UI
+   MCP surface — never on product `MCPServerImpl`. Soft contract and lifecycle:
+   [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md) (ATTACH-1 /
+   [PYPOST-1206](https://pypost.atlassian.net/browse/PYPOST-1206)).
 
 Product MCP docs: [mcp_integration.md](mcp_integration.md),
 [mcp_trust_model.md](mcp_trust_model.md). In-process agent e2e packaging
@@ -279,7 +283,8 @@ widgets that already have `objectName` set via `set_widget_id`.
 
 ## Related
 
-- [Agent UI Actions MCP](agent_ui_actions_mcp.md) — stdio sidecar (PYPOST-952)
+- [Agent UI Actions MCP](agent_ui_actions_mcp.md) — stdio sidecar; spawn vs
+  attach contract (PYPOST-952 / ATTACH-1)
 - [Agent UI E2E](agent_e2e.md) — umbrella + `make test-agent-e2e`
 - [Agent lifecycle](agent_lifecycle.md) — launch → ready → shutdown
 - [UI widget identity](ui_identity.md) — stable `objectName` catalog
