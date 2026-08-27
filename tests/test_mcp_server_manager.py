@@ -46,6 +46,7 @@ def test_status_true_when_port_is_listening(qapp):
 
 @patch("uvicorn.Server.serve", side_effect=OSError(errno.EADDRINUSE, "Address already in use"))
 def test_port_busy_emits_start_failed(mock_serve, qapp):
+    """Busy-port start must report failure and stopped status (PYPOST-1113)."""
     port = free_port()
     failures: list[str] = []
     statuses: list[bool] = []
@@ -54,10 +55,12 @@ def test_port_busy_emits_start_failed(mock_serve, qapp):
     manager.status_changed.connect(statuses.append)
     try:
         manager.start_server(port, [], host="127.0.0.1")
-        wait_until(lambda: bool(failures), message="start_failed was not emitted")
+        wait_until(
+            lambda: bool(failures) and bool(statuses) and statuses[-1] is False,
+            message="start_failed and stopped status were not emitted",
+        )
         assert len(failures) == 1
         assert str(port) in failures[0]
-        assert statuses
         assert statuses[-1] is False
     finally:
         manager.stop_server()
