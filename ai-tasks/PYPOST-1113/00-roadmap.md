@@ -53,7 +53,7 @@
     no new feature, API, or production behavior
   - Existing guidance already covers bounded Qt signal waits:
     `doc/dev/testing.md`, `doc/dev/ui_wait.md` — no `doc/dev/` update required
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
 
 ## Status Legend
 
