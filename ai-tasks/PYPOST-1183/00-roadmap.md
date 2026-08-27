@@ -49,7 +49,7 @@
   - Verification-debt / production no-op: no AC-breaking debt; remaining
     items are intentional hermetic gaps, out-of-scope sibling helpers, and
     epic context (none block Step 8)
-- [/] **STEP 8: Dev Docs**
+- [x] **STEP 8: Dev Docs**
   - `doc/dev/new_tab_protocol_picker.md` — PYPOST-1183 blank MCP title /
     widget id / suite `_request_tab_count` proofs + troubleshooting
   - `doc/dev/last_tab_protocol_picker.md` — last-HTTP-close-with-MCP
@@ -57,7 +57,7 @@
   - `doc/dev/mcp_client_draft_tab.md` — teardown count note + Tests
     cross-links to PYPOST-1183 proofs
   - `doc/dev/README.md` — index titles include PYPOST-1183
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
 
 ## Status Legend
 
