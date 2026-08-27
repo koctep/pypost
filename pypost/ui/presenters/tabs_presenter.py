@@ -619,6 +619,15 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def handle_websocket_format_json_global(self) -> None:
         tab_hotkeys.handle_websocket_format_json_global(self)
 
+    def handle_mcp_client_connect_global(self) -> None:
+        tab_hotkeys.handle_mcp_client_connect_global(self)
+
+    def handle_mcp_client_invoke_global(self) -> None:
+        tab_hotkeys.handle_mcp_client_invoke_global(self)
+
+    def handle_mcp_client_send_global(self) -> None:
+        tab_hotkeys.handle_mcp_client_send_global(self)
+
     def handle_focus_url(self) -> None:
         tab_hotkeys.handle_focus_url(self)
 

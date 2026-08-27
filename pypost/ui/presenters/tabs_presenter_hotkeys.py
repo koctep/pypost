@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QApplication, QWidget
 
+from pypost.models.mcp_client import McpClientSessionState
 from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.new_tab_protocol_picker import TabProtocol
 from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
@@ -36,8 +37,17 @@ def current_websocket_tab(presenter: TabsPresenter) -> WebSocketTab | None:
     return tab if isinstance(tab, WebSocketTab) else None
 
 
+def current_mcp_client_tab(presenter: TabsPresenter) -> McpClientTab | None:
+    tab = presenter._tabs.currentWidget()
+    return tab if isinstance(tab, McpClientTab) else None
+
+
 def handle_send_request_global(presenter: TabsPresenter) -> None:
-    """Route F5 / Ctrl+Return to WS connect/send or HTTP send."""
+    """Route F5 / Ctrl+Return to MCP/WS connect/invoke/send or HTTP send."""
+    mcp_tab = current_mcp_client_tab(presenter)
+    if mcp_tab is not None:
+        handle_mcp_client_send_global(presenter)
+        return
     ws_tab = current_websocket_tab(presenter)
     if ws_tab is not None:
         handle_websocket_send_global(presenter)
@@ -71,7 +81,44 @@ def handle_websocket_format_json_global(presenter: TabsPresenter) -> None:
     ws_tab.composer.format_json_payload()
 
 
+def handle_mcp_client_connect_global(presenter: TabsPresenter) -> None:
+    mcp_tab = current_mcp_client_tab(presenter)
+    if mcp_tab is None:
+        return
+    state = mcp_tab.presenter.state
+    if state in (
+        McpClientSessionState.CONNECTED,
+        McpClientSessionState.CONNECTING,
+    ):
+        mcp_tab.presenter.disconnect_requested()
+    else:
+        mcp_tab.presenter.connect_requested()
+
+
+def handle_mcp_client_invoke_global(presenter: TabsPresenter) -> None:
+    mcp_tab = current_mcp_client_tab(presenter)
+    if mcp_tab is None:
+        return
+    mcp_tab.presenter.invoke_requested()
+
+
+def handle_mcp_client_send_global(presenter: TabsPresenter) -> None:
+    mcp_tab = current_mcp_client_tab(presenter)
+    if mcp_tab is None:
+        return
+    if _focus_in_invoke_form(mcp_tab):
+        handle_mcp_client_invoke_global(presenter)
+    else:
+        handle_mcp_client_connect_global(presenter)
+
+
 def handle_focus_url(presenter: TabsPresenter) -> None:
+    mcp_tab = current_mcp_client_tab(presenter)
+    if mcp_tab is not None:
+        url_input = mcp_tab.url_input
+        url_input.setFocus()
+        url_input.selectAll()
+        return
     ws_tab = current_websocket_tab(presenter)
     if ws_tab is not None:
         url_input = ws_tab.connection_editor.url_input
@@ -122,6 +169,14 @@ def _focus_in_composer(ws_tab: WebSocketTab) -> bool:
     if focus is composer.payload_edit:
         return True
     return _is_descendant(composer, focus)
+
+
+def _focus_in_invoke_form(mcp_tab: McpClientTab) -> bool:
+    focus = QApplication.focusWidget()
+    if focus is None:
+        return False
+    invoke_form = mcp_tab.invoke_form
+    return _is_descendant(invoke_form, focus)
 
 
 def _is_descendant(ancestor: QWidget, widget: QWidget | None) -> bool:

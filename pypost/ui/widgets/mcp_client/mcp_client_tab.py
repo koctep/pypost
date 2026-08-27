@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -130,7 +130,16 @@ class McpClientTab(QWidget):
             self.presenter.invoke_requested,
         )
 
+    @property
+    def invoke_form(self) -> McpClientToolInvokeForm:
+        """Return the embedded tool invoke form widget."""
+        return self._invoke_form
+
     def _setup_save_shortcuts(self) -> None:
+        self.save_action.setShortcut(QKeySequence("Ctrl+S"))
+        self.save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.addAction(self.save_action)
+        self.addAction(self.save_as_action)
         tag_action(
             self.save_action,
             section="MCP Client",

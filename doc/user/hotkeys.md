@@ -53,6 +53,23 @@ and **Save As WebSocket Profile** only while a WebSocket tab exists in the works
 Request-editor shortcuts (Params, Headers, Body, Script) do nothing when a WebSocket tab is
 active.
 
+## MCP Client session
+
+Active when an **MCP Client** tab is focused. **Help → Hotkeys** lists **Save MCP Client
+Profile** and **Save As MCP Client Profile** only while an MCP Client tab exists in the
+workspace.
+
+| Action | Shortcut | Description |
+| ------ | -------- | ----------- |
+| Connect / Disconnect | `F5` / `Ctrl+Enter` | Connect from URL; Invoke when args form focused |
+| Invoke Tool | `Ctrl+Enter` | Invokes the selected remote tool with current arguments |
+| Save MCP Client Profile | `Ctrl+S` | Saves the MCP Client profile to a collection |
+| Save As MCP Client Profile | `Ctrl+Shift+S` | Saves to a new collection profile |
+| Focus URL Bar | `Ctrl+L` / `Alt+D` | Highlights the MCP Client URL input |
+
+Request-editor shortcuts (Params, Headers, Body, Script) do nothing when an MCP Client tab is
+active.
+
 ## Body editor & response viewer shortcuts
 
 Context-sensitive shortcuts active when specific panes have focus:

@@ -57,8 +57,8 @@ existing environment dialog boundary.
 
 | Metric | Audit era (PYPOST-40) | Baseline | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 433 | 477 |
-| `MainWindow` class LOC | 1040 | 387 | 426 |
+| `main_window.py` file LOC | 1040 | 445 | 477 |
+| `MainWindow` class LOC | 1040 | 398 | 426 |
 
 Authoritative generated snapshot (all module caps):
 [baseline-metrics.md](../../ai-tasks/PYPOST-376/baseline-metrics.md).

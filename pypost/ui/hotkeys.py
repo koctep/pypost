@@ -14,7 +14,13 @@ ALT_KEYS_PROPERTY = "pypost_hotkey_alt_keys"
 COLLAPSE_PROPERTY = "pypost_hotkey_collapse_keys"
 LABEL_PROPERTY = "pypost_hotkey_label"
 
-SECTION_ORDER = ("General", "Tabs", "Request Editor", "WebSocket Session")
+SECTION_ORDER = (
+    "General",
+    "Tabs",
+    "Request Editor",
+    "WebSocket Session",
+    "MCP Client",
+)
 
 
 def format_shortcut_display(keys: Sequence[str], *, collapse: bool = False) -> str:
