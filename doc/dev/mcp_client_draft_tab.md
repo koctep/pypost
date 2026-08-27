@@ -797,14 +797,17 @@ never reaches Connected, check worker settlement (`wait_until` +
   last-HTTP-close-with-MCP
   (`test_close_last_http_with_mcp_remaining_does_not_auto_open_http`).
 - `tests/test_mcp_client_tab.py`: chrome + widget ids (Refresh, error
-  label, Invoke, form, JSON, result, elapsed); Connect fills
-  name/description; Connect error → Failed + empty tools; Refresh
-  failure → Connected + stale list; Invoke `call_tool` + structured
-  result + elapsed; invoke error stays Connected with tools; nested
-  schema JSON fallback; empty required field does not `run`; result
-  sanitizer; INFO omits URL / `headers` / secrets / arguments; outbound
-  metrics. Construction `objectName == MCP_CLIENT_TAB_PAGE` remains
-  complementary to the presenter blank-open identity proof.
+  label, Invoke, form, JSON, result, elapsed); Headers empty-row UX;
+  Headers table edit → sync `execute_outbound` → resolved `headers=`
+  (PYPOST-1187); Headers hover masks hidden keys as `********`
+  (PYPOST-1187); Connect fills name/description; Connect error → Failed
+  + empty tools; Refresh failure → Connected + stale list; Invoke
+  `call_tool` + structured result + elapsed; invoke error stays Connected
+  with tools; nested schema JSON fallback; empty required field does not
+  `run`; result sanitizer; INFO omits URL / `headers` / secrets /
+  arguments; outbound metrics. Construction
+  `objectName == MCP_CLIENT_TAB_PAGE` remains complementary to the
+  presenter blank-open identity proof.
 - `tests/test_mcp_client_arg_schema.py`: Qt-free classifier
   (`simple_form` / `json_only` / `no_args`).
 - `tests/test_mcp_client_presenter.py`: `execute_outbound` forwards
@@ -817,6 +820,31 @@ never reaches Connected, check worker settlement (`wait_until` +
   `test_execute_mcp_forwards_resolved_headers_to_mcp_client`,
   `test_execute_mcp_forwards_empty_headers_to_mcp_client`,
   `test_run_passes_headers_to_create_mcp_http_client`.
+
+### Hermetic Headers table → execute_outbound and hidden-key hover (PYPOST-1187)
+
+Presenter unit tests seed `McpClientConnection(headers=...)` without a
+tab. PYPOST-1187 locks the **live Headers table → sync path**:
+
+- `test_headers_table_edit_execute_outbound_forwards_widget_headers` —
+  type Key/Value on `pypost_mcp_client_headers_table` (empty ctor
+  headers), call `presenter.execute_outbound("list_tools")` with
+  injected `mcp_client=`, assert `run(..., headers=)` is the
+  environment-resolved map from widget data (`_sync_fields_from_tab` /
+  `headers_data`).
+- `test_mcp_client_headers_table_hover_masks_hidden_keys` — value cell
+  with `{{token}}` and `hidden_keys={"token"}`; `_resolve_cell_hover`
+  yields `********` and omits the secret (same pattern as WebSocket
+  Headers hover tests).
+
+No live MCP server. Module `pytestmark = pytest.mark.timeout(30)`.
+
+Targeted run:
+
+```bash
+make test PYTEST_ARGS="tests/test_mcp_client_tab.py -k \
+  'headers_table_edit_execute_outbound or headers_table_hover_masks' -v"
+```
 
 ### Hermetic Connect / Disconnect badge button paths (PYPOST-1185)
 

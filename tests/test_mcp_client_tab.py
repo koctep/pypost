@@ -205,6 +205,55 @@ def test_mcp_client_tab_has_headers_table(qapp) -> None:
     assert _tool_item_count(tools) == 0
 
 
+def test_headers_table_edit_execute_outbound_forwards_widget_headers(qapp) -> None:
+    """PYPOST-1187: typed Headers table rows reach run(..., headers=) via execute_outbound."""
+    mock_client = MagicMock()
+    mock_client.run.return_value = _tools_response()
+    tab = _build_draft_tab(
+        mcp_client=mock_client,
+        env_vars={"token": "secret"},
+        url=_MCP_URL,
+        headers={},
+    )
+    table = tab.findChild(QWidget, MCP_CLIENT_HEADERS_TABLE)
+    assert table is not None
+    last = table.rowCount() - 1
+    assert last >= 0
+    table.setItem(last, 0, QTableWidgetItem("Authorization"))
+    table.setItem(last, 1, QTableWidgetItem("Bearer {{token}}"))
+
+    tab.presenter.execute_outbound("list_tools")
+
+    mock_client.run.assert_called_once_with(
+        _MCP_URL,
+        "list_tools",
+        None,
+        headers={"Authorization": "Bearer secret"},
+    )
+
+
+def test_mcp_client_headers_table_hover_masks_hidden_keys(qapp) -> None:
+    """PYPOST-1187: hidden env keys resolve to ******** on Headers hover preview."""
+    secret = "sec_val_456"
+    tab = _build_draft_tab(
+        env_vars={"token": secret},
+        hidden_keys={"token"},
+        headers={"Authorization": "Bearer {{token}}"},
+    )
+    table = tab.findChild(QWidget, MCP_CLIENT_HEADERS_TABLE)
+    assert table is not None
+    resolve = getattr(table, "_resolve_cell_hover", None)
+    assert callable(resolve), (
+        "MCP Client Headers table must support variable hover resolution"
+    )
+    value_item = table.item(0, 1)
+    assert value_item is not None
+    resolved = resolve(value_item)
+    assert resolved is not None
+    assert secret not in resolved
+    assert "********" in resolved
+
+
 def test_presenter_logs_connect_disconnect_teardown(caplog, qapp) -> None:
     """Local chrome lifecycle emits INFO events without URL or payload dumps."""
     tab = _build_draft_tab()
