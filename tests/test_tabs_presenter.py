@@ -1008,6 +1008,96 @@ class TestTabsPresenter(unittest.TestCase):
         teardown.assert_called_once()
         self.assertEqual(p.widget.indexOf(tab), -1)
 
+    def test_close_saved_websocket_tab_with_edited_url_does_not_prompt(self):
+        from pypost.models.models import Collection
+
+        p = self._make_presenter()
+        conn = WebSocketConnection(
+            id="ws-saved-url-edit",
+            name="Saved Feed",
+            url="wss://example.com/original",
+        )
+        p._request_manager.collections.append(
+            Collection(name="Streams", websockets=[conn])
+        )
+        tab = p.open_websocket_tab(conn)
+        tab.connection_editor.url_input.setText("wss://example.com/modified")
+        idx = p.widget.indexOf(tab)
+        presenter = tab.presenter
+        teardown = MagicMock()
+        presenter.teardown = teardown
+        prompt_path = (
+            "pypost.ui.presenters.tabs_presenter.prompt_unsaved_draft_tab_close"
+        )
+        with patch(prompt_path, return_value=False) as prompt:
+            p.close_tab(idx)
+        prompt.assert_not_called()
+        teardown.assert_called_once()
+        self.assertEqual(p.widget.indexOf(tab), -1)
+
+    def test_is_websocket_draft_dirty_editor_snapshots(self):
+        from pypost.ui.presenters.tab_dirty import is_websocket_draft_dirty
+
+        p = self._make_presenter()
+        tab = p.add_blank_websocket_tab()
+        self.assertFalse(is_websocket_draft_dirty(tab))
+
+        # URL edit
+        tab.connection_editor.url_input.setText("wss://example.com/socket")
+        self.assertTrue(is_websocket_draft_dirty(tab))
+        tab.connection_editor.url_input.setText("")
+        self.assertFalse(is_websocket_draft_dirty(tab))
+
+        # Params table edit
+        tab.connection_editor.params_table.set_data({"foo": "bar"})
+        self.assertTrue(is_websocket_draft_dirty(tab))
+        tab.connection_editor.params_table.set_data({})
+        self.assertFalse(is_websocket_draft_dirty(tab))
+
+        # Headers table edit
+        tab.connection_editor.headers_table.set_data({"Authorization": "Bearer token"})
+        self.assertTrue(is_websocket_draft_dirty(tab))
+        tab.connection_editor.headers_table.set_data({})
+        self.assertFalse(is_websocket_draft_dirty(tab))
+
+        # Subprotocols edit
+        tab.connection_editor.subprotocols_input.setText("graphql-ws, json")
+        self.assertTrue(is_websocket_draft_dirty(tab))
+        tab.connection_editor.subprotocols_input.setText("")
+        self.assertFalse(is_websocket_draft_dirty(tab))
+
+        # MCP Expose checkbox edit
+        tab.connection_editor.mcp_expose_check.setChecked(True)
+        self.assertTrue(is_websocket_draft_dirty(tab))
+        tab.connection_editor.mcp_expose_check.setChecked(False)
+        self.assertFalse(is_websocket_draft_dirty(tab))
+
+        # MCP Description edit
+        tab.connection_editor.mcp_description_edit.setText("MCP description")
+        self.assertTrue(is_websocket_draft_dirty(tab))
+        tab.connection_editor.mcp_description_edit.setText("")
+        self.assertFalse(is_websocket_draft_dirty(tab))
+
+    def test_save_tabs_state_mixed_saved_and_draft_websocket_tabs(self):
+        from pypost.models.models import Collection
+
+        p = self._make_presenter()
+        conn = WebSocketConnection(
+            id="ws-saved-mixed",
+            name="Saved Mixed Feed",
+            url="wss://example.com/live",
+        )
+        p._request_manager.collections.append(
+            Collection(name="Streams", websockets=[conn])
+        )
+        p.open_websocket_tab(conn)
+        draft_tab = p.add_blank_websocket_tab()
+
+        p.save_tabs_state()
+        open_tabs = p._state_manager.get_open_tabs()
+        self.assertIn("ws-saved-mixed", open_tabs)
+        self.assertNotIn(draft_tab.connection_data.id, open_tabs)
+
 
 _DRAFT_LOGGER = "pypost.ui.presenters.tabs_presenter_draft"
 
