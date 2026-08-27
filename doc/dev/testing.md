@@ -841,7 +841,7 @@ duplicate scope: prior tickets already cover the intent.
 | Live HTTP `/metrics` scrape after uvicorn start | `tests/test_metrics_server_integration.py` | Integration | PYPOST-169; real socket bind + urllib GET |
 | Live metrics MCP resource round-trip | `tests/test_metrics_server_integration.py` | Integration | PYPOST-563; Streamable HTTP and SSE |
 | RequestWidget GUI action counters | `tests/test_request_editor_gui_metrics.py` | Integration | PYPOST-170; Send click + Save/Copy cURL scrape |
-| MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556 / PYPOST-1178; port busy, listen readiness, tool-set restart wait (`_wait_until_port_bindable`) |
+| MCP server bind / startup signaling | `tests/test_mcp_server_manager.py` | Integration | PYPOST-556 / PYPOST-1178 / PYPOST-1196; port busy, listen readiness, tool-set restart wait (`_wait_until_port_bindable`), join-timeout restart |
 | MCP and metrics bind host fidelity | `tests/test_server_bind_host_integration.py` | Integration | PYPOST-150; `127.0.0.1`, `0.0.0.0`, `localhost`, `::1` |
 
 PYPOST-154 verified end-to-end port-in-use handling for both MCP and metrics (closes

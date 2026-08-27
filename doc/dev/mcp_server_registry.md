@@ -85,7 +85,8 @@ registry.stop_all()                  # application/agent-session shutdown only
 `refresh_collection()` updates only servers selected for that collection;
 `MCPServerManager.update_tools()` may restart only those endpoint(s) when the
 tool signature changed; the restart path waits until the prior host/port is
-probe-bindable before starting again (PYPOST-1178; see
+probe-bindable before starting again, retaining the worker thread ref if stop’s
+join times out (PYPOST-1178 / PYPOST-1196; see
 [MCP Integration](mcp_integration.md)). `refresh_environment()` replaces the
 variables and hidden-key suppliers only for servers that selected that
 environment.

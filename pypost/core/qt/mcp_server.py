@@ -182,9 +182,12 @@ class MCPServerManager(QObject):
             self._server_instance.should_exit = True
 
         if self._server_thread:
-            # Wait for thread to finish (with timeout to avoid freeze)
+            # Wait for thread to finish (with timeout to avoid freeze).
+            # Keep the ref if join times out so is_running() stays truthful while
+            # the orphaned worker still holds the listen socket (PYPOST-1196).
             self._server_thread.join(timeout=2.0)
-            self._server_thread = None
+            if not self._server_thread.is_alive():
+                self._server_thread = None
 
         self._server_instance = None
         logger.info("MCP server stopped")
@@ -204,10 +207,12 @@ class MCPServerManager(QObject):
         logger.info("mcp_tools_changed tool_count=%d restarting=true", len(signature))
         self.stop_server()
         self._wait_until_port_bindable()
+        if self._server_thread is not None and not self._server_thread.is_alive():
+            self._server_thread = None
         self.start_server(self._current_port, tools, self._current_host)
         return True
 
-    def _wait_until_port_bindable(self, timeout: float = 5.0) -> None:
+    def _wait_until_port_bindable(self, timeout: float = 10.0) -> None:
         """Wait until the current host/port can be bound again after stop_server."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:

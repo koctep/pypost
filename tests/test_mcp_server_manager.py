@@ -3,6 +3,8 @@ import asyncio
 import errno
 import gc
 import logging
+import threading
+import time
 import warnings
 from unittest.mock import MagicMock, patch
 
@@ -90,6 +92,11 @@ def test_set_variable_supplier_forwards_to_impl():
 
 
 def test_update_tools_restarts_when_exposed_set_changes(qapp):
+    """Exposed-set change restarts to a listening server (PYPOST-1196).
+
+    Assert ``is_listening`` (not merely ``is_running``) so a brief thread spawn
+    before bind failure cannot satisfy the wait under port-busy races.
+    """
     port = free_port()
     tool_a = RequestData(
         name="A", id="a", expose_as_mcp=True, method="GET", url="http://a"
@@ -98,15 +105,90 @@ def test_update_tools_restarts_when_exposed_set_changes(qapp):
         name="B", id="b", expose_as_mcp=True, method="GET", url="http://b"
     )
     manager = MCPServerManager()
+    failures: list[str] = []
+    manager.start_failed.connect(failures.append)
     manager.start_server(port, [tool_a], host="127.0.0.1")
     try:
-        wait_until(lambda: manager.is_running(), message="MCP server did not start")
-        assert manager.update_tools([tool_a, tool_b])
+        wait_until(lambda: manager.is_listening, message="MCP server did not start")
+        assert manager.update_tools([tool_a, tool_b]) is True
         wait_until(
-            lambda: manager.is_running(),
+            lambda: bool(failures) or manager.is_listening,
             message="MCP server did not restart after tool update",
         )
+        assert not failures, failures
+        assert manager.is_listening
+        wait_for_port("127.0.0.1", port)
     finally:
+        manager.stop_server()
+
+
+def test_update_tools_restarts_when_stop_join_times_out(qapp):
+    """Restart must listen again when stop join times out under slow exit (PYPOST-1196).
+
+    Delays uvicorn ``should_exit`` so the prior listener outlives ``stop_server``'s
+    2s join. Desired: ``update_tools`` still reaches ``is_listening`` without
+    ``start_failed``. Current clear-``_server_thread``-after-join-timeout path
+    spends the port-bindable wait probing a still-held port, then rebinds with
+    EADDRINUSE.
+    """
+    port = free_port()
+    tool_a = RequestData(
+        name="A", id="a", expose_as_mcp=True, method="GET", url="http://a"
+    )
+    tool_b = RequestData(
+        name="B", id="b", expose_as_mcp=True, method="GET", url="http://b"
+    )
+    manager = MCPServerManager()
+    failures: list[str] = []
+    manager.start_failed.connect(failures.append)
+
+    manager.start_server(port, [tool_a], host="127.0.0.1")
+    try:
+        wait_until(lambda: manager.is_listening, message="MCP server did not start")
+
+        real_server = manager._server_instance
+        assert real_server is not None
+
+        class _DelayShouldExit:
+            """Proxy: defer should_exit=True so the listen socket stays up."""
+
+            def __init__(self, inner):
+                object.__setattr__(self, "_inner", inner)
+
+            def __getattr__(self, name):
+                return getattr(self._inner, name)
+
+            def __setattr__(self, name, value):
+                if name == "_inner":
+                    object.__setattr__(self, name, value)
+                    return
+                if name == "should_exit" and value:
+
+                    def arm() -> None:
+                        # Longer than stop join (2s) + default port wait (5s) so
+                        # clear-thread-then-probe still sees a busy port.
+                        time.sleep(8.5)
+                        setattr(self._inner, "should_exit", True)
+
+                    threading.Thread(target=arm, daemon=True).start()
+                    return
+                setattr(self._inner, name, value)
+
+        manager._server_instance = _DelayShouldExit(real_server)
+
+        assert manager.update_tools([tool_a, tool_b]) is True
+        wait_until(
+            lambda: bool(failures) or manager.is_listening,
+            message="restart neither listening nor start_failed",
+            timeout=15.0,
+        )
+        assert not failures, failures
+        assert manager.is_listening
+        wait_for_port("127.0.0.1", port)
+    finally:
+        if manager._server_instance is not None:
+            inner = getattr(manager._server_instance, "_inner", manager._server_instance)
+            setattr(inner, "should_exit", True)
         manager.stop_server()
 
 
