@@ -159,13 +159,38 @@ class ManifestDiagnosticError(Exception):
         message: str,
         path: Optional[Path | str] = None,
         details: Optional[Dict[str, Any]] = None,
+        field: Optional[str] = None,
+        json_path: Optional[str] = None,
+        line: Optional[int] = None,
+        column: Optional[int] = None,
+        field_errors: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         self.code = code
         self.message = message
         self.path = Path(path) if path else None
         self.details = details or {}
+        self.field = field
+        self.json_path = json_path
+        self.line = line
+        self.column = column
+        self.field_errors = field_errors or []
         path_str = f" (file: {path})" if path else ""
-        super().__init__(f"[{code}] {message}{path_str}")
+        field_str = f" [field: {field}]" if field else ""
+        super().__init__(f"[{code}] {message}{path_str}{field_str}")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert diagnostic error to a JSON-serializable dictionary."""
+        return {
+            "code": self.code,
+            "message": self.message,
+            "path": str(self.path) if self.path else None,
+            "field": self.field,
+            "json_path": self.json_path,
+            "line": self.line,
+            "column": self.column,
+            "field_errors": self.field_errors,
+            "details": self.details,
+        }
 
 
 class ManifestValidationError(ManifestDiagnosticError):
@@ -176,10 +201,20 @@ class ManifestValidationError(ManifestDiagnosticError):
         message: str,
         path: Optional[Path | str] = None,
         details: Optional[Dict[str, Any]] = None,
+        field: Optional[str] = None,
+        json_path: Optional[str] = None,
+        line: Optional[int] = None,
+        column: Optional[int] = None,
+        field_errors: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         super().__init__(
             code="MANIFEST_VALIDATION_ERROR",
             message=message,
             path=path,
             details=details,
+            field=field,
+            json_path=json_path,
+            line=line,
+            column=column,
+            field_errors=field_errors,
         )

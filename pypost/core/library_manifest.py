@@ -92,11 +92,40 @@ def deserialize_manifest_from_dict(
         return manifest
     except (ValidationError, ValueError, TypeError) as exc:
         logger.warning("manifest_deserialization_failed reason=%s", exc)
+        field_errors: list[dict[str, Any]] = []
+        primary_field = None
+        primary_json_path = None
+        if isinstance(exc, ValidationError):
+            for err in exc.errors():
+                loc_parts = err.get("loc", ())
+                field_str = ""
+                json_path_parts = ["$"]
+                for part in loc_parts:
+                    if isinstance(part, int):
+                        field_str = f"{field_str}[{part}]" if field_str else f"[{part}]"
+                        json_path_parts.append(f"[{part}]")
+                    else:
+                        field_str = f"{field_str}.{part}" if field_str else str(part)
+                        json_path_parts.append(f".{part}")
+                json_path_str = "".join(json_path_parts)
+                field_err = {
+                    "field": field_str,
+                    "json_path": json_path_str,
+                    "message": str(err.get("msg", "Validation error")),
+                    "type": str(err.get("type", "value_error")),
+                }
+                field_errors.append(field_err)
+                if primary_field is None:
+                    primary_field = field_str
+                    primary_json_path = json_path_str
         raise ManifestDiagnosticError(
             code="MANIFEST_VALIDATION_ERROR",
             message=f"Failed to validate library manifest: {exc}",
             path=path,
             details={"error": str(exc)},
+            field=primary_field,
+            json_path=primary_json_path,
+            field_errors=field_errors,
         ) from exc
 
 
@@ -112,11 +141,18 @@ def deserialize_manifest_from_yaml(
         data = yaml.safe_load(content)
     except yaml.YAMLError as exc:
         logger.warning("manifest_yaml_parse_failed reason=%s", exc)
+        line = None
+        column = None
+        if hasattr(exc, "problem_mark") and exc.problem_mark is not None:
+            line = exc.problem_mark.line + 1
+            column = exc.problem_mark.column + 1
         raise ManifestDiagnosticError(
             code="MANIFEST_SYNTAX_ERROR",
             message=f"Invalid YAML content: {exc}",
             path=path,
             details={"error": str(exc)},
+            line=line,
+            column=column,
         ) from exc
 
     if not isinstance(data, dict):
@@ -147,6 +183,8 @@ def deserialize_manifest_from_json(
             message=f"Invalid JSON content: {exc}",
             path=path,
             details={"error": str(exc)},
+            line=exc.lineno,
+            column=exc.colno,
         ) from exc
 
     if not isinstance(data, dict):

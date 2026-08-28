@@ -436,6 +436,16 @@ All core operations emit structured `key=value` log events:
 
 ## Troubleshooting & Error Diagnostics
 
+### Field-Level Validation Diagnostics (PYPOST-1226)
+
+`ManifestDiagnosticError` provides structured properties for UI Form Editors and programmatic inspection:
+- `field: Optional[str]`: Dot-notation path to the invalid field (e.g. `"variables[0].name"` or `"name"`).
+- `json_path: Optional[str]`: RFC 9535 JSONPath to the error location (e.g. `"$.variables[0].name"` or `"$.name"`).
+- `line: Optional[int]`: 1-indexed source file line number for syntax or parse errors.
+- `column: Optional[int]`: 1-indexed source file column number for syntax or parse errors.
+- `field_errors: List[Dict[str, Any]]`: Complete list of field-level errors containing `field`, `json_path`, `message`, and error `type`.
+- `to_dict() -> Dict[str, Any]`: Serializes the diagnostic error into a JSON-compatible dictionary for API / UI bridge serialization.
+
 ### Standard Diagnostic Error Codes
 
 `ManifestDiagnosticError` provides structured error codes:
