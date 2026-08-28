@@ -10,10 +10,13 @@ import logging
 import os
 from pathlib import Path
 import shutil
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 import uuid
 
 from pypost.models.library_manifest import LocalLibraryOverlay
+
+if TYPE_CHECKING:
+    from pypost.core.environment_secrets_codec import EnvironmentSecretsCodec
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +26,22 @@ __all__ = ["LocalOverlayManager"]
 class LocalOverlayManager:
     """Manages persistent local configuration and secret overlays for collection libraries."""
 
-    def __init__(self, base_dir: Optional[Path | str] = None) -> None:
-        """Initialize LocalOverlayManager with a base storage directory.
+    def __init__(
+        self,
+        base_dir: Optional[Path | str] = None,
+        secrets_codec: Optional[EnvironmentSecretsCodec] = None,
+    ) -> None:
+        """Initialize LocalOverlayManager with a base storage directory and optional secrets codec.
 
         Args:
             base_dir: Root directory for library overlays. Defaults to ~/.pypost/libraries_data.
+            secrets_codec: Optional codec for encrypting sensitive secrets at rest.
         """
         if base_dir is not None:
             self.base_dir = Path(base_dir).expanduser().resolve()
         else:
             self.base_dir = (Path.home() / ".pypost" / "libraries_data").resolve()
+        self.secrets_codec = secrets_codec
 
     def _library_dir(self, library_id: str) -> Path:
         """Get the directory path for a library's local overlay."""
@@ -64,6 +73,25 @@ class LocalOverlayManager:
                     type(data).__name__,
                 )
                 return LocalLibraryOverlay(library_id=library_id)
+            raw_secrets = data.get("secrets", {})
+            if isinstance(raw_secrets, dict) and self.secrets_codec is not None:
+                decrypted_secrets: dict[str, Any] = {}
+                for key, val in raw_secrets.items():
+                    if isinstance(val, dict) and val.get("enc") is True:
+                        try:
+                            decrypted_secrets[key] = self.secrets_codec.decrypt(val)
+                        except Exception as exc:
+                            logger.warning(
+                                "overlay_secret_decrypt_failed library_id=%s key=%s reason=%s",
+                                library_id,
+                                key,
+                                exc,
+                            )
+                            decrypted_secrets[key] = val
+                    else:
+                        decrypted_secrets[key] = val
+                data["secrets"] = decrypted_secrets
+
             overlay = LocalLibraryOverlay(**data)
             logger.info(
                 "overlay_loaded library_id=%s path=%s secrets_count=%d "
@@ -116,7 +144,28 @@ class LocalOverlayManager:
         target_file = self._overlay_path(overlay.library_id)
         tmp_file = target_dir / f"overlay.json.tmp.{uuid.uuid4().hex}"
 
-        content = overlay.model_dump_json(indent=2)
+        payload = overlay.model_dump()
+        if self.secrets_codec is not None and isinstance(overlay.secrets, dict):
+            encrypted_secrets: dict[str, Any] = {}
+            for key, val in overlay.secrets.items():
+                if isinstance(val, dict) and val.get("enc") is True:
+                    encrypted_secrets[key] = val
+                elif isinstance(val, str):
+                    try:
+                        encrypted_secrets[key] = self.secrets_codec.encrypt(val).to_json()
+                    except Exception as exc:
+                        logger.warning(
+                            "overlay_secret_encrypt_failed library_id=%s key=%s reason=%s",
+                            overlay.library_id,
+                            key,
+                            exc,
+                        )
+                        encrypted_secrets[key] = val
+                else:
+                    encrypted_secrets[key] = val
+            payload["secrets"] = encrypted_secrets
+
+        content = json.dumps(payload, indent=2)
 
         try:
             if os.name == "posix":

@@ -271,6 +271,11 @@ The variable resolution engine evaluates effective variable values according to 
 - **Atomic File Writes**:
   - Overlays are written to a unique temporary file (`overlay.json.tmp.<uuid>`) with `0o600` permissions.
   - Safely swapped into place via `os.replace` to prevent file corruption during sudden terminations.
+- **At-Rest Encryption for Secrets (PYPOST-1225)**:
+  - `LocalOverlayManager` accepts an optional `secrets_codec: Optional[EnvironmentSecretsCodec] = None`.
+  - When configured, sensitive fields in `overlay.secrets` are saved as standard encrypted envelopes on disk.
+  - Transparently decrypts encrypted envelopes on load (`get_overlay`), while preserving full backward compatibility for legacy plaintext overlay files.
+  - Non-secret fields (`overrides`, `active_profile`, `library_id`) remain unencrypted JSON.
 
 ---
 
