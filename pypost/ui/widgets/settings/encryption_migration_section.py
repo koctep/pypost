@@ -43,6 +43,7 @@ class EncryptionMigrationSection:
         show_migration_result: Callable[..., None],
         confirm_re_encrypt_environments: Callable[[QWidget], bool],
         confirm_encrypt_plaintext_hidden: Callable[[QWidget], bool],
+        confirm_upgrade_envelopes_v2: Callable[[QWidget], bool] | None = None,
         host_dialog: QWidget,
     ) -> None:
         self._parent = parent
@@ -51,6 +52,11 @@ class EncryptionMigrationSection:
         self._show_migration_result_fn = show_migration_result
         self._confirm_re_encrypt = confirm_re_encrypt_environments
         self._confirm_encrypt_plaintext = confirm_encrypt_plaintext_hidden
+        self._confirm_upgrade_v2 = (
+            confirm_upgrade_envelopes_v2
+            if confirm_upgrade_envelopes_v2 is not None
+            else lambda p: True
+        )
         self._host_dialog = host_dialog
 
         if migration_service is not None:
@@ -75,17 +81,24 @@ class EncryptionMigrationSection:
             parent,
         )
         self.encrypt_plaintext_btn.clicked.connect(self.on_encrypt_plaintext_hidden)
+        self.upgrade_v2_btn = QPushButton(
+            "Upgrade encrypted values to v2",
+            parent,
+        )
+        self.upgrade_v2_btn.clicked.connect(self.on_upgrade_envelopes_v2)
 
         migration_enabled = self._migration_service is not None
         self.verify_encryption_btn.setEnabled(migration_enabled)
         self.reencrypt_environments_btn.setEnabled(migration_enabled)
         self.encrypt_plaintext_btn.setEnabled(migration_enabled)
+        self.upgrade_v2_btn.setEnabled(migration_enabled)
 
     def add_to_form(self, form: QFormLayout) -> None:
         form.addRow(self.encryption_migration_section_label)
         form.addRow("", self.verify_encryption_btn)
         form.addRow("", self.reencrypt_environments_btn)
         form.addRow("", self.encrypt_plaintext_btn)
+        form.addRow("", self.upgrade_v2_btn)
 
     @property
     def migration_worker(self) -> EncryptionMigrationWorker | None:
@@ -125,6 +138,13 @@ class EncryptionMigrationSection:
             confirm=self._confirm_encrypt_plaintext,
         )
 
+    def on_upgrade_envelopes_v2(self) -> None:
+        self._start_migration_worker(
+            "upgrade_v2",
+            title="Upgrade encrypted values to v2",
+            confirm=self._confirm_upgrade_v2,
+        )
+
     def _show_migration_result(self, title: str, report: MigrationReport) -> None:
         body = format_migration_report(report)
         self._show_migration_result_fn(
@@ -140,6 +160,7 @@ class EncryptionMigrationSection:
             self.verify_encryption_btn,
             self.reencrypt_environments_btn,
             self.encrypt_plaintext_btn,
+            self.upgrade_v2_btn,
         ):
             button.setEnabled(enabled and has_service)
 

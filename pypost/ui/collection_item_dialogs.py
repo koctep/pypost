@@ -300,6 +300,19 @@ def confirm_encrypt_plaintext_hidden(parent: QWidget) -> bool:
     return reply == QMessageBox.StandardButton.Yes
 
 
+def confirm_upgrade_envelopes_v2(parent: QWidget) -> bool:
+    reply = QMessageBox.question(
+        parent,
+        "Upgrade encrypted values to v2",
+        "This rewrites all legacy v1 encrypted hidden values to version 2 envelopes. "
+        "A timestamped backup of environments.json is created before writing.\n\n"
+        "Continue?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No,
+    )
+    return reply == QMessageBox.StandardButton.Yes
+
+
 def prompt_import_environments_file(parent: QWidget) -> Path | None:
     """Open a file picker for an environment import file; None on Cancel."""
     path_str, _selected_filter = QFileDialog.getOpenFileName(

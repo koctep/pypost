@@ -12,7 +12,7 @@ from pypost.models.settings import AppSettings
 
 logger = logging.getLogger(__name__)
 
-MigrationOperation = Literal["re_encrypt", "encrypt_plaintext"]
+MigrationOperation = Literal["re_encrypt", "encrypt_plaintext", "upgrade_v2"]
 
 
 class EncryptionMigrationWorker(QThread):
@@ -37,6 +37,11 @@ class EncryptionMigrationWorker(QThread):
         try:
             if self._operation == "re_encrypt":
                 report = self._service.bulk_re_encrypt(
+                    self._settings,
+                    backup=True,
+                )
+            elif self._operation == "upgrade_v2":
+                report = self._service.upgrade_envelopes_to_v2(
                     self._settings,
                     backup=True,
                 )

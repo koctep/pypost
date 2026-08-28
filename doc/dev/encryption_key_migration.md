@@ -177,8 +177,12 @@ Open **Settings** from the main window. Under **Encryption migration**:
   bulk re-encrypts under the active key. Same safety properties as the CLI `re-encrypt` command.
   The result dialog includes **Re-encrypted** and **Reused** counts when the migration service
   returns `reencrypt_stats` (same fields as CLI `reencrypt_stats`).
+- **Encrypt plaintext hidden values** — asks for confirmation, creates a timestamped backup, and
+  encrypts any plaintext hidden values found in storage.
+- **Upgrade encrypted values to v2** — asks for confirmation, creates a timestamped backup, and
+  rewrites legacy version 1 encrypted envelopes to version 2 envelopes.
 
-`encrypt-plaintext` and dry-run are CLI-only. `upgrade-v2` is CLI-only.
+Dry-run mode remains CLI-only.
 
 ### Operator CLI
 

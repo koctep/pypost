@@ -340,3 +340,51 @@ class TestSettingsDialogEncryptionMigration:
 
         mock_show.assert_called_once()
         assert mock_show.call_args.kwargs["success"] is False
+
+    def test_upgrade_v2_button_disabled_without_service(self, qapp):
+        dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=None)
+        try:
+            assert hasattr(dlg, "upgrade_v2_btn")
+            assert dlg.upgrade_v2_btn.isEnabled() is False
+        finally:
+            _close_dialog(dlg)
+
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    @patch(
+        "pypost.ui.dialogs.settings_dialog.confirm_upgrade_envelopes_v2",
+        return_value=False,
+    )
+    def test_upgrade_v2_cancels_when_declined(self, mock_confirm, mock_show, qapp):
+        storage = MagicMock(spec=StorageManager)
+        dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
+        service = dlg._migration_service
+        service.upgrade_envelopes_to_v2 = MagicMock()
+        try:
+            dlg._on_upgrade_envelopes_v2()
+        finally:
+            _close_dialog(dlg)
+
+        service.upgrade_envelopes_to_v2.assert_not_called()
+        mock_show.assert_not_called()
+
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    @patch(
+        "pypost.ui.dialogs.settings_dialog.confirm_upgrade_envelopes_v2",
+        return_value=True,
+    )
+    def test_upgrade_v2_runs_when_confirmed(self, mock_confirm, mock_show, qapp):
+        storage = MagicMock(spec=StorageManager)
+        dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
+        service = dlg._migration_service
+        service.upgrade_envelopes_to_v2 = MagicMock(return_value=_empty_report())
+        try:
+            dlg._on_upgrade_envelopes_v2()
+            _wait_for_migration_worker(dlg)
+        finally:
+            _close_dialog(dlg)
+
+        service.upgrade_envelopes_to_v2.assert_called_once()
+        call_kwargs = service.upgrade_envelopes_to_v2.call_args.kwargs
+        assert call_kwargs["backup"] is True
+        mock_show.assert_called_once()
+

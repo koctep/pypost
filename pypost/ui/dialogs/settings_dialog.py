@@ -22,6 +22,7 @@ from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import (
     confirm_encrypt_plaintext_hidden,
     confirm_re_encrypt_environments,
+    confirm_upgrade_envelopes_v2,
     show_migration_result,
 )
 from pypost.ui.collection_item_dialogs import (  # noqa: F401
@@ -101,6 +102,7 @@ class SettingsDialog(QDialog):
             show_migration_result=show_migration_result,
             confirm_re_encrypt_environments=confirm_re_encrypt_environments,
             confirm_encrypt_plaintext_hidden=confirm_encrypt_plaintext_hidden,
+            confirm_upgrade_envelopes_v2=confirm_upgrade_envelopes_v2,
             host_dialog=self,
         )
         retry_policy = RetryPolicySection(current_settings, self)
@@ -140,6 +142,7 @@ class SettingsDialog(QDialog):
         self.verify_encryption_btn = encryption_migration.verify_encryption_btn
         self.reencrypt_environments_btn = encryption_migration.reencrypt_environments_btn
         self.encrypt_plaintext_btn = encryption_migration.encrypt_plaintext_btn
+        self.upgrade_v2_btn = encryption_migration.upgrade_v2_btn
         self.max_retries_spin = retry_policy.max_retries_spin
         self.retry_delay_spin = retry_policy.retry_delay_spin
         self.retry_backoff_spin = retry_policy.retry_backoff_spin
@@ -221,6 +224,9 @@ class SettingsDialog(QDialog):
 
     def _on_encrypt_plaintext_hidden(self) -> None:
         self._encryption_migration_section.on_encrypt_plaintext_hidden()
+
+    def _on_upgrade_envelopes_v2(self) -> None:
+        self._encryption_migration_section.on_upgrade_envelopes_v2()
 
     def accept(self):
         bind_values = self._server_bind_section.validate(self)
