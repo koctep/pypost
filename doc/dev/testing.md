@@ -227,8 +227,10 @@ establishing Make-only differential execution profiles (isolated node 100% pass 
 multi-worker parallel suite duration inflation +40.3%) for downstream DIAG-1
 ([PYPOST-1216](https://pypost.atlassian.net/browse/PYPOST-1216)) and FIX-1
 ([PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217)).
-Detailed diagnosis and fix prose belong to those children. See also
-[GUI testing Troubleshooting](gui_testing.md#troubleshooting).
+For root-cause findings, failure class taxonomy, and downstream stabilization
+architecture, see
+[Collection tree flake root cause](#collection-tree-parallel-flake-root-cause-pypost-1216)
+below. See also [GUI testing Troubleshooting](gui_testing.md#troubleshooting).
 Model-backed `QListView` with no model is locked by
 `test_select_list_view_no_model_raises` (PYPOST-972;
 `item view has no model`).
@@ -278,6 +280,129 @@ points increment Prometheus counters; tests inject `MetricsManager` and scrape t
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_request_editor_gui_metrics.py -v
 ```
+
+### Collection tree parallel flake root cause (PYPOST-1216)
+
+#### Overview and Target Contract
+
+The test node
+`tests/test_ui_actions.py::test_live_collection_tree_missing_option_raises`
+exercises the negative interaction contract from
+[PYPOST-975](https://pypost.atlassian.net/browse/PYPOST-975): selecting a non-existent
+option in `COLLECTION_TREE` (`pypost_collection_tree`) must raise
+`UiTargetNotInteractableError` with `"option not found"`.
+
+While the test is 100% deterministic in isolation (~1.37s single-node, ~5.80s file-level),
+it exhibited intermittent flakes during multi-worker parallel runs (`make test` via
+`scripts/run_parallel_tests.py` with 8 subprocess workers). Initial triage in
+[PYPOST-1167](https://pypost.atlassian.net/browse/PYPOST-1167) suspected a race between
+Qt `apply_theme` and background `uvicorn` startup. Under
+[PYPOST-1216](https://pypost.atlassian.net/browse/PYPOST-1216) (DIAG-1), this hypothesis was
+systematically evaluated and formally refuted, confirming the actual root cause as compound
+GIL/CPU contention and Qt event loop pump starvation. The canonical diagnosis report is in
+[`ai-tasks/PYPOST-1216/30-diagnosis-report.md`](../../ai-tasks/PYPOST-1216/30-diagnosis-report.md).
+
+#### Empirical Refutation of Direct In-Memory Race
+
+Investigation confirmed zero shared mutable state between `apply_theme` and `uvicorn`:
+
+- **Thread affinity**: `StyleManager.apply_appearance()` and `StyleManager.apply_theme()`
+  execute strictly on the main Qt GUI thread. In contrast, `MetricsServer._run_uvicorn()`
+  runs on an isolated daemon worker thread inside an `asyncio` event loop.
+- **Zero shared memory**: `StyleManager` modifies Qt C++ structures (`QApplication`,
+  `QPalette`, and QSS stylesheet parsing); `MetricsServer` operates exclusively on
+  Starlette routing and HTTP socket connections. There is no concurrent access to shared
+  widget pointers, palettes, or mutable Python state.
+- **Import locks**: Modules `uvicorn`, `starlette`, and `PySide6` are imported at Python
+  module load time, eliminating dynamic runtime import lock contention.
+
+Consequently, the direct in-memory race hypothesis was empirically and architecturally
+refuted.
+
+#### Confirmed Root Cause: Compound GIL/CPU Contention & Starvation
+
+The actual failure mechanism is compound resource contention and event loop starvation:
+
+1. **CPU saturation**: When `make test` launches 8 parallel pytest subprocess workers across
+   available CPU cores, the host system experiences heavy CPU saturation.
+2. **GIL preemption latency**: Python Global Interpreter Lock (GIL) switching under
+   multi-threaded worker execution causes scheduling jitter across threads.
+3. **Temporal convergence during startup**: In `AgentAppSession.start()`, three heavy
+   operations execute nearly simultaneously:
+   - `MetricsManager.start_server()` spawns the background uvicorn daemon thread.
+   - `CollectionStorageGateway.load_collections_async()` spawns a disk/JSON worker thread.
+   - `MainWindow.apply_settings()` parses QSS stylesheets on the main thread.
+4. **Qt event pump starvation**: CPU/GIL saturation delays the main thread
+   `QCoreApplication.processEvents()` pump inside `ui_wait.wait_until(is_ui_ready)`.
+   Deferred events, such as `QTimer.singleShot(0, apply_settings)` queued during
+   `MainWindow.showEvent()` and the asynchronous `gateway.load_completed` Qt
+   signal, experience significant queue dispatch delays.
+5. **Execution duration inflation**: Baseline empirical profiling in
+   [`ai-tasks/PYPOST-1215/baseline-evidence.md`](../../ai-tasks/PYPOST-1215/baseline-evidence.md)
+   demonstrated a **+40.3% duration inflation** for `tests/test_ui_actions.py` (from 5.80s
+   isolated to 8.14s parallel). The intermittent flake occurs when test interaction starts
+   while the tree viewport or model layout is in the middle of event pump settling.
+
+#### Failure Class Taxonomy and Differentiation
+
+To prevent scope conflation across active and historical epics, PyPost classifies test
+failures into a formal taxonomy:
+
+- **Class 1: Port Allocation & Socket Collision** (PYPOST-1178) -- Addressed by
+  cross-process port allocation locking via `allocate_tcp_port()`.
+- **Class 2: Compound Resource Contention & Event Loop Starvation** (PYPOST-1216 /
+  PYPOST-1188) -- Non-fatal timing jitter and event pump delays under multi-worker CPU load.
+- **Class 3: Long-Lived Native C++ State Leak** (PYPOST-1117 / PYPOST-1213) -- Hard native
+  `SIGSEGV` (core dump) in `QStyleFactory.create("Fusion")` / Qt styling engine caused by
+  accumulated C++ state across ~110 GUI test modules (~1,384 tests) executed sequentially in
+  a single long-lived process. Resolved via batch partitioning and process isolation
+  (PYPOST-1214).
+- **Class 4: Destructor Double-Free during GC** (PYPOST-1115 / PYPOST-1040) -- Post-PASS
+  `SIGSEGV` during Python garbage collection (`Shiboken::callCppDestructor`) caused by
+  orphaned `QWidgetItem` wrappers in nested `SettingsDialog` layout trees. Resolved via
+  layout item deletion and GC suppression (PYPOST-1115).
+
+Explicit differentiation:
+
+- **Differentiation from PYPOST-1117**: PYPOST-1117 is a native C++ crash (`SIGSEGV`) from
+  cumulative memory/state leak over hundreds of sequential `apply_theme` calls in a long-lived
+  process, completely absent in short isolated runs. PYPOST-1216 is non-fatal timing jitter
+  under parallel CPU load, with zero C++ crash or styling engine leak.
+- **Differentiation from PYPOST-1115 / PYPOST-1040**: PYPOST-1115/1040 is a post-pass GC
+  destructor crash involving `SettingsDialog` layout wrappers. PYPOST-1216 does not involve
+  `SettingsDialog`, layout item deletion, or garbage collection double-frees.
+
+#### Downstream Stabilization Architecture (FIX-1 / PYPOST-1217)
+
+Stabilization of the collection tree actions parallel execution is assigned to
+[PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217) (FIX-1) under the following
+handoff specifications:
+
+1. **Deterministic event loop settle**: In `pypost/agent/lifecycle.py`
+   (`AgentAppSession.start()`), after `wait_until(lambda: composed.window.is_ui_ready)`
+   returns `True`, execute an explicit event flush via `QCoreApplication.processEvents()`
+   to ensure all deferred single-shot timers (e.g. `apply_settings` queued during
+   `showEvent`) execute before yielding control to the test body.
+2. **Collection tree realization gating**: In `pypost/agent/ui_actions.py` (`ui_select`),
+   verify that when the target is `COLLECTION_TREE`, the widget viewport and model have
+   fully settled layout events prior to scanning display text indices.
+3. **Preservation of assertion contracts**: The negative interaction assertion contract from
+   PYPOST-975 must be strictly preserved:
+   ```python
+   with pytest.raises(UiTargetNotInteractableError) as exc_info:
+       session.ui_select(COLLECTION_TREE, "__no_such_collection_tree_option__")
+   assert "option not found" in str(exc_info.value)
+   ```
+   Do not soften the assertion, and do not introduce arbitrary `time.sleep()` calls.
+4. **Verification quality gate**: FIX-1 must pass:
+   - Isolated node:
+     ```bash
+     make test PYTEST_ARGS="tests/test_ui_actions.py \
+       -k test_live_collection_tree_missing_option_raises"
+     ```
+   - Isolated file: `make test PYTEST_ARGS="tests/test_ui_actions.py"`
+   - Full parallel quality gate: `make check` (running `lint`, `test`, and
+     `verify-ai-tasks` across parallel workers).
 
 ## Response search flow integration (PYPOST-357)
 
