@@ -6,8 +6,8 @@
 
 | Metric | Audit era (PYPOST-40) | Baseline | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 445 | 477 |
-| `MainWindow` class LOC | 1040 | 398 | 426 |
+| `main_window.py` file LOC | 1040 | 456 | 477 |
+| `MainWindow` class LOC | 1040 | 408 | 426 |
 
 ## Module inventory caps
 
@@ -26,7 +26,7 @@
 | `pypost/core/template_service.py` | 36 | 212 | 225 |
 | `pypost/core/websocket_registry.py` | — | 129 | 131 |
 | `pypost/ui/mcp_server_controller.py` | — | 229 | 296 |
-| `pypost/ui/presenters/collections_presenter.py` | — | 486 | 535 |
+| `pypost/ui/presenters/collections_presenter.py` | — | 490 | 535 |
 | `pypost/ui/presenters/env_presenter.py` | — | 381 | 432 |
 | `pypost/ui/presenters/mcp_controls_presenter.py` | — | 329 | 362 |
 | `pypost/ui/presenters/tabs_presenter.py` | — | 1059 | 1165 |

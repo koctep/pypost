@@ -357,6 +357,10 @@ class CollectionsPresenter(QObject):
         """Run the Import Collection flow (delegated to CollectionImportActions)."""
         self._import_actions.import_collections()
 
+    def wait_import_idle(self, timeout_ms: int = 5000) -> bool:
+        """Wait until collection import actions are completely idle."""
+        return self._import_actions.wait_idle(timeout_ms)
+
     def _show_import_status(self, message: str) -> None:
         """Show a non-modal preparing cue on the main window status bar if present."""
         window = self._panel.window()

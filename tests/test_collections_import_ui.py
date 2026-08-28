@@ -56,9 +56,21 @@ def _reader(collections, parse_errors=None):
     return read
 
 
-def _wait_import(done: Callable[[], bool]) -> None:
-    """Pump the event loop until async import parse/finish completes."""
-    process_until(done, timeout_ms=_IMPORT_WAIT_MS)
+def _wait_import(
+    done: Callable[[], bool],
+    presenter: CollectionsPresenter | None = None,
+    timeout_ms: int = _IMPORT_WAIT_MS,
+) -> None:
+    """Pump the event loop until async import parse/finish completes and actions are idle."""
+
+    def condition() -> bool:
+        if not done():
+            return False
+        if presenter is not None and presenter._import_actions.is_busy():
+            return False
+        return True
+
+    process_until(condition, timeout_ms=timeout_ms)
 
 
 class TestImportCollectionEntryPoint:
@@ -96,7 +108,7 @@ class TestImportCollections:
         )
         try:
             presenter.import_collections()
-            _wait_import(lambda: mock_result.call_count >= 1)
+            _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             assert [col.name for col in manager.get_collections()] == [
                 "Existing",
@@ -121,7 +133,7 @@ class TestImportCollections:
         presenter.collections_changed.connect(lambda: received.append(True))
         try:
             presenter.import_collections()
-            _wait_import(lambda: len(received) >= 1)
+            _wait_import(lambda: len(received) >= 1, presenter)
             assert received == [True]
         finally:
             presenter.panel.close()
@@ -151,7 +163,7 @@ class TestImportCollections:
         )
         try:
             presenter.import_collections()
-            _wait_import(lambda: mock_invalid.call_count >= 1)
+            _wait_import(lambda: mock_invalid.call_count >= 1, presenter)
             assert [col.name for col in manager.get_collections()] == ["Existing"]
             manager.storage.save_collection.assert_not_called()
             mock_invalid.assert_called_once()
@@ -170,7 +182,7 @@ class TestImportCollections:
         )
         try:
             presenter.import_collections()
-            _wait_import(lambda: mock_invalid.call_count >= 1)
+            _wait_import(lambda: mock_invalid.call_count >= 1, presenter)
             assert len(manager.get_collections()) == 1
             manager.storage.save_collection.assert_not_called()
             message = mock_invalid.call_args[0][1]
@@ -190,7 +202,7 @@ class TestImportCollections:
         presenter, manager = _make_presenter([existing], _reader([incoming]))
         try:
             presenter.import_collections()
-            _wait_import(lambda: _mock_result.call_count >= 1)
+            _wait_import(lambda: _mock_result.call_count >= 1, presenter)
 
             mock_conflict.assert_called_once()
             collections = manager.get_collections()
@@ -211,7 +223,7 @@ class TestImportCollections:
         presenter, manager = _make_presenter(existing, _reader(incoming))
         try:
             presenter.import_collections()
-            _wait_import(lambda: _mock_result.call_count >= 1)
+            _wait_import(lambda: _mock_result.call_count >= 1, presenter)
 
             mock_conflict.assert_called_once()
             assert [col.id for col in manager.get_collections()] == ["c1", "c2"]
@@ -238,7 +250,7 @@ class TestImportCollections:
         presenter, manager = _make_presenter(existing, _reader(incoming))
         try:
             presenter.import_collections()
-            _wait_import(lambda: _mock_result.call_count >= 1)
+            _wait_import(lambda: _mock_result.call_count >= 1, presenter)
 
             mock_conflict.assert_called_once()
             assert mock_conflict.call_args.kwargs["remaining_count"] == 2
@@ -264,7 +276,7 @@ class TestImportCollections:
         presenter, manager = _make_presenter([existing], _reader([incoming]))
         try:
             presenter.import_collections()
-            _wait_import(lambda: mock_result.call_count >= 1)
+            _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             collections = manager.get_collections()
             assert [col.name for col in collections] == ["My API", "Copy of My API"]
@@ -285,7 +297,7 @@ class TestImportCollections:
         )
         try:
             presenter.import_collections()
-            _wait_import(lambda: mock_result.call_count >= 1)
+            _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             assert [col.name for col in manager.get_collections()] == ["Good"]
             _args, kwargs = mock_result.call_args
@@ -304,7 +316,7 @@ class TestImportCollections:
         manager.storage.save_collection.side_effect = OSError("disk full")
         try:
             presenter.import_collections()
-            _wait_import(lambda: mock_result.call_count >= 1)
+            _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             _args, kwargs = mock_result.call_args
             assert kwargs["success"] is False
@@ -332,7 +344,7 @@ class TestImportCollections:
         try:
             with caplog.at_level(logging.ERROR, logger="pypost.core.collection_import_apply"):
                 presenter.import_collections()
-                _wait_import(lambda: mock_result.call_count >= 1)
+                _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             _args, kwargs = mock_result.call_args
             summary = _args[1]
@@ -367,7 +379,7 @@ class TestImportCollections:
 
         try:
             presenter.import_collections()
-            _wait_import(lambda: mock_result.call_count >= 1)
+            _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             _args, kwargs = mock_result.call_args
             assert kwargs["success"] is False
@@ -404,7 +416,7 @@ class TestImportCollections:
 
         try:
             presenter.import_collections()
-            _wait_import(lambda: mock_result.call_count >= 1)
+            _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             _args, kwargs = mock_result.call_args
             assert kwargs["success"] is False
@@ -435,7 +447,8 @@ class TestImportCollections:
                         "collection_import_completed added_count=1" in r.message
                         and "request_count=1" in r.message
                         for r in caplog.records
-                    )
+                    ),
+                    presenter,
                 )
             assert any(
                 "collection_import_parse_started path=" in r.message
@@ -470,7 +483,7 @@ class TestImportCollections:
         try:
             with caplog.at_level(logging.WARNING, logger=_MODULE):
                 presenter.import_collections()
-                _wait_import(lambda: mock_invalid.call_count >= 1)
+                _wait_import(lambda: mock_invalid.call_count >= 1, presenter)
 
             mock_invalid.assert_called_once()
             assert [col.name for col in manager.get_collections()] == ["Existing"]
@@ -504,7 +517,7 @@ class TestImportCollections:
         try:
             with caplog.at_level(logging.WARNING, logger=_MODULE):
                 presenter.import_collections()
-                _wait_import(lambda: mock_invalid.call_count >= 1)
+                _wait_import(lambda: mock_invalid.call_count >= 1, presenter)
 
             mock_invalid.assert_called_once()
             assert [col.name for col in manager.get_collections()] == ["Existing"]
@@ -557,7 +570,7 @@ class TestImportCollectionsEndToEnd:
         try:
             with patch(_PICKER, return_value=source):
                 presenter.import_collections()
-                _wait_import(lambda: mock_result.call_count >= 1)
+                _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             assert mock_result.call_args[1]["success"] is True
             reloaded = StorageManager(data_dir=tmp_path / "data").load_collections()
@@ -630,7 +643,7 @@ class TestImportCollectionsEndToEnd:
             with patch.object(storage, "save_collection", side_effect=failing_save):
                 with patch(_PICKER, return_value=source):
                     presenter.import_collections()
-                    _wait_import(lambda: mock_result.call_count >= 1)
+                    _wait_import(lambda: mock_result.call_count >= 1, presenter)
 
             assert mock_result.call_args[1]["success"] is False
             disk_collections = StorageManager(data_dir=tmp_path / "data").load_collections()

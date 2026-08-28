@@ -15,8 +15,8 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QPushButton, QWidget
+from PySide6.QtCore import QElapsedTimer, QObject
+from PySide6.QtWidgets import QApplication, QPushButton, QWidget
 
 from pypost.core.collection_import import (
     CollectionImportFileError,
@@ -86,6 +86,32 @@ class CollectionImportActions(QObject):
         if self._preparing:
             return True
         return self._worker is not None and self._worker.isRunning()
+
+    def wait_idle(self, timeout_ms: int = 5000) -> bool:
+        """Pump event loop / wait until background worker has finished and joined."""
+        if not self.is_busy():
+            return True
+
+        timer = QElapsedTimer()
+        timer.start()
+        app = QApplication.instance()
+        logger.info("collection_import_wait_idle_started")
+        while self.is_busy():
+            if timer.elapsed() >= timeout_ms:
+                logger.warning(
+                    "collection_import_wait_idle_timeout elapsed_ms=%d",
+                    timer.elapsed(),
+                )
+                return False
+            if app is not None:
+                app.processEvents()
+            elif self._worker is not None:
+                self._worker.wait(10)
+        logger.info(
+            "collection_import_wait_idle_completed elapsed_ms=%d",
+            timer.elapsed(),
+        )
+        return True
 
     def import_collections(self) -> None:
         """Pick a file, parse off-thread, then finish import on the GUI thread."""

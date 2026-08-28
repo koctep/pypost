@@ -48,6 +48,10 @@ coverage for busy re-entry prevention, unexpected reader exceptions caught by th
 status bar lifecycle message transitions, and real-file disk JSON parsing in
 `tests/test_collection_import_async_gaps.py`.
 
+**PYPOST-1182** introduces deterministic lifecycle synchronization APIs (`CollectionImportActions.wait_idle`
+and `CollectionsPresenter.wait_import_idle`) to eliminate Qt event loop wait hangs and worker thread
+teardown race conditions during test suite execution (`tests/test_collections_import_ui.py`).
+
 ## Architecture
 
 ```text
@@ -321,11 +325,21 @@ and a short `wait(100)` before dropping the reference (same PYPOST-829 pattern a
 
 - **`is_busy() -> bool`** — true while preparing / the parse worker is running. Second
   Import click while busy is ignored (`collection_import_skipped reason=busy`).
+- **`wait_idle(timeout_ms: int = 5000) -> bool`** — synchronously pump the Qt event loop
+  (`QApplication.processEvents()`) or wait for thread completion until all background
+  worker threads (`CollectionImportParseWorker`) have finished and joined (`is_busy() is False`).
+  Returns `True` if idle within `timeout_ms`, or `False` if timed out.
 - **`import_collections() -> None`** — pick file; dispatch async parse; finish on the
   GUI thread when ready. Callers and the button wire-up do not change.
 
 Constructor DI (beyond the original refresh/emit hooks): optional `show_status` /
 `clear_status` for the preparing message; `read_import_file` for the worker.
+
+### `CollectionsPresenter.wait_import_idle(timeout_ms: int = 5000) -> bool`
+
+Delegates directly to `CollectionImportActions.wait_idle(timeout_ms)`. Allows UI harnesses, parent
+presenters, and automated test fixtures to deterministically wait for any in-flight import parse worker
+to finish and join before tearing down widgets or closing panels.
 
 ### Testing seam
 
@@ -337,6 +351,36 @@ parser, `RequestManager`, and `StorageManager` against a `tmp_path`.
 Because parse is async, UI tests must wait for completion (e.g. `process_until` until
 `not actions.is_busy()` or equivalent) rather than asserting immediately after
 `import_collections()`. Stubs used from the worker thread must be thread-safe.
+
+### Worker thread lifecycle synchronization and test unhanging (PYPOST-1182)
+
+Background worker threads started by UI presenters must provide deterministic synchronization so
+callers and test harnesses can guarantee that native thread execution finishes and joins before
+destroying enclosing widgets or moving to the next test.
+
+Without deterministic synchronization:
+1. When `CollectionImportParseWorker` emits `parse_completed`, Qt delivers the signal to the GUI thread
+   via a queued connection.
+2. `CollectionImportActions._finish_import()` executes synchronously on the GUI thread, triggering tree
+   refreshes and showing the result dialog.
+3. If test helpers exit immediately upon observing dialog invocation (e.g. `mock_result.called`), the
+   test function returns, calling `presenter.panel.close()` and deallocating Qt objects while the
+   background `QThread` native thread is still completing its OS run loop or emitting queued `finished`
+   signals.
+4. This causes `pthread_join` deadlocks, memory races, or event loop starvation across subsequent tests
+   in `make test`.
+
+To resolve this deterministically:
+- **`CollectionImportActions.wait_idle(timeout_ms=5000)`** pumps the `QApplication` event loop with a
+  watchdog timer until `is_busy()` returns `False` and `_worker` is joined via `wait()`.
+- **`CollectionsPresenter.wait_import_idle(timeout_ms=5000)`** exposes this wait condition on the
+  presenter.
+- In `tests/test_collections_import_ui.py`, helper `_wait_import(done, presenter)` waits until both
+  `done()` is `True` and `presenter.wait_import_idle()` confirms all background workers have joined
+  and cleaned up before assertions or widget closures run.
+- Automated tests in headless mode (`QT_QPA_PLATFORM=offscreen`) also patch dialog handlers in
+  `collection_item_dialogs.py` to ensure unexpected branches fail fast with descriptive assertions rather
+  than opening blocking modal dialog loops (`QDialog.exec()`).
 
 Responsiveness coverage: `tests/test_collection_import_responsiveness.py` injects a
 blocking reader and asserts the Qt event loop still fires a `QTimer` during parse, with
@@ -402,16 +446,20 @@ routinely carries credentials in a header template. Paths are logged for triage
 `ai-tasks/PYPOST-1004/50-observability.md`,
 `ai-tasks/PYPOST-1005/50-observability.md`,
 `ai-tasks/PYPOST-1006/50-observability.md`,
-`ai-tasks/PYPOST-1058/50-observability.md`, and
-`ai-tasks/PYPOST-1059/50-observability.md`.
+`ai-tasks/PYPOST-1058/50-observability.md`,
+`ai-tasks/PYPOST-1059/50-observability.md`, and
+`ai-tasks/PYPOST-1182/50-observability.md`.
 
-### Async parse lifecycle (PYPOST-1005)
+### Async parse and lifecycle synchronization (PYPOST-1005 / PYPOST-1182)
 
 In `collection_import_actions.py`:
 
 - **INFO** `collection_import_skipped reason=busy` — second Import while preparing
 - **INFO** `collection_import_parse_started path=…` — orchestrator dispatched the worker
 - **DEBUG** `collection_import_busy_cue_shown` / `collection_import_busy_cue_cleared`
+- **INFO** `collection_import_wait_idle_started` — entered `wait_idle()` while parse worker is active (PYPOST-1182)
+- **INFO** `collection_import_wait_idle_completed elapsed_ms=%d` — `wait_idle()` successfully completed with worker joined (PYPOST-1182)
+- **WARNING** `collection_import_wait_idle_timeout elapsed_ms=%d` — `wait_idle()` reached timeout before worker joined (PYPOST-1182)
 - **ERROR** `collection_import_parse_unexpected error=…` — unexpected exception from the
   worker, handled on the GUI thread (invalid-file dialog)
 - **WARNING** `collection_import_worker_finish_wait_timeout wait_ms=…` — short join after
@@ -488,6 +536,8 @@ the collection id, not its name.
 | Result dialog "Renamed" count is lower than the number of `Copy of …` names in the tree | `renamed` was stored as a dict keyed by original name (fixed in PYPOST-1003) | Confirm you are on a build where `CollectionImportPlanResult.renamed` is `list[tuple[str, str]]`; n same-named duplicates should report n−1 renames |
 | Agents suddenly see new MCP tools | Imported requests had `expose_as_mcp: true` and a running endpoint selected that collection; `collections_changed` refreshes only those endpoint(s) | Review that collection's MCP flags and endpoint selection before importing — see [MCP Integration](mcp_integration.md) |
 | WARNING `collection_import_worker_finish_wait_timeout` | Short post-`finished` join did not complete within `_WORKER_FINISH_WAIT_MS` | Same class of issue as storage gateway finish hygiene (PYPOST-829); usually transient; escalate if paired with crashes under rapid import churn |
+| WARNING `collection_import_wait_idle_timeout` | `CollectionImportActions.wait_idle()` reached timeout waiting for background parse worker to finish and join | Check if `read_import_file` is blocked on slow I/O or stuck in a deadlocked event loop; increase `timeout_ms` if parsing massive files |
+| Test suite stalls or hangs on `test_collections_import_ui.py` | Widget teardown or garbage collection occurred while background `CollectionImportParseWorker` `QThread` was still running | Use `presenter.wait_import_idle()` or `_wait_import(..., presenter)` to ensure workers are fully drained before closing panel or exiting test fixtures |
 
 ## Related
 
