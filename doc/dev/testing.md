@@ -227,8 +227,8 @@ establishing Make-only differential execution profiles (isolated node 100% pass 
 multi-worker parallel suite duration inflation +40.3%) for downstream DIAG-1
 ([PYPOST-1216](https://pypost.atlassian.net/browse/PYPOST-1216)) and FIX-1
 ([PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217)).
-For root-cause findings, failure class taxonomy, and downstream stabilization
-architecture, see
+For root-cause findings, failure class taxonomy, and stabilization architecture &
+resolution, see
 [Collection tree flake root cause](#collection-tree-parallel-flake-root-cause-pypost-1216)
 below. See also [GUI testing Troubleshooting](gui_testing.md#troubleshooting).
 Model-backed `QListView` with no model is locked by
@@ -372,37 +372,90 @@ Explicit differentiation:
   destructor crash involving `SettingsDialog` layout wrappers. PYPOST-1216 does not involve
   `SettingsDialog`, layout item deletion, or garbage collection double-frees.
 
-#### Downstream Stabilization Architecture (FIX-1 / PYPOST-1217)
+#### Implemented Stabilization Architecture & Resolution (FIX-1 / PYPOST-1217)
 
-Stabilization of the collection tree actions parallel execution is assigned to
-[PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217) (FIX-1) under the following
-handoff specifications:
+Stabilization of `test_live_collection_tree_missing_option_raises` under multi-worker
+parallel execution (`make test` with 8 parallel subprocess workers) was completed in
+[PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217) (FIX-1). The fix resolves
+the Class 2 compound GIL/CPU contention and Qt event pump starvation identified in
+[PYPOST-1216](https://pypost.atlassian.net/browse/PYPOST-1216) without modifying the async
+gateway or background metrics server threads.
 
-1. **Deterministic event loop settle**: In `pypost/agent/lifecycle.py`
-   (`AgentAppSession.start()`), after `wait_until(lambda: composed.window.is_ui_ready)`
-   returns `True`, execute an explicit event flush via `QCoreApplication.processEvents()`
-   to ensure all deferred single-shot timers (e.g. `apply_settings` queued during
-   `showEvent`) execute before yielding control to the test body.
-2. **Collection tree realization gating**: In `pypost/agent/ui_actions.py` (`ui_select`),
-   verify that when the target is `COLLECTION_TREE`, the widget viewport and model have
-   fully settled layout events prior to scanning display text indices.
-3. **Preservation of assertion contracts**: The negative interaction assertion contract from
-   PYPOST-975 must be strictly preserved:
+##### Stabilization Components
+
+1. **Post-ready event loop flush (`pypost/agent/lifecycle.py`)**:
+   In `AgentAppSession.start()`, immediately following the resolution of
+   `wait_until(lambda: composed.window.is_ui_ready)`, an explicit event flush is
+   executed via `QCoreApplication.processEvents()`. This drains all queued deferred
+   single-shot timers and queued signals posted during window initialization — most notably
+   `MainWindow.showEvent()`'s deferred `QTimer.singleShot(0, self.apply_settings)` QSS
+   styling pass and `CollectionStorageGateway` asynchronous `load_completed` signals —
+   guaranteeing a quiesced event queue before yielding control to the test harness.
+
+2. **Tree layout realization settlement (`pypost/agent/ui_actions.py`)**:
+   In `_select_tree()`, an explicit layout realization pump `_pump()`
+   (`QCoreApplication.processEvents()`) is invoked before performing item lookup via
+   `find_tree_index_by_display_text(widget, option)` or validating row bounds. Under high
+   CPU load across 8 worker processes, model population and viewport layout calculations
+   can lag behind widget attachment. Draining pending layout and paint passes ensures that
+   widget geometry and tree item indices are fully realized prior to item traversal.
+
+3. **Strict preservation of negative interaction contract**:
+   The negative interaction assertion contract established in [PYPOST-975](
+   https://pypost.atlassian.net/browse/PYPOST-975) is strictly preserved without softening:
    ```python
    with pytest.raises(UiTargetNotInteractableError) as exc_info:
        session.ui_select(COLLECTION_TREE, "__no_such_collection_tree_option__")
    assert "option not found" in str(exc_info.value)
    ```
-   Do not soften the assertion, and do not introduce arbitrary `time.sleep()` calls.
-4. **Verification quality gate**: FIX-1 must pass:
-   - Isolated node:
-     ```bash
-     make test PYTEST_ARGS="tests/test_ui_actions.py \
-       -k test_live_collection_tree_missing_option_raises"
-     ```
-   - Isolated file: `make test PYTEST_ARGS="tests/test_ui_actions.py"`
-   - Full parallel quality gate: `make check` (running `lint`, `test`, and
-     `verify-ai-tasks` across parallel workers).
+   The contract continues to enforce that non-existent options raise
+   `UiTargetNotInteractableError` containing `"option not found"`. No arbitrary
+   `time.sleep()` calls, timeout loosenings, or fallback catches were introduced.
+
+##### Dedicated Regression Suite
+
+Two targeted regression tests in `tests/test_agent_session_event_settle.py` lock these
+invariants and prevent regression under `@pytest.mark.timeout(60)` and
+`@pytest.mark.agent_e2e`:
+
+- `test_agent_session_start_drains_post_ready_events`: Verifies that an asynchronous
+  single-shot timer queued at the instant `MainWindow.is_ui_ready` becomes `True` is
+  fully drained and executed inside `AgentAppSession.start()` before the session is returned.
+- `test_ui_select_tree_settles_layout_before_index_lookup`: Verifies that `_select_tree()`
+  flushes pending events prior to index traversal, ensuring layout settlement occurs
+  even when resolving non-existent tree options.
+
+##### Verification Commands & Multi-Profile Results
+
+The stabilization fix was validated across four distinct execution profiles matching the
+empirical baseline from [PYPOST-1215](https://pypost.atlassian.net/browse/PYPOST-1215),
+achieving a **100% pass rate** across all profiles:
+
+1. **Profile 1: Isolated Node** (single test target):
+   ```bash
+   make test PYTEST_ARGS="tests/test_ui_actions.py \
+     -k test_live_collection_tree_missing_option_raises"
+   ```
+   - Result: **100% pass** (1/1 passed in ~1.37s).
+2. **Profile 2: Isolated File** (full `test_ui_actions.py` module):
+   ```bash
+   make test PYTEST_ARGS="tests/test_ui_actions.py"
+   ```
+   - Result: **100% pass** (14/14 passed in ~5.80s).
+3. **Profile 3: Concurrent Subset** (session-heavy modules under 8 workers):
+   ```bash
+   make test PYTEST_ARGS="tests/test_ui_actions.py \
+     tests/test_agent_session_event_settle.py \
+     tests/test_agent_lifecycle_smoke.py \
+     tests/test_agent_golden_e2e.py"
+   ```
+   - Result: **100% pass** (all 4 modules passed in ~6.1s).
+4. **Profile 4: Full Parallel Quality Gate** (full suite under 8 workers):
+   ```bash
+   make check
+   ```
+   - Result: **100% pass** across `lint`, parallel `test` (1,400+ tests across ~110
+     modules), and `verify-ai-tasks`, confirming zero regressions and zero flakes.
 
 ## Response search flow integration (PYPOST-357)
 

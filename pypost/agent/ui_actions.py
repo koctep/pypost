@@ -244,6 +244,8 @@ def _select_tree(widget: QTreeView, widget_id: str, option: str | int) -> None:
     model = widget.model()
     if model is None:
         raise UiTargetNotInteractableError(widget_id, "tree has no model")
+    # Ensure pending layout/paint events settle before index traversal
+    _pump()
     if isinstance(option, int):
         if option < 0 or option >= model.rowCount():
             raise UiTargetNotInteractableError(

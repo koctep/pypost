@@ -169,6 +169,10 @@ class AgentAppSession:
                 )
                 raise
 
+            # Deterministic post-ready event loop flush: drain queued single-shot
+            # events (such as showEvent's deferred apply_settings) before returning.
+            QCoreApplication.processEvents()
+
             ready_ms = int((time.monotonic() - ready_wait_started) * 1000)
             launch_ms = int((time.monotonic() - launch_started) * 1000)
             self._started = True
