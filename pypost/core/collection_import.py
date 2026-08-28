@@ -17,6 +17,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 import uuid
 
 from pydantic import ValidationError
@@ -44,6 +45,7 @@ from pypost.core.collection_messages import (
 from pypost.core.import_conflicts import ImportConflictDecision, generate_import_copy_name
 from pypost.models.models import Collection, RequestData
 from pypost.models.websocket import WebSocketConnection
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -73,16 +75,38 @@ class CollectionImportPlanResult:
 
 
 def _read_records(path: Path) -> list[dict]:
-    """Read the file and normalize its JSON root into a list of records."""
+    """Read the file and normalize its JSON or YAML root into a list of records."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
+        logger.warning("collection_import_file_read_failed path=%s reason=%s", path, exc)
         raise CollectionImportFileError(MSG_FILE_UNREADABLE.format(reason=exc)) from exc
 
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise CollectionImportFileError(MSG_FILE_NOT_JSON.format(reason=exc)) from exc
+    data: Any = None
+    if path.suffix.lower() in (".yaml", ".yml"):
+        try:
+            data = yaml.safe_load(text)
+        except yaml.YAMLError as exc:
+            logger.warning(
+                "collection_import_yaml_parse_failed path=%s reason=%s", path, exc
+            )
+            raise CollectionImportFileError(MSG_FILE_NOT_JSON.format(reason=exc)) from exc
+    else:
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            try:
+                data = yaml.safe_load(text)
+                if not isinstance(data, (dict, list)):
+                    logger.warning(
+                        "collection_import_json_parse_failed path=%s reason=%s", path, exc
+                    )
+                    raise CollectionImportFileError(MSG_FILE_NOT_JSON.format(reason=exc)) from exc
+            except Exception:
+                logger.warning(
+                    "collection_import_parse_failed path=%s reason=%s", path, exc
+                )
+                raise CollectionImportFileError(MSG_FILE_NOT_JSON.format(reason=exc)) from exc
 
     if isinstance(data, dict):
         records = [data]
@@ -239,8 +263,13 @@ def _materialize(
     return Collection(
         id=collection_id,
         name=name,
+        description=source.description,
+        version=source.version,
+        variables=[v.model_copy(deep=True) for v in getattr(source, "variables", [])],
+        presets=dict(getattr(source, "presets", {})),
         requests=_reserve_requests(source.requests, taken_request_ids),
         websockets=_reserve_websockets(getattr(source, "websockets", []), taken_ws_ids),
+        mcp_clients=[mcp.model_copy(deep=True) for mcp in getattr(source, "mcp_clients", [])],
     )
 
 
@@ -320,8 +349,15 @@ def plan_collection_import(
             result[index] = Collection(
                 id=replaced.id,
                 name=replaced.name,
+                description=source.description,
+                version=source.version,
+                variables=[v.model_copy(deep=True) for v in getattr(source, "variables", [])],
+                presets=dict(getattr(source, "presets", {})),
                 requests=new_requests,
                 websockets=new_websockets,
+                mcp_clients=[
+                    mcp.model_copy(deep=True) for mcp in getattr(source, "mcp_clients", [])
+                ],
             )
             persisted.append(result[index])
             updated.append(name)

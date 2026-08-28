@@ -35,9 +35,10 @@ CollectionExportActions             selection/snapshot → save dialog → write
 ```
 
 - **`pypost/core/collection_export.py`** — pure core. Resolves the single-export target,
-  builds JSON-ready object or ordered list payloads via `Collection.model_dump(mode="json")`,
-  and formats the typed success summaries. Writing delegates to the shared
-  `export_file_writer.write_json_export_file` helper. No Qt or storage dependency.
+  builds JSON/YAML-ready object or ordered list payloads via `Collection.model_dump(mode="json")`
+  (preserving format v2 metadata including `variables`, `presets`, `description`, and `version`),
+  and formats the typed success summaries. Writing delegates to `write_export_file`, which supports
+  both JSON and YAML formats. No Qt or storage dependency.
 - **`pypost/core/export_file_writer.py`** — shared low-level write helper (PYPOST-1011):
   `write_json_export_file(path, payload, *, error_cls)` creates `path`'s parent
   directories, writes `json.dumps(payload, indent=2)` with a trailing newline via
@@ -152,7 +153,7 @@ Menu entry: delegates with `source_index=` so the clicked row wins over selectio
 | `build_export_payload(collection)` | JSON-ready `dict` via `model_dump` |
 | `build_all_export_payload(collections)` | Ordered `list[dict]` using the native collection shape |
 | `suggested_export_filename(collection)` | Default save-dialog name |
-| `write_export_file(path, payload)` | Delegates to `export_file_writer.write_json_export_file(path, payload, error_cls=CollectionExportError)` — writes an object or list as indented UTF-8 JSON |
+| `write_export_file(path, payload, *, format="auto")` | Writes an object or list as indented UTF-8 JSON or deterministic YAML based on format / extension |
 | `format_export_result(result)` | Success dialog body |
 | `CollectionsExportResult` / `format_all_export_result(result)` | Typed bulk outcome and success-dialog body |
 
@@ -249,6 +250,7 @@ Check `collections_export_failed` if the backup was not written.
 - User guide: [Collections — Export all collections](../user/collections.md#export-all-collections)
 - Tree menu wiring: [Collection Tree Actions](collection_tree_actions.md)
 - Import counterpart: [Collection Import](collection_import.md)
+- Format v2 specification: [Collection Format v2](collection_format_v2.md)
 - Root policy: [Shared JSON Export Root Policy](json_export_root.md)
 - On-disk format: [Collection Storage](collection_storage.md)
 - Log catalog: [Logging](logging.md)

@@ -58,6 +58,7 @@ conventions.
 1. [Collection Storage](collection_storage.md)
 1. [Collection Import](collection_import.md)
 1. [Collection Export](collection_export.md)
+1. [Collection Format v2 (PYPOST-1220)](collection_format_v2.md)
 1. [Shared JSON Export Root Policy (PYPOST-1010)](json_export_root.md)
 1. [WebSocket Connection Profile Model, Persistence, and Interchange (PYPOST-1128)](websocket_persistence_and_interchange.md)
 1. [Collection Tree Actions](collection_tree_actions.md)

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from pydantic import BaseModel, Field
 
+from pypost.models.collection_variable import CollectionVariable
 from pypost.models.retry import RetryPolicy
 from pypost.models.mcp_client import McpClientConnection
 from pypost.models.websocket import WebSocketConnection
@@ -93,6 +94,10 @@ class RequestData(BaseModel):
 class Collection(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "New Collection"
+    description: str = ""
+    version: str = "1.0.0"
+    variables: List[CollectionVariable] = Field(default_factory=list)
+    presets: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     requests: List[RequestData] = Field(default_factory=list)
     websockets: List[WebSocketConnection] = Field(default_factory=list)
     mcp_clients: List[McpClientConnection] = Field(default_factory=list)

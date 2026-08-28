@@ -11,6 +11,8 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from pypost.core.export_file_writer import write_json_export_file
 from pypost.models.models import Collection
 
@@ -68,22 +70,26 @@ def collection_for_export(
     return None
 
 
-def suggested_export_filename(collection: Collection) -> str:
+def suggested_export_filename(collection: Collection, *, extension: str = "json") -> str:
     """Default save-dialog filename for one collection."""
     safe_name = collection.name.strip() or "collection"
     for char in '\\/:*?"<>|':
         safe_name = safe_name.replace(char, "_")
-    return f"{safe_name}.json"
+    ext = extension.lstrip(".")
+    return f"{safe_name}.{ext}"
 
 
 def build_export_payload(collection: Collection) -> dict:
     """Serialize one collection into native PyPost JSON import shape."""
     payload = collection.model_dump(mode="json")
     logger.info(
-        "collection_export_payload_built collection_name=%s request_count=%d websocket_count=%d",
+        "collection_export_payload_built collection_name=%s request_count=%d "
+        "websocket_count=%d variable_count=%d preset_count=%d",
         collection.name,
         len(collection.requests),
         len(getattr(collection, "websockets", [])),
+        len(getattr(collection, "variables", [])),
+        len(getattr(collection, "presets", {})),
     )
     return payload
 
@@ -93,19 +99,57 @@ def build_all_export_payload(collections: list[Collection]) -> list[dict]:
     payload = [build_export_payload(collection) for collection in collections]
     total_requests = sum(len(c.requests) for c in collections)
     total_websockets = sum(len(getattr(c, "websockets", [])) for c in collections)
+    total_variables = sum(len(getattr(c, "variables", [])) for c in collections)
     logger.info(
-        "collections_export_payload_built collection_count=%d request_count=%d websocket_count=%d",
+        "collections_export_payload_built collection_count=%d request_count=%d "
+        "websocket_count=%d variable_count=%d",
         len(payload),
         total_requests,
         total_websockets,
+        total_variables,
     )
     return payload
 
 
-def write_export_file(path: Path, payload: dict | list[dict]) -> None:
-    """Write the export payload to ``path`` as indented UTF-8 JSON."""
-    write_json_export_file(path, payload, error_cls=CollectionExportError)
-    logger.info("collection_export_file_written path=%s", path)
+def write_export_file(
+    path: Path,
+    payload: dict | list[dict],
+    *,
+    format: str = "auto",
+) -> None:
+    """Write the export payload to ``path`` as indented UTF-8 JSON or YAML."""
+    target_format = format.lower()
+    if target_format == "auto":
+        if path.suffix.lower() in (".yaml", ".yml"):
+            target_format = "yaml"
+        else:
+            target_format = "json"
+
+    if target_format == "yaml":
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            content = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
+            path.write_text(content, encoding="utf-8")
+        except OSError as exc:
+            logger.warning(
+                "collection_export_file_write_failed path=%s format=%s reason=%s",
+                path,
+                target_format,
+                exc,
+            )
+            raise CollectionExportError(f"Could not write file {path}: {exc}") from exc
+    else:
+        try:
+            write_json_export_file(path, payload, error_cls=CollectionExportError)
+        except CollectionExportError as exc:
+            logger.warning(
+                "collection_export_file_write_failed path=%s format=%s reason=%s",
+                path,
+                target_format,
+                exc,
+            )
+            raise
+    logger.info("collection_export_file_written path=%s format=%s", path, target_format)
 
 
 def format_export_result(result: CollectionExportResult) -> str:

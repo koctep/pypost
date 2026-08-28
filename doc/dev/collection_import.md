@@ -2,10 +2,11 @@
 
 ## Overview
 
-**Import Collection** (PYPOST-987) loads one or more collections, with all of their
-requests, from a JSON file into the running app. The accepted format is PyPost's own
-collection serialization — a copy of a `{data_dir}/collections/{id}.json` file, or a JSON
-list of such objects. Foreign formats (Postman, Insomnia, OpenAPI) are explicitly out of
+**Import Collection** (PYPOST-987, PYPOST-1220) loads one or more collections, with all of their
+requests and variable schemas, from a JSON or YAML file into the running app. The accepted format
+is PyPost's own collection serialization (format v1 or format v2) — a copy of a
+`{data_dir}/collections/{id}.json` file, a self-contained `.yaml`/`.yml` file, or a list
+of such objects. Foreign formats (Postman, Insomnia, OpenAPI) are explicitly out of
 scope.
 
 It mirrors [Import environments](environments_dialog.md) (PYPOST-986) structurally: a
@@ -490,12 +491,13 @@ the collection id, not its name.
 
 ## Related
 
-- [Collection Export](collection_export.md) — write a collection to the same JSON shape
-  (PYPOST-989; context-menu entry point PYPOST-1013)
-- [Collection Storage](collection_storage.md) — the on-disk format this feature reads
-- [Collection Loading](collection_loading.md) — the async startup path that shares
-  `apply_loaded_collections` and the worker finish-teardown pattern
-- [Async Environment Storage](environment_storage_async.md) — sibling `QThread` + finish
-  wait hygiene
-- [Environments Dialog](environments_dialog.md) — the environment import precedent
-- [UI Identity](ui_identity.md) — `COLLECTION_IMPORT_BUTTON` and the widget-id convention
+ - [Collection Export](collection_export.md) — write a collection to the same JSON shape
+   (PYPOST-989; context-menu entry point PYPOST-1013)
+ - [Collection Format v2](collection_format_v2.md) — self-contained collection format v2 with YAML and JSON serialization
+ - [Collection Storage](collection_storage.md) — the on-disk format this feature reads
+ - [Collection Loading](collection_loading.md) — the async startup path that shares
+   `apply_loaded_collections` and the worker finish-teardown pattern
+ - [Async Environment Storage](environment_storage_async.md) — sibling `QThread` + finish
+   wait hygiene
+ - [Environments Dialog](environments_dialog.md) — the environment import precedent
+ - [UI Identity](ui_identity.md) — `COLLECTION_IMPORT_BUTTON` and the widget-id convention
