@@ -155,6 +155,7 @@ conventions.
 1. [UI Action Tools (PYPOST-836; out-of-process packaging PYPOST-918)](ui_actions.md)
 1. [Agent UI Actions MCP (PYPOST-952; attach PYPOST-1207; ATTACH-3
    verification PYPOST-1208)](agent_ui_actions_mcp.md#proven-vs-manual-attach-3--pypost-1208)
+1. [Agent Sidecar Seed Injection (PYPOST-993)](agent_seed_injection.md)
 1. [UI Settle / Wait Helpers (PYPOST-837)](ui_wait.md)
 1. [Agent Golden E2E (PYPOST-838)](agent_golden_e2e.md)
 1. [Agent E2E Product Dialog Settle (PYPOST-919)](agent_dialog_settle.md)

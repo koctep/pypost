@@ -26,6 +26,7 @@ Trust: [mcp_trust_model.md](mcp_trust_model.md). Lifecycle:
 | Component | Role |
 | --- | --- |
 | `pypost/agent/ui_actions_mcp.py` | MCP Server + stdio `main()` (spawn or `--attach`) |
+| `pypost/agent/seed_loader.py` | Seed path resolution and pre-compose workspace staging |
 | `AgentUiActionsMcpServer` | `list_tools` / `call_tool` for ui_* primitives |
 | `pypost/agent/ui_drive.py` | `UiDriveSession` protocol + `MainWindowUiDrive` |
 | `AgentAppSession` | Spawn-session: launches Qt app, ready wait, ui_* |
@@ -77,8 +78,13 @@ never logged on either side.
 After `pip install -e .` (or project venv):
 
 ```bash
-# Console script
+# Console script (unseeded)
 pypost-agent-ui-mcp
+
+# Launch with pre-loaded seed collection or bundle directory (PYPOST-993)
+pypost-agent-ui-mcp --seed /path/to/collection.json
+# Alias: --seed-file /path/to/collection.json
+# Env var: PYPOST_AGENT_SEED_PATH=/path/to/seed.yaml pypost-agent-ui-mcp
 
 # Module
 python -m pypost.agent.ui_actions_mcp
@@ -88,8 +94,10 @@ make run-agent-ui-mcp
 ```
 
 The sidecar starts an offscreen `AgentAppSession`, waits for `is_ui_ready`, then
-serves MCP on stdin/stdout until the client disconnects. The session is
-**sidecar-owned**: it is not the operator’s already-running desktop window.
+serves MCP on stdin/stdout until the client disconnects. When `--seed`, `--seed-file`,
+or `PYPOST_AGENT_SEED_PATH` is specified, fixtures are staged into workspace storage
+before UI composition (see [agent_seed_injection.md](agent_seed_injection.md)).
+The session is **sidecar-owned**: it is not the operator’s already-running desktop window.
 
 ### Client configuration (example)
 
@@ -101,6 +109,7 @@ pattern):
   "mcpServers": {
     "pypost-agent-ui": {
       "command": "pypost-agent-ui-mcp",
+      "args": ["--seed", "/path/to/collection.json"],
       "env": {
         "QT_QPA_PLATFORM": "offscreen"
       }
@@ -259,6 +268,8 @@ Widget ids: [ui_identity.md](ui_identity.md).
 | --- | --- | --- |
 | `--no-offscreen` | offscreen on | Allow on-screen Qt platform (spawn-session) |
 | `--ready-timeout` | 30 | Seconds to wait for UI ready (spawn-session) |
+| `--seed`, `--seed-file` | unset | Path to seed collection JSON/YAML or bundle dir |
+| `PYPOST_AGENT_SEED_PATH` | unset | Env var for seed path (CLI takes precedence) |
 | `--attach` | off | Bind to desktop attach host (no spawn) |
 | `--attach-endpoint` | per-user path | Override AF_UNIX path for attach |
 | `PYPOST_AGENT_UI_ATTACH_ENDPOINT` | unset | Env override for the well-known AF_UNIX path |
@@ -296,14 +307,20 @@ Prometheus metrics are **not** used for attach IPC (agent-UI policy).
   [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991).
 - **Stdio only** — no separate loopback Streamable HTTP port for agent-UI MCP
   in this release.
-- Default spawn-session has empty collections unless you extend launch options
-  in a follow-up.
+- Default spawn-session boots unseeded; supply `--seed` / `--seed-file` or
+  `PYPOST_AGENT_SEED_PATH` to pre-populate collections and environments (see
+  [agent_seed_injection.md](agent_seed_injection.md)).
 
 ## Troubleshooting
 
 - **Sidecar hangs at start** — Increase `--ready-timeout`; check stderr for
   `agent_session_ready_timeout`. Applies to **spawn-session** (sidecar-owned
   ready wait).
+- **Seed injection fails / exit code 1** — Verify seed file exists and contains valid collection or
+  environment JSON/YAML. Check stderr for `agent_ui_mcp_seed_failed`.
+- **Rejecting --attach with --seed** — Mutual exclusion is enforced. Attach connects to an
+  interactive desktop, while seeds only apply to spawned sessions. Check stderr for
+  `agent_ui_mcp_attach_with_seed_rejected`.
 - **UiTargetNotFoundError in tool result** — Wrong `widget_id` or use
   `in_current_tab: true` for per-tab controls.
 - **Client sees no tools** — Ensure the client uses stdio transport, not HTTP,
@@ -336,6 +353,7 @@ Prometheus metrics are **not** used for attach IPC (agent-UI policy).
 
 - [UI Action Tools](ui_actions.md) — in-process API + packaging history
 - [Agent lifecycle](agent_lifecycle.md) — session and attach outcomes
+- [Agent Sidecar Seed Injection](agent_seed_injection.md) — seed formats, staging, and CLI
 - [MCP Integration](mcp_integration.md) — product HTTP MCP
 - [MCP trust model](mcp_trust_model.md) — separate trust surfaces
 - [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991) — agent-UI
@@ -352,6 +370,10 @@ Prometheus metrics are **not** used for attach IPC (agent-UI policy).
 make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -v'
 make test-agent-e2e \
   PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py::test_stdio_sidecar_lists_ui_action_tools -v'
+
+# Seed injection unit and repro tests (PYPOST-993)
+make test PYTEST_ARGS='tests/test_agent_seed_loader.py -v'
+make test-agent-e2e PYTEST_ARGS='tests/test_agent_ui_actions_mcp_seed.py -v'
 
 # Attach CLI + host/client IPC (ATTACH-2/3)
 make test PYTEST_ARGS='tests/test_agent_ui_attach.py -v'

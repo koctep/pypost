@@ -356,6 +356,7 @@ Engine DI examples: [websocket_session_engine.md](websocket_session_engine.md) �
 ## References
 
 - [testing.md](testing.md) — suite-wide timeout and MCP testing
+- [agent_seed_injection.md](agent_seed_injection.md) — pre-populating session workspace for tests
 - [testability.md](testability.md) — RequestService / HTTPClient / MainWindow seams (PYPOST-382)
 - [environment_storage_async.md](environment_storage_async.md) — encrypted load/save tests
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — agent rules

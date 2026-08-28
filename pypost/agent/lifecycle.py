@@ -11,12 +11,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QCoreApplication
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtWidgets import QApplication, QWidget
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget
-
+from pypost.agent.seed_loader import inject_seed
 from pypost.agent.ui_actions import (
     find_widget,
     ui_click,
@@ -76,17 +74,24 @@ class AgentAppSession:
         config_dir: Path | None = None,
         data_dir: Path | None = None,
         ready_timeout: float = 30.0,
+        seed_path: Path | str | None = None,
     ) -> None:
         self._offscreen = offscreen
         self._config_dir = config_dir
         self._data_dir = data_dir
         self._ready_timeout = ready_timeout
+        self._seed_path = Path(seed_path) if seed_path is not None else None
         self._temp_dirs: list[tempfile.TemporaryDirectory[str]] = []
         self._app: QApplication | None = None
         self._composed: ComposedApp | None = None
         self._metrics_port: int | None = None
         self._started = False
         self._shut_down = False
+
+    @property
+    def seed_path(self) -> Path | None:
+        """Configured seed path for pre-populating workspace storage."""
+        return self._seed_path
 
     @property
     def app(self) -> QApplication:
@@ -124,6 +129,20 @@ class AgentAppSession:
         data_dir = self._data_dir or Path(self._make_temp_dir("pypost-agent-data-"))
         metrics_port = _free_port()
         self._metrics_port = metrics_port
+
+        if self._seed_path is not None:
+            seed_start = time.perf_counter()
+            injected = inject_seed(data_dir, self._seed_path)
+            seed_duration_ms = (time.perf_counter() - seed_start) * 1000.0
+            logger.info(
+                "agent_session_seed_injected path=%s seed_path=%s "
+                "collections_count=%d collection_count=%d duration_ms=%.2f",
+                self._seed_path,
+                self._seed_path,
+                len(injected),
+                len(injected),
+                seed_duration_ms,
+            )
 
         logger.info(
             "agent_session_started offscreen=%s ready_timeout_s=%s "

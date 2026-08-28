@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import json
 import logging
+from pathlib import Path
 import sys
 from typing import Any, Final
 
@@ -21,6 +22,11 @@ from PySide6.QtCore import QCoreApplication, Qt
 
 from pypost.agent.attach_ipc import AttachClientSession, AttachUnboundError
 from pypost.agent.lifecycle import AgentAppSession
+from pypost.agent.seed_loader import (
+    DEFAULT_SEED_ENV_VAR,
+    SeedLoadError,
+    resolve_seed_path,
+)
 from pypost.agent.ui_actions import UiActionError
 from pypost.agent.ui_drive import UiDriveSession
 
@@ -285,6 +291,16 @@ def main(argv: list[str] | None = None) -> None:
         default=30.0,
         help="Seconds to wait for MainWindow.is_ui_ready (default: 30).",
     )
+    parser.add_argument(
+        "--seed",
+        "--seed-file",
+        dest="seed",
+        default=None,
+        help=(
+            "Path to seed collection JSON/YAML file or seed data directory "
+            f"(overrides {DEFAULT_SEED_ENV_VAR})."
+        ),
+    )
     parsed = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.INFO,
@@ -292,15 +308,27 @@ def main(argv: list[str] | None = None) -> None:
         stream=sys.stderr,
     )
     if parsed.attach:
+        if parsed.seed is not None:
+            logger.error(
+                "agent_ui_mcp_attach_with_seed_rejected seed_path=%s "
+                "error_type=%s error=%s",
+                parsed.seed,
+                "CommandLineError",
+                "--attach cannot be combined with --seed",
+            )
+            sys.exit(1)
         _run_attach(parsed.attach_endpoint)
         return
+    seed_path = resolve_seed_path(parsed.seed)
     _run_spawn_session(
         offscreen=not parsed.no_offscreen,
         ready_timeout=parsed.ready_timeout,
+        seed_path=seed_path,
     )
 
 
 def _run_attach(endpoint: str | None) -> None:
+    """Connect to an existing UI attach server and serve MCP tools over stdio."""
     session = AttachClientSession(endpoint=endpoint)
     logger.info(
         "agent_ui_mcp_attach_starting endpoint=%s",
@@ -326,10 +354,17 @@ def _run_attach(endpoint: str | None) -> None:
         )
 
 
-def _run_spawn_session(*, offscreen: bool, ready_timeout: float) -> None:
+def _run_spawn_session(
+    *,
+    offscreen: bool,
+    ready_timeout: float,
+    seed_path: Path | None = None,
+) -> None:
+    """Spawn an in-process AgentAppSession and serve MCP tools over stdio."""
     session = AgentAppSession(
         offscreen=offscreen,
         ready_timeout=ready_timeout,
+        seed_path=seed_path,
     )
     try:
         session.start()
@@ -338,6 +373,14 @@ def _run_spawn_session(*, offscreen: bool, ready_timeout: float) -> None:
             str(offscreen).lower(),
         )
         asyncio.run(_serve_stdio(session))
+    except SeedLoadError as exc:
+        logger.error(
+            "agent_ui_mcp_seed_failed seed_path=%s error_type=%s error=%s",
+            seed_path,
+            type(exc).__name__,
+            exc,
+        )
+        sys.exit(1)
     finally:
         session.shutdown()
 

@@ -133,15 +133,20 @@ def _raw_value(widget: QWidget) -> str | None:
         return widget.toPlainText()
     if isinstance(widget, QAbstractItemView):
         indexes = widget.selectedIndexes()
-        if not indexes:
-            return ""
         model = widget.model()
         if model is None:
             return ""
+        if indexes:
+            parts = [
+                str(model.data(idx) or "")
+                for idx in indexes[:UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP]
+                if model.data(idx) is not None
+            ]
+            return ", ".join(p for p in parts if p)
         parts = [
-            str(model.data(idx) or "")
-            for idx in indexes[:UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP]
-            if model.data(idx) is not None
+            str(model.data(model.index(row, 0)) or "")
+            for row in range(min(model.rowCount(), UI_SNAPSHOT_ITEM_VIEW_SELECTION_CAP))
+            if model.data(model.index(row, 0)) is not None
         ]
         return ", ".join(p for p in parts if p)
     return None

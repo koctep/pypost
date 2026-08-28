@@ -70,12 +70,17 @@ when a harness already configured logging.
 ## API / Usage
 
 ```python
+from pathlib import Path
 from pypost.agent import AgentAppSession
 
 with AgentAppSession(offscreen=True) as session:
     # session.window.is_ui_ready is True here
     window = session.window
 # shutdown runs on context exit
+
+# Seeded session: pre-populates collections and environments (PYPOST-993)
+with AgentAppSession(seed_path=Path("fixtures/seed.json"), offscreen=True) as session:
+    assert session.window.is_ui_ready
 ```
 
 When an `Exception` propagates out of the `with` body and the agent e2e
@@ -104,6 +109,7 @@ See [agent_e2e_failure_artifacts.md](agent_e2e_failure_artifacts.md).
 | `config_dir` | temp dir | Injectable config root; cleaned on shutdown when temp |
 | `data_dir` | temp dir | Injectable data root; cleaned on shutdown when temp |
 | `ready_timeout` | `30.0` | Seconds to wait for `is_ui_ready` before `TimeoutError` |
+| `seed_path` | `None` | Seed collection/env file or bundle dir (PYPOST-993) |
 
 ### Properties (after `start()`)
 
@@ -167,6 +173,7 @@ singular; only event-loop ownership and isolation knobs differ.
 | Config / data dirs | Constructor args, or automatic `tempfile.TemporaryDirectory` |
 | Metrics bind | Always `127.0.0.1` + free ephemeral port inside the session |
 | Ready timeout | `ready_timeout` seconds (default 30) |
+| Seed injection | `seed_path` argument (or `PYPOST_AGENT_SEED_PATH` in sidecar) |
 
 No new environment variables beyond Qt’s `QT_QPA_PLATFORM`. Interactive
 `make run` keeps user config/data dirs and configured metrics ports.
@@ -178,7 +185,7 @@ entries live under **Application lifecycle** in [logging.md](logging.md).
 
 | Phase | Events |
 | --- | --- |
-| Launch | `agent_session_started` |
+| Launch | `agent_session_started` / `agent_session_seed_injected` |
 | Ready (UI) | `main_window_ui_ready` |
 | Ready (harness) | `agent_session_ready` / `agent_session_ready_timeout` |
 | Snapshot | `ui_snapshot_captured` (DEBUG; see [ui_snapshot.md](ui_snapshot.md)) |
@@ -267,6 +274,7 @@ Attach capability / tests: PYPOST-1207 / PYPOST-1208.
 | --- | --- |
 | [agent_e2e.md](agent_e2e.md) | Broader pack primary packaging (`make test-agent-e2e`) |
 | [agent_ui_actions_mcp.md](agent_ui_actions_mcp.md) | Spawn vs attach; attach lifecycle |
+| [agent_seed_injection.md](agent_seed_injection.md) | Sidecar/session seed injection (PYPOST-993) |
 | [gui_testing.md](gui_testing.md) | Offscreen Qt, `wait_until`, GUI test patterns |
 | [ui_identity.md](ui_identity.md) | Stable `objectName` catalog for key controls |
 | [ui_snapshot.md](ui_snapshot.md) | Visible-UI tree for agents after ready |
