@@ -38,28 +38,41 @@ class _FakeSignal:
 class _DeterministicMigrationWorker:
     def __init__(
         self,
-        report: MigrationReport,
-        retained_check: Callable[[], bool],
-        result_requested_check: Callable[[], bool],
+        report: MigrationReport | None = None,
+        retained_check: Callable[[], bool] | None = None,
+        result_requested_check: Callable[[], bool] | None = None,
         *,
+        fail_message: str | None = None,
         wait_result: bool = True,
     ) -> None:
         self.succeeded = _FakeSignal()
         self.failed = _FakeSignal()
         self.finished = _FakeSignal()
         self._report = report
+        self._fail_message = fail_message
         self._retained_check = retained_check
         self._result_requested_check = result_requested_check
         self._wait_result = wait_result
         self.operation = "re_encrypt"
         self.retained_after_success: bool | None = None
         self.result_requested_after_success: bool | None = None
+        self.retained_after_event: bool | None = None
+        self.result_requested_after_event: bool | None = None
         self.delete_later_called = False
 
     def start(self) -> None:
-        self.succeeded.emit(self._report)
-        self.result_requested_after_success = self._result_requested_check()
-        self.retained_after_success = self._retained_check()
+        if self._fail_message is not None:
+            self.failed.emit(self._fail_message)
+        elif self._report is not None:
+            self.succeeded.emit(self._report)
+        if self._result_requested_check is not None:
+            res = self._result_requested_check()
+            self.result_requested_after_success = res
+            self.result_requested_after_event = res
+        if self._retained_check is not None:
+            ret = self._retained_check()
+            self.retained_after_success = ret
+            self.retained_after_event = ret
         self.finished.emit()
 
     def deleteLater(self) -> None:
@@ -174,6 +187,47 @@ class TestSettingsDialogEncryptionMigration:
             assert dlg.verify_encryption_btn.isEnabled()
             assert dlg.reencrypt_environments_btn.isEnabled()
             assert dlg.encrypt_plaintext_btn.isEnabled()
+        finally:
+            _close_dialog(dlg)
+
+    @patch("pypost.ui.dialogs.settings_dialog.show_migration_result")
+    @patch(
+        "pypost.ui.dialogs.settings_dialog.confirm_re_encrypt_environments",
+        return_value=True,
+    )
+    def test_migration_worker_failure_lifecycle(
+        self,
+        mock_confirm: MagicMock,
+        mock_show: MagicMock,
+        qapp: QApplication,
+    ) -> None:
+        storage = MagicMock(spec=StorageManager)
+        dlg = SettingsDialog(AppSettings(env_encryption_enabled=True), storage=storage)
+        worker = _DeterministicMigrationWorker(
+            fail_message="Simulated disk IO failure",
+            retained_check=lambda: dlg._migration_worker is worker,
+            result_requested_check=lambda: mock_show.called,
+        )
+        try:
+            with patch(
+                "pypost.ui.widgets.settings.encryption_migration_section."
+                "EncryptionMigrationWorker",
+                return_value=worker,
+            ):
+                dlg._on_re_encrypt_environments()
+
+            assert worker.result_requested_after_event is True
+            assert worker.retained_after_event is True
+            assert dlg._migration_worker is None
+            assert worker.delete_later_called is True
+            mock_confirm.assert_called_once()
+            mock_show.assert_called_once()
+            assert mock_show.call_args.kwargs["success"] is False
+            assert "Simulated disk IO failure" in mock_show.call_args[0][2]
+            assert dlg.verify_encryption_btn.isEnabled()
+            assert dlg.reencrypt_environments_btn.isEnabled()
+            assert dlg.encrypt_plaintext_btn.isEnabled()
+            assert dlg.upgrade_v2_btn.isEnabled()
         finally:
             _close_dialog(dlg)
 

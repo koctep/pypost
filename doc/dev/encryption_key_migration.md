@@ -533,9 +533,7 @@ Evidenced result: 14 focused tests passed.
 
 This covers service dispatch, domain-result signals, retained ownership through native thread
 completion, the 100 millisecond cleanup warning, control restoration, and the existing migration
-UI scenarios. The deterministic UI seam currently covers success and cleanup-timeout ordering.
-Failure-path lifecycle ordering is tracked by
-[PYPOST-1078](https://pypost.atlassian.net/browse/PYPOST-1078).
+UI scenarios. The deterministic UI seam covers success, failure-path, and cleanup-timeout ordering.
 
 ### Affected-platform verification (PYPOST-1076)
 

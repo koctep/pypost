@@ -53,15 +53,6 @@ from pypost.ui import widget_ids
 
 
 @pytest.fixture
-def qapp():
-    """Ensure QApplication instance exists for GUI tests."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
-@pytest.fixture
 def sample_manifest() -> LibraryManifest:
     return LibraryManifest(
         schema_version="1.0.0",
