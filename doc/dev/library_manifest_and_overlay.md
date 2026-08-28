@@ -244,8 +244,12 @@ The variable resolution engine evaluates effective variable values according to 
 1. **Base Defaults (Tier 1)**: All default values defined in `collection.variables` and `manifest.variables` are loaded.
 2. **Active Profile Overrides (Tier 2)**: If an active profile is specified (e.g. `staging`), values from `manifest.presets[profile]` and `collection.presets[profile]` override base defaults.
 3. **Local Overrides & Secrets (Tier 3)**: Values from `overlay.overrides` and `overlay.secrets` override all lower layers.
-4. **Type Validation**: Each resolved value is verified against its declared schema type (`string`, `integer`, `number`, `boolean`, `array`, `object`).
-5. **Required Check**: Any variable marked `required=True` that resolves to `None` or `""` is flagged in `missing_required`.
+4. **Collection Namespace Resolution (PYPOST-1227)**:
+   - When evaluating variables for a specific collection, scoped entries (`<collection_name>.<variable_name>`) defined in preset profiles, overlay overrides, and overlay secrets take precedence over generic shared variables.
+   - Both stripped (`<variable_name>`) and fully qualified (`<collection_name>.<variable_name>`) keys are populated in the resolution output.
+   - Matching supports exact collection names, lowercase, and normalized snake_case identifiers.
+5. **Type Validation**: Each resolved value is verified against its declared schema type (`string`, `integer`, `number`, `boolean`, `array`, `object`).
+6. **Required Check**: Any variable marked `required=True` that resolves to `None` or `""` is flagged in `missing_required`.
 
 ---
 

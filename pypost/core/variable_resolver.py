@@ -76,6 +76,34 @@ class LibraryVariableResolver:
                 schemas[var.name] = var
 
         # ---------------------------------------------------------------------
+        # Extract Collection Namespace Prefixes
+        # ---------------------------------------------------------------------
+        collection_prefixes: set[str] = set()
+        if collection:
+            col_name = getattr(collection, "name", "")
+            col_id = getattr(collection, "id", "")
+            if col_name:
+                collection_prefixes.add(col_name)
+                collection_prefixes.add(col_name.lower())
+                collection_prefixes.add(col_name.lower().replace(" ", "_"))
+                collection_prefixes.add(col_name.lower().replace(" ", "-"))
+            if col_id:
+                collection_prefixes.add(col_id)
+
+        def _apply_dict(src: dict[str, Any], prov: VariableProvenance) -> None:
+            # Apply un-namespaced keys first, then namespaced keys to guarantee precedence
+            sorted_keys = sorted(src.keys(), key=lambda k: (1 if "." in k else 0))
+            for k in sorted_keys:
+                v = src[k]
+                variables[k] = v
+                provenance[k] = prov
+                if "." in k and collection_prefixes:
+                    prefix, _, var_name = k.partition(".")
+                    if prefix in collection_prefixes and var_name:
+                        variables[var_name] = v
+                        provenance[var_name] = prov
+
+        # ---------------------------------------------------------------------
         # Layer 1 (Base Defaults): Collection then Manifest Defaults
         # ---------------------------------------------------------------------
         if collection and hasattr(collection, "variables") and collection.variables:
@@ -103,9 +131,7 @@ class LibraryVariableResolver:
             if manifest and manifest.presets and profile_name in manifest.presets:
                 profile_vars = manifest.presets[profile_name]
                 if isinstance(profile_vars, dict):
-                    for k, v in profile_vars.items():
-                        variables[k] = v
-                        provenance[k] = VariableProvenance.PROFILE
+                    _apply_dict(profile_vars, VariableProvenance.PROFILE)
 
             if collection and hasattr(collection, "presets") and collection.presets:
                 if profile_name in collection.presets:
@@ -118,22 +144,17 @@ class LibraryVariableResolver:
                                 or profile_name not in manifest.presets
                                 or k not in manifest.presets[profile_name]
                             ):
-                                variables[k] = v
-                                provenance[k] = VariableProvenance.PROFILE
+                                _apply_dict({k: v}, VariableProvenance.PROFILE)
 
         # ---------------------------------------------------------------------
         # Layer 3 (Local Overlay: Overrides & Secrets)
         # ---------------------------------------------------------------------
         if overlay:
             if overlay.overrides:
-                for k, v in overlay.overrides.items():
-                    variables[k] = v
-                    provenance[k] = VariableProvenance.LOCAL_OVERRIDE
+                _apply_dict(overlay.overrides, VariableProvenance.LOCAL_OVERRIDE)
 
             if overlay.secrets:
-                for k, v in overlay.secrets.items():
-                    variables[k] = v
-                    provenance[k] = VariableProvenance.LOCAL_SECRET
+                _apply_dict(overlay.secrets, VariableProvenance.LOCAL_SECRET)
 
         # ---------------------------------------------------------------------
         # Schema Validation & Required Variable Checks
