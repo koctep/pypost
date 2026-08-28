@@ -224,7 +224,7 @@ re-imports on the same installation with the same key:
 | --- | --- |
 | Encryption on | `PYPOST_ENV_ENCRYPTION_ENABLED` plus `AppSettings` enabled |
 | Temp key | Generated Fernet key in `PYPOST_ENV_ENCRYPTION_KEY` |
-| Envelope on disk | Hidden field is v1 Fernet envelope; secret string absent |
+| Envelope on disk | Hidden field is v2 Fernet envelope; secret string absent |
 | Non-Hidden | Host remains plaintext in the export file |
 | Same-key re-import | `load_import_candidates` restores name, Hidden flag, plaintext |
 
