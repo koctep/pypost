@@ -1,5 +1,13 @@
-from __future__ import annotations
-
+from pypost.models.git_library import (
+    GitAuthConfig,
+    GitAuthMode,
+    GitBranchInfo,
+    GitDiagnosticError,
+    GitDiagnosticErrorCode,
+    GitOperationResult,
+    GitOperationType,
+    GitRepoStatus,
+)
 from pypost.models.library_manifest import (
     LibraryCollectionEntry,
     LibraryEnvironmentEntry,
@@ -15,6 +23,14 @@ from pypost.models.library_manifest import (
 )
 
 __all__ = [
+    "GitAuthConfig",
+    "GitAuthMode",
+    "GitBranchInfo",
+    "GitDiagnosticError",
+    "GitDiagnosticErrorCode",
+    "GitOperationResult",
+    "GitOperationType",
+    "GitRepoStatus",
     "LibraryCollectionEntry",
     "LibraryEnvironmentEntry",
     "LibraryManifest",
