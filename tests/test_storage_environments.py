@@ -118,7 +118,7 @@ def test_save_environments_encrypts_only_hidden_keys_when_enabled(tmp_path, monk
     assert isinstance(secret_payload, dict)
     assert secret_payload["enc"] is True
     assert secret_payload["alg"] == "fernet"
-    assert secret_payload["v"] == 1
+    assert secret_payload["v"] == 2
     assert isinstance(secret_payload["kid"], str)
     assert isinstance(secret_payload["ct"], str)
     assert payload[0]["variables"]["VISIBLE"] == "public"
