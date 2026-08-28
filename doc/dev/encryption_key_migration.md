@@ -151,7 +151,7 @@ until re-encrypted.
 
 ### M9 — Upgrade v1 envelopes to v2 fernet
 
-After [v2 decrypt support](environment_encryption_at_rest.md#version-2-decrypt-supported-encrypt-still-v1-only)
+After [v2 decrypt support](environment_encryption_at_rest.md#version-2-on-disk-default)
 is available, operators can normalize on-disk envelopes to v2 without changing key material
 semantics (v2 fernet uses the same Fernet token in `ct` as v1).
 
@@ -162,8 +162,8 @@ semantics (v2 fernet uses the same Fernet token in `ct` as v1).
 5. Confirm `v1_envelopes: 0` and `v2_envelopes` matches hidden value count.
 
 Also encrypts plain hidden strings as v2 when present. Skips when every hidden value is already v2.
-Runtime saves through the desktop app still emit v1 until a future change; use `upgrade-v2` for
-bulk normalization.
+Runtime saves through the desktop app now emit v2 by default (PYPOST-1018); use `upgrade-v2` for
+bulk normalization of historical files.
 
 ## Operator surfaces
 

@@ -551,11 +551,9 @@ Encrypted values are stored as envelope objects in the `variables` map. All vers
 - `kid`: key identifier (sha256 prefix of key material)
 - `ct`: ciphertext (algorithm-specific encoding)
 
-### Version 1 (on-disk default)
+### Version 2 (on-disk default)
 
-`encrypt()` emits v1 only. Fields: `enc`, `v=1`, `alg=fernet`, `kid`, `ct`.
-
-### Version 2 (decrypt supported; encrypt still v1-only)
+`encrypt()` emits v2 envelopes by default.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -563,9 +561,13 @@ Encrypted values are stored as envelope objects in the `variables` map. All vers
 | `iv`, `tag` | aes-gcm only | Base64 nonce and authentication tag |
 | `meta` | no | String-to-string metadata map |
 
-Algorithm rules: `fernet` must not include `iv`/`tag`; `aes-gcm` requires both. `encrypt()` still
-emits v1 only for runtime saves. `encrypt_v2()` emits v2 fernet (or aes-gcm) for migration tooling.
-Use `encryption_migrate upgrade-v2` to bulk-rewrite v1 on-disk envelopes to v2 fernet.
+Algorithm rules: `fernet` must not include `iv`/`tag`; `aes-gcm` requires both. `encrypt()` emits
+v2 fernet envelopes by default for runtime saves. `encrypt_v2()` emits v2 fernet (or aes-gcm) with
+custom options. Use `encryption_migrate upgrade-v2` to bulk-rewrite legacy v1 on-disk envelopes to v2 fernet.
+
+### Version 1 (legacy backward compatibility)
+
+`encrypt_v1()` emits explicit legacy v1 envelopes. Fields: `enc`, `v=1`, `alg=fernet`, `kid`, `ct`.
 
 Validation and version dispatch are centralized in `EncryptedValueEnvelope.from_payload()`.
 Callers should not re-implement field checks before `EnvironmentSecretsCodec.decrypt()`.
