@@ -133,13 +133,11 @@ one test's registry/spec file writes never leaks into the next test. That fixtur
 *between* tests — a test that rewrites the registry/spec file mid-test still needs its own
 explicit `clear_registry_cache()` / `clear_spec_cache()` call right after the rewrite (see above).
 
-**Known asymmetry (tracked separately, not fixed by PYPOST-1088 — PYPOST-1112):**
-`SecretStoreKeySource._read_spec_file` guards against syntactically-valid but non-object JSON
-(`isinstance(data, dict)`), returning `None` instead of raising. `EnvKeySource._read_registry_file`
-performs the structurally identical read but has no equivalent guard — a registry file containing
-valid non-object JSON (e.g. `[]`, `"x"`, `42`) raises `AttributeError` from the first `.get()` call
-instead of returning `None`. This gap predates PYPOST-1088 and is intentionally left as-is here;
-mirroring the guard onto `env.py` is filed as a follow-up.
+**Resolved asymmetry (PYPOST-1112):**
+`EnvKeySource._read_registry_file` mirrors `SecretStoreKeySource._read_spec_file`'s guard against
+syntactically-valid but non-object JSON (`isinstance(data, dict)`), returning `None` instead of
+raising an `AttributeError`. Both loaders now handle malformed or non-dict JSON files gracefully
+with consistent debug logging.
 
 ### Data flow
 
@@ -441,7 +439,9 @@ Rotation relies on registries that hold multiple keys outside `settings.json`.
 ```
 
 When unset, env-only mode uses `PYPOST_ENV_ENCRYPTION_KEY` as the active key; historical lookup
-succeeds only when stored `kid` matches that key.
+succeeds only when stored `kid` matches that key. If `PYPOST_ENV_ENCRYPTION_KEYS_FILE` contains
+malformed or non-dictionary JSON, `EnvKeySource` logs a debug warning and returns `None`
+(PYPOST-1112), matching `SecretStoreKeySource`'s resilience.
 
 **Secret-store spec** (`PYPOST_ENV_ENCRYPTION_SECRETS_FILE`):
 

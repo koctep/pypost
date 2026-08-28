@@ -236,3 +236,19 @@ def test_clear_spec_cache_forces_reload(monkeypatch, tmp_path):
     clear_spec_cache()
     source._load_spec()
     assert calls == 2
+
+
+def test_env_key_source_non_dict_json_returns_none(monkeypatch, tmp_path):
+    bad_path = tmp_path / "keys.json"
+    bad_path.write_text(json.dumps(["not", "a", "dict"]), encoding="utf-8")
+    monkeypatch.setenv(EnvKeySource.KEYS_FILE, str(bad_path))
+    monkeypatch.delenv(EnvKeySource.ENV_KEY, raising=False)
+    assert EnvKeySource().try_resolve_active() is None
+    assert EnvKeySource()._read_registry_file(bad_path) is None
+
+
+def test_secret_store_non_dict_json_returns_none(tmp_path):
+    bad_path = tmp_path / "spec.json"
+    bad_path.write_text(json.dumps(["not", "a", "dict"]), encoding="utf-8")
+    assert SecretStoreKeySource()._read_spec_file(bad_path) is None
+

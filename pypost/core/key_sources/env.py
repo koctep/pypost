@@ -37,6 +37,9 @@ class EnvKeySource:
         except (OSError, json.JSONDecodeError) as exc:
             logger.debug("env_keys_file_load_failed path=%s reason=%s", path, exc)
             return None
+        if not isinstance(data, dict):
+            logger.debug("env_keys_file_invalid path=%s", path)
+            return None
         active_key_id = data.get("active_key_id", "")
         keys = data.get("keys", {})
         if not active_key_id or not isinstance(keys, dict) or not keys:
