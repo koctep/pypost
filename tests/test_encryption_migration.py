@@ -656,7 +656,8 @@ def test_build_inventory_counts_v1_and_v2_envelopes(tmp_path, monkeypatch):
                 variables={"SECRET": "hidden"},
                 hidden_keys={"SECRET"},
             )
-        ]
+        ],
+        target_envelope_version=1,
     )
 
     with open(storage.environments_file, "r", encoding="utf-8") as handle:
@@ -703,7 +704,8 @@ def test_upgrade_envelopes_to_v2_rewrites_v1(tmp_path, monkeypatch):
                 variables={"SECRET": "value"},
                 hidden_keys={"SECRET"},
             )
-        ]
+        ],
+        target_envelope_version=1,
     )
 
     before = EncryptionMigrationService(storage).build_inventory(settings)
@@ -773,7 +775,8 @@ def test_upgrade_envelopes_to_v2_dry_run_projects_v2_inventory(tmp_path, monkeyp
                 variables={"SECRET": "value"},
                 hidden_keys={"SECRET"},
             )
-        ]
+        ],
+        target_envelope_version=1,
     )
 
     report = EncryptionMigrationService(storage).upgrade_envelopes_to_v2(

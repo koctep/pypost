@@ -165,8 +165,8 @@ EnvelopePayload: TypeAlias = EncryptedValueEnvelope | EncryptedValueEnvelopeV2
 class EnvironmentSecretsCodec:
     """Encodes and decodes encrypted environment values."""
 
-    VERSION = EncryptedValueEnvelope.VERSION
-    ALGORITHM = EncryptedValueEnvelope.ALGORITHM
+    VERSION = EncryptedValueEnvelopeV2.VERSION
+    ALGORITHM = EncryptedValueEnvelopeV2.FERNET_ALGORITHM
 
     def __init__(self, key_provider: KeyProvider) -> None:
         self._key_provider = key_provider
@@ -178,20 +178,28 @@ class EnvironmentSecretsCodec:
                 "encrypted environment storage."
             )
 
-    def encrypt(self, value: str) -> EncryptedValueEnvelope:
+    def encrypt(
+        self,
+        value: str,
+        *,
+        algorithm: str = EncryptedValueEnvelopeV2.FERNET_ALGORITHM,
+    ) -> EncryptedValueEnvelopeV2:
+        return self.encrypt_v2(value, algorithm=algorithm)
+
+    def encrypt_v1(self, value: str) -> EncryptedValueEnvelope:
         self._ensure_crypto_available()
         key = self._key_provider.get_current_key()
         token = Fernet(key.key.encode("utf-8")).encrypt(value.encode("utf-8"))
         logger.debug(
             "env_value_encrypted algorithm=%s version=%d key_id=%s",
-            self.ALGORITHM,
-            self.VERSION,
+            EncryptedValueEnvelope.ALGORITHM,
+            EncryptedValueEnvelope.VERSION,
             key.key_id,
         )
         return EncryptedValueEnvelope(
             enc=True,
-            v=self.VERSION,
-            alg=self.ALGORITHM,
+            v=EncryptedValueEnvelope.VERSION,
+            alg=EncryptedValueEnvelope.ALGORITHM,
             kid=key.key_id,
             ct=token.decode("utf-8"),
         )

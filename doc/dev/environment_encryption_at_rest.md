@@ -291,7 +291,8 @@ Builds a `ChainedKeyProvider` from `resolve_key_source_chain(settings)`. Logs
 
 ### `EncryptedValueEnvelope` / `EncryptedValueEnvelopeV2` (`pypost/core/environment_secrets_codec.py`)
 
-Typed envelopes for encrypted environment values. `encrypt()` returns a v1 instance; persisted
+Typed envelopes for encrypted environment values. `encrypt()` returns an `EncryptedValueEnvelopeV2`
+instance by default (`v=2`); `encrypt_v1()` is provided for explicit legacy v1 generation. Persisted
 JSON uses `to_json()`.
 
 - `EncryptedValueEnvelope` — v1 schema (`VERSION=1`, `ALGORITHM=fernet`).

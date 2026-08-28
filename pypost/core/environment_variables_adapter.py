@@ -107,8 +107,8 @@ class EnvironmentVariablesAdapter:
                     reused_count += 1
                     continue
                 try:
-                    if target_envelope_version == 2:
-                        envelope = self._secrets_codec.encrypt_v2(current_plaintext)
+                    if target_envelope_version == 1:
+                        envelope = self._secrets_codec.encrypt_v1(current_plaintext)
                     else:
                         envelope = self._secrets_codec.encrypt(current_plaintext)
                     serialized_variables[key] = envelope.to_json()

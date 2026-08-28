@@ -382,7 +382,8 @@ def test_cli_upgrade_v2_rewrites_v1_envelopes(tmp_path, monkeypatch, capsys):
                 variables={"SECRET": "value"},
                 hidden_keys={"SECRET"},
             )
-        ]
+        ],
+        target_envelope_version=1,
     )
 
     main = _import_cli_main()
@@ -414,7 +415,8 @@ def test_cli_upgrade_v2_dry_run(tmp_path, monkeypatch, capsys):
                 variables={"SECRET": "value"},
                 hidden_keys={"SECRET"},
             )
-        ]
+        ],
+        target_envelope_version=1,
     )
 
     main = _import_cli_main()
