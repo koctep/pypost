@@ -1,17 +1,18 @@
-# Example collections and environments
+# Example Collection Library, collections, and environments
 
-Importable fixtures you can load into PyPost, fill with your own values, and adapt.
-They use the same native JSON shapes as **Import Collection…** and
-**Manage Environments → Import…**.
+This directory functions as a self-contained **Collection Library** (configured via [`pypost-library.yaml`](pypost-library.yaml)) as well as providing standalone importable fixtures you can load into PyPost, fill with your own values, and adapt.
 
-For step-by-step import UI details, see the User Guide:
+## Git Collection Library
 
-- [Import a collection](../doc/user/collections.md#import-a-collection)
-- [Import environments](../doc/user/environments.md#import-environments)
-- [MCP tools](../doc/user/mcp-tools.md) and
-  [Common workflows](../doc/user/workflows.md)
+You can clone or connect this repository directly into PyPost via the **Library Manager** (`Ctrl+Shift+L` or **File → Library Manager...**).
 
-## Inventory
+The library manifest [`pypost-library.yaml`](pypost-library.yaml) declares:
+- Metadata (`id`, `name`, `version`, `description`)
+- Bundled collections ([`collections/jira_mcp.json`](collections/jira_mcp.json), [`collections/mcp.json`](collections/mcp.json))
+- Default variable schemas with secrets isolation
+- Profile presets (`jira_cloud`)
+
+## Standalone Inventory
 
 - [`collections/jira_mcp.json`](collections/jira_mcp.json) — **End users.**
   Curated Jira Cloud MCP collection (22 REST tools): issue search/CRUD,

@@ -1,0 +1,54 @@
+{
+  "id": "test-collection-mcp",
+  "name": "MCP",
+  "requests": [
+    {
+      "id": "sse-probe-metrics",
+      "name": "SSE Probe Metrics",
+      "method": "GET",
+      "url": "http://127.0.0.1:9080/sse",
+      "headers": {},
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "sse-probe-main",
+      "name": "SSE Probe Main",
+      "method": "GET",
+      "url": "http://127.0.0.1:1080/sse",
+      "headers": {},
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "mcp-list-tools",
+      "name": "List Tools",
+      "method": "MCP",
+      "url": "http://127.0.0.1:1080/mcp",
+      "headers": {},
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": false,
+      "mcp_description": "",
+      "mcp_params": {},
+      "retry_policy": null
+    }
+  ]
+}

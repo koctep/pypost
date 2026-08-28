@@ -1,0 +1,24 @@
+[
+  {
+    "id": "gurushots-api-environment",
+    "name": "GuruShots",
+    "variables": {
+      "gurushots_base_url": "https://api.gurushots.com/rest",
+      "gurushots_token": "your-x-token-here",
+      "member_id": "",
+      "challenge_id": "131159",
+      "challenge_url": "street-lights3",
+      "challenge_filter": "open",
+      "photos_start": "0",
+      "photos_limit": "100",
+      "closed_start": "0",
+      "closed_limit": "12",
+      "following_start": "0",
+      "following_limit": "100"
+    },
+    "hidden_keys": [
+      "gurushots_token"
+    ],
+    "enable_mcp": false
+  }
+]

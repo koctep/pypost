@@ -1,34 +1,6 @@
 {
   "id": "jira-cloud-mcp",
   "name": "Jira Cloud MCP",
-  "description": "Curated Jira Cloud REST API collection with 22 MCP tools.",
-  "version": "2.0.0",
-  "variables": [
-    {
-      "name": "jira_base_url",
-      "type": "string",
-      "default": "https://your-company.atlassian.net",
-      "description": "Jira Cloud site base URL",
-      "required": true,
-      "secret": false
-    },
-    {
-      "name": "jira_project_key",
-      "type": "string",
-      "default": "PROJ",
-      "description": "Default Jira project key",
-      "required": false,
-      "secret": false
-    },
-    {
-      "name": "jira_credentials",
-      "type": "string",
-      "default": "",
-      "description": "Atlassian account email:api_token",
-      "required": true,
-      "secret": true
-    }
-  ],
   "requests": [
     {
       "id": "jira-get-current-user",
