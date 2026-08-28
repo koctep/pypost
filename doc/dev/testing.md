@@ -221,8 +221,14 @@ Parallel-suite flake / Qt–uvicorn race work for
 [PYPOST-1215](https://pypost.atlassian.net/browse/PYPOST-1215) (repro),
 [PYPOST-1216](https://pypost.atlassian.net/browse/PYPOST-1216) (diagnosis),
 [PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217) (fix).
-Repro, diagnosis, and fix prose belong to those children — not expanded
-here. See also [GUI testing Troubleshooting](gui_testing.md#troubleshooting).
+Baseline empirical evidence is documented in
+[`ai-tasks/PYPOST-1215/baseline-evidence.md`](../../ai-tasks/PYPOST-1215/baseline-evidence.md),
+establishing Make-only differential execution profiles (isolated node 100% pass vs
+multi-worker parallel suite duration inflation +40.3%) for downstream DIAG-1
+([PYPOST-1216](https://pypost.atlassian.net/browse/PYPOST-1216)) and FIX-1
+([PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217)).
+Detailed diagnosis and fix prose belong to those children. See also
+[GUI testing Troubleshooting](gui_testing.md#troubleshooting).
 Model-backed `QListView` with no model is locked by
 `test_select_list_view_no_model_raises` (PYPOST-972;
 `item view has no model`).
