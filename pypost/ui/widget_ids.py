@@ -111,6 +111,24 @@ WS_SEQUENCE_STEP_REMOVE_BUTTON = "pypost_ws_sequence_step_remove_button"
 WS_SEQUENCE_STEP_UP_BUTTON = "pypost_ws_sequence_step_up_button"
 WS_SEQUENCE_STEP_DOWN_BUTTON = "pypost_ws_sequence_step_down_button"
 
+# Collection Library surfaces (PYPOST-1223).
+LIBRARY_MANAGER_BUTTON = "pypost_library_manager_button"
+LIBRARY_MANAGER_DIALOG = "pypost_library_manager_dialog"
+LIBRARY_LIST = "pypost_library_list"
+LIBRARY_CLONE_BUTTON = "pypost_library_clone_button"
+LIBRARY_PULL_BUTTON = "pypost_library_pull_button"
+LIBRARY_COMMIT_PUSH_BUTTON = "pypost_library_commit_push_button"
+LIBRARY_SWITCH_BRANCH_BUTTON = "pypost_library_switch_branch_button"
+LIBRARY_DELETE_BUTTON = "pypost_library_delete_button"
+LIBRARY_DIRTY_BADGE = "pypost_library_dirty_badge"
+LIBRARY_BRANCH_BADGE = "pypost_library_branch_badge"
+LIBRARY_SYNC_BADGE = "pypost_library_sync_badge"
+LIBRARY_COLLECTIONS_LIST = "pypost_library_collections_list"
+LIBRARY_CLONE_DIALOG = "pypost_library_clone_dialog"
+LIBRARY_COMMIT_PUSH_DIALOG = "pypost_library_commit_push_dialog"
+LIBRARY_DIRTY_PULL_WARNING_DIALOG = "pypost_library_dirty_pull_warning_dialog"
+LIBRARY_BRANCH_SWITCH_DIALOG = "pypost_library_branch_switch_dialog"
+
 KEY_WIDGET_IDS = (
     MAIN_WINDOW,
     COLLECTION_TREE,

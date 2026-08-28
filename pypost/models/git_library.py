@@ -79,6 +79,8 @@ class GitOperationType(str, Enum):
     CHECKOUT = "checkout"
     STATUS = "status"
     BRANCH_LIST = "branch_list"
+    COMMIT = "commit"
+    PUSH = "push"
 
 
 class GitDiagnosticErrorCode(str, Enum):
@@ -106,6 +108,8 @@ class GitOperationResult(BaseModel):
     repo_path: Optional[Path] = None
     current_branch: Optional[str] = None
     output: str = ""
+    commit_hash: Optional[str] = None
+    message: Optional[str] = None
     error_code: Optional[GitDiagnosticErrorCode] = None
     error_message: Optional[str] = None
     details: Dict[str, Any] = Field(default_factory=dict)

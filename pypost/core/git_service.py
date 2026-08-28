@@ -752,6 +752,153 @@ class GitLibraryService:
             output=stdout + stderr,
         )
 
+    def commit(
+        self,
+        library_id: str,
+        message: str,
+        files: Optional[list[str]] = None,
+        auth: Optional[GitAuthConfig] = None,
+        timeout: Optional[float] = None,
+    ) -> GitOperationResult:
+        """Stage specified (or all dirty) files and create a Git commit.
+
+        Args:
+            library_id: Collection library identifier.
+            message: Commit message.
+            files: Specific files to stage, or None to stage all dirty/untracked files.
+            auth: Optional authentication config.
+            timeout: Command timeout in seconds.
+
+        Returns:
+            GitOperationResult: Result of the commit operation.
+        """
+        logger.info("git_commit_started library_id=%s", library_id)
+        repo_dir = self.get_library_dir(library_id)
+
+        if not message or not message.strip():
+            raise GitDiagnosticError(
+                code=GitDiagnosticErrorCode.COMMAND_FAILED,
+                message="Commit message cannot be empty",
+                repo_path=repo_dir,
+            )
+
+        if files:
+            add_args = ["add", "--"] + list(files)
+        else:
+            add_args = ["add", "-A"]
+
+        ret_add, stdout_add, stderr_add = self._run_git(
+            add_args, cwd=repo_dir, auth=auth, timeout=timeout or 10.0
+        )
+        if ret_add != 0:
+            err_code = self._classify_git_error(stderr_add, stdout_add)
+            raise GitDiagnosticError(
+                code=err_code,
+                message=f"Git add failed: {stderr_add.strip() or stdout_add.strip()}",
+                repo_path=repo_dir,
+                details={"stdout": stdout_add, "stderr": stderr_add},
+            )
+
+        ret_commit, stdout_commit, stderr_commit = self._run_git(
+            ["commit", "-m", message.strip()],
+            cwd=repo_dir,
+            auth=auth,
+            timeout=timeout or 10.0,
+        )
+        if ret_commit != 0:
+            err_code = self._classify_git_error(stderr_commit, stdout_commit)
+            raise GitDiagnosticError(
+                code=err_code,
+                message=f"Git commit failed: {stderr_commit.strip() or stdout_commit.strip()}",
+                repo_path=repo_dir,
+                details={"stdout": stdout_commit, "stderr": stderr_commit},
+            )
+
+        _, stdout_hash, _ = self._run_git(["rev-parse", "HEAD"], cwd=repo_dir, timeout=5.0)
+        commit_hash = stdout_hash.strip() or None
+
+        _, stdout_br, _ = self._run_git(["branch", "--show-current"], cwd=repo_dir, timeout=5.0)
+        current_branch = stdout_br.strip() or None
+
+        logger.info("git_commit_success library_id=%s hash=%s", library_id, commit_hash)
+        return GitOperationResult(
+            success=True,
+            operation=GitOperationType.COMMIT,
+            library_id=library_id,
+            repo_path=repo_dir,
+            commit_hash=commit_hash,
+            current_branch=current_branch,
+            message=message.strip(),
+            output=stdout_commit + stderr_commit,
+        )
+
+    def push(
+        self,
+        library_id: str,
+        remote: str = "origin",
+        branch: Optional[str] = None,
+        auth: Optional[GitAuthConfig] = None,
+        set_upstream: bool = True,
+        timeout: Optional[float] = None,
+    ) -> GitOperationResult:
+        """Push local commits to remote tracking branch with transient auth credentials.
+
+        Args:
+            library_id: Collection library identifier.
+            remote: Remote name, defaults to "origin".
+            branch: Branch to push, defaults to current active branch.
+            auth: Optional authentication config.
+            set_upstream: Whether to set upstream tracking (-u).
+            timeout: Network timeout in seconds.
+
+        Returns:
+            GitOperationResult: Result of the push operation.
+        """
+        logger.info(
+            "git_push_started library_id=%s remote=%s branch=%s",
+            library_id,
+            remote,
+            branch,
+        )
+        repo_dir = self.get_library_dir(library_id)
+
+        if not branch:
+            _, stdout_br, _ = self._run_git(["branch", "--show-current"], cwd=repo_dir, timeout=5.0)
+            branch = stdout_br.strip() or None
+
+        push_args = ["push"]
+        if set_upstream and branch:
+            push_args.extend(["-u", remote, branch])
+        elif branch:
+            push_args.extend([remote, branch])
+        else:
+            push_args.append(remote)
+
+        ret, stdout, stderr = self._run_git(
+            push_args,
+            cwd=repo_dir,
+            auth=auth,
+            timeout=timeout or self.default_timeout,
+        )
+        if ret != 0:
+            err_code = self._classify_git_error(stderr, stdout)
+            raise GitDiagnosticError(
+                code=err_code,
+                message=f"Git push failed: {stderr.strip() or stdout.strip()}",
+                repo_path=repo_dir,
+                details={"stdout": stdout, "stderr": stderr},
+            )
+
+        logger.info("git_push_success library_id=%s branch=%s", library_id, branch)
+        return GitOperationResult(
+            success=True,
+            operation=GitOperationType.PUSH,
+            library_id=library_id,
+            repo_path=repo_dir,
+            current_branch=branch,
+            output=stdout + stderr,
+        )
+
     def delete_library(self, library_id: str) -> bool:
         """Delete a local collection library directory from disk.
 

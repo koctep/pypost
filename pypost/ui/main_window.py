@@ -34,11 +34,12 @@ from pypost.ui.dialogs.about_dialog import AboutDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.hotkeys import register_hotkey, register_hotkey_group, tag_action
 from pypost.ui.main_window_protocol_hotkeys import register_protocol_session_hotkeys
+from pypost.ui.dialogs.library_dialogs import LibraryManagerDialog
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.main_window_signals import wire_presenter_signals
 from pypost.ui.mcp_server_controller import McpServerSettingsController
 from pypost.ui.presenters import CollectionsPresenter, EnvPresenter, TabsPresenter
-from pypost.ui.widget_ids import MAIN_WINDOW, SETTINGS_BUTTON, set_widget_id
+from pypost.ui.widget_ids import LIBRARY_MANAGER_BUTTON, MAIN_WINDOW, SETTINGS_BUTTON, set_widget_id
 from pypost.ui.widgets.history_panel import HistoryPanel
 from pypost.ui.widgets.mixins import VariableHoverResolver
 
@@ -194,10 +195,14 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
         top_bar = QHBoxLayout()
+        self.libraries_btn = QPushButton("Libraries")
+        set_widget_id(self.libraries_btn, LIBRARY_MANAGER_BUTTON)
+        self.libraries_btn.clicked.connect(self.open_library_manager)
         self.settings_btn = QPushButton("Settings")
         set_widget_id(self.settings_btn, SETTINGS_BUTTON)
         self.settings_btn.clicked.connect(self.open_settings)
         top_bar.addWidget(self.env.widget)
+        top_bar.addWidget(self.libraries_btn)
         top_bar.addWidget(self.settings_btn)
         main_layout.addLayout(top_bar)
         splitter = QSplitter(Qt.Horizontal)
@@ -213,6 +218,8 @@ class MainWindow(QMainWindow):
     def _create_menu_bar(self) -> None:
         menubar = self.menuBar()
         file_menu = menubar.addMenu("File")
+        lib_action = file_menu.addAction("Library Manager...")
+        lib_action.triggered.connect(self.open_library_manager)
         quit_action = file_menu.addAction("Quit")
         quit_action.setShortcut("Ctrl+Q")
         quit_action.triggered.connect(self.handle_exit)
@@ -429,6 +436,10 @@ class MainWindow(QMainWindow):
             logger.info("main_window_exit_storage_idle completed=%s", idle)
         self.mcp_controller.stop_all()
         QApplication.instance().quit()
+
+    def open_library_manager(self) -> None:
+        dialog = LibraryManagerDialog(parent=self)
+        dialog.exec()
 
     def handle_show_hotkeys(self) -> None:
         HotkeysDialog(self).exec()
