@@ -191,9 +191,12 @@ agent e2e sessions. Use `tests/helpers/qt_item_view.py` (`detach_item_view_model
 `close_item_view_fixture`; PYPOST-940). Consumers: `tests/test_ui_actions.py` tree and
 list-view ui_select fixtures; unit proofs in `tests/test_qt_item_view_teardown.py`.
 Collections-tree isolated harnesses use the same detach via
-`close_isolated_tree_actions` / `isolated_tree_actions` in
-`tests/helpers/collections_tree.py` (PYPOST-973); unittest callers register
-`self.addCleanup(close_isolated_tree_actions, harness)`.
+`isolated_tree_actions` in `tests/helpers/collections_tree.py` (PYPOST-973 /
+PYPOST-1043). The standard idiomatic testing pattern for collection tree action
+suites is the `with isolated_tree_actions(...) as harness:` context manager, which
+guarantees model detachment and view teardown on block exit; the earlier manual
+pattern of `build_isolated_tree_actions` + `self.addCleanup(close_isolated_tree_actions, harness)`
+is superseded by the context manager.
 
 DisplayRole matching for flat item views and trees shares
 `pypost/agent/tree_index.py` (PYPOST-941 / PYPOST-971):

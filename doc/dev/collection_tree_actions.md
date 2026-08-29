@@ -171,12 +171,12 @@ GUI metrics; menu selection logs `collection_export_selected` (see
 
 `tests/helpers/collections_tree.py` provides shared fixtures (`FakeRequestManager`,
 `patch_tree_context_menu`, `patch_rename_context_menu`, `patch_delete_context_menu`,
-`build_isolated_tree_actions()`, `wire_rename_delegate`, `wait_for_rename_editor`,
-`commit_inline_rename`, `cancel_inline_rename`, etc.) for presenter integration and
-isolated `CollectionTreeActions` tests. Pass `with_rename_delegate=True` to
-`build_isolated_tree_actions` for end-to-end rename editor tests. The isolated harness
-builds a minimal `QTreeView` + `QStandardItemModel` with `MagicMock` callbacks (no
-`CollectionsPresenter`) and wires a mock `export_collection` by default.
+`isolated_tree_actions()`, `build_isolated_tree_actions()`, `wire_rename_delegate`,
+`wait_for_rename_editor`, `commit_inline_rename`, `cancel_inline_rename`, etc.) for
+presenter integration and isolated `CollectionTreeActions` tests. Pass `with_rename_delegate=True`
+to `isolated_tree_actions` (or `build_isolated_tree_actions`) for end-to-end rename editor tests.
+The isolated harness builds a minimal `QTreeView` + `QStandardItemModel` with `MagicMock` callbacks
+(no `CollectionsPresenter`) and wires a mock `export_collection` by default.
 
 After PYPOST-1013, mocked menu helpers take `action_count` as the **full** menu size:
 
