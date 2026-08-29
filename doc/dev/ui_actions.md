@@ -193,7 +193,10 @@ PYPOST-974); list/tree missing option and out-of-range index
 `test_live_collection_tree_index_out_of_range_raises` (PYPOST-975).
 Model-backed list view without a model is locked by
 `test_select_list_view_no_model_raises` (PYPOST-972;
-`reason=item view has no model`, distinct from `tree has no model`).
+`reason=item view has no model`, distinct from `tree has no model`),
+and model-less `QTreeView` is locked by its dedicated twin
+`test_select_tree_no_model_raises` (PYPOST-1042; `reason=tree has no model`,
+distinct from `item view has no model`).
 
 ```python
 ui_select(root, METHOD_COMBO, "POST")   # combo by text
@@ -362,7 +365,8 @@ widgets that already have `objectName` set via `set_widget_id`.
   set a model before selecting. Fixture proof:
   `test_select_list_view_no_model_raises` (PYPOST-972).
 - **`tree has no model`** — `QTreeView` has no model attached; set a model
-  before selecting (distinct from the item-view reason above).
+  before selecting (distinct from the item-view reason above). Fixture proof:
+  `test_select_tree_no_model_raises` (PYPOST-1042).
 - **`option not found` / `option index out of range`** — Display text mismatch
   (case-sensitive exact DisplayRole via `display_role_equals`) or index
   outside the control’s range. Flat list views scan root rows only; trees
