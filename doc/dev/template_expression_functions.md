@@ -53,6 +53,21 @@ behavior is backward compatible:
   direct `to_int(...)` expressions are the narrow exception during HTTP request
   preparation, where dispatch is blocked before `session.request`.
 
+### Plain Variable Tokenizer and Whitespace Handling (PYPOST-1151 / PYPOST-1176)
+
+PyPost provides shared tokenizer helpers in `pypost/core/template_expression_tokenizer.py`
+for distinguishing strict plain variable tokens from general/loose template expressions:
+
+- `PLAIN_VARIABLE_PATTERN`: Strict regex `^\{\{([a-zA-Z0-9_]+)\}\}$` matching only unspaced,
+  untrimmed identifiers inside double braces (e.g. `{{var}}`). Tokens with inner whitespace
+  (such as `{{ var }}`, `{{  var  }}`, `{{\tvar\t}}`, `{{\nvar\n}}`) are rejected by
+  `is_plain_variable_token` and return `None` from `extract_plain_variable_name`.
+- `LOOSE_PLAIN_VARIABLE_PATTERN`: Permissive regex `^\{\{\s*([a-zA-Z0-9_]+)\s*\}\}$` for
+  UI hover locators and forgiving context extraction where leading/trailing whitespace around
+  identifiers is accepted via `is_loose_plain_variable_token` and `extract_loose_plain_variable_name`.
+
+Unit tests in `tests/test_template_expression_tokenizer.py` enforce these whitespace contracts.
+
 ## Architecture
 
 Main components:
