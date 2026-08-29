@@ -229,3 +229,63 @@ def test_mcp_status_changed_and_start_failed_ui(qapp, caplog):
         presenter._on_mcp_start_failed("Port in use")
         assert presenter.status_text() == "MCP: OFF"
         mock_show.assert_called_once_with(parent, "Port in use")
+
+
+def test_handle_environment_selected_starts_and_stops_legacy_server(qapp):
+    parent = QWidget()
+    manager = MagicMock()
+    manager.is_running.return_value = False
+    settings = AppSettings(mcp_host="127.0.0.1", mcp_port=9080)
+    metrics = MagicMock()
+    env_mcp = Environment(id="env-mcp", name="MCP Env", enable_mcp=True)
+
+    presenter = McpControlsPresenter(
+        mcp_manager=manager,
+        settings_provider=lambda: settings,
+        get_collections=lambda: [],
+        get_environments=lambda: [env_mcp],
+        current_environment=lambda: env_mcp,
+        metrics=metrics,
+        dialog_parent=parent,
+    )
+
+    presenter.handle_environment_selected(env_mcp)
+    manager.start_server.assert_called_once_with(
+        port=9080,
+        tools=[],
+        host="127.0.0.1",
+    )
+    assert presenter._active_environment == env_mcp
+
+    # Deselecting stops server
+    manager.is_running.return_value = True
+    presenter.handle_environment_selected(None)
+    manager.stop_server.assert_called_once()
+    assert presenter._active_environment is None
+    metrics.track_mcp_active_env_changed.assert_called_once()
+
+
+def test_on_environment_manager_closed_reconciles_and_refreshes(qapp):
+    parent = QWidget()
+    manager = MagicMock()
+    registry = MagicMock()
+    settings = AppSettings()
+    metrics = MagicMock()
+    env1 = Environment(id="e1", name="Env 1")
+    env2 = Environment(id="e2", name="Env 2")
+
+    presenter = McpControlsPresenter(
+        mcp_manager=manager,
+        settings_provider=lambda: settings,
+        get_collections=lambda: [],
+        get_environments=lambda: [env1, env2],
+        current_environment=lambda: None,
+        metrics=metrics,
+        dialog_parent=parent,
+        mcp_registry=registry,
+    )
+
+    presenter.on_environment_manager_closed()
+    registry.reconcile_references.assert_called_once()
+    registry.refresh_environment.assert_any_call("e1")
+    registry.refresh_environment.assert_any_call("e2")

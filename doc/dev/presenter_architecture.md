@@ -45,6 +45,9 @@ classDiagram
         +env_variables_changed
         +current_variables
         +current_hidden_keys
+        +environment_selected
+        +environment_updated
+        +environment_manager_closed
         +load_environments()
         +reload_current_env()
     }
@@ -57,6 +60,8 @@ classDiagram
         +refresh_tools()
         +refresh_environment(environment_id)
         +reconcile_references()
+        +handle_environment_selected(selected)
+        +on_environment_manager_closed()
     }
 
     class MainWindowSignals {
@@ -171,7 +176,21 @@ def wire_presenter_signals(window: MainWindow) -> None:
 
     # EnvPresenter -> Tabs / RequestEditor (variable propagation)
     window.env.env_variables_changed.connect(window.tabs.on_env_variables_changed)
+
+    # EnvPresenter -> McpControlsPresenter (PYPOST-1108 decoupled domain signals)
+    window.env.environment_selected.connect(
+        window.mcp_controls.handle_environment_selected
+    )
+    window.env.environment_updated.connect(
+        window.mcp_controls.refresh_environment
+    )
+    window.env.environment_manager_closed.connect(
+        window.mcp_controls.on_environment_manager_closed
+    )
 ```
+
+See [Environment-to-MCP State Propagation and Domain Signals](environment_mcp_signals.md) for
+complete details on this event-driven interaction.
 
 ---
 
@@ -185,7 +204,14 @@ class EnvPresenter(QObject):
 
     # Public signals
     env_variables_changed = Signal(dict)
-    env_hidden_keys_changed = Signal(list)
+    env_keys_changed = Signal(object)
+    env_hidden_keys_changed = Signal(set)
+    environments_loaded = Signal()
+
+    # Public domain signals (PYPOST-1108)
+    environment_selected = Signal(object)  # payload: Environment | None
+    environment_updated = Signal(str)      # payload: environment_id: str
+    environment_manager_closed = Signal()  # payload: None
 
     @property
     def mcp_controls(self) -> McpControlsPresenter:

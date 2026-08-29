@@ -53,6 +53,9 @@ class EnvPresenter(QObject):
     env_keys_changed = Signal(object)  # payload: list[str] | None
     env_hidden_keys_changed = Signal(set)  # payload: set[str]
     environments_loaded = Signal()
+    environment_selected = Signal(object)  # payload: Environment | None
+    environment_updated = Signal(str)  # payload: environment_id
+    environment_manager_closed = Signal()  # payload: None
 
     def __init__(
         self,
@@ -254,7 +257,8 @@ class EnvPresenter(QObject):
             )
             selected.variables.update(vars)
             self._save_environments()
-            self._mcp_controls.refresh_environment(selected.id)
+            logger.debug("environment_updated_emitted env_id=%s source=script", selected.id)
+            self.environment_updated.emit(selected.id)
             self._on_env_changed(self._env_selector.currentIndex())
 
     def handle_variable_set_request(self, key, value: str) -> None:
@@ -285,7 +289,8 @@ class EnvPresenter(QObject):
         )
         selected.variables[target_key] = value
         self._save_environments()
-        self._mcp_controls.refresh_environment(selected.id)
+        logger.debug("environment_updated_emitted env_id=%s source=manual_set", selected.id)
+        self.environment_updated.emit(selected.id)
         self._on_env_changed(self._env_selector.currentIndex())
 
     def _is_valid_variable_name(self, name: str) -> tuple[bool, str]:
@@ -311,9 +316,7 @@ class EnvPresenter(QObject):
         self._open_env_manager()
 
     def _on_env_changed(self, index: int) -> None:
-        """Resolves vars, starts/stops MCP, saves config, emits signals."""
-        previous = self._env_selector.itemData(self._current_env_index)
-        mcp_was_running = self._mcp_controls.legacy_server_running()
+        """Resolves vars, saves config, and emits domain and variable signals."""
         selected = self._env_selector.itemData(index)
         variables: dict = {}
 
@@ -327,11 +330,11 @@ class EnvPresenter(QObject):
             )
             self._settings.last_environment_id = selected.id
             variables = resolve_environment_variables(selected.variables)
-            self._mcp_controls.handle_environment_selected(selected)
+            selected_env: Environment | None = selected
         else:
             logger.info("env_deselected index=%d", index)
             self._settings.last_environment_id = None
-            self._mcp_controls.handle_environment_selected(None)
+            selected_env = None
 
         self._config_manager.save_config(self._settings)
         self._current_env_index = index
@@ -342,9 +345,11 @@ class EnvPresenter(QObject):
         self.env_variables_changed.emit(variables)
         self.env_keys_changed.emit(keys)
         self.env_hidden_keys_changed.emit(hidden_keys)
-        self._mcp_controls.refresh_tools_button()
-        if mcp_was_running:
-            self._mcp_controls.track_active_env_changed(previous, selected)
+        logger.debug(
+            "environment_selected_emitted env_id=%s",
+            selected_env.id if selected_env else None,
+        )
+        self.environment_selected.emit(selected_env)
 
     def _open_env_manager(self) -> None:
         current_env_name = self._env_selector.currentText()
@@ -364,9 +369,8 @@ class EnvPresenter(QObject):
         logger.info("env_manager_dialog_closed")
         self._environments = dialog.environments
         self._save_environments()
-        self._mcp_controls.reconcile_references()
-        for environment in self._environments:
-            self._mcp_controls.refresh_environment(environment.id)
+        logger.debug("environment_manager_closed_emitted")
+        self.environment_manager_closed.emit()
         if self._encryption_enabled():
             self._pending_env_manager_refresh = True
         self.load_environments()

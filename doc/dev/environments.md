@@ -13,7 +13,7 @@ Environment management follows a composite Model-View-Presenter (MVP) architectu
 ```
 +-------------------------------------------------------------------------+
 |                              EnvPresenter                               |
-| (Coordinates MainWindow combo selector, Storage gateway, MCP lifecycle) |
+| (Coordinates MainWindow combo selector, Storage gateway, domain signals) |
 +-------------------------------------------------------------------------+
                                     |
                                     | creates & exec()
@@ -41,6 +41,7 @@ Environment management follows a composite Model-View-Presenter (MVP) architectu
    - Extracts the currently active environment name (`current_env_name = self._env_selector.currentText()` or `None` if "No Environment" is selected).
    - Instantiates `EnvironmentDialog(self._environments, self._widget, current_env_name=current_env_name, ...)`.
    - On dialog accept/close, updates presenter-owned environment state and triggers save.
+   - Emits decoupled domain Qt signals (`environment_selected`, `environment_updated`, `environment_manager_closed`) wired centrally in `main_window_signals.py` to notify MCP controls and tab editors without direct cross-presenter calls. See [Environment-to-MCP State Propagation](environment_mcp_signals.md).
 
 2. **`EnvironmentDialog`** (`pypost/ui/dialogs/env_dialog.py`):
    - Acts as the mediator between the list and variables subwidgets.

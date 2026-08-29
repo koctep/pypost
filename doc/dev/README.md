@@ -73,6 +73,7 @@ conventions.
 1. [Collection Item Strategies and Dispatch Context (PYPOST-1193)](collection_item_strategies.md)
 1. [Environments Dialog](environments_dialog.md)
 1. [Environment Management and Variable Display (PYPOST-1073)](environments.md)
+1. [Environment-to-MCP State Propagation and Domain Signals (PYPOST-1108)](environment_mcp_signals.md)
 1. [Environment Variable Delete](environment_variable_delete.md)
 1. [Environment Encryption at Rest](environment_encryption_at_rest.md)
 1. [Async Environment Storage (PYPOST-486)](environment_storage_async.md)
@@ -106,6 +107,7 @@ conventions.
 ### MCP
 
 1. [MCP Integration](mcp_integration.md)
+1. [Environment-to-MCP State Propagation and Domain Signals (PYPOST-1108)](environment_mcp_signals.md)
 1. [MCP Client draft tab (PYPOST-1166–1170)](mcp_client_draft_tab.md)
 1. [Shared empty-row Key/Value table (PYPOST-1186)](empty_row_key_value_table.md)
 1. [MCP Reverse Proxy (PYPOST-1092)](mcp_proxy.md)

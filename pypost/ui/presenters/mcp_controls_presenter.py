@@ -76,6 +76,7 @@ class McpControlsPresenter(QObject):
         # active editor environment can no longer retarget a running MCP endpoint.
         self._mcp_registry = mcp_registry
         self._mcp_server_controller: McpServerController | None = None
+        self._active_environment: Environment | None = None
 
         self._mcp_status_label = QLabel("MCP: OFF")
         self._mcp_status_label.setStyleSheet("color: gray;")
@@ -135,11 +136,24 @@ class McpControlsPresenter(QObject):
         """True only while the single-server workflow owns a running endpoint."""
         return self._mcp_manager.is_running() if self._mcp_registry is None else False
 
-    def handle_environment_selected(self, selected: Environment | None) -> None:
+    def handle_environment_selected(self, selected: object) -> None:
         """Apply the legacy single-server start/stop rule for the new selection."""
+        selected_env = selected if isinstance(selected, Environment) else None
+        mcp_was_running = self.legacy_server_running()
+        previous = self._active_environment
+        logger.debug(
+            "mcp_handle_environment_selected env_id=%s mcp_enabled=%s legacy_running=%s",
+            selected_env.id if selected_env else None,
+            selected_env.enable_mcp if selected_env else False,
+            mcp_was_running,
+        )
         if self._mcp_registry is not None:
+            self._active_environment = selected_env
+            self._refresh_mcp_tools_button()
+            if mcp_was_running:
+                self.track_active_env_changed(previous, selected_env)
             return
-        if selected is not None and selected.enable_mcp:
+        if selected_env is not None and selected_env.enable_mcp:
             self._mcp_manager.start_server(
                 port=self._settings.mcp_port,
                 tools=self._get_mcp_tools(),
@@ -148,6 +162,18 @@ class McpControlsPresenter(QObject):
             self._show_mcp_starting()
         else:
             self._mcp_manager.stop_server()
+        self._active_environment = selected_env
+        self._refresh_mcp_tools_button()
+        if mcp_was_running:
+            self.track_active_env_changed(previous, selected_env)
+
+    def on_environment_manager_closed(self) -> None:
+        """Reconcile references and refresh configurations after environment manager closes."""
+        logger.debug("mcp_on_environment_manager_closed")
+        self.reconcile_references()
+        for environment in self._get_environments():
+            self.refresh_environment(environment.id)
+        self._refresh_mcp_tools_button()
 
     def track_active_env_changed(
         self,
@@ -186,11 +212,13 @@ class McpControlsPresenter(QObject):
 
     def reconcile_references(self) -> None:
         """Drop registry references to collections/environments that no longer exist."""
+        logger.debug("mcp_reconcile_references")
         if self._mcp_registry is not None:
             self._mcp_registry.reconcile_references()
 
     def refresh_environment(self, environment_id: str) -> None:
         """Update only endpoints explicitly configured for this environment."""
+        logger.debug("mcp_refresh_environment env_id=%s", environment_id)
         if self._mcp_registry is not None:
             self._mcp_registry.refresh_environment(environment_id)
 
@@ -311,7 +339,11 @@ class McpControlsPresenter(QObject):
         dialog.exec()
 
     def _selected_legacy_mcp_environment(self) -> Environment | None:
-        selected = self._current_environment()
+        selected = (
+            self._active_environment
+            if self._active_environment is not None
+            else self._current_environment()
+        )
         return selected if selected is not None and selected.enable_mcp else None
 
     def _on_mcp_activity_dialog_closed(self) -> None:

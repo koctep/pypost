@@ -50,3 +50,17 @@ def test_wire_presenter_signals_connects_mcp_controls_refresh_tools():
     window.tabs.request_saved.connect.assert_any_call(
         window.mcp_controls.refresh_tools
     )
+
+
+def test_wire_presenter_signals_connects_env_domain_signals_to_mcp_controls():
+    window = MagicMock()
+    wire_presenter_signals(window)
+    window.env.environment_selected.connect.assert_any_call(
+        window.mcp_controls.handle_environment_selected
+    )
+    window.env.environment_updated.connect.assert_any_call(
+        window.mcp_controls.refresh_environment
+    )
+    window.env.environment_manager_closed.connect.assert_any_call(
+        window.mcp_controls.on_environment_manager_closed
+    )

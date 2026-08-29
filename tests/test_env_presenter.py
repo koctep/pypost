@@ -119,7 +119,11 @@ class TestEnvPresenter(unittest.TestCase):
         def get_collections():
             return collections or []
 
-        return EnvPresenter(storage, config, mcp, settings, get_collections, metrics)
+        p = EnvPresenter(storage, config, mcp, settings, get_collections, metrics)
+        p.environment_selected.connect(p.mcp_controls.handle_environment_selected)
+        p.environment_updated.connect(p.mcp_controls.refresh_environment)
+        p.environment_manager_closed.connect(p.mcp_controls.on_environment_manager_closed)
+        return p
 
     def test_widget_is_qwidget(self):
         p = self._make_presenter()
