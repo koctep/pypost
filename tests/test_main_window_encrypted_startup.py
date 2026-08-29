@@ -23,9 +23,6 @@ class _DeferredEnvPresenter(QObject):
     def load_environments(self) -> None:
         return
 
-    def set_mcp_server_controller(self, controller: object) -> None:  # noqa: ARG002
-        return
-
 
 class _DeferredCollectionsPresenter(QObject):
     collections_loaded = Signal()

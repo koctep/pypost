@@ -213,9 +213,6 @@ class EnvPresenter(QObject):
 
     def handle_variable_set_request(self, key: str, value: str) -> None:
         """Handle request from response panel to add or update a variable in active environment."""
-
-    def set_mcp_server_controller(self, controller: McpServerController) -> None:
-        """Forward server lifecycle controller to McpControlsPresenter."""
 ```
 
 ### `McpControlsPresenter` (`pypost/ui/presenters/mcp_controls_presenter.py`)
@@ -273,4 +270,4 @@ When writing automated tests for UI presenters:
 | `AttributeError: 'EnvPresenter' object has no attribute 'refresh_mcp_tools'` | Caller using retired legacy shim removed in PYPOST-1082. | Update call site to use `env_presenter.mcp_controls.refresh_tools()` or `window.mcp_controls.refresh_tools()`. |
 | `AttributeError: 'EnvPresenter' object has no attribute 'mcp_status_text'` | Test or caller using retired shim. | Update call site to use `env_presenter.mcp_controls.status_text()`. |
 | MCP tools not updating after collection edits in UI | Signal routing in `main_window_signals.py` disconnected or uninitialized. | Ensure `wire_presenter_signals(window)` is called after both `window.collections` and `window.mcp_controls` are instantiated. |
-| MCP Servers dialog shows no rows or does nothing | `McpServerSettingsController` was not set on presenter. | Verify that `window.env.set_mcp_server_controller(...)` was invoked during `MainWindow` initialization. |
+| MCP Servers dialog shows no rows or does nothing | `McpServerSettingsController` was not set on presenter. | Verify that `window.mcp_controls.set_server_controller(...)` was invoked during `MainWindow` initialization. |

@@ -85,15 +85,15 @@ def test_dialog_audit_report_has_full_discovery_and_coherent_aggregates() -> Non
     issues = check_audit_report_covers(modules)
     if issues:
         errors.extend(issues)
-    if len(modules) != 8 or total_loc(modules) != 1208:
-        errors.append("dialog discovery must contain exactly eight modules totaling 1,208 LOC")
+    if len(modules) != 9 or total_loc(modules) != 1747:
+        errors.append("dialog discovery must contain exactly nine modules totaling 1,747 LOC")
     if not any(
         module.filename == "mcp_servers_dialog.py" and module.total_lines == 446
         for module in modules
     ):
         errors.append("dialog discovery must include mcp_servers_dialog.py at 446 LOC")
-    if "**Scope:** `pypost/ui/dialogs/` (eight modules, 1,208 LOC total)" not in report:
-        errors.append("scope must state eight modules and 1,208 LOC")
+    if "**Scope:** `pypost/ui/dialogs/` (nine modules, 1,747 LOC total)" not in report:
+        errors.append("scope must state nine modules and 1,747 LOC")
     if set(inventory_rows) != expected_inventory:
         errors.append("module inventory must exactly match discovered filenames and LOC")
     if expected_filenames != {filename for filename, _ in inventory_rows}:
@@ -105,15 +105,19 @@ def test_dialog_audit_report_has_full_discovery_and_coherent_aggregates() -> Non
     if "server manager supports configuration and lifecycle changes" not in report:
         errors.append("executive summary must state the server manager mutation capability")
     if set(testability_rows) != expected_filenames:
-        errors.append("testability table must have one row for each of the eight dialog modules")
-    if "Individual audit **complete** for all eight modules." not in report:
-        errors.append("verdict must state completion for all eight modules")
+        errors.append("testability table must have one row for each of the nine dialog modules")
+    if "Individual audit **complete** for all nine modules." not in report:
+        errors.append("verdict must state completion for all nine modules")
     for stale_claim in (
         "seven modules",
+        "eight modules",
         "923 LOC",
+        "1,030 LOC",
+        "1,208 LOC",
         "**Two MCP read-only dialogs**",
         "**Three MCP read-only dialogs**",
         "all seven modules",
+        "all eight modules",
     ):
         if stale_claim in report:
             errors.append(f"report retains contradictory stale claim: {stale_claim}")
@@ -189,13 +193,24 @@ def test_jira_smoke_board_contract_and_invocation_are_exact_and_offline() -> Non
 
 def test_deferred_environment_presenter_has_the_mcp_controller_seam() -> None:
     presenter = _find_class(_parse_python(_ENCRYPTED_STARTUP_TEST), "_DeferredEnvPresenter")
-    methods = [
-        statement
+    method_names = [
+        statement.name
         for statement in presenter.body
         if isinstance(statement, ast.FunctionDef)
-        and statement.name == "set_mcp_server_controller"
     ]
-    assert len(methods) == 1
-    assert [argument.arg for argument in methods[0].args.args] == ["self", "controller"]
-    assert isinstance(methods[0].args.args[1].annotation, ast.Name)
-    assert methods[0].args.args[1].annotation.id == "object"
+    assert "set_mcp_server_controller" not in method_names
+
+    init_method = _find_function(presenter, "__init__")
+    mcp_controls_assigns = [
+        statement
+        for statement in init_method.body
+        if isinstance(statement, ast.Assign)
+        and any(
+            isinstance(target, ast.Attribute)
+            and isinstance(target.value, ast.Name)
+            and target.value.id == "self"
+            and target.attr == "mcp_controls"
+            for target in statement.targets
+        )
+    ]
+    assert len(mcp_controls_assigns) == 1

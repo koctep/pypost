@@ -35,10 +35,7 @@ from pypost.ui.collection_item_dialogs import (
     show_no_environment_selected,
 )
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
-from pypost.ui.presenters.mcp_controls_presenter import (
-    McpControlsPresenter,
-    McpServerController,
-)
+from pypost.ui.presenters.mcp_controls_presenter import McpControlsPresenter
 from pypost.ui.widget_ids import (
     ENV_BAR,
     ENV_MANAGE_BUTTON,
@@ -144,10 +141,6 @@ class EnvPresenter(QObject):
 
     def apply_settings(self, settings: AppSettings) -> None:
         self._settings = settings
-
-    def set_mcp_server_controller(self, controller: McpServerController) -> None:
-        """Attach MainWindow's persistence/lifecycle API to the server manager UI."""
-        self._mcp_controls.set_server_controller(controller)
 
     def _selected_environment(self) -> Environment | None:
         selected = self._env_selector.currentData()

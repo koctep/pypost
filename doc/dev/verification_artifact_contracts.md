@@ -79,7 +79,7 @@ Keep `maxResults` and `startAt` as the exact inputs, and call the board tool wit
 ### Encrypted-startup test fails before readiness assertions
 
 Ensure the deferred environment presenter double provides
-`set_mcp_server_controller(controller)`. Preserve the assertion that tabs and tree restore only
+`mcp_controls` with `set_server_controller`. Preserve the assertion that tabs and tree restore only
 after both signals.
 
 For broader test-environment and Qt guidance, see [Testing via MCP and Prometheus](testing.md)

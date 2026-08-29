@@ -165,9 +165,8 @@ buttons, the dialogs behind them, and scoped registry refreshes. Extracted from
     legacy catalog.
 *   **MCP activity log**: The top-bar **MCP Activity (N)** view remains the legacy
     single-manager feed; the registry dialog exposes activity per selected endpoint.
-*   **Server controller**: `MainWindow` calls `env.set_mcp_server_controller(...)`
-    (`pypost/ui/main_window.py:130`), which forwards to
-    `McpControlsPresenter.set_server_controller`. Without it, **MCP Servers…** logs
+*   **Server controller**: `MainWindow` calls `mcp_controls.set_server_controller(...)`
+    (`pypost/ui/main_window.py:142`) directly. Without it, **MCP Servers…** logs
     `mcp_servers_dialog_no_controller` and does nothing.
 *   **Legacy adapter**: `handle_environment_selected` applies the old
     `Environment.enable_mcp` start/stop rule, and `legacy_server_running()` reports it —

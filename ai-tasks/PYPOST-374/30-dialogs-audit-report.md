@@ -1,13 +1,13 @@
 # PYPOST-374: Individual Dialog SOLID Audit Report
 
 **Date:** 2026-06-11
-**Scope:** `pypost/ui/dialogs/` (eight modules, 1,208 LOC total)
+**Scope:** `pypost/ui/dialogs/` (nine modules, 1,747 LOC total)
 **Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)
 **Baseline comparison:** PYPOST-40 grouped inventory ~400 LOC, five dialogs named
 
 ## Executive Summary
 
-The current individual-dialog inventory contains eight modules. `SettingsDialog` is a thin
+The current individual-dialog inventory contains nine modules. `SettingsDialog` is a thin
 composition root over dedicated settings sections, while `McpServersDialog` manages explicit,
 persisted MCP server configurations. **Three MCP dialogs**
 (`mcp_activity_dialog.py`, `mcp_servers_dialog.py`, and `mcp_tools_overview_dialog.py`) use
@@ -30,13 +30,14 @@ complete for the full current scope.
 | `about_dialog.py` | 43 | `AboutDialog` | Static app information | `main_window.py` |
 | `env_dialog.py` | 112 | `EnvironmentDialog` | Environment manager shell | env presenter |
 | `hotkeys_dialog.py` | 69 | `HotkeysDialog` | Shared shortcut reference table | `main_window.py` |
+| `library_dialogs.py` | 533 | `GitCommitDialog` + auth/clone | Git library manager dialogs | library manager |
 | `mcp_activity_dialog.py` | 117 | `McpActivityDialog` | MCP activity viewer | env presenter |
 | `mcp_servers_dialog.py` | 446 | `McpServersDialog` + editor | MCP server manager | main window |
 | `mcp_tools_overview_dialog.py` | 74 | Tool overview | MCP tools | env |
 | `save_dialog.py` | 93 | `SaveRequestDialog` | Save-as picker | save orchestrator |
-| `settings_dialog.py` | 254 | `SettingsDialog` | Settings composition | main window |
+| `settings_dialog.py` | 260 | `SettingsDialog` | Settings composition | main window |
 
-**Total:** 1,208 LOC (vs PYPOST-40 grouped ~400 LOC).
+**Total:** 1,747 LOC (vs PYPOST-40 grouped ~400 LOC).
 
 Regenerate counts: `scripts/audit_dialogs_inventory.py --markdown`
 
@@ -82,6 +83,19 @@ Display-only; low risk.
 
 **Maintainability:** The table no longer duplicates shortcut definitions. **Test coverage:**
 Display behavior is low risk.
+
+### `library_dialogs.py` — GitCommitDialog, GitAuthDialog, GitCloneDialog
+
+| Principle | Rating | Notes |
+| --- | --- | --- |
+| SRP | OK | Focused modal dialogs for Git library actions (commit, push/pull auth, clone) |
+| OCP | OK | Dialogs use modular form layouts and explicit signal callbacks |
+| LSP | N/A | Inherits QDialog standard semantics |
+| ISP | Good | Clean parameter interfaces per dialog role |
+| DIP | Good | Interacts through Git service / presenter abstractions without transport lock-in |
+
+**Maintainability:** Strong separation across commit, authentication, and clone workflows. **Test coverage:**
+Covered via unit and UI tests in `tests/test_ui_library_manager.py`.
 
 ### `mcp_activity_dialog.py` — McpActivityDialog
 
@@ -161,6 +175,7 @@ encryption/migration UI tests).
 | `about_dialog.py` | No | Manual/display-only |
 | `env_dialog.py` | Yes | E2E persistence |
 | `hotkeys_dialog.py` | No | Shared collector coverage |
+| `library_dialogs.py` | Yes | Library presenter and manager tests |
 | `mcp_activity_dialog.py` | No | Presenter opens with activity data |
 | `mcp_servers_dialog.py` | Yes | Presenter and configuration mocks |
 | `mcp_tools_overview_dialog.py` | No | Presenter opens with overview data |
@@ -203,7 +218,7 @@ encryption/migration UI tests).
 
 ## Verdict
 
-Individual audit **complete** for all eight modules. No dialog-level **blockers** for closing
+Individual audit **complete** for all nine modules. No dialog-level **blockers** for closing
 PYPOST-374; findings are documented maintenance and test follow-ups. The primary maintenance
 focus is preserving the current settings-section boundaries and callback-injected MCP dialog
 design.

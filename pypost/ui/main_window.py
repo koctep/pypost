@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
             mcp_registry=self.mcp_controller.registry,
         )
         self.mcp_controls = self.env.mcp_controls
-        self.env.set_mcp_server_controller(self.mcp_controller)
+        self.mcp_controls.set_server_controller(self.mcp_controller)
         self._build_layout()
         wire_presenter_signals(self)
         self._create_menu_bar()
