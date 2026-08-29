@@ -220,6 +220,36 @@ class TestFunctionExpressionResolver(unittest.TestCase):
         r = self.resolver.validate_content("{{ mcp.request.issue_key }}")
         self.assertTrue(r.is_valid)
 
+    def test_validate_catalog_functions_with_safe_dotted_args(self):
+        """PYPOST-1035: catalog functions accept safe dotted variable paths."""
+        cases = [
+            ("{{ urlencode(mcp.request.query) }}"),
+            ("{{ md5(mcp.request.body) }}"),
+            ("{{ base64(nested.data.value) }}"),
+            ("{{ to_int(mcp.request.count) }}"),
+            ("{{ env(config.env_key) }}"),
+        ]
+        for expr in cases:
+            with self.subTest(expression=expr):
+                r = self.resolver.validate_content(expr)
+                self.assertTrue(r.is_valid, f"Expression '{expr}' failed validation: {r.code}")
+
+    def test_validate_catalog_functions_with_unsafe_attribute_paths(self):
+        """PYPOST-1035: catalog functions reject unsafe attribute access in args."""
+        cases = [
+            ("{{ urlencode(db.__class__) }}", "urlencode"),
+            ("{{ md5(mcp.request.__class__) }}", "md5"),
+            ("{{ base64(data._private) }}", "base64"),
+            ("{{ to_int(nested.__dict__) }}", "to_int"),
+            ("{{ env(mcp.request.__globals__) }}", "env"),
+        ]
+        for expr, expected_fn in cases:
+            with self.subTest(expression=expr):
+                r = self.resolver.validate_content(expr)
+                self.assertFalse(r.is_valid)
+                self.assertEqual("invalid_argument", r.code)
+                self.assertEqual(expected_fn, r.function_name)
+
     def test_validate_rejects_unsafe_underscore_attribute_segments(self):
         """PYPOST-1033: underscore-leading attribute segments stay invalid."""
         cases = [

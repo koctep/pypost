@@ -75,6 +75,37 @@ class TestTemplateServiceRenderString(unittest.TestCase):
             )
             self.assertEqual("Bearer token-xyz", result)
 
+    def test_render_catalog_functions_with_dotted_paths(self):
+        """PYPOST-1035: catalog functions render nested dictionary values via dotted paths."""
+        variables = {
+            "mcp": {
+                "request": {
+                    "query": "foo/bar baz&q=1",
+                    "hash_input": "secret_text",
+                    "num": "555",
+                },
+                "nested": {
+                    "data": "hello",
+                },
+            },
+        }
+        self.assertEqual(
+            "foo%2Fbar%20baz%26q%3D1",
+            self.svc.render_string("{{urlencode(mcp.request.query)}}", variables),
+        )
+        self.assertEqual(
+            "9827ac5f875784488e3bb9c44a88672b",
+            self.svc.render_string("{{md5(mcp.request.hash_input)}}", variables),
+        )
+        self.assertEqual(
+            "aGVsbG8=",
+            self.svc.render_string("{{base64(mcp.nested.data)}}", variables),
+        )
+        self.assertEqual(
+            "555",
+            self.svc.render_string("{{to_int(mcp.request.num)}}", variables),
+        )
+
     def test_render_nested_functions_with_env(self):
         with patch.dict(os.environ, {
             "SECRET": "my_secret",

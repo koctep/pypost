@@ -178,7 +178,7 @@ Supported patterns:
 - Plain variable: `{{host}}`
 - Safe dotted variable path (PYPOST-1033): `{{ mcp.request.issue_key }}`
 - Function call: `{{urlencode(db)}}`
-- Function call with safe path argument: `{{urlencode(mcp.request.query)}}`
+- Function call with safe path argument (PYPOST-1033 / PYPOST-1035): `{{urlencode(mcp.request.query)}}`
 - Nested function call: `{{md5(urlencode(db))}}`
 - Deep chain (no fixed depth limit): `{{base64(md5(urlencode(db)))}}`
 
