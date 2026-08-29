@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable, Iterable
 from typing import Literal
@@ -15,7 +16,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
-    QPlainTextEdit,
     QPushButton,
     QSpinBox,
     QTableWidget,
@@ -30,6 +30,9 @@ from pypost.models.models import Collection, Environment
 from pypost.models.settings import McpServerConfiguration
 from pypost.ui.dialogs.mcp_activity_dialog import McpActivityDialog
 from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
+from pypost.ui.widgets.mcp_server_headers_table import McpServerHeadersTable
+
+logger = logging.getLogger(__name__)
 
 
 class McpServersDialog(QDialog):
@@ -182,8 +185,22 @@ class McpServersDialog(QDialog):
         )
         if dialog.exec():
             try:
-                self._save(dialog.configuration())
+                config = dialog.configuration()
+                header_count = len(config.headers) if config.headers else 0
+                logger.info(
+                    "Adding new MCP server: id=%s, type=%s, name=%s (header_count=%d)",
+                    config.id,
+                    config.server_type,
+                    config.name,
+                    header_count,
+                )
+                self._save(config)
             except ValueError as exc:
+                logger.warning(
+                    "Failed to add MCP server %s: %s",
+                    getattr(config, "id", "unknown"),
+                    exc,
+                )
                 self._show_error(str(exc))
             else:
                 self.refresh()
@@ -203,8 +220,22 @@ class McpServersDialog(QDialog):
         )
         if dialog.exec():
             try:
-                self._save(dialog.configuration())
+                config = dialog.configuration()
+                header_count = len(config.headers) if config.headers else 0
+                logger.info(
+                    "Updating MCP server: id=%s, type=%s, name=%s (header_count=%d)",
+                    config.id,
+                    config.server_type,
+                    config.name,
+                    header_count,
+                )
+                self._save(config)
             except ValueError as exc:
+                logger.warning(
+                    "Failed to update MCP server %s: %s",
+                    getattr(config, "id", "unknown"),
+                    exc,
+                )
                 self._show_error(str(exc))
             else:
                 self.refresh()
@@ -227,6 +258,7 @@ class McpServersDialog(QDialog):
             self, "Remove MCP server", f"Remove {selected.name or selected.id}?"
         ) != QMessageBox.StandardButton.Yes:
             return
+        logger.info("Removing MCP server: id=%s, name=%s", selected.id, selected.name)
         self._remove(selected.id)
         self.refresh()
 
@@ -296,6 +328,7 @@ class _McpServerEditor(QDialog):
 
         self._collection = QComboBox()
         self._environment = QComboBox()
+        self._environments_by_id: dict[str, Environment] = {env.id: env for env in environments}
         for collection in collections:
             self._collection.addItem(collection.name, collection.id)
         for environment in environments:
@@ -308,14 +341,10 @@ class _McpServerEditor(QDialog):
         self._upstream_transport.addItem("Streamable HTTP", "streamable_http")
         self._upstream_transport.addItem("Server-Sent Events (SSE)", "sse")
 
-        self._headers_edit = QPlainTextEdit()
-        self._headers_edit.setPlaceholderText(
-            "Authorization: Bearer {{ API_KEY }}\nX-Custom: value"
-        )
+        self._headers_table = McpServerHeadersTable(self)
+        self._headers_table.setMinimumHeight(140)
         if configuration and configuration.headers:
-            self._headers_edit.setPlainText(
-                "\n".join(f"{k}: {v}" for k, v in configuration.headers.items())
-            )
+            self._headers_table.set_data(configuration.headers)
 
         target_environment = (
             configuration.environment_id
@@ -334,6 +363,9 @@ class _McpServerEditor(QDialog):
         if target_environment:
             self._select_data(self._environment, target_environment)
 
+        self._environment.currentIndexChanged.connect(self._on_environment_changed)
+        self._on_environment_changed()
+
         self._layout.addRow("Name", self._name)
         self._layout.addRow("Host", self._host)
         self._layout.addRow("Port", self._port)
@@ -341,7 +373,7 @@ class _McpServerEditor(QDialog):
         self._layout.addRow("Collection", self._collection)
         self._layout.addRow("Upstream URL", self._upstream_url)
         self._layout.addRow("Transport", self._upstream_transport)
-        self._layout.addRow("Custom Headers", self._headers_edit)
+        self._layout.addRow("Custom Headers", self._headers_table)
         self._layout.addRow("Environment", self._environment)
 
         self._error = QLabel()
@@ -358,6 +390,11 @@ class _McpServerEditor(QDialog):
 
         self._server_type.currentIndexChanged.connect(self._on_server_type_changed)
         self._on_server_type_changed()
+
+    def _on_environment_changed(self) -> None:
+        env_id = self._environment.currentData()
+        env = self._environments_by_id.get(str(env_id)) if env_id else None
+        self._headers_table.set_environment(env)
 
     def _on_server_type_changed(self) -> None:
         is_proxy = self._server_type.currentData() == "proxy"
@@ -376,21 +413,13 @@ class _McpServerEditor(QDialog):
         if label_transport:
             label_transport.setVisible(is_proxy)
 
-        self._headers_edit.setVisible(is_proxy)
-        label_headers = self._layout.labelForField(self._headers_edit)
+        self._headers_table.setVisible(is_proxy)
+        label_headers = self._layout.labelForField(self._headers_table)
         if label_headers:
             label_headers.setVisible(is_proxy)
 
     def _parse_headers(self) -> dict[str, str]:
-        headers: dict[str, str] = {}
-        for line in self._headers_edit.toPlainText().splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if ":" in line:
-                key, val = line.split(":", 1)
-                headers[key.strip()] = val.strip()
-        return headers
+        return self._headers_table.get_data()
 
     @staticmethod
     def _select_data(combo: QComboBox, value: str) -> None:
@@ -401,18 +430,29 @@ class _McpServerEditor(QDialog):
     def _accept_if_complete(self) -> None:
         if not self._host.text().strip():
             self._error.setText("Host is required.")
+            logger.debug("MCP server editor rejected save: host is required")
             return
 
         is_proxy = self._server_type.currentData() == "proxy"
         if is_proxy:
             if not self._upstream_url.text().strip():
                 self._error.setText("Upstream URL is required for proxy servers.")
+                logger.debug("MCP server editor rejected save: upstream URL is required")
                 return
-        else:
-            if self._collection.currentData() is None or self._environment.currentData() is None:
-                self._error.setText("Collection and environment are required.")
+            if self._headers_table.has_structural_errors():
+                err_msg = (self._headers_table.get_validation_errors() or ["syntax error"])[0]
+                self._error.setText(f"Custom headers error: {err_msg}")
+                logger.warning(
+                    "MCP server editor rejected save due to custom headers error: %s",
+                    err_msg,
+                )
                 return
+        elif self._collection.currentData() is None or self._environment.currentData() is None:
+            self._error.setText("Collection and environment are required.")
+            logger.debug("MCP server editor rejected save: collection and environment are required")
+            return
 
+        logger.debug("MCP server editor accepted configuration for server id=%s", self._id)
         self.accept()
 
     def configuration(self) -> McpServerConfiguration:
@@ -430,7 +470,7 @@ class _McpServerEditor(QDialog):
                 server_type="proxy",
                 upstream_url=self._upstream_url.text().strip(),
                 upstream_transport=upstream_transport,
-                headers=self._parse_headers(),
+                headers=self._headers_table.get_data(),
                 environment_id=str(self._environment.currentData() or ""),
                 enabled=self._enabled,
             )

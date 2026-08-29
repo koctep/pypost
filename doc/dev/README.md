@@ -111,6 +111,7 @@ conventions.
 1. [MCP Client draft tab (PYPOST-1166–1170)](mcp_client_draft_tab.md)
 1. [Shared empty-row Key/Value table (PYPOST-1186)](empty_row_key_value_table.md)
 1. [MCP Reverse Proxy (PYPOST-1092)](mcp_proxy.md)
+1. [MCP Server Custom Headers Editor (PYPOST-1104)](mcp_server_headers_editor.md)
 1. [Multiple independent MCP servers (PYPOST-1044)](mcp_server_registry.md)
 1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
 1. [Jira numeric identifier MCP contract (PYPOST-1038)](mcp_integration.md#jira-numeric-path-identifiers-pypost-1038)

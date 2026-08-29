@@ -6,6 +6,7 @@ See also:
 - [MCP Integration (Developer Guide)](mcp_integration.md) for local MCP collection server architecture.
 - [Multiple Independent MCP Servers (PYPOST-1044)](mcp_server_registry.md) for multi-server lifecycle and registry management.
 - [MCP Secrets Policy](mcp_secrets_policy.md) and [Sensitive Data Masking Policy](sensitive_data_masking_policy.md).
+- [MCP Server Custom Headers Editor](mcp_server_headers_editor.md) for headers UI and variable autocomplete.
 - [Inbound MCP Trust Model](mcp_trust_model.md).
 
 ---

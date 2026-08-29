@@ -1,5 +1,7 @@
-import pytest
+import logging
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from pypost.core.mcp_server_registry import McpServerStatus
 from pypost.models.models import Collection, Environment, RequestData
@@ -202,3 +204,47 @@ def test_server_dialog_shows_tools_from_the_selected_collection_only():
     entries = overview.call_args.args[0]
     assert [entry.request_name for entry in entries] == ["Jira Tool"]
     overview.return_value.setWindowTitle.assert_called_once_with("MCP Tools — server-1")
+
+
+@pytest.mark.usefixtures("qapp")
+def test_server_dialog_observability_logging(caplog: pytest.LogCaptureFixture) -> None:
+    """Ensure McpServersDialog logs configuration additions without leaking secrets."""
+    with caplog.at_level(logging.INFO, logger="pypost.ui.dialogs.mcp_servers_dialog"):
+        saved = []
+        dialog = McpServersDialog(
+            configurations=lambda: [],
+            status_for=lambda _id: McpServerStatus(_id, "stopped"),
+            save=saved.append,
+            remove=lambda _id: None,
+            start=lambda _id: None,
+            stop=lambda _id: None,
+            activity=lambda _id: [],
+            collections=lambda: [Collection(id="col-1", name="Jira")],
+            environments=lambda: [Environment(id="env-1", name="Cloud")],
+            legacy_environment=lambda: None,
+            legacy_host="127.0.0.1",
+            legacy_port=1080,
+        )
+        editor = MagicMock()
+        editor.exec.return_value = True
+        editor.configuration.return_value = McpServerConfiguration(
+            id="server-obs",
+            name="Observability Test Server",
+            port=1090,
+            server_type="proxy",
+            upstream_url="http://127.0.0.1:8080/mcp",
+            headers={"Authorization": "Bearer supersecret123"},
+            environment_id="env-1",
+        )
+        with patch(
+            "pypost.ui.dialogs.mcp_servers_dialog._McpServerEditor",
+            return_value=editor,
+        ):
+            dialog._add()
+
+        assert any(
+            "Adding new MCP server: id=server-obs" in r.message for r in caplog.records
+        )
+        # Verify secret token value is not logged
+        assert not any("supersecret123" in r.message for r in caplog.records)
+
