@@ -202,9 +202,14 @@ Rules:
 | --- | --- |
 | `mcp.request.issue_key` | valid → Jinja renders nested dict access |
 | `urlencode(mcp.request.query)` | valid (same path rule for arguments) |
+| `payload.user.contact.city` | valid (deep navigation path) |
+| `_context.field` | valid (root segment may start with underscore) |
 | `db.__class__` | `invalid_syntax` (underscore attribute segment) |
 | `mcp.request.__class__` | `invalid_syntax` |
-| `db\|md5` / filter forms | `invalid_syntax` |
+| `mcp.request._private` | `invalid_syntax` (child underscore segment) |
+| `.mcp.request` / `mcp.request.` | `invalid_syntax` (leading / trailing dot) |
+| `mcp..request` | `invalid_syntax` (consecutive dots / empty segment) |
+| `db|md5` / filter forms | `invalid_syntax` |
 
 Supported functions:
 
