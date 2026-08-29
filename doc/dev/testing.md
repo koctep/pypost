@@ -205,6 +205,22 @@ marker: `tests/test_display_role_scan_ownership.py`. Runtime proofs:
 `tests/test_tree_index_walk.py` (deep nested row + error-type boundaries) and
 list/tree coverage in `tests/test_ui_actions.py`.
 
+PYPOST-1041 hardened that marker: it now also asserts that
+`find_child_index_by_display_text` delegates to `display_role_equals`, never
+inlines `ItemDataRole.DisplayRole`, and that `pypost.agent.tree_index.__all__`
+exports all three helpers. `tests/test_display_role_scan_ownership_repro.py`
+guards those three assertions — and only those three of the suite's fourteen
+(three AST presence checks over the ownership suite's own source, plus two
+synthetic `tree_index` mutants the suite must reject). The
+`find_tree_index_by_display_text` and `_select_item_view` assertions are **not**
+pinned: they can be deleted with all five repro tests still green (TD-3 /
+[PYPOST-1236](https://pypost.atlassian.net/browse/PYPOST-1236)). So the
+assertion wording, and the `_calls_name` / `_has_display_role_attr` pair that
+names `find_child_index_by_display_text`, are load-bearing — and none of the
+three pairs may be folded into a loop or a shared helper. Rules and rationale in
+[DisplayRole ownership boundary and its
+guard](ui_actions.md#displayrole-ownership-boundary-and-its-guard-pypost-1041).
+
 List/tree negative `ui_select` paths (missing display text, out-of-range index)
 are locked in `tests/test_ui_actions.py`
 (`test_select_list_missing_option_raises`,

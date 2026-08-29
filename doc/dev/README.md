@@ -153,6 +153,8 @@ conventions.
 1. [UI Widget Identity (PYPOST-834)](ui_identity.md)
 1. [UI State Snapshot (PYPOST-835)](ui_snapshot.md)
 1. [UI Action Tools (PYPOST-836; out-of-process packaging PYPOST-918)](ui_actions.md)
+1. [DisplayRole ownership boundary and its guard (PYPOST-971 / PYPOST-1041)](
+   ui_actions.md#displayrole-ownership-boundary-and-its-guard-pypost-1041)
 1. [Agent UI Actions MCP (PYPOST-952; attach PYPOST-1207; ATTACH-3
    verification PYPOST-1208)](agent_ui_actions_mcp.md#proven-vs-manual-attach-3--pypost-1208)
 1. [Agent Sidecar Seed Injection (PYPOST-993)](agent_seed_injection.md)

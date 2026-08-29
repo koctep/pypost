@@ -1,4 +1,4 @@
-"""PYPOST-971: flat and tree DisplayRole scan share one helper owner."""
+"""PYPOST-971/1041: flat and tree DisplayRole scan share one helper owner."""
 
 from __future__ import annotations
 
@@ -57,8 +57,40 @@ def _has_display_role_attr(fn: ast.AST) -> bool:
     return False
 
 
+def _module_all_exports(tree: ast.AST) -> set[str]:
+    """Return the string names listed in the module-level ``__all__`` assignment.
+
+    Returns an empty set when the module declares no ``__all__`` or assigns it
+    something other than a list/tuple literal, so a missing manifest fails the
+    caller's subset assertion instead of raising.
+    """
+    for node in ast.iter_child_nodes(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == "__all__"
+            for target in node.targets
+        ):
+            continue
+        value = node.value
+        if isinstance(value, (ast.List, ast.Tuple)):
+            return {
+                elt.value
+                for elt in value.elts
+                if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+            }
+    return set()
+
+
 def test_flat_and_tree_share_display_role_match_helper() -> None:
-    """AC-1: shared DisplayRole match + flat scan live in tree_index and are used."""
+    """Ownership contract for the shared DisplayRole match and flat sibling scan.
+
+    AC-1: ``find_child_index_by_display_text`` delegates matching to ``display_role_equals``.
+    AC-2: it never inlines an ``ItemDataRole.DisplayRole`` comparison of its own.
+    AC-3: ``pypost.agent.tree_index.__all__`` names the three public helpers.
+    AC-4: the pre-existing ``find_tree_index_by_display_text`` and ``_select_item_view``
+    assertions stay intact.
+    """
     assert _TREE_INDEX.is_file(), f"missing {_TREE_INDEX}"
     assert _UI_ACTIONS.is_file(), f"missing {_UI_ACTIONS}"
 
@@ -71,9 +103,29 @@ def test_flat_and_tree_share_display_role_match_helper() -> None:
         "pypost.agent.tree_index must define display_role_equals "
         "(shared DisplayRole exact-match policy)"
     )
-    assert "find_child_index_by_display_text" in tree_defs, (
+    find_child = tree_defs.get("find_child_index_by_display_text")
+    assert find_child is not None, (
         "pypost.agent.tree_index must define find_child_index_by_display_text "
         "(flat sibling DisplayRole scan)"
+    )
+    assert _calls_name(find_child, "display_role_equals"), (
+        "find_child_index_by_display_text must call display_role_equals "
+        "instead of inlining DisplayRole comparison"
+    )
+    assert not _has_display_role_attr(find_child), (
+        "find_child_index_by_display_text must not compare ItemDataRole.DisplayRole "
+        "inline; use display_role_equals"
+    )
+
+    tree_exports = _module_all_exports(tree_index_ast)
+    expected_exports = {
+        "display_role_equals",
+        "find_child_index_by_display_text",
+        "find_tree_index_by_display_text",
+    }
+    assert expected_exports.issubset(tree_exports), (
+        f"pypost.agent.tree_index.__all__ must export {sorted(expected_exports)}; "
+        f"found {sorted(tree_exports)}"
     )
 
     find_tree = tree_defs.get("find_tree_index_by_display_text")

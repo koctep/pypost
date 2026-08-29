@@ -50,7 +50,7 @@ Product MCP docs: [mcp_integration.md](mcp_integration.md),
 | --- | --- |
 | `pypost/agent/ui_actions.py` | Lookup, interactable checks, primitives, errors |
 | `pypost/agent/tree_index.py` | Shared DisplayRole match + flat/tree index lookup
-  (PYPOST-941 / PYPOST-971) |
+  (PYPOST-941 / PYPOST-971; ownership AST guard PYPOST-1041) |
 | `AgentAppSession.ui_*` | Convenience after `start()`; root = main window
   (or current tab when `in_current_tab=True` — PYPOST-851) |
 | `QTest.mouseClick` / `keyClick` / `keyClicks` | Click, single-key, and opt-in fill typing |
@@ -164,7 +164,10 @@ Flat item-view text selection calls the flat helper only (root siblings).
 Tree text selection keeps DFS order and shares only the match predicate — it
 does **not** call `find_child_index_by_display_text` at each level (that would
 become siblings-first and change duplicate-label first-match). Ownership is
-locked by `tests/test_display_role_scan_ownership.py`.
+locked by `tests/test_display_role_scan_ownership.py` — see
+[DisplayRole ownership boundary and its
+guard](#displayrole-ownership-boundary-and-its-guard-pypost-1041) for the rule,
+its AST enforcement, and the constraints on editing that suite.
 
 Missing option/index or unsupported widget type →
 `UiTargetNotInteractableError` with `reason=option not found` or
@@ -202,6 +205,109 @@ ui_select(root, "fixture_list_view", 0)      # QListView by index
 ui_select(root, COLLECTION_TREE, "GET Seed GET")  # tree by text
 ui_select(root, COLLECTION_TREE, 0)     # tree top-level index
 ```
+
+#### DisplayRole ownership boundary and its guard (PYPOST-1041)
+
+The DisplayRole ownership boundary described above is a rule about **source
+shape**, not only behaviour, so it is enforced statically instead of by a
+runtime test:
+
+- `display_role_equals` in `pypost/agent/tree_index.py` is the only function
+  **inside `pypost/agent`** that may read `Qt.ItemDataRole.DisplayRole` for
+  text matching.
+- `find_child_index_by_display_text` (flat) and
+  `find_tree_index_by_display_text` (recursive DFS) both delegate the row
+  comparison to it and never inline `ItemDataRole.DisplayRole`.
+- `pypost/agent/ui_actions.py` imports `find_child_index_by_display_text` from
+  `pypost.agent.tree_index` at **module level**, and `_select_item_view` calls
+  it on the text branch and never reads `ItemDataRole.DisplayRole` itself. The
+  guard's `_imports_from_tree_index` check runs over the whole `ui_actions.py`
+  module AST, so it pins the module's import edge, not an import inside the
+  function.
+- `pypost.agent.tree_index.__all__` names all three helpers, keeping the
+  shared public surface explicit.
+
+**Scope.** This is a `pypost/agent` rule, not a repo-wide one. Product UI code
+outside that package still reads the role directly — see
+`pypost/ui/delegates/environment_name_delegate.py`,
+`pypost/ui/widgets/websocket/stream_view.py`, and
+`pypost/ui/widgets/websocket/stream_model.py` — and the AST guard parses only
+`pypost/agent/tree_index.py` and `pypost/agent/ui_actions.py`, so nothing
+outside those two files is checked.
+
+A new caller **in `pypost/agent`** that needs display-text matching routes
+through one of the two finders (or `display_role_equals`); it does not re-read
+the role.
+
+**Enforcement.** `tests/test_display_role_scan_ownership.py` parses
+`tree_index.py` and `ui_actions.py` with `ast.parse` — the modules under test
+are never imported, so no Qt app, display server, or fixture lifecycle is
+involved — and asserts all four rules inside one test,
+`test_flat_and_tree_share_display_role_match_helper` (module-level
+`pytestmark = pytest.mark.timeout(10)`). Its AST helpers are `_calls_name`
+(delegation), `_has_display_role_attr` (inline-DisplayRole probe),
+`_imports_from_tree_index` (import edge), and `_module_all_exports` (literal
+`__all__` manifest). The test is fail-fast: a run reports the first violated
+rule only.
+
+**Guard of the guard.** `tests/test_display_role_scan_ownership_repro.py`
+keeps *part of* the ownership suite from being quietly weakened. Three of its
+tests read the ownership suite's *own* AST and look for one specific assertion
+shape each; two monkeypatch the suite's `_parse` so it audits a synthetic
+`tree_index` mutant (one inlines DisplayRole, one empties `__all__`) and must
+raise `AssertionError`.
+
+**What the repro actually pins** — three of the ownership suite's fourteen
+assertions, no more:
+
+- `_calls_name(find_child, "display_role_equals")` — the flat finder delegates.
+- `not _has_display_role_attr(find_child)` — the flat finder does not inline.
+- `expected_exports.issubset(tree_exports)` — the `__all__` manifest (pinned by
+  the empty-`__all__` mutant test, not by a source-shape test).
+
+Delete one of those three and the repro turns red while the ownership suite
+itself would stay green. The other eleven assertions are **not** guarded: the
+`is_file` / `is not None` structural checks, the whole
+`find_tree_index_by_display_text` pair, and all three `_select_item_view`
+assertions can each be deleted individually with all five repro tests
+still passing —
+`_refers_to_find_child` only recognises a first argument that names the *flat*
+finder, so it never sees the other two pairs. That gap is TD-3 in
+[60-tech-debt.md](../../ai-tasks/PYPOST-1041/60-tech-debt.md), tracked as
+[PYPOST-1236](https://pypost.atlassian.net/browse/PYPOST-1236). Until it is
+fixed, a green repro is evidence about the flat finder and `__all__` only —
+do not read it as proof that the whole ownership contract is intact.
+
+Two constraints follow from that coupling. Both apply when editing either
+file:
+
+- **Diagnostic wording is a machine-checked contract**
+  (TD-9 in [60-tech-debt.md](../../ai-tasks/PYPOST-1041/60-tech-debt.md)).
+  The repro pins the assertion messages with `pytest.raises(match=...)`:
+  `find_child_index_by_display_text.*(display_role_equals|DisplayRole)` and
+  `__all__.*export`. Rewording a message means changing both files together —
+  keep the function name and the helper name on **one** line (`.` does not
+  match a newline) and keep `__all__` ahead of `export`.
+- **The repeated assertion pairs must stay repeated**
+  (TD-5 in [60-tech-debt.md](../../ai-tasks/PYPOST-1041/60-tech-debt.md)).
+  The three `_calls_name(...)` / `_has_display_role_attr(...)` pairs look like
+  obvious duplication. Do not fold any of them into a loop or a shared
+  `_assert_delegates(fn, ...)` helper — but they fail differently:
+
+  - The **`find_child`** pair is the one the repro watches.
+    `_refers_to_find_child` accepts a first argument that is either an
+    `ast.Name` whose lowercased id contains `child`, *or* any expression whose
+    `ast.dump` contains `find_child_index_by_display_text` — so an inline
+    lookup such as `tree_defs["find_child_index_by_display_text"]` is accepted
+    too, not only a bare name. A helper or loop rebinds that argument to a
+    generic `fn`, which matches neither branch, so the repro stops seeing the
+    assertion and reports the guard as missing (both source-shape repro tests
+    go red).
+  - The **`find_tree`** and **`_select_item_view`** pairs match neither branch
+    today, so folding *those* changes nothing in the repro — it stays green
+    and the loss is silent. That is TD-3 above, not a licence to dedup them.
+
+  Revert such a dedup rather than loosening the repro.
 
 ### `ui_send_key(root, widget_id, key, *, modifiers=NoModifier)`
 
@@ -265,6 +371,18 @@ widgets that already have `objectName` set via `set_widget_id`.
   (PYPOST-942). Live `COLLECTION_TREE` proofs:
   `test_live_collection_tree_missing_option_raises` /
   `test_live_collection_tree_index_out_of_range_raises` (PYPOST-975).
+- **Ownership suite fails with `__all__ must export [...]; found []`** —
+  either `pypost.agent.tree_index.__all__` really lost a name, or it was
+  respelled as an annotated (`__all__: list[str] = [...]`) or computed
+  assignment, which `_module_all_exports` skips because it matches `ast.Assign`
+  only. Keep the plain literal list (TD-1 in
+  [60-tech-debt.md](../../ai-tasks/PYPOST-1041/60-tech-debt.md)).
+- **Repro fails but the ownership suite passes** — an ownership assertion was
+  deleted, renamed, reworded, or folded into a helper/loop. Restore the
+  assertion shape rather than relaxing
+  `tests/test_display_role_scan_ownership_repro.py`; see
+  [DisplayRole ownership boundary and its
+  guard](#displayrole-ownership-boundary-and-its-guard-pypost-1041).
 - **Tree select did not open the request** — By design; `ui_select` sets
   current index. Use `click_tree_row_by_text` when the product needs a
   viewport click to open/activate.
