@@ -100,6 +100,9 @@ Harness modules under the marker (also the documented file-list override):
 | `tests/test_agent_dialog_settle_e2e.py` | Dialog settle (919); [doc](agent_dialog_settle.md) |
 | `tests/test_agent_ui_actions_mcp.py` | Out-of-process agent-UI MCP sidecar (952) |
 | `tests/test_agent_e2e_websocket.py` | WebSocket UI & Inspector loopback e2e (1132) |
+| `tests/test_agent_session_event_settle.py` | Post-ready flush and tree settlement contracts (1217) |
+| `tests/test_agent_ui_actions_mcp_seed.py` | Seed/collection injection in sidecar session (993) |
+| `tests/test_ui_actions_tree_no_model_mutation.py` | Load-bearing evidence for tree-no-model refusal guard (1042/972) |
 
 **Keep this table synced with markers:** when you add or remove
 `@pytest.mark.agent_e2e` on a module, update the Module column above in the
