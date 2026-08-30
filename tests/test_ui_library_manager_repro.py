@@ -10,8 +10,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 from pypost.models.git_library import (
     GitAuthConfig,
     GitAuthMode,
@@ -24,6 +22,8 @@ from pypost.models.git_library import (
 )
 from pypost.core.git_service import GitLibraryService
 from pypost.ui import widget_ids
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def test_git_library_models_extended_operation_types():

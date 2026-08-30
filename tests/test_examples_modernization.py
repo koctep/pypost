@@ -4,8 +4,6 @@ from __future__ import annotations
 from pathlib import Path
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 from pypost.core.library_manifest import (
     find_and_read_manifest,
     read_library_manifest,
@@ -14,6 +12,8 @@ from pypost.core.library_manifest import (
 from pypost.core.collection_serializer import read_collection_file
 from pypost.models.library_manifest import LibraryManifest
 from pypost.models.models import Collection
+
+pytestmark = pytest.mark.timeout(30)
 
 
 class TestModernizedExamplesLibrary:

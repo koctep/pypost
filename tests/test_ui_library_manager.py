@@ -15,8 +15,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
@@ -50,6 +48,8 @@ from pypost.ui.widgets.library_manager_panel import (
     LibraryListWidget,
 )
 from pypost.ui import widget_ids
+
+pytestmark = pytest.mark.timeout(30)
 
 
 @pytest.fixture

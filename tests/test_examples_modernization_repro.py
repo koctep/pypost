@@ -4,14 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 import pytest
 
-pytestmark = pytest.mark.timeout(30)
-
 from pypost.core.library_manifest import (
     read_library_manifest,
     validate_manifest_collections,
 )
 from pypost.models.library_manifest import LibraryManifest
 from pypost.core.collection_serializer import read_collection_file
+
+pytestmark = pytest.mark.timeout(30)
 
 
 def test_examples_library_manifest_validity():

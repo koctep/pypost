@@ -1168,6 +1168,13 @@ the marker; `pytest-timeout` is installed via `make venv-test`. There is no glob
 `pyproject.toml` — each test module,
 class, or function must declare its own timeout.
 
+The `pytestmark`-after-imports ordering (above) is additionally enforced repo-wide by
+[`tests/test_lint_pytestmark_e402.py`](../../tests/test_lint_pytestmark_e402.py), which runs
+`flake8 --select=E402` over `tests/` and fails if any finding is reported. All test modules,
+including `test_examples_modernization.py`, `test_examples_modernization_repro.py`,
+`test_ui_library_manager.py`, and `test_ui_library_manager_repro.py`, are compliant
+(PYPOST-1233).
+
 ```bash
 make test
 ```
