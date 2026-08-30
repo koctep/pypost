@@ -66,6 +66,7 @@ class FunctionRegistry:
     def __init__(self) -> None:
         self._functions: dict[str, Callable[..., Any]] = dict(_DEFAULT_CATALOG)
         self._allowed_names: frozenset[str] = frozenset(self._functions)
+        self._strict_functions: frozenset[str] = frozenset({"to_int"})
 
     def allowed_names(self) -> frozenset[str]:
         """Immutable set of permitted function names for template expressions."""
@@ -74,6 +75,10 @@ class FunctionRegistry:
     def is_allowed(self, name: str) -> bool:
         """True if name is in the catalog."""
         return name in self._functions
+
+    def is_strict_conversion(self, function_name: str) -> bool:
+        """True if function_name is a strict conversion function."""
+        return function_name in self._strict_functions
 
     def register_into_env(self, env: Environment) -> None:
         """

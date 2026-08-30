@@ -29,6 +29,7 @@ conventions.
 1. [WebSocket Subsystem Architecture (PYPOST-1138)](websocket_architecture.md)
 1. [TemplateService — central variable substitution](template_service.md)
 1. [Template Expression Functions and Integer Conversion (PYPOST-450, PYPOST-1037, PYPOST-1038)](template_expression_functions.md)
+1. [Template Failure Provenance and Strict Conversion (PYPOST-1120)](template_failure_provenance.md)
 1. [Variable Propagation](variable_propagation.md)
 1. [Variable Validation](variable_validation.md)
 1. [Sensitive Data Masking Policy (PYPOST-446)](sensitive_data_masking_policy.md)

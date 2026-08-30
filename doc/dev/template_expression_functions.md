@@ -1,4 +1,4 @@
-# Template Expression Functions (PYPOST-450–PYPOST-454, PYPOST-1037, PYPOST-1118)
+# Template Expression Functions (PYPOST-450–PYPOST-454, PYPOST-1037, PYPOST-1118, PYPOST-1120)
 
 ## Overview
 
@@ -42,6 +42,11 @@ PYPOST-1118 adds `env(name)`: an allow-listed template function retrieving
 operating system environment variables from `os.environ`, safely returning an
 empty string when the variable is unset and converting input objects to string.
 
+PYPOST-1120 decouples strict conversion failure identification from renderer regex
+heuristics by introducing structured failure provenance (`ExpressionFailureProvenance`)
+in `FunctionExpressionResolver` and strict conversion metadata in `FunctionRegistry`.
+See [Template Failure Provenance and Strict Conversion](template_failure_provenance.md).
+
 Outside the narrow strict HTTP conversion boundary described below, implemented
 behavior is backward compatible:
 
@@ -50,8 +55,9 @@ behavior is backward compatible:
 - Plain variable placeholders like `{{host}}` continue to work unchanged.
 - Safe dotted paths are accepted; unsafe attribute-style paths stay rejected.
 - Ordinary invalid expressions retain their literal-fallback behavior.  Invalid
-  direct `to_int(...)` expressions are the narrow exception during HTTP request
-  preparation, where dispatch is blocked before `session.request`.
+  `to_int(...)` expressions (including nested and unclosed forms) are the narrow
+  exception during HTTP request preparation, where dispatch is blocked before
+  `session.request`.
 
 ### Plain Variable Tokenizer and Whitespace Handling (PYPOST-1151 / PYPOST-1176)
 
@@ -75,10 +81,13 @@ Main components:
 - `pypost/core/function_registry.py` (`FunctionRegistry`)
   - Single source of truth for allow-listed template-callable names and implementations:
     `urlencode`, `md5`, `base64`, `to_int`, `env`.
-  - Exposes `allowed_names()`, `is_allowed()`, `get()`, and `register_into_env(env)` to bind
-    those callables onto `jinja2.Environment.globals` (catalog keys only).
-- `pypost/core/template_expression_types.py` (`ValidationResult`)
-  - Shared validation outcome dataclass with `is_valid`, `code`, and `function_name`.
+  - Exposes `allowed_names()`, `is_allowed()`, `is_strict_conversion()` (PYPOST-1120), `get()`,
+    and `register_into_env(env)` to bind those callables onto `jinja2.Environment.globals`.
+- `pypost/core/template_expression_types.py` (`ValidationResult`, `ExpressionFailureProvenance`)
+  - Shared validation outcome dataclass (`ValidationResult`) with `is_valid`, `code`,
+    `function_name`, `expression`, `failures` tuple, and `has_strict_failure` property (PYPOST-1120).
+  - Diagnostic failure record (`ExpressionFailureProvenance`) with `code`, `expression`,
+    `function_name`, `is_strict_conversion`, `span`, and `is_strict` alias (PYPOST-1120).
   - Factory methods: `ValidationResult.valid()` and `ValidationResult.error(...)`.
 - `pypost/core/function_expression_resolver.py` (`FunctionExpressionResolver`)
   - Parses and validates expressions inside `{{...}}`.
@@ -86,11 +95,15 @@ Main components:
     (PYPOST-1033); same rule applies to function arguments.
   - Uses `FunctionRegistry` for allow-list checks at every call node, including nested chains.
   - Exposes `NESTED_FUNCTION_CALLS_ALLOWED` as the declarative nested-call policy constant.
-  - Returns `ValidationResult` and does not emit logs or metrics.
+  - Authoritatively inspects multi-expression content, nested calls, and unclosed placeholders
+    via `inspect_failure_provenance(...)` and `has_strict_conversion_failure(...)` (PYPOST-1120).
+  - Returns `ValidationResult` with provenance details and does not emit user-facing logs.
 - `pypost/core/template_service.py` (`TemplateService`)
   - Owns `jinja2.Environment`, registry wiring, render orchestration, logging, and metrics.
   - Delegates `validate_function_expressions(...)` and render-path validation to
     `FunctionExpressionResolver`.
+  - Eliminates renderer regex heuristics (`_DIRECT_TO_INT_CALL_RE` and `_STARTED_TO_INT_CALL_RE`),
+    delegating strict conversion failure detection to resolver provenance (PYPOST-1120).
   - Maps validation codes to user-facing messages only on the render fallback path.
 - `pypost/ui/widgets/mixins.py` (`VariableHoverHelper`)
   - `EXPRESSION_PATTERN` aliases `TEMPLATE_PLACEHOLDER_PATTERN` from the core tokenizer
@@ -103,8 +116,8 @@ Main components:
   - Renders URL, header keys/values, param keys/values, and body via
     `TemplateService.render_string` before outbound requests.
   - Uses the strict conversion render path for request preparation. A failed
-    direct `to_int(...)` is mapped to `ExecutionError(TEMPLATE)` and stops the
-    request before `session.request`.
+    `to_int(...)` (direct, nested, or unclosed) is mapped to `ExecutionError(TEMPLATE)`
+    and stops the request before `session.request`.
 - `pypost/core/request_service.py` (`RequestService`)
   - MCP/history paths render URL, headers, and body
     (`_execute_mcp` / PYPOST-1173).
@@ -273,11 +286,17 @@ request value.
 `TemplateService.render_string()` and hover callers retain the established
 backward-compatible fallback: an invalid expression returns the complete
 original field content. `HTTPClient` instead uses
-`render_string_strict_conversion()` during request preparation. If a direct
-`{{to_int(...)` expression fails because of an invalid value, wrong arity,
-malformed/unclosed syntax, or a nested-expression failure, it raises
-`ExecutionError` with `ErrorCategory.TEMPLATE`; `session.request` is not
-called. This applies to URL, headers, parameters, and JSON bodies.
+`render_string_strict_conversion()` during request preparation. If a
+`{{to_int(...)` expression (direct, nested such as `{{ md5(to_int(val)) }}`,
+or unclosed syntax) fails because of an invalid value, wrong arity, or
+malformed syntax, it raises `ExecutionError` with `ErrorCategory.TEMPLATE`;
+`session.request` is not called. This applies to URL, headers, parameters, and
+JSON bodies.
+
+In PYPOST-1120, this failure detection is powered by structured failure
+provenance from `FunctionExpressionResolver.inspect_failure_provenance()` rather
+than regex matching in `TemplateService`. See [Template Failure Provenance and
+Strict Conversion](template_failure_provenance.md) for architectural details.
 
 The boundary is intentionally precise, not a general change to template error
 handling:
@@ -286,7 +305,7 @@ handling:
   containing `to_int(` keep ordinary fallback behavior.
 - A valid `{{to_int(issue_id)}}` in the same field as an unrelated invalid
   expression also keeps the ordinary complete-field literal fallback and may
-  dispatch. The strict path blocks only when the `to_int` expression itself
+  dispatch. The strict path blocks only when a strict conversion function itself
   has failed.
 - A `TemplateService` subclass that overrides `render_string(content,
   variables)` remains supported; the strict preflight protects conversion

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
-import re
 from typing import Any
 
 from jinja2 import Environment
@@ -25,17 +25,15 @@ from pypost.core.template_service_render import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 class TemplateService:
     """Central ``{{...}}`` substitution entry point (PYPOST-18).
 
     Accepts optional ``template_service`` across client/service layer.
     See ``doc/dev/template_service.md`` for consumers and test seams.
     """
-
-    # Only a direct ``to_int`` placeholder participates in strict conversion;
-    # ``not_to_int(...)`` and ``value.to_int(...)`` remain unrelated forms.
-    _DIRECT_TO_INT_CALL_RE = re.compile(r"^\s*to_int\s*\(")
-    _STARTED_TO_INT_CALL_RE = re.compile(r"\{\{\s*to_int\s*\(")
 
     def __init__(self, metrics: MetricsTrackerProtocol | None = None):
         self.env = Environment()
@@ -121,11 +119,16 @@ class TemplateService:
                 render_path,
                 expression_count,
             )
-            if strict_conversion and self._is_failed_to_int_expression(
+            if strict_conversion and self._contains_failed_to_int_call(
                 content,
                 exc,
                 variables,
             ):
+                logger.info(
+                    "strict_conversion_failure_propagated render_path=%s error_type=%s",
+                    render_path,
+                    type(exc).__name__,
+                )
                 if isinstance(exc, IntegerConversionError):
                     raise
                 raise IntegerConversionError("Invalid to_int template expression") from exc
@@ -137,42 +140,68 @@ class TemplateService:
         exc: Exception,
         variables: dict[str, Any],
     ) -> bool:
-        """Identify failed direct ``to_int`` expressions without widening fallback.
+        """Backward-compatibility wrapper for _contains_failed_to_int_call."""
+        return self._contains_failed_to_int_call(content, exc, variables)
 
-        A field can contain more than one placeholder.  The normal resolver
-        intentionally stops at the first invalid one, so its provenance alone
-        cannot tell us whether a later direct ``to_int`` also failed.  Inspect
-        each direct call independently only after the ordinary render has
-        failed.  This preserves literal fallback when there is no failed
-        ``to_int`` call, including a valid conversion beside an unrelated
-        invalid expression.
+    def _contains_failed_to_int_call(
+        self,
+        content: str,
+        exc: Exception,
+        variables: dict[str, Any],
+    ) -> bool:
+        """Identify failed strict conversion expressions without widening fallback.
+
+        Relies on FunctionExpressionResolver structured failure provenance and
+        dynamic evaluation of strict expressions.
         """
         if isinstance(exc, IntegerConversionError):
+            logger.debug(
+                "strict_conversion_failure_identified source=exception error_type=%s",
+                type(exc).__name__,
+            )
             return True
 
-        completed_direct_calls: list[tuple[int, int]] = []
+        # Check structured failure provenance from the resolver (syntax errors,
+        # unclosed placeholders, arity errors, unknown functions in strict context).
+        provenances = self._function_expression_resolver.inspect_failure_provenance(content)
+        strict_prov = next((p for p in provenances if p.is_strict_conversion), None)
+        if strict_prov is not None:
+            logger.debug(
+                "strict_conversion_failure_identified source=provenance "
+                "function_name=%s code=%s",
+                strict_prov.function_name or "unknown",
+                strict_prov.code,
+            )
+            return True
+
+        # Dynamically evaluate completed placeholders containing strict conversion functions
         for token in TEMPLATE_PLACEHOLDER_PATTERN.finditer(content):
             expression = token.group(1)
-            if not self._DIRECT_TO_INT_CALL_RE.search(expression):
+            if not self._function_expression_resolver.contains_strict_function(expression):
                 continue
-            completed_direct_calls.append(token.span())
 
             expression_validation = self._validate_template_expressions([expression])
             if not expression_validation.is_valid:
+                logger.debug(
+                    "strict_conversion_failure_identified source=validation "
+                    "function_name=%s code=%s",
+                    expression_validation.function_name or "unknown",
+                    expression_validation.code or "unknown",
+                )
                 return True
 
             try:
                 self._compile_template("{{" + expression + "}}").render(variables)
-            except IntegerConversionError:
+            except IntegerConversionError as conv_err:
+                logger.debug(
+                    "strict_conversion_failure_identified source=eval error_type=%s",
+                    type(conv_err).__name__,
+                )
                 return True
+            except Exception:
+                pass
 
-        # An unclosed ``{{to_int(...`` placeholder is not tokenized by the
-        # legacy tokenizer and reaches Jinja as a syntax error.  Do not mistake
-        # a completed, valid call earlier in the field for that malformed form.
-        return any(
-            not any(start <= match.start() < end for start, end in completed_direct_calls)
-            for match in self._STARTED_TO_INT_CALL_RE.finditer(content)
-        )
+        return False
 
     def render_string_strict_conversion(
         self,

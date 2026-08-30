@@ -42,13 +42,15 @@ flowchart LR
 | Module | Role |
 | --- | --- |
 | `environment_variable_resolver.py` | Evaluates template expressions and built-ins in environment variable values (PYPOST-1119) |
-| `function_registry.py` | Allow-listed callable names (`urlencode`, `md5`, `base64`, `env`) |
-| `function_expression_resolver.py` | Validates `{{func(...)}}` and safe dotted paths before render (PYPOST-1033) |
+| `function_registry.py` | Allow-listed callable names (`urlencode`, `md5`, `base64`, `to_int`, `env`) and strict metadata (PYPOST-1120) |
+| `function_expression_resolver.py` | Validates `{{func(...)}}`, safe dotted paths, and provides structured failure provenance (PYPOST-1120) |
+| `template_expression_types.py` | Shared `ValidationResult` and `ExpressionFailureProvenance` dataclasses (PYPOST-1120) |
 | `template_expression_tokenizer.py` | Shared `{{...}}` token patterns |
 | `template_service_render.py` | Private render stages, metrics, and logging helpers (PYPOST-700) |
 
-See also [template_expression_functions.md](template_expression_functions.md) for function
-expression policy and test matrix.
+See also [template_expression_functions.md](template_expression_functions.md) and
+[template_failure_provenance.md](template_failure_provenance.md) for function expression policy,
+strict conversion semantics, and failure provenance.
 
 ## Consumer matrix
 
@@ -150,6 +152,26 @@ Validation-first render:
 
 Safe-path grammar and MCP substitution details:
 [template_expression_functions.md](template_expression_functions.md) (PYPOST-1033).
+
+### `render_string_strict_conversion(content, variables, render_path="http") -> str`
+
+Strict rendering mode used by `HTTPClient` during outbound request preparation:
+
+1. Invokes `render_string(..., strict_conversion=True)`.
+2. When rendering fails, invokes `_contains_failed_to_int_call(content, exc, variables)`
+   (with `_is_failed_to_int_expression` backward-compatibility alias).
+3. **Decoupled from Regex Heuristics (PYPOST-1120):** `TemplateService` no longer maintains regex
+   attributes (`_DIRECT_TO_INT_CALL_RE` and `_STARTED_TO_INT_CALL_RE` have been removed). Instead,
+   it queries `FunctionExpressionResolver.inspect_failure_provenance(content)` for structured
+   provenance records and dynamically evaluates completed placeholders containing strict functions.
+4. If a strict conversion failure is identified (direct call, nested call such as
+   `{{ md5(to_int(val)) }}`, or unclosed placeholder `{{to_int(...`), raises
+   `IntegerConversionError` to halt outbound dispatch before `session.request`.
+5. Emits structured log events `strict_conversion_failure_identified` (`DEBUG`) and
+   `strict_conversion_failure_propagated` (`INFO`).
+6. Preserves safe literal fallback for benign syntax or unrelated non-strict errors.
+
+See [template_failure_provenance.md](template_failure_provenance.md) for full details.
 
 ### `parse(content) -> AST`
 
