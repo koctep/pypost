@@ -391,6 +391,15 @@ Explicit differentiation:
   destructor crash involving `SettingsDialog` layout wrappers. PYPOST-1216 does not involve
   `SettingsDialog`, layout item deletion, or garbage collection double-frees.
 
+**Unclassified, non-reproduced report**: not every filed failure fits one of the four classes
+above. A segfault originally filed against `tests/test_ui_wait.py` (isolated subprocess) was
+investigated under [PYPOST-1152](https://pypost.atlassian.net/browse/PYPOST-1152) and did not
+reproduce (47/47 clean runs across 4 invocation shapes; code review found no PyPost-owned defect
+pattern matching Classes 1-4). It is deliberately left unclassified rather than force-fit into an
+existing class — see
+[GUI testing § Troubleshooting](gui_testing.md#troubleshooting) for the full row and the
+`tests/test_ui_wait_stress.py` regression guard.
+
 #### Implemented Stabilization Architecture & Resolution (FIX-1 / PYPOST-1217)
 
 Stabilization of `test_live_collection_tree_missing_option_raises` under multi-worker
