@@ -61,6 +61,9 @@ Reference surfaces (non-exhaustive):
 - `tests/test_collection_storage_worker.py` — `usefixtures("qapp")` (PYPOST-884)
 - `tests/test_env_presenter.py` / `tests/test_tabs_presenter.py`
 - `tests/test_code_editor.py` / `tests/test_request_editor_*.py`
+- `tests/test_mcp_controls_presenter.py` — free functions + `qapp` (verified
+  aligned, PYPOST-1110; fix had already landed via unrelated commit 494eb857 /
+  PYPOST-1176)
 
 Free-function style (preferred for new plain pytest modules):
 
@@ -382,3 +385,7 @@ Engine DI examples: [websocket_session_engine.md](websocket_session_engine.md) �
   full-suite re-check after PYPOST-828 timeout diagnostics
 - [PYPOST-882](https://pypost.atlassian.net/browse/PYPOST-882) —
   full-suite re-check after PYPOST-829 H3 finish-path fix
+- [PYPOST-1110](https://pypost.atlassian.net/browse/PYPOST-1110) —
+  verified `tests/test_mcp_controls_presenter.py` already aligned with the
+  shared conftest `qapp` fixture and guard test; fix had already landed via
+  unrelated commit 494eb857 / [PYPOST-1176](https://pypost.atlassian.net/browse/PYPOST-1176)
