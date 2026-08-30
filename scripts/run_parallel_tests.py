@@ -534,12 +534,13 @@ def run_parallel_tests(config: RunnerConfig) -> RunSummary:
     test_targets = ",".join(config.test_targets) if config.test_targets else "tests/"
     logger.info(
         "parallel_test_run_started workers=%d enable_coverage=%s report_json=%s "
-        "test_targets=%s pytest_arg_count=%d",
+        "test_targets=%s pytest_arg_count=%d worker_timeout=%s",
         config.workers,
         config.enable_coverage,
         report_json,
         test_targets,
         len(config.pytest_args),
+        config.worker_timeout,
     )
 
     test_files = TestDiscovery.discover_test_files(config.repo_root, config.test_targets)

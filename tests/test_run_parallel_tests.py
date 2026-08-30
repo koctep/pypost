@@ -466,6 +466,7 @@ def test_parallel_runner_logs_run_config(
     assert any("enable_coverage=True" in message for message in messages)
     assert any("test_targets=tests" in message for message in messages)
     assert any(f"report_json={json_path}" in message for message in messages)
+    assert any("worker_timeout=30.0" in message for message in messages)
 
 
 def test_parallel_runner_logs_failure_context(

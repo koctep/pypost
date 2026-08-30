@@ -232,8 +232,10 @@ Example:
 WARNING worker_timeout file=tests/test_hang.py timeout_seconds=30.0
 ```
 
-`parallel_test_run_started` does not currently include `worker_timeout=…`; operators read the
-bound from CLI/Make/env or from a timeout WARNING.
+`parallel_test_run_started` includes `worker_timeout=…` (PYPOST-1198): the effective per-worker
+timeout bound resolved for the run (see [Worker timeout precedence](#worker-timeout-precedence)),
+so operators can read the active bound directly from the run-start log line instead of only from
+CLI/Make/env or a later timeout WARNING.
 
 ## Subprocess isolation and Qt offscreen
 
