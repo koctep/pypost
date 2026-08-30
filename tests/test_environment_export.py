@@ -138,7 +138,7 @@ def test_write_encrypted_export_file_round_trips_through_import(tmp_path, monkey
     assert isinstance(hidden_field, dict)
     envelope = EncryptedValueEnvelope.from_payload(hidden_field)
     assert envelope.enc is True
-    assert envelope.v == 1
+    assert envelope.v == 2
     assert envelope.alg == "fernet"
     assert isinstance(envelope.kid, str)
     assert isinstance(envelope.ct, str)
