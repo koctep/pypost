@@ -145,7 +145,7 @@ conventions.
 1. [Test Log Guardrails and Capture (PYPOST-1081)](test_log_guardrails.md)
 1. [Verification-Artifact Contracts (PYPOST-1077)](verification_artifact_contracts.md)
 1. [AI Task Artifacts Verification (PYPOST-816, PYPOST-1071, PYPOST-1079)](ai_task_artifacts_verification.md)
-1. [Static Type Checking (PYPOST-734)](static_type_checking.md)
+1. [Static Type Checking (PYPOST-734, PYPOST-1007, PYPOST-1241)](static_type_checking.md)
 1. [GUI Testing](gui_testing.md)
 1. [Agent UI E2E (PYPOST-839; broader packaging PYPOST-922)](agent_e2e.md)
 1. [Agent E2E Environment Contract (PYPOST-856)](agent_e2e_env.md)

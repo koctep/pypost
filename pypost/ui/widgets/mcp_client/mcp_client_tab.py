@@ -80,7 +80,7 @@ class McpClientTab(QWidget):
         header_row.addStretch()
         self.actions_btn = QToolButton(self)
         self.actions_btn.setText("Actions")
-        self.actions_btn.setPopupMode(QToolButton.InstantPopup)
+        self.actions_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.actions_menu = QMenu(self.actions_btn)
         self.save_as_action = QAction("Save As...", self)
         self.save_as_action.triggered.connect(self.handle_save_as_menu_action)

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QWidget
-
 from pypost.core.websocket_session_policy import SessionState
-from pypost.ui.collection_item_dialogs import prompt_deleted_websocket_profile_tab_close
+from pypost.ui.collection_item_dialogs import (
+    TabClosePromptProtocol,
+    prompt_deleted_websocket_profile_tab_close,
+)
 from pypost.ui.presenters.tab_dirty import is_websocket_saved_tab_dirty
 from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
 
@@ -49,7 +49,7 @@ def close_tabs_for_websocket_ids(
     presenter: TabsPresenter,
     ws_ids: list[str],
     *,
-    prompt: Callable[[QWidget, str, bool, bool], bool] | None = None,
+    prompt: TabClosePromptProtocol | None = None,
 ) -> None:
     """Closes tabs bound to deleted WebSocket profile ids; prompts when at risk."""
     if not ws_ids:

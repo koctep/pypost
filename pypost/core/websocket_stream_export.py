@@ -18,6 +18,7 @@ from pypost.core.websocket_stream import MessageStream, StreamEntry
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "StreamExportSnapshot",
     "WebSocketExportError",
     "format_json_transcript",
     "format_text_transcript",
@@ -58,7 +59,7 @@ class StreamExportSnapshot:
 
 
 def format_json_transcript(
-    stream: MessageStream,
+    stream: MessageStream | StreamExportSnapshot,
     metadata: Mapping[str, Any] | None = None,
     *,
     env_vars: Mapping[str, str] | None = None,
@@ -104,7 +105,7 @@ def format_json_transcript(
 
 
 def format_text_transcript(
-    stream: MessageStream,
+    stream: MessageStream | StreamExportSnapshot,
     metadata: Mapping[str, Any] | None = None,
     *,
     env_vars: Mapping[str, str] | None = None,
@@ -142,7 +143,7 @@ def format_text_transcript(
 
 def export_stream_to_json_file(
     path: Path,
-    stream: MessageStream,
+    stream: MessageStream | StreamExportSnapshot,
     metadata: Mapping[str, Any] | None = None,
     *,
     env_vars: Mapping[str, str] | None = None,
@@ -165,7 +166,7 @@ def export_stream_to_json_file(
 
 def export_stream_to_text_file(
     path: Path,
-    stream: MessageStream,
+    stream: MessageStream | StreamExportSnapshot,
     metadata: Mapping[str, Any] | None = None,
     *,
     env_vars: Mapping[str, str] | None = None,

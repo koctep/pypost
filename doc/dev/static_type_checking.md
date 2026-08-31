@@ -16,10 +16,10 @@ make install      # editable install with [dev] extra (includes mypy)
 make typecheck    # mypy + baseline gate (optional; not part of make check)
 ```
 
-The current gate passes with 217 known errors:
+The current gate passes with 189 known errors:
 
 ```text
-mypy baseline OK (217 known errors in pypost/core, pypost/models, pypost/ui)
+mypy baseline OK (189 known errors in pypost/core, pypost/models, pypost/ui)
 ```
 
 To see raw mypy output (including all known baseline errors):
@@ -36,6 +36,7 @@ To see raw mypy output (including all known baseline errors):
 | `mypy-baseline.json` | Version 2 frozen `(path, code, message)` error records |
 | `scripts/check_mypy_baseline.py` `MYPY_PATHS` | Authoritative checked path prefixes |
 | `scripts/check_mypy_baseline.py` | Runs mypy, parses diagnostics, and compares the baseline |
+| `tests/test_mypy_baseline_live.py` | Live pytest gate enforcing zero new and zero fixed baseline errors |
 | `Makefile` `typecheck` | Developer entry point |
 
 ### Configuring checked paths
@@ -129,6 +130,31 @@ The normal gate never rewrites the baseline automatically:
 git add mypy-baseline.json
 ```
 
+### Automated ratchet reconciliation
+
+The baseline gate functions as a strict, unidirectional ratchet:
+- **Zero regressions allowed:** Any new error introduced in `pypost/core/`, `pypost/models/`, or
+  `pypost/ui/` triggers an immediate gate failure (`New mypy errors (not in baseline)`).
+- **Mandatory debt retirement:** When code refactoring or bug fixes resolve previously baselined
+  errors, the gate exits with status `1` (`Resolved baseline errors (update baseline)`). Developers
+  must run `--update-baseline` and commit the updated `mypy-baseline.json`.
+
+This enforces that technical debt only decreases (ratcheting down from 217 to 201 to 189 errors),
+preventing retired errors from silently resurfacing in future changes.
+
+### Live test gate (`tests/test_mypy_baseline_live.py`)
+
+In addition to the standalone `make typecheck` target, PyPost includes an automated live test gate
+in [`tests/test_mypy_baseline_live.py`](file:///home/src/tests/test_mypy_baseline_live.py)
+(introduced in PYPOST-1241). This test runs under `make test` and `make check`:
+- It invokes `_run_mypy()`, parses live diagnostics, loads `mypy-baseline.json`, and computes
+  the multiset difference via `_diff_errors()`.
+- It asserts that `check_mypy_baseline.main()` exits with status `0`, `new_keys == []`, and
+  `fixed_keys == []`.
+- This ensures that unbaselined regressions and unratcheted baseline debt are caught immediately
+  during routine developer test runs and CI pipelines without requiring a separate `make typecheck`
+  step.
+
 ## Postponed annotations convention
 
 All modules under **`pypost/core/`**, **`pypost/models/`**, and **`pypost/ui/`** must include
@@ -155,6 +181,112 @@ This keeps forward references (`EncryptionKey | None`) consistent and aligns wit
 paths. Core/models adopted in PYPOST-738; UI bulk migration in PYPOST-815; 100% UI coverage
 verified in PYPOST-817 (67 modules).
 
+## Key Typing Contracts and Protocols (PYPOST-1241)
+
+### Generic save orchestrators (`SaveResult[T]`, `StaleCheckContext[T]`)
+
+Save orchestrators coordinate dirty checks, overwrite warnings, save-as dialogs, and persistence
+for tabs in the main window. Because PyPost supports multiple distinct protocol entities (HTTP
+requests, WebSocket connection profiles, and MCP client configurations), save orchestrator
+data structures in `pypost/ui/request_save_orchestrator.py` are parameterized over a generic
+type variable `T = TypeVar("T")`:
+
+```python
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class StaleCheckContext(Generic[T]):
+    """Tab persistence state used before overwriting an existing request or connection."""
+
+    persisted_baseline: T | None
+    stale_persisted: bool
+
+
+@dataclass(frozen=True)
+class SaveResult(Generic[T]):
+    action: SaveAction
+    request: T | None = None
+    collection_id: str | None = None
+```
+
+Concrete parameterizations across the codebase:
+- **HTTP Requests:** `SaveResult[RequestData]` and `StaleCheckContext[RequestData]` in
+  [`RequestSaveOrchestrator`](file:///home/src/pypost/ui/request_save_orchestrator.py).
+- **WebSocket Profiles:** `SaveResult[WebSocketConnection]` and
+  `StaleCheckContext[WebSocketConnection]` in
+  [`WebSocketSaveOrchestrator`](file:///home/src/pypost/ui/websocket_save_orchestrator.py).
+- **MCP Client Connections:** `SaveResult[McpClientConnection]` and
+  `StaleCheckContext[McpClientConnection]` in
+  [`McpClientSaveOrchestrator`](file:///home/src/pypost/ui/mcp_client_save_orchestrator.py).
+
+`TabsPresenter` implements typed helper methods (`_stale_context_for_tab`,
+`_stale_context_for_websocket_tab`, `_stale_context_for_mcp_client_tab`) that produce these
+strongly typed contexts, eliminating cross-entity union conflation and ensuring type safety when
+inspecting `result.request` or `context.persisted_baseline`.
+
+### Structural protocol for tab close prompts (`TabClosePromptProtocol`)
+
+When closing modified or active tabs, presenters display confirmation dialogs before closing.
+The dialog functions for protocol tabs (such as `prompt_deleted_websocket_profile_tab_close`
+and `prompt_deleted_mcp_client_tab_close` in `pypost/ui/collection_item_dialogs.py`) declare
+explicit keyword-only arguments:
+
+```python
+def prompt_deleted_websocket_profile_tab_close(
+    parent: QWidget,
+    tab_title: str,
+    *,
+    has_unsaved_edits: bool,
+    has_active_connection: bool,
+) -> bool: ...
+```
+
+In standard Python typing, `Callable[[QWidget, str, bool, bool], bool]` denotes positional-only
+arguments. Passing keyword arguments to a callback annotated with `Callable` causes mypy errors
+(`Unexpected keyword argument`). To enforce correct argument passing at type-check time,
+`pypost/ui/collection_item_dialogs.py` defines `TabClosePromptProtocol`:
+
+```python
+class TabClosePromptProtocol(Protocol):
+    def __call__(
+        self,
+        parent: QWidget,
+        tab_title: str,
+        *,
+        has_unsaved_edits: bool,
+        has_active_connection: bool,
+    ) -> bool: ...
+```
+
+This protocol is used across `tabs_presenter_ws_close.py`, `tabs_presenter_mcp_close.py`, and
+`tabs_presenter.py`, allowing dialog implementations and custom test fakes to be verified
+statically with keyword-only contracts.
+
+### Stream export typing with snapshots (`MessageStream | StreamExportSnapshot`)
+
+WebSocket message streams are buffered in memory via `MessageStream`
+(`pypost/core/websocket_stream.py`). For asynchronous disk exports, passing mutable in-memory
+streams across threads risks data races. PyPost captures an immutable snapshot on the GUI thread
+using `StreamExportSnapshot` (`pypost/core/websocket_stream_export.py`) before passing it to
+`WebSocketStreamExportWorker` on a background thread.
+
+Both `MessageStream` and `StreamExportSnapshot` provide identical structural read interfaces:
+- `__len__() -> int`: Retained message count.
+- `snapshot() -> tuple[StreamEntry, ...]`: Immutable tuple of stream entries.
+- `dropped -> dict[str, int]`: Drop counters (`capacity`, `memory_budget`).
+
+Core export formatters and writers in `pypost/core/websocket_stream_export.py`
+(`format_json_transcript`, `format_text_transcript`, `export_stream_to_json_file`, and
+`export_stream_to_text_file`) are annotated to accept the union:
+
+```python
+stream: MessageStream | StreamExportSnapshot
+```
+
+This allows synchronous headless callers to pass `MessageStream` directly, while off-thread workers
+pass `StreamExportSnapshot` without type casts, maintaining pure Qt-free typing contracts in core.
+
 ## Configuration
 
 Key mypy settings (see `pyproject.toml` for the full list):
@@ -169,15 +301,23 @@ Key mypy settings (see `pyproject.toml` for the full list):
 Dev dependencies: `mypy`, `types-PyYAML` (YAML stub types), and `types-PySide6` (Qt6 stub types)
 in `requirements-dev.in`.
 
-## Baseline Triage (PYPOST-734 / PYPOST-813 / PYPOST-814 / PYPOST-815)
+## Baseline Triage and History
 
-218 errors total (July 2026 snapshot): 41 in `pypost/core/`, 0 in `pypost/models/`, 177 in
-`pypost/ui/` (29 files). Per-code breakdown below is this original snapshot; it illustrates
-*typical* fixes rather than a live count. The baseline was regenerated under PYPOST-1007 for the
-key-format change (see [Architecture](#architecture)). The current baseline holds 217 known errors
-after resolving the Qt signal overload drift and removing two stale records. `make typecheck`
-passes when those 217 current diagnostics match the committed records. Open `mypy-baseline.json`
-(one JSON object per error, with an `error_count` summary field) for the exact live breakdown.
+The baseline error count reflects known technical debt across `pypost/core`, `pypost/models`, and
+`pypost/ui`. The baseline history and key milestones:
+
+- **PYPOST-734 / PYPOST-813 / PYPOST-814 / PYPOST-815 (July 2026):** Initial scoped baseline
+  frozen at 218 errors (41 in `pypost/core/`, 0 in `pypost/models/`, 177 in `pypost/ui/`).
+- **PYPOST-1007:** Migrated baseline keys from `path:line:code` to `(path, code, message)`
+  multiset representation to eliminate line-drift false positives. Reconciled to 217 errors.
+- **PYPOST-1241 (August 2026):** Reconciled the baseline down to **189 known errors**. Eliminated
+  33 newly introduced errors across generic save orchestrators, tab close prompt protocols, stream
+  export signatures, and Qt UserRole enums, while retiring 4 resolved baseline entries via
+  automated ratchet reconciliation. Added `tests/test_mypy_baseline_live.py` to enforce zero drift.
+
+Per-code breakdown below is the original July 2026 snapshot; it illustrates *typical* fixes rather
+than a live count. Open `mypy-baseline.json` (one JSON object per error, with an `error_count`
+summary field) for the exact live breakdown.
 
 ### Core (`pypost/core/`) — 41 errors in 14 files
 
@@ -212,17 +352,21 @@ helpers → presenter optional-parameter annotations.
 Full breakdown: `ai-tasks/PYPOST-734/20-architecture.md` (core initial triage);
 `ai-tasks/PYPOST-813/20-architecture.md` (R-P2-005a delta);
 `ai-tasks/PYPOST-814/20-architecture.md` (R-P2-005b delta);
-`ai-tasks/PYPOST-815/20-architecture.md` (R-P2-005c UI scope).
+`ai-tasks/PYPOST-815/20-architecture.md` (R-P2-005c UI scope);
+`ai-tasks/PYPOST-1241/20-architecture.md` (save orchestrator, dialog protocol,
+and stream export delta).
 
 ## Relationship to Other Quality Gates
 
 | Target | Includes mypy? |
 | --- | --- |
 | `make lint` | No (flake8) |
-| `make check` | No (lint + fast tests + `verify-ai-tasks`) |
-| `make typecheck` | Yes (optional) |
+| `make test` | Yes (runs `tests/test_mypy_baseline_live.py`) |
+| `make check` | Yes (lint + fast tests including live baseline gate + `verify-ai-tasks`) |
+| `make typecheck` | Yes (direct `check_mypy_baseline.py` invocation) |
 
-CI (`.github/workflows/test.yml`) does not run mypy yet.
+CI (`.github/workflows/test.yml`) runs `make check`, which executes
+`tests/test_mypy_baseline_live.py`.
 
 ## Troubleshooting
 
@@ -253,5 +397,8 @@ module import; do not patch `_ERROR_RE` separately.
 - [setup.md](setup.md) — dev dependency installation
 - [testing.md](testing.md) — primary quality gate (`make check`)
 - [maintainability_audit.md](maintainability_audit.md) — audit context for R-P2-005
+- `tests/test_mypy_baseline_live.py` — live pytest gate enforcing baseline ratchet invariants
 - `ai-tasks/PYPOST-1007/20-architecture.md` — full design rationale for the `(path, code,
   message)` key and Counter-based multiset diff, including the PYPOST-987 line-shift incident
+- `ai-tasks/PYPOST-1241/20-architecture.md` — full architectural design for generic
+  save orchestrator, protocol dialog, and stream export typing reconciliation

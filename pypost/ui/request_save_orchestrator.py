@@ -6,6 +6,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import Generic, TypeVar
 
 from PySide6.QtWidgets import QWidget
 
@@ -26,6 +27,8 @@ from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
+
 
 class SaveAction(Enum):
     CANCELLED = auto()
@@ -35,17 +38,17 @@ class SaveAction(Enum):
 
 
 @dataclass(frozen=True)
-class StaleCheckContext:
+class StaleCheckContext(Generic[T]):
     """Tab persistence state used before overwriting an existing request."""
 
-    persisted_baseline: RequestData | None
+    persisted_baseline: T | None
     stale_persisted: bool
 
 
 @dataclass(frozen=True)
-class SaveResult:
+class SaveResult(Generic[T]):
     action: SaveAction
-    request: RequestData | None = None
+    request: T | None = None
     collection_id: str | None = None
 
 
@@ -69,8 +72,8 @@ class RequestSaveOrchestrator:
         request_data: RequestData,
         parent: QWidget,
         *,
-        stale_context: StaleCheckContext | None = None,
-    ) -> SaveResult:
+        stale_context: StaleCheckContext[RequestData] | None = None,
+    ) -> SaveResult[RequestData]:
         existing_result = self._request_manager.find_request(request_data.id)
 
         if existing_result:
@@ -85,7 +88,9 @@ class RequestSaveOrchestrator:
 
         return self._save_new(request_data, parent)
 
-    def save_as_request(self, request_data: RequestData, parent: QWidget) -> SaveResult:
+    def save_as_request(
+        self, request_data: RequestData, parent: QWidget
+    ) -> SaveResult[RequestData]:
         logger.info("save_as_flow_started source_request_id=%s", request_data.id)
         collections = self._request_manager.get_collections()
         dialog = SaveRequestDialog(collections, parent)
@@ -124,8 +129,8 @@ class RequestSaveOrchestrator:
         collection_id: str,
         parent: QWidget,
         *,
-        stale_context: StaleCheckContext | None,
-    ) -> SaveResult:
+        stale_context: StaleCheckContext[RequestData] | None,
+    ) -> SaveResult[RequestData]:
         if self._settings.confirm_overwrite_request:
             message = (
                 "This will overwrite the existing request "
@@ -162,10 +167,13 @@ class RequestSaveOrchestrator:
             collection_id=collection_id,
         )
 
-    def _save_new(self, request_data: RequestData, parent: QWidget) -> SaveResult:
+    def _save_new(
+        self, request_data: RequestData, parent: QWidget
+    ) -> SaveResult[RequestData]:
         collections = self._request_manager.get_collections()
         dialog = SaveRequestDialog(collections, parent)
         if not dialog.exec():
+            logger.info("save_request_new_cancelled request_id=%s", request_data.id)
             return SaveResult(SaveAction.CANCELLED)
 
         request_data.name = dialog.request_name
@@ -206,7 +214,7 @@ class RequestSaveOrchestrator:
     def _confirm_stale_overwrite(
         self,
         parent: QWidget,
-        stale_context: StaleCheckContext | None,
+        stale_context: StaleCheckContext[RequestData] | None,
         disk_request: RequestData,
     ) -> bool:
         if stale_context is None or stale_context.persisted_baseline is None:

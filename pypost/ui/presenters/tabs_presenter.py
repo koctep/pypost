@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.ui.collection_item_dialogs import (
+    TabClosePromptProtocol,
     prompt_clean_sibling_tab_reload,
     prompt_dirty_sibling_tab_reload,
     prompt_deleted_websocket_profile_tab_close,
@@ -506,7 +507,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self,
         ws_ids: list[str],
         *,
-        prompt: Callable[[QWidget, str, bool, bool], bool] | None = None,
+        prompt: TabClosePromptProtocol | None = None,
     ) -> None:
         close_tabs_for_websocket_ids_ws(
             self,
@@ -518,7 +519,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self,
         profile_ids: list[str],
         *,
-        prompt: Callable[[QWidget, str, bool, bool], bool] | None = None,
+        prompt: TabClosePromptProtocol | None = None,
     ) -> None:
         close_tabs_for_mcp_client_ids_mcp(
             self,
@@ -789,7 +790,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             )
         )
 
-    def _index_of_tab(self, tab: RequestTab | WebSocketTab) -> int | None:
+    def _index_of_tab(
+        self, tab: RequestTab | WebSocketTab | McpClientTab
+    ) -> int | None:
         for i in range(self._tabs.count()):
             if self._tabs.widget(i) is tab:
                 return i
@@ -847,7 +850,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         tab.request_editor.load_data()
         tab.stale_persisted = False
 
-    def _stale_context_for_tab(self, source_tab: RequestTab | None) -> StaleCheckContext | None:
+    def _stale_context_for_tab(
+        self, source_tab: RequestTab | None
+    ) -> StaleCheckContext[RequestData] | None:
         if source_tab is None:
             return None
         return StaleCheckContext(
@@ -862,7 +867,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def _stale_context_for_websocket_tab(
         self, source_tab: WebSocketTab
-    ) -> StaleCheckContext | None:
+    ) -> StaleCheckContext[WebSocketConnection] | None:
         return StaleCheckContext(
             persisted_baseline=source_tab.persisted_baseline,
             stale_persisted=source_tab.stale_persisted,
@@ -879,7 +884,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def _stale_context_for_mcp_client_tab(
         self, source_tab: McpClientTab
-    ) -> StaleCheckContext | None:
+    ) -> StaleCheckContext[McpClientConnection] | None:
         return StaleCheckContext(
             persisted_baseline=source_tab.persisted_baseline,
             stale_persisted=source_tab.stale_persisted,

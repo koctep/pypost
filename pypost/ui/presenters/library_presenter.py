@@ -291,11 +291,12 @@ class LibraryPresenter(QObject):
         auth: Optional[GitAuthConfig] = None,
     ) -> GitOperationResult:
         """Clone a remote repository and register it in the library list."""
+        target_lib_id = library_id or url.rstrip("/").split("/")[-1].removesuffix(".git")
         self.operation_started.emit("clone")
         try:
-            result = self.service.clone(url, library_id=library_id, branch=branch, auth=auth)
+            result = self.service.clone(url, library_id=target_lib_id, branch=branch, auth=auth)
             self.load_libraries()
-            target_id = result.library_id or library_id
+            target_id = result.library_id or target_lib_id
             if target_id:
                 self.select_library(target_id)
             self.operation_completed.emit(result)
@@ -336,7 +337,7 @@ class LibraryPresenter(QObject):
         lib_id = library_id or self._selected_library_id
         if not lib_id:
             return []
-        return self.service.list_branches(lib_id, remote=remote, auth=auth)
+        return self.service.list_branches(lib_id)
 
     def delete_library(self, library_id: Optional[str] = None) -> bool:
         """Delete local library repository and its local overlay."""

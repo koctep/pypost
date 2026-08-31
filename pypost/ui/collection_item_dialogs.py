@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Protocol
 
 from PySide6.QtWidgets import QCheckBox, QFileDialog, QMessageBox, QWidget
 
@@ -126,6 +127,17 @@ def prompt_unsaved_draft_tab_close(parent: QWidget, tab_title: str) -> bool:
     box.setDefaultButton(keep_btn)
     box.exec()
     return box.clickedButton() is discard_btn
+
+
+class TabClosePromptProtocol(Protocol):
+    def __call__(
+        self,
+        parent: QWidget,
+        tab_title: str,
+        *,
+        has_unsaved_edits: bool,
+        has_active_connection: bool,
+    ) -> bool: ...
 
 
 def prompt_deleted_websocket_profile_tab_close(

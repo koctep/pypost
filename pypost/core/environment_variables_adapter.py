@@ -10,7 +10,11 @@ from pypost.core.encryption_config import (
     resolve_key_source,
     resolve_key_source_chain,
 )
-from pypost.core.environment_secrets_codec import EnvironmentSecretsCodec
+from pypost.core.environment_secrets_codec import (
+    EncryptedValueEnvelope,
+    EncryptedValueEnvelopeV2,
+    EnvironmentSecretsCodec,
+)
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.models.models import Environment
@@ -107,6 +111,7 @@ class EnvironmentVariablesAdapter:
                     reused_count += 1
                     continue
                 try:
+                    envelope: EncryptedValueEnvelope | EncryptedValueEnvelopeV2
                     if target_envelope_version == 1:
                         envelope = self._secrets_codec.encrypt_v1(current_plaintext)
                     else:

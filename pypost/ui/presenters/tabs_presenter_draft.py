@@ -98,19 +98,19 @@ def collect_persistable_open_tab_ids(
                 )
             continue
         if isinstance(tab, McpClientTab):
-            conn = tab.connection_data
-            if conn and conn.id and mcp_saved(conn.id):
-                open_ids.append(conn.id)
+            mcp_conn = tab.connection_data
+            if mcp_conn and mcp_conn.id and mcp_saved(mcp_conn.id):
+                open_ids.append(mcp_conn.id)
                 persisted_mcp_count += 1
                 logger.info(
                     "mcp_client_saved_tab_persisted_in_open_tabs profile_id=%s",
-                    conn.id,
+                    mcp_conn.id,
                 )
-            elif conn and conn.id:
+            elif mcp_conn and mcp_conn.id:
                 omitted_draft_count += 1
                 logger.info(
                     "mcp_client_draft_omitted_from_open_tabs profile_id=%s",
-                    conn.id,
+                    mcp_conn.id,
                 )
             continue
         request_data = getattr(tab, "request_data", None)

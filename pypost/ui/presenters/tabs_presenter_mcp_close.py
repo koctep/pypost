@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QWidget
-
 from pypost.models.mcp_client import McpClientSessionState
-from pypost.ui.collection_item_dialogs import prompt_deleted_websocket_profile_tab_close
+from pypost.ui.collection_item_dialogs import (
+    TabClosePromptProtocol,
+    prompt_deleted_websocket_profile_tab_close,
+)
 from pypost.ui.presenters.tab_dirty import is_mcp_client_saved_tab_dirty
 from pypost.ui.widgets.mcp_client import McpClientTab
 
@@ -47,7 +47,7 @@ def close_tabs_for_mcp_client_ids(
     presenter: TabsPresenter,
     profile_ids: list[str],
     *,
-    prompt: Callable[[QWidget, str, bool, bool], bool] | None = None,
+    prompt: TabClosePromptProtocol | None = None,
 ) -> None:
     """Closes tabs bound to deleted MCP Client profile ids; prompts when at risk."""
     if not profile_ids:

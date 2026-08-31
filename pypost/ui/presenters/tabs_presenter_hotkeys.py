@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 from PySide6.QtWidgets import QApplication, QWidget
 
@@ -155,7 +155,7 @@ def handle_switch_to_script_global(presenter: TabsPresenter) -> None:
         tab.request_editor.detail_tabs.setCurrentIndex(3)
 
 
-def _is_request_tab(tab: object) -> bool:
+def _is_request_tab(tab: object) -> TypeGuard[RequestTab]:
     from pypost.ui.presenters.tabs_presenter import RequestTab
 
     return isinstance(tab, RequestTab)

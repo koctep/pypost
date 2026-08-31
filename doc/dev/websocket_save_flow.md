@@ -71,7 +71,7 @@ Triggers Save As from menu or `Ctrl+Shift+S`.
 
 - Draft (id not in registry): `_save_new` → `SaveRequestDialog` → `CREATED_NEW`
 - Saved profile: `_save_overwrite` → optional confirms → `OVERWRITE`
-- Returns shared `SaveResult` / `SaveAction` from `request_save_orchestrator`
+- Returns generic `SaveResult[WebSocketConnection]` / `SaveAction` from `request_save_orchestrator`
 
 ### `WebSocketSaveOrchestrator.save_as_profile(connection, parent)`
 
@@ -79,9 +79,10 @@ Always dialog + **new UUID**; original registry entry unchanged; returns `SAVE_A
 
 ### `TabsPresenter._handle_save_websocket(tab, connection)`
 
-Calls orchestrator with `_stale_context_for_websocket_tab(tab)`. On success: updates tab
-identity, title, `persisted_baseline`, calls `save_tabs_state()` on first save, emits
-`websocket_saved` (and `websocket_persisted` on overwrite).
+Calls orchestrator with `_stale_context_for_websocket_tab(tab)`
+(`StaleCheckContext[WebSocketConnection]`). On success: updates tab identity, title,
+`persisted_baseline`, calls `save_tabs_state()` on first save, emits `websocket_saved`
+(and `websocket_persisted` on overwrite).
 
 ### `CollectionsPresenter.add_saved_websocket_to_tree(ws, collection_id) -> bool`
 

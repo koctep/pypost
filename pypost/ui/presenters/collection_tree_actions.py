@@ -373,7 +373,7 @@ class CollectionTreeActions:
         self._emit_collections_changed()
 
     def _resolve_item_target(self, item: QStandardItem) -> tuple:
-        data = item.data(Qt.UserRole)
+        data = item.data(Qt.ItemDataRole.UserRole)
         if isinstance(data, RequestData):
             return "request", data.id, item.text(), data
         if isinstance(data, WebSocketConnection):
@@ -416,21 +416,21 @@ class CollectionTreeActions:
                 for col in self._request_manager.get_collections():
                     for req in col.requests:
                         if req.id == item_id:
-                            item.setData(req, Qt.UserRole)
+                            item.setData(req, Qt.ItemDataRole.UserRole)
                             item.setText(f"{req.method} {req.name}")
                             return
             elif item_type == "websocket":
                 for col in self._request_manager.get_collections():
                     for ws in col.websockets:
                         if ws.id == item_id:
-                            item.setData(ws, Qt.UserRole)
+                            item.setData(ws, Qt.ItemDataRole.UserRole)
                             item.setText(f"ws {ws.name}")
                             return
             elif item_type == "mcp_client":
                 for col in self._request_manager.get_collections():
                     for profile in col.mcp_clients:
                         if profile.id == item_id:
-                            item.setData(profile, Qt.UserRole)
+                            item.setData(profile, Qt.ItemDataRole.UserRole)
                             item.setText(f"mcp {profile.name}")
                             return
             else:

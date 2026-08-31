@@ -391,8 +391,8 @@ class LibraryManagerDialog(QDialog):
 
         # Connect Presenter Signals
         self.presenter.libraries_loaded.connect(self._on_libraries_loaded)
-        self.presenter.status_updated.connect(self.detail_panel.update_status)
-        self.presenter.manifest_loaded.connect(self.collections_panel.update_manifest)
+        self.presenter.status_updated.connect(lambda s: self.detail_panel.update_status(s))
+        self.presenter.manifest_loaded.connect(lambda m: self.collections_panel.update_manifest(m))
 
         # Connect Widget Signals
         self.list_panel.library_selected.connect(self._on_library_selected)

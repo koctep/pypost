@@ -50,8 +50,8 @@ class WebSocketSaveOrchestrator:
         connection: WebSocketConnection,
         parent: QWidget,
         *,
-        stale_context: StaleCheckContext | None = None,
-    ) -> SaveResult:
+        stale_context: StaleCheckContext[WebSocketConnection] | None = None,
+    ) -> SaveResult[WebSocketConnection]:
         existing_result = self._registry.find_websocket(connection.id)
 
         if existing_result:
@@ -68,7 +68,7 @@ class WebSocketSaveOrchestrator:
 
     def save_as_profile(
         self, connection: WebSocketConnection, parent: QWidget
-    ) -> SaveResult:
+    ) -> SaveResult[WebSocketConnection]:
         logger.info("ws_save_as_flow_started source_ws_id=%s", connection.id)
         collections = self._registry.request_manager.get_collections()
         dialog = SaveRequestDialog(collections, parent)
@@ -109,8 +109,8 @@ class WebSocketSaveOrchestrator:
         collection_id: str,
         parent: QWidget,
         *,
-        stale_context: StaleCheckContext | None,
-    ) -> SaveResult:
+        stale_context: StaleCheckContext[WebSocketConnection] | None,
+    ) -> SaveResult[WebSocketConnection]:
         if self._settings.confirm_overwrite_request:
             message = (
                 "This will overwrite the existing WebSocket profile "
@@ -155,10 +155,11 @@ class WebSocketSaveOrchestrator:
 
     def _save_new(
         self, connection: WebSocketConnection, parent: QWidget
-    ) -> SaveResult:
+    ) -> SaveResult[WebSocketConnection]:
         collections = self._registry.request_manager.get_collections()
         dialog = SaveRequestDialog(collections, parent)
         if not dialog.exec():
+            logger.info("ws_save_new_cancelled ws_id=%s", connection.id)
             return SaveResult(SaveAction.CANCELLED)
 
         connection.name = dialog.request_name
@@ -201,7 +202,7 @@ class WebSocketSaveOrchestrator:
     def _confirm_stale_overwrite(
         self,
         parent: QWidget,
-        stale_context: StaleCheckContext | None,
+        stale_context: StaleCheckContext[WebSocketConnection] | None,
         disk_conn: WebSocketConnection,
     ) -> bool:
         if stale_context is None or stale_context.persisted_baseline is None:

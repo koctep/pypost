@@ -50,8 +50,8 @@ class McpClientSaveOrchestrator:
         connection: McpClientConnection,
         parent: QWidget,
         *,
-        stale_context: StaleCheckContext | None = None,
-    ) -> SaveResult:
+        stale_context: StaleCheckContext[McpClientConnection] | None = None,
+    ) -> SaveResult[McpClientConnection]:
         existing_result = self._registry.find_mcp_client(connection.id)
 
         if existing_result:
@@ -68,7 +68,7 @@ class McpClientSaveOrchestrator:
 
     def save_as_profile(
         self, connection: McpClientConnection, parent: QWidget
-    ) -> SaveResult:
+    ) -> SaveResult[McpClientConnection]:
         logger.info("mcp_client_save_as_flow_started source_id=%s", connection.id)
         collections = self._registry.request_manager.get_collections()
         dialog = SaveRequestDialog(collections, parent)
@@ -112,8 +112,8 @@ class McpClientSaveOrchestrator:
         collection_id: str,
         parent: QWidget,
         *,
-        stale_context: StaleCheckContext | None,
-    ) -> SaveResult:
+        stale_context: StaleCheckContext[McpClientConnection] | None,
+    ) -> SaveResult[McpClientConnection]:
         if self._settings.confirm_overwrite_request:
             message = (
                 "This will overwrite the existing MCP Client profile "
@@ -162,10 +162,11 @@ class McpClientSaveOrchestrator:
 
     def _save_new(
         self, connection: McpClientConnection, parent: QWidget
-    ) -> SaveResult:
+    ) -> SaveResult[McpClientConnection]:
         collections = self._registry.request_manager.get_collections()
         dialog = SaveRequestDialog(collections, parent)
         if not dialog.exec():
+            logger.info("mcp_client_save_new_cancelled profile_id=%s", connection.id)
             return SaveResult(SaveAction.CANCELLED)
 
         connection.name = dialog.request_name
@@ -208,7 +209,7 @@ class McpClientSaveOrchestrator:
     def _confirm_stale_overwrite(
         self,
         parent: QWidget,
-        stale_context: StaleCheckContext | None,
+        stale_context: StaleCheckContext[McpClientConnection] | None,
         disk_conn: McpClientConnection,
     ) -> bool:
         if stale_context is None or stale_context.persisted_baseline is None:

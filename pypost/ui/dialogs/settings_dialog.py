@@ -87,7 +87,7 @@ class SettingsDialog(QDialog):
         self._storage = storage
         self._migration_worker = None
 
-        self.layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(self)
 
         editor = EditorSettingsSection(current_settings, self)
         request = RequestSettingsSection(current_settings, self)
@@ -193,12 +193,12 @@ class SettingsDialog(QDialog):
         for page, label in zip(self._tab_pages, SETTINGS_TAB_LABELS, strict=True):
             self.settings_tabs.addTab(page, label)
 
-        self.layout.addWidget(self.settings_tabs)
+        main_layout.addWidget(self.settings_tabs)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
-        self.layout.addWidget(self.buttons)
+        main_layout.addWidget(self.buttons)
 
     def tab_form_layout(self, page: QWidget) -> QFormLayout:
         index = self._tab_pages.index(page)

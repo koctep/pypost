@@ -1,5 +1,5 @@
 {
-  "error_count": 201,
+  "error_count": 189,
   "errors": [
     {
       "code": "arg-type",
@@ -53,11 +53,6 @@
     },
     {
       "code": "assignment",
-      "message": "Incompatible types in assignment (expression has type \"EncryptedValueEnvelope\", variable has type \"EncryptedValueEnvelopeV2\")",
-      "path": "pypost/core/environment_variables_adapter.py"
-    },
-    {
-      "code": "assignment",
       "message": "Incompatible types in assignment (expression has type \"CallToolResult\", variable has type \"ListToolsResult\")",
       "path": "pypost/core/mcp_client_service.py"
     },
@@ -80,26 +75,6 @@
       "code": "method-assign",
       "message": "Cannot assign to a method",
       "path": "pypost/core/qt/mcp_server.py"
-    },
-    {
-      "code": "union-attr",
-      "message": "Item \"None\" of \"TemplateService | None\" has no attribute \"render_string\"",
-      "path": "pypost/core/request_service.py"
-    },
-    {
-      "code": "union-attr",
-      "message": "Item \"None\" of \"TemplateService | None\" has no attribute \"render_string\"",
-      "path": "pypost/core/request_service.py"
-    },
-    {
-      "code": "union-attr",
-      "message": "Item \"None\" of \"TemplateService | None\" has no attribute \"render_string\"",
-      "path": "pypost/core/request_service.py"
-    },
-    {
-      "code": "union-attr",
-      "message": "Item \"None\" of \"TemplateService | None\" has no attribute \"render_string\"",
-      "path": "pypost/core/request_service.py"
     },
     {
       "code": "var-annotated",
@@ -437,21 +412,6 @@
       "path": "pypost/ui/dialogs/settings_dialog.py"
     },
     {
-      "code": "assignment",
-      "message": "Incompatible types in assignment (expression has type \"QVBoxLayout\", variable has type \"Callable[[], QLayout | None]\")",
-      "path": "pypost/ui/dialogs/settings_dialog.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"Callable[[], QLayout | None]\" has no attribute \"addLayout\"",
-      "path": "pypost/ui/dialogs/settings_dialog.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"Callable[[], QLayout | None]\" has no attribute \"addWidget\"",
-      "path": "pypost/ui/dialogs/settings_dialog.py"
-    },
-    {
       "code": "attr-defined",
       "message": "\"type[QDialogButtonBox]\" has no attribute \"Cancel\"",
       "path": "pypost/ui/dialogs/settings_dialog.py"
@@ -459,11 +419,6 @@
     {
       "code": "attr-defined",
       "message": "\"type[QDialogButtonBox]\" has no attribute \"Save\"",
-      "path": "pypost/ui/dialogs/settings_dialog.py"
-    },
-    {
-      "code": "method-assign",
-      "message": "Cannot assign to a method",
       "path": "pypost/ui/dialogs/settings_dialog.py"
     },
     {
@@ -485,16 +440,6 @@
       "code": "misc",
       "message": "Cannot infer type of lambda",
       "path": "pypost/ui/main_window.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collection_tree_actions.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"UserRole\"",
-      "path": "pypost/ui/presenters/collection_tree_actions.py"
     },
     {
       "code": "no-any-return",
@@ -894,11 +839,6 @@
     {
       "code": "attr-defined",
       "message": "\"type[QFont]\" has no attribute \"Monospace\"",
-      "path": "pypost/ui/widgets/request_editor.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[QHeaderView]\" has no attribute \"Stretch\"",
       "path": "pypost/ui/widgets/request_editor.py"
     },
     {
