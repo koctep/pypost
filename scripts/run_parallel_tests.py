@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -298,6 +299,31 @@ class TestDiscovery:
         return result
 
 
+def kill_process_group(pid: int) -> None:
+    """Terminate a process group cleanly on POSIX systems with Windows fallback."""
+    if sys.platform == "win32":
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError, OSError) as exc:
+            logger.debug("kill_process_group win32 failed for pid=%s: %s", pid, exc)
+        return
+
+    try:
+        try:
+            pgid = os.getpgid(pid)
+        except (ProcessLookupError, OSError) as exc:
+            logger.debug(
+                "kill_process_group getpgid failed for pid=%s: %s; falling back to pgid=pid",
+                pid,
+                exc,
+            )
+            pgid = pid
+        logger.debug("kill_process_group sending SIGKILL to pgid=%s for pid=%s", pgid, pid)
+        os.killpg(pgid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError) as exc:
+        logger.debug("kill_process_group killpg failed for pgid=%s: %s", pgid, exc)
+
+
 class SubprocessTestExecutor:
     """Executes a single test file in an isolated OS subprocess with QT_QPA_PLATFORM=offscreen."""
 
@@ -332,39 +358,37 @@ class SubprocessTestExecutor:
             cmd.extend(["--cov-report=", "--cov-fail-under=0"])
 
         start_time = time.perf_counter()
+        popen_kwargs: dict[str, Any] = {
+            "cwd": str(self.config.repo_root),
+            "env": env,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "text": True,
+        }
+        if sys.platform != "win32":
+            popen_kwargs["start_new_session"] = True
+
+        proc = subprocess.Popen(cmd, **popen_kwargs)
         try:
-            proc = subprocess.run(
-                cmd,
-                cwd=str(self.config.repo_root),
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=self.config.worker_timeout,
-            )
-        except subprocess.TimeoutExpired as exc:
+            stdout, stderr = proc.communicate(timeout=self.config.worker_timeout)
+        except subprocess.TimeoutExpired:
             duration = time.perf_counter() - start_time
+            kill_process_group(proc.pid)
+            try:
+                proc.kill()
+            except (ProcessLookupError, OSError):
+                pass
+            stdout, stderr = proc.communicate()
+            stdout_str = stdout or ""
+            stderr_str = stderr or ""
             try:
                 rel_file = str(test_file.relative_to(self.config.repo_root))
             except ValueError:
                 rel_file = str(test_file)
-            stdout = ""
-            if exc.stdout is not None:
-                stdout = (
-                    exc.stdout.decode("utf-8", errors="replace")
-                    if isinstance(exc.stdout, bytes)
-                    else exc.stdout
-                )
-            stderr = ""
-            if exc.stderr is not None:
-                stderr = (
-                    exc.stderr.decode("utf-8", errors="replace")
-                    if isinstance(exc.stderr, bytes)
-                    else exc.stderr
-                )
             timeout_note = (
                 f"worker timed out after {self.config.worker_timeout}s"
             )
-            stderr = f"{stderr}\n{timeout_note}".strip()
+            stderr_str = f"{stderr_str}\n{timeout_note}".strip()
             logger.warning(
                 "worker_timeout file=%s timeout_seconds=%s",
                 rel_file,
@@ -375,8 +399,8 @@ class SubprocessTestExecutor:
                 status=TestStatus.TIMED_OUT,
                 exit_code=-9,
                 duration_seconds=duration,
-                stdout=stdout,
-                stderr=stderr,
+                stdout=stdout_str,
+                stderr=stderr_str,
             )
         duration = time.perf_counter() - start_time
 
@@ -396,10 +420,10 @@ class SubprocessTestExecutor:
         return TestResult(
             test_file=rel_file,
             status=status,
-            exit_code=proc.returncode,
+            exit_code=proc.returncode if proc.returncode is not None else 1,
             duration_seconds=duration,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
+            stdout=stdout or "",
+            stderr=stderr or "",
         )
 
 

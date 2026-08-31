@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -25,6 +28,7 @@ from scripts.run_parallel_tests import (
     TestStatus,
     default_worker_count,
     get_worker_count,
+    kill_process_group,
     main,
     run_parallel_tests,
 )
@@ -582,13 +586,14 @@ def test_parallel_runner_logs_coverage_threshold_warning(
     )
 
 
+@pytest.mark.timeout(10)
 def test_hung_worker_under_timeout_yields_timed_out(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Hung worker under short worker_timeout yields TIMED_OUT and failed run.
 
-    Mocks ``subprocess.run`` raising ``TimeoutExpired`` so the suite stays
+    Mocks ``subprocess.Popen`` communicate raising ``TimeoutExpired`` so the suite stays
     bounded while asserting status, structured ``worker_timeout`` log, and
     non-success summary.
     """
@@ -614,30 +619,32 @@ def test_hung_worker_under_timeout_yields_timed_out(
         worker_timeout=1.0,
     )
 
-    def fake_subprocess_run(
-        *args: Any,
-        **kwargs: Any,
-    ) -> subprocess.CompletedProcess[str]:
-        timeout = kwargs.get("timeout")
-        cmd = args[0] if args else kwargs.get("args", [])
-        if timeout is not None:
-            raise subprocess.TimeoutExpired(cmd=cmd, timeout=float(timeout))
-        return subprocess.CompletedProcess(
-            args=cmd,
-            returncode=0,
-            stdout="",
-            stderr="",
-        )
+    class FakePopen:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self.pid = 99999
+            self.returncode = -9
+
+        def communicate(self, *args: Any, **kwargs: Any) -> tuple[str, str]:
+            if kwargs.get("timeout") is not None:
+                raise subprocess.TimeoutExpired(cmd=["test"], timeout=float(kwargs["timeout"]))
+            return ("", "")
+
+        def kill(self) -> None:
+            pass
 
     with (
         caplog.at_level(logging.WARNING),
         patch(
-            "scripts.run_parallel_tests.subprocess.run",
-            side_effect=fake_subprocess_run,
+            "scripts.run_parallel_tests.subprocess.Popen",
+            side_effect=FakePopen,
         ),
+        patch(
+            "scripts.run_parallel_tests.kill_process_group",
+        ) as mock_kill_pg,
     ):
         summary = run_parallel_tests(config)
 
+    assert mock_kill_pg.called
     assert summary.is_success is False
     assert any(r.status == TestStatus.TIMED_OUT for r in summary.results)
     assert any(
@@ -645,3 +652,125 @@ def test_hung_worker_under_timeout_yields_timed_out(
         and "timeout_seconds=" in record.getMessage()
         for record in caplog.records
     )
+
+
+@pytest.mark.timeout(15)
+def test_worker_timeout_terminates_grandchild_process_group(tmp_path: Path) -> None:
+    """A worker timeout must terminate grandchild processes spawned in its group."""
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir(parents=True)
+    pid_file = tmp_path / "grandchild.pid"
+
+    test_file = tests_dir / "test_hang_with_grandchild.py"
+    test_file.write_text(
+        "import subprocess\n"
+        "import sys\n"
+        "import time\n"
+        "from pathlib import Path\n"
+        "\n"
+        "def test_hang():\n"
+        f"    pid_file = Path({str(pid_file)!r})\n"
+        "    proc = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
+        "    pid_file.write_text(str(proc.pid), encoding='utf-8')\n"
+        "    time.sleep(30)\n",
+        encoding="utf-8",
+    )
+
+    config = RunnerConfig(
+        workers=1,
+        enable_coverage=False,
+        report_json_path=None,
+        test_targets=[str(test_file)],
+        pytest_args=["-o", "addopts="],
+        repo_root=tmp_path,
+        python_bin=Path(sys.executable),
+        worker_timeout=1.0,
+    )
+    executor = SubprocessTestExecutor(config)
+
+    grandchild_pid: int | None = None
+    try:
+        result = executor.run_test_file(test_file, index=1, total=1)
+        assert result.status == TestStatus.TIMED_OUT
+
+        assert pid_file.exists(), (
+            f"Grandchild PID file was not created; stdout={result.stdout} stderr={result.stderr}"
+        )
+        grandchild_pid = int(pid_file.read_text(encoding="utf-8").strip())
+
+        # Desired behavior: grandchild process must be terminated upon worker timeout.
+        deadline = time.perf_counter() + 1.0
+        is_alive = True
+        while time.perf_counter() < deadline:
+            try:
+                os.kill(grandchild_pid, 0)
+                time.sleep(0.05)
+            except (ProcessLookupError, OSError):
+                is_alive = False
+                break
+
+        assert not is_alive, (
+            f"Grandchild process {grandchild_pid} is still alive after worker timeout"
+        )
+    finally:
+        if grandchild_pid is not None:
+            try:
+                os.kill(grandchild_pid, signal.SIGKILL)
+            except (ProcessLookupError, OSError):
+                pass
+
+
+@pytest.mark.timeout(10)
+def test_kill_process_group_posix() -> None:
+    """kill_process_group calls os.killpg with SIGKILL on POSIX."""
+    with (
+        patch("sys.platform", "linux"),
+        patch("os.getpgid", return_value=1234),
+        patch("os.killpg") as mock_killpg,
+    ):
+        kill_process_group(1234)
+        mock_killpg.assert_called_once_with(1234, signal.SIGKILL)
+
+
+@pytest.mark.timeout(10)
+def test_kill_process_group_posix_fallback_on_lookup_error() -> None:
+    """kill_process_group uses pid directly if os.getpgid fails."""
+    with (
+        patch("sys.platform", "linux"),
+        patch("os.getpgid", side_effect=ProcessLookupError),
+        patch("os.killpg") as mock_killpg,
+    ):
+        kill_process_group(4321)
+        mock_killpg.assert_called_once_with(4321, signal.SIGKILL)
+
+
+@pytest.mark.timeout(10)
+def test_kill_process_group_posix_suppresses_exceptions(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """kill_process_group safely suppresses killpg errors and logs at debug level."""
+    with (
+        caplog.at_level(logging.DEBUG),
+        patch("sys.platform", "linux"),
+        patch("os.getpgid", return_value=1234),
+        patch("os.killpg", side_effect=ProcessLookupError("No such process")),
+    ):
+        kill_process_group(1234)
+
+    debug_records = [
+        record for record in caplog.records if record.levelno == logging.DEBUG
+    ]
+    assert any("kill_process_group killpg failed" in record.getMessage() for record in debug_records)
+
+
+@pytest.mark.timeout(10)
+def test_kill_process_group_win32() -> None:
+    """kill_process_group calls os.kill with SIGTERM on Windows."""
+    with (
+        patch("sys.platform", "win32"),
+        patch("os.kill") as mock_kill,
+    ):
+        kill_process_group(5678)
+        mock_kill.assert_called_once_with(5678, signal.SIGTERM)
+
+

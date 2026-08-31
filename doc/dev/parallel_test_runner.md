@@ -1,4 +1,4 @@
-# Parallel Test Runner Orchestrator (PYPOST-1149 / PYPOST-1192 / PYPOST-1234)
+# Parallel Test Runner Orchestrator (PYPOST-1149 / PYPOST-1192 / PYPOST-1234 / PYPOST-1197)
 
 ## Overview
 
@@ -26,7 +26,7 @@ Integration tests for the orchestrator live in `tests/test_run_parallel_tests.py
 | --- | --- |
 | `CLIParser` | Parses orchestrator flags (`--workers`, `--worker-timeout`, `--cov`, `--report-json`) and forwards pytest options (`-k`, `-m`, `-v`, `--tb`, `--timeout`, …) to each subprocess |
 | `TestDiscovery` | Resolves `test_*.py` files from explicit targets or from `tests/` when no targets are given |
-| `SubprocessTestExecutor` | Runs one test file per subprocess with `QT_QPA_PLATFORM=offscreen`, repo-root `PYTHONPATH`, and `subprocess.run(..., timeout=worker_timeout)` |
+| `SubprocessTestExecutor` | Runs one test file per subprocess with session isolation (`start_new_session=True`), repo-root `PYTHONPATH`, and process-group teardown via `kill_process_group` |
 | `CoverageManager` | Assigns per-worker `COVERAGE_FILE` under `.coverage_parallel/`, then runs `coverage combine`, `coverage report`, and `coverage html` |
 | `JsonReporter` | Writes optional machine-readable run summary (`--report-json`) |
 | `run_parallel_tests()` | Main entry: discovery → worker pool → failure grouping (including timed-out files) → slowest-files report → optional JSON |
@@ -198,15 +198,17 @@ failure counts as a failure); `1` otherwise.
 
 ### Behavior
 
-For each test file, `SubprocessTestExecutor.run_test_file` calls:
+For each test file, `SubprocessTestExecutor.run_test_file` spawns the worker process using
+`subprocess.Popen` with `start_new_session=True` (on POSIX) and waits with:
 
 ```text
-subprocess.run(..., timeout=config.worker_timeout)
+proc.communicate(timeout=config.worker_timeout)
 ```
 
 On `subprocess.TimeoutExpired`:
 
-1. The direct child process is killed (stdlib `subprocess` timeout path).
+1. The entire worker process group is terminated via `kill_process_group(proc.pid)` and the
+   direct child is reaped.
 2. Result status is `TestStatus.TIMED_OUT` (`"timed_out"`).
 3. Structured WARNING is emitted: `worker_timeout file=… timeout_seconds=…`.
 4. Progress line prints `TIMED_OUT`; the file appears in the FAILURES section with a stderr note
@@ -215,8 +217,23 @@ On `subprocess.TimeoutExpired`:
 
 Ordinary pytest failures remain `failed`; timeouts are distinguishable by status and logs.
 
-Process-group / grandchild teardown is out of scope; if orphans appear after kill, that is
-follow-up hardening debt.
+### Process-group isolation and cascading teardown (PYPOST-1197)
+
+Workers are spawned with `start_new_session=True` on POSIX systems so that the worker is the
+leader of its own process group session (`setsid()`). Any grandchild processes, helper scripts,
+or background threads spawned by the worker inherit this process group ID (PGID == worker PID).
+
+On `subprocess.TimeoutExpired`:
+
+1. `kill_process_group(proc.pid)` resolves the process group (`os.getpgid(proc.pid)` with PID
+   fallback if the leader has already exited) and sends `os.killpg(pgid, signal.SIGKILL)` on
+   POSIX, and `os.kill(proc.pid, signal.SIGTERM)` on Windows fallback.
+2. Transient exceptions (`ProcessLookupError`, `PermissionError`, `OSError`) are suppressed with
+   debug-level logging.
+3. The direct child process leader is reaped with `proc.kill()` and `proc.communicate()`.
+4. Status is set to `TestStatus.TIMED_OUT` with `exit_code=-9`.
+5. Any grandchild processes, helper scripts, or background threads spawned by the worker are
+   terminated, preventing orphan processes, leaked file handles, or locked network ports.
 
 ### Structured logs (timeout path)
 
@@ -385,3 +402,5 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py \
 - `ai-tasks/PYPOST-1192/50-observability.md` — timeout log events (`worker_timeout`, `test_file_timed_out`)
 - `ai-tasks/PYPOST-1234/20-architecture.md` — test modularization and timeout budget design
 - `ai-tasks/PYPOST-1234/60-tech-debt.md` — parallel execution and technical debt analysis
+- `ai-tasks/PYPOST-1197/20-architecture.md` — process-group isolation and cascading teardown design
+- `ai-tasks/PYPOST-1197/60-tech-debt.md` — process group isolation and technical debt analysis
