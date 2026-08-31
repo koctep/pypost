@@ -21,8 +21,16 @@ _baseline = importlib.util.module_from_spec(_spec)
 sys.modules["audit_baseline_metrics"] = _baseline
 _spec.loader.exec_module(_baseline)
 
+EXPECTED_CAP_TEMPLATE_SERVICE = 265
+
 
 class TestSolidAuditBaseline(unittest.TestCase):
+    def test_template_service_cap_expected(self):
+        self.assertEqual(
+            _baseline.FILE_CAPS["pypost/core/template_service.py"],
+            EXPECTED_CAP_TEMPLATE_SERVICE,
+        )
+
     def test_markdown_snapshot_matches_current_metrics(self):
         expected = _baseline.format_markdown(_baseline.measure_all())
         actual = _BASELINE_SNAPSHOT.read_text(encoding="utf-8")

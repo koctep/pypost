@@ -110,6 +110,15 @@ the command prints the canonical Markdown to stdout.
 Always run both `--check` and the pytest module after reconciliation. A green cap check alone
 does not prove that the committed snapshot is fresh.
 
+**PYPOST-1111 (2026-08-31):** Raised `FILE_CAPS` for `pypost/core/template_service.py`
+225 → cap **265** (measured 241 LOC + ~10% headroom) accommodating structured template errors,
+AST enhancements, and environment variable resolver (PYPOST-143, PYPOST-378, PYPOST-1118).
+Regenerated canonical `baseline-metrics.md` snapshot via
+`scripts/audit_baseline_metrics.py --markdown`. Synchronized dialog inventory in
+`ai-tasks/PYPOST-374/30-dialogs-audit-report.md` and contract guards in
+`tests/test_pypost_1077_verification_artifacts.py` to 9 dialog modules / 1,787 LOC
+(reflecting `mcp_servers_dialog.py` growth to 486 LOC from PYPOST-1104 headers editor).
+
 **PYPOST-1194 (2026-08-27):** Raised `FILE_CAPS` for intentional presenter growth —
 `collections_presenter.py` 486 → cap **535**, `tabs_presenter.py` 1059 → cap **1165**
 (`ceil(measured * 1.10)`). Snapshot regenerated. Prefer further `tabs_presenter_*`

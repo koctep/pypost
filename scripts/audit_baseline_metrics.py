@@ -62,7 +62,10 @@ FILE_CAPS: dict[str, int] = {
     # PYPOST-1146: WebSocket explicit delegation mixin; capped at ~10% headroom (40 measured).
     "pypost/core/qt/metrics_websocket.py": 45,
     "pypost/ui/widgets/mixins.py": 411,
-    "pypost/core/template_service.py": 225,
+    # PYPOST-1111: structured template error provenance (PYPOST-143), AST enhancements
+    # (PYPOST-378), and environment variable resolver (PYPOST-1118); cap re-derived
+    # from measured 241 + ~10% headroom policy (ceil(241 * 1.10) = 266 -> 265).
+    "pypost/core/template_service.py": 265,
     # PYPOST-1128: item dispatch extracted to collection_item_dispatch.py;
     # cap re-derived from post-extraction measurement (240) + ~10% headroom.
     "pypost/core/request_manager.py": 264,

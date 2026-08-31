@@ -1,7 +1,7 @@
 # PYPOST-374: Individual Dialog SOLID Audit Report
 
 **Date:** 2026-06-11
-**Scope:** `pypost/ui/dialogs/` (nine modules, 1,747 LOC total)
+**Scope:** `pypost/ui/dialogs/` (nine dialog modules, 1,787 LOC total)
 **Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)
 **Baseline comparison:** PYPOST-40 grouped inventory ~400 LOC, five dialogs named
 
@@ -32,12 +32,12 @@ complete for the full current scope.
 | `hotkeys_dialog.py` | 69 | `HotkeysDialog` | Shared shortcut reference table | `main_window.py` |
 | `library_dialogs.py` | 533 | `GitCommitDialog` + auth/clone | Git library manager dialogs | library manager |
 | `mcp_activity_dialog.py` | 117 | `McpActivityDialog` | MCP activity viewer | env presenter |
-| `mcp_servers_dialog.py` | 446 | `McpServersDialog` + editor | MCP server manager | main window |
+| `mcp_servers_dialog.py` | 486 | `McpServersDialog` + editor | MCP server manager | main window |
 | `mcp_tools_overview_dialog.py` | 74 | Tool overview | MCP tools | env |
 | `save_dialog.py` | 93 | `SaveRequestDialog` | Save-as picker | save orchestrator |
 | `settings_dialog.py` | 260 | `SettingsDialog` | Settings composition | main window |
 
-**Total:** 1,747 LOC (vs PYPOST-40 grouped ~400 LOC).
+**Total:** 1,787 LOC (vs PYPOST-40 grouped ~400 LOC).
 
 Regenerate counts: `scripts/audit_dialogs_inventory.py --markdown`
 
@@ -120,7 +120,7 @@ logic risk; direct formatter coverage remains a useful follow-up.
 | ISP | Good | Receives narrow callbacks for configuration, status, lifecycle, and activity |
 | DIP | Good | Uses injected callbacks and collections/environments rather than transport globals |
 
-**Maintainability:** The 446-LOC dialog separates row management from `_McpServerEditor` input
+**Maintainability:** The 486-LOC dialog separates row management from `_McpServerEditor` input
 validation. It exposes activity and tools as read-only views and keeps legacy conversion explicit.
 **Test coverage:** Direct coverage in `tests/test_mcp_servers_dialog.py`.
 
