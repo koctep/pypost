@@ -99,13 +99,23 @@ isolated unit tests. Production always injects from `main.py`.
 **Coverage:** `TestHTTPClientInjection`, `TestRequestServiceInjection`,
 `test_variable_hover.py` (hover property patching).
 
-## MetricsTrackerProtocol and NullMetrics
+## MetricsTrackerProtocol
 
-Tracking consumers accept `MetricsTrackerProtocol | None` and normalize with
-`resolve_metrics()` to `NULL_METRICS` when omitted ([PYPOST-74](https://pypost.atlassian.net/browse/PYPOST-74)).
-Call sites invoke `self._metrics.track_*()` directly — no `if self._metrics` guards.
-[PYPOST-799](https://pypost.atlassian.net/browse/PYPOST-799) verified PYPOST-44 TD-2 closure:
-zero optional-injection guards in `pypost/`, 11 `resolve_metrics` normalization sites.
+`pypost.core.metrics_protocol.MetricsTrackerProtocol` defines the structural typing contract
+for operational telemetry throughout PyPost
+([PYPOST-73](https://pypost.atlassian.net/browse/PYPOST-73)).
+It is decorated with `@runtime_checkable`, enabling runtime type verification using
+`isinstance(obj, MetricsTrackerProtocol)`.
+
+The protocol defines over 40 tracking methods spanning HTTP requests and responses, error
+categorization, MCP server/client operations and transports, template rendering, environment
+variable resolution, encryption operations, and WebSocket sessions.
+
+Tracking consumers accept `MetricsTrackerProtocol | None` and normalize with `resolve_metrics()`
+to `NULL_METRICS` when omitted ([PYPOST-74](https://pypost.atlassian.net/browse/PYPOST-74)). Call
+sites invoke `self._metrics.track_*()` directly without defensive `if self._metrics` guards.
+[PYPOST-799](https://pypost.atlassian.net/browse/PYPOST-799) verified zero optional-injection
+guards across `pypost/`.
 
 ```python
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
@@ -115,21 +125,29 @@ class RequestService:
         self._metrics = resolve_metrics(metrics)
 ```
 
-```python
-from unittest.mock import MagicMock
+### Concrete implementations
 
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+PyPost provides three interchangeable implementations satisfying `MetricsTrackerProtocol`:
 
-metrics = MagicMock(spec=MetricsTrackerProtocol)
-```
+- **`MetricsManager` (`pypost.core.qt.metrics`)**:
+  The Qt desktop runtime facade that adapts GUI signals and backend operations to an internal
+  `MetricsRegistry` serving Prometheus scrape requests (`/metrics`). To maintain modularity and
+  keep file sizes manageable, `MetricsManager` inherits from two explicit mixins:
+  - `MetricsTrackingMixin` (`pypost/core/qt/metrics_tracking_mixin.py`): HTTP, MCP, template,
+    and encryption tracking methods.
+  - `MetricsWebSocketMixin` (`pypost/core/qt/metrics_websocket_mixin.py`): WebSocket session,
+    message, and lifecycle tracking methods.
 
-See [PYPOST-73](../../ai-tasks/PYPOST-73/70-dev-docs.md) and
-[PYPOST-74](../../ai-tasks/PYPOST-74/70-dev-docs.md) dev notes.
+- **`NullMetrics` / `NULL_METRICS` (`pypost.core.metrics_protocol`)**:
+  A lightweight, zero-overhead no-op implementation. All protocol tracking methods are defined
+  as safe no-ops returning `None`. Used as the fallback default whenever metrics tracking is
+  omitted (`resolve_metrics(None) is NULL_METRICS`), in headless mode, and in unit tests where
+  telemetry is out of scope.
 
-### OpenTelemetry adapter (PYPOST-579)
-
-Production can inject `OtelMetricsTracker` instead of Prometheus counters without changing
-consumer call sites. Configure exporters on a `MeterProvider`, then:
+- **`OtelMetricsTracker` (`pypost.core.metrics_otel`)**:
+  The OpenTelemetry metrics adapter ([PYPOST-579](https://pypost.atlassian.net/browse/PYPOST-579)).
+  Translates protocol method calls into OpenTelemetry counters, histograms, and gauges using a
+  configured `MeterProvider`. Constructed via `create_otel_metrics_tracker(meter_provider=...)`.
 
 ```python
 from opentelemetry.sdk.metrics import MeterProvider
@@ -141,6 +159,87 @@ metrics = create_otel_metrics_tracker(meter_provider=provider)
 
 Metric names and labels mirror `MetricsRegistry`. The desktop app default remains
 `MetricsManager` (embedded Prometheus scrape). See `pypost/core/metrics_otel.py`.
+
+### Protocol parity and drift prevention tests
+
+Python's `@runtime_checkable` verifies only that required method attributes exist on a class;
+it does not inspect signature compatibility, parameter counts, parameter names, or parameter
+kinds. Furthermore, having three distinct implementations (`MetricsManager`, `NullMetrics`, and
+`OtelMetricsTracker`) creates a risk of protocol drift when new metrics methods are added.
+
+To prevent drift, `tests/test_metrics_protocol.py` provides reflection-based contract tests:
+
+- **Signature extraction (`_get_protocol_methods`)**:
+  Uses `inspect.getmembers()` and `inspect.signature()` to introspect all public callable
+  methods declared on `MetricsTrackerProtocol`.
+- **Exhaustive contract verification (`_assert_tracker_satisfies_all_protocol_methods`)**:
+  Inspects the implementation class via reflection to verify that:
+  - Every protocol method exists and is callable.
+  - Parameter counts match between protocol and implementation.
+  - Parameter names match identically.
+  - Parameter kinds (`POSITIONAL_OR_KEYWORD`, etc.) match.
+  - Default argument values match.
+- **Implementation parity test suite**:
+  - `test_metrics_manager_satisfies_all_protocol_methods`: Validates `MetricsManager`.
+  - `test_null_metrics_satisfies_all_protocol_methods`: Validates `NullMetrics`.
+  - `test_otel_tracker_satisfies_all_protocol_methods`: Validates `OtelMetricsTracker`.
+  - `test_null_metrics_all_methods_callable_without_error`: Automatically synthesizes typed
+    dummy values via reflection (`_get_dummy_value`) and executes every method on `NullMetrics`
+    to guarantee safe runtime execution without raising exceptions.
+
+### Testing patterns
+
+When writing unit or integration tests for components that accept `MetricsTrackerProtocol`:
+
+- **Silent no-op testing (`NULL_METRICS` / `NullMetrics`)**:
+  When tests do not need to verify telemetry, omit the `metrics` argument or explicitly pass
+  `NULL_METRICS`. This avoids mock overhead and prevents side effects.
+  ```python
+  from pypost.core.metrics_protocol import NULL_METRICS
+
+  service = RequestService(metrics=NULL_METRICS)
+  ```
+
+- **Invocation assertions (`MagicMock(spec=MetricsTrackerProtocol)`)**:
+  When tests need to assert that specific metrics are recorded, inject a mock typed with
+  `spec=MetricsTrackerProtocol`. Because `MetricsTrackerProtocol` defines all tracking methods,
+  the mock restricts available attributes to valid protocol methods and catches typos:
+  ```python
+  from unittest.mock import MagicMock
+
+  from pypost.core.metrics_protocol import MetricsTrackerProtocol
+
+  mock_metrics = MagicMock(spec=MetricsTrackerProtocol)
+  service = RequestService(metrics=mock_metrics)
+  service.execute(request_data)
+  mock_metrics.track_request_sent.assert_called_once_with("GET")
+  ```
+
+- **Prometheus registry assertions**:
+  When testing `MetricsManager` itself or testing that counters increment in the embedded scrape
+  server, inspect `MetricsRegistry` directly or use `MetricsManager()` in an offscreen test.
+
+### Historical note: dynamic delegation vs `@runtime_checkable` (PYPOST-1150 / PYPOST-1146)
+
+During early WebSocket metrics implementation (PYPOST-1136), dynamic `__getattr__` delegation
+was introduced on `MetricsManager` to forward WebSocket calls to a helper while staying below
+strict file size thresholds.
+
+However, Python's `@runtime_checkable` protocol mechanism relies on `inspect` and class-level
+attribute dictionary lookups (`getattr(type(inst), attr)`). It intentionally does **not**
+invoke instance-level `__getattr__` or `__getattribute__` fallbacks. Consequently,
+`isinstance(MetricsManager(), MetricsTrackerProtocol)` evaluated to `False` at runtime, causing
+failures in test suites expecting protocol conformance (discovered in PYPOST-1149).
+
+PYPOST-1146 resolved the issue by replacing dynamic delegation with explicit mixin
+inheritance (`MetricsTrackingMixin` and `MetricsWebSocketMixin`), restoring class-level method
+definitions. PYPOST-1150 established the reflection-based signature conformance test suite
+across all three implementations to prevent protocol drift.
+
+See [PYPOST-73](../../ai-tasks/PYPOST-73/70-dev-docs.md),
+[PYPOST-74](../../ai-tasks/PYPOST-74/70-dev-docs.md),
+[PYPOST-1146](https://pypost.atlassian.net/browse/PYPOST-1146), and
+[PYPOST-1150](https://pypost.atlassian.net/browse/PYPOST-1150).
 
 ## RequestService
 
