@@ -361,6 +361,14 @@ class CollectionsPresenter(QObject):
         """Wait until collection import actions are completely idle."""
         return self._import_actions.wait_idle(timeout_ms)
 
+    def teardown(self, timeout_ms: int = 5000) -> bool:
+        """Tears down import actions and presenter resources cleanly."""
+        logger.info("collections_presenter_teardown_started timeout_ms=%d", timeout_ms)
+        result = self._import_actions.teardown(timeout_ms=timeout_ms)
+        self._panel.close()
+        logger.info("collections_presenter_teardown_completed clean=%s", result)
+        return result
+
     def _show_import_status(self, message: str) -> None:
         """Show a non-modal preparing cue on the main window status bar if present."""
         window = self._panel.window()

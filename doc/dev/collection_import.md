@@ -48,9 +48,17 @@ coverage for busy re-entry prevention, unexpected reader exceptions caught by th
 status bar lifecycle message transitions, and real-file disk JSON parsing in
 `tests/test_collection_import_async_gaps.py`.
 
-**PYPOST-1182** introduces deterministic lifecycle synchronization APIs (`CollectionImportActions.wait_idle`
-and `CollectionsPresenter.wait_import_idle`) to eliminate Qt event loop wait hangs and worker thread
-teardown race conditions during test suite execution (`tests/test_collections_import_ui.py`).
+**PYPOST-1182** introduces deterministic lifecycle synchronization APIs
+(`CollectionImportActions.wait_idle` and `CollectionsPresenter.wait_import_idle`) to eliminate Qt
+event loop wait hangs and worker thread teardown race conditions during test suite execution
+(`tests/test_collections_import_ui.py`).
+
+**PYPOST-1148** resolves indefinite futex deadlocks during full test suite runs (2,700+ tests)
+by establishing deterministic `teardown()` contracts on `CollectionImportActions` and
+`CollectionsPresenter`, refining the `is_busy()` contract (`self._preparing or self._worker is
+not None`) to prevent premature idle detection, safely disconnecting signals, interrupting
+and joining background worker threads, and draining deferred deletion events before widget
+destruction.
 
 ## Architecture
 
@@ -103,8 +111,10 @@ After:
   `CollectionImportApplyResult` containing formatted failure messages and failed collection
   IDs.
 - **`pypost/ui/presenters/collection_import_actions.py`** — `CollectionImportActions`,
-  a `QObject` orchestrator. Owns worker lifecycle and busy state; sequences pick →
-  async parse → sync conflict/plan/apply/result. Split out of `CollectionsPresenter`
+  a `QObject` orchestrator. Owns worker lifecycle, busy state, and teardown; sequences
+  pick → async parse → sync conflict/plan/apply/result. Exposes `is_busy()`, `wait_idle()`,
+  and `teardown()` to guarantee deterministic worker joining, signal disconnection, and
+  deferred event processing (PYPOST-1148, PYPOST-1182). Split out of `CollectionsPresenter`
   the same way `CollectionTreeActions` and `CollectionsAsyncLoader` are.
 - **`pypost/ui/collection_item_dialogs.py`** — four helpers:
   `prompt_import_collection_file`, `show_collection_import_invalid_file_error`,
@@ -116,7 +126,9 @@ After:
   sidebar tab now mounts `presenter.panel` (a `QWidget` holding the tree plus an action
   row) instead of the bare tree; `presenter.widget` still returns the `QTreeView`, so
   existing callers and automation are unaffected. Injects status-bar show/clear hooks
-  for the preparing cue; keeps the optional `read_import_file` DI seam.
+  for the preparing cue; keeps the optional `read_import_file` DI seam. Exposes
+  `wait_import_idle()` and `teardown()` delegating to `CollectionImportActions` for clean
+  worker termination and panel closure (PYPOST-1148, PYPOST-1182).
 
 ### Async parse and busy cue (PYPOST-1005)
 
@@ -323,12 +335,29 @@ and a short `wait(100)` before dropping the reference (same PYPOST-829 pattern a
 
 `QObject` owned by the presenter. Public surface:
 
-- **`is_busy() -> bool`** — true while preparing / the parse worker is running. Second
-  Import click while busy is ignored (`collection_import_skipped reason=busy`).
-- **`wait_idle(timeout_ms: int = 5000) -> bool`** — synchronously pump the Qt event loop
-  (`QApplication.processEvents()`) or wait for thread completion until all background
-  worker threads (`CollectionImportParseWorker`) have finished and joined (`is_busy() is False`).
-  Returns `True` if idle within `timeout_ms`, or `False` if timed out.
+- **`is_busy() -> bool`** — returns `True` while preparing or while a parse worker is active
+  (`self._preparing or self._worker is not None`). Refined in PYPOST-1148 to check
+  `self._worker is not None` rather than `self._worker.isRunning()`, preventing premature idle
+  detection while worker finalization (`_on_worker_finished`), signal delivery, or teardown is in
+  flight. A second Import click while busy is ignored (`collection_import_skipped reason=busy`).
+- **`wait_idle(timeout_ms: int = 5000) -> bool`** — synchronously pumps the Qt event loop
+  (`QApplication.processEvents()`) or waits for thread completion until all background worker
+  threads (`CollectionImportParseWorker`) have finished, joined, and been reset to `None`
+  (`is_busy() is False`). Performs an additional `processEvents()` pass once idle to drain
+  deferred deletion events (`deleteLater()`). Returns `True` if idle within `timeout_ms`, or
+  `False` if timed out (PYPOST-1182, PYPOST-1148).
+- **`teardown(timeout_ms: int = 5000) -> bool`** — safely and deterministically stops,
+  disconnects, waits, joins, and reaps background workers (PYPOST-1148):
+  1. If `is_busy()`, calls `wait_idle(timeout_ms)` to allow in-flight tasks to complete cleanly.
+  2. Safely disconnects all worker Qt signals (`parse_progress`, `parse_completed`,
+     `parse_failed`, `finished`) within guarded `try...except (RuntimeError, TypeError)` blocks,
+     preventing asynchronous callbacks from firing on a dying presenter.
+  3. If the worker thread remains active after `wait_idle()`, requests thread interruption via
+     `worker.requestInterruption()` and waits boundedly (100ms) for thread exit.
+  4. Calls `worker.deleteLater()`, clears `self._worker = None`, and resets
+     `self._set_preparing(False)`.
+  5. Flushes pending Qt events via `app.processEvents()` to process deferred deletions.
+  Returns `True` if cleanly torn down, or `False` if interruption or idle wait timed out.
 - **`import_collections() -> None`** — pick file; dispatch async parse; finish on the
   GUI thread when ready. Callers and the button wire-up do not change.
 
@@ -338,8 +367,16 @@ Constructor DI (beyond the original refresh/emit hooks): optional `show_status` 
 ### `CollectionsPresenter.wait_import_idle(timeout_ms: int = 5000) -> bool`
 
 Delegates directly to `CollectionImportActions.wait_idle(timeout_ms)`. Allows UI harnesses, parent
-presenters, and automated test fixtures to deterministically wait for any in-flight import parse worker
-to finish and join before tearing down widgets or closing panels.
+presenters, and automated test fixtures to deterministically wait for any in-flight import parse
+worker to finish, join, and be reaped before tearing down widgets or closing panels (PYPOST-1182).
+
+### `CollectionsPresenter.teardown(timeout_ms: int = 5000) -> bool`
+
+Deterministically tears down import actions and presenter resources (PYPOST-1148). Delegates to
+`self._import_actions.teardown(timeout_ms=timeout_ms)` and closes the presenter panel
+(`self._panel.close()`). Returns `True` if background worker resources were cleanly drained and
+stopped. Test fixtures and parent widget cleanup routines invoke `teardown()` in `finally:` blocks
+to prevent background thread leaks and C++ destructor futex deadlocks during test suite runs.
 
 ### Testing seam
 
@@ -379,8 +416,62 @@ To resolve this deterministically:
   `done()` is `True` and `presenter.wait_import_idle()` confirms all background workers have joined
   and cleaned up before assertions or widget closures run.
 - Automated tests in headless mode (`QT_QPA_PLATFORM=offscreen`) also patch dialog handlers in
-  `collection_item_dialogs.py` to ensure unexpected branches fail fast with descriptive assertions rather
-  than opening blocking modal dialog loops (`QDialog.exec()`).
+  `collection_item_dialogs.py` to ensure unexpected branches fail fast with descriptive assertions
+  rather than opening blocking modal dialog loops (`QDialog.exec()`).
+
+### Futex deadlock elimination during full test suite execution (PYPOST-1148)
+
+Running the complete fast test suite in batch mode (`make test` or `make check`, executing
+over 2,700 tests in a single Python process and shared `QApplication`) previously triggered
+an unrecoverable futex deadlock (`futex_wait_queue`) around collection import error tests
+(`tests/test_collection_import_async_gaps.py`).
+
+#### Root cause analysis
+
+1. **Premature test completion on reader exception**:
+   When reader fixtures raised unexpected exceptions (such as `_exploding_reader`),
+   `CollectionImportParseWorker` caught the error and emitted `parse_failed(error)`.
+   On the main thread, `_on_parse_failed()` immediately invoked
+   `show_collection_import_invalid_file_error()`. Tests monitoring the mock dialog observed
+   `mock_invalid.called` and returned without waiting for the background `QThread` to finish.
+2. **Premature `is_busy()` false negative**:
+   Previously, `is_busy()` returned `self._preparing or (self._worker and`
+   `self._worker.isRunning())`. When `_on_parse_failed()` ran, it set `self._preparing = False`.
+   As soon as the worker exited its Python `run()` method, `isRunning()` evaluated to `False`.
+   However, the queued `finished` signal had not yet been processed by the GUI event loop,
+   leaving `_on_worker_finished()` uncalled, native thread join unperformed, and `_worker`
+   still holding an active native thread reference.
+3. **GIL contention and C++ destructor futex deadlock**:
+   Upon test completion, `presenter` fell out of scope. In a full run of 2,700+ tests, Python
+   garbage collection cycles deallocated the Python `CollectionImportParseWorker` wrapper.
+   Its underlying Qt C++ destructor `QThread::~QThread()` detected an active or terminating
+   OS thread and invoked `pthread_join()`, sleeping on a Linux futex while holding the
+   Python GIL. Concurrently, the exiting native worker thread required the Python GIL or
+   Qt event dispatcher mutexes to complete thread termination. Because the main GUI thread
+   held the GIL during GC while blocked in `pthread_join()`, a circular deadlock occurred.
+   Signal-based timeouts (`SIGALRM` via `pytest-timeout`) could not interrupt glibc pthreads
+   kernel futex waits, causing pytest to hang indefinitely.
+
+#### Architectural resolution
+
+- **Refined `is_busy()` lifecycle contract**:
+  `CollectionImportActions.is_busy()` now returns `self._preparing or self._worker is not None`.
+  An import action remains busy throughout worker initialization, execution, signal delivery,
+  and native thread join until `_on_worker_finished()` explicitly resets `self._worker = None`.
+- **Deterministic `teardown()` contract**:
+  `CollectionImportActions.teardown(timeout_ms)` and `CollectionsPresenter.teardown(timeout_ms)`
+  provide an explicit lifecycle drain protocol:
+  - **Wait**: Invokes `wait_idle(timeout_ms)` to allow active workers to finish and join.
+  - **Disconnect**: Safely disconnects all Qt signals (`parse_progress`, `parse_completed`,
+    `parse_failed`, `finished`) within `try...except (RuntimeError, TypeError)` blocks.
+  - **Interrupt & Join**: If the worker thread remains running, requests interruption via
+    `worker.requestInterruption()` and waits boundedly (100ms) for clean exit.
+  - **Reap & Defer Delete**: Invokes `worker.deleteLater()`, clears `self._worker = None`,
+    and pumps `app.processEvents()` to process deferred deletion events before widget teardown.
+- **Harness synchronization**:
+  All asynchronous collection import tests in `tests/test_collection_import_async_gaps.py`
+  synchronize via `presenter.wait_import_idle()` before assertions and invoke
+  `presenter.teardown()` in `finally:` blocks, guaranteeing zero thread leaks across the suite.
 
 Responsiveness coverage: `tests/test_collection_import_responsiveness.py` injects a
 blocking reader and asserts the Qt event loop still fires a `QTimer` during parse, with
@@ -447,19 +538,42 @@ routinely carries credentials in a header template. Paths are logged for triage
 `ai-tasks/PYPOST-1005/50-observability.md`,
 `ai-tasks/PYPOST-1006/50-observability.md`,
 `ai-tasks/PYPOST-1058/50-observability.md`,
-`ai-tasks/PYPOST-1059/50-observability.md`, and
-`ai-tasks/PYPOST-1182/50-observability.md`.
+`ai-tasks/PYPOST-1059/50-observability.md`,
+`ai-tasks/PYPOST-1182/50-observability.md`, and
+`ai-tasks/PYPOST-1148/50-observability.md`.
 
-### Async parse and lifecycle synchronization (PYPOST-1005 / PYPOST-1182)
+### Async parse, lifecycle synchronization, and teardown (PYPOST-1005 / PYPOST-1182 / PYPOST-1148)
+
+In `collections_presenter.py`:
+
+- **INFO** `collections_presenter_teardown_started timeout_ms=%d` — start of presenter-level
+  teardown sequence (PYPOST-1148)
+- **INFO** `collections_presenter_teardown_completed clean=%s` — completion of presenter
+  teardown (PYPOST-1148)
 
 In `collection_import_actions.py`:
 
 - **INFO** `collection_import_skipped reason=busy` — second Import while preparing
 - **INFO** `collection_import_parse_started path=…` — orchestrator dispatched the worker
 - **DEBUG** `collection_import_busy_cue_shown` / `collection_import_busy_cue_cleared`
-- **INFO** `collection_import_wait_idle_started` — entered `wait_idle()` while parse worker is active (PYPOST-1182)
-- **INFO** `collection_import_wait_idle_completed elapsed_ms=%d` — `wait_idle()` successfully completed with worker joined (PYPOST-1182)
-- **WARNING** `collection_import_wait_idle_timeout elapsed_ms=%d` — `wait_idle()` reached timeout before worker joined (PYPOST-1182)
+- **INFO** `collection_import_wait_idle_started` — entered `wait_idle()` while worker active
+  (PYPOST-1182)
+- **INFO** `collection_import_wait_idle_completed elapsed_ms=%d` — `wait_idle()` successfully
+  completed with worker joined (PYPOST-1182)
+- **WARNING** `collection_import_wait_idle_timeout elapsed_ms=%d` — `wait_idle()` reached
+  timeout before worker joined (PYPOST-1182)
+- **INFO** `collection_import_teardown_started timeout_ms=%d` — start of actions teardown
+  (PYPOST-1148)
+- **INFO** `collection_import_teardown_completed clean=%s` — completion of actions teardown
+  (PYPOST-1148)
+- **WARNING** `collection_import_worker_interrupting` — worker active when teardown started;
+  interruption requested (PYPOST-1148)
+- **WARNING** `collection_import_worker_interrupt_timeout` — worker interruption wait (100ms)
+  timed out (PYPOST-1148)
+- **INFO** `collection_import_worker_interrupted` — running worker stopped successfully after
+  interruption (PYPOST-1148)
+- **DEBUG** `collection_import_worker_reaped` — worker reference reaped and scheduled for
+  deletion (PYPOST-1148)
 - **ERROR** `collection_import_parse_unexpected error=…` — unexpected exception from the
   worker, handled on the GUI thread (invalid-file dialog)
 - **WARNING** `collection_import_worker_finish_wait_timeout wait_ms=…` — short join after
@@ -538,6 +652,8 @@ the collection id, not its name.
 | WARNING `collection_import_worker_finish_wait_timeout` | Short post-`finished` join did not complete within `_WORKER_FINISH_WAIT_MS` | Same class of issue as storage gateway finish hygiene (PYPOST-829); usually transient; escalate if paired with crashes under rapid import churn |
 | WARNING `collection_import_wait_idle_timeout` | `CollectionImportActions.wait_idle()` reached timeout waiting for background parse worker to finish and join | Check if `read_import_file` is blocked on slow I/O or stuck in a deadlocked event loop; increase `timeout_ms` if parsing massive files |
 | Test suite stalls or hangs on `test_collections_import_ui.py` | Widget teardown or garbage collection occurred while background `CollectionImportParseWorker` `QThread` was still running | Use `presenter.wait_import_idle()` or `_wait_import(..., presenter)` to ensure workers are fully drained before closing panel or exiting test fixtures |
+| Futex deadlock in batch tests (2,700+ tests) | Unjoined worker QThread deallocated during GC while C++ destructor waits in pthread_join | Call presenter.teardown() in finally block and wait_import_idle() before assertions (PYPOST-1148) |
+| WARNING `collection_import_worker_interrupt_timeout` | Worker failed to stop within 100ms of interruption request | Check if custom reader callable is blocked in uninterruptible C I/O (PYPOST-1148) |
 
 ## Related
 

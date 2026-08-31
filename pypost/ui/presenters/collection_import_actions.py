@@ -82,10 +82,8 @@ class CollectionImportActions(QObject):
         self._preparing = False
 
     def is_busy(self) -> bool:
-        """True while a parse worker is in flight (busy cue / re-entry guard)."""
-        if self._preparing:
-            return True
-        return self._worker is not None and self._worker.isRunning()
+        """True while a parse worker is in flight or preparing (busy cue / re-entry guard)."""
+        return self._preparing or self._worker is not None
 
     def wait_idle(self, timeout_ms: int = 5000) -> bool:
         """Pump event loop / wait until background worker has finished and joined."""
@@ -107,11 +105,56 @@ class CollectionImportActions(QObject):
                 app.processEvents()
             elif self._worker is not None:
                 self._worker.wait(10)
+        if app is not None:
+            app.processEvents()
         logger.info(
             "collection_import_wait_idle_completed elapsed_ms=%d",
             timer.elapsed(),
         )
         return True
+
+    def teardown(self, timeout_ms: int = 5000) -> bool:
+        """Safely disconnect, interrupt/wait, join, and reap background workers deterministically.
+        """
+        logger.info("collection_import_teardown_started timeout_ms=%d", timeout_ms)
+        clean = True
+        if self.is_busy():
+            clean = self.wait_idle(timeout_ms)
+        worker = self._worker
+        if worker is not None:
+            try:
+                worker.parse_progress.disconnect(self._on_parse_progress)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                worker.parse_completed.disconnect(self._on_parse_completed)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                worker.parse_failed.disconnect(self._on_parse_failed)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                worker.finished.disconnect(self._on_worker_finished)
+            except (RuntimeError, TypeError):
+                pass
+            if worker.isRunning():
+                logger.warning("collection_import_worker_interrupting")
+                worker.requestInterruption()
+                if not worker.wait(100):
+                    clean = False
+                    logger.warning("collection_import_worker_interrupt_timeout")
+                else:
+                    logger.info("collection_import_worker_interrupted")
+            worker.deleteLater()
+            logger.debug("collection_import_worker_reaped")
+            self._worker = None
+        self._set_preparing(False)
+        app = QApplication.instance()
+        if app is not None:
+            app.processEvents()
+        logger.info("collection_import_teardown_completed clean=%s", clean)
+        return clean
 
     def import_collections(self) -> None:
         """Pick a file, parse off-thread, then finish import on the GUI thread."""
@@ -218,9 +261,16 @@ class CollectionImportActions(QObject):
 
     def _set_preparing(self, active: bool) -> None:
         self._preparing = active
-        button = self._parent.findChild(QPushButton, COLLECTION_IMPORT_BUTTON)
-        if button is not None:
-            button.setEnabled(not active)
+        try:
+            button = (
+                self._parent.findChild(QPushButton, COLLECTION_IMPORT_BUTTON)
+                if self._parent is not None
+                else None
+            )
+            if button is not None:
+                button.setEnabled(not active)
+        except RuntimeError:
+            pass
         if active:
             if self._show_status is not None:
                 self._show_status(MSG_IMPORT_PREPARING)

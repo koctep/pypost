@@ -69,7 +69,7 @@ def test_import_skipped_when_already_busy(_mock_picker, caplog, qapp):
         )
     finally:
         presenter._import_actions._preparing = False
-        presenter.panel.close()
+        presenter.teardown()
 
 
 @patch(_INVALID)
@@ -96,8 +96,9 @@ def test_unexpected_reader_exception_surfaces_invalid_dialog(
             and "unexpected disk failure" in rec.message
             for rec in caplog.records
         )
+        assert presenter.wait_import_idle()
     finally:
-        presenter.panel.close()
+        presenter.teardown()
 
 
 @patch(_RESULT)
@@ -122,8 +123,9 @@ def test_status_bar_lifecycle_transitions(_mock_picker, _mock_result, qapp):
 
         assert any(MSG_IMPORT_PREPARING in s for s in recorded_statuses)
         assert len(cleared) >= 1
+        assert presenter.wait_import_idle()
     finally:
-        presenter.panel.close()
+        presenter.teardown()
 
 
 @patch(_RESULT)
@@ -157,5 +159,6 @@ def test_real_json_file_async_import_integration(_mock_result, tmp_path: Path, q
             assert cols[0].name == "Integration Collection"
             assert len(cols[0].requests) == 1
             assert cols[0].requests[0].name == "Get Info"
+            assert presenter.wait_import_idle()
         finally:
-            presenter.panel.close()
+            presenter.teardown()
