@@ -62,7 +62,7 @@ Use this checklist on a **clean checkout** to match CI regression coverage local
 | **Python** | 3.11+ recommended ([README](../../README.md)); CI matrix runs **3.11** and **3.13** |
 | **Install** | `make install` — creates `.venv`, runs `pip install -e ".[dev,otel]"` |
 | **Fast regression** | `make test` — full suite except `-m slow` |
-| **Slow smoke** | `make test-slow` — Makefile install smoke (`tests/test_makefile.py`) |
+| **Slow smoke** | `make test-slow` — Makefile install smoke (`tests/test_makefile_slow_smoke.py`) |
 | **Coverage** | `make test-cov` — fast suite with `--cov=pypost` |
 | **CI parity** | Main job (`.github/workflows/test.yml`) installs `pip install -e ".[dev,otel]"` |
 
@@ -1336,11 +1336,22 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 
 ## Makefile automation tests
 
-`tests/test_makefile.py` validates root `Makefile` contracts without touching the repository
-`.venv`. Shared static parsers for `##` help lines and target recipe bodies live in
+Root `Makefile` contracts are validated by modular test suites without touching the repository
+`.venv`. In PYPOST-1234, the monolithic `tests/test_makefile.py` was decomposed into focused
+suites to distribute execution across parallel runner workers and prevent worker timeouts:
+
+- `tests/test_makefile_recipes.py`: static recipe syntax, dependency graphs (`make -p`), lock files.
+- `tests/test_makefile_lifecycle.py`: virtual environment marker creation, `clean`, stamp tracking.
+- `tests/test_makefile_targets.py`: target execution in isolated temporary workspaces, exit codes.
+- `tests/test_makefile_slow_smoke.py`: slow editable install smoke with real `pyproject.toml`.
+
+Shared static parsers for `##` help lines and target recipe bodies live in
 `tests/makefile_contract_helpers.py` (`makefile_target_help_comment`,
 `makefile_target_recipe_body`) — use them when adding make-entry contract locks (PYPOST-937).
-Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across two tasks to avoid duplicate fixtures:
+Shared workspace fixtures (`make_workspace`, `make_workspace_full_deps`), pyproject seed
+generators, and subprocess execution wrappers live in `tests/makefile_test_helpers.py`
+(PYPOST-1234). Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across
+tasks to avoid duplicate fixtures:
 
 | Task | Scope |
 | ---- | ----- |
@@ -1370,6 +1381,7 @@ Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across 
 | [PYPOST-937] | Shared Makefile help/recipe parse helpers for make-entry contract locks |
 | [PYPOST-938] | KEEP 873-style packaging doc locks; revisit criteria documented |
 | [PYPOST-954] | Shared `packaging_doc_lock` helper; UI-action MCP packaging locks hardened |
+| [PYPOST-1234] | Split monolithic test_makefile.py into focused suites and budget timeouts |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -1397,6 +1409,7 @@ Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across 
 [PYPOST-928]: https://pypost.atlassian.net/browse/PYPOST-928
 [PYPOST-938]: https://pypost.atlassian.net/browse/PYPOST-938
 [PYPOST-954]: https://pypost.atlassian.net/browse/PYPOST-954
+[PYPOST-1234]: https://pypost.atlassian.net/browse/PYPOST-1234
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -1409,6 +1422,7 @@ Unit coverage: `tests/test_makefile_contract_helpers.py`. Scope is split across 
 | Slow smoke seed contract | Isolated workspace seed mirrors packaging metadata from committed `pyproject.toml` (dynamic version attr, readme), not only dependency pins (PYPOST-943) |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
 | Agent e2e target | deps (`venv-test` + `venv-otel`), help listing, recipe marker, selection smoke (861/872) |
+| Parallel budget & bounds | Modular test bounds, exit-policy subprocess timeouts (PYPOST-1234) |
 
 ### Packaging doc lock strategy (PYPOST-922 / PYPOST-938 / PYPOST-954)
 
@@ -1430,7 +1444,7 @@ doc-lock module made DRY pressure real (938 trigger #3).
 | --- | --- | --- |
 | `tests/test_agent_e2e_broader_packaging_doc.py` | `agent_e2e.md`, `agent_golden_e2e.md`, `testing.md` | `PYPOST-922`, `beyond golden`, `primary packaging`, `make test-agent-e2e`, `PYTEST_ARGS` |
 | `tests/test_ui_actions_mcp_packaging_doc.py` | `ui_actions.md`, `mcp_integration.md`, `mcp_trust_model.md` | `PYPOST-918`, `out-of-process`, `packaging path`, `MCPServerImpl`, no-mix tuple (`never mount`, …) |
-| `tests/test_makefile.py` (`TestAgentE2eTargetRecipe`, help cross-check) | Makefile `test-agent-e2e` | `broader`, `beyond golden`, marker default ≠ golden-only |
+| `tests/test_makefile_recipes.py` (`TestAgentE2eTargetRecipe`, help cross-check) | Makefile `test-agent-e2e` | `broader`, `beyond golden`, marker default ≠ golden-only |
 
 When editing locked prose, **preserve the tokens** above (case-insensitive
 where the test uses `case_insensitive=True`). Rephrasing without tokens will
@@ -1449,7 +1463,9 @@ occur within one sprint):
 Focused runs:
 
 ```bash
-make test PYTEST_ARGS='tests/test_agent_e2e_broader_packaging_doc.py tests/test_makefile.py::TestAgentE2eTargetRecipe tests/test_makefile.py::TestHelpTarget::test_help_frames_test_agent_e2e_broader_beyond_golden -v'
+make test PYTEST_ARGS='tests/test_agent_e2e_broader_packaging_doc.py \
+  tests/test_makefile_recipes.py::TestAgentE2eTargetRecipe \
+  tests/test_makefile_recipes.py::TestHelpTarget -v'
 
 make test PYTEST_ARGS='tests/test_ui_actions_mcp_packaging_doc.py tests/test_packaging_doc_lock_helper.py -v'
 ```
@@ -1499,7 +1515,8 @@ Each case runs GNU Make in an isolated `tmp_path` with a copied `Makefile`, mini
 
 ### Slow smoke isolated workspace seed (PYPOST-943)
 
-The slow install smoke (`make_workspace_full_deps` in `tests/test_makefile.py`) copies the
+The slow install smoke (`make_workspace_full_deps` in `tests/makefile_test_helpers.py`, executed
+in `tests/test_makefile_slow_smoke.py`) copies the
 **committed** `pyproject.toml` into an isolated `tmp_path` and runs `make install` there.
 Both the fixture and the fast seed-contract tests assemble that workspace via
 `_materialize_slow_smoke_workspace` (Makefile copy, `pyproject.toml` copy, then
@@ -1537,11 +1554,12 @@ module and readme file — not application subpackages such as `pypost/core/` or
 | `README.md` (workspace root) | Copied from repo |
 | Other `pypost/**` paths | **Excluded** unless packaging requires them at install time |
 
-The canonical stub file set is `SLOW_SMOKE_MINIMUM_PYPPOST_FILES` in `tests/test_makefile.py`
-(currently `__init__.py`, `version.py`, and script entry-point stubs under `pypost/agent/`).
-`_required_seed_paths_from_pyproject` derives workspace-root and out-of-tree install artifacts
-(readme, license files, package-data); `test_slow_smoke_seed_materializes_minimum_pypost_tree`
-asserts the `pypost/` stub shape exactly — catching under-seeding and accidental full-tree copies.
+The canonical stub file set is `SLOW_SMOKE_MINIMUM_PYPPOST_FILES` in
+`tests/makefile_test_helpers.py` (currently `__init__.py`, `version.py`, and script entry-point
+stubs under `pypost/agent/`). `_required_seed_paths_from_pyproject` derives workspace-root and
+out-of-tree install artifacts (readme, license files, package-data);
+`test_slow_smoke_seed_materializes_minimum_pypost_tree` asserts the `pypost/` stub shape exactly
+— catching under-seeding and accidental full-tree copies.
 
 When adding new dynamic or install-time paths to `pyproject.toml`, extend the seed helper,
 `SLOW_SMOKE_MINIMUM_PYPPOST_FILES` (if under `pypost/`), and the contract parser together;
@@ -1550,7 +1568,7 @@ see `ai-tasks/PYPOST-943/20-architecture.md` § Packaging fields the seed must s
 #### Post-install sanity (PYPOST-559, PYPOST-966)
 
 After `make install` succeeds in the slow smoke workspace, `TestSlowInstallSmoke` runs each
-snippet in `POST_INSTALL_SANITY_SNIPPETS` (`tests/test_makefile.py`) via
+snippet in `POST_INSTALL_SANITY_SNIPPETS` (`tests/makefile_test_helpers.py`) via
 `_assert_post_install_sanity` against `.venv/bin/python`:
 
 | Snippet purpose | Check |
@@ -1571,7 +1589,9 @@ make test PYTEST_ARGS='tests/test_makefile_install_seed_contract.py -v'
 ```
 
 ```bash
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -v
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
+  tests/test_makefile_recipes.py tests/test_makefile_lifecycle.py \
+  tests/test_makefile_targets.py -v
 ```
 
 Slow install smoke (network-heavy; excluded from default `make test` and main CI job):
@@ -1579,7 +1599,7 @@ Slow install smoke (network-heavy; excluded from default `make test` and main CI
 ```bash
 make test-slow
 # or
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile.py -m slow -v
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_makefile_slow_smoke.py -m slow -v
 ```
 
 CI runs fast tests on every push/PR (Python 3.11 and 3.13). Default pytest
@@ -2017,8 +2037,10 @@ python scripts/audit_test_durations.py tests.txt
 
 - Re-run `scripts/parse_timeout_audit.py` when adding e2e/integration tests that may shift
   duration baselines (PYPOST-669).
-- Monitor `tests/test_makefile.py` peak duration (~4.6s); consider a 45s timeout marker
-  after a stable week if CI annotations persist (PYPOST-668).
+- Monolithic `tests/test_makefile.py` was decomposed into modular suites in PYPOST-1234
+  (`test_makefile_recipes.py`, `test_makefile_lifecycle.py`, `test_makefile_targets.py`,
+  and `test_makefile_slow_smoke.py`) with explicit per-module timeout budgets (<= 30–60s) to
+  guarantee execution well under the 120s worker timeout ceiling during parallel contention.
 - Optional verbose CI job: `--durations=10 --durations-min=5` on manual/workflow_dispatch runs
   (PYPOST-667).
 

@@ -1,4 +1,4 @@
-# Parallel Test Runner Orchestrator (PYPOST-1149 / PYPOST-1192)
+# Parallel Test Runner Orchestrator (PYPOST-1149 / PYPOST-1192 / PYPOST-1234)
 
 ## Overview
 
@@ -237,6 +237,78 @@ timeout bound resolved for the run (see [Worker timeout precedence](#worker-time
 so operators can read the active bound directly from the run-start log line instead of only from
 CLI/Make/env or a later timeout WARNING.
 
+## Test suite modularization and timeout budget principles (PYPOST-1234)
+
+### Background and problem statement
+
+Under `make test`, the orchestrator dispatches test execution on a **per-file** basis to
+isolated subprocesses. If an individual test module's cumulative runtime approaches the 120s
+`WORKER_TIMEOUT` ceiling in isolation, system load and resource contention (concurrent CPU and
+disk I/O pressure) during full-suite parallel execution easily pushes the worker over the 120s
+deadline. When this happens, the worker subprocess is terminated (`subprocess.TimeoutExpired`),
+marking the entire file as `TIMED_OUT` and aborting all subsequent tests in that module.
+
+Similarly, integration tests executing inner child subprocesses (e.g. `make install` or
+`make test` inside temporary workspaces) can fail if their internal subprocess timeouts or
+test-level timeouts are budgeted too tightly to absorb contention delays.
+
+### Modular decomposition of monolithic suites
+
+In PYPOST-1234, the monolithic `tests/test_makefile.py` (952 lines, 65 tests, ~109s standalone
+execution) was decomposed into four focused, cohesive test suites:
+
+| Test suite module | Tests | Timeout | Scope / responsibilities |
+| --- | --- | --- | --- |
+| `tests/test_makefile_recipes.py` | 34 | 30s | Static checks, deps (`make -p`), lock files, help |
+| `tests/test_makefile_lifecycle.py` | 13 | 60s | Venv creation, clean, stamps, idempotency |
+| `tests/test_makefile_targets.py` | 11 | 60s | Target execution in isolated workspaces, exit codes |
+| `tests/test_makefile_slow_smoke.py` | 1 | 180s | Full pyproject install, imports (`@pytest.mark.slow`) |
+
+This decomposition splits the heavy Makefile test load across multiple worker processes during
+`make test`, cutting peak per-worker duration to ~25–60s under full parallel load and establishing
+a healthy >50% safety margin below the 120s ceiling. The slow smoke test is marked
+`@pytest.mark.slow` and isolated from fast `make test` runs, executing exclusively under
+`make test-slow`.
+
+### Shared helper centralization
+
+Shared workspace fixtures (`make_workspace`, `make_workspace_full_deps`), subprocess execution
+wrappers (`_run_make`, `_prerequisites`), pyproject seed generators, and post-install assertions
+were extracted into `tests/makefile_test_helpers.py`. This centralizes common fixture machinery,
+eliminates duplicate code across modular suites, and provides a stable import location for
+contract guards like `tests/test_makefile_install_seed_contract.py`.
+
+### Subprocess timeout budgeting under contention
+
+Tests that invoke child subprocesses must budget timeouts hierarchically to prevent inner
+timeout failures or premature test aborts during CPU/disk contention:
+
+1. **Inner subprocess timeout**: Budget child subprocess invocations (e.g. `make install`,
+   `make test`) with sufficient headroom to tolerate 2x–3x slower I/O under parallel load. For
+   example, `tests/test_pytest_exit_policy.py` budgets 60s subprocess timeouts for `make install`
+   and `make test`.
+2. **Outer test timeout**: Test-level timeouts (`@pytest.mark.timeout(...)`) must exceed the
+   cumulative worst-case duration of all inner subprocess calls. In `test_pytest_exit_policy.py`,
+   the test timeout is set to 75s (`@pytest.mark.timeout(75)`), providing a 15s buffer over the
+   inner 60s command budget.
+3. **Module default timeout**: The module-level `pytestmark = pytest.mark.timeout(...)` provides a
+   fallback upper bound for fast unit/smoke tests within the module.
+
+### Test design guidelines for parallel execution
+
+When adding new integration or end-to-end test suites executed under `make test`:
+
+- **Individual file runtime ceiling**: Structure per-file test counts and execution profiles so
+  that each file's total duration remains comfortably under the 120s `WORKER_TIMEOUT` ceiling
+  even during full-suite parallel contention (target <= 30–60s under parallel load).
+- **Decompose when approaching thresholds**: If a test file's runtime exceeds 60s in standalone
+  execution, decompose it into multiple focused modules along logical boundaries (e.g., static
+  recipe parsing, lifecycle/state management, live command execution).
+- **Explicit timeout bounds**: Every test module must declare explicit, bounded timeouts per
+  the `do-testing` standard (`pytestmark = pytest.mark.timeout(N)`).
+- **Hierarchical margins for nested processes**: When spawning subprocesses within tests, ensure
+  `inner_subprocess_timeout < test_timeout < worker_timeout`.
+
 ## Subprocess isolation and Qt offscreen
 
 Each test file runs as:
@@ -311,3 +383,5 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py \
 - `ai-tasks/PYPOST-1149/50-observability.md` — structured logging fields (base orchestrator)
 - `ai-tasks/PYPOST-1192/20-architecture.md` — worker timeout design
 - `ai-tasks/PYPOST-1192/50-observability.md` — timeout log events (`worker_timeout`, `test_file_timed_out`)
+- `ai-tasks/PYPOST-1234/20-architecture.md` — test modularization and timeout budget design
+- `ai-tasks/PYPOST-1234/60-tech-debt.md` — parallel execution and technical debt analysis

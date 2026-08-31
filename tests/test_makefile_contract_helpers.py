@@ -8,7 +8,7 @@ from tests.makefile_contract_helpers import (
     makefile_target_help_comment,
     makefile_target_recipe_body,
 )
-from tests.test_makefile import MAKEFILE
+from tests.makefile_test_helpers import MAKEFILE
 
 pytestmark = pytest.mark.timeout(10)
 

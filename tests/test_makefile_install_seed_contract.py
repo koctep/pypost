@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.test_makefile import (
+from tests.makefile_test_helpers import (
     POST_INSTALL_SANITY_SNIPPETS,
     PYPROJECT,
     REPO_ROOT,

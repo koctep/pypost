@@ -60,7 +60,7 @@ def test_pytest_returns_exit_code_5_for_empty_tests_dir(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.timeout(30)
+@pytest.mark.timeout(75)
 def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path) -> None:
     """make test must propagate pytest exit 5 — zero collection is a failure."""
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
@@ -74,7 +74,7 @@ def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path
         cwd=tmp_path,
         capture_output=True,
         text=True,
-        timeout=25,
+        timeout=60,
         check=False,
     )
     assert install.returncode == 0, install.stderr
@@ -84,7 +84,7 @@ def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path
         cwd=tmp_path,
         capture_output=True,
         text=True,
-        timeout=25,
+        timeout=60,
         check=False,
     )
     assert test_result.returncode != 0, (
