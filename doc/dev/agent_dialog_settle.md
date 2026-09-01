@@ -192,8 +192,8 @@ Mitigation follow-up is ticketed under epic
 contract / baseline),
 [PYPOST-1210](https://pypost.atlassian.net/browse/PYPOST-1210) (pin attempt),
 [PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211) (app-side +
-settlement). Evaluation contract, pin outcome, and marker/docs settlement
-belong to those children — not expanded here.
+settlement). See [Mitigation Evaluation Contract (PYPOST-1115 / PYPOST-1209)](#mitigation-evaluation-contract-pypost-1115--pypost-1209)
+below.
 
 Run it explicitly:
 
@@ -201,6 +201,76 @@ Run it explicitly:
 pytest tests/test_agent_dialog_settle_teardown_stress.py -m slow -v
 make test-slow  # runs all slow-marked tests, including this one
 ```
+
+## Mitigation Evaluation Contract (PYPOST-1115 / PYPOST-1209)
+
+Epic [PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115) governs the
+mitigation of the native post-PASS teardown crash diagnosed in PYPOST-1040. To
+ensure consistent, objective evaluation across decomposed implementation
+children ([PYPOST-1210](https://pypost.atlassian.net/browse/PYPOST-1210) and
+[PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211)), this contract
+establishes the baseline facts, success criteria, candidate ordering,
+stop-on-success protocol, settlement ownership, and mandatory proof surfaces.
+
+### Diagnosed Baseline Specification
+
+The baseline crash profile established in PYPOST-1040:
+
+| Dimension | Baseline Finding / Reference Environment |
+| --- | --- |
+| **Crash Rate** | **32.5%** (13 crashes across 40 fresh, independent single-shot runs: 11× SIGSEGV/139, 2× SIGBUS/135) |
+| **Operating System** | Linux (Debian 13 "trixie" container, kernel 6.8+ / `aarch64` and `x86_64`) |
+| **Python Version** | Python 3.13.5 (standard CI matrix) |
+| **PySide6 / shiboken6** | `6.11.1` (exact pin in `pyproject.toml`) |
+| **QPA Platform** | `QT_QPA_PLATFORM=offscreen` |
+| **Proximate Trigger** | Pytest `unraisableexception` plugin executing `gc_collect_harder()` (5 rounds of cyclic `gc.collect()` at session teardown) |
+| **Target Subtree** | `SettingsDialog` nested `QVBoxLayout` / `QFormLayout` composite layout hierarchy |
+| **PyPost State** | Zero raw `QLayoutItem` / `QWidgetItem` references held; `AgentAppSession.shutdown()` completes and logs success prior to crash |
+
+### Quantitative Success Threshold
+
+Mitigation efficacy is measured statistically on the teardown stress detector:
+
+- **Statistical Detection Power**: For baseline crash probability $p = 0.325$, the probability of detecting at least one crash across $N = 25$ independent child runs if the defect is unmitigated is $1 - (1 - 0.325)^{25} \approx 99.991\%$ (>99.99% detection power).
+- **Full Mitigation Success (Epic Success)**: Exactly **0 crashes out of 25 runs** (`0/25`, 0.0% crash rate) on `tests/test_agent_dialog_settle_teardown_stress.py`, alongside **zero assertion or functional regressions** on `tests/test_agent_dialog_settle_e2e.py`.
+- **Partial / Inconclusive Improvement**: Any outcome with $\ge 1$ crash in 25 runs (e.g. 1/25 or 2/25). Even if frequency is reduced, process teardown remains vulnerable and does not satisfy the stop-on-success criterion.
+- **Failed / No Improvement**: $\ge 3$ crashes out of 25 runs (statistically indistinguishable from baseline).
+
+### Candidate Evaluation Sequence & Stop-on-Success Rules
+
+Mitigation candidates must be attempted in strict hierarchical order:
+
+1. **Candidate 1: Dependency Pin Evaluation (MITIGATE-2 / [PYPOST-1210](https://pypost.atlassian.net/browse/PYPOST-1210))**:
+   - Assess candidate PySide6 / shiboken6 patch versions (e.g. newer patch releases fixing the `QWidgetItem` destructor defect).
+   - Preferred first candidate: least invasive, directly addresses upstream root cause without application-side complexity.
+2. **Candidate 2: Application-Side Mitigations (MITIGATE-3 / [PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211))**:
+   - Evaluated only if Candidate 1 fails or is inconclusive.
+   - Explores breaking reference cycles in `SettingsDialog` layout composite sections and/or controlled post-shutdown `gc.collect()` in `AgentAppSession`.
+
+**Stop-on-Success Protocol**: If Candidate 1 (MITIGATE-2) satisfies the Full Mitigation Success threshold (0/25 crashes + green e2e assertions), Candidate 2 (MITIGATE-3) is **soft-skipped** with recorded empirical evidence.
+
+### Deterministic Settlement Ownership Model
+
+To prevent orphaned test markers (`pytest.mark.xfail`) and developer documentation across branching outcomes, settlement responsibility is deterministically assigned:
+
+| Execution Path | Condition | Settlement Owner | Required Settlement Actions |
+| --- | --- | --- | --- |
+| **Path A: Pin Success (M3 Soft-Skipped)** | MITIGATE-2 achieves 0/25 crashes + green e2e | **MITIGATE-2 ([PYPOST-1210](https://pypost.atlassian.net/browse/PYPOST-1210))** | 1. Settle detector marker: remove `xfail` from `tests/test_agent_dialog_settle_teardown_stress.py`.<br>2. Settle developer documentation with pin resolution evidence.<br>3. Record soft-skip justification for MITIGATE-3. |
+| **Path B: App-Side Success** | MITIGATE-2 fails/inconclusive; MITIGATE-3 achieves 0/25 crashes | **MITIGATE-3 ([PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211))** | 1. Settle detector marker: remove `xfail` from `tests/test_agent_dialog_settle_teardown_stress.py`.<br>2. Settle developer documentation with app-side mitigation details.<br>3. Close epic PYPOST-1115 with green stress detector. |
+| **Path C: Exhaustion / Permanent Upstream** | Both MITIGATE-2 and MITIGATE-3 fail to reach 0/25 crashes | **MITIGATE-3 ([PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211))** | 1. Retain `pytest.mark.xfail(strict=False)` with documented trial history.<br>2. Settle developer documentation with residual debt disposition.<br>3. Record permanent upstream tracking under PYPOST-1115. |
+
+**Settlement Invariant**: Exactly one child story owns detector marker and documentation settlement on any given execution path. Settlement is never left unassigned or orphaned.
+
+### Dual Proof Surfaces
+
+Every mitigation candidate must validate against both mandatory proof surfaces:
+
+1. **Stability Proof Surface (`tests/test_agent_dialog_settle_teardown_stress.py`)**:
+   - `STRESS_ITERATIONS = 25` isolated child pytest invocations.
+   - Verifies complete elimination of SIGSEGV/SIGBUS process exit crashes (target: 0/25).
+2. **Functional Preservation Proof Surface (`tests/test_agent_dialog_settle_e2e.py`)**:
+   - Executes both `test_agent_dialog_settle_after_settings_open` and `test_agent_dialog_settle_timeout_includes_step_and_modal_diag`.
+   - Verifies that dialog modal settle behavior, forced-timeout diagnostic rewraps (`step=wait_dialog_after_settings_open`), and DEBUG event contracts (`pypost.agent.ui_wait`, `condition=forced_dialog_settle_timeout`) remain fully preserved without regressions.
 
 ### Pattern sketch (shared helper)
 
