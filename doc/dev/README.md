@@ -147,6 +147,7 @@ conventions.
 1. [AI Task Artifacts Verification (PYPOST-816, PYPOST-1071, PYPOST-1079)](ai_task_artifacts_verification.md)
 1. [Static Type Checking (PYPOST-734, PYPOST-1007, PYPOST-1241)](static_type_checking.md)
 1. [GUI Testing](gui_testing.md)
+1. [Large-Batch GUI apply_theme Segfault (PYPOST-1212)](gui_batch_segfault.md)
 1. [Agent UI E2E (PYPOST-839; broader packaging PYPOST-922)](agent_e2e.md)
 1. [Agent E2E Environment Contract (PYPOST-856)](agent_e2e_env.md)
 1. [Agent E2E Seed Inventory (PYPOST-857)](agent_e2e_seed.md)
