@@ -261,6 +261,22 @@ def test_collection_e2e_make_target_selects_the_focused_module() -> None:
     assert "tests/test_mcp_collection_e2e.py" in recipe
 
 
+def test_makefile_worker_timeout_contract() -> None:
+    """PYPOST-1199: verify Makefile defines WORKER_TIMEOUT ?= 120 and forwards it."""
+    text = MAKEFILE.read_text(encoding="utf-8")
+    assert "WORKER_TIMEOUT ?= 120" in text, (
+        "Makefile must declare default 'WORKER_TIMEOUT ?= 120'"
+    )
+    test_recipe = makefile_target_recipe_body(text, _TEST)
+    assert "--worker-timeout $(WORKER_TIMEOUT)" in test_recipe, (
+        "Makefile 'test' target recipe must forward --worker-timeout $(WORKER_TIMEOUT)"
+    )
+    test_cov_recipe = makefile_target_recipe_body(text, "test-cov")
+    assert "--worker-timeout $(WORKER_TIMEOUT)" in test_cov_recipe, (
+        "Makefile 'test-cov' target recipe must forward --worker-timeout $(WORKER_TIMEOUT)"
+    )
+
+
 class TestHelpTarget:
     def test_help_prints_non_empty_output(self, make_workspace: Path) -> None:
         """PYPOST-800: catch accidental removal of Makefile ## annotations."""

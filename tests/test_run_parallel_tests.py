@@ -28,6 +28,7 @@ from scripts.run_parallel_tests import (
     TestStatus,
     default_worker_count,
     get_worker_count,
+    get_worker_timeout,
     kill_process_group,
     main,
     run_parallel_tests,
@@ -157,6 +158,90 @@ def test_worker_count_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # 4. Explicit CLI arg takes highest precedence
     assert get_worker_count(cli_workers=2) == 2
+
+
+@pytest.mark.parametrize(
+    ("cli_timeout", "env_timeout", "expected"),
+    [
+        (45.0, "60.0", 45.0),
+        (None, "60.0", 60.0),
+        (None, None, 30.0),
+    ],
+)
+def test_get_worker_timeout_precedence(
+    monkeypatch: pytest.MonkeyPatch,
+    cli_timeout: float | None,
+    env_timeout: str | None,
+    expected: float,
+) -> None:
+    """Worker timeout precedence: CLI arg > WORKER_TIMEOUT env > default 30.0."""
+    if env_timeout is not None:
+        monkeypatch.setenv("WORKER_TIMEOUT", env_timeout)
+    else:
+        monkeypatch.delenv("WORKER_TIMEOUT", raising=False)
+    assert get_worker_timeout(cli_timeout) == expected
+
+
+@pytest.mark.parametrize("invalid_cli", [0.0, -5.0, -1.0])
+@pytest.mark.parametrize(
+    ("env_timeout", "expected"),
+    [
+        ("45.0", 45.0),
+        (None, 30.0),
+    ],
+)
+def test_get_worker_timeout_invalid_cli_fallthrough(
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_cli: float,
+    env_timeout: str | None,
+    expected: float,
+) -> None:
+    """Invalid CLI timeout values (<= 0) fall through to env or default 30.0."""
+    if env_timeout is not None:
+        monkeypatch.setenv("WORKER_TIMEOUT", env_timeout)
+    else:
+        monkeypatch.delenv("WORKER_TIMEOUT", raising=False)
+    assert get_worker_timeout(invalid_cli) == expected
+
+
+@pytest.mark.parametrize(
+    "invalid_env",
+    ["", "   ", "-10.0", "0", "invalid", "abc"],
+)
+@pytest.mark.parametrize(
+    ("cli_timeout", "expected"),
+    [
+        (None, 30.0),
+        (42.0, 42.0),
+    ],
+)
+def test_get_worker_timeout_invalid_env_fallthrough(
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_env: str,
+    cli_timeout: float | None,
+    expected: float,
+) -> None:
+    """Invalid env timeout values fall through to default unless valid CLI is provided."""
+    monkeypatch.setenv("WORKER_TIMEOUT", invalid_env)
+    assert get_worker_timeout(cli_timeout) == expected
+
+
+def test_cli_parser_worker_timeout_flags(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CLIParser parses --worker-timeout in space, equals, or missing formats."""
+    monkeypatch.delenv("WORKER_TIMEOUT", raising=False)
+    parser = CLIParser()
+
+    # a) ["--worker-timeout", "42"] -> config.worker_timeout == 42.0
+    config_space = parser.parse_args(["--worker-timeout", "42"])
+    assert config_space.worker_timeout == 42.0
+
+    # b) ["--worker-timeout=42"] -> config.worker_timeout == 42.0
+    config_equals = parser.parse_args(["--worker-timeout=42"])
+    assert config_equals.worker_timeout == 42.0
+
+    # c) ["--worker-timeout"] (missing value) -> falls through to env/default 30.0 without error
+    config_missing = parser.parse_args(["--worker-timeout"])
+    assert config_missing.worker_timeout == 30.0
 
 
 def test_discovery_finds_all_test_files(sample_test_workspace: Path) -> None:
@@ -760,7 +845,10 @@ def test_kill_process_group_posix_suppresses_exceptions(
     debug_records = [
         record for record in caplog.records if record.levelno == logging.DEBUG
     ]
-    assert any("kill_process_group killpg failed" in record.getMessage() for record in debug_records)
+    assert any(
+        "kill_process_group killpg failed" in record.getMessage()
+        for record in debug_records
+    )
 
 
 @pytest.mark.timeout(10)

@@ -1,4 +1,4 @@
-# Parallel Test Runner Orchestrator (PYPOST-1149 / PYPOST-1192 / PYPOST-1234 / PYPOST-1197)
+# Parallel Test Runner Orchestrator (PYPOST-1149 / PYPOST-1192 / PYPOST-1234 / PYPOST-1197 / PYPOST-1199)
 
 ## Overview
 
@@ -138,6 +138,70 @@ Make still use 30 unless overridden.
 
 Do not use bare `--timeout` as an orchestrator flag: pytest-timeout owns that name, and the
 parser forwards it into every worker.
+
+### `get_worker_timeout()` API and validation rules (PYPOST-1199)
+
+`get_worker_timeout` is a pure, side-effect-free resolver at
+[`scripts/run_parallel_tests.py`](file:///home/src/scripts/run_parallel_tests.py#L128-L148).
+
+```python
+DEFAULT_WORKER_TIMEOUT: float = 30.0
+
+def get_worker_timeout(cli_timeout: float | None = None) -> float:
+    """Determine effective per-worker timeout following precedence rules.
+
+    Precedence:
+    1. Explicit CLI argument (--worker-timeout) — must be > 0
+    2. WORKER_TIMEOUT environment variable    — must parse as float > 0
+    3. DEFAULT_WORKER_TIMEOUT (30 seconds)
+    """
+```
+
+**Validation rules** (applied at each tier before accepting the value):
+
+| Tier | Source | Accepted when | Rejected and falls through when |
+| --- | --- | --- | --- |
+| 1 — CLI | `cli_timeout` argument | `cli_timeout is not None and cli_timeout > 0` | `None`, `0.0`, any negative value |
+| 2 — Env | `os.environ["WORKER_TIMEOUT"]` | Parses as `float` **and** `> 0` | Empty string, whitespace-only, `"0"`, negative, non-numeric |
+| 3 — Default | `DEFAULT_WORKER_TIMEOUT` | Always | — |
+
+The function never raises; invalid values at any tier cause silent fallthrough to the next.
+
+**CLIParser flag handling** — two equivalent invocation styles are accepted:
+
+```bash
+scripts/run_parallel_tests.py --worker-timeout 42.5  # space-separated
+scripts/run_parallel_tests.py --worker-timeout=42.5  # equals-separated
+```
+
+A bare `--worker-timeout` with no following value is silently ignored; resolution falls
+through to env/default.
+
+### Test coverage for `get_worker_timeout` (PYPOST-1199)
+
+Unit tests live in
+[`tests/test_run_parallel_tests.py`](file:///home/src/tests/test_run_parallel_tests.py#L163-L244)
+and cover the full precedence matrix via `@pytest.mark.parametrize`:
+
+| Test | What it verifies |
+| --- | --- |
+| `test_get_worker_timeout_precedence` | CLI overrides env; env overrides default; default applies when both absent |
+| `test_get_worker_timeout_invalid_cli_fallthrough` | `0.0`, `-5.0`, `-1.0` all fall through to env or default |
+| `test_get_worker_timeout_invalid_env_fallthrough` | `""`, `"   "`, `"0"`, `"-10.0"`, `"invalid"`, `"abc"` all fall through to default |
+| `test_cli_parser_worker_timeout_flags` | Space-separated, equals-separated, and missing-value forms of `--worker-timeout` |
+
+All tests use `monkeypatch.setenv` / `monkeypatch.delenv` — no environment state leaks across
+test boundaries.
+
+Makefile contract tests in
+[`tests/test_makefile_recipes.py`](file:///home/src/tests/test_makefile_recipes.py#L264-L277)
+(`test_makefile_worker_timeout_contract`) statically assert:
+
+1. `WORKER_TIMEOUT ?= 120` is declared in the Makefile.
+2. `--worker-timeout $(WORKER_TIMEOUT)` is present in the `test` recipe.
+3. `--worker-timeout $(WORKER_TIMEOUT)` is present in the `test-cov` recipe.
+
+These checks run without executing Make, giving instant feedback on accidental recipe regressions.
 
 ### Pytest passthrough
 
@@ -404,3 +468,5 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py \
 - `ai-tasks/PYPOST-1234/60-tech-debt.md` — parallel execution and technical debt analysis
 - `ai-tasks/PYPOST-1197/20-architecture.md` — process-group isolation and cascading teardown design
 - `ai-tasks/PYPOST-1197/60-tech-debt.md` — process group isolation and technical debt analysis
+- `ai-tasks/PYPOST-1199/10-requirements.md` — requirements for `get_worker_timeout` precedence unit tests
+- `ai-tasks/PYPOST-1199/20-architecture.md` — architecture and parameterized test matrices for timeout resolution
