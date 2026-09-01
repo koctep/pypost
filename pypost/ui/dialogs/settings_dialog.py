@@ -95,15 +95,12 @@ class SettingsDialog(QDialog):
         encryption_config = EncryptionConfigSection(current_settings, self)
         encryption_migration = EncryptionMigrationSection(
             self,
-            storage=storage,
-            migration_service=migration_service,
-            encryption_config=encryption_config,
-            current_settings=current_settings,
+            storage=storage, migration_service=migration_service,
+            encryption_config=encryption_config, current_settings=current_settings,
             show_migration_result=show_migration_result,
             confirm_re_encrypt_environments=confirm_re_encrypt_environments,
             confirm_encrypt_plaintext_hidden=confirm_encrypt_plaintext_hidden,
-            confirm_upgrade_envelopes_v2=confirm_upgrade_envelopes_v2,
-            host_dialog=self,
+            confirm_upgrade_envelopes_v2=confirm_upgrade_envelopes_v2, host_dialog=self,
         )
         retry_policy = RetryPolicySection(current_settings, self)
         security_alert = SecurityAlertSection(current_settings, self)
@@ -174,18 +171,10 @@ class SettingsDialog(QDialog):
         encryption_migration.add_to_form(encryption_form)
 
         self._tab_pages = (
-            general_page,
-            requests_page,
-            network_page,
-            security_page,
-            encryption_page,
+            general_page, requests_page, network_page, security_page, encryption_page
         )
         self._tab_form_layouts = (
-            general_form,
-            requests_form,
-            network_form,
-            security_form,
-            encryption_form,
+            general_form, requests_form, network_form, security_form, encryption_form
         )
 
         self.settings_tabs = QTabWidget(self)
@@ -212,9 +201,7 @@ class SettingsDialog(QDialog):
         return -1
 
     def _encryption_settings_from_form(self) -> AppSettings:
-        return self._encryption_config_section.encryption_settings_from_form(
-            self.current_settings,
-        )
+        return self._encryption_config_section.encryption_settings_from_form(self.current_settings)
 
     def _on_verify_encryption(self) -> None:
         self._encryption_migration_section.on_verify_encryption()
@@ -255,6 +242,19 @@ class SettingsDialog(QDialog):
             **fields,
         )
         super().accept()
+        self.cleanup()
+
+    def reject(self) -> None:
+        super().reject()
+        self.cleanup()
+
+    def cleanup(self) -> None:
+        """Break reference cycles and unbind section cross-references."""
+        section = getattr(self, "_encryption_migration_section", None)
+        if section is not None:
+            if hasattr(section, "_host_dialog"):
+                setattr(section, "_host_dialog", None)
+            setattr(self, "_encryption_migration_section", None)
 
     def get_settings(self) -> AppSettings:
         return self.new_settings

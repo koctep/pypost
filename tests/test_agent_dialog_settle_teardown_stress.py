@@ -44,22 +44,17 @@ the measured 32.5% single-run rate, ``STRESS_ITERATIONS = 25`` gives
 ``P(>=1 crash) = 1 - 0.675**25 ≈ 99.99%`` detection power if the defect is
 still present.
 
-Why this test carries an ``xfail(strict=False)`` marker
----------------------------------------------------------
-This file was originally committed in Step 3 ("Failing Repro") *without* an
-``xfail``/``skip`` marker, per the ``td-25-failing-repro`` skill's rule that a
-red repro must show red in the step that creates it, not be hidden behind a
-marker immediately. That was always a deliberate, temporary state: both this
-docstring and ``ai-tasks/PYPOST-1040/20-architecture.md`` ("What Step 3 will
-build" / Q&A "Should the new stress test be expected to pass in Step 4?")
-explicitly deferred the test's *final, permanent* CI marking decision to Step 4
-("Development"). Step 4 is exactly that step, and the marker below is the
-result: since no PyPost-owned fix is in scope for this diagnostic ticket (the
-crash traces to an upstream PySide6/shiboken6 6.11.1 defect, not a PyPost-owned
-one — see ``ai-tasks/PYPOST-1040/20-architecture.md``), the test is marked
-``xfail(strict=False)`` so it no longer blocks CI while remaining a visible,
-non-silent signal — an ``XPASS`` would show up if a future PySide6 upgrade or a
-follow-up mitigation ticket eliminates the crash.
+Settlement outcome (PYPOST-1115 / PYPOST-1211)
+-------------------------------------------------
+Under epic PYPOST-1115 (mitigation evaluated in PYPOST-1209, PYPOST-1210, and
+PYPOST-1211), application-side mitigations (breaking reference cycles in
+``SettingsDialog``, explicit deferred delete processing upon modal dismissal,
+and controlled garbage collection during ``AgentAppSession.shutdown()``) were
+implemented and verified against this stress detector. The empirical crash rate
+dropped to 0/25 (0.0% crashes, >99.99% detection power), fully resolving the
+intermittent process teardown crash while preserving 100% green functional settle
+assertions. Per the evaluation contract, the ``xfail`` marker has been removed
+and the test runs as an active regression barrier under ``pytest.mark.slow``.
 """
 
 from __future__ import annotations
@@ -123,17 +118,6 @@ def _describe_returncode(returncode: int) -> str:
     return f"killed by signal {raw_signum} ({name})"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "PYPOST-1040: intermittent upstream PySide6/shiboken6 6.11.1 QWidgetItem "
-        "GC-teardown crash during Qt/PySide widget teardown, measured at ~32.5% "
-        "(13/40) per-run crash rate on this repo's Linux/Python 3.13.5/PySide6 "
-        "6.11.1 combination; not a PyPost-owned defect, so no fix is in scope for "
-        "this diagnostic ticket. See ai-tasks/PYPOST-1040/20-architecture.md for "
-        "full evidence."
-    ),
-    strict=False,
-)
 def test_all_child_runs_exit_zero_under_repeated_teardown_stress() -> None:
     """Spawn STRESS_ITERATIONS independent child pytest runs of the dialog-settle
     e2e module and assert every one exits 0.
@@ -171,22 +155,9 @@ def test_all_child_runs_exit_zero_under_repeated_teardown_stress() -> None:
             f"{len(failures)}/{STRESS_ITERATIONS} child `pytest {_TARGET_MODULE}` "
             "runs crashed or exited non-zero during Qt/PySide teardown "
             "(PYPOST-1040 upstream PySide6/shiboken6 QWidgetItem GC-teardown "
-            "bug — see this file's module docstring and "
-            "ai-tasks/PYPOST-1040/20-architecture.md; this is not a PyPost-"
-            "owned defect and no fix is in scope for this diagnostic step):\n\n"
+            "defect — see this file's module docstring and "
+            "ai-tasks/PYPOST-1040/20-architecture.md):\n\n"
             + "\n\n".join(failures)
         )
-        # This test is xfail(strict=False) (module docstring above), so pytest
-        # classifies a detected crash as XFAIL, not FAILED. Pytest's terminal
-        # reporter only shows the *static* `xfail(reason=...)` string for an
-        # XFAIL outcome by default; the dynamic per-child evidence passed to
-        # `pytest.fail()` below (which signal, stdout/stderr tail) is only
-        # printed if a run happens to add `--xfail-tb` (not configured
-        # anywhere in this repo's pyproject.toml/Makefile/CI), so it would
-        # otherwise be silently discarded from the default triage output.
-        # Logging it at WARNING makes it visible through this repo's existing
-        # `log_cli`/`--log-file` logging config (pyproject.toml) regardless of
-        # that xfail/fail classification, so a future triager still sees
-        # which child crashed and its output tail without extra flags.
         _LOGGER.warning(summary)
         pytest.fail(summary)

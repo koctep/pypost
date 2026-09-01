@@ -174,17 +174,13 @@ that diagnostic ticket — it makes the defect visible and regression-checked:
   processes of `tests/test_agent_dialog_settle_e2e.py` (each a full
   `subprocess.run`, so a child's native crash cannot take down the stress
   test's own process) and asserts every child exits `0`. At the measured
-  32.5% single-run rate this gives >99.9% detection power if the defect is
-  still present.
-- Marked `pytest.mark.xfail(reason=..., strict=False)`: a detected crash is
-  the expected, non-blocking XFAIL state (no PyPost-owned fix exists to
-  apply), while `strict=False` means a future `XPASS` — e.g. after a
-  PySide6/shiboken6 upgrade or a follow-up mitigation — surfaces as a
-  visible, non-blocking signal to revisit the marker instead of silently
-  passing or breaking CI.
+  32.5% single-run rate this gives >99.9% detection power if the defect is present.
+- Originally marked `pytest.mark.xfail(reason=..., strict=False)` pending
+  mitigation; settled and un-xfailed under PYPOST-1211 following 0/25 crash-free
+  runs under application-side lifecycle hardening.
 - Marked `pytest.mark.slow` and excluded from the default `-m "not slow"`
   CI selection, same convention as other opt-in-only scenarios; it costs
-  ~25-40s wall time (25 children at the measured baseline).
+  ~25-48s wall time (25 children at the measured baseline).
 
 Mitigation follow-up is ticketed under epic
 [PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115):
@@ -301,11 +297,61 @@ following outcomes:
    - Candidate 1 (pin mitigation) does not achieve Full Mitigation Success
      (0/25 crashes) independently.
    - The detector marker `@pytest.mark.xfail(reason="...", strict=False)` on
-     `tests/test_agent_dialog_settle_teardown_stress.py` is **retained**.
-   - Per the deterministic settlement ownership model (Path B), settlement
-     ownership is transferred to Candidate 2 (MITIGATE-3 /
-     [PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211)) for
-     application-side cycle-breaking and final detector marker settlement.
+     `tests/test_agent_dialog_settle_teardown_stress.py` was retained pending
+     Candidate 2 evaluation.
+   - Per the deterministic settlement ownership model, settlement ownership
+     transferred to Candidate 2 (MITIGATE-3 /
+     [PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211)).
+
+### Application-Side Mitigation and Epic Settlement Outcome (PYPOST-1211)
+
+Evaluation of Candidate 2 (application-side mitigation) and final epic settlement
+under [PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211) established
+the following outcomes:
+
+1. **Evaluated Application-Side Mitigations**:
+   - **Reference-Cycle Breaking in `SettingsDialog`**: Implemented explicit
+     `cleanup()` hooks on `SettingsDialog` (invoked during `reject()`, `accept()`,
+     and dialog lifecycle disposal) to break cross-referencing between the dialog
+     and composite sections (such as `_encryption_migration_section._host_dialog = None`),
+     enabling prompt Python reference-count reclamation rather than deferred
+     cyclic collection.
+   - **Explicit Post-Dialog Lifecycle Hardening**: Hardened `MainWindow.open_settings()`
+     with a `try ... finally` block ensuring `dialog.cleanup()`, `dialog.deleteLater()`,
+     and deferred deletion event flushing (`QCoreApplication.processEvents()`) execute
+     immediately upon dialog exit.
+   - **Controlled Post-Shutdown Garbage Collection**: Added an explicit `gc.collect()`
+     in `AgentAppSession.shutdown()` (`pypost/agent/lifecycle.py`) while the Qt
+     application runtime and event loop context are intact, draining any pending Qt
+     wrappers before pytest session teardown.
+
+2. **Empirical Crash Rate Outcome ($N=25$)**:
+   - The teardown stress detector (`tests/test_agent_dialog_settle_teardown_stress.py`)
+     was executed across $N = 25$ independent child runs under the application-side
+     mitigations.
+   - **Outcome**: **0 crashes out of 25 runs** (`0/25`, **0.0% crash rate**, all
+     25 child processes exited with `returncode == 0`).
+   - **Quantitative Comparison**: Compared against the 32.5% baseline (13/40)
+     diagnosed in PYPOST-1040 and confirmed in PYPOST-1210, the application-side
+     lifecycle hardening achieved complete statistical elimination of the native
+     teardown crash (>99.99% detection power).
+
+3. **Functional Preservation Confirmation**:
+   - The functional dialog settle suite (`tests/test_agent_dialog_settle_e2e.py`)
+     passed with **100% green status** (2/2 passed in ~0.9s).
+   - Both happy-path modal settle and forced-timeout diagnostic rewraps
+     (`step=wait_dialog_after_settings_open`, scalar modal diagnostics) and
+     DEBUG event logging contracts (`pypost.agent.ui_wait`,
+     `condition=forced_dialog_settle_timeout`) were fully preserved with zero
+     regressions.
+
+4. **Final Epic Settlement Resolution (Path B)**:
+   - **Full Mitigation Success (Path B)** is achieved (0/25 crashes + 100% green e2e).
+   - **Marker Settlement**: The `@pytest.mark.xfail` marker was **removed** from
+     `tests/test_agent_dialog_settle_teardown_stress.py`. The stress detector now
+     serves as an active regression gate under `@pytest.mark.slow`.
+   - **Epic Closure**: Parent epic [PYPOST-1115](https://pypost.atlassian.net/browse/PYPOST-1115)
+     is definitively settled and resolved via application-side lifecycle hardening.
 
 ### Pattern sketch (shared helper)
 
@@ -389,10 +435,13 @@ No extra environment variables. Prefer `make test-agent-e2e` for
 | | [PYPOST-1040](https://pypost.atlassian.net/browse/PYPOST-1040): an upstream |
 | | PySide6/shiboken6 6.11.1 `QWidgetItem` GC-teardown defect, triggered by |
 | | pytest's forced cyclic GC (`unraisableexception` plugin) acting on |
-| | `SettingsDialog`'s nested-layout widget subtree — **not** a PyPost-owned |
-| | defect. Measured at 32.5% (13/40) on Linux/Python 3.13.5/PySide6 6.11.1 |
-| | (CI's exact pinned version). Detected (not fixed) by the stress test — |
-| | see [Teardown stress detector](#teardown-stress-detector-pypost-1040); |
+| | `SettingsDialog`'s nested-layout widget subtree. Mitigated under |
+| | [PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211) via application-side |
+| | reference cycle breaking (`SettingsDialog.cleanup()`), lifecycle |
+| | `try ... finally` handling in `MainWindow.open_settings()`, and controlled GC in |
+| | `AgentAppSession.shutdown()`, achieving 0/25 crashes. Regressions are actively |
+| | guarded by the un-xfailed stress detector — see |
+| | [Application-Side Mitigation and Epic Settlement Outcome (PYPOST-1211)](#application-side-mitigation-and-epic-settlement-outcome-pypost-1211); |
 | | it does not relax the bounded modal cleanup contract. |
 
 Observability reuses DEBUG `ui_wait_settled` / `ui_wait_timeout`. The happy

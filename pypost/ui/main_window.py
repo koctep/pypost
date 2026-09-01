@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QCoreApplication, Qt, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -375,53 +375,53 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app:
             self.style_manager.apply_appearance(
-                app,
-                theme=settings.theme,
-                font_size=settings.font_size,
+                app, theme=settings.theme, font_size=settings.font_size
             )
         self.tabs.apply_settings(settings)
         self.env.apply_settings(settings)
 
     def open_settings(self) -> None:
         dialog = SettingsDialog(self.settings, self, storage=self.storage)
-        if not dialog.exec():
-            return
-        new_settings = dialog.get_settings()
-        if not new_settings:
-            return
-        previous_settings = self.settings
-        metrics_changed = (
-            previous_settings.metrics_host != new_settings.metrics_host
-            or previous_settings.metrics_port != new_settings.metrics_port
-        )
-        alert_settings_changed = self._alert_settings_changed(
-            previous_settings, new_settings
-        )
-        self.settings = new_settings
-        self.config_manager.save_config(self.settings)
-        self.env.wait_storage_idle()
-        self.storage.apply_encryption_settings(self.settings)
-        self.apply_settings(self.settings)
-        if alert_settings_changed:
-            self._reload_alert_manager()
-        if metrics_changed:
+        try:
+            if not dialog.exec():
+                return
+            new_settings = dialog.get_settings()
+            if not new_settings:
+                return
+            previous_settings = self.settings
+            metrics_changed = (
+                previous_settings.metrics_host != new_settings.metrics_host
+                or previous_settings.metrics_port != new_settings.metrics_port
+            )
+            alert_settings_changed = self._alert_settings_changed(
+                previous_settings, new_settings
+            )
+            self.settings = new_settings
+            self.config_manager.save_config(self.settings)
+            self.env.wait_storage_idle()
+            self.storage.apply_encryption_settings(self.settings)
+            self.apply_settings(self.settings)
+            if alert_settings_changed:
+                self._reload_alert_manager()
+            if metrics_changed:
+                logger.info(
+                    "metrics_server_restarting host=%s port=%d",
+                    self.settings.metrics_host,
+                    self.settings.metrics_port,
+                )
+                self.metrics.restart_server(self.settings.metrics_host, self.settings.metrics_port)
             logger.info(
-                "metrics_server_restarting host=%s port=%d",
-                self.settings.metrics_host,
-                self.settings.metrics_port,
+                "settings_applied font_size=%d indent_size=%d request_timeout=%d "
+                "env_encryption_enabled=%s env_encryption_key_source=%s",
+                self.settings.font_size, self.settings.indent_size,
+                self.settings.request_timeout,
+                self.settings.env_encryption_enabled,
+                self.settings.env_encryption_key_source,
             )
-            self.metrics.restart_server(
-                self.settings.metrics_host, self.settings.metrics_port
-            )
-        logger.info(
-            "settings_applied font_size=%d indent_size=%d request_timeout=%d "
-            "env_encryption_enabled=%s env_encryption_key_source=%s",
-            self.settings.font_size,
-            self.settings.indent_size,
-            self.settings.request_timeout,
-            self.settings.env_encryption_enabled,
-            self.settings.env_encryption_key_source,
-        )
+        finally:
+            dialog.cleanup()
+            dialog.deleteLater()
+            QCoreApplication.processEvents()
         self.env.reload_current_env()
 
     def _on_metrics_start_failed(self, message: str) -> None:

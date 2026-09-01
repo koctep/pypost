@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 import os
 import socket
@@ -239,6 +240,7 @@ class AgentAppSession:
             except Exception:
                 logger.exception("agent_session_metrics_stop_failed")
             QCoreApplication.processEvents()
+            gc.collect()
 
         self._composed = None
         for td in self._temp_dirs:
