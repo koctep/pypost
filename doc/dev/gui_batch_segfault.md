@@ -11,6 +11,27 @@ This issue is tracked under parent epic [PYPOST-1117](https://pypost.atlassian.n
 2. **DIAG-1 ([PYPOST-1213](https://pypost.atlassian.net/browse/PYPOST-1213))**: Root-cause diagnosis (investigating Shiboken wrapper lifecycle vs `QStyle`/`QPalette` accumulation).
 3. **MITIGATE-1 ([PYPOST-1214](https://pypost.atlassian.net/browse/PYPOST-1214))**: Safe mitigation, bounded batching thresholds, and CI ownership.
 
+### Diagnosis conclusion (DIAG-1 / PYPOST-1213)
+
+The large-batch crash is a distinct **process-accumulated Qt style-engine state
+instability**, not the SettingsDialog/Shiboken `QWidgetItem` teardown defect. The
+conclusion is based on the independent failure site and trigger shape:
+
+- The crash occurs while creating or installing the Fusion style in
+  `StyleManager.apply_theme`, during the batch, rather than during session-end GC.
+- It requires sustained accumulation across many GUI modules in one process; a fresh
+  process per bounded batch or module completes cleanly.
+- The SettingsDialog defect occurs in `Shiboken::callCppDestructor<QWidgetItem>` after
+  modal teardown and forced cyclic collection, with a small targeted workload.
+- The evidence does not prove a single leaking Qt allocation or guarantee an upstream
+  PySide6 defect. It does establish that mitigation must bound the process lifetime or
+  style-state accumulation; changing SettingsDialog ownership alone is not an adequate
+  mitigation.
+
+This classification is sufficient for MITIGATE-1 to evaluate process-isolated or bounded
+batch execution without reopening the class question. The PYPOST-1212 harness and reports
+remain the authoritative reproduction evidence.
+
 ---
 
 ## Environment Specifications
