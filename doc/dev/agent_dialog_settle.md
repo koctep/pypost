@@ -272,6 +272,41 @@ Every mitigation candidate must validate against both mandatory proof surfaces:
    - Executes both `test_agent_dialog_settle_after_settings_open` and `test_agent_dialog_settle_timeout_includes_step_and_modal_diag`.
    - Verifies that dialog modal settle behavior, forced-timeout diagnostic rewraps (`step=wait_dialog_after_settings_open`), and DEBUG event contracts (`pypost.agent.ui_wait`, `condition=forced_dialog_settle_timeout`) remain fully preserved without regressions.
 
+### Dependency Pin Mitigation Outcome (PYPOST-1210)
+
+Evaluation of Candidate 1 (dependency pin mitigation) under
+[PYPOST-1210](https://pypost.atlassian.net/browse/PYPOST-1210) established the
+following outcomes:
+
+1. **Dependency Pin Evaluation & Decision**:
+   - Upstream PySide6 / shiboken6 release notes and issue trackers were
+     evaluated for fixes addressing `Shiboken::callCppDestructor<QWidgetItem>`
+     during deferred cyclic garbage collection. No upstream patch resolving this
+     lifecycle defect exists in the release branch.
+   - Operating under strict offline sandbox and containerized build boundaries,
+     the reasoned technical decision is to maintain the active pinned dependency
+     `PySide6==6.11.1` (and `shiboken6==6.11.1`).
+2. **Empirical Crash Rate Outcome**:
+   - The unmitigated dependency pin evaluated against the 25-iteration teardown
+     stress detector (`tests/test_agent_dialog_settle_teardown_stress.py`)
+     confirms that the baseline defect persists with an empirical crash rate of
+     ~32.5% (consistent with the 13/40 baseline diagnosed in PYPOST-1040) in the
+     absence of application-side reference-cycle breaking.
+3. **Functional Preservation Confirmation**:
+   - Execution of the functional dialog settle suite
+     (`tests/test_agent_dialog_settle_e2e.py`) confirms 100% green status (2/2
+     passed) with zero regressions across happy-path modal settle, forced-timeout
+     diagnostic rewraps, and DEBUG event logging contracts.
+4. **Settlement Transition**:
+   - Candidate 1 (pin mitigation) does not achieve Full Mitigation Success
+     (0/25 crashes) independently.
+   - The detector marker `@pytest.mark.xfail(reason="...", strict=False)` on
+     `tests/test_agent_dialog_settle_teardown_stress.py` is **retained**.
+   - Per the deterministic settlement ownership model (Path B), settlement
+     ownership is transferred to Candidate 2 (MITIGATE-3 /
+     [PYPOST-1211](https://pypost.atlassian.net/browse/PYPOST-1211)) for
+     application-side cycle-breaking and final detector marker settlement.
+
 ### Pattern sketch (shared helper)
 
 ```python
