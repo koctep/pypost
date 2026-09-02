@@ -82,6 +82,50 @@ def _module_all_exports(tree: ast.AST) -> set[str]:
     return set()
 
 
+_FLAT_DELEGATION_DIAGNOSTIC = (
+    "find_child_index_by_display_text must call display_role_equals "
+    "instead of inlining DisplayRole comparison"
+)
+_FLAT_DUPLICATE_DIAGNOSTIC = (
+    "find_child_index_by_display_text must not compare "
+    "ItemDataRole.DisplayRole inline; use display_role_equals"
+)
+_TREE_DELEGATION_DIAGNOSTIC = (
+    "find_tree_index_by_display_text must call display_role_equals "
+    "instead of inlining DisplayRole comparison"
+)
+_TREE_DUPLICATE_DIAGNOSTIC = (
+    "find_tree_index_by_display_text must not compare "
+    "ItemDataRole.DisplayRole inline; use display_role_equals"
+)
+
+
+def _tree_defs(tree_defs: dict[str, ast.AST] | None) -> dict[str, ast.AST]:
+    return _function_defs(_parse(_TREE_INDEX)) if tree_defs is None else tree_defs
+
+
+def _assert_flat_shared_ownership(tree_defs: dict[str, ast.AST] | None = None) -> None:
+    tree_defs = _tree_defs(tree_defs)
+    find_child = tree_defs.get("find_child_index_by_display_text")
+    assert find_child is not None, "missing find_child_index_by_display_text"
+    assert _calls_name(find_child, "display_role_equals"), _FLAT_DELEGATION_DIAGNOSTIC
+
+
+def _assert_flat_no_duplicate_ownership(tree_defs: dict[str, ast.AST] | None = None) -> None:
+    tree_defs = _tree_defs(tree_defs)
+    find_child = tree_defs.get("find_child_index_by_display_text")
+    assert find_child is not None, "missing find_child_index_by_display_text"
+    assert not _has_display_role_attr(find_child), _FLAT_DUPLICATE_DIAGNOSTIC
+
+
+def _assert_tree_shared_ownership(tree_defs: dict[str, ast.AST] | None = None) -> None:
+    tree_defs = _tree_defs(tree_defs)
+    find_tree = tree_defs.get("find_tree_index_by_display_text")
+    assert find_tree is not None, "missing find_tree_index_by_display_text"
+    assert _calls_name(find_tree, "display_role_equals"), _TREE_DELEGATION_DIAGNOSTIC
+    assert not _has_display_role_attr(find_tree), _TREE_DUPLICATE_DIAGNOSTIC
+
+
 def test_flat_and_tree_share_display_role_match_helper() -> None:
     """Ownership contract for the shared DisplayRole match and flat sibling scan.
 
@@ -108,14 +152,8 @@ def test_flat_and_tree_share_display_role_match_helper() -> None:
         "pypost.agent.tree_index must define find_child_index_by_display_text "
         "(flat sibling DisplayRole scan)"
     )
-    assert _calls_name(find_child, "display_role_equals"), (
-        "find_child_index_by_display_text must call display_role_equals "
-        "instead of inlining DisplayRole comparison"
-    )
-    assert not _has_display_role_attr(find_child), (
-        "find_child_index_by_display_text must not compare ItemDataRole.DisplayRole "
-        "inline; use display_role_equals"
-    )
+    _assert_flat_shared_ownership(tree_defs)
+    _assert_flat_no_duplicate_ownership(tree_defs)
 
     tree_exports = _module_all_exports(tree_index_ast)
     expected_exports = {
@@ -130,14 +168,7 @@ def test_flat_and_tree_share_display_role_match_helper() -> None:
 
     find_tree = tree_defs.get("find_tree_index_by_display_text")
     assert find_tree is not None, "missing find_tree_index_by_display_text"
-    assert _calls_name(find_tree, "display_role_equals"), (
-        "find_tree_index_by_display_text (or nested walk) must call "
-        "display_role_equals instead of inlining DisplayRole comparison"
-    )
-    assert not _has_display_role_attr(find_tree), (
-        "find_tree_index_by_display_text must not compare ItemDataRole.DisplayRole "
-        "inline; use display_role_equals"
-    )
+    _assert_tree_shared_ownership(tree_defs)
 
     select_item = ui_defs.get("_select_item_view")
     assert select_item is not None, "missing _select_item_view"
