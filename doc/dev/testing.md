@@ -1222,6 +1222,32 @@ including `test_examples_modernization.py`, `test_examples_modernization_repro.p
 `test_ui_library_manager.py`, and `test_ui_library_manager_repro.py`, are compliant
 (PYPOST-1233).
 
+### Scoped test-module lint maintenance (PYPOST-1253)
+
+**Overview.** PYPOST-1253 removed the known 16 `F401`, 12 `E501`, and 2 `W293` findings from
+these existing test modules without changing test behavior:
+
+- `tests/test_examples_modernization.py`
+- `tests/test_examples_modernization_repro.py`
+- `tests/test_ui_library_manager.py`
+- `tests/test_ui_library_manager_repro.py`
+
+**Architecture and scope.** This is a test-source maintenance boundary only. The four modules
+must retain explicit module-level `pytest.mark.timeout(30)` markers, while production code,
+runtime behavior, test scenarios, and lint configuration remain unchanged.
+
+**Usage and validation.** Run `make test` to verify the existing test behavior and `make lint`
+for the repository quality gate. The `make lint` target scans `pypost/` and runs its configured
+documentation checks; it does not provide an exact Flake8 target for these four test modules.
+
+**Configuration impact.** None. Do not add timeout defaults, lint suppressions, or Makefile,
+`.flake8`, or pytest configuration changes for this maintenance record.
+
+**Troubleshooting and limitations.** If a scoped module loses its timeout marker, restore the
+module-level declaration after its imports. Treat `make lint` as the repository gate, not as
+the exact four-module `F401`/`E501`/`W293` assessment, because that Make target does not scan
+the test paths.
+
 ```bash
 make test
 ```

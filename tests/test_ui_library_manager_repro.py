@@ -1,4 +1,5 @@
-"""Failing repro test for UI library manager panel, dirty check guards, and two-way Git flow (PYPOST-1223).
+"""Failing repro test for UI library manager panel, dirty check guards, and two-way Git flow
+(PYPOST-1223).
 
 Asserts requirements from:
 - ai-tasks/PYPOST-1223/10-requirements.md
@@ -11,14 +12,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from pypost.models.git_library import (
-    GitAuthConfig,
-    GitAuthMode,
-    GitBranchInfo,
-    GitDiagnosticError,
-    GitDiagnosticErrorCode,
     GitOperationResult,
     GitOperationType,
-    GitRepoStatus,
 )
 from pypost.core.git_service import GitLibraryService
 from pypost.ui import widget_ids
@@ -100,9 +95,9 @@ def test_library_presenter_dirty_pull_guard(tmp_path: Path):
 
     service = MagicMock(spec=GitLibraryService)
     service.check_dirty.return_value = (True, ["collections/billing.yaml"])
-    
+
     presenter = LibraryPresenter(service=service)
-    
+
     is_dirty, dirty_files = presenter.check_dirty("test-lib")
     assert is_dirty is True
     assert dirty_files == ["collections/billing.yaml"]
@@ -126,7 +121,11 @@ def test_library_presenter_two_way_commit_and_push(tmp_path: Path):
     )
 
     presenter = LibraryPresenter(service=service)
-    res_commit = presenter.commit_library("test-lib", "feat: add new payment request", ["collections/payment.yaml"])
+    res_commit = presenter.commit_library(
+        "test-lib",
+        "feat: add new payment request",
+        ["collections/payment.yaml"],
+    )
     assert res_commit.success is True
     assert res_commit.commit_hash == "abcdef123456"
 

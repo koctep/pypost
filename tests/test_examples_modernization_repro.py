@@ -1,4 +1,5 @@
-"""Repro and regression test for modernizing examples to unified library format and legacy fixtures (PYPOST-1224)."""
+"""Repro and regression test for modernizing examples to unified library format and legacy
+fixtures (PYPOST-1224)."""
 from __future__ import annotations
 
 from pathlib import Path

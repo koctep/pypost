@@ -1,4 +1,5 @@
-"""Comprehensive test suite for UI library manager panel, dirty check guards, and two-way Git flow (PYPOST-1223).
+"""Comprehensive test suite for UI library manager panel, dirty check guards, and two-way Git
+flow (PYPOST-1223).
 
 Tests:
 1. LibraryPresenter methods, signal emissions, and error mappings.
@@ -15,13 +16,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+from PySide6.QtWidgets import QMessageBox
 
 from pypost.core.git_service import GitLibraryService
 from pypost.core.local_overlay_manager import LocalOverlayManager
 from pypost.models.git_library import (
-    GitAuthConfig,
     GitAuthMode,
     GitBranchInfo,
     GitDiagnosticError,
@@ -31,7 +30,6 @@ from pypost.models.git_library import (
     GitRepoStatus,
 )
 from pypost.models.library_manifest import (
-    LibraryCollectionEntry,
     LibraryManifest,
 )
 from pypost.ui.dialogs.library_dialogs import (
@@ -42,11 +40,6 @@ from pypost.ui.dialogs.library_dialogs import (
     LibraryManagerDialog,
 )
 from pypost.ui.presenters.library_presenter import LibraryPresenter
-from pypost.ui.widgets.library_manager_panel import (
-    LibraryCollectionsWidget,
-    LibraryDetailWidget,
-    LibraryListWidget,
-)
 from pypost.ui import widget_ids
 
 pytestmark = pytest.mark.timeout(30)
@@ -106,7 +99,12 @@ class TestLibraryPresenter:
         assert len(signal_emitted) == 1
         assert signal_emitted[0] == loaded
 
-    def test_select_library_and_status(self, tmp_path: Path, sample_manifest: LibraryManifest, sample_status: GitRepoStatus):
+    def test_select_library_and_status(
+        self,
+        tmp_path: Path,
+        sample_manifest: LibraryManifest,
+        sample_status: GitRepoStatus,
+    ):
         service = MagicMock(spec=GitLibraryService)
         service.status.return_value = sample_status
         service.get_library_dir.return_value = tmp_path / "payments-library"
@@ -116,7 +114,10 @@ class TestLibraryPresenter:
         status_signals = []
         presenter.status_updated.connect(lambda st: status_signals.append(st))
 
-        with patch("pypost.ui.presenters.library_presenter.find_and_read_manifest", return_value=(sample_manifest, tmp_path / "manifest.yaml")):
+        with patch(
+            "pypost.ui.presenters.library_presenter.find_and_read_manifest",
+            return_value=(sample_manifest, tmp_path / "manifest.yaml"),
+        ):
             status = presenter.select_library("payments-library")
 
         assert status == sample_status
@@ -198,7 +199,10 @@ class TestLibraryPresenter:
         )
 
         presenter = LibraryPresenter(service=service)
-        res = presenter.clone_library(url="https://github.com/org/repo.git", library_id="cloned-lib")
+        res = presenter.clone_library(
+            url="https://github.com/org/repo.git",
+            library_id="cloned-lib",
+        )
         assert res.success is True
         assert res.library_id == "cloned-lib"
 
@@ -309,7 +313,13 @@ class TestLibraryDialogs:
         dialog.branch_combo.setCurrentIndex(1)
         assert dialog.get_selected_branch() == "feature"
 
-    def test_library_manager_dialog_integration(self, qapp, tmp_path: Path, sample_manifest: LibraryManifest, sample_status: GitRepoStatus):
+    def test_library_manager_dialog_integration(
+        self,
+        qapp,
+        tmp_path: Path,
+        sample_manifest: LibraryManifest,
+        sample_status: GitRepoStatus,
+    ):
         service = MagicMock(spec=GitLibraryService)
         service.base_dir = tmp_path
         service.status.return_value = sample_status
@@ -321,6 +331,12 @@ class TestLibraryDialogs:
 
         assert dialog.list_panel.list_widget.objectName() == widget_ids.LIBRARY_LIST
         assert dialog.detail_panel.pull_button.objectName() == widget_ids.LIBRARY_PULL_BUTTON
-        assert dialog.detail_panel.commit_push_button.objectName() == widget_ids.LIBRARY_COMMIT_PUSH_BUTTON
-        assert dialog.detail_panel.switch_branch_button.objectName() == widget_ids.LIBRARY_SWITCH_BRANCH_BUTTON
+        assert (
+            dialog.detail_panel.commit_push_button.objectName()
+            == widget_ids.LIBRARY_COMMIT_PUSH_BUTTON
+        )
+        assert (
+            dialog.detail_panel.switch_branch_button.objectName()
+            == widget_ids.LIBRARY_SWITCH_BRANCH_BUTTON
+        )
         assert dialog.detail_panel.delete_button.objectName() == widget_ids.LIBRARY_DELETE_BUTTON

@@ -1,4 +1,5 @@
-"""Comprehensive tests for modernized examples collection library and legacy fixtures (PYPOST-1224)."""
+"""Comprehensive tests for modernized examples collection library and legacy fixtures
+(PYPOST-1224)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,8 +7,6 @@ import pytest
 
 from pypost.core.library_manifest import (
     find_and_read_manifest,
-    read_library_manifest,
-    validate_manifest_collections,
 )
 from pypost.core.collection_serializer import read_collection_file
 from pypost.models.library_manifest import LibraryManifest
@@ -64,7 +63,11 @@ class TestLegacyFixturesRegression:
 
     def test_legacy_collections_import_compatibility(self):
         fixture_dir = Path("tests/fixtures/legacy_collections")
-        for filename in ["legacy_jira_mcp_v1.json", "legacy_mcp_v1.json", "legacy_gurushots_v1.json"]:
+        for filename in [
+            "legacy_jira_mcp_v1.json",
+            "legacy_mcp_v1.json",
+            "legacy_gurushots_v1.json",
+        ]:
             path = fixture_dir / filename
             coll = read_collection_file(path)
             assert isinstance(coll, Collection)
