@@ -17,6 +17,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
+from pypost.ui.styles.ui_tokens import (
+    AUTOCOMPLETE_POPUP_MAX_HEIGHT,
+    AUTOCOMPLETE_POPUP_MIN_WIDTH,
+    AUTOCOMPLETE_POPUP_ROW_HEIGHT,
+    AUTOCOMPLETE_POPUP_VERTICAL_PADDING,
+)
 
 logger = logging.getLogger(__name__)
 _legacy_logger = logging.getLogger("pypost.ui.widgets.mcp_server_headers_table")
@@ -119,6 +125,7 @@ class VariableAutocompleteLineEdit(QLineEdit):
         self._metrics = resolve_metrics(metrics)
         self._context = context
         self._popup = QListWidget(self)
+        self._popup.setObjectName("autocompletePopup")
         self._popup.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
         self._popup.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._popup.itemClicked.connect(self._on_item_clicked)
@@ -152,7 +159,14 @@ class VariableAutocompleteLineEdit(QLineEdit):
         self._popup.setCurrentRow(0)
         if self.isVisible():
             self._popup.move(self.mapToGlobal(self.rect().bottomLeft()))
-            self._popup.resize(max(self.width(), 180), min(160, 24 * len(candidates) + 8))
+            self._popup.resize(
+                max(self.width(), AUTOCOMPLETE_POPUP_MIN_WIDTH),
+                min(
+                    AUTOCOMPLETE_POPUP_MAX_HEIGHT,
+                    AUTOCOMPLETE_POPUP_ROW_HEIGHT * len(candidates)
+                    + AUTOCOMPLETE_POPUP_VERTICAL_PADDING,
+                ),
+            )
         self._popup.show()
 
     def trigger_autocomplete(self) -> None:

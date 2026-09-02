@@ -5,10 +5,10 @@ import re
 from typing import Dict, Optional, Set, Tuple
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QTableWidget, QTextEdit, QToolTip
 
 from pypost.ui.widgets.variable_autocomplete_line_edit import reference_statuses
+from pypost.ui.styles.ui_tokens import VALIDATION_COLUMN_ERROR_COLOR
 from pypost.ui.widgets.mixins import (
     VariableHoverLocator,
     VariableHoverMixin,
@@ -166,7 +166,7 @@ class VariableAwareTableWidget(QTableWidget):
                 item.setToolTip(message)
                 item.setData(
                     Qt.ItemDataRole.ForegroundRole,
-                    QColor("#b00020") if statuses else None,
+                    VALIDATION_COLUMN_ERROR_COLOR if statuses else None,
                 )
 
     def set_hidden_keys(self, hidden_keys: Set[str]):

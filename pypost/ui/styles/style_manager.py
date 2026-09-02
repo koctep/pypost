@@ -8,6 +8,10 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QStyleFactory
 
 from pypost.ui.styles.custom_style import PyPostStyle
+from pypost.ui.styles.ui_tokens import (
+    VALIDATION_LABEL_BACKGROUND,
+    VALIDATION_LABEL_FOREGROUND,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +84,12 @@ class StyleManager:
         # Convert to absolute path and resolve any symlinks
         icons_path = self.icons_dir.resolve().as_posix()
         combined_style = combined_style.replace("%ICONS_DIR%", icons_path)
+        combined_style = combined_style.replace(
+            "%VALIDATION_LABEL_BACKGROUND%", VALIDATION_LABEL_BACKGROUND
+        )
+        combined_style = combined_style.replace(
+            "%VALIDATION_LABEL_FOREGROUND%", VALIDATION_LABEL_FOREGROUND
+        )
 
         logger.debug(
             "styles_loaded file_count=%d bytes=%d",

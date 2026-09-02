@@ -23,6 +23,12 @@ from pypost.ui.widgets.validate import ValidationController
 from pypost.ui.widgets.paste_json_worker import PasteJsonFormatWorker
 from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
 from pypost.ui.widgets.variable_autocomplete_line_edit import reference_statuses
+from pypost.ui.styles.ui_tokens import (
+    AUTOCOMPLETE_POPUP_MAX_HEIGHT,
+    AUTOCOMPLETE_POPUP_MIN_WIDTH,
+    AUTOCOMPLETE_POPUP_ROW_HEIGHT,
+    AUTOCOMPLETE_POPUP_VERTICAL_PADDING,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +79,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self._async_paste_length = 0
         self._async_paste_original = ""
         self._autocomplete_popup = QListWidget(self)
+        self._autocomplete_popup.setObjectName("autocompletePopup")
         self._autocomplete_popup.setWindowFlags(
             Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint
         )
@@ -125,7 +132,12 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self._autocomplete_popup.setCurrentRow(0)
         self._autocomplete_popup.move(self.mapToGlobal(self.rect().bottomLeft()))
         self._autocomplete_popup.resize(
-            max(self.width(), 180), min(160, 24 * len(candidates) + 8)
+            max(self.width(), AUTOCOMPLETE_POPUP_MIN_WIDTH),
+            min(
+                AUTOCOMPLETE_POPUP_MAX_HEIGHT,
+                AUTOCOMPLETE_POPUP_ROW_HEIGHT * len(candidates)
+                + AUTOCOMPLETE_POPUP_VERTICAL_PADDING,
+            ),
         )
         self._autocomplete_popup.show()
         self._autocomplete_metrics.track_gui_variable_autocomplete_trigger(

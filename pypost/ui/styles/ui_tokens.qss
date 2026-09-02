@@ -1,0 +1,13 @@
+/* Shared validation and autocomplete presentation tokens. */
+
+QLabel#validationErrorBanner {
+    background-color: %VALIDATION_LABEL_BACKGROUND%;
+    color: %VALIDATION_LABEL_FOREGROUND%;
+    padding: 2px 6px;
+    font-size: 11px;
+}
+
+QListWidget#autocompletePopup {
+    background-color: palette(base);
+    color: palette(text);
+}

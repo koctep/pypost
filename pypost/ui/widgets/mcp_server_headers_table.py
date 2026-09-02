@@ -33,6 +33,12 @@ from pypost.ui.widgets.variable_autocomplete_line_edit import (
     VariableAutocompleteDelegate as SharedVariableAutocompleteDelegate,
     VariableAutocompleteLineEdit as SharedVariableAutocompleteLineEdit,
 )
+from pypost.ui.styles.ui_tokens import (
+    AUTOCOMPLETE_POPUP_MAX_HEIGHT,
+    AUTOCOMPLETE_POPUP_MIN_WIDTH,
+    AUTOCOMPLETE_POPUP_ROW_HEIGHT,
+    AUTOCOMPLETE_POPUP_VERTICAL_PADDING,
+)
 
 if TYPE_CHECKING:
     from pypost.models.models import Environment
@@ -170,6 +176,7 @@ class _LegacyVariableAutocompleteLineEdit(QLineEdit):
         super().__init__(parent)
         self._variables: list[str] = list(variables or [])
         self._popup = QListWidget(self)
+        self._popup.setObjectName("autocompletePopup")
         self._popup.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
         self._popup.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._popup.itemClicked.connect(self._on_item_clicked)
@@ -199,7 +206,14 @@ class _LegacyVariableAutocompleteLineEdit(QLineEdit):
         if self.isVisible():
             global_pos = self.mapToGlobal(self.rect().bottomLeft())
             self._popup.move(global_pos)
-            self._popup.resize(max(self.width(), 180), min(160, 24 * len(candidates) + 8))
+            self._popup.resize(
+                max(self.width(), AUTOCOMPLETE_POPUP_MIN_WIDTH),
+                min(
+                    AUTOCOMPLETE_POPUP_MAX_HEIGHT,
+                    AUTOCOMPLETE_POPUP_ROW_HEIGHT * len(candidates)
+                    + AUTOCOMPLETE_POPUP_VERTICAL_PADDING,
+                ),
+            )
         self._popup.show()
 
     def trigger_autocomplete(self) -> None:

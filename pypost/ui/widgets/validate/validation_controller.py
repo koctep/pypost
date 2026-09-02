@@ -4,16 +4,18 @@ from __future__ import annotations
 
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QLabel, QPlainTextEdit, QTextEdit
 
 from pypost.ui.widgets.fold.fold_region import BodyFormat
 from pypost.ui.widgets.validate.body_validator import get_validator
 from pypost.ui.widgets.validate.validation_error import ValidationError
+from pypost.ui.styles.ui_tokens import (
+    VALIDATION_COLUMN_ERROR_COLOR,
+    VALIDATION_LINE_BACKGROUND,
+)
 
 _DEBOUNCE_MS = 200
-_LINE_ERROR_COLOR = QColor(255, 220, 220)
-_COLUMN_ERROR_COLOR = QColor(220, 50, 50)
 
 
 class ValidationController:
@@ -27,6 +29,7 @@ class ValidationController:
         self._errors: list[ValidationError] = []
 
         self._error_label = QLabel(editor)
+        self._error_label.setObjectName("validationErrorBanner")
         self._error_label.setWordWrap(True)
         self._error_label.hide()
         self._style_error_label()
@@ -70,9 +73,7 @@ class ValidationController:
         self._error_label.hide()
 
     def _style_error_label(self) -> None:
-        self._error_label.setStyleSheet(
-            "background-color: #fdd; color: #900; padding: 2px 6px; font-size: 11px;"
-        )
+        self._error_label.setProperty("validationFeedback", True)
 
     def _schedule_validate(self) -> None:
         self._validate_timer.start()
@@ -106,7 +107,7 @@ class ValidationController:
 
         line_selection = QTextEdit.ExtraSelection()
         line_format = QTextCharFormat()
-        line_format.setBackground(_LINE_ERROR_COLOR)
+        line_format.setBackground(VALIDATION_LINE_BACKGROUND)
         line_selection.format = line_format
 
         line_cursor = QTextCursor(block)
@@ -122,7 +123,7 @@ class ValidationController:
         if column_pos <= block.position() + block.length() - 1:
             column_selection = QTextEdit.ExtraSelection()
             column_format = QTextCharFormat()
-            column_format.setUnderlineColor(_COLUMN_ERROR_COLOR)
+            column_format.setUnderlineColor(VALIDATION_COLUMN_ERROR_COLOR)
             column_format.setUnderlineStyle(
                 QTextCharFormat.UnderlineStyle.WaveUnderline
             )
