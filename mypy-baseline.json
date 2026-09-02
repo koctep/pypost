@@ -408,26 +408,6 @@
     },
     {
       "code": "assignment",
-      "message": "Incompatible types in assignment (expression has type \"AppSettings\", variable has type \"None\")",
-      "path": "pypost/ui/dialogs/settings_dialog.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[QDialogButtonBox]\" has no attribute \"Cancel\"",
-      "path": "pypost/ui/dialogs/settings_dialog.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[QDialogButtonBox]\" has no attribute \"Save\"",
-      "path": "pypost/ui/dialogs/settings_dialog.py"
-    },
-    {
-      "code": "return-value",
-      "message": "Incompatible return value type (got \"None\", expected \"AppSettings\")",
-      "path": "pypost/ui/dialogs/settings_dialog.py"
-    },
-    {
-      "code": "assignment",
       "message": "Incompatible types in assignment (expression has type \"list[str]\", variable has type \"tuple[str, ...]\")",
       "path": "pypost/ui/hotkeys.py"
     },

@@ -81,6 +81,21 @@ When `alert_log_path` is `None`, `AlertManager` uses
 Saved through `SettingsDialog.accept()` → `MainWindow.open_settings()` →
 `ConfigManager.save_config()`. Fields are optional; empty strings become `None`.
 
+## Static typing baseline (PYPOST-1179)
+
+`SettingsDialog.new_settings` is optional until the dialog is accepted, and
+`get_settings()` therefore returns `AppSettings | None`. The button box uses
+the typed `QDialogButtonBox.StandardButton.Save` and `.Cancel` members. These
+contracts remove four resolved mypy baseline records for
+`pypost/ui/dialogs/settings_dialog.py` (one assignment, two button enum
+attributes, and one return-value diagnostic).
+
+After this refresh, the repository baseline contains 185 known diagnostics.
+That count includes findings outside this task; it is not a claim that the
+whole typecheck is clean. `StreamExportSnapshot` / `stream-export` was checked
+as part of the Jira scope but is unchanged and has no task-specific baseline
+delta.
+
 ## Runtime reload (PYPOST-621)
 
 `AlertManager` is created at startup in `main.py`. When the operator saves alert field

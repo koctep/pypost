@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -83,7 +84,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Settings")
         self.resize(520, 480)
         self.current_settings = current_settings
-        self.new_settings = None
+        self.new_settings: Optional[AppSettings] = None
         self._storage = storage
         self._migration_worker = None
 
@@ -184,7 +185,9 @@ class SettingsDialog(QDialog):
 
         main_layout.addWidget(self.settings_tabs)
 
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
+        )
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         main_layout.addWidget(self.buttons)
@@ -256,5 +259,5 @@ class SettingsDialog(QDialog):
                 setattr(section, "_host_dialog", None)
             setattr(self, "_encryption_migration_section", None)
 
-    def get_settings(self) -> AppSettings:
+    def get_settings(self) -> Optional[AppSettings]:
         return self.new_settings
