@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -98,6 +99,68 @@ _TREE_DUPLICATE_DIAGNOSTIC = (
     "find_tree_index_by_display_text must not compare "
     "ItemDataRole.DisplayRole inline; use display_role_equals"
 )
+
+
+@dataclass(frozen=True)
+class _OwnershipViolation:
+    """One deterministic, test-side ownership validation result."""
+
+    diagnostic: str
+    context: str
+    source_order: int
+
+
+def _ownership_context(path: Path) -> str:
+    return {
+        "flat": "flat",
+        "tree_duplicate": "tree-duplicate",
+        "tree_ownership": "tree-ownership",
+    }.get(path.stem, path.stem)
+
+
+def _collect_display_role_violations(paths: tuple[Path, ...]) -> list[_OwnershipViolation]:
+    violations: list[_OwnershipViolation] = []
+    for source_order, path in enumerate(paths):
+        tree_defs = _function_defs(_parse(path))
+        context = _ownership_context(path)
+        if path.stem == "flat":
+            finder = tree_defs.get("find_child_index_by_display_text")
+            if finder is not None and not _calls_name(finder, "display_role_equals"):
+                violations.append(
+                    _OwnershipViolation(
+                        _FLAT_DELEGATION_DIAGNOSTIC, context, source_order
+                    )
+                )
+            continue
+
+        finder = tree_defs.get("find_tree_index_by_display_text")
+        if finder is None:
+            continue
+        if _has_display_role_attr(finder):
+            violations.append(
+                _OwnershipViolation(
+                    _TREE_DUPLICATE_DIAGNOSTIC, context, source_order
+                )
+            )
+        elif not _calls_name(finder, "display_role_equals"):
+            violations.append(
+                _OwnershipViolation(
+                    _TREE_DELEGATION_DIAGNOSTIC, context, source_order
+                )
+            )
+    return violations
+
+
+def _validate_display_role_ownership(paths: tuple[Path, ...]) -> None:
+    """Report every ownership violation in one stable validation outcome."""
+    violations = _collect_display_role_violations(paths)
+    if violations:
+        raise AssertionError(
+            "\n".join(
+                f"[{violation.context}] {violation.diagnostic}"
+                for violation in violations
+            )
+        )
 
 
 def _tree_defs(tree_defs: dict[str, ast.AST] | None) -> dict[str, ast.AST]:

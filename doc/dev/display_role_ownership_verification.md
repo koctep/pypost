@@ -22,14 +22,21 @@ are not sufficient.
   and exposes three independent assertion helpers:
   `_assert_flat_shared_ownership`, `_assert_flat_no_duplicate_ownership`, and
   `_assert_tree_shared_ownership`.
-- `tests/test_display_role_scan_ownership_independent_repro.py` supplies small
+- `tests/test_display_role_scan_ownership_aggregate_repro.py` supplies small
   synthetic source mutants through the ownership suite's `_parse(Path)` seam.
-  It invokes one assertion helper per mutant so a passing condition cannot mask
-  a failing condition.
+  It invokes `_validate_display_role_ownership` once across all fixtures and
+  scopes so every violation is reported in one aggregate outcome.
 
 The checks intentionally use Python AST inspection. They are hermetic, do not
 import or execute the Qt lookup implementation, and do not require a display
 server.
+
+The ownership suite also provides `_validate_display_role_ownership(paths)` for
+the aggregate guard. It parses each bounded fixture path in the supplied order,
+collects every applicable violation, and raises one `AssertionError` when any
+are found. Each diagnostic is prefixed with its fixture context, so a single
+failure reports all ownership problems while preserving deterministic ordering.
+A compliant collection of paths completes without an exception.
 
 ## Ownership contract and mutant matrix
 
@@ -58,6 +65,11 @@ diagnostic:
 The compliant control source must pass all three helpers. The flat and tree
 mutants must remain independent: do not combine violations or reuse a flat
 diagnostic for the tree condition.
+
+The aggregate repro covers a flat violation, a tree duplicate comparison, and
+a tree delegation violation together. Its expected output demonstrates the
+single-outcome contract and the stable context labels (`flat`,
+`tree-duplicate`, and `tree-ownership`).
 
 ## Usage
 
@@ -100,3 +112,10 @@ traversal and validity checks.
 Keep the helper names and `_parse(Path)` seam stable. The repro monkeypatches
 that seam only for the `tree_index.py` path and delegates all other paths to the
 real parser.
+
+### Several ownership violations appear in one failure
+
+This is expected for the aggregate guard. Read the context prefix on each line
+to identify the fixture and fix every reported ownership violation before
+rerunning the focused command. The validator deliberately does not stop at the
+first violation.
