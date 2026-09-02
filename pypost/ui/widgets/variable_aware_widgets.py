@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import logging
+import re
 from typing import Dict, Optional, Set, Tuple
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QLineEdit, QPlainTextEdit, QTableWidget, QTextEdit, QToolTip
 
+from pypost.ui.widgets.variable_autocomplete_line_edit import reference_statuses
 from pypost.ui.widgets.mixins import (
     VariableHoverLocator,
     VariableHoverMixin,
     VariableHoverResolver,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class VariableAwareLineEdit(VariableHoverMixin, QLineEdit):
@@ -42,6 +49,32 @@ class VariableAwarePlainTextEdit(VariableHoverMixin, QPlainTextEdit):
         index = cursor.position()
         return text, index
 
+    def set_variables(self, variables: Dict[str, str]) -> None:
+        self._variables = dict(variables)
+        self._clear_hover_scan_cache()
+        if hasattr(self, "refresh_reference_status"):
+            self.refresh_reference_status(self.toPlainText())
+
+    def set_hidden_keys(self, hidden_keys: Set[str]) -> None:
+        self._hidden_keys = set(hidden_keys)
+        self._clear_hover_scan_cache()
+
+    def _track_reference_feedback(self, statuses) -> None:
+        status_names: set[str] = set(str(status["kind"]) for status in statuses)
+        if not status_names:
+            status_names.add("ok")
+        metrics = getattr(self, "_autocomplete_metrics", None)
+        if metrics is not None:
+            for status in status_names:
+                metrics.track_gui_variable_autocomplete_feedback(
+                    getattr(self, "_autocomplete_context", "unknown"), status
+                )
+        logger.debug(
+            "variable_autocomplete_feedback context=%s statuses=%s",
+            getattr(self, "_autocomplete_context", "unknown"),
+            ",".join(sorted(status_names)),
+        )
+
 
 class VariableAwareTextEdit(VariableHoverMixin, QTextEdit):
     """QTextEdit with variable tooltip support."""
@@ -68,10 +101,73 @@ class VariableAwareTableWidget(QTableWidget):
         self._hidden_keys: Set[str] = set()
         self._hover_cache_key: Optional[Tuple[int, int, str]] = None
         self._hover_cache_resolved: Optional[str] = None
+        self.itemChanged.connect(self._refresh_changed_item_feedback)
+
+    def _refresh_changed_item_feedback(self, item) -> None:
+        if item.column() == 1:
+            self.refresh_reference_status(item.text())
 
     def set_variables(self, variables: Dict[str, str]):
         self._variables = variables
         self._clear_hover_cache()
+        delegate = self.itemDelegateForColumn(1)
+        if hasattr(delegate, "set_variables"):
+            delegate.set_variables(variables)
+        if hasattr(self, "refresh_reference_status"):
+            for row in range(self.rowCount()):
+                item = self.item(row, 1)
+                if item:
+                    self.refresh_reference_status(item.text())
+
+    @property
+    def environment_variable_names(self) -> list[str]:
+        return sorted(self._variables)
+
+    def complete_at_cursor(self, text: str, cursor_offset: int):
+        prefix = text[:cursor_offset]
+        match = re.search(r"\{\{\s*[A-Za-z0-9_]*$", prefix)
+        if not match:
+            return None
+        token = re.sub(r"^\{\{\s*", "", prefix[match.start():]).lower()
+        candidate = next(
+            (name for name in self.environment_variable_names
+             if name.lower().startswith(token)),
+            None,
+        )
+        if candidate is None:
+            return None
+        start = match.start()
+        return start, cursor_offset, f"{{{{ {candidate} }}}}"
+
+    def show_reference_feedback(self, statuses) -> None:
+        self._reference_feedback = list(statuses)
+
+    def refresh_reference_status(self, text: str) -> None:
+        statuses = reference_statuses(text, self._variables)
+        self.show_reference_feedback(statuses)
+        status_names: set[str] = set(str(status["kind"]) for status in statuses)
+        if not status_names:
+            status_names.add("ok")
+        metrics = getattr(self, "_autocomplete_metrics", None)
+        if metrics is not None:
+            for status in status_names:
+                metrics.track_gui_variable_autocomplete_feedback(
+                    getattr(self, "_autocomplete_context", "unknown"), status
+                )
+        logger.debug(
+            "variable_autocomplete_feedback context=%s statuses=%s",
+            getattr(self, "_autocomplete_context", "unknown"),
+            ",".join(sorted(status_names)),
+        )
+        message = "\n".join(status["message"] for status in statuses)
+        for row in range(self.rowCount()):
+            item = self.item(row, 1)
+            if item and item.text() == text:
+                item.setToolTip(message)
+                item.setData(
+                    Qt.ItemDataRole.ForegroundRole,
+                    QColor("#b00020") if statuses else None,
+                )
 
     def set_hidden_keys(self, hidden_keys: Set[str]):
         self._hidden_keys = hidden_keys

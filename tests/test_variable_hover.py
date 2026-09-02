@@ -32,7 +32,10 @@ from pypost.ui.widgets.mixins import (
     VariableHoverMixin,
     VariableHoverResolver,
 )
-from pypost.ui.widgets.variable_aware_widgets import VariableAwareTableWidget
+from pypost.ui.widgets.variable_aware_widgets import (
+    VariableAwarePlainTextEdit,
+    VariableAwareTableWidget,
+)
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -446,6 +449,22 @@ class TestVariableAwareLineEditTooltips(unittest.TestCase):
 @pytest.mark.usefixtures("qapp")
 
 class TestVariableAwarePlainTextEditTooltips(unittest.TestCase):
+    def test_environment_and_masking_changes_clear_hover_cache(self):
+        w = VariableAwarePlainTextEdit()
+        w.setPlainText("{{token}}")
+        w.set_variables({"token": "first"})
+
+        first_expression, first_value = w._resolve_hover_at_scan_index("{{token}}", 2)
+        self.assertEqual((first_expression, first_value), ("{{token}}", "first"))
+
+        w.set_variables({"token": "second"})
+        _, second_value = w._resolve_hover_at_scan_index("{{token}}", 2)
+        self.assertEqual(second_value, "second")
+
+        w.set_hidden_keys({"token"})
+        _, masked_value = w._resolve_hover_at_scan_index("{{token}}", 2)
+        self.assertEqual(masked_value, HIDDEN_MASK)
+
     @patch("pypost.ui.widgets.mixins.QToolTip.hideText")
     @patch("pypost.ui.widgets.mixins.QToolTip.showText")
     def test_mouse_over_variable_in_body_shows_tooltip(self, show_mock, _hide):

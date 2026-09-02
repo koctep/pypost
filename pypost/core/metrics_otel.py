@@ -126,6 +126,22 @@ class OtelMetricsTracker:
                 "Number of times the Body tab was auto-selected due to method change"
             ),
         )
+        self._gui_variable_autocomplete_triggers = meter.create_counter(
+            "gui_variable_autocomplete_triggers_total",
+            description="Number of variable autocomplete popup triggers",
+        )
+        self._gui_variable_autocomplete_selections = meter.create_counter(
+            "gui_variable_autocomplete_selections_total",
+            description="Number of variable autocomplete selections",
+        )
+        self._gui_variable_autocomplete_feedback = meter.create_counter(
+            "gui_variable_autocomplete_feedback_total",
+            description="Number of variable autocomplete feedback states",
+        )
+        self._gui_variable_autocomplete_environment_refreshes = meter.create_counter(
+            "gui_variable_autocomplete_environment_refreshes_total",
+            description="Number of variable autocomplete environment refreshes",
+        )
         self._requests_sent = meter.create_counter(
             "requests_sent_total",
             description="Number of HTTP requests sent",
@@ -318,6 +334,24 @@ class OtelMetricsTracker:
 
     def track_gui_method_body_autoswitch(self, method: str) -> None:
         self._gui_method_body_autoswitches.add(1, {"method": method})
+
+    def track_gui_variable_autocomplete_trigger(self, context: str) -> None:
+        self._gui_variable_autocomplete_triggers.add(1, {"context": context})
+
+    def track_gui_variable_autocomplete_selection(self, context: str) -> None:
+        self._gui_variable_autocomplete_selections.add(1, {"context": context})
+
+    def track_gui_variable_autocomplete_feedback(
+        self, context: str, status: str
+    ) -> None:
+        self._gui_variable_autocomplete_feedback.add(
+            1, {"context": context, "status": status}
+        )
+
+    def track_gui_variable_autocomplete_environment_refresh(self, context: str) -> None:
+        self._gui_variable_autocomplete_environment_refreshes.add(
+            1, {"context": context}
+        )
 
     def track_request_sent(self, method: str) -> None:
         self._requests_sent.add(1, {"method": method})

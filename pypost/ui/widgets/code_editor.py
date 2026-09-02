@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from PySide6.QtCore import QEvent, QMimeData, Qt, QRect
 from PySide6.QtGui import (
@@ -12,14 +13,16 @@ from PySide6.QtGui import (
     QPainter,
     QTextCursor,
 )
-from PySide6.QtWidgets import QPlainTextEdit
+from PySide6.QtWidgets import QListWidget, QListWidgetItem, QPlainTextEdit
 
 from pypost.core.yaml_json_converter import convert_json_object_to_yaml
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.ui.widgets.fold import BodyFormat, FoldController
 from pypost.ui.widgets.line_number_area import LineNumberArea
 from pypost.ui.widgets.validate import ValidationController
 from pypost.ui.widgets.paste_json_worker import PasteJsonFormatWorker
 from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
+from pypost.ui.widgets.variable_autocomplete_line_edit import reference_statuses
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +43,15 @@ def _looks_like_json(text: str) -> bool:
 
 
 class CodeEditor(VariableAwarePlainTextEdit):
-    def __init__(self, parent=None, indent_size=2):
+    def __init__(
+        self,
+        parent=None,
+        indent_size=2,
+        metrics: MetricsTrackerProtocol | None = None,
+    ):
         super().__init__(parent)
+        self._autocomplete_metrics = resolve_metrics(metrics)
+        self._autocomplete_context = "body"
         self.indent_size = indent_size
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
@@ -62,12 +72,111 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self._async_paste_start = 0
         self._async_paste_length = 0
         self._async_paste_original = ""
+        self._autocomplete_popup = QListWidget(self)
+        self._autocomplete_popup.setWindowFlags(
+            Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint
+        )
+        self._autocomplete_popup.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._autocomplete_popup.itemClicked.connect(self._apply_body_completion_item)
+        self.textChanged.connect(self._refresh_body_feedback)
 
     def fold_controller(self) -> FoldController:
         return self._fold_controller
 
     def validation_controller(self) -> ValidationController:
         return self._validation_controller
+
+    def complete_at_cursor(self, text: str, cursor_offset: int):
+        prefix = text[:cursor_offset]
+        match = re.search(r"\{\{\s*[A-Za-z0-9_]*$", prefix)
+        if not match or not self._variables:
+            return None
+        token = prefix[match.start():]
+        token = re.sub(r"^\{\{\s*", "", token).lower()
+        candidate = next(
+            (name for name in sorted(self._variables) if name.lower().startswith(token)),
+            None,
+        )
+        if candidate is None:
+            return None
+        return match.start(), cursor_offset, f"{{{{ {candidate} }}}}"
+
+    def show_reference_feedback(self, statuses) -> None:
+        self._reference_feedback = list(statuses)
+        self.setToolTip("\n".join(status["message"] for status in statuses))
+
+    def _refresh_body_feedback(self) -> None:
+        self.refresh_reference_status(self.toPlainText())
+
+    def _update_body_popup(self) -> None:
+        result = self.complete_at_cursor(self.toPlainText(), self.textCursor().position())
+        self._autocomplete_popup.clear()
+        if result is None:
+            self._autocomplete_popup.hide()
+            return
+        prefix = self.toPlainText()[: self.textCursor().position()]
+        token = re.sub(r"^\{\{\s*", "", prefix[result[0]:]).lower()
+        candidates = [name for name in sorted(self._variables)
+                      if name.lower().startswith(token)]
+        if not candidates:
+            self._autocomplete_popup.hide()
+            return
+        self._autocomplete_popup.addItems(candidates)
+        self._autocomplete_popup.setCurrentRow(0)
+        self._autocomplete_popup.move(self.mapToGlobal(self.rect().bottomLeft()))
+        self._autocomplete_popup.resize(
+            max(self.width(), 180), min(160, 24 * len(candidates) + 8)
+        )
+        self._autocomplete_popup.show()
+        self._autocomplete_metrics.track_gui_variable_autocomplete_trigger(
+            self._autocomplete_context
+        )
+
+    def _apply_body_completion_item(self, item: QListWidgetItem) -> None:
+        self._autocomplete_metrics.track_gui_variable_autocomplete_selection(
+            self._autocomplete_context
+        )
+        result = self.complete_at_cursor(self.toPlainText(), self.textCursor().position())
+        if result is None:
+            return
+        start, end, replacement = result
+        cursor = self.textCursor()
+        cursor.setPosition(start)
+        cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText(replacement)
+        self.setTextCursor(cursor)
+        self._autocomplete_popup.hide()
+
+    def _complete_body_key(self, event: QKeyEvent) -> bool:
+        if not self._autocomplete_popup.isVisible():
+            return False
+        if event.key() in (Qt.Key.Key_Down, Qt.Key.Key_Up):
+            count = self._autocomplete_popup.count()
+            delta = 1 if event.key() == Qt.Key.Key_Down else -1
+            self._autocomplete_popup.setCurrentRow(
+                (self._autocomplete_popup.currentRow() + delta) % count
+            )
+            return True
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Tab):
+            item = self._autocomplete_popup.currentItem()
+            if item:
+                self._apply_body_completion_item(item)
+            return True
+        if event.key() == Qt.Key.Key_Escape:
+            self._autocomplete_popup.hide()
+            return True
+        return False
+
+    def refresh_reference_status(self, text: str) -> None:
+        statuses = reference_statuses(text, self._variables)
+        self.show_reference_feedback(statuses)
+        self._track_reference_feedback(statuses)
+
+    def set_variables(self, variables: dict[str, str]) -> None:
+        super().set_variables(variables)
+        self._autocomplete_metrics.track_gui_variable_autocomplete_environment_refresh(
+            self._autocomplete_context
+        )
 
     def set_body_format(self, body_format: BodyFormat) -> None:
         self._body_format = body_format
@@ -224,12 +333,16 @@ class CodeEditor(VariableAwarePlainTextEdit):
             pass
 
     def keyPressEvent(self, event: QKeyEvent):
+        if self._complete_body_key(event):
+            event.accept()
+            return
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self._handle_enter_key(event)
         elif event.text() in ("}", "]"):
             self._handle_closing_bracket(event)
         else:
             super().keyPressEvent(event)
+        self._update_body_popup()
 
     def _handle_enter_key(self, event: QKeyEvent):
         cursor = self.textCursor()

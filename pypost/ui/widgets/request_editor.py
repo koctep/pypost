@@ -41,6 +41,7 @@ from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.mixins import VariableHoverResolver, push_snapshot_to_widgets
 from pypost.ui.widgets.empty_row_key_value_table import EmptyRowKeyValueTable
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit
+from pypost.ui.widgets.variable_autocomplete_line_edit import VariableAutocompleteDelegate
 from pypost.ui.widget_ids import (
     METHOD_COMBO,
     REQUEST_BODY_EDIT,
@@ -138,13 +139,13 @@ class RequestWidget(QWidget):
         self.detail_tabs = QTabWidget()
         set_widget_id(self.detail_tabs, REQUEST_DETAIL_TABS)
 
-        self.params_table = KeyValueTable()
+        self.params_table = KeyValueTable(metrics=self._metrics, context="query")
         self.detail_tabs.addTab(self.params_table, "Params")
 
-        self.headers_table = KeyValueTable()
+        self.headers_table = KeyValueTable(metrics=self._metrics, context="header")
         self.detail_tabs.addTab(self.headers_table, "Headers")
 
-        self.body_edit = CodeEditor()
+        self.body_edit = CodeEditor(metrics=self._metrics)
         set_widget_id(self.body_edit, REQUEST_BODY_EDIT)
         self.json_highlighter = JsonHighlighter(self.body_edit.document())
 
@@ -642,5 +643,17 @@ class McpParamsTable(QTableWidget):
 class KeyValueTable(EmptyRowKeyValueTable):
     """HTTP Params/Headers table; preserves unstripped key collect (FR-2)."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        metrics: MetricsTrackerProtocol | None = None,
+        context: str = "query",
+    ) -> None:
         super().__init__(parent, strip_keys=False)
+        self._autocomplete_metrics = resolve_metrics(metrics)
+        self._autocomplete_context = context
+        self._delegate = VariableAutocompleteDelegate(
+            self, metrics=self._autocomplete_metrics, context=context
+        )
+        self.setItemDelegateForColumn(1, self._delegate)

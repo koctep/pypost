@@ -4,6 +4,7 @@ from PySide6.QtCore import Signal
 
 from pypost.core.metrics_registry import MetricsRegistry
 from pypost.core.metrics_server import MetricsServer
+from pypost.core.qt.metrics_autocomplete import MetricsAutocompleteMixin
 from pypost.core.qt.metrics_lifecycle import MetricsLifecycle
 from pypost.core.qt.metrics_tracking import MetricsTrackingMixin
 from pypost.core.qt.metrics_websocket import MetricsWebSocketMixin
@@ -12,6 +13,7 @@ from pypost.core.qt.metrics_websocket import MetricsWebSocketMixin
 # Qt-facing listener lifecycle is inherited from MetricsLifecycle.
 class MetricsManager(
     MetricsLifecycle,
+    MetricsAutocompleteMixin,
     MetricsTrackingMixin,
     MetricsWebSocketMixin,
 ):

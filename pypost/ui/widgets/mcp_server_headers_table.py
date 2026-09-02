@@ -29,6 +29,10 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.ui.widgets.empty_row_key_value_table import EmptyRowKeyValueTable
+from pypost.ui.widgets.variable_autocomplete_line_edit import (
+    VariableAutocompleteDelegate as SharedVariableAutocompleteDelegate,
+    VariableAutocompleteLineEdit as SharedVariableAutocompleteLineEdit,
+)
 
 if TYPE_CHECKING:
     from pypost.models.models import Environment
@@ -155,7 +159,7 @@ class HeaderValidationEngine:
         return validate_header_value(value, env_vars)
 
 
-class VariableAutocompleteLineEdit(QLineEdit):
+class _LegacyVariableAutocompleteLineEdit(QLineEdit):
     """QLineEdit editor with inline {{ autocompletion popup for environment variables."""
 
     def __init__(
@@ -297,7 +301,7 @@ class VariableAutocompleteLineEdit(QLineEdit):
         super().hideEvent(event)
 
 
-class VariableAutocompleteDelegate(QStyledItemDelegate):
+class _LegacyVariableAutocompleteDelegate(QStyledItemDelegate):
     """Delegate providing VariableAutocompleteLineEdit for the Value column."""
 
     def __init__(self, parent: McpServerHeadersTable) -> None:
@@ -346,6 +350,11 @@ class VariableAutocompleteDelegate(QStyledItemDelegate):
         index: QModelIndex | QPersistentModelIndex,
     ) -> None:
         editor.setGeometry(option.rect)
+
+
+# Keep the historical import surface while sharing the implementation.
+VariableAutocompleteDelegate = SharedVariableAutocompleteDelegate
+VariableAutocompleteLineEdit = SharedVariableAutocompleteLineEdit
 
 
 class McpServerHeadersTable(EmptyRowKeyValueTable):

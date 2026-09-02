@@ -31,6 +31,16 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_gui_method_body_autoswitch(self, method: str) -> None: ...
 
+    def track_gui_variable_autocomplete_trigger(self, context: str) -> None: ...
+
+    def track_gui_variable_autocomplete_selection(self, context: str) -> None: ...
+
+    def track_gui_variable_autocomplete_feedback(
+        self, context: str, status: str
+    ) -> None: ...
+
+    def track_gui_variable_autocomplete_environment_refresh(self, context: str) -> None: ...
+
     def track_request_sent(self, method: str) -> None: ...
 
     def track_response_received(self, method: str, status_code: str) -> None: ...
@@ -157,6 +167,20 @@ class NullMetrics:
         return None
 
     def track_gui_method_body_autoswitch(self, method: str) -> None:
+        return None
+
+    def track_gui_variable_autocomplete_trigger(self, context: str) -> None:
+        return None
+
+    def track_gui_variable_autocomplete_selection(self, context: str) -> None:
+        return None
+
+    def track_gui_variable_autocomplete_feedback(
+        self, context: str, status: str
+    ) -> None:
+        return None
+
+    def track_gui_variable_autocomplete_environment_refresh(self, context: str) -> None:
         return None
 
     def track_request_sent(self, method: str) -> None:

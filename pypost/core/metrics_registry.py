@@ -112,6 +112,27 @@ class MetricsRegistry:
             registry=self.registry,
         )
 
+        self.gui_variable_autocomplete_triggers = Counter(
+            "gui_variable_autocomplete_triggers_total",
+            "Number of variable autocomplete popup triggers",
+            ["context"], registry=self.registry,
+        )
+        self.gui_variable_autocomplete_selections = Counter(
+            "gui_variable_autocomplete_selections_total",
+            "Number of variable autocomplete selections",
+            ["context"], registry=self.registry,
+        )
+        self.gui_variable_autocomplete_feedback = Counter(
+            "gui_variable_autocomplete_feedback_total",
+            "Number of variable autocomplete feedback states",
+            ["context", "status"], registry=self.registry,
+        )
+        self.gui_variable_autocomplete_environment_refreshes = Counter(
+            "gui_variable_autocomplete_environment_refreshes_total",
+            "Number of variable autocomplete environment refreshes",
+            ["context"], registry=self.registry,
+        )
+
     def _init_http_metrics(self) -> None:
         """Register HTTP request, history, and template counters."""
         self.requests_sent = Counter(
@@ -323,6 +344,24 @@ class MetricsRegistry:
 
     def track_gui_method_body_autoswitch(self, method: str) -> None:
         self.gui_method_body_autoswitches.labels(method=method).inc()
+
+    def track_gui_variable_autocomplete_trigger(self, context: str) -> None:
+        self.gui_variable_autocomplete_triggers.labels(context=context).inc()
+
+    def track_gui_variable_autocomplete_selection(self, context: str) -> None:
+        self.gui_variable_autocomplete_selections.labels(context=context).inc()
+
+    def track_gui_variable_autocomplete_feedback(
+        self, context: str, status: str
+    ) -> None:
+        self.gui_variable_autocomplete_feedback.labels(
+            context=context, status=status
+        ).inc()
+
+    def track_gui_variable_autocomplete_environment_refresh(self, context: str) -> None:
+        self.gui_variable_autocomplete_environment_refreshes.labels(
+            context=context
+        ).inc()
 
     def track_request_sent(self, method: str) -> None:
         self.requests_sent.labels(method=method).inc()

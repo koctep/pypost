@@ -67,6 +67,35 @@ class TestMetricsRegistryMcpCounters(unittest.TestCase):
         self.assertIn('mcp_client_connect_total{result="error"} 1.0', out)
         self.assertNotIn("mcp_requests_received_total{", out)
 
+
+class TestMetricsRegistryVariableAutocompleteCounters(unittest.TestCase):
+    def test_track_variable_autocomplete_counters(self):
+        reg = MetricsRegistry()
+        reg.track_gui_variable_autocomplete_trigger("query")
+        reg.track_gui_variable_autocomplete_selection("query")
+        reg.track_gui_variable_autocomplete_feedback("body", "unavailable")
+        reg.track_gui_variable_autocomplete_environment_refresh("header")
+
+        out = _scrape(reg)
+        self.assertIn(
+            'gui_variable_autocomplete_triggers_total{context="query"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'gui_variable_autocomplete_selections_total{context="query"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'gui_variable_autocomplete_feedback_total{context="body",status="unavailable"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'gui_variable_autocomplete_environment_refreshes_total{context="header"} 1.0',
+            out,
+        )
+
+
+class TestMetricsRegistryMcpClientCounters(unittest.TestCase):
     def test_track_mcp_client_list_tools(self):
         reg = MetricsRegistry()
         reg.track_mcp_client_list_tools("success", "connect")
