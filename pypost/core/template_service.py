@@ -11,8 +11,7 @@ from pypost.core.function_expression_resolver import FunctionExpressionResolver
 from pypost.core.function_registry import FunctionRegistry
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_expression_tokenizer import (
-    TEMPLATE_PLACEHOLDER_PATTERN,
-    tokenize_template_expressions,
+    lex_template_expressions,
 )
 from pypost.core.template_expression_types import IntegerConversionError, ValidationResult
 from pypost.core.template_service_render import (
@@ -85,7 +84,8 @@ class TemplateService:
                 variables, render_path=render_path
             )
 
-        expressions = tokenize_template_expressions(content)
+        template_tokens = lex_template_expressions(content)
+        expressions = [token.expression for token in template_tokens if token.closed]
         expression_count = len(expressions)
         validation: ValidationResult | None = None
         try:
@@ -120,9 +120,7 @@ class TemplateService:
                 expression_count,
             )
             if strict_conversion and self._contains_failed_to_int_call(
-                content,
-                exc,
-                variables,
+                content, exc, variables, template_tokens
             ):
                 logger.info(
                     "strict_conversion_failure_propagated render_path=%s error_type=%s",
@@ -148,6 +146,7 @@ class TemplateService:
         content: str,
         exc: Exception,
         variables: dict[str, Any],
+        template_tokens: tuple[Any, ...] | None = None,
     ) -> bool:
         """Identify failed strict conversion expressions without widening fallback.
 
@@ -163,7 +162,9 @@ class TemplateService:
 
         # Check structured failure provenance from the resolver (syntax errors,
         # unclosed placeholders, arity errors, unknown functions in strict context).
-        provenances = self._function_expression_resolver.inspect_failure_provenance(content)
+        provenances = self._function_expression_resolver.inspect_failure_provenance(
+            content, tokens=template_tokens
+        )
         strict_prov = next((p for p in provenances if p.is_strict_conversion), None)
         if strict_prov is not None:
             logger.debug(
@@ -174,9 +175,19 @@ class TemplateService:
             )
             return True
 
-        # Dynamically evaluate completed placeholders containing strict conversion functions
-        for token in TEMPLATE_PLACEHOLDER_PATTERN.finditer(content):
-            expression = token.group(1)
+        # Evaluate all valid strict placeholders in one cached template. This keeps the
+        # fallback path linear in the number of placeholders and avoids one Jinja compile
+        # and render call per placeholder.
+        tokens = (
+            template_tokens
+            if template_tokens is not None
+            else lex_template_expressions(content)
+        )
+        strict_expressions: list[str] = []
+        for token in tokens:
+            if not token.closed:
+                continue
+            expression = token.expression
             if not self._function_expression_resolver.contains_strict_function(expression):
                 continue
 
@@ -190,16 +201,24 @@ class TemplateService:
                 )
                 return True
 
-            try:
-                self._compile_template("{{" + expression + "}}").render(variables)
-            except IntegerConversionError as conv_err:
-                logger.debug(
-                    "strict_conversion_failure_identified source=eval error_type=%s",
-                    type(conv_err).__name__,
-                )
-                return True
-            except Exception:
-                pass
+            strict_expressions.append(expression)
+
+        if not strict_expressions:
+            return False
+
+        try:
+            strict_template = "".join(
+                "{{" + expression + "}}" for expression in strict_expressions
+            )
+            self._compile_template(strict_template).render(**variables)
+        except IntegerConversionError as conv_err:
+            logger.debug(
+                "strict_conversion_failure_identified source=eval error_type=%s",
+                type(conv_err).__name__,
+            )
+            return True
+        except Exception:
+            pass
 
         return False
 

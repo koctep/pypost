@@ -213,6 +213,30 @@ class TestTemplateServiceRenderString(unittest.TestCase):
                 {"value": "ignored", "issue_id": "not-an-int"},
             )
 
+    def test_strict_conversion_evaluates_all_placeholders_in_one_template(self):
+        """PYPOST-1249: strict fallback evaluation uses one combined Jinja template."""
+        content = "{{not_allowed(value)}}/{{to_int(first)}}/{{to_int(second)}}"
+        with patch.object(
+            self.svc,
+            "_compile_template",
+            wraps=self.svc._compile_template,
+        ) as compile_mock:
+            with self.assertRaises(IntegerConversionError):
+                self.svc.render_string_strict_conversion(
+                    content,
+                    {"value": "ignored", "first": "bad", "second": "also-bad"},
+                )
+
+        compiled_templates = [call_args.args[0] for call_args in compile_mock.call_args_list]
+        self.assertIn("{{to_int(first)}}{{to_int(second)}}", compiled_templates)
+        self.assertEqual(
+            1,
+            sum(
+                template == "{{to_int(first)}}{{to_int(second)}}"
+                for template in compiled_templates
+            ),
+        )
+
     def test_render_mixed_variant_b_functions(self):
         result = self.svc.render_string(
             "/{{host}}/{{urlencode(db)}}/{{md5(secret)}}/{{base64(db)}}",

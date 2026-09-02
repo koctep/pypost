@@ -139,6 +139,7 @@ class FunctionExpressionResolver:
         self,
         content: str,
         expressions: list[str] | None = None,
+        tokens: tuple[Any, ...] | None = None,
     ) -> tuple[ExpressionFailureProvenance, ...]:
         """Inspect content and expressions, returning structured failure provenance."""
         completed_spans: list[tuple[int, int]] = []
@@ -150,7 +151,8 @@ class FunctionExpressionResolver:
                 if prov:
                     failures.append(prov)
         else:
-            for token in lex_template_expressions(content):
+            lexed_tokens = tokens if tokens is not None else lex_template_expressions(content)
+            for token in lexed_tokens:
                 if not token.closed:
                     continue
                 span = (token.start, token.end)
@@ -161,7 +163,8 @@ class FunctionExpressionResolver:
                     failures.append(prov)
 
         if "{{" in content:
-            for token in lex_template_expressions(content):
+            lexed_tokens = tokens if tokens is not None else lex_template_expressions(content)
+            for token in lexed_tokens:
                 if token.closed:
                     continue
                 start_idx = token.start
