@@ -65,12 +65,11 @@ class FunctionRegistry:
 
     def __init__(self) -> None:
         self._functions: dict[str, Callable[..., Any]] = dict(_DEFAULT_CATALOG)
-        self._allowed_names: frozenset[str] = frozenset(self._functions)
-        self._strict_functions: frozenset[str] = frozenset({"to_int"})
+        self._strict_functions: set[str] = {"to_int"}
 
     def allowed_names(self) -> frozenset[str]:
         """Immutable set of permitted function names for template expressions."""
-        return self._allowed_names
+        return frozenset(self._functions)
 
     def is_allowed(self, name: str) -> bool:
         """True if name is in the catalog."""
@@ -79,6 +78,54 @@ class FunctionRegistry:
     def is_strict_conversion(self, function_name: str) -> bool:
         """True if function_name is a strict conversion function."""
         return function_name in self._strict_functions
+
+    def register(
+        self,
+        name: str | Callable[..., Any] | None = None,
+        function: Callable[..., Any] | None = None,
+        *,
+        is_strict: bool = False,
+    ) -> Callable[..., Any] | Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register a callable, either directly or as a decorator.
+
+        ``register("name", fn, is_strict=True)`` and
+        ``@register("name", is_strict=True)`` are equivalent.  When the name is
+        omitted, a decorator uses the decorated function's ``__name__``.
+        """
+        if callable(name) and function is None:
+            function = name
+            name = function.__name__
+        if function is None:
+            if name is not None and not isinstance(name, str):
+                raise TypeError("function name must be a string")
+
+            def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+                registration_name = name or fn.__name__
+                self.register(registration_name, fn, is_strict=is_strict)
+                return fn
+
+            return decorator
+        if not isinstance(name, str):
+            raise TypeError("function name must be a string")
+        if not name:
+            raise ValueError("function name must not be empty")
+        if not callable(function):
+            raise TypeError("registered function must be callable")
+
+        self._functions[name] = function
+        if is_strict:
+            self._strict_functions.add(name)
+        else:
+            self._strict_functions.discard(name)
+        return function
+
+    def register_strict(
+        self,
+        name: str | Callable[..., Any] | None = None,
+        function: Callable[..., Any] | None = None,
+    ) -> Callable[..., Any] | Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register a function with strict-conversion failure semantics."""
+        return self.register(name, function, is_strict=True)
 
     def register_into_env(self, env: Environment) -> None:
         """

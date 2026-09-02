@@ -47,6 +47,32 @@ heuristics by introducing structured failure provenance (`ExpressionFailureProve
 in `FunctionExpressionResolver` and strict conversion metadata in `FunctionRegistry`.
 See [Template Failure Provenance and Strict Conversion](template_failure_provenance.md).
 
+### Dynamic Function Registration (PYPOST-1247)
+
+`FunctionRegistry` supports adding approved functions to an individual registry instance:
+
+```python
+registry.register("slugify", slugify)
+registry.register("parse_id", parse_id, is_strict=True)
+```
+
+The decorator forms preserve the original callable and add it to the same allow-list:
+
+```python
+@registry.register("slugify")
+def slugify(value: object) -> str:
+    return str(value).lower().replace(" ", "-")
+
+@registry.register_strict
+def parse_id(value: object) -> int:
+    return int(value)
+```
+
+`register_strict("name")` is available when the registered name differs from the Python
+function name. Re-registering a name replaces both its callable and strictness classification.
+Only explicitly registered callables are exposed through `allowed_names()` and
+`register_into_env()`; registry instances do not share dynamic registrations.
+
 Outside the narrow strict HTTP conversion boundary described below, implemented
 behavior is backward compatible:
 

@@ -12,6 +12,82 @@ pytestmark = pytest.mark.timeout(30)
 
 
 class TestFunctionRegistry(unittest.TestCase):
+    def test_register_adds_dynamic_function_and_strict_metadata(self):
+        reg = FunctionRegistry()
+
+        def reverse(value: object) -> str:
+            return str(value)[::-1]
+
+        registered = reg.register("reverse", reverse, is_strict=True)
+
+        self.assertIs(registered, reverse)
+        self.assertTrue(reg.is_allowed("reverse"))
+        self.assertTrue(reg.is_strict_conversion("reverse"))
+        self.assertIs(reg.get("reverse"), reverse)
+
+    def test_register_can_be_used_as_a_strict_decorator(self):
+        reg = FunctionRegistry()
+
+        @reg.register("double", is_strict=True)
+        def double(value: object) -> str:
+            return f"{value}{value}"
+
+        self.assertEqual(double("x"), "xx")
+        self.assertIs(reg.get("double"), double)
+        self.assertTrue(reg.is_strict_conversion("double"))
+
+    def test_register_strict_supports_bare_and_named_decorators(self):
+        reg = FunctionRegistry()
+
+        @reg.register_strict
+        def upper(value: object) -> str:
+            return str(value).upper()
+
+        @reg.register_strict("lower")
+        def lower(value: object) -> str:
+            return str(value).lower()
+
+        self.assertIs(reg.get("upper"), upper)
+        self.assertIs(reg.get("lower"), lower)
+        self.assertTrue(reg.is_strict_conversion("upper"))
+        self.assertTrue(reg.is_strict_conversion("lower"))
+
+    def test_reregister_replaces_callable_and_strictness(self):
+        reg = FunctionRegistry()
+
+        def first(value: object) -> object:
+            return value
+
+        def second(value: object) -> object:
+            return value
+
+        reg.register("replaceable", first, is_strict=True)
+        reg.register("replaceable", second)
+
+        self.assertIs(reg.get("replaceable"), second)
+        self.assertFalse(reg.is_strict_conversion("replaceable"))
+
+    def test_dynamic_function_is_bound_into_environment(self):
+        reg = FunctionRegistry()
+
+        def shout(value: object) -> str:
+            return str(value).upper()
+
+        reg.register("shout", shout)
+        env = Environment()
+        reg.register_into_env(env)
+
+        self.assertEqual(env.globals["shout"]("hello"), "HELLO")
+
+    def test_register_rejects_invalid_name_and_callable(self):
+        reg = FunctionRegistry()
+
+        with self.assertRaises(ValueError):
+            reg.register("", lambda value: value)
+        with self.assertRaises(TypeError):
+            reg.register("not_callable", object())
+        self.assertFalse(reg.is_allowed("not_callable"))
+
     def test_allowed_names_matches_catalog(self):
         reg = FunctionRegistry()
         self.assertEqual(
