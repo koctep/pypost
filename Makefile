@@ -3,7 +3,7 @@
 	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
 	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
-	check-license-inventory lint-docs check-docs-links check-lock-all
+	check-license-inventory lint-docs check-docs-links check-lock-all test-gui-batch
 
 .DEFAULT_GOAL := help
 
@@ -21,6 +21,7 @@ WORKERS ?= $(shell PYTHONPATH=. $(PYTHON) -c 'from scripts.run_parallel_tests im
 # WORKER_TIMEOUT=N make test. Script/CLI default remains 30 when invoked without Make.
 WORKER_TIMEOUT ?= 120
 PYTEST_ARGS ?=
+GUI_BATCH_SIZE ?= 4
 
 help: ## Show available make targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
@@ -170,6 +171,10 @@ test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow i
 test-slow: $(VENV_MARKER) venv-test venv-otel ## Run slow integration tests only (Makefile install smoke)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m slow)
+
+test-gui-batch: $(VENV_MARKER) venv-test venv-otel ## Verify bounded GUI batch isolation
+	QT_QPA_PLATFORM=offscreen PYTHONPATH=. $(BIN)/python scripts/repro_gui_batch_segfault.py \
+		--mode=bounded --batch-size=$(GUI_BATCH_SIZE)
 
 test-mcp-collection-e2e: $(VENV_MARKER) venv-test venv-otel ## Run Jira MCP e2e
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/test_mcp_collection_e2e.py

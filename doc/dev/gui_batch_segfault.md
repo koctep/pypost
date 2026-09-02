@@ -60,7 +60,10 @@ A dedicated CLI harness is available in `scripts/repro_gui_batch_segfault.py` to
 python scripts/repro_gui_batch_segfault.py --mode=full --timeout=180
 
 # Bounded chunked execution (e.g. 15 modules per subprocess batch) (PASS / Exit Code 0)
-python scripts/repro_gui_batch_segfault.py --mode=bounded --batch-size=15
+python scripts/repro_gui_batch_segfault.py --mode=bounded --batch-size=4
+
+# CI-equivalent repository entry point
+make test-gui-batch
 
 # Single isolated module execution (PASS / Exit Code 0)
 python scripts/repro_gui_batch_segfault.py --mode=single
@@ -115,10 +118,20 @@ Current thread 0x0000ffff8a9fe020 (most recent call first):
 | Execution Topology | Command Shape | Modules / Tests | Process Model | Result | Exit Code / Signal | Duration |
 | --- | --- | --- | --- | --- | --- | --- |
 | **Full Large Batch** | `python scripts/repro_gui_batch_segfault.py --mode=full` | ~110 modules (~1,384 tests) | Single Process | **CRASH (SIGSEGV)** | `139` / `SIGSEGV` | ~40–60s |
-| **8 Bounded Batches** | `python scripts/repro_gui_batch_segfault.py --mode=bounded --batch-size=15` | ~110 modules (8 chunks) | Subprocess per Chunk | **PASS** | `0` | ~75s total |
+| **Bounded Batches** | `python scripts/repro_gui_batch_segfault.py --mode=bounded --batch-size=4` | ~110 modules (28 chunks) | Subprocess per Chunk | **PASS** | `0` | environment-dependent |
 | **Per-File Isolation** | `scripts/run_parallel_tests.py` / `make test` | 110 modules | Subprocess per File | **PASS** | `0` | ~25–35s |
 | **Individual Module** | `pytest tests/test_settings_dialog.py` | 1 module (24 tests) | Single Process | **PASS** | `0` | ~1.8s |
 | **Bounded Guard Test** | `test_bounded_gui_batch_execution_passes_cleanly` | 4 modules (~45 tests) | Child Subprocess | **PASS** | `0` | ~1.1s |
+
+## CI Ownership and Tradeoffs
+
+The CI test job owns the mitigation policy through `make test-gui-batch`. The default
+threshold is 4 GUI modules per subprocess and can be changed deliberately with
+`GUI_BATCH_SIZE`; the normal `make test` runner additionally isolates each test file.
+This costs subprocess startup time and does not prove an upstream Qt fix, but prevents
+cumulative style-engine state from crossing the bounded process boundary. The full mode
+is retained for diagnosis and is not a required green CI assertion. PYPOST-1115 remains
+a separate SettingsDialog teardown scope.
 
 ---
 

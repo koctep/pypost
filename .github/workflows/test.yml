@@ -147,6 +147,9 @@ jobs:
             --log-file=pytest.log --log-file-level=WARNING \
             2>&1 | tee pytest-output.txt
 
+      - name: Verify bounded GUI batch isolation
+        run: make test-gui-batch
+
       - name: Verify test log guardrails
         if: success()
         run: python scripts/verify_test_log_guardrails.py pytest.log
