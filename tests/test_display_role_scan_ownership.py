@@ -560,11 +560,17 @@ def test_flat_and_tree_share_display_role_match_helper() -> None:
     )
 
     find_tree = tree_defs.get("find_tree_index_by_display_text")
-    assert find_tree is not None, "missing find_tree_index_by_display_text"
+    assert find_tree is not None, (
+        "missing find_tree_index_by_display_text recursive/tree lookup responsibility "
+        "in Tree Index module; restore recursive lookup"
+    )
     _assert_tree_shared_ownership(tree_defs)
 
     select_item = ui_defs.get("_select_item_view")
-    assert select_item is not None, "missing _select_item_view"
+    assert select_item is not None, (
+        "missing _select_item_view item-view selection responsibility in UI Actions "
+        "module; restore item-view selection"
+    )
     assert _imports_from_tree_index(ui_actions_ast, "find_child_index_by_display_text"), (
         "_select_item_view must import find_child_index_by_display_text from "
         "pypost.agent.tree_index"

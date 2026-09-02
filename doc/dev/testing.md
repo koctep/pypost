@@ -213,14 +213,52 @@ PYPOST-1041 hardened that marker: it now also asserts that
 inlines `ItemDataRole.DisplayRole`, and that `pypost.agent.tree_index.__all__`
 exports all three helpers. `tests/test_display_role_scan_ownership_repro.py`
 guards those three assertions — and only those three of the suite's fourteen
-(three AST presence checks over the ownership suite's own source, plus two
-synthetic `tree_index` mutants the suite must reject). The
-`find_tree_index_by_display_text` and `_select_item_view` assertions are **not**
-pinned: they can be deleted with all five repro tests still green (TD-3 /
-[PYPOST-1236](https://pypost.atlassian.net/browse/PYPOST-1236)). So the
-assertion wording, and the `_calls_name` / `_has_display_role_attr` pair that
-names `find_child_index_by_display_text`, are load-bearing — and none of the
-three pairs may be folded into a loop or a shared helper. Rules and rationale in
+ownership assertions (three AST presence checks over the ownership suite's own
+source, plus two existing synthetic `tree_index` mutants the suite must reject).
+The `find_tree_index_by_display_text` and `_select_item_view` assertions are
+covered below by PYPOST-1240 source-inspection repros. The assertion wording,
+and the `_calls_name` / `_has_display_role_attr` pair that names
+`find_child_index_by_display_text`, are load-bearing — and none of the three
+pairs may be folded into a loop or a shared helper. Rules and rationale in
+[DisplayRole ownership boundary and its
+guard](ui_actions.md#displayrole-ownership-boundary-and-its-guard-pypost-1041).
+
+PYPOST-1240 adds focused coverage for the two actionable missing-responsibility
+diagnostics in `tests/test_display_role_scan_ownership.py`. The two repro tests
+in `tests/test_display_role_scan_ownership_repro.py`,
+`test_missing_recursive_lookup_diagnostic_names_owner_and_remedy` and
+`test_missing_item_view_selection_diagnostic_names_owner_and_remedy`, reuse
+`_parse_file` and AST inspection to read the main ownership test's assertion
+messages. Each pins the symbol, correct owner module, actionable remedy, and
+one-line message. No new mutant or aggregate harness is required.
+
+After the diagnostic change, this focused validation should pass:
+
+```bash
+make test PYTEST_ARGS='tests/test_display_role_scan_ownership_repro.py \
+  tests/test_display_role_scan_ownership.py -q'
+```
+
+The diagnostic contract is one readable line containing the missing
+responsibility, its owner, and the remedy:
+
+- Missing `find_tree_index_by_display_text` identifies the `Tree Index` module and
+  says to restore recursive lookup.
+- Missing `_select_item_view` identifies the `UI Actions` module and says to
+  restore item-view selection.
+
+These are test-side quality-gate diagnostics only. They do not change lookup,
+selection, or application behavior and do not add production logging, metrics,
+tracing, or telemetry.
+
+The repro module retains its five existing flat-finder/`__all__` tests and adds
+two source-inspection tests for the PYPOST-1240 diagnostic messages. The existing
+two synthetic `tree_index` mutant tests remain part of the PYPOST-1041 coverage;
+PYPOST-1240 adds no mutant. The repro's green result therefore must not be read
+as proof of the entire ownership contract. The assertion wording, and the
+`_calls_name` / `_has_display_role_attr` pair that names
+`find_child_index_by_display_text`, are load-bearing — and none of the three
+pairs may be folded into a loop or a shared helper. Rules and rationale in
 [DisplayRole ownership boundary and its
 guard](ui_actions.md#displayrole-ownership-boundary-and-its-guard-pypost-1041).
 

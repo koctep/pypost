@@ -11,9 +11,11 @@ Each test below was red before Step 4 and pins one gap in
 4. Mutation gap: a ``find_child_index_by_display_text`` that inlines DisplayRole
    passes the ownership suite.
 5. Mutation gap: an empty ``__all__`` in ``tree_index`` passes the ownership suite.
+6. No source-inspection repro pins the ``find_tree_index_by_display_text`` diagnostic.
+7. No source-inspection repro pins the ``_select_item_view`` diagnostic.
 
-Tests 1-3 inspect the ownership suite's own source; tests 4-5 run the suite against a
-synthetic ``tree_index`` mutant and require it to fail.
+Tests 1-3 and 6-7 inspect the ownership suite's own source; tests 4-5 run the suite against
+a synthetic ``tree_index`` mutant and require it to fail.
 """
 
 from __future__ import annotations
@@ -178,6 +180,39 @@ def _has_all_exports_check(tree: ast.AST) -> bool:
     return False
 
 
+def _main_ownership_test(tree: ast.AST) -> ast.FunctionDef:
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.FunctionDef)
+            and node.name == "test_flat_and_tree_share_display_role_match_helper"
+        ):
+            return node
+    raise AssertionError(
+        "tests/test_display_role_scan_ownership.py must define the main ownership test"
+    )
+
+
+def _main_test_assertion_message(local_name: str) -> str:
+    main_test = _main_ownership_test(_parse_file(_OWNERSHIP_TEST_FILE))
+    matching_assertions = [
+        node
+        for node in ast.walk(main_test)
+        if isinstance(node, ast.Assert)
+        and isinstance(node.test, ast.Compare)
+        and isinstance(node.test.left, ast.Name)
+        and node.test.left.id == local_name
+        and node.msg is not None
+    ]
+    assert len(matching_assertions) == 1, (
+        f"main ownership test must have one diagnostic assertion for {local_name}"
+    )
+    message = matching_assertions[0].msg
+    assert isinstance(message, ast.Constant) and isinstance(message.value, str), (
+        f"main ownership test diagnostic for {local_name} must be a string literal"
+    )
+    return message.value
+
+
 def _patch_tree_index_source(monkeypatch: pytest.MonkeyPatch, source: str) -> None:
     """Make the ownership suite parse ``source`` in place of the real tree_index."""
     real_parse = ownership_suite._parse
@@ -213,6 +248,26 @@ def test_repro_ownership_suite_checks_tree_index_all_exports() -> None:
         "pypost.agent.tree_index.__all__ exports display_role_equals "
         "and find_child_index_by_display_text"
     )
+
+
+def test_missing_recursive_lookup_diagnostic_names_owner_and_remedy() -> None:
+    """The main tree lookup diagnostic identifies its owner and repair direction."""
+    message = _main_test_assertion_message("find_tree")
+
+    assert "find_tree_index_by_display_text" in message
+    assert "Tree Index" in message
+    assert "restore recursive lookup" in message
+    assert len(message.splitlines()) == 1, message
+
+
+def test_missing_item_view_selection_diagnostic_names_owner_and_remedy() -> None:
+    """The main item-view diagnostic identifies its owner and repair direction."""
+    message = _main_test_assertion_message("select_item")
+
+    assert "_select_item_view" in message
+    assert "UI Actions" in message
+    assert "restore item-view selection" in message
+    assert len(message.splitlines()) == 1, message
 
 
 def test_repro_ownership_suite_catches_inlined_display_role_mutant(

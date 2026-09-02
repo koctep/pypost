@@ -250,47 +250,69 @@ involved — and asserts all four rules inside one test,
 `pytestmark = pytest.mark.timeout(10)`). Its AST helpers are `_calls_name`
 (delegation), `_has_display_role_attr` (inline-DisplayRole probe),
 `_imports_from_tree_index` (import edge), and `_module_all_exports` (literal
-`__all__` manifest). The test is fail-fast: a run reports the first violated
-rule only.
+`__all__` manifest). The test also requires the recursive/tree lookup helper
+`find_tree_index_by_display_text` and the item-view selection helper
+`_select_item_view` to be present. The test is fail-fast: a run reports the
+first violated rule only.
+
+PYPOST-1240 adds two focused source-inspection repro tests in
+`tests/test_display_role_scan_ownership_repro.py`:
+`test_missing_recursive_lookup_diagnostic_names_owner_and_remedy` and
+`test_missing_item_view_selection_diagnostic_names_owner_and_remedy`. They reuse
+`_parse_file` and AST inspection to read the main ownership test's assertion
+messages. Each pins the symbol, correct owner module, actionable remedy, and
+one-line message. No new mutant or aggregate harness is required.
+
+After the diagnostic change, this focused validation should pass:
+
+```bash
+make test PYTEST_ARGS='tests/test_display_role_scan_ownership_repro.py \
+  tests/test_display_role_scan_ownership.py -q'
+```
+
+These messages are test-side quality-gate diagnostics. PYPOST-1240 is
+diagnostic-only: it leaves UI behavior and production logging, metrics,
+tracing, and telemetry unchanged.
 
 **Guard of the guard.** `tests/test_display_role_scan_ownership_repro.py`
 keeps *part of* the ownership suite from being quietly weakened. Three of its
 tests read the ownership suite's *own* AST and look for one specific assertion
 shape each; two monkeypatch the suite's `_parse` so it audits a synthetic
 `tree_index` mutant (one inlines DisplayRole, one empties `__all__`) and must
-raise `AssertionError`.
+raise `AssertionError`. The two additional PYPOST-1240 repro tests inspect the
+main ownership test's assertion messages directly; they add no mutant. The
+existing five repro tests remain intact and cover the flat-finder
+delegation/no-inline checks and the `__all__` export check.
 
-**What the repro actually pins** — three of the ownership suite's fourteen
-assertions, no more:
+**What the repro actually pins** — five of the ownership suite's fourteen
+ownership assertions:
 
 - `_calls_name(find_child, "display_role_equals")` — the flat finder delegates.
 - `not _has_display_role_attr(find_child)` — the flat finder does not inline.
 - `expected_exports.issubset(tree_exports)` — the `__all__` manifest (pinned by
   the empty-`__all__` mutant test, not by a source-shape test).
+- The main test's `find_tree_index_by_display_text` diagnostic message names
+  `Tree Index` and says to restore recursive lookup.
+- The main test's `_select_item_view` diagnostic message names `UI Actions` and
+  says to restore item-view selection.
 
-Delete one of those three and the repro turns red while the ownership suite
-itself would stay green. The other eleven assertions are **not** guarded: the
-`is_file` / `is not None` structural checks, the whole
-`find_tree_index_by_display_text` pair, and all three `_select_item_view`
-assertions can each be deleted individually with all five repro tests
-still passing —
-`_refers_to_find_child` only recognises a first argument that names the *flat*
-finder, so it never sees the other two pairs. That gap is TD-3 in
-[60-tech-debt.md](../../ai-tasks/PYPOST-1041/60-tech-debt.md), tracked as
-[PYPOST-1236](https://pypost.atlassian.net/browse/PYPOST-1236). Until it is
-fixed, a green repro is evidence about the flat finder and `__all__` only —
-do not read it as proof that the whole ownership contract is intact.
+Delete one of those five and the repro turns red while the ownership suite
+itself would stay green; deleting either message assertion also turns the new
+source-inspection repro red. The repro intentionally does not prove that every
+ownership assertion remains present or that the two existing synthetic mutants
+cover the recursive/tree and item-view checks. `_refers_to_find_child` only
+recognises a first argument that names the *flat* finder, so it never sees the
+other two ownership pairs.
 
 Two constraints follow from that coupling. Both apply when editing either
 file:
 
 - **Diagnostic wording is a machine-checked contract**
   (TD-9 in [60-tech-debt.md](../../ai-tasks/PYPOST-1041/60-tech-debt.md)).
-  The repro pins the assertion messages with `pytest.raises(match=...)`:
-  `find_child_index_by_display_text.*(display_role_equals|DisplayRole)` and
-  `__all__.*export`. Rewording a message means changing both files together —
-  keep the function name and the helper name on **one** line (`.` does not
-  match a newline) and keep `__all__` ahead of `export`.
+  The repro locates the two main-test assertion messages by their local symbols
+  and checks the symbol, owner, remedy, and one-line shape. Rewording either
+  message means changing both files together; keep the owner and repair
+  direction on the same line as the missing responsibility.
 - **The repeated assertion pairs must stay repeated**
   (TD-5 in [60-tech-debt.md](../../ai-tasks/PYPOST-1041/60-tech-debt.md)).
   The three `_calls_name(...)` / `_has_display_role_attr(...)` pairs look like
@@ -307,8 +329,9 @@ file:
     assertion and reports the guard as missing (both source-shape repro tests
     go red).
   - The **`find_tree`** and **`_select_item_view`** pairs match neither branch
-    today, so folding *those* changes nothing in the repro — it stays green
-    and the loss is silent. That is TD-3 above, not a licence to dedup them.
+     today, so their delegation/no-inline assertions are not covered by the
+     flat-finder source-shape checks. The new message repros cover only their
+     missing-responsibility diagnostic strings; do not deduplicate the pairs.
 
   Revert such a dedup rather than loosening the repro.
 
