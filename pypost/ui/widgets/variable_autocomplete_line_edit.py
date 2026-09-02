@@ -32,6 +32,46 @@ class VariableReferenceStatus(TypedDict):
     message: str
 
 
+class _PrefixTrieNode:
+    """Node in the name-only autocomplete prefix index."""
+
+    def __init__(self) -> None:
+        self.children: dict[str, _PrefixTrieNode] = {}
+        self.names: list[str] = []
+
+
+class _PrefixTrie:
+    """Case-insensitive prefix index that preserves variable insertion order."""
+
+    def __init__(self, names: Iterable[str] = ()) -> None:
+        self._root = _PrefixTrieNode()
+        self.rebuild(names)
+
+    def rebuild(self, names: Iterable[str]) -> None:
+        self._root = _PrefixTrieNode()
+        for name in names:
+            node = self._root
+            if name not in node.names:
+                node.names.append(name)
+            for character in name.casefold():
+                child = node.children.get(character)
+                if child is None:
+                    child = _PrefixTrieNode()
+                    node.children[character] = child
+                node = child
+                if name not in node.names:
+                    node.names.append(name)
+
+    def matches(self, prefix: str, limit: int) -> list[str]:
+        node = self._root
+        for character in prefix.casefold():
+            child = node.children.get(character)
+            if child is None:
+                return []
+            node = child
+        return node.names[:limit]
+
+
 def reference_statuses(text: str, names: Iterable[str]) -> list[VariableReferenceStatus]:
     """Classify malformed or unavailable references without resolving their values."""
     known = set(names)
@@ -68,9 +108,14 @@ class VariableAutocompleteLineEdit(QLineEdit):
         *,
         metrics: MetricsTrackerProtocol | None = None,
         context: str = "query",
+        candidate_limit: int = 30,
     ):
         super().__init__(parent)
         self._variables = list(variables or [])
+        if candidate_limit <= 0:
+            raise ValueError("candidate_limit must be positive")
+        self._candidate_limit = candidate_limit
+        self._variable_index = _PrefixTrie(self._variables)
         self._metrics = resolve_metrics(metrics)
         self._context = context
         self._popup = QListWidget(self)
@@ -81,6 +126,7 @@ class VariableAutocompleteLineEdit(QLineEdit):
 
     def set_variables(self, variables: Iterable[str]) -> None:
         self._variables = list(variables)
+        self._variable_index.rebuild(self._variables)
 
     def is_popup_visible(self) -> bool:
         return self._popup.isVisible()
@@ -115,9 +161,7 @@ class VariableAutocompleteLineEdit(QLineEdit):
             self.dismiss_popup()
             return
         token = match.group(1)
-        candidates = [
-            name for name in self._variables if name.upper().startswith(token.upper())
-        ]
+        candidates = self._variable_index.matches(token, self._candidate_limit)
         logger.debug(
             "variable_autocomplete_triggered context=%s candidates=%d",
             self._context,
