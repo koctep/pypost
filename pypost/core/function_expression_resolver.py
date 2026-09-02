@@ -6,10 +6,13 @@ import re
 from typing import Any
 
 from pypost.core.function_registry import FunctionRegistry
-from pypost.core.template_expression_tokenizer import (
-    TEMPLATE_PLACEHOLDER_PATTERN,
-    tokenize_template_expressions,
+from pypost.core.template_expression_parser import (
+    function_names,
+    identifier_names,
+    lex_template_expressions,
+    split_single_argument,
 )
+from pypost.core.template_expression_tokenizer import tokenize_template_expressions
 from pypost.core.template_expression_types import (
     ExpressionFailureProvenance,
     IntegerConversionError,
@@ -36,21 +39,27 @@ class FunctionExpressionResolver:
         r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$"
     )
     _FUNCTION_SIGNATURE_RE = re.compile(r"^(?P<func>[a-zA-Z_][a-zA-Z0-9_]*)\((?P<args>.*)\)$")
-    _FUNCTION_CALL_NAME_RE = re.compile(r"(?<!\.)\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(")
-    _IDENTIFIER_RE = re.compile(r"(?<!\.)\b([a-zA-Z_][a-zA-Z0-9_]*)\b")
 
     def __init__(self, registry: FunctionRegistry) -> None:
         self._registry = registry
 
     def extract_function_names(self, expression: str) -> list[str]:
         """Extract all function names called in expression (outer and nested)."""
-        return self._FUNCTION_CALL_NAME_RE.findall(expression)
+        return list(function_names(expression))
 
     def contains_strict_function(self, expression: str) -> bool:
         """Return True if any function in the expression is a strict conversion function."""
         return any(
             self._registry.is_strict_conversion(fn)
             for fn in self.extract_function_names(expression)
+        )
+
+    def _strict_function_name(self, expression: str) -> str | None:
+        """Return the first strict function called by an expression, if any."""
+        return next(
+            (name for name in self.extract_function_names(expression)
+             if self._registry.is_strict_conversion(name)),
+            None,
         )
 
     def validate_content(self, content: str) -> ValidationResult:
@@ -66,18 +75,9 @@ class FunctionExpressionResolver:
                 is_strict = False
                 if func_name and self._registry.is_strict_conversion(func_name):
                     is_strict = True
-                elif self.contains_strict_function(expression):
+                elif (strict_func := self._strict_function_name(expression)) is not None:
                     is_strict = True
-                    strict_func = next(
-                        (
-                            fn
-                            for fn in self.extract_function_names(expression)
-                            if self._registry.is_strict_conversion(fn)
-                        ),
-                        None,
-                    )
-                    if strict_func:
-                        func_name = strict_func
+                    func_name = strict_func
 
                 if is_strict:
                     logger.debug(
@@ -114,18 +114,9 @@ class FunctionExpressionResolver:
         is_strict = False
         if func_name and self._registry.is_strict_conversion(func_name):
             is_strict = True
-        elif self.contains_strict_function(expr):
+        elif (strict_func := self._strict_function_name(expr)) is not None:
             is_strict = True
-            strict_func = next(
-                (
-                    fn
-                    for fn in self.extract_function_names(expr)
-                    if self._registry.is_strict_conversion(fn)
-                ),
-                None,
-            )
-            if strict_func:
-                func_name = strict_func
+            func_name = strict_func
 
         code = validation_error.code or "invalid_syntax"
         if is_strict:
@@ -159,39 +150,39 @@ class FunctionExpressionResolver:
                 if prov:
                     failures.append(prov)
         else:
-            for match in TEMPLATE_PLACEHOLDER_PATTERN.finditer(content):
-                span = match.span()
+            for token in lex_template_expressions(content):
+                if not token.closed:
+                    continue
+                span = (token.start, token.end)
                 completed_spans.append(span)
-                expr = match.group(1)
+                expr = token.expression
                 prov = self._inspect_single_expression(expr, span=span)
                 if prov:
                     failures.append(prov)
 
         if "{{" in content:
-            for match in re.finditer(r"\{\{", content):
-                start_idx = match.start()
+            for token in lex_template_expressions(content):
+                if token.closed:
+                    continue
+                start_idx = token.start
                 if any(c_start <= start_idx < c_end for c_start, c_end in completed_spans):
                     continue
 
-                next_delim = content.find("{{", start_idx + 2)
-                end_idx = next_delim if next_delim != -1 else len(content)
-                unclosed_expr = content[start_idx + 2:end_idx].strip()
+                end_idx = token.end
+                unclosed_expr = token.expression
                 funcs = self.extract_function_names(unclosed_expr)
                 func_name: str | None = None
                 if funcs:
                     func_name = funcs[0]
-                    strict_func = next(
-                        (fn for fn in funcs if self._registry.is_strict_conversion(fn)),
-                        None,
-                    )
+                    strict_func = self._strict_function_name(unclosed_expr)
                     if strict_func:
                         func_name = strict_func
                         is_strict = True
                     else:
                         is_strict = False
                 else:
-                    ident_match = self._IDENTIFIER_RE.search(unclosed_expr)
-                    first_ident = ident_match.group(1) if ident_match else None
+                    identifiers = identifier_names(unclosed_expr)
+                    first_ident = identifiers[0] if identifiers else None
                     func_name = first_ident
                     is_strict = bool(
                         first_ident and self._registry.is_strict_conversion(first_ident)
@@ -297,12 +288,4 @@ class FunctionExpressionResolver:
         Returns single argument preserving nested call expression support.
         Returns None when there are multiple top-level arguments.
         """
-        depth = 0
-        for char in args:
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth = max(0, depth - 1)
-            elif char == "," and depth == 0:
-                return None
-        return args.strip()
+        return split_single_argument(args)

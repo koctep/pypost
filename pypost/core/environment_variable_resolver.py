@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any
 
+from pypost.core.template_expression_parser import identifier_names
 from pypost.core.template_expression_tokenizer import tokenize_template_expressions
+
 
 if TYPE_CHECKING:
     from pypost.core.template_service import TemplateService
@@ -13,7 +14,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_VARIABLE_RESOLUTION_DEPTH = 32
-_IDENTIFIER_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
 
 
 def _extract_referenced_keys(template_str: str, available_keys: set[str]) -> set[str]:
@@ -21,8 +21,7 @@ def _extract_referenced_keys(template_str: str, available_keys: set[str]) -> set
     expressions = tokenize_template_expressions(template_str)
     referenced = set()
     for expr in expressions:
-        for match in _IDENTIFIER_RE.finditer(expr):
-            token = match.group(0)
+        for token in identifier_names(expr):
             if token in available_keys:
                 referenced.add(token)
     return referenced

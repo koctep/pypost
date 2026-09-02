@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from pypost.core.template_expression_parser import lex_template_expressions
+
 TEMPLATE_PLACEHOLDER_PATTERN = re.compile(r"\{\{\s*(.*?)\s*\}\}")
 
 # Plain ``{{name}}`` tokens with no inner whitespace — fast hover lookup (PYPOST-113).
@@ -19,7 +21,7 @@ def tokenize_template_expressions(content: str) -> list[str]:
     Matches the legacy ``re.findall(r"\\{\\{\\s*(.*?)\\s*\\}\\}", content)`` contract:
     non-greedy inner capture with optional surrounding whitespace inside delimiters.
     """
-    return TEMPLATE_PLACEHOLDER_PATTERN.findall(content)
+    return [token.expression for token in lex_template_expressions(content) if token.closed]
 
 
 def is_plain_variable_token(token: str) -> bool:
