@@ -9,6 +9,13 @@ safe, parameter-specific diagnostics for invalid calls.
 This guide covers the implementation delivered by PYPOST-1100. General server
 transport and lifecycle details remain in [MCP Integration](mcp_integration.md).
 
+The proxy lifecycle refactor delivered by PYPOST-1102 routes tool, prompt, and
+resource forwarding through one `_dispatch_proxy_operation` boundary. The public
+methods retain their existing signatures and result shapes; the shared boundary
+owns header resolution, upstream cleanup, timeout/network mapping, timing,
+metrics, activity entries, and safe completion logs. It does not add connection
+pooling, so per-request upstream initialization remains the PYPOST-1101 scope.
+
 ## Architecture
 
 The call flow has one application-owned validation boundary:

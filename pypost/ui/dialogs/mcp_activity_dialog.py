@@ -18,7 +18,7 @@ from pypost.core.mcp_activity_log import McpActivityEntry
 
 
 class McpActivityDialog(QDialog):
-    """Read-only table of recent list_tools and call_tool operations."""
+    """Read-only table of recent MCP protocol operations."""
 
     _COLUMNS = ("Time", "Operation", "Tool", "Details", "Outcome")
 
@@ -71,7 +71,7 @@ class McpActivityDialog(QDialog):
         else:
             summary = (
                 "No MCP activity recorded yet. Operations appear when an agent "
-                "calls list_tools or call_tool while the server is running."
+                "uses the MCP server while it is running."
             )
         self._summary_label.setText(summary)
 

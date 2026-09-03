@@ -9,9 +9,9 @@ import contextlib
 import logging
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import httpx
 from mcp.client.session import ClientSession
@@ -135,295 +135,277 @@ class MCPProxyServerImpl:
                         await session.initialize()
                         yield session
 
-    async def list_tools(self) -> list[Any]:
-        started = time.perf_counter()
-        logger.debug("mcp_proxy_list_tools_started proxy=%s", self.name)
-        try:
-            resolved_headers = self._resolve_headers()
-        except McpUnresolvedVariableError:
-            duration_ms = (time.perf_counter() - started) * 1000.0
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry(
-                        id=str(uuid.uuid4()),
-                        timestamp=datetime.now(timezone.utc),
-                        operation="list_tools",
-                        outcome="error",
-                        detail="Proxy variable could not be resolved",
-                        duration_ms=duration_ms,
-                    )
-                )
-            raise
-
-        try:
-            async with self._connect_upstream(resolved_headers) as session:
-                result = await session.list_tools()
-                tools = getattr(result, "tools", result)
-                tools_list: list[Any] = (
-                    list(tools) if isinstance(tools, (list, tuple)) else list(tools or [])
-                )
-                duration_ms = (time.perf_counter() - started) * 1000.0
-                logger.info(
-                    "mcp_proxy_list_tools_success proxy=%s tool_count=%d duration_ms=%.2f",
-                    self.name,
-                    len(tools_list),
-                    duration_ms,
-                )
-                if self._activity_log is not None:
-                    self._activity_log.append(
-                        McpActivityEntry.new_list_tools(len(tools_list))
-                    )
-                return tools_list
-        except (httpx.TimeoutException, TimeoutError) as exc:
-            duration_ms = (time.perf_counter() - started) * 1000.0
-            logger.error(
-                "mcp_proxy_list_tools_timeout proxy=%s duration_ms=%.2f",
-                self.name,
-                duration_ms,
-            )
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry(
-                        id=str(uuid.uuid4()),
-                        timestamp=datetime.now(timezone.utc),
-                        operation="list_tools",
-                        outcome="error",
-                        detail="Upstream request timed out",
-                        duration_ms=duration_ms,
-                    )
-                )
-            raise TimeoutError(f"Upstream MCP server timed out: {exc}") from exc
-        except (httpx.ConnectError, httpx.NetworkError) as exc:
-            duration_ms = (time.perf_counter() - started) * 1000.0
-            logger.error(
-                "mcp_proxy_list_tools_connect_error proxy=%s duration_ms=%.2f",
-                self.name,
-                duration_ms,
-            )
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry(
-                        id=str(uuid.uuid4()),
-                        timestamp=datetime.now(timezone.utc),
-                        operation="list_tools",
-                        outcome="error",
-                        detail="Upstream connection failed",
-                        duration_ms=duration_ms,
-                    )
-                )
-            raise httpx.ConnectError(f"Connection failed to upstream MCP server: {exc}") from exc
-        except Exception as exc:
-            duration_ms = (time.perf_counter() - started) * 1000.0
-            logger.error(
-                "mcp_proxy_list_tools_error proxy=%s category=%s duration_ms=%.2f",
-                self.name,
-                type(exc).__name__,
-                duration_ms,
-            )
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry(
-                        id=str(uuid.uuid4()),
-                        timestamp=datetime.now(timezone.utc),
-                        operation="list_tools",
-                        outcome="error",
-                        detail="Upstream operation failed",
-                        duration_ms=duration_ms,
-                    )
-                )
-            raise
-
-    async def call_tool(self, name: str, arguments: dict | None = None) -> Any:
-        mcp_args = dict(arguments or {})
+    async def _dispatch_proxy_operation(
+        self,
+        operation: str,
+        callback: Callable[[ClientSession], Awaitable[Any]],
+        *,
+        tool_name: str | None = None,
+        mcp_arg_count: int | None = None,
+    ) -> Any:
+        """Run one upstream operation with common lifecycle and observability."""
         started = time.perf_counter()
         self._metrics.track_mcp_request_received("POST")
+        logger.debug(
+            "mcp_proxy_operation_started proxy=%s operation=%s",
+            self.name,
+            operation,
+        )
+
         try:
             resolved_headers = self._resolve_headers()
+            async with self._connect_upstream(resolved_headers) as session:
+                result = await callback(session)
         except McpUnresolvedVariableError:
             duration_ms = (time.perf_counter() - started) * 1000.0
-            self._metrics.track_mcp_response_sent("POST", "error")
-            self._metrics.track_mcp_tool_call_duration("POST", "error", duration_ms / 1000.0)
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry.new_call_tool(
-                        name,
-                        outcome="error",
-                        mcp_arg_count=len(mcp_args),
-                        detail="Proxy variable could not be resolved",
-                        duration_ms=duration_ms,
-                    )
-                )
+            self._record_proxy_failure(
+                operation,
+                "error",
+                "Proxy variable could not be resolved",
+                duration_ms,
+                tool_name=tool_name,
+                mcp_arg_count=mcp_arg_count,
+            )
             raise
-
-        try:
-            async with self._connect_upstream(resolved_headers) as session:
-                result = await session.call_tool(name, mcp_args)
-                duration_ms = (time.perf_counter() - started) * 1000.0
-                is_error = getattr(result, "isError", False)
-                outcome = "error" if is_error else "success"
-
-                self._metrics.track_mcp_response_sent("POST", outcome)
-                self._metrics.track_mcp_tool_call_duration("POST", outcome, duration_ms / 1000.0)
-
-                logger.info(
-                    "mcp_proxy_call_tool_completed proxy=%s tool=%s outcome=%s duration_ms=%.2f",
-                    self.name,
-                    name,
-                    outcome,
-                    duration_ms,
-                )
-
-                if self._activity_log is not None:
-                    sanitized_headers = sanitize_proxy_headers(
-                        self.headers,
-                        env_vars=self._variable_supplier(),
-                        hidden_keys=self._hidden_keys_supplier(),
-                    )
-                    self._activity_log.append(
-                        McpActivityEntry.new_call_tool(
-                            name,
-                            outcome=outcome,
-                            mcp_arg_count=len(mcp_args),
-                            detail=f"Headers: {sanitized_headers}" if sanitized_headers else None,
-                            duration_ms=duration_ms,
-                        )
-                    )
-                return result
         except (httpx.TimeoutException, TimeoutError) as exc:
             duration_ms = (time.perf_counter() - started) * 1000.0
-            self._metrics.track_mcp_response_sent("POST", "error")
-            self._metrics.track_mcp_tool_call_duration("POST", "error", duration_ms / 1000.0)
-            logger.error(
-                "mcp_proxy_call_tool_timeout proxy=%s tool=%s duration_ms=%.2f",
-                self.name,
-                name,
+            self._record_proxy_failure(
+                operation,
+                "timeout",
+                "Upstream request timed out",
                 duration_ms,
+                tool_name=tool_name,
+                mcp_arg_count=mcp_arg_count,
             )
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry.new_call_tool(
-                        name,
-                        outcome="error",
-                        mcp_arg_count=len(mcp_args),
-                        detail="Upstream request timed out",
-                        duration_ms=duration_ms,
-                    )
-                )
             raise TimeoutError(f"Upstream MCP server timed out: {exc}") from exc
         except (httpx.ConnectError, httpx.NetworkError) as exc:
             duration_ms = (time.perf_counter() - started) * 1000.0
-            self._metrics.track_mcp_response_sent("POST", "error")
-            self._metrics.track_mcp_tool_call_duration("POST", "error", duration_ms / 1000.0)
-            logger.error(
-                "mcp_proxy_call_tool_connect_error proxy=%s tool=%s "
-                "duration_ms=%.2f",
-                self.name,
-                name,
+            self._record_proxy_failure(
+                operation,
+                "connect_error",
+                "Upstream connection failed",
                 duration_ms,
+                tool_name=tool_name,
+                mcp_arg_count=mcp_arg_count,
             )
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry.new_call_tool(
-                        name,
-                        outcome="error",
-                        mcp_arg_count=len(mcp_args),
-                        detail="Upstream connection failed",
-                        duration_ms=duration_ms,
-                    )
-                )
-            raise httpx.ConnectError(f"Connection failed to upstream MCP server: {exc}") from exc
-        except Exception as exc:
+            raise httpx.ConnectError(
+                f"Connection failed to upstream MCP server: {exc}"
+            ) from exc
+        except Exception:
             duration_ms = (time.perf_counter() - started) * 1000.0
-            self._metrics.track_mcp_response_sent("POST", "error")
-            self._metrics.track_mcp_tool_call_duration("POST", "error", duration_ms / 1000.0)
-            logger.error(
-                "mcp_proxy_call_tool_error proxy=%s tool=%s category=%s duration_ms=%.2f",
-                self.name,
-                name,
-                type(exc).__name__,
+            self._record_proxy_failure(
+                operation,
+                "error",
+                "Upstream operation failed",
                 duration_ms,
+                tool_name=tool_name,
+                mcp_arg_count=mcp_arg_count,
             )
-            if self._activity_log is not None:
-                self._activity_log.append(
-                    McpActivityEntry.new_call_tool(
-                        name,
-                        outcome="error",
-                        mcp_arg_count=len(mcp_args),
-                        detail="Upstream operation failed",
-                        duration_ms=duration_ms,
-                    )
-                )
             raise
 
-    async def list_prompts(self) -> list[Any]:
-        started = time.perf_counter()
-        logger.debug("mcp_proxy_list_prompts_started proxy=%s", self.name)
-        resolved_headers = self._resolve_headers()
-        async with self._connect_upstream(resolved_headers) as session:
-            result = await session.list_prompts()
-            prompts = getattr(result, "prompts", result)
-            prompts_list = (
-                list(prompts) if isinstance(prompts, (list, tuple)) else list(prompts or [])
+        duration_ms = (time.perf_counter() - started) * 1000.0
+        outcome = (
+            "error"
+            if operation == "call_tool" and getattr(result, "isError", False) is True
+            else "success"
+        )
+        self._metrics.track_mcp_response_sent("POST", outcome)
+        if operation == "call_tool":
+            self._metrics.track_mcp_tool_call_duration(
+                "POST", outcome, duration_ms / 1000.0
             )
-            duration_ms = (time.perf_counter() - started) * 1000.0
+        self._record_proxy_activity(
+            operation,
+            outcome,
+            duration_ms,
+            tool_name=tool_name,
+            mcp_arg_count=mcp_arg_count,
+            result=result,
+        )
+        self._log_proxy_success(
+            operation,
+            outcome,
+            duration_ms,
+            tool_name=tool_name,
+            result=result,
+        )
+        return result
+
+    def _record_proxy_failure(
+        self,
+        operation: str,
+        log_suffix: str,
+        detail: str,
+        duration_ms: float,
+        *,
+        tool_name: str | None,
+        mcp_arg_count: int | None,
+    ) -> None:
+        self._metrics.track_mcp_response_sent("POST", "error")
+        if operation == "call_tool":
+            self._metrics.track_mcp_tool_call_duration(
+                "POST", "error", duration_ms / 1000.0
+            )
+        logger.error(
+            "mcp_proxy_%s_%s proxy=%s%s duration_ms=%.2f",
+            operation,
+            log_suffix,
+            self.name,
+            f" tool={tool_name}" if tool_name is not None else "",
+            duration_ms,
+        )
+        self._record_proxy_activity(
+            operation,
+            "error",
+            duration_ms,
+            tool_name=tool_name,
+            mcp_arg_count=mcp_arg_count,
+            detail=detail,
+        )
+
+    def _record_proxy_activity(
+        self,
+        operation: str,
+        outcome: str,
+        duration_ms: float,
+        *,
+        tool_name: str | None,
+        mcp_arg_count: int | None,
+        result: Any = None,
+        detail: str | None = None,
+    ) -> None:
+        if self._activity_log is None:
+            return
+        if operation == "call_tool" and outcome == "success":
+            sanitized_headers = sanitize_proxy_headers(
+                self.headers,
+                env_vars=self._variable_supplier(),
+                hidden_keys=self._hidden_keys_supplier(),
+            )
+            if sanitized_headers:
+                detail = f"Headers: {sanitized_headers}"
+        tool_count = (
+            len(result)
+            if operation == "list_tools" and isinstance(result, (list, tuple))
+            else None
+        )
+        self._activity_log.append(
+            McpActivityEntry(
+                id=str(uuid.uuid4()),
+                timestamp=datetime.now(timezone.utc),
+                operation=operation,
+                outcome=outcome,
+                tool_name=tool_name,
+                tool_count=tool_count,
+                mcp_arg_count=mcp_arg_count,
+                detail=McpActivityEntry._sanitize_detail(detail),
+                duration_ms=duration_ms,
+            )
+        )
+
+    def _log_proxy_success(
+        self,
+        operation: str,
+        outcome: str,
+        duration_ms: float,
+        *,
+        tool_name: str | None,
+        result: Any,
+    ) -> None:
+        if operation == "list_tools":
+            logger.info(
+                "mcp_proxy_list_tools_success proxy=%s tool_count=%d duration_ms=%.2f",
+                self.name,
+                len(result),
+                duration_ms,
+            )
+        elif operation == "list_prompts":
             logger.info(
                 "mcp_proxy_list_prompts_success proxy=%s prompt_count=%d duration_ms=%.2f",
                 self.name,
-                len(prompts_list),
+                len(result),
                 duration_ms,
             )
-            return prompts_list
-
-    async def get_prompt(self, name: str, arguments: dict | None = None) -> Any:
-        started = time.perf_counter()
-        logger.debug("mcp_proxy_get_prompt_started proxy=%s prompt=%s", self.name, name)
-        resolved_headers = self._resolve_headers()
-        async with self._connect_upstream(resolved_headers) as session:
-            res = await session.get_prompt(name, arguments or {})
-            duration_ms = (time.perf_counter() - started) * 1000.0
+        elif operation == "list_resources":
+            logger.info(
+                "mcp_proxy_list_resources_success proxy=%s resource_count=%d duration_ms=%.2f",
+                self.name,
+                len(result),
+                duration_ms,
+            )
+        elif operation == "call_tool":
+            logger.info(
+                "mcp_proxy_call_tool_completed proxy=%s tool=%s outcome=%s duration_ms=%.2f",
+                self.name,
+                tool_name,
+                outcome,
+                duration_ms,
+            )
+        elif operation == "get_prompt":
             logger.info(
                 "mcp_proxy_get_prompt_completed proxy=%s prompt=%s duration_ms=%.2f",
                 self.name,
-                name,
+                tool_name,
                 duration_ms,
             )
-            return res
+        else:
+            logger.info(
+                "mcp_proxy_read_resource_completed proxy=%s uri=%s duration_ms=%.2f",
+                self.name,
+                tool_name,
+                duration_ms,
+            )
+
+    async def list_tools(self) -> list[Any]:
+        async def invoke(session: ClientSession) -> list[Any]:
+            result = await session.list_tools()
+            tools = getattr(result, "tools", result)
+            return list(tools) if isinstance(tools, (list, tuple)) else list(tools or [])
+
+        return cast(list[Any], await self._dispatch_proxy_operation("list_tools", invoke))
+
+    async def call_tool(self, name: str, arguments: dict | None = None) -> Any:
+        mcp_args = dict(arguments or {})
+        return await self._dispatch_proxy_operation(
+            "call_tool",
+            lambda session: session.call_tool(name, mcp_args),
+            tool_name=name,
+            mcp_arg_count=len(mcp_args),
+        )
+
+    async def list_prompts(self) -> list[Any]:
+        async def invoke(session: ClientSession) -> list[Any]:
+            result = await session.list_prompts()
+            prompts = getattr(result, "prompts", result)
+            return list(prompts) if isinstance(prompts, (list, tuple)) else list(prompts or [])
+
+        return cast(list[Any], await self._dispatch_proxy_operation("list_prompts", invoke))
+
+    async def get_prompt(self, name: str, arguments: dict | None = None) -> Any:
+        return await self._dispatch_proxy_operation(
+            "get_prompt",
+            lambda session: session.get_prompt(name, arguments or {}),
+            tool_name=name,
+        )
 
     async def list_resources(self) -> list[Any]:
-        started = time.perf_counter()
-        logger.debug("mcp_proxy_list_resources_started proxy=%s", self.name)
-        resolved_headers = self._resolve_headers()
-        async with self._connect_upstream(resolved_headers) as session:
+        async def invoke(session: ClientSession) -> list[Any]:
             result = await session.list_resources()
             resources = getattr(result, "resources", result)
-            resources_list = (
+            return (
                 list(resources)
                 if isinstance(resources, (list, tuple))
                 else list(resources or [])
             )
-            duration_ms = (time.perf_counter() - started) * 1000.0
-            logger.info(
-                "mcp_proxy_list_resources_success proxy=%s resource_count=%d duration_ms=%.2f",
-                self.name,
-                len(resources_list),
-                duration_ms,
-            )
-            return resources_list
+
+        return cast(list[Any], await self._dispatch_proxy_operation("list_resources", invoke))
 
     async def read_resource(self, uri: Any) -> Any:
-        started = time.perf_counter()
-        logger.debug("mcp_proxy_read_resource_started proxy=%s uri=%s", self.name, uri)
-        resolved_headers = self._resolve_headers()
-        async with self._connect_upstream(resolved_headers) as session:
-            res = await session.read_resource(uri)
-            duration_ms = (time.perf_counter() - started) * 1000.0
-            logger.info(
-                "mcp_proxy_read_resource_completed proxy=%s uri=%s duration_ms=%.2f",
-                self.name,
-                uri,
-                duration_ms,
-            )
-            return res
+        return await self._dispatch_proxy_operation(
+            "read_resource",
+            lambda session: session.read_resource(uri),
+            tool_name=str(uri),
+        )
 
     def create_app(self) -> Starlette:
         mcp_route, lifespan = build_streamable_http_route(self.server)

@@ -22,7 +22,7 @@ class McpActivityEntry:
 
     id: str
     timestamp: datetime
-    operation: str  # "list_tools" | "call_tool"
+    operation: str  # MCP protocol operation, such as "list_tools" or "call_tool"
     outcome: str  # "success" | "error" | "validation_error"
     tool_name: str | None = None
     tool_count: int | None = None
