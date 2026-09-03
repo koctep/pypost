@@ -28,7 +28,10 @@
   - Residual debt and scope assessment are recorded in `60-tech-debt.md`.
 - [x] **STEP 8: Dev Docs**
   - Updated `doc/dev/testability.md`; details are recorded in `70-dev-docs.md`.
-- [/] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
+  - Commit `43b27c69` contains the shared helper extraction, generic proof,
+    metrics-test migration, documentation, and task artifacts.
+  - Focused tests, lint, typecheck, and AI-task verification passed.
 
 ## Status Legend
 
