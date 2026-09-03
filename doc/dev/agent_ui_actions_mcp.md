@@ -434,6 +434,9 @@ make test PYTEST_ARGS='tests/test_agent_ui_attach.py -v'
 make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -v'
 make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -m slow -v'
 
+# Stdio call_tool click/fill smoke (PYPOST-992)
+make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -m agent_e2e -v'
+
 # Product MCP catalog must exclude ui_* tools (PYPOST-953)
 make test PYTEST_ARGS=\
   'tests/test_mcp_server_impl.py -k test_list_tools_excludes_agent_ui -v'

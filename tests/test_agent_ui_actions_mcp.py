@@ -222,3 +222,45 @@ def test_stdio_sidecar_lists_ui_action_tools() -> None:
 
     names = anyio.run(_list)
     assert set(names) == _EXPECTED_TOOLS
+
+
+@pytest.mark.agent_e2e
+@pytest.mark.timeout(120)
+def test_stdio_sidecar_calls_ui_click_and_fill() -> None:
+    """Spawn sidecar subprocess; call_tool drives real click and fill widgets."""
+    env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "pypost.agent.ui_actions_mcp"],
+        env=env,
+    )
+
+    async def _call_actions() -> tuple[str, str]:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                with anyio.fail_after(20):
+                    fill_result = await session.call_tool(
+                        "ui_fill",
+                        {
+                            "widget_id": "pypost_url_input",
+                            "text": "https://agent-ui.example/",
+                            "in_current_tab": True,
+                        },
+                    )
+                with anyio.fail_after(20):
+                    click_result = await session.call_tool(
+                        "ui_click",
+                        {
+                            "widget_id": "pypost_url_input",
+                            "in_current_tab": True,
+                        },
+                    )
+                return (
+                    fill_result.content[0].text,
+                    click_result.content[0].text,
+                )
+
+    fill_text, click_text = anyio.run(_call_actions)
+    assert fill_text == '{"ok": true}'
+    assert click_text == '{"ok": true}'
