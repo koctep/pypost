@@ -432,11 +432,25 @@ Explicit differentiation:
 **Unclassified, non-reproduced report**: not every filed failure fits one of the four classes
 above. A segfault originally filed against `tests/test_ui_wait.py` (isolated subprocess) was
 investigated under [PYPOST-1152](https://pypost.atlassian.net/browse/PYPOST-1152) and did not
-reproduce (47/47 clean runs across 4 invocation shapes; code review found no PyPost-owned defect
-pattern matching Classes 1-4). It is deliberately left unclassified rather than force-fit into an
-existing class — see
-[GUI testing § Troubleshooting](gui_testing.md#troubleshooting) for the full row and the
-`tests/test_ui_wait_stress.py` regression guard.
+reproduce: 47/47 clean runs covered five invocation shapes — direct `pytest`,
+`make test PYTEST_ARGS=...`, full-suite embedding, genuine concurrent multi-subprocess load, and
+a final standalone rerun. Code review found no PyPost-owned defect pattern matching Classes 1-4,
+so the report remains deliberately unclassified rather than being force-fit into an existing
+class.
+
+The existing `tests/test_ui_wait_stress.py` is a green, slow-marked conditional guard for a future
+recurrence. Run it with:
+
+```bash
+PYTHONFAULTHANDLER=1 make test-slow PYTEST_ARGS='tests/test_ui_wait_stress.py -m slow'
+```
+
+A green result means the follow-up remains dormant and requires no action; no PyPost-owned defect
+is assumed. If a future run turns red, first preserve each child's stdout and stderr, including
+limited Python `faulthandler` diagnostics, before rerunning or interpreting the result. A red
+result starts a focused investigation; it does not establish a segfault, cause, or ownership.
+See [GUI testing § Troubleshooting](gui_testing.md#troubleshooting) for the guard's failure
+handling and the full historical context.
 
 #### Implemented Stabilization Architecture & Resolution (FIX-1 / PYPOST-1217)
 

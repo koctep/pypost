@@ -298,7 +298,27 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
 | ELF `core` file in repo root | Native crash (SIGSEGV), not a Python exception. Delete the file; do not commit. Repo-root `/core` is gitignored. Run tests via `make test` or set `QT_QPA_PLATFORM=offscreen`. If it recurs, capture `lldb -c core --batch -o bt` and file a ticket with Python/PySide6 versions. See [PYPOST-429 investigation](../../ai-tasks/PYPOST-429/investigation-report.md). |
 | Large-batch `apply_theme` segfault | Ticketed under epic [PYPOST-1117](https://pypost.atlassian.net/browse/PYPOST-1117): [PYPOST-1212](https://pypost.atlassian.net/browse/PYPOST-1212) (repro), [PYPOST-1213](https://pypost.atlassian.net/browse/PYPOST-1213) (diagnosis), [PYPOST-1214](https://pypost.atlassian.net/browse/PYPOST-1214) (mitigation + CI ownership). See [Large-Batch GUI apply_theme Segfault](gui_batch_segfault.md) for repro procedures, evidence baseline, and pass/fail contrast. |
 | Flaky `test_live_collection_tree_missing_option_raises` (parallel `make test`) | Ticketed under epic [PYPOST-1188](https://pypost.atlassian.net/browse/PYPOST-1188): [PYPOST-1215](https://pypost.atlassian.net/browse/PYPOST-1215) (repro), [PYPOST-1216](https://pypost.atlassian.net/browse/PYPOST-1216) (diagnosis), [PYPOST-1217](https://pypost.atlassian.net/browse/PYPOST-1217) (fix). Stabilized in PYPOST-1217 via post-ready event loop flush in `AgentAppSession.start()` and tree realization settlement in `_select_tree()`. See [Testing § Collection tree root cause](testing.md#collection-tree-parallel-flake-root-cause-pypost-1216). |
-| Segfault originally filed against `tests/test_ui_wait.py` in isolated subprocess | Investigated under [PYPOST-1152](https://pypost.atlassian.net/browse/PYPOST-1152); does not currently reproduce — 47/47 clean runs across 4 invocation shapes (direct `pytest`, `make test PYTEST_ARGS=...`, full-suite embedding, concurrent multi-subprocess) and a full code-review pass found no PyPost-owned defect pattern. This is an unclassified, non-reproduced report — it does not cleanly fit the `apply_theme` (PYPOST-1117), `SettingsDialog` GC double-free (PYPOST-1040/1115), port-collision, or event-loop-starvation (PYPOST-1188/1216) classes above, so it is not force-fit into any of them. `tests/test_ui_wait_stress.py` now guards for a future recurrence (green at creation, no `xfail`; run via `make test-slow` / `pytest -m slow`); if it ever goes red, its captured stdout/stderr/`PYTHONFAULTHANDLER` traceback is the starting forensic evidence — see [PYPOST-1152 architecture](../../ai-tasks/PYPOST-1152/20-architecture.md). |
+| UI-wait segfault report | See the PYPOST-1152 note below. |
+
+The historical `tests/test_ui_wait.py` segfault report remains unclassified and non-reproduced.
+[PYPOST-1152](https://pypost.atlassian.net/browse/PYPOST-1152) recorded 47/47 clean runs across
+five invocation shapes: direct `pytest`, `make test PYTEST_ARGS=...`, full-suite embedding,
+genuine concurrent multi-subprocess load, and a final standalone rerun. Code review found no
+PyPost-owned defect pattern, so the report is not force-fit into the failure classes above.
+
+The existing `tests/test_ui_wait_stress.py` is a green, slow-marked conditional guard for a future
+recurrence. Run it with:
+
+```bash
+PYTHONFAULTHANDLER=1 make test-slow PYTEST_ARGS='tests/test_ui_wait_stress.py -m slow'
+```
+
+A green result means this follow-up remains dormant and requires no action; no PyPost-owned defect
+is assumed. If a future run turns red, first preserve each child's stdout and stderr, including
+limited Python `faulthandler` diagnostics, before rerunning or interpreting the result. The red
+result activates a focused investigation but does not establish a segfault, cause, or ownership.
+See [PYPOST-1152 architecture](../../ai-tasks/PYPOST-1152/20-architecture.md) for the evidence
+boundary and future-red workflow.
 
 ## Agent UI e2e (in-process)
 
