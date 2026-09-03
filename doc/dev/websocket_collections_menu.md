@@ -172,4 +172,4 @@ Harness: `tests/helpers/collections_tree.py` (`make_websocket`, `build_isolated_
 | [PYPOST-1158](https://pypost.atlassian.net/browse/PYPOST-1158) | Blank WebSocket draft tabs |
 | [PYPOST-1161](https://pypost.atlassian.net/browse/PYPOST-1161) | Save / Save As to collection |
 | [PYPOST-1163](https://pypost.atlassian.net/browse/PYPOST-1163) | User documentation |
-| [PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184) | `tabs_presenter` insert-before-plus extract (still open) |
+| [PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184) | `tabs_presenter` insert-before-plus extract (`tabs_presenter_insert.py`) |

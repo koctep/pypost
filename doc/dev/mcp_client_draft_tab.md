@@ -101,8 +101,14 @@ import `request_editor`. See
   text. Image/audio blocks are `[image content]` / `[audio content]`.
 - **`TabsPresenter`**: thin factory + duck-typed close teardown and env
   fan-out. Chrome must not live in `tabs_presenter.py` (LOC cap **1165**;
-  measured **1059 / 1165**, PYPOST-1194). PYPOST-1169 and PYPOST-1170 do
-  **not** edit this file.
+  measured **1039 / 1165** after
+  [PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184)).
+  PYPOST-1169 and PYPOST-1170 do **not** edit this file.
+- **`tabs_presenter_insert.py::insert_tab_before_plus(presenter, tab, name,
+  *, save_state=True)`** (PYPOST-1184) — `_insert_mcp_client_tab`'s
+  insert-before-plus/append/focus/conditional-save tail, shared with
+  `add_new_tab` and `_insert_websocket_tab`. Pure LOC extraction, no
+  behavior change.
 
 ```mermaid
 flowchart TB
@@ -767,11 +773,11 @@ from the GUI thread.
 ### `tabs_presenter.py` exceeds 1165 LOC
 
 Chrome belongs in `pypost/ui/widgets/mcp_client/` and
-`mcp_client_presenter.py`. Extract shared insert-before-plus before
-growing the presenter. Current snapshot is **1059 / 1165** (PYPOST-1194).
-Canonical inventory:
-`ai-tasks/PYPOST-376/baseline-metrics.md`. Prefer extraction before
-raising again (PYPOST-1184). PYPOST-1169 and PYPOST-1170 must not edit
+`mcp_client_presenter.py`. Shared insert-before-plus is extracted to
+`tabs_presenter_insert.py` (PYPOST-1184); do not re-inline it. Current
+snapshot is **1039 / 1165**. Canonical inventory:
+`ai-tasks/PYPOST-376/baseline-metrics.md`. Prefer further extraction
+before raising the cap again. PYPOST-1169 and PYPOST-1170 must not edit
 this file.
 
 ### User docs still omit Invoke

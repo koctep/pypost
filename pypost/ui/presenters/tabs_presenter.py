@@ -37,6 +37,7 @@ from pypost.ui.presenters.tab_dirty import (
     mcp_client_snapshot_from_tab,
 )
 from pypost.ui.presenters.tabs_presenter_close import close_workspace_tab
+from pypost.ui.presenters.tabs_presenter_insert import insert_tab_before_plus
 from pypost.ui.presenters.tabs_presenter_request_close import (
     close_tabs_for_request_ids as close_tabs_for_request_ids_helper,
 )
@@ -208,16 +209,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             tab.persisted_baseline = snapshot_persisted_fields(request_data)
 
         name = request_data.name if request_data else "New Request"
-        plus_idx = self._header.insert_index_before_plus()
-        if plus_idx >= 0:
-            self._tabs.insertTab(plus_idx, tab, name)
-        else:
-            self._tabs.addTab(tab, name)
-            self._header.ensure_plus_tab()
-        self._tabs.setCurrentWidget(tab)
-
-        if save_state:
-            self.save_tabs_state()
+        insert_tab_before_plus(self, tab, name, save_state=save_state)
 
     def open_websocket_tab(
         self,
@@ -302,15 +294,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             tab.persisted_baseline = snapshot_mcp_client_persisted_fields(connection)
         self._wire_mcp_client_tab_signals(tab)
         name = connection.name if connection.name else "New MCP Client"
-        plus_idx = self._header.insert_index_before_plus()
-        if plus_idx >= 0:
-            self._tabs.insertTab(plus_idx, tab, name)
-        else:
-            self._tabs.addTab(tab, name)
-            self._header.ensure_plus_tab()
-        self._tabs.setCurrentWidget(tab)
-        if save_state:
-            self.save_tabs_state()
+        insert_tab_before_plus(self, tab, name, save_state=save_state)
         return tab
 
     def _insert_websocket_tab(
@@ -334,16 +318,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._wire_websocket_tab_signals(tab)
 
         name = connection.name if connection.name else "WebSocket"
-        plus_idx = self._header.insert_index_before_plus()
-        if plus_idx >= 0:
-            self._tabs.insertTab(plus_idx, tab, name)
-        else:
-            self._tabs.addTab(tab, name)
-            self._header.ensure_plus_tab()
-        self._tabs.setCurrentWidget(tab)
-
-        if save_state:
-            self.save_tabs_state()
+        insert_tab_before_plus(self, tab, name, save_state=save_state)
         return tab
 
     def _on_websocket_title_changed(self, tab: WebSocketTab, glyph: str, title: str) -> None:

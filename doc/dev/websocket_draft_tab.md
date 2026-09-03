@@ -20,7 +20,7 @@ What this story owns:
   tab**. Saved profiles and factory-clean drafts skip the prompt.
 - **Helper extraction.** Persist, dirty compare, and the dialog live
   outside `tabs_presenter.py` so new draft/close logic does not grow the
-  presenter further (current inventory **1059 / 1165**, PYPOST-1194).
+  presenter further (current inventory **1039 / 1165**, PYPOST-1184).
 
 Do **not** copy MCP Client's "omit every tab of this kind". Saved
 WebSocket profiles must still restore. User-facing copy is
@@ -38,6 +38,11 @@ Picker routing:
 - **`add_blank_websocket_tab()`** — thin factory from PYPOST-1157. Still
   `_insert_websocket_tab(WebSocketConnection())`. Never calls
   `open_websocket_tab` (that path dedups by saved id).
+- **`tabs_presenter_insert.py::insert_tab_before_plus(presenter, tab, name, *,
+  save_state=True)`** ([PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184))
+  — `_insert_websocket_tab`'s insert-before-plus/append/focus/conditional-save
+  tail, shared with `add_new_tab` and `_insert_mcp_client_tab`. No behavior
+  change; pure LOC extraction.
 - **`WebSocketRegistry.find_websocket(id)`** — read-only "is this id
   saved?" gate. This story never calls `save_websocket`.
 - **`tabs_presenter_draft.py`** — `collect_persistable_open_tab_ids` and
@@ -111,10 +116,12 @@ Collection-backed tabs set `persisted_baseline` on insert; profile save
 [websocket_save_flow.md](websocket_save_flow.md). The draft-close dialog has
 **no Save / Save As** path (use Actions menu or Ctrl+S on the tab).
 
-`tabs_presenter.py` inventory is **1059 / 1165** LOC after PYPOST-1194
+`tabs_presenter.py` inventory is **1039 / 1165** LOC after
+[PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184) extracted the
+insert-before-plus tail (`add_new_tab`, `_insert_mcp_client_tab`,
+`_insert_websocket_tab`) into `tabs_presenter_insert.py`
 (`scripts/audit_baseline_metrics.py`). Persist and close helpers must
-still not grow that file when avoidable. Further extraction headroom is
-[PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184).
+still not grow that file when avoidable.
 
 ## API / Usage
 
@@ -249,9 +256,10 @@ Factory defaults come from `WebSocketConnection()` (`name="New WebSocket"`,
 `url=""`, empty handshake tables, `expose_as_mcp=False`). URL placeholder
 text is a hint only, not a value.
 
-`tabs_presenter.py` LOC cap: **1165** (measured 1059; PYPOST-1194). Do not
+`tabs_presenter.py` LOC cap: **1165** (measured 1039; PYPOST-1184). Do not
 add persist/close logic inline; extend `tabs_presenter_draft.py` or
-`tab_dirty.py`.
+`tab_dirty.py`. Tab-insertion logic (insert-before-plus/append/focus/save)
+lives in `tabs_presenter_insert.py`.
 
 Observability (INFO, `pypost.ui.presenters.tabs_presenter_draft`). Fields
 are `connection_id`, `choice`, and counts only — no URL, headers,
@@ -331,9 +339,9 @@ nothing else restored).
 ### `tabs_presenter.py` exceeds 1165 LOC
 
 Extract into `tabs_presenter_draft.py` / `tab_dirty.py` /
-`websocket_persisted_fields.py`. Current snapshot is **1059 / 1165**
-(PYPOST-1194). Prefer extraction before raising the cap again
-(PYPOST-1184).
+`websocket_persisted_fields.py` / `tabs_presenter_insert.py` (the latter
+already owns insert-before-plus as of PYPOST-1184). Current snapshot is
+**1039 / 1165**. Prefer extraction before raising the cap again.
 
 ### User docs still omit draft close / restore
 
