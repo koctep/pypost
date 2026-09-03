@@ -3,12 +3,79 @@
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Iterable
 
 from pypost.core.mcp_secrets_policy import McpSecretsPolicy
 from pypost.core.template_service import TemplateService
-from pypost.models.models import McpToolParam, RequestData
+from pypost.models.models import _MCP_PARAM_TYPES, McpToolParam, RequestData
+
+
+_INTEGER_OR_STRING_PATTERN = re.compile(r"^[+-]?[0-9]+$")
+
+
+class McpArgumentValidationError(ValueError):
+    """Safe validation error for an MCP argument without exposing its value."""
+
+    def __init__(self, parameter_name: str, expected_type: str, kind: str) -> None:
+        self.parameter_name = parameter_name
+        self.expected_type = expected_type
+        self.kind = kind
+        if kind == "missing":
+            message = (
+                f"Missing required MCP argument '{parameter_name}' "
+                f"(expected {expected_type})"
+            )
+        else:
+            message = (
+                f"Invalid MCP argument '{parameter_name}': "
+                f"expected {expected_type}"
+            )
+        super().__init__(message)
+
+
+def is_mcp_runtime_value_compatible(param_type: str, value: Any) -> bool:
+    """Return whether a caller value matches an MCP type without coercion."""
+    if param_type not in _MCP_PARAM_TYPES or isinstance(value, bool):
+        return param_type == "boolean" and isinstance(value, bool)
+    if param_type == "string":
+        return isinstance(value, str)
+    if param_type == "integer":
+        return isinstance(value, int)
+    if param_type == "integer_or_string":
+        return isinstance(value, int) or (
+            isinstance(value, str) and _INTEGER_OR_STRING_PATTERN.fullmatch(value) is not None
+        )
+    if param_type == "number":
+        return isinstance(value, (int, float))
+    if param_type == "array":
+        return isinstance(value, list)
+    if param_type == "object":
+        return isinstance(value, dict)
+    return False
+
+
+def validate_mcp_required_arguments(
+    arguments: Mapping[str, Any], required_specs: Mapping[str, McpToolParam]
+) -> None:
+    """Reject omitted names from the published required MCP parameter set."""
+    for name, spec in required_specs.items():
+        if spec.required and name not in arguments:
+            raise McpArgumentValidationError(name, spec.type, "missing")
+
+
+def validate_mcp_argument_values(
+    arguments: Mapping[str, Any], specs: Mapping[str, McpToolParam]
+) -> None:
+    """Reject declared caller values whose runtime types do not match exactly."""
+    for name, value in arguments.items():
+        spec = specs.get(name)
+        if spec is None or value is None:
+            continue
+        if not is_mcp_runtime_value_compatible(spec.type, value):
+            raise McpArgumentValidationError(name, spec.type, "invalid")
 
 
 def normalize_mcp_tool_name(name: str) -> str:
@@ -35,6 +102,28 @@ def resolve_mcp_param_specs(
         if name not in specs:
             specs[name] = spec
     return specs
+
+
+def resolve_mcp_call_param_specs(
+    req: RequestData,
+    template_service: TemplateService | None,
+    hidden_keys: Iterable[str],
+) -> tuple[dict[str, McpToolParam], dict[str, McpToolParam]]:
+    """Return complete and agent-visible parameter specs for one HTTP tool call."""
+    discovered = McpSecretsPolicy.extract_mcp_request_variables(req)
+    complete = resolve_mcp_param_specs(req, discovered)
+    visible = McpSecretsPolicy.filter_agent_param_specs(
+        complete, req, template_service, hidden_keys
+    )
+    return complete, visible
+
+
+def validate_mcp_execution_arguments(
+    req: RequestData, arguments: Mapping[str, Any]
+) -> None:
+    """Validate effective HTTP arguments after omitted/null defaults are applied."""
+    discovered = McpSecretsPolicy.extract_mcp_request_variables(req)
+    validate_mcp_argument_values(arguments, resolve_mcp_param_specs(req, discovered))
 
 
 def build_tool_input_schema(specs: dict[str, McpToolParam]) -> dict:

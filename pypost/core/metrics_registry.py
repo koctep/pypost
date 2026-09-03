@@ -11,6 +11,11 @@ _NEW_TAB_ACTION_SOURCES = frozenset(
     {"plus_button", "shortcut", "unknown", "collections_context", "last_tab"}
 )
 _NEW_TAB_PROTOCOLS = frozenset({"http", "websocket", "mcp_client", "unknown"})
+_MCP_VALIDATION_STAGES = frozenset({"preflight", "execution_boundary", "unknown"})
+_MCP_VALIDATION_TRANSPORTS = frozenset({"http", "websocket", "unknown"})
+_MCP_VALIDATION_TYPES = frozenset(
+    {"string", "integer", "integer_or_string", "number", "boolean", "array", "object", "unknown"}
+)
 
 
 def _normalize_new_tab_source(source: str) -> str:
@@ -23,6 +28,10 @@ def _normalize_new_tab_protocol(protocol: str) -> str:
     if protocol in _NEW_TAB_PROTOCOLS:
         return protocol
     return "unknown"
+
+
+def _normalize_mcp_validation_label(value: str, allowed: frozenset[str]) -> str:
+    return value if value in allowed else "unknown"
 
 
 class MetricsRegistry:
@@ -239,6 +248,12 @@ class MetricsRegistry:
             ["method", "status"],
             registry=self.registry,
         )
+        self.mcp_argument_validation_failures = Counter(
+            "mcp_argument_validation_failures_total",
+            "Number of MCP argument validation failures",
+            ["stage", "transport", "declared_type"],
+            registry=self.registry,
+        )
 
         self.mcp_server_up = Gauge(
             "mcp_server_up",
@@ -377,6 +392,19 @@ class MetricsRegistry:
 
     def track_mcp_response_sent(self, method: str, status: str) -> None:
         self.mcp_responses_sent.labels(method=method, status=status).inc()
+
+    def track_mcp_argument_validation_failure(
+        self, stage: str, transport: str, declared_type: str
+    ) -> None:
+        self.mcp_argument_validation_failures.labels(
+            stage=_normalize_mcp_validation_label(stage, _MCP_VALIDATION_STAGES),
+            transport=_normalize_mcp_validation_label(
+                transport, _MCP_VALIDATION_TRANSPORTS
+            ),
+            declared_type=_normalize_mcp_validation_label(
+                declared_type, _MCP_VALIDATION_TYPES
+            ),
+        ).inc()
 
     def set_mcp_server_up(self, ready: bool) -> None:
         self.mcp_server_up.set(1 if ready else 0)

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
-import asyncio
 from collections.abc import Callable, Sequence
 from typing import Any, Dict, List
 
 from starlette.applications import Starlette
-
 from mcp.server import Server
 from mcp.types import TextContent, Tool
 from starlette.concurrency import run_in_threadpool
@@ -19,12 +18,19 @@ from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_response_sanitizer import McpResponseSanitizer
 from pypost.core.mcp_secrets_policy import McpSecretsPolicy
 from pypost.core.mcp_tool_contract import (
+    McpArgumentValidationError,
     build_tool_input_schema,
     normalize_mcp_tool_name,
-    resolve_mcp_param_specs,
+    resolve_mcp_call_param_specs,
     tool_description,
+    validate_mcp_execution_arguments,
 )
 from pypost.core.mcp_legacy_sse import build_legacy_sse_app
+from pypost.core.mcp_observability import (
+    record_mcp_call_outcome,
+    record_mcp_validation_failure,
+    validate_mcp_call_arguments,
+)
 from pypost.core.mcp_streamable_http import build_streamable_http_route
 from pypost.core.mcp_transport_routes import MCP_LEGACY_SSE_MOUNT_PATH
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
@@ -34,6 +40,7 @@ from pypost.core.template_service import TemplateService
 from pypost.core.websocket_mcp_tools import (
     build_websocket_mcp_tool_schema,
     execute_websocket_probe,
+    resolve_websocket_mcp_call_specs,
 )
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
@@ -116,7 +123,7 @@ class MCPServerImpl:
 
         # Register handlers
         self.server.list_tools()(self.list_tools)
-        self.server.call_tool()(self.call_tool)
+        self.server.call_tool(validate_input=False)(self.call_tool)
 
     async def list_tools(self) -> List[Tool]:
         tools = []
@@ -142,8 +149,25 @@ class MCPServerImpl:
             raise ValueError(f"Tool {name} not found")
 
         item = self.tools_map[name]
-
-        # ── WebSocket probe dispatch ──────────────────────────────────────────
+        arguments = arguments or {}
+        mcp_arg_count = len(arguments)
+        started = time.perf_counter()
+        if isinstance(item, WebSocketConnection):
+            transport, method = "websocket", "WEBSOCKET"
+            complete_specs, visible_specs = resolve_websocket_mcp_call_specs(
+                item, self._hidden_keys_supplier()
+            )
+        else:
+            transport, method = "http", item.method
+            complete_specs, visible_specs = resolve_mcp_call_param_specs(
+                item,  # type: ignore[arg-type]
+                self._template_service,
+                self._hidden_keys_supplier(),
+            )
+        validate_mcp_call_arguments(
+            arguments, visible_specs, complete_specs, "preflight", transport, name,
+            method, mcp_arg_count, started, self._metrics, self._activity_log
+        )
         if isinstance(item, WebSocketConnection):
             return await run_in_threadpool(
                 execute_websocket_probe,
@@ -156,22 +180,13 @@ class MCPServerImpl:
                 metrics=self._metrics,
                 activity_log=self._activity_log,
             )
-
-        # ── HTTP request dispatch ─────────────────────────────────────────────
-        request_data: RequestData = item  # type: ignore[assignment]
-        mcp_arg_count = len(arguments or {})
-        started = time.perf_counter()
-
-        # Track MCP request
-        self._metrics.track_mcp_request_received(request_data.method)
-
-        # Execute request in threadpool since RequestService is synchronous
+        self._metrics.track_mcp_request_received(method)
         try:
             env_vars = self._variable_supplier()
             hidden_keys = self._hidden_keys_supplier()
             result = await run_in_threadpool(
                 self._execute_request_sync,
-                request_data,
+                item,
                 arguments,
                 env_vars,
                 hidden_keys,
@@ -183,28 +198,23 @@ class MCPServerImpl:
             outcome = "error" if has_error else "success"
             detail = result.execution_error.message if result.execution_error else None
             http_status = result.response.status_code
+        except McpArgumentValidationError as error:
+            record_mcp_validation_failure(
+                error, "execution_boundary", transport, name, method, mcp_arg_count,
+                (time.perf_counter() - started) * 1000.0, self._metrics,
+                self._activity_log
+            )
+            raise
         except Exception as e:
             output_text = f"Error executing request: {str(e)}"
             outcome = "error"
             detail = str(e)
             http_status = None
-
         duration_ms = (time.perf_counter() - started) * 1000.0
-        self._metrics.track_mcp_response_sent(request_data.method, outcome)
-        self._metrics.track_mcp_tool_call_duration(
-            request_data.method, outcome, duration_ms / 1000.0
+        record_mcp_call_outcome(
+            self._metrics, self._activity_log, method, outcome, name,
+            mcp_arg_count, http_status, detail, duration_ms
         )
-        if self._activity_log is not None:
-            self._activity_log.append(
-                McpActivityEntry.new_call_tool(
-                    name,
-                    outcome=outcome,
-                    mcp_arg_count=mcp_arg_count,
-                    http_status=http_status,
-                    detail=detail,
-                    duration_ms=duration_ms,
-                )
-            )
         return [TextContent(type="text", text=output_text)]
 
     def set_variable_supplier(
@@ -235,11 +245,14 @@ class MCPServerImpl:
                     defaults_applied += 1
                     self._metrics.track_mcp_param_default_applied(request_data.method)
                     logger.info(
-                        "mcp_param_default_applied method=%s param=%s default=%r",
+                        "mcp_param_default_applied method=%s param=%s "
+                        "default_applied=true default_type=%s",
                         request_data.method,
                         param_name,
-                        param_spec.default,
+                        param_spec.type,
                     )
+        if request_data is not None:
+            validate_mcp_execution_arguments(request_data, merged_args)
         counts = McpSecretsPolicy.safe_execution_log_fields(
             len(env_vars), len(hidden_keys), len(merged_args)
         )
@@ -291,12 +304,10 @@ class MCPServerImpl:
 
     def _generate_schema(self, req: RequestData) -> dict:
         hidden_keys = self._hidden_keys_supplier()
-        discovered = McpSecretsPolicy.extract_mcp_request_variables(req)
-        specs = resolve_mcp_param_specs(req, discovered)
-        specs = McpSecretsPolicy.filter_agent_param_specs(
-            specs, req, self._template_service, hidden_keys
+        _, visible_specs = resolve_mcp_call_param_specs(
+            req, self._template_service, hidden_keys
         )
-        return build_tool_input_schema(specs)
+        return build_tool_input_schema(visible_specs)
 
     def create_app(self) -> Starlette:
         mcp_route, lifespan = build_streamable_http_route(self.server)

@@ -196,8 +196,12 @@ def format_markdown(metrics: list[FileMetrics]) -> str:
     lines.extend(
         [
             "",
-            "Regenerate: `.venv/bin/python scripts/audit_baseline_metrics.py "
-            "--markdown ai-tasks/PYPOST-376/baseline-metrics.md`",
+            "Regenerate:",
+            "",
+            "```sh",
+            ".venv/bin/python scripts/audit_baseline_metrics.py \\",
+            "  --markdown ai-tasks/PYPOST-376/baseline-metrics.md",
+            "```",
             "",
         ],
     )

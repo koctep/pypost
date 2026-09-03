@@ -55,6 +55,11 @@ class MetricsTrackingMixin:
     def track_mcp_response_sent(self, method: str, status: str) -> None:
         self._registry.track_mcp_response_sent(method, status)
 
+    def track_mcp_argument_validation_failure(
+        self, stage: str, transport: str, declared_type: str
+    ) -> None:
+        self._registry.track_mcp_argument_validation_failure(stage, transport, declared_type)
+
     def set_mcp_server_up(self, ready: bool) -> None:
         self._registry.set_mcp_server_up(ready)
 

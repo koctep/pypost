@@ -1,6 +1,5 @@
 """Integration tests: live MCP server over Streamable HTTP round-trip (PYPOST-368/551)."""
-import pytest
-
+import inspect
 import json
 import threading
 import unittest
@@ -10,15 +9,18 @@ from unittest.mock import MagicMock
 from urllib.parse import parse_qs, urlsplit
 
 import anyio
+import pytest
+
 from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
+from mcp.types import CallToolRequest
 
 from pypost.core.mcp_client_service import MCPClientService
 from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.request_service import ExecutionResult
-from pypost.models.models import RequestData
+from pypost.models.models import McpToolParam, RequestData
 from pypost.models.response import ResponseData
 from tests.helpers.mcp_live_server import (
     LiveMCPServer,
@@ -133,7 +135,59 @@ async def _mcp_call_tool_result(mcp_url: str, name: str, arguments: dict | None 
                 return await session.call_tool(name, arguments or {})
 
 
+async def _mcp_tool_schema(mcp_url: str, name: str) -> dict:
+    async with create_mcp_http_client() as http_client:
+        async with streamable_http_client(mcp_url, http_client=http_client) as (
+            read,
+            write,
+            _,
+        ):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.list_tools()
+                return next(
+                    tool.inputSchema for tool in result.tools if tool.name == name
+                )
+
+
 class TestMCPServerIntegration(unittest.TestCase):
+    def test_invalid_call_over_streamable_http_returns_safe_application_validation_error(
+        self,
+    ) -> None:
+        tool = RequestData(
+            name="Typed Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://example.com",
+            mcp_params={"count": McpToolParam(type="integer", required=True)},
+        )
+        raw_value = "sensitive-count"
+
+        with live_mcp_server(
+            [tool], execute_result=_exec_result("must not execute")
+        ) as server:
+            schema = anyio.run(_mcp_tool_schema, server.mcp_url, "typed_tool")
+            self.assertEqual(schema["required"], ["count"])
+
+            result = anyio.run(
+                _mcp_call_tool_result,
+                server.mcp_url,
+                "typed_tool",
+                {"count": raw_value},
+            )
+
+            self.assertTrue(result.isError)
+            message = result.content[0].text
+            self.assertIn("count", message)
+            self.assertIn("integer", message)
+            self.assertNotIn(raw_value, message)
+            self.assertNotIn("Input validation error", message)
+            server._mock_request_service.execute.assert_not_called()
+
+            handler = server.impl.server.request_handlers[CallToolRequest]
+            closure = inspect.getclosurevars(handler).nonlocals
+            self.assertFalse(closure["validate_input"])
+
     def test_jira_numeric_path_identifiers_accept_decimal_strings_and_native_integers(self):
         """PYPOST-1038 R4: every published numeric path accepts both forms end-to-end."""
         for (
@@ -196,7 +250,7 @@ class TestMCPServerIntegration(unittest.TestCase):
                         httpd.shutdown()
                         server_thread.join(timeout=2.0)
 
-    def test_jira_non_integral_identifier_never_dispatches_to_http(self):
+    def test_jira_non_integral_identifier_never_dispatches_to_http(self) -> None:
         """PYPOST-1038 R5: to_int fails closed before HTTP dispatch."""
         for request_id, tool_name, identifier_name, path_fragment, extra_arguments in (
             _JIRA_NUMERIC_PATH_CASES[0],
@@ -235,12 +289,10 @@ class TestMCPServerIntegration(unittest.TestCase):
                                 tool_name,
                                 arguments,
                             )
-                        if identifier_value == "not-an-id":
-                            self.assertTrue(result.isError)
-                        else:
-                            payload = json.loads(result.content[0].text)
-                            self.assertTrue(payload["error"])
-                            self.assertEqual(payload["error_category"], "template")
+                        self.assertTrue(result.isError)
+                        self.assertIn(identifier_name, result.content[0].text)
+                        self.assertIn("integer_or_string", result.content[0].text)
+                        self.assertNotIn(str(identifier_value), result.content[0].text)
                         self.assertEqual(captured_paths, [])
                     finally:
                         httpd.shutdown()

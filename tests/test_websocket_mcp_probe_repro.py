@@ -42,6 +42,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 import uuid
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtWebSockets import QWebSocket
@@ -538,6 +539,27 @@ class TestWebSocketProbeSessionSlotsConcurrency:
 
 class TestMCPServerImplWebSocketIntegration:
     """Asserts MCPServerImpl registration, listing, and dispatching of WebSocket tools."""
+
+    def test_invalid_declared_value_does_not_invoke_websocket_probe(self) -> None:
+        conn = WebSocketConnection(
+            name="Typed Feed",
+            expose_as_mcp=True,
+            url="ws://unused",
+            mcp_params={"count": McpToolParam(type="integer", required=True)},
+        )
+        impl = MCPServerImpl()
+        impl.register_tools([conn])
+        probe = MagicMock(return_value=[])
+
+        with patch("pypost.core.mcp_server_impl.execute_websocket_probe", probe):
+            with pytest.raises(Exception) as raised:
+                asyncio.run(impl.call_tool("ws_typed_feed", {"count": "bad"}))
+
+        assert type(raised.value).__name__ == "McpArgumentValidationError"
+        assert "count" in str(raised.value)
+        assert "integer" in str(raised.value)
+        assert "bad" not in str(raised.value)
+        probe.assert_not_called()
 
     def test_mcp_server_impl_lists_and_dispatches_websocket_tool(self, ws_test_server) -> None:
         """MCPServerImpl registers WebSocketConnection, lists ws_* tool, and executes call_tool."""

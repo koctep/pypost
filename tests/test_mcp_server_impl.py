@@ -1,11 +1,11 @@
 """Tests for MCPServerImpl: tool registration, schemas, routing, and call_tool path."""
-import pytest
-
 import asyncio
 import json
 import logging
 import unittest
 from unittest.mock import MagicMock
+
+import pytest
 
 from mcp.types import TextContent
 from starlette.applications import Starlette
@@ -286,6 +286,127 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertEqual(duration_args[0], "GET")
         self.assertEqual(duration_args[1], "success")
         self.assertGreaterEqual(duration_args[2], 0.0)
+
+    def test_call_tool_rejects_wrong_typed_declared_value_before_request_service(self) -> None:
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Typed Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://u",
+            mcp_params={"count": McpToolParam(type="integer", required=True)},
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("must not execute")
+        raw_value = "sensitive-count"
+
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(impl.call_tool("typed_tool", {"count": raw_value}))
+
+        self.assertEqual(type(raised.exception).__name__, "McpArgumentValidationError")
+        self.assertIn("count", str(raised.exception))
+        self.assertIn("integer", str(raised.exception))
+        self.assertNotIn(raw_value, str(raised.exception))
+        mock_svc.execute.assert_not_called()
+
+    def test_call_tool_preserves_missing_required_argument_behavior(self) -> None:
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Required Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://u",
+            mcp_params={"token": McpToolParam(type="string", required=True)},
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("must not execute")
+
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(impl.call_tool("required_tool", {}))
+
+        self.assertEqual(type(raised.exception).__name__, "McpArgumentValidationError")
+        self.assertIn("token", str(raised.exception))
+        self.assertIn("string", str(raised.exception))
+        mock_svc.execute.assert_not_called()
+
+    def test_call_tool_preserves_valid_values_and_applies_valid_null_default(self) -> None:
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Values Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://u",
+            mcp_params={
+                "identifier": McpToolParam(
+                    type="integer_or_string", required=True
+                ),
+                "count": McpToolParam(type="integer", required=False, default=3),
+            },
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("ok")
+
+        asyncio.run(
+            impl.call_tool("values_tool", {"identifier": "+007", "count": None})
+        )
+
+        mock_svc.execute.assert_called_once()
+        _request, context = mock_svc.execute.call_args[0]
+        self.assertEqual(
+            context["mcp"]["request"], {"identifier": "+007", "count": 3}
+        )
+
+    def test_call_tool_does_not_replace_wrong_typed_value_with_default(self) -> None:
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Default Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://u",
+            mcp_params={
+                "count": McpToolParam(type="integer", required=False, default=3),
+            },
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("must not execute")
+        raw_value = "not-an-integer"
+
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(impl.call_tool("default_tool", {"count": raw_value}))
+
+        self.assertEqual(type(raised.exception).__name__, "McpArgumentValidationError")
+        self.assertNotIn(raw_value, str(raised.exception))
+        mock_svc.execute.assert_not_called()
+
+    def test_call_tool_rejects_legacy_string_default_at_execution_boundary(self) -> None:
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Legacy Default Tool",
+            expose_as_mcp=True,
+            method="GET",
+            url="http://u",
+            mcp_params={
+                "identifier": McpToolParam(
+                    type="integer_or_string", required=False, default="legacy-id"
+                ),
+            },
+        )
+        impl.register_tools([req])
+        mock_svc = _stub_request_service(impl)
+        mock_svc.execute.return_value = _exec_result("must not execute")
+
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(impl.call_tool("legacy_default_tool", {}))
+
+        self.assertEqual(type(raised.exception).__name__, "McpArgumentValidationError")
+        self.assertIn("identifier", str(raised.exception))
+        self.assertIn("integer_or_string", str(raised.exception))
+        self.assertNotIn("legacy-id", str(raised.exception))
+        mock_svc.execute.assert_not_called()
 
     def test_merge_execution_variables_combines_env_and_mcp_args(self):
         merged = _merge_execution_variables(

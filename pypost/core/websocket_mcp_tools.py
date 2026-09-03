@@ -79,13 +79,7 @@ def build_websocket_mcp_tool_schema(
     Returns:
         JSON Schema dict suitable for ``Tool.inputSchema``.
     """
-    discovered = extract_websocket_mcp_variables(conn)
-    specs: dict[str, McpToolParam] = {}
-    for name in discovered:
-        specs[name] = conn.mcp_params.get(name, McpToolParam())
-    for name, spec in conn.mcp_params.items():
-        if name not in specs:
-            specs[name] = spec
+    specs = resolve_websocket_mcp_param_specs(conn)
 
     # Strip hidden keys from agent-visible schema
     hidden = set(hidden_keys)
@@ -99,6 +93,37 @@ def build_websocket_mcp_tool_schema(
             required=False,
         )
     return build_tool_input_schema(filtered)
+
+
+def resolve_websocket_mcp_param_specs(
+    conn: WebSocketConnection,
+) -> dict[str, McpToolParam]:
+    """Return all discovered and explicit MCP specs used by a WebSocket tool."""
+    discovered = extract_websocket_mcp_variables(conn)
+    specs: dict[str, McpToolParam] = {
+        name: conn.mcp_params.get(name, McpToolParam()) for name in discovered
+    }
+    for name, spec in conn.mcp_params.items():
+        specs.setdefault(name, spec)
+    specs.setdefault(
+        "stop_when",
+        McpToolParam(
+            type="string",
+            description="Stop probe early when an incoming message body contains this substring",
+            required=False,
+        ),
+    )
+    return specs
+
+
+def resolve_websocket_mcp_call_specs(
+    conn: WebSocketConnection, hidden_keys: Iterable[str]
+) -> tuple[dict[str, McpToolParam], dict[str, McpToolParam]]:
+    """Return complete and agent-visible parameter specs for one WebSocket call."""
+    complete = resolve_websocket_mcp_param_specs(conn)
+    hidden = set(hidden_keys)
+    visible = {name: spec for name, spec in complete.items() if name not in hidden}
+    return complete, visible
 
 
 def build_websocket_mcp_preview(

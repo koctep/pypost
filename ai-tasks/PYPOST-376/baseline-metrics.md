@@ -15,9 +15,9 @@
 | --- | ---: | ---: | ---: |
 | `pypost/core/collection_item_dispatch.py` | — | 83 | 83 |
 | `pypost/core/http_client.py` | 198 | 381 | 418 |
-| `pypost/core/mcp_server_impl.py` | 231 | 314 | 325 |
+| `pypost/core/mcp_server_impl.py` | 231 | 325 | 325 |
 | `pypost/core/qt/metrics.py` | 286 | 63 | 70 |
-| `pypost/core/qt/metrics_tracking.py` | — | 140 | 145 |
+| `pypost/core/qt/metrics_tracking.py` | — | 145 | 145 |
 | `pypost/core/qt/metrics_websocket.py` | — | 40 | 45 |
 | `pypost/core/qt/worker.py` | 57 | 180 | 180 |
 | `pypost/core/request_manager.py` | 201 | 250 | 264 |
@@ -32,4 +32,9 @@
 | `pypost/ui/presenters/tabs_presenter.py` | — | 1064 | 1165 |
 | `pypost/ui/widgets/mixins.py` | — | 396 | 411 |
 
-Regenerate: `.venv/bin/python scripts/audit_baseline_metrics.py --markdown ai-tasks/PYPOST-376/baseline-metrics.md`
+Regenerate:
+
+```sh
+.venv/bin/python scripts/audit_baseline_metrics.py \
+  --markdown ai-tasks/PYPOST-376/baseline-metrics.md
+```

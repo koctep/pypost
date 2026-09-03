@@ -5,6 +5,7 @@ import unittest
 
 import pytest
 
+import pypost.core.mcp_tool_contract as mcp_tool_contract
 from pypost.core.mcp_tool_contract import (
     build_mcp_tool_contract_preview,
     build_tool_input_schema,
@@ -174,6 +175,81 @@ class TestMcpToolContract(unittest.TestCase):
         self.assertIn("board_name", preview.input_schema["properties"])
         self.assertIn("board_id", preview.input_schema["required"])
         self.assertIn("board_name", preview.input_schema["required"])
+
+    def test_runtime_predicate_accepts_all_declared_types(self) -> None:
+        predicate = getattr(mcp_tool_contract, "is_mcp_runtime_value_compatible", None)
+        self.assertTrue(
+            callable(predicate),
+            "Step 4 must provide the strict MCP runtime compatibility predicate",
+        )
+        accepted_values = {
+            "string": "plain text",
+            "integer": 7,
+            "integer_or_string": "+007",
+            "number": 3.14,
+            "boolean": False,
+            "array": ["item"],
+            "object": {"key": "value"},
+        }
+
+        for param_type, value in accepted_values.items():
+            with self.subTest(param_type=param_type):
+                self.assertTrue(predicate(param_type, value))
+
+    def test_runtime_predicate_rejects_numeric_bools_and_coercion(self) -> None:
+        predicate = getattr(mcp_tool_contract, "is_mcp_runtime_value_compatible", None)
+        self.assertTrue(callable(predicate))
+
+        for param_type in ("integer", "integer_or_string", "number"):
+            with self.subTest(param_type=param_type):
+                self.assertFalse(predicate(param_type, True))
+
+        non_coercible_values = (
+            ("integer", "7"),
+            ("number", "3.14"),
+            ("boolean", 1),
+            ("array", ("item",)),
+            ("object", [("key", "value")]),
+        )
+        for param_type, value in non_coercible_values:
+            with self.subTest(param_type=param_type, value=value):
+                self.assertFalse(predicate(param_type, value))
+
+    def test_runtime_predicate_accepts_only_integer_or_string_decimal_forms(self) -> None:
+        predicate = getattr(mcp_tool_contract, "is_mcp_runtime_value_compatible", None)
+        self.assertTrue(callable(predicate))
+
+        for value in (42, "-42", "+42"):
+            with self.subTest(value=value):
+                self.assertTrue(predicate("integer_or_string", value))
+
+        for value in (42.0, "3.14", "1e3", "arbitrary text", " 42", "+ 42"):
+            with self.subTest(value=value):
+                self.assertFalse(predicate("integer_or_string", value))
+
+    def test_runtime_validator_uses_safe_named_diagnostics_without_mutation(self) -> None:
+        validator = getattr(mcp_tool_contract, "validate_mcp_argument_values", None)
+        self.assertTrue(callable(validator))
+        error_type = getattr(mcp_tool_contract, "McpArgumentValidationError", None)
+        self.assertIsInstance(error_type, type)
+
+        raw_value = "sensitive-raw-argument"
+        arguments = {"account_id": raw_value}
+        original_arguments = dict(arguments)
+        specs = {"account_id": McpToolParam(type="integer", required=True)}
+
+        with self.assertRaises(error_type) as raised:
+            validator(arguments, specs)
+
+        message = str(raised.exception)
+        self.assertIn("account_id", message)
+        self.assertIn("integer", message)
+        self.assertNotIn(raw_value, message)
+        self.assertEqual(arguments, original_arguments)
+
+    def test_legacy_integer_or_string_default_compatibility_remains_unchanged(self) -> None:
+        param = McpToolParam(type="integer_or_string", default="legacy-id")
+        self.assertEqual(param.default, "legacy-id")
 
 
 # ---------------------------------------------------------------------------

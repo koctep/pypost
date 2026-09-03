@@ -16,6 +16,10 @@ except ImportError:  # pragma: no cover - exercised when dependency is absent.
     MeterProvider = Any  # type: ignore[assignment,misc]
 
 from pypost.core.metrics_registry import (
+    _MCP_VALIDATION_STAGES,
+    _MCP_VALIDATION_TRANSPORTS,
+    _MCP_VALIDATION_TYPES,
+    _normalize_mcp_validation_label,
     _normalize_new_tab_protocol,
     _normalize_new_tab_source,
 )
@@ -161,6 +165,10 @@ class OtelMetricsTracker:
         self._mcp_responses_sent = meter.create_counter(
             "mcp_responses_sent_total",
             description="Number of responses sent by MCP server",
+        )
+        self._mcp_argument_validation_failures = meter.create_counter(
+            "mcp_argument_validation_failures_total",
+            description="Number of MCP argument validation failures",
         )
         self._mcp_tool_call_duration_seconds = meter.create_histogram(
             "mcp_tool_call_duration_seconds",
@@ -369,6 +377,22 @@ class OtelMetricsTracker:
 
     def track_mcp_response_sent(self, method: str, status: str) -> None:
         self._mcp_responses_sent.add(1, {"method": method, "status": status})
+
+    def track_mcp_argument_validation_failure(
+        self, stage: str, transport: str, declared_type: str
+    ) -> None:
+        self._mcp_argument_validation_failures.add(
+            1,
+            {
+                "stage": _normalize_mcp_validation_label(stage, _MCP_VALIDATION_STAGES),
+                "transport": _normalize_mcp_validation_label(
+                    transport, _MCP_VALIDATION_TRANSPORTS
+                ),
+                "declared_type": _normalize_mcp_validation_label(
+                    declared_type, _MCP_VALIDATION_TYPES
+                ),
+            },
+        )
 
     def set_mcp_server_up(self, ready: bool) -> None:
         self._mcp_server_ready = 1 if ready else 0

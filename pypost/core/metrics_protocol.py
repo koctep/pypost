@@ -51,6 +51,10 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_mcp_response_sent(self, method: str, status: str) -> None: ...
 
+    def track_mcp_argument_validation_failure(
+        self, stage: str, transport: str, declared_type: str
+    ) -> None: ...
+
     def set_mcp_server_up(self, ready: bool) -> None: ...
 
     def set_mcp_server_instance_counts(self, counts: Mapping[str, int]) -> None: ...
@@ -196,6 +200,11 @@ class NullMetrics:
         return None
 
     def track_mcp_response_sent(self, method: str, status: str) -> None:
+        return None
+
+    def track_mcp_argument_validation_failure(
+        self, stage: str, transport: str, declared_type: str
+    ) -> None:
         return None
 
     def set_mcp_server_up(self, ready: bool) -> None:
