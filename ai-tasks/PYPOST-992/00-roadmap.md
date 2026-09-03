@@ -32,8 +32,10 @@
   - Retained test-harness limitations are recorded in `60-tech-debt.md`.
 - [x] **STEP 8: Dev Docs**
   - The sidecar developer guide's test section documents the click/fill smoke.
-- [ ] **COMMIT: Commit Changes**
-  - Pending final focused Make checks and Jira completion transition.
+- [x] **COMMIT: Commit Changes**
+  - Commit `07770480` contains the PYPOST-992 stdio integration coverage and
+    its task artifacts.
+  - Focused agent-UI Make tests, lint, typecheck, and verification pass.
 
 ## Status Legend
 
