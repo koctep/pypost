@@ -26,6 +26,7 @@ from pypost.core.collection_import import (
     recount_collection_import_plan,
 )
 from pypost.core.collection_import_apply import apply_imported_collections
+from pypost.core.collection_import_state import CollectionImportState
 from pypost.core.collection_messages import (
     MSG_IMPORT_NO_VALID_COLLECTIONS,
     MSG_IMPORT_PREPARING,
@@ -79,11 +80,11 @@ class CollectionImportActions(QObject):
         self._show_status = show_status
         self._clear_status = clear_status
         self._worker: CollectionImportParseWorker | None = None
-        self._preparing = False
+        self._state: CollectionImportState = CollectionImportState.IDLE
 
     def is_busy(self) -> bool:
-        """True while a parse worker is in flight or preparing (busy cue / re-entry guard)."""
-        return self._preparing or self._worker is not None
+        """True while an import is in flight (any stage but idle)."""
+        return self._state is not CollectionImportState.IDLE
 
     def wait_idle(self, timeout_ms: int = 5000) -> bool:
         """Pump event loop / wait until background worker has finished and joined."""
@@ -149,7 +150,7 @@ class CollectionImportActions(QObject):
             worker.deleteLater()
             logger.debug("collection_import_worker_reaped")
             self._worker = None
-        self._set_preparing(False)
+        self._set_state(CollectionImportState.IDLE)
         app = QApplication.instance()
         if app is not None:
             app.processEvents()
@@ -169,7 +170,7 @@ class CollectionImportActions(QObject):
         self._start_parse(path)
 
     def _start_parse(self, path: Path) -> None:
-        self._set_preparing(True)
+        self._set_state(CollectionImportState.PREPARING)
         worker = CollectionImportParseWorker(path, self._read_import_file)
         worker.parse_progress.connect(self._on_parse_progress)
         worker.parse_completed.connect(self._on_parse_completed)
@@ -177,6 +178,7 @@ class CollectionImportActions(QObject):
         worker.finished.connect(self._on_worker_finished)
         self._worker = worker
         worker.start()
+        self._set_state(CollectionImportState.PARSING)
         logger.info("collection_import_parse_started path=%s", path)
 
     def _on_parse_progress(self, done: int, total: int) -> None:
@@ -188,18 +190,19 @@ class CollectionImportActions(QObject):
         collections: list[Collection],
         parse_errors: list[str],
     ) -> None:
-        self._set_preparing(False)
         if not collections:
+            self._set_state(CollectionImportState.IDLE)
             logger.warning("collection_import_file_invalid reason=no_valid_collections")
             message = MSG_IMPORT_NO_VALID_COLLECTIONS
             if parse_errors:
                 message = "\n".join([message, ""] + parse_errors)
             show_collection_import_invalid_file_error(self._parent, message)
             return
+        self._set_state(CollectionImportState.APPLYING)
         self._finish_import(collections, parse_errors)
 
     def _on_parse_failed(self, error: object) -> None:
-        self._set_preparing(False)
+        self._set_state(CollectionImportState.IDLE)
         if isinstance(error, CollectionImportFileError):
             logger.warning("collection_import_file_invalid reason=%s", error)
             show_collection_import_invalid_file_error(self._parent, str(error))
@@ -258,9 +261,17 @@ class CollectionImportActions(QObject):
             format_collection_import_result(result),
             success=success,
         )
+        self._set_state(CollectionImportState.IDLE)
 
-    def _set_preparing(self, active: bool) -> None:
-        self._preparing = active
+    def _set_state(self, state: CollectionImportState) -> None:
+        previous = self._state
+        logger.debug(
+            "collection_import_state_changed from=%s to=%s",
+            previous.value,
+            state.value,
+        )
+        active = state is not CollectionImportState.IDLE
+        self._state = state
         try:
             button = (
                 self._parent.findChild(QPushButton, COLLECTION_IMPORT_BUTTON)

@@ -10,6 +10,10 @@ import pytest
 from PySide6.QtWidgets import QPushButton
 
 from pypost.core.collection_import import CollectionImportFileError
+from pypost.core.collection_import_apply import (
+    apply_imported_collections as real_apply_imported_collections,
+)
+from pypost.core.collection_import_state import CollectionImportState
 from pypost.core.import_conflicts import ImportConflictDecision
 from pypost.core.request_manager import RequestManager
 from pypost.core.storage import StorageManager
@@ -31,6 +35,7 @@ _PICKER = f"{_MODULE}.prompt_import_collection_file"
 _CONFLICT = f"{_MODULE}.prompt_collection_import_conflict"
 _RESULT = f"{_MODULE}.show_collection_import_result"
 _INVALID = f"{_MODULE}.show_collection_import_invalid_file_error"
+_APPLY = f"{_MODULE}.apply_imported_collections"
 
 _PATH = Path("/tmp/import.json")
 _IMPORT_WAIT_MS = 5_000
@@ -528,6 +533,63 @@ class TestImportCollections:
                 and "collection_import_file_invalid reason=no_valid_collections"
                 in r.message
                 for r in caplog.records
+            )
+        finally:
+            presenter.panel.close()
+
+
+class TestImportCollectionsBusyDuringApply:
+    """PYPOST-1228: is_busy() must stay True for the whole _finish_import() window.
+
+    Today `is_busy()` is `self._preparing or self._worker is not None`.
+    `_on_parse_completed()` clears `_preparing` as its first statement, before
+    calling `_finish_import()` (conflict resolution, planning, persisting via
+    `apply_imported_collections`, refresh). If the worker's `finished` signal has
+    already been processed by the time `_on_parse_completed()` runs — which
+    clears `self._worker` in `_on_worker_finished()` — then `is_busy()` reports
+    `False` for the entire `_finish_import()` window, even though an import is
+    actively being applied. Per the architecture doc, both `parse_completed` and
+    `finished` are independently queued signals from the worker thread with no
+    ordering guarantee between them, so this interleaving is a real, reachable
+    race, not a contrived one.
+
+    This test reproduces that exact interleaving deterministically (without
+    depending on Qt's queued-signal delivery order, which usually — but not
+    always — happens to process `parse_completed` before `finished`): it drives
+    `_on_parse_completed()` directly with `self._worker` already cleared, exactly
+    as it would be if `_on_worker_finished()` had already run, and asserts
+    `is_busy()` is `True` from inside `apply_imported_collections` — the heart of
+    the "applying" stage.
+    """
+
+    def test_is_busy_true_while_applying_imported_collections(self, qapp):
+        incoming = make_collection("new-id", "Imported", [make_request("r1", "Ping")])
+        presenter, _manager = _make_presenter(
+            [make_collection("c1", "Existing")], _reader([incoming])
+        )
+        actions = presenter._import_actions
+        captured_busy: list[bool] = []
+
+        def spy_apply(manager, collections, persisted):
+            captured_busy.append(actions.is_busy())
+            return real_apply_imported_collections(manager, collections, persisted)
+
+        try:
+            with patch(_APPLY, side_effect=spy_apply) as mock_apply, patch(_RESULT):
+                # Simulate the worker having been started (preparing) and then its
+                # `finished` signal already having been handled — i.e. `_worker`
+                # already cleared by `_on_worker_finished()` — before the
+                # `parse_completed` signal is handled. This is the documented gap
+                # trigger: neither `_preparing` nor `_worker` is True/non-None once
+                # `_finish_import()` starts running.
+                actions._state = CollectionImportState.PARSING
+                actions._worker = None
+                actions._on_parse_completed([incoming], [])
+
+            assert mock_apply.call_count == 1, "apply_imported_collections was not called"
+            assert captured_busy == [True], (
+                "is_busy() must report True while _finish_import() is applying "
+                "the imported collections (PYPOST-1228 applying-stage gap)"
             )
         finally:
             presenter.panel.close()

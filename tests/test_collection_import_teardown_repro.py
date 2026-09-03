@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from pypost.core.collection_import_state import CollectionImportState
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from tests.helpers.collections_tree import (
     FakeMetrics,
@@ -58,24 +59,34 @@ def test_presenter_and_actions_expose_teardown_contract(qapp):
         presenter.teardown()
 
 
-def test_is_busy_retains_true_while_worker_instance_exists(qapp):
-    """is_busy() must remain True as long as _worker is not None, even if isRunning() is False."""
+def test_is_busy_reflects_state_independent_of_worker_presence(qapp):
+    """is_busy() tracks `_state` only (PYPOST-1228); `_worker` is purely lifecycle bookkeeping.
+
+    Superseded contract from PYPOST-1148 (`_preparing or _worker is not None`): a lingering
+    `_worker` reference no longer implies busy on its own, and a non-idle `_state` implies busy
+    even with no `_worker` reference at all.
+    """
     presenter, _ = _make_presenter()
     try:
         actions = presenter._import_actions
         mock_worker = MagicMock()
         mock_worker.isRunning.return_value = False
         actions._worker = mock_worker
-        actions._preparing = False
+        actions._state = CollectionImportState.IDLE
 
-        # In unpatched code: is_busy() returns False when isRunning() is False,
-        # despite _worker being non-None.
-        # The new architecture contract requires is_busy() to be True while _worker is not None.
+        assert actions.is_busy() is False, (
+            "is_busy() must be False when _state is IDLE, even if _worker is still set"
+        )
+
+        actions._worker = None
+        actions._state = CollectionImportState.PARSING
+
         assert actions.is_busy() is True, (
-            "CollectionImportActions.is_busy() must remain True while _worker is not None"
+            "is_busy() must be True whenever _state is not IDLE, even with no _worker"
         )
     finally:
         actions._worker = None
+        actions._state = CollectionImportState.IDLE
         presenter.teardown()
 
 
@@ -128,7 +139,7 @@ def test_teardown_structured_logging(caplog, qapp):
     mock_worker.isRunning.return_value = True
     mock_worker.wait.return_value = True
     actions._worker = mock_worker
-    actions._preparing = False
+    actions._state = CollectionImportState.PARSING
 
     with caplog.at_level(logging.DEBUG):
         clean_interrupted = presenter.teardown(timeout_ms=20)

@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
+from pypost.core.collection_import_state import CollectionImportState
 from pypost.core.collection_messages import (
     MSG_IMPORT_PREPARING,
 )
@@ -58,7 +59,7 @@ def test_import_skipped_when_already_busy(_mock_picker, caplog, qapp):
     presenter, manager = _make_presenter()
     try:
         # Simulate active busy state on import actions
-        presenter._import_actions._preparing = True
+        presenter._import_actions._state = CollectionImportState.PREPARING
 
         with caplog.at_level(logging.INFO):
             presenter.import_collections()
@@ -68,7 +69,7 @@ def test_import_skipped_when_already_busy(_mock_picker, caplog, qapp):
             for rec in caplog.records
         )
     finally:
-        presenter._import_actions._preparing = False
+        presenter._import_actions._state = CollectionImportState.IDLE
         presenter.teardown()
 
 

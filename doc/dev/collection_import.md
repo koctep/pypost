@@ -60,6 +60,18 @@ not None`) to prevent premature idle detection, safely disconnecting signals, in
 and joining background worker threads, and draining deferred deletion events before widget
 destruction.
 
+**PYPOST-1228** replaces that boolean `_preparing` flag plus `_worker is not None` check with a
+formal `CollectionImportState` enum (`pypost/core/collection_import_state.py`: `IDLE`,
+`PREPARING`, `PARSING`, `APPLYING`) and fixes a real bug the two-flag scheme had: because
+`_on_parse_completed()` cleared `_preparing` *before* running `_finish_import()` (conflict
+prompts → plan → apply → refresh — the applying phase), and `_worker` could already be `None`
+by then if the worker's `finished` signal had already been processed, `is_busy()` could report
+`False` for the entire applying window. A second `import_collections()` call arriving during
+that window (e.g. from a modal conflict dialog pumping the event loop) was not reliably
+rejected. `_state` now transitions to `APPLYING` synchronously before `_finish_import()` runs
+and back to `IDLE` as its last statement, closing the gap. See [State machine
+(PYPOST-1228)](#state-machine-pypost-1228) below.
+
 ## Architecture
 
 ```text
@@ -84,6 +96,11 @@ After:
        → conflicts → plan → apply → result   (GUI thread, unchanged)
 ```
 
+- **`pypost/core/collection_import_state.py`** — `CollectionImportState`, a Qt-free
+  `str, Enum` (`IDLE`, `PREPARING`, `PARSING`, `APPLYING`) naming what
+  `CollectionImportActions` is doing right now, following the `ImportConflictDecision(str,
+  Enum)` precedent in `import_conflicts.py` (PYPOST-1228). Replaces the earlier `_preparing`
+  bool plus `_worker is not None` presence check.
 - **`pypost/core/collection_import.py`** — the pure core. No Qt, no storage. Parses a
   file into candidate `Collection` models, detects name conflicts, reserves colliding
   ids, computes the resulting collection list, recounts plan results against save
@@ -151,6 +168,62 @@ There is no modal `QProgressDialog` and no determinate percent bar — same clas
 experience as [Collection Loading](collection_loading.md) startup async load, plus a
 visible preparing cue for a user-initiated action. Plan and apply remain synchronous
 after parse; only parse is off-thread.
+
+### State machine (PYPOST-1228)
+
+`CollectionImportActions._state: CollectionImportState` is the single source `is_busy()`
+reads. Transitions all happen synchronously on the GUI thread:
+
+```
+        import_collections()                 worker.start()
+IDLE ───────────────────────▶ PREPARING ───────────────────────▶ PARSING
+  ▲                                                                  │
+  │                                                     parse_completed (no valid collections)
+  │                                                     or parse_failed
+  │◀─────────────────────────────────────────────────────────────────┤
+  │                                                                  │
+  │                                          parse_completed (valid collections)
+  │                                                                  ▼
+  │                                                              APPLYING
+  │                                                     (_finish_import: conflicts →
+  │                                                      plan → apply → refresh/restore/emit)
+  │                                                                  │
+  └──────────────────────── end of _finish_import() ─────────────────┘
+
+Any state ──── teardown() ────▶ IDLE   (forced, unconditional, after worker
+                                          disconnect/interrupt/reap)
+```
+
+| From | Event / call site | To |
+| --- | --- | --- |
+| IDLE | `import_collections()` picks a file (not busy) → `_start_parse()` begins | PREPARING |
+| PREPARING | `worker.start()` returns | PARSING |
+| PARSING | `parse_completed` fires, `collections` empty | IDLE |
+| PARSING | `parse_completed` fires, `collections` non-empty | APPLYING |
+| PARSING | `parse_failed` fires | IDLE |
+| APPLYING | `_finish_import()` reaches its final statement (after the result dialog) | IDLE |
+| any | `teardown()` called | IDLE |
+
+The bug this closes: the previous two-flag scheme (`_preparing` bool + `_worker is not None`)
+cleared `_preparing` as the first statement of `_on_parse_completed()`, before `_finish_import()`
+ran. `_worker` could already be `None` at that point too, if the worker's `finished` signal
+(queued asynchronously, with no ordering guarantee relative to `parse_completed`) had already been
+processed. When both were false, `is_busy()` reported `False` for the entire applying window —
+conflict dialogs, `plan_collection_import`, `apply_imported_collections`, tree refresh — even
+though an import was still actively in flight. A second `import_collections()` call arriving
+during that window (a modal conflict dialog pumps the Qt event loop, so a re-entrant trigger is
+possible) was not reliably rejected.
+
+`_state` transitions to `APPLYING` synchronously inside `_on_parse_completed()`, strictly before
+`_finish_import()` is invoked, and back to `IDLE` synchronously as the last statement inside
+`_finish_import()`. Both edges are on the same call stack as the work they bracket, so neither
+depends on the worker's `finished` signal timing — the race is removed rather than narrowed.
+`self._worker` continues to be written in the same three places (`_start_parse`,
+`_on_worker_finished`, `teardown`) for `QThread` lifecycle mechanics only; it is no longer
+consulted by `is_busy()`.
+
+There is no `FAILED` state: a parse failure or "no valid collections" result returns straight to
+`IDLE` after the error dialog, matching pre-PYPOST-1228 behavior.
 
 ### Plan-then-apply
 
@@ -335,11 +408,16 @@ and a short `wait(100)` before dropping the reference (same PYPOST-829 pattern a
 
 `QObject` owned by the presenter. Public surface:
 
-- **`is_busy() -> bool`** — returns `True` while preparing or while a parse worker is active
-  (`self._preparing or self._worker is not None`). Refined in PYPOST-1148 to check
-  `self._worker is not None` rather than `self._worker.isRunning()`, preventing premature idle
-  detection while worker finalization (`_on_worker_finished`), signal delivery, or teardown is in
-  flight. A second Import click while busy is ignored (`collection_import_skipped reason=busy`).
+- **`is_busy() -> bool`** — returns `True` whenever `self._state is not
+  CollectionImportState.IDLE`, i.e. while preparing, parsing, or applying (PYPOST-1228). A second
+  Import click while busy is ignored (`collection_import_skipped reason=busy`). Prior to
+  PYPOST-1228 this was `self._preparing or self._worker is not None` (refined in PYPOST-1148 to
+  check `self._worker is not None` rather than `self._worker.isRunning()`, to prevent premature
+  idle detection while worker finalization (`_on_worker_finished`), signal delivery, or teardown
+  was in flight); that two-flag scheme could still report `False` during the applying phase — see
+  [State machine (PYPOST-1228)](#state-machine-pypost-1228). `self._worker` remains, but purely
+  for `QThread` lifecycle mechanics (`wait_idle()`'s no-`QApplication` fallback, `teardown()`'s
+  disconnect/interrupt/reap sequence); it no longer feeds `is_busy()`.
 - **`wait_idle(timeout_ms: int = 5000) -> bool`** — synchronously pumps the Qt event loop
   (`QApplication.processEvents()`) or waits for thread completion until all background worker
   threads (`CollectionImportParseWorker`) have finished, joined, and been reset to `None`
@@ -553,6 +631,8 @@ In `collections_presenter.py`:
 
 In `collection_import_actions.py`:
 
+- **DEBUG** `collection_import_state_changed from=%s to=%s` — every `CollectionImportState`
+  transition (`_set_state`), e.g. `from=parsing to=applying` (PYPOST-1228)
 - **INFO** `collection_import_skipped reason=busy` — second Import while preparing
 - **INFO** `collection_import_parse_started path=…` — orchestrator dispatched the worker
 - **DEBUG** `collection_import_busy_cue_shown` / `collection_import_busy_cue_cleared`
