@@ -1,31 +1,6 @@
 {
-  "error_count": 189,
+  "error_count": 180,
   "errors": [
-    {
-      "code": "arg-type",
-      "message": "Argument 1 to \"_webhook_log_target\" has incompatible type \"str | None\"; expected \"str\"",
-      "path": "pypost/core/alert_manager.py"
-    },
-    {
-      "code": "arg-type",
-      "message": "Argument 1 to \"_webhook_log_target\" has incompatible type \"str | None\"; expected \"str\"",
-      "path": "pypost/core/alert_manager.py"
-    },
-    {
-      "code": "arg-type",
-      "message": "Argument 1 to \"_webhook_log_target\" has incompatible type \"str | None\"; expected \"str\"",
-      "path": "pypost/core/alert_manager.py"
-    },
-    {
-      "code": "arg-type",
-      "message": "Argument 1 to \"_webhook_log_target\" has incompatible type \"str | None\"; expected \"str\"",
-      "path": "pypost/core/alert_manager.py"
-    },
-    {
-      "code": "arg-type",
-      "message": "Argument 1 to \"post\" has incompatible type \"str | None\"; expected \"str | bytes\"",
-      "path": "pypost/core/alert_manager.py"
-    },
     {
       "code": "return-value",
       "message": "Incompatible return value type (got \"list[Literal['environment', 'keyring', 'secret_store']]\", expected \"list[str]\")",

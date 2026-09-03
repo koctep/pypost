@@ -25,6 +25,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = REPO_ROOT / "mypy-baseline.json"
 MYPY_PATHS = ("pypost/core", "pypost/models", "pypost/ui")
 BASELINE_VERSION = 2
+MYPY_TIMEOUT_SECONDS = 60
+MYPY_TIMEOUT_EXIT_CODE = 124
 _MYPY_PATH_RE = "|".join(
     re.escape(path)
     for path in sorted(MYPY_PATHS, key=lambda path: (-len(path), path))
@@ -68,13 +70,28 @@ def _run_mypy() -> tuple[int, str]:
         *MYPY_PATHS,
         "--show-error-codes",
     ]
-    completed = subprocess.run(
-        cmd,
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            cmd,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=MYPY_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        output = stdout + stderr
+        if output and not output.endswith("\n"):
+            output += "\n"
+        output += f"mypy timed out after {MYPY_TIMEOUT_SECONDS} seconds\n"
+        return MYPY_TIMEOUT_EXIT_CODE, output
+
     output = completed.stdout + completed.stderr
     return completed.returncode, output
 
@@ -226,7 +243,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    _returncode, output = _run_mypy()
+    returncode, output = _run_mypy()
+    if returncode == MYPY_TIMEOUT_EXIT_CODE:
+        print(output, file=sys.stderr, end="")
+        return 1
+
     current = _parse_errors(output)
 
     if args.update_baseline:

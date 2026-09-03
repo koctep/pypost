@@ -14,12 +14,15 @@ blocks unreviewed type-regression drift.
 ```bash
 make install      # editable install with [dev] extra (includes mypy)
 make typecheck    # mypy + baseline gate (optional; not part of make check)
+make lint         # repository lint checks
+make verify-ai-tasks  # workflow artifact integrity
 ```
 
-The current gate passes with 189 known errors:
+The current gate passes with 180 known errors. These are pre-existing baseline diagnostics; they do
+not fail the gate while the current `(path, code, message)` multiset matches the committed baseline:
 
 ```text
-mypy baseline OK (189 known errors in pypost/core, pypost/models, pypost/ui)
+mypy baseline OK (180 known errors in pypost/core, pypost/models, pypost/ui)
 ```
 
 To see raw mypy output (including all known baseline errors):
@@ -38,6 +41,10 @@ To see raw mypy output (including all known baseline errors):
 | `scripts/check_mypy_baseline.py` | Runs mypy, parses diagnostics, and compares the baseline |
 | `tests/test_mypy_baseline_live.py` | Live pytest gate enforcing zero new and zero fixed baseline errors |
 | `Makefile` `typecheck` | Developer entry point |
+
+The baseline scope is exactly the three directory prefixes in
+`MYPY_PATHS = ("pypost/core", "pypost/models", "pypost/ui")`. The JSON `scope` field and the
+diagnostic parser use this same tuple; errors outside these directories are not baseline keys.
 
 ### Configuring checked paths
 
@@ -71,7 +78,8 @@ broad `object` declaration when one concrete payload class describes every live 
 
 ### Baseline gate behavior
 
-1. Run mypy on every directory in `MYPY_PATHS`, preserving the tuple's configured order.
+1. Run mypy on exactly `pypost/core`, `pypost/models`, and `pypost/ui`, preserving the tuple's
+   configured order.
 2. Parse errors into `(path, code, message)` keys — **not** `path:line:code`. The line number is
    parsed too, but only for display in the "new errors" report; it is deliberately excluded from
    the comparison key because it shifts whenever unrelated code moves above an error (an import
@@ -80,8 +88,9 @@ broad `object` declaration when one concrete payload class describes every live 
    from pure line drift buried the one real regression in that run's mypy diff. Dropping the line
    removes that churn while keeping enough specificity to tell errors apart, since mypy's message
    text usually names the specific attribute/argument/variable involved.
-3. Diff current vs. baseline as a `collections.Counter`-based **multiset** difference, not a set
-   difference. Because the key excludes line number, distinct errors on different lines can
+3. Diff current vs. baseline as a `collections.Counter`-based **multiset** difference keyed by
+   `(path, code, message)`, not a set difference. Because the key excludes line number, distinct
+   errors on different lines can
    legitimately share the same `(path, code, message)` — empirically true for roughly half of
    today's baselined errors. A plain set diff would only track key *presence*, so fixing one of
    three duplicate-key instances (or introducing a new one) would look like no change at all. The
@@ -98,6 +107,9 @@ broad `object` declaration when one concrete payload class describes every live 
 7. `mypy-baseline.json` missing/wrong `"version"` (i.e. not `2`, including the legacy flat
    `path:line:code` format) is rejected outright with an error pointing at `--update-baseline` —
    there is no silent dual-format fallback.
+8. The internal mypy subprocess is limited to 60 seconds. On timeout, the gate preserves any
+   partial output, adds `mypy timed out after 60 seconds`, writes it visibly to stderr, and exits
+   nonzero. A timeout does not perform a baseline comparison or rewrite the baseline.
 
 ### Reading occurrence reports
 
@@ -123,7 +135,8 @@ New mypy errors (not in baseline):
 These formatting contracts have direct regression coverage in `tests/test_mypy_baseline.py`.
 
 After fixing type errors intentionally, explicitly regenerate the baseline and commit the result.
-The normal gate never rewrites the baseline automatically:
+The normal `make typecheck` gate only compares results; it never rewrites the baseline
+automatically:
 
 ```bash
 .venv/bin/python scripts/check_mypy_baseline.py --update-baseline
@@ -139,8 +152,16 @@ The baseline gate functions as a strict, unidirectional ratchet:
   errors, the gate exits with status `1` (`Resolved baseline errors (update baseline)`). Developers
   must run `--update-baseline` and commit the updated `mypy-baseline.json`.
 
-This enforces that technical debt only decreases (ratcheting down from 217 to 201 to 189 errors),
-preventing retired errors from silently resurfacing in future changes.
+This enforces that technical debt only decreases (ratcheting down from 217 to 201 to 189 to 180
+records), preventing retired errors from silently resurfacing in future changes.
+
+### Safe optional URL narrowing
+
+`AlertManager._send_webhook()` copies its optional webhook URL to a local variable and returns
+when that value is `None`. The subsequent request and `_webhook_log_target()` calls therefore use
+a narrowed `str`, while configured-webhook request and logging behavior remains unchanged. Keep
+this kind of guard local to the nullable use; it retires the relevant `arg-type` diagnostics
+without changing the three-directory baseline scope or its update policy.
 
 ### Live test gate (`tests/test_mypy_baseline_live.py`)
 
@@ -314,6 +335,10 @@ The baseline error count reflects known technical debt across `pypost/core`, `py
   33 newly introduced errors across generic save orchestrators, tab close prompt protocols, stream
   export signatures, and Qt UserRole enums, while retiring 4 resolved baseline entries via
   automated ratchet reconciliation. Added `tests/test_mypy_baseline_live.py` to enforce zero drift.
+- **PYPOST-1255 (September 2026):** Ratcheted the live baseline to **180 records** by retiring five
+  direct `pypost/core/alert_manager.py` webhook `arg-type` occurrences. Added a 60-second internal
+  mypy subprocess timeout with visible nonzero failure handling and regression coverage for the
+  timeout and Counter-key contracts.
 
 Per-code breakdown below is the original July 2026 snapshot; it illustrates *typical* fixes rather
 than a live count. Open `mypy-baseline.json` (one JSON object per error, with an `error_count`
@@ -332,8 +357,9 @@ summary field) for the exact live breakdown.
 | `return-value` | 2 | Protocol / envelope mismatches |
 | `no-any-return` | 2 | Untyped third-party returns |
 
-Suggested fix order: `alert_manager.py` webhook URL guards → encryption codec conditional imports
-→ nullable `TemplateService` in `request_service.py`.
+The `alert_manager.py` webhook URL guard was completed in PYPOST-1255. Remaining suggested fix
+order: encryption codec conditional imports → nullable `TemplateService` in
+`request_service.py`.
 
 ### UI (`pypost/ui/`) — 177 errors in 29 files
 
@@ -368,11 +394,24 @@ and stream export delta).
 CI (`.github/workflows/test.yml`) runs `make check`, which executes
 `tests/test_mypy_baseline_live.py`.
 
+Use Make targets for local validation. `make typecheck` runs the baseline comparison,
+`make lint` runs static/style checks, and `make verify-ai-tasks` verifies workflow artifacts.
+The underlying mypy process may report the 180 known diagnostics and still yield a passing
+`make typecheck` when no new or resolved Counter-key occurrences are present. A task-caused new
+key or additional occurrence is different: it is reported as `New mypy errors (not in baseline)`
+and makes the gate nonzero until the source change is fixed.
+
 ## Troubleshooting
 
 ### `make typecheck` reports new errors
 
 Fix the type errors or revert the change. Do not edit the baseline to hide regressions.
+
+### `make typecheck` reports a timeout
+
+The gate fails visibly after the internal 60-second mypy limit with
+`mypy timed out after 60 seconds`. Investigate the environment or checker run and retry; the
+timeout path never rewrites `mypy-baseline.json`.
 
 ### Fixed errors but the gate still fails
 

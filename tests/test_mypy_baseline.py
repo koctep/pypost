@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import json
 import runpy
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,38 @@ def _load_with_mypy_paths(
 
 
 class TestMypyBaseline:
+    def test_mypy_timeout_fails_gate_and_reports_timeout(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        observed_timeout: list[int] = []
+
+        def timeout_run(*args: Any, **kwargs: Any) -> None:
+            del args
+            observed_timeout.append(kwargs["timeout"])
+            raise subprocess.TimeoutExpired(
+                cmd=["python", "-m", "mypy"],
+                timeout=kwargs["timeout"],
+                output=b"partial stdout\n",
+                stderr=b"partial stderr\n",
+            )
+
+        monkeypatch.setattr(check_mypy_baseline.subprocess, "run", timeout_run)
+        monkeypatch.setattr(sys, "argv", ["check_mypy_baseline.py"])
+
+        exit_code = check_mypy_baseline.main()
+        captured = capsys.readouterr()
+
+        assert observed_timeout == [check_mypy_baseline.MYPY_TIMEOUT_SECONDS]
+        assert exit_code == 1
+        assert captured.err == (
+            "partial stdout\n"
+            "partial stderr\n"
+            "mypy timed out after 60 seconds\n"
+        )
+        assert "mypy baseline OK" not in captured.out
+
     def test_baseline_file_exists(self) -> None:
         assert BASELINE_PATH.is_file()
 

@@ -132,36 +132,40 @@ class AlertManager:
             self._send_webhook(payload)
 
     def _send_webhook(self, payload: AlertPayload) -> None:
+        webhook_url = self._webhook_url
+        if webhook_url is None:
+            return
+
         headers = {"Content-Type": "application/json"}
         if self._webhook_auth_header:
             headers["Authorization"] = self._webhook_auth_header
         try:
             resp = requests.post(
-                self._webhook_url,
+                webhook_url,
                 json=payload.to_dict(),
                 headers=headers,
                 timeout=5.0,
             )
             logger.debug(
                 "alert_webhook_ok target=%s status=%d",
-                _webhook_log_target(self._webhook_url),
+                _webhook_log_target(webhook_url),
                 resp.status_code,
             )
         except requests.Timeout as exc:
             logger.warning(
                 "alert_webhook_failed target=%s error=%s",
-                _webhook_log_target(self._webhook_url),
+                _webhook_log_target(webhook_url),
                 exc,
             )
         except requests.ConnectionError as exc:
             logger.warning(
                 "alert_webhook_failed target=%s error=%s",
-                _webhook_log_target(self._webhook_url),
+                _webhook_log_target(webhook_url),
                 exc,
             )
         except requests.RequestException as exc:
             logger.warning(
                 "alert_webhook_failed target=%s error=%s",
-                _webhook_log_target(self._webhook_url),
+                _webhook_log_target(webhook_url),
                 exc,
             )
