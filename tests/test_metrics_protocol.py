@@ -17,18 +17,12 @@ from pypost.core.metrics_protocol import (
 )
 from pypost.core.qt.metrics import MetricsManager
 from pypost.models.errors import ErrorCategory
+from tests.helpers.protocol_guards import (
+    _assert_tracker_satisfies_all_protocol_methods,
+    _get_protocol_methods,
+)
 
 pytestmark = pytest.mark.timeout(30)
-
-
-def _get_protocol_methods(protocol: type) -> dict[str, inspect.Signature]:
-    """Extract non-dunder public methods and their callable signatures from a protocol."""
-    methods: dict[str, inspect.Signature] = {}
-    for name, member in inspect.getmembers(protocol, predicate=callable):
-        if name.startswith("_"):
-            continue
-        methods[name] = inspect.signature(member)
-    return methods
 
 
 def _get_dummy_value(param: inspect.Parameter) -> Any:
@@ -67,62 +61,6 @@ def _get_dummy_value(param: inspect.Parameter) -> Any:
         return ErrorCategory.NETWORK
 
     return "test"
-
-
-def _assert_tracker_satisfies_all_protocol_methods(
-    tracker_cls: type,
-    protocol: type = MetricsTrackerProtocol,
-) -> None:
-    protocol_methods = _get_protocol_methods(protocol)
-    assert protocol_methods, f"No methods found on {protocol.__name__}"
-
-    missing_methods: list[str] = []
-    signature_mismatches: list[str] = []
-
-    for name, proto_sig in protocol_methods.items():
-        if not hasattr(tracker_cls, name):
-            missing_methods.append(name)
-            continue
-        impl_member = getattr(tracker_cls, name)
-        if not callable(impl_member):
-            missing_methods.append(f"{name} (not callable)")
-            continue
-
-        impl_sig = inspect.signature(impl_member)
-        proto_params = [p for p in proto_sig.parameters.values() if p.name != "self"]
-        impl_params = [p for p in impl_sig.parameters.values() if p.name != "self"]
-
-        if len(proto_params) != len(impl_params):
-            signature_mismatches.append(
-                f"{name}: parameter count mismatch "
-                f"(expected {len(proto_params)}, got {len(impl_params)})"
-            )
-            continue
-
-        for p_proto, p_impl in zip(proto_params, impl_params):
-            if p_proto.name != p_impl.name:
-                signature_mismatches.append(
-                    f"{name}: param name mismatch (expected {p_proto.name}, got {p_impl.name})"
-                )
-            elif p_proto.kind != p_impl.kind:
-                signature_mismatches.append(
-                    f"{name}: param '{p_proto.name}' kind mismatch "
-                    f"(expected {p_proto.kind}, got {p_impl.kind})"
-                )
-            elif p_proto.default != p_impl.default:
-                signature_mismatches.append(
-                    f"{name}: param '{p_proto.name}' default mismatch "
-                    f"(expected {p_proto.default}, got {p_impl.default})"
-                )
-
-    assert not missing_methods, (
-        f"{tracker_cls.__name__} is missing {len(missing_methods)} methods "
-        f"from {protocol.__name__}: {missing_methods}"
-    )
-    assert not signature_mismatches, (
-        f"{tracker_cls.__name__} has {len(signature_mismatches)} signature "
-        f"mismatches: {signature_mismatches}"
-    )
 
 
 def test_metrics_manager_satisfies_tracker_protocol():

@@ -167,11 +167,12 @@ it does not inspect signature compatibility, parameter counts, parameter names, 
 kinds. Furthermore, having three distinct implementations (`MetricsManager`, `NullMetrics`, and
 `OtelMetricsTracker`) creates a risk of protocol drift when new metrics methods are added.
 
-To prevent drift, `tests/test_metrics_protocol.py` provides reflection-based contract tests:
+To prevent drift, the shared `tests/helpers/protocol_guards.py` helper provides reflection-based
+contract checks used by `tests/test_metrics_protocol.py` and available to any protocol test:
 
 - **Signature extraction (`_get_protocol_methods`)**:
   Uses `inspect.getmembers()` and `inspect.signature()` to introspect all public callable
-  methods declared on `MetricsTrackerProtocol`.
+  methods declared on the supplied protocol.
 - **Exhaustive contract verification (`_assert_tracker_satisfies_all_protocol_methods`)**:
   Inspects the implementation class via reflection to verify that:
   - Every protocol method exists and is callable.
@@ -186,6 +187,12 @@ To prevent drift, `tests/test_metrics_protocol.py` provides reflection-based con
   - `test_null_metrics_all_methods_callable_without_error`: Automatically synthesizes typed
     dummy values via reflection (`_get_dummy_value`) and executes every method on `NullMetrics`
     to guarantee safe runtime execution without raising exceptions.
+
+For a new `@runtime_checkable` protocol, import
+`_assert_tracker_satisfies_all_protocol_methods` from
+`tests.helpers.protocol_guards` and pass the implementation class and protocol explicitly. The
+guard checks structural method presence and signature parity; protocol-specific invocation data
+belongs in the calling test.
 
 ### Testing patterns
 
