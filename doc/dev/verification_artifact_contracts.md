@@ -24,8 +24,8 @@ the declarations below without contacting Jira or another external service.
 - **Encrypted-startup restore gate:** the `MainWindow` two-signal readiness barrier is covered
   by `tests/test_main_window_encrypted_startup.py`.
 
-The dialog report is documentation-as-contract. It must match discovery exactly: eight modules,
-1,030 LOC, and one `mcp_servers_dialog.py` entry at 333 LOC. Its three-MCP-dialog summary,
+The dialog report is documentation-as-contract. It must match discovery exactly: nine modules,
+1,790 LOC, and one `mcp_servers_dialog.py` entry at 486 LOC. Its three-MCP-dialog summary,
 testability table, and completion verdict must describe that same inventory.
 
 The other validators parse test artifacts with Python ASTs. They lock the approved four-name

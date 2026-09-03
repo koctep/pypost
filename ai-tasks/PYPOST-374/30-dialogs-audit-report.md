@@ -1,7 +1,7 @@
 # PYPOST-374: Individual Dialog SOLID Audit Report
 
 **Date:** 2026-06-11
-**Scope:** `pypost/ui/dialogs/` (nine dialog modules, 1,787 LOC total)
+**Scope:** `pypost/ui/dialogs/` (nine dialog modules, 1,790 LOC total)
 **Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)
 **Baseline comparison:** PYPOST-40 grouped inventory ~400 LOC, five dialogs named
 
@@ -35,9 +35,9 @@ complete for the full current scope.
 | `mcp_servers_dialog.py` | 486 | `McpServersDialog` + editor | MCP server manager | main window |
 | `mcp_tools_overview_dialog.py` | 74 | Tool overview | MCP tools | env |
 | `save_dialog.py` | 93 | `SaveRequestDialog` | Save-as picker | save orchestrator |
-| `settings_dialog.py` | 260 | `SettingsDialog` | Settings composition | main window |
+| `settings_dialog.py` | 263 | `SettingsDialog` | Settings composition | main window |
 
-**Total:** 1,787 LOC (vs PYPOST-40 grouped ~400 LOC).
+**Total:** 1,790 LOC (vs PYPOST-40 grouped ~400 LOC).
 
 Regenerate counts: `scripts/audit_dialogs_inventory.py --markdown`
 
@@ -160,7 +160,7 @@ validation. It exposes activity and tools as read-only views and keeps legacy co
 | ISP | Good | Optional storage and migration dependencies stay scoped to encryption |
 | DIP | Good | Receives storage and migration service seams |
 
-**Maintainability:** At 254 LOC, the dialog delegates form construction, validation, and field
+**Maintainability:** At 263 LOC, the dialog delegates form construction, validation, and field
 collection to dedicated widgets. **Test coverage:** Strong (`test_settings_dialog.py` and
 encryption/migration UI tests).
 
