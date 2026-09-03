@@ -16,6 +16,18 @@ owns header resolution, upstream cleanup, timeout/network mapping, timing,
 metrics, activity entries, and safe completion logs. It does not add connection
 pooling, so per-request upstream initialization remains the PYPOST-1101 scope.
 
+PYPOST-1105 adds process-based wire coverage for this proxy. The slow tests start
+one upstream and one proxy Uvicorn process on loopback, then connect a real MCP
+client to the proxy. Run them explicitly with:
+
+```sh
+make test-slow PYTEST_ARGS="tests/test_mcp_proxy_live_integration.py -m slow"
+```
+
+The Streamable HTTP case checks a large payload, and the SSE case selects the
+legacy `/sse/` upstream transport. Both tests use bounded startup and teardown;
+the default `make test` suite intentionally excludes them.
+
 ## Architecture
 
 The call flow has one application-owned validation boundary:
