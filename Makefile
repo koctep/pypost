@@ -154,7 +154,7 @@ run: $(VENV_MARKER) ## Run the PyPost desktop application
 run-daemon: $(VENV_MARKER) ## Run PyPost services without a graphical interface
 	PYTHONPATH=. $(BIN)/python -m pypost.daemon
 
-run-agent-ui-mcp: $(VENV_MARKER) ## Stdio MCP sidecar for agent UI actions (PYPOST-952)
+run-agent-ui-mcp: $(VENV_MARKER) ## Stdio agent-UI MCP sidecar (use module --http for HTTP)
 	QT_QPA_PLATFORM=offscreen PYTHONPATH=. $(BIN)/python -m pypost.agent.ui_actions_mcp
 
 test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow integration tests)

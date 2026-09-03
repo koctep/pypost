@@ -133,6 +133,11 @@ Local AF_UNIX attach host/client for the agent-UI sidecar. Logging-only
 | `agent_ui_mcp_attach_ready` | INFO | `endpoint` | `agent/ui_actions_mcp` |
 | `agent_ui_mcp_attach_failed` | ERROR | `endpoint`, `error` | `agent/ui_actions_mcp` |
 | `agent_ui_mcp_attach_ended` | INFO | `endpoint` | `agent/ui_actions_mcp` |
+| `agent_ui_mcp_http_starting` | INFO | `host`, `port` | `agent/ui_actions_mcp` |
+| `agent_ui_mcp_http_listening` | INFO | `endpoint` | `agent/ui_actions_mcp` |
+| `agent_ui_mcp_http_failed` | ERROR | exception | `agent/ui_actions_mcp` |
+| `agent_ui_mcp_http_stop_timeout` | ERROR | `endpoint` | `agent/ui_actions_mcp` |
+| `agent_ui_mcp_http_stopped` | INFO | `endpoint` | `agent/ui_actions_mcp` |
 
 Agent session contract and ready-gate semantics:
 [agent_lifecycle.md](agent_lifecycle.md). Packaging fixtures emit

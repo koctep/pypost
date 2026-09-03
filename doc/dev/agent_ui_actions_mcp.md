@@ -3,8 +3,9 @@
 ## Overview
 
 External MCP clients can drive PyPost widgets **out-of-process** via a dedicated
-stdio MCP server that wraps `pypost.agent.ui_actions`. This surface is **not**
-part of product `MCPServerImpl` (collection HTTP request tools).
+stdio or optional Streamable HTTP MCP server that wraps
+`pypost.agent.ui_actions`. This surface is **not** part of product
+`MCPServerImpl` (collection HTTP request tools).
 
 Two **session paths** are valid on this surface:
 
@@ -25,7 +26,7 @@ Trust: [mcp_trust_model.md](mcp_trust_model.md). Lifecycle:
 
 | Component | Role |
 | --- | --- |
-| `pypost/agent/ui_actions_mcp.py` | MCP Server + stdio `main()` (spawn or `--attach`) |
+| `pypost/agent/ui_actions_mcp.py` | MCP Server + stdio/HTTP `main()` (spawn or `--attach`) |
 | `pypost/agent/seed_loader.py` | Seed path resolution and pre-compose workspace staging |
 | `AgentUiActionsMcpServer` | `list_tools` / `call_tool` for ui_* primitives |
 | `pypost/agent/ui_drive.py` | `UiDriveSession` protocol + `MainWindowUiDrive` |
@@ -33,13 +34,17 @@ Trust: [mcp_trust_model.md](mcp_trust_model.md). Lifecycle:
 | `pypost/agent/attach_ipc.py` | AF_UNIX host + client; NDJSON wire protocol |
 | `AgentUiAttachHost` | Desktop listener; GUI-thread `ui_*` dispatch |
 | `AttachClientSession` | Sidecar attach client (`UiDriveSession`) |
+| `QtMainThreadDispatcher` | Queued Qt dispatch for HTTP-thread `call_tool` |
+| `AgentUiHttpServer` | Optional bounded Uvicorn `/mcp` lifecycle |
 | `pypost/main.py` | Starts/stops host around interactive `app.exec()` |
 | `MCPServerImpl` | Product HTTP tools only — **no UI-action tools** |
 
 ```mermaid
 flowchart LR
   Client[MCP client] -->|stdio| Sidecar[pypost-agent-ui-mcp]
+  HttpClient[MCP HTTP client] -->|HTTP /mcp| HttpSidecar[pypost-agent-ui-mcp --http]
   Sidecar --> Bridge[AgentUiActionsMcpServer]
+  HttpSidecar --> Bridge
   Bridge --> Proto[UiDriveSession]
   Proto -->|spawn| Session[AgentAppSession]
   Proto -->|attach| AttClient[AttachClientSession]
@@ -48,6 +53,7 @@ flowchart LR
   Host --> Drive[MainWindowUiDrive]
   Drive --> Actions[ui_actions]
   Session --> Actions
+  HttpSidecar -->|queued| Qt[Qt application thread]
   Client -->|HTTP /mcp| Product[MCPServerImpl]
 ```
 
@@ -55,9 +61,9 @@ Server name: `pypost-agent-ui` (distinct from default product `pypost-server`).
 
 ### Local IPC (AF_UNIX)
 
-MCP clients always **spawn** the stdio sidecar. Attach cannot turn the desktop
+Attach MCP clients **spawn** the stdio sidecar. Attach cannot turn the desktop
 into that stdio child, so the sidecar binds a **side-channel** into the live
-Qt process:
+Qt process. HTTP clients start the explicit `--http` sidecar path instead:
 
 1. Interactive `main()` constructs `AgentUiAttachHost(window)` after show,
    calls `start()` before `app.exec()`, and `stop()` in `finally`.
@@ -121,6 +127,32 @@ pattern):
 Compose **two** servers when you need both UI drive and collection HTTP tools:
 this sidecar plus product MCP at `http://127.0.0.1:<port>/mcp`
 ([mcp_integration.md](mcp_integration.md)).
+
+## Optional Streamable HTTP path
+
+The sidecar remains stdio by default. Select HTTP explicitly for a spawned
+sidecar session:
+
+```bash
+# Port 0 chooses an available loopback port and logs the resolved URL.
+pypost-agent-ui-mcp --http
+
+# Use a stable port when configuring an HTTP MCP client.
+pypost-agent-ui-mcp --http --host 127.0.0.1 --port 8765
+```
+
+The endpoint is `http://<host>:<port>/mcp`. The HTTP listener runs beside the
+sidecar-owned `AgentAppSession`; the main thread pumps Qt events while Uvicorn
+serves requests. Each HTTP `call_tool` is queued to that Qt thread and waits
+for completion with the `--qt-dispatch-timeout` bound. This preserves widget
+thread affinity while allowing normal Streamable HTTP MCP clients to use the
+same four tools.
+
+HTTP mode is intentionally separate from `--attach`: attach connects the
+stdio sidecar to the live desktop's AF_UNIX host and cannot be combined with
+`--http`. HTTP has no authentication or TLS layer and should remain on a
+trusted local interface; binding a non-loopback host exposes UI control to
+every reachable client.
 
 ## Attach path
 
@@ -273,6 +305,10 @@ Widget ids: [ui_identity.md](ui_identity.md).
 | `--attach` | off | Bind to desktop attach host (no spawn) |
 | `--attach-endpoint` | per-user path | Override AF_UNIX path for attach |
 | `PYPOST_AGENT_UI_ATTACH_ENDPOINT` | unset | Env override for the well-known AF_UNIX path |
+| `--http` | off | Use optional Streamable HTTP instead of stdio |
+| `--host` | `127.0.0.1` | HTTP bind host when `--http` is selected |
+| `--port` | `0` | HTTP bind port; `0` selects an ephemeral port |
+| `--qt-dispatch-timeout` | `30` | Seconds for HTTP UI action Qt dispatch |
 
 Logging goes to **stderr** (stdio is MCP transport). Tool calls log at DEBUG;
 fill **text is never logged** (same policy as in-process ui_actions).
@@ -296,6 +332,12 @@ Key structured events (`event_name key=value`). Full catalog:
 
 Prometheus metrics are **not** used for attach IPC (agent-UI policy).
 
+HTTP mode adds `agent_ui_mcp_http_starting`,
+`agent_ui_mcp_http_listening`, `agent_ui_mcp_http_failed`,
+`agent_ui_mcp_http_stop_timeout`, and `agent_ui_mcp_http_stopped`. These events
+contain only bind or lifecycle metadata; tool arguments and fill text are not
+logged.
+
 ## Limitations
 
 - **Spawn-session (default):** Sidecar **owns** its own `AgentAppSession`
@@ -305,8 +347,8 @@ Prometheus metrics are **not** used for attach IPC (agent-UI policy).
   plus sidecar `--attach`. Automated vs manual matrix is under Tests
   ([PYPOST-1208](https://pypost.atlassian.net/browse/PYPOST-1208)). Epic
   [PYPOST-991](https://pypost.atlassian.net/browse/PYPOST-991).
-- **Stdio only** — no separate loopback Streamable HTTP port for agent-UI MCP
-  in this release.
+- **HTTP is opt-in** — omit `--http` for the unchanged stdio path. HTTP mode
+  is a separate sidecar-owned spawn session and does not replace attach.
 - Default spawn-session boots unseeded; supply `--seed` / `--seed-file` or
   `PYPOST_AGENT_SEED_PATH` to pre-populate collections and environments (see
   [agent_seed_injection.md](agent_seed_injection.md)).
@@ -316,15 +358,25 @@ Prometheus metrics are **not** used for attach IPC (agent-UI policy).
 - **Sidecar hangs at start** — Increase `--ready-timeout`; check stderr for
   `agent_session_ready_timeout`. Applies to **spawn-session** (sidecar-owned
   ready wait).
-- **Seed injection fails / exit code 1** — Verify seed file exists and contains valid collection or
-  environment JSON/YAML. Check stderr for `agent_ui_mcp_seed_failed`.
+- **Seed injection fails / exit code 1** — Verify seed file exists and contains
+  valid collection or environment JSON/YAML. Check stderr for
+  `agent_ui_mcp_seed_failed`.
 - **Rejecting --attach with --seed** — Mutual exclusion is enforced. Attach connects to an
   interactive desktop, while seeds only apply to spawned sessions. Check stderr for
   `agent_ui_mcp_attach_with_seed_rejected`.
 - **UiTargetNotFoundError in tool result** — Wrong `widget_id` or use
   `in_current_tab: true` for per-tab controls.
-- **Client sees no tools** — Ensure the client uses stdio transport, not HTTP,
-  for this server.
+- **Client sees no tools** — Ensure the client uses stdio transport, unless the
+  sidecar was started with `--http`; for HTTP use the resolved `/mcp` endpoint
+  from `agent_ui_mcp_http_listening`.
+- **HTTP sidecar fails to bind** — Check `--host`/`--port` and stderr for
+  `agent_ui_mcp_http_failed`; port `0` avoids fixed-port collisions.
+- **HTTP UI action times out** — The main thread may be blocked or the
+  `--qt-dispatch-timeout` bound may be too short. Keep the sidecar's Qt event
+  pump running and inspect `agent_ui_mcp_http_stop_timeout` for shutdown issues.
+- **HTTP exposes the desktop unexpectedly** — The listener is unauthenticated.
+  Use the default loopback host and do not bind a shared interface unless every
+  reachable client is trusted.
 - **Accidentally merged with product MCP** — UI tools must never appear on
   `MCPServerImpl`; use two MCP server entries in the client config. CI enforces
   this via `TestMCPServerImpl.test_list_tools_excludes_agent_ui_action_names` in
@@ -377,6 +429,10 @@ make test-agent-e2e PYTEST_ARGS='tests/test_agent_ui_actions_mcp_seed.py -v'
 
 # Attach CLI + host/client IPC (ATTACH-2/3)
 make test PYTEST_ARGS='tests/test_agent_ui_attach.py -v'
+
+# Optional Streamable HTTP route and Qt-thread handoff
+make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -v'
+make test PYTEST_ARGS='tests/test_agent_ui_actions_mcp.py -m slow -v'
 
 # Product MCP catalog must exclude ui_* tools (PYPOST-953)
 make test PYTEST_ARGS=\
