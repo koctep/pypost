@@ -469,7 +469,7 @@ and product-catalog exclusion stay in sibling suites. Discoverability:
 | Sidecar exit → host still listening | **Automated** |
 | Endpoint override (env / CLI / default) | **Automated** |
 | UI tools off product MCP | **Automated** |
-| Protocol-version reject on mismatch | **Manual** |
+| Protocol-version reject on mismatch | **Automated** |
 | Concurrent interleaved `ui_*` / multi-client | **Manual** |
 | Stale multi-desktop socket steal | **Manual** |
 
@@ -500,12 +500,9 @@ and product-catalog exclusion stay in sibling suites. Discoverability:
 
 **Manual residual checks:**
 
-- **Protocol-version reject on mismatch** — Handshake version is advisory
-  today
-  ([PYPOST-1218](https://pypost.atlassian.net/browse/PYPOST-1218)).
-  **Check:** connect a client with a mismatched `handshake.version`; expect
-  reject only after 1218 enforces it — today host may still accept. Do not
-  treat advisory accept as a product bug in ATTACH-3.
+- **Protocol-version reject on mismatch** — The host requires exact
+  `ATTACH_PROTOCOL_VERSION` and returns an unbound failure for any other
+  version. Automated proof: `test_attach_host_rejects_protocol_version_mismatch`.
 - **Concurrent interleaved `ui_*` / multi-client** — **Check:** two sidecars
   (or clients) bound to one host; interleave `ui_fill` / `ui_click` under
   load. **Pass:** no crash; actions apply without silent cross-client

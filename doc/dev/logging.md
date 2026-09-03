@@ -121,6 +121,7 @@ Local AF_UNIX attach host/client for the agent-UI sidecar. Logging-only
 | `agent_ui_attach_client_accepted` | INFO | `endpoint`, `peers` | `agent/attach_ipc` |
 | `agent_ui_attach_client_closed` | INFO | `endpoint`, `peers` | `agent/attach_ipc` |
 | `agent_ui_attach_handshake_ok` | INFO | `endpoint`, `version` | `agent/attach_ipc` |
+| `agent_ui_attach_handshake_rejected` | WARNING | `endpoint`, `version`, `expected_version` | `agent/attach_ipc` |
 | `agent_ui_attach_detach_received` | INFO | `endpoint` | `agent/attach_ipc` |
 | `agent_ui_attach_bound` | INFO | `endpoint` | `agent/attach_ipc` |
 | `agent_ui_attach_detached` | INFO | `endpoint` | `agent/attach_ipc` |

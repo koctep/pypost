@@ -389,6 +389,23 @@ class AgentUiAttachHost:
     def _handle_request(self, request: dict[str, Any]) -> dict[str, Any]:
         op = request.get("op")
         if op == "handshake":
+            version = request.get("version")
+            if version != ATTACH_PROTOCOL_VERSION:
+                logger.warning(
+                    "agent_ui_attach_handshake_rejected endpoint=%s "
+                    "version=%s expected_version=%s",
+                    self._endpoint,
+                    version,
+                    ATTACH_PROTOCOL_VERSION,
+                )
+                return {
+                    "ok": False,
+                    "error": (
+                        "unsupported attach protocol version: "
+                        f"{version!r}"
+                    ),
+                    "version": ATTACH_PROTOCOL_VERSION,
+                }
             logger.info(
                 "agent_ui_attach_handshake_ok endpoint=%s version=%s",
                 self._endpoint,

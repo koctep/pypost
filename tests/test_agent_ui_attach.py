@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from pypost.agent import ui_actions_mcp
 from pypost.agent.attach_ipc import (
+    ATTACH_PROTOCOL_VERSION,
     AgentUiAttachHost,
     AttachClientSession,
     AttachUnboundError,
@@ -47,6 +48,24 @@ def test_cli_accepts_attach_mode(capsys: pytest.CaptureFixture[str]) -> None:
     assert "--attach" in help_text, (
         "CLI must accept attach mode (--attach); missing from --help"
     )
+
+
+def test_attach_host_rejects_protocol_version_mismatch(qapp: QApplication) -> None:
+    """Attach handshake must fail closed for an unsupported protocol version."""
+    root = QWidget()
+    host = AgentUiAttachHost(root)
+    try:
+        reply = host._handle_request(
+            {
+                "op": "handshake",
+                "version": ATTACH_PROTOCOL_VERSION + 1,
+            }
+        )
+    finally:
+        root.close()
+
+    assert reply["ok"] is False
+    assert "version" in str(reply["error"])
 
 
 def test_attach_mode_does_not_call_agent_app_session_start(
