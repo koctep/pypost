@@ -30,8 +30,10 @@
 - [x] **STEP 8: Dev Docs**
   - The attach verification matrix and manual residual section are updated in
     `agent_ui_actions_mcp.md`.
-- [ ] **COMMIT: Commit Changes**
-  - Pending final focused Make checks and Jira completion transition.
+- [x] **COMMIT: Commit Changes**
+  - Commit `2e0729c5` contains the handshake validation, focused test,
+    documentation, and task artifacts.
+  - Focused attach/sidecar Make tests, lint, typecheck, and verification pass.
 
 ## Status Legend
 
