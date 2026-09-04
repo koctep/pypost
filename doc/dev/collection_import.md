@@ -81,6 +81,11 @@ refresh the tree, apply results, or emit a collections-changed event. Cancellati
 and best-effort: a reader must call `on_progress` to be interruptible during its record loop, and
 file decoding or one expensive record can delay observation. No forcible thread termination is used.
 
+**PYPOST-1230** extracts the repeated presenter-import wait used by the collection-import UI tests
+into the test-only `tests/helpers/collection_import_wait.py` module. It does not add a production
+dependency or change the import lifecycle; it centralizes the test condition that an expected
+outcome is visible and the presenter has become idle.
+
 ## Architecture
 
 ```text
@@ -554,9 +559,95 @@ defaulting to `load_collection_import_candidates`. Qt tests inject a stub reader
 exercise the flow without touching disk; the end-to-end test omits it and drives the real
 parser, `RequestManager`, and `StorageManager` against a `tmp_path`.
 
-Because parse is async, UI tests must wait for completion (e.g. `process_until` until
-`not actions.is_busy()` or equivalent) rather than asserting immediately after
-`import_collections()`. Stubs used from the worker thread must be thread-safe.
+Because parse is async, UI tests must wait for completion rather than asserting immediately after
+`import_collections()`. Use the shared `wait_import()` helper below for the normal outcome-plus-idle
+contract. Stubs used from the worker thread must be thread-safe.
+
+### Shared import wait helper for presenter tests (PYPOST-1230)
+
+`tests/helpers/collection_import_wait.py` provides the test-only `wait_import()` helper. It
+combines a scenario-owned outcome predicate with the presenter's import lifecycle state and
+delegates event-loop processing and deadline enforcement to
+`tests.helpers.process_until.process_until`.
+
+#### API
+
+```python
+def wait_import(
+    done: Callable[[], bool],
+    presenter: _ImportPresenter | None = None,
+    timeout_ms: int = 5_000,
+) -> None:
+    ...
+```
+
+- `done` is a zero-argument predicate supplied by the test. It should be a repeatable,
+  side-effect-free observation such as `lambda: mock_result.call_count >= 1`.
+- `presenter` is optional. When supplied, it must expose the test-visible
+  `presenter._import_actions.is_busy()` surface. The helper waits for that value to become
+  `False` after the outcome predicate becomes true.
+- `timeout_ms` is the wall-clock bound passed to `process_until()`. It defaults to 5,000 ms and
+  can be overridden for a deliberately slower test.
+- The helper returns `None` only after the required condition is complete. If the condition is not
+  reached, it raises `AssertionError` with the configured bound and lazy diagnostic state:
+  `outcome=<last observed value>` and, when a presenter is supplied, `busy=<current value>`.
+
+The combined predicate is evaluated in this order on each event-loop turn: `done()` must first be
+true, then the optional presenter's `_import_actions.is_busy()` must be false. An outcome callback
+can therefore become visible before queued apply, refresh, signal, or return-to-idle work has
+finished without releasing the test wait. With no presenter, the helper waits only for `done()`.
+`process_until()` pumps a nested Qt event loop with its bounded polling and watchdog behavior; the
+helper does not create a second timeout mechanism.
+
+The helper only observes lifecycle state. It does not call `wait_import_idle()`, interrupt a worker,
+join a thread, close a panel, or perform teardown. Tests still own resource cleanup and should call
+`presenter.teardown()` in fixture cleanup when the presenter can have an active worker. A timeout
+does not imply that the worker was stopped.
+
+#### Migrating a presenter UI test
+
+Import the shared helper, remove the local `_wait_import()` implementation, and preserve each
+test's existing outcome predicate and presenter argument:
+
+```python
+from tests.helpers.collection_import_wait import wait_import
+
+try:
+    presenter.import_collections()
+    wait_import(lambda: mock_result.call_count >= 1, presenter)
+    assert mock_result.call_args.kwargs["success"] is True
+finally:
+    presenter.teardown()
+```
+
+Use `presenter=None` only when the test has no presenter lifecycle to observe. Do not migrate
+specialized waits whose contract is different, such as cancellation checkpoints, progress
+signals, responsiveness timers, or explicit teardown tests. Those tests should keep their
+purpose-specific predicates and cleanup sequencing.
+
+#### Contributor validation
+
+Run repository checks through Make targets. The focused collection-import helper and UI tests can
+be run together with:
+
+```sh
+make test \
+  PYTEST_ARGS='tests/test_collection_import_wait_repro.py tests/test_collections_import_ui.py'
+```
+
+For the surrounding repository gates, use:
+
+```sh
+make lint
+make typecheck
+make verify-ai-tasks
+make check
+```
+
+`make check` runs the combined lint, fast-test, and AI-task-artifact checks. If it reports an
+unrelated baseline failure, compare the failing test node with the existing baseline Jira issues
+before attributing it to the import test helper. Do not replace these commands with direct test,
+linter, type-checker, or artifact-verification invocations.
 
 ### Worker thread lifecycle synchronization and test unhanging (PYPOST-1182)
 
@@ -584,11 +675,11 @@ Use the lifecycle synchronization as follows:
   `QApplication` path.
 - **`CollectionsPresenter.wait_import_idle(timeout_ms=5000)`** exposes this wait condition on the
   presenter.
-- In `tests/test_collections_import_ui.py`, helper `_wait_import(done, presenter)` waits until
-  `done()` is `True` and, when a presenter is supplied, checks
+- In `tests/test_collections_import_ui.py`, shared test helper `wait_import(done, presenter)` waits
+  until `done()` is `True` and, when a presenter is supplied, checks
   `presenter._import_actions.is_busy()` directly. It does not call
-  `presenter.wait_import_idle()`. These tests generally close `presenter.panel` in `finally:`;
-  they do not generally invoke `presenter.teardown()`.
+  `presenter.wait_import_idle()` or perform teardown. These tests own their cleanup and should
+  use `presenter.teardown()` when a worker may still be active.
 - Automated tests in headless mode (`QT_QPA_PLATFORM=offscreen`) also patch dialog handlers in
   `collection_item_dialogs.py` to ensure unexpected branches fail fast with descriptive assertions
   rather than opening blocking modal dialog loops (`QDialog.exec()`).
@@ -671,7 +762,7 @@ PYPOST-1006 (verification debt; no product change) adds three locks:
   `pypost.ui.presenters.collection_import_actions` (not the worker).
   Parse failure: `reason=` plus the exception text, and no
   `reason=no_valid_collections`. Empty candidates: exact token
-  `reason=no_valid_collections`. Same `_wait_import` as the dialog.
+  `reason=no_valid_collections`. Same `wait_import()` as the dialog.
 - **Apply-to-all 3+** (`tests/test_collections_import_ui.py`
   `test_apply_to_all_prompts_only_once_for_three_conflicts`): three
   distinct conflicting names, KEEP_BOTH + apply-to-all, one prompt
