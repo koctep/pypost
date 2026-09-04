@@ -64,3 +64,15 @@ def test_wire_presenter_signals_connects_env_domain_signals_to_mcp_controls():
     window.env.environment_manager_closed.connect.assert_any_call(
         window.mcp_controls.on_environment_manager_closed
     )
+
+
+def test_wire_presenter_signals_keeps_legacy_environment_update_route():
+    window = MagicMock()
+    del window.env.accept_accepted_env_update
+
+    wire_presenter_signals(window)
+
+    window.tabs.env_update_requested.connect.assert_called_once_with(
+        window.env.on_env_update,
+    )
+    window.tabs.env_update_accepted.connect.assert_not_called()

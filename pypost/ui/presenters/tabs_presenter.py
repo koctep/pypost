@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
@@ -31,11 +32,7 @@ from pypost.core.websocket_persisted_fields import snapshot_websocket_persisted_
 from pypost.core.mcp_client_persisted_fields import snapshot_mcp_client_persisted_fields
 from pypost.core.websocket_registry import WebSocketRegistry
 from pypost.core.mcp_client_registry import McpClientRegistry
-from pypost.ui.presenters.tab_dirty import (
-    connection_snapshot_from_tab,
-    is_tab_dirty,
-    mcp_client_snapshot_from_tab,
-)
+from pypost.ui.presenters.tab_dirty import is_tab_dirty
 from pypost.ui.presenters.tabs_presenter_close import close_workspace_tab
 from pypost.ui.presenters.tabs_presenter_insert import insert_tab_before_plus
 from pypost.ui.presenters.tabs_presenter_request_close import (
@@ -55,8 +52,11 @@ from pypost.ui.presenters.tabs_presenter_draft import (
     make_websocket_saved_predicate,
 )
 from pypost.ui.presenters import tabs_presenter_hotkeys as tab_hotkeys
+from pypost.ui.presenters import tabs_presenter_lifecycle
+from pypost.ui.presenters import tabs_presenter_save
 from pypost.ui.presenters.tabs_presenter_worker import TabsPresenterWorkerHandlers
 from pypost.core.history_manager import HistoryManager
+from pypost.core.lifecycle import EnvironmentUpdateLedger, TeardownResult
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
@@ -71,7 +71,6 @@ from pypost.ui.presenters.mcp_client_presenter import McpClientPresenter
 from pypost.ui.presenters.websocket_presenter import WebSocketPresenter
 from pypost.ui.request_save_orchestrator import (
     RequestSaveOrchestrator,
-    SaveAction,
     StaleCheckContext,
 )
 from pypost.ui.websocket_save_orchestrator import WebSocketSaveOrchestrator
@@ -116,6 +115,8 @@ class RequestTab(QWidget):
         self._content_layout.addWidget(self.splitter)
 
         self.worker: RequestWorker | None = None
+        self._request_generation = 0
+        self._terminal_claimed = False
 
 
 class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
@@ -123,6 +124,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     variable_set_requested = Signal(object, str)  # (key: str | None, value: str)
     env_update_requested = Signal(dict)  # payload from RequestWorker
+    env_update_accepted = Signal(int, dict)  # (acceptance sequence, payload)
     request_saved = Signal()  # after save, triggers collections tree refresh
     request_save_as_completed = Signal(RequestData, str)  # request, collection_id
     request_persisted = Signal(str, RequestData, RequestTab)  # id, snapshot, source_tab
@@ -182,6 +184,14 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._chunk_buffers: dict[int, list[str]] = {}
         self._chunk_flush_timers: dict[int, QTimer] = {}
         self._chunk_flush_ms = 33
+        self._teardown_lock = threading.Lock()
+        self._teardown_started = False
+        self._teardown_result: TeardownResult | None = None
+        self._fenced_tabs: set[int] = set()
+        self._tab_teardown_results: dict[int, TeardownResult] = {}
+        self._env_update_ledger = EnvironmentUpdateLedger()
+        self._env_update_consumer: Callable[[dict[str, str], int], None] | None = None
+        self._env_update_cutoff: int | None = None
 
         self._tabs = QTabWidget()
         set_widget_id(self._tabs, REQUEST_TABS)
@@ -197,7 +207,16 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def widget(self) -> QTabWidget:
         return self._tabs
 
+    def _admission_open(self) -> bool:
+        if self._teardown_started:
+            logger.info("tabs_mutation_rejected reason=teardown")
+            return False
+        return True
+
     def add_new_tab(self, request_data: RequestData | None = None, save_state: bool = True) -> None:
+        if self._teardown_started:
+            logger.info("tab_creation_rejected reason=teardown")
+            return
         if request_data is not None and is_legacy_mcp_request(request_data):
             self.open_legacy_mcp_request_tab(request_data, save_state=save_state)
             return
@@ -216,6 +235,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         connection: WebSocketConnection,
         save_state: bool = True,
     ) -> WebSocketTab:
+        if self._teardown_started:
+            logger.info("tab_creation_rejected reason=teardown")
+            return None  # type: ignore[return-value]
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if (
@@ -234,9 +256,14 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         save_state: bool = True,
     ) -> WebSocketTab:
         """Always insert a new WebSocket tab; never focus-dedup by profile id."""
+        if self._teardown_started:
+            logger.info("tab_creation_rejected reason=teardown")
+            return None  # type: ignore[return-value]
         return self._insert_websocket_tab(connection, save_state=save_state)
 
     def add_blank_websocket_tab(self, *, save_state: bool = True) -> WebSocketTab:
+        if self._teardown_started:
+            return None  # type: ignore[return-value]
         return self._insert_websocket_tab(WebSocketConnection(), save_state=save_state)
 
     def open_mcp_client_isolated_tab(
@@ -246,9 +273,14 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         save_state: bool = True,
     ) -> McpClientTab:
         """Always insert a new MCP Client tab; never focus-dedup by profile id."""
+        if self._teardown_started:
+            logger.info("tab_creation_rejected reason=teardown")
+            return None  # type: ignore[return-value]
         return self._insert_mcp_client_tab(connection, save_state=save_state)
 
     def add_blank_mcp_client_tab(self, *, save_state: bool = True) -> McpClientTab:
+        if self._teardown_started:
+            return None  # type: ignore[return-value]
         return self._insert_mcp_client_tab(McpClientConnection(), save_state=save_state)
 
     def open_mcp_client_tab(
@@ -257,6 +289,9 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         *,
         save_state: bool = True,
     ) -> McpClientTab:
+        if self._teardown_started:
+            logger.info("tab_creation_rejected reason=teardown")
+            return None  # type: ignore[return-value]
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if (
@@ -322,6 +357,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         return tab
 
     def _on_websocket_title_changed(self, tab: WebSocketTab, glyph: str, title: str) -> None:
+        if self._teardown_started:
+            return
         idx = self._tabs.indexOf(tab)
         if idx >= 0:
             self._header.set_tab_label(idx, f"{glyph} {title}".strip())
@@ -337,12 +374,31 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             self._tabs.setCurrentIndex(preferred)
 
     def close_tab(self, index: int) -> None:
+        if self._teardown_started:
+            return
         close_workspace_tab(
             self, index, prompt_close=prompt_unsaved_draft_tab_close,
         )
 
+    def begin_teardown(self) -> None:
+        tabs_presenter_lifecycle.begin_teardown(self)
+
+    def teardown_tab(self, tab: RequestTab, timeout_ms: int | None = None) -> TeardownResult:
+        return tabs_presenter_lifecycle.teardown_tab(self, tab, timeout_ms)
+
+    def teardown(self, timeout_ms: int | None = None) -> TeardownResult:
+        return tabs_presenter_lifecycle.teardown(self, timeout_ms)
+
+    def set_environment_update_consumer(self, consumer) -> None:
+        tabs_presenter_lifecycle.set_environment_update_consumer(self, consumer)
+
+    def drain_accepted_env_updates(self, consumer, cutoff: int | None = None) -> bool:
+        return tabs_presenter_lifecycle.drain_accepted_env_updates(self, consumer, cutoff)
+
     def restore_tabs(self) -> None:
         """Restores tabs from StateManager."""
+        if not self._admission_open():
+            return
         from pypost.core.websocket_registry import WebSocketRegistry
         from pypost.core.mcp_client_registry import McpClientRegistry
 
@@ -394,6 +450,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def save_tabs_state(self) -> None:
         """Persists open tab IDs to StateManager."""
+        if not self._admission_open():
+            return
         open_ids = collect_persistable_open_tab_ids(
             self._tabs,
             websocket_id_is_saved=make_websocket_saved_predicate(self._request_manager),
@@ -410,6 +468,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         Caches variables for new tabs and calls set_variables on each tab.
         See doc/dev/variable_propagation.md.
         """
+        if not self._admission_open():
+            return
         self._current_variables = variables
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
@@ -426,6 +486,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def on_env_keys_changed(self, keys: object) -> None:
         """Pushes env key list to all ResponseView widgets."""
+        if not self._admission_open():
+            return
         if keys is not None and not isinstance(keys, list):
             logger.warning(
                 "env_keys_update_ignored reason=invalid_payload_type type=%s",
@@ -443,6 +505,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         hidden_keys: set,
     ) -> None:
         """Pushes hidden-key set to all open tabs."""
+        if not self._admission_open():
+            return
         self._current_hidden_keys = hidden_keys
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
@@ -458,6 +522,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def rename_request_tabs(self, request_id: str, new_name: str) -> None:
         """Updates tab labels after a request rename."""
+        if not self._admission_open():
+            return
         self._sync_tab_labels_for_request(request_id, new_name)
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
@@ -470,12 +536,18 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
                 tab.persisted_baseline.name = new_name
 
     def rename_websocket_tabs(self, ws_id: str, new_name: str) -> None:
+        if not self._admission_open():
+            return
         rename_websocket_tabs_ws(self, ws_id, new_name)
 
     def rename_mcp_client_tabs(self, profile_id: str, new_name: str) -> None:
+        if not self._admission_open():
+            return
         rename_mcp_client_tabs_mcp(self, profile_id, new_name)
 
     def close_tabs_for_request_ids(self, request_ids: list) -> None:
+        if not self._admission_open():
+            return
         close_tabs_for_request_ids_helper(self, request_ids)
 
     def close_tabs_for_websocket_ids(
@@ -484,6 +556,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         *,
         prompt: TabClosePromptProtocol | None = None,
     ) -> None:
+        if not self._admission_open():
+            return
         close_tabs_for_websocket_ids_ws(
             self,
             ws_ids,
@@ -496,6 +570,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         *,
         prompt: TabClosePromptProtocol | None = None,
     ) -> None:
+        if not self._admission_open():
+            return
         close_tabs_for_mcp_client_ids_mcp(
             self,
             profile_ids,
@@ -503,6 +579,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         )
 
     def set_alert_manager(self, alert_manager: AlertManager | None) -> None:
+        if not self._admission_open():
+            return
         self._alert_manager = alert_manager
         logger.debug(
             "TabsPresenter: alert_manager_updated=%s", alert_manager is not None
@@ -510,6 +588,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
 
     def apply_settings(self, settings: AppSettings) -> None:
         """Updates indent, JSON syntax colors, and body reformat in all tabs."""
+        if not self._admission_open():
+            return
         self._settings = settings
         json_colors = resolve_json_syntax_colors(theme=settings.theme)
         for i in range(self._tabs.count()):
@@ -526,6 +606,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
                     tab.response_view.json_highlighter.set_colors(json_colors)
 
     def handle_new_tab(self, source: str = "unknown") -> None:
+        if not self._admission_open():
+            return
         tabs_before = self._request_tab_count()
         logger.info("new_tab_action_triggered source=%s tabs_before=%d", source, tabs_before)
         protocol = self._protocol_picker(self._tabs)
@@ -535,6 +617,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self.open_blank_tab(protocol, source)
 
     def open_blank_tab(self, protocol: TabProtocol, source: str) -> None:
+        if not self._admission_open():
+            return
         logger.info(
             "new_tab_action_completed source=%s protocol=%s",
             source,
@@ -550,11 +634,15 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self.add_new_tab()
 
     def handle_close_tab(self) -> None:
+        if not self._admission_open():
+            return
         current_index = self._tabs.currentIndex()
         if current_index >= 0:
             self.close_tab(current_index)
 
     def handle_next_tab(self) -> None:
+        if not self._admission_open():
+            return
         indices = self._header.navigable_tab_indices()
         if not indices:
             return
@@ -566,6 +654,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._tabs.setCurrentIndex(indices[(pos + 1) % len(indices)])
 
     def handle_previous_tab(self) -> None:
+        if not self._admission_open():
+            return
         indices = self._header.navigable_tab_indices()
         if not indices:
             return
@@ -577,6 +667,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._tabs.setCurrentIndex(indices[(pos - 1) % len(indices)])
 
     def handle_switch_to_tab(self, index: int) -> None:
+        if not self._admission_open():
+            return
         if 0 <= index < self._tabs.count() and not self._header.is_plus_tab_index(index):
             self._tabs.setCurrentIndex(index)
 
@@ -584,39 +676,63 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         return tab_hotkeys.active_tab_kind(self)
 
     def handle_send_request_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_send_request_global(self)
 
     def handle_websocket_connect_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_websocket_connect_global(self)
 
     def handle_websocket_send_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_websocket_send_global(self)
 
     def handle_websocket_format_json_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_websocket_format_json_global(self)
 
     def handle_mcp_client_connect_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_mcp_client_connect_global(self)
 
     def handle_mcp_client_invoke_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_mcp_client_invoke_global(self)
 
     def handle_mcp_client_send_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_mcp_client_send_global(self)
 
     def handle_focus_url(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_focus_url(self)
 
     def handle_switch_to_params_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_switch_to_params_global(self)
 
     def handle_switch_to_headers_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_switch_to_headers_global(self)
 
     def handle_switch_to_body_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_switch_to_body_global(self)
 
     def handle_switch_to_script_global(self) -> None:
+        if not self._admission_open():
+            return
         tab_hotkeys.handle_switch_to_script_global(self)
 
     def _current_tab(self) -> RequestTab | None:
@@ -682,6 +798,16 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         tab.response_view.variable_set_requested.connect(self.variable_set_requested)
 
     def _handle_send_request(self, sender_tab: RequestTab, request_data: RequestData) -> None:
+        """Admit a request while holding the same boundary as workspace teardown."""
+        with self._teardown_lock:
+            self._handle_send_request_locked(sender_tab, request_data)
+
+    def _handle_send_request_locked(
+        self, sender_tab: RequestTab, request_data: RequestData
+    ) -> None:
+        if self._teardown_started or id(sender_tab) in self._fenced_tabs:
+            logger.info("request_send_rejected reason=teardown")
+            return
         if sender_tab.worker is not None and not sender_tab.worker.isRunning():
             self._clear_tab_worker(sender_tab, reason="stale", request_data=request_data)
 
@@ -726,11 +852,19 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             default_retry_policy=self._settings.default_retry_policy,
             max_response_bytes=self._settings.max_response_bytes,
         )
+        sender_tab._request_generation += 1
+        sender_tab._terminal_claimed = False
+        generation = sender_tab._request_generation
         worker.request_finished.connect(
-            lambda resp: self._on_request_finished(sender_tab, resp)
+            lambda resp, t=sender_tab, g=generation: self._on_request_finished(t, resp, g)
         )
-        worker.error.connect(lambda err: self._on_request_error(sender_tab, err))
-        worker.env_update.connect(lambda vars: self.env_update_requested.emit(vars))
+        worker.error.connect(
+            lambda err, t=sender_tab, g=generation: self._on_request_error(t, err, g)
+        )
+        worker.env_update.connect(
+            lambda variables, t=sender_tab: self._on_worker_env_update(t, variables),
+            Qt.ConnectionType.DirectConnection,
+        )
         worker.script_output.connect(
             lambda logs, err: self._on_script_output(sender_tab, logs, err)
         )
@@ -746,8 +880,28 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         sender_tab.worker = worker
         worker.start()
 
+    def _on_worker_env_update(self, tab: RequestTab, variables: dict) -> None:
+        """Assign an acceptance sequence before notifying the environment owner."""
+        with self._teardown_lock:
+            admitted = not self._teardown_started and id(tab) not in self._fenced_tabs
+            sequence = self._env_update_ledger.accept(variables, admitted)
+        if not admitted:
+            logger.info(
+                "environment_update_rejected_after_cutoff sequence=%d",
+                sequence,
+            )
+            return
+        self.env_update_accepted.emit(sequence, variables)
+        self.env_update_requested.emit(variables)
+
+    def record_env_update_disposition(self, sequence: int, disposition: str) -> None:
+        """Record a gateway outcome without reopening a fenced request owner."""
+        tabs_presenter_lifecycle.record_env_update_disposition(self, sequence, disposition)
+
     def load_request_from_history(self, request_data: RequestData) -> None:
         """Opens a new scratch tab pre-populated with data from a history entry."""
+        if not self._admission_open():
+            return
         logger.info(
             "history_request_loaded_into_editor method=%s url=%s",
             request_data.method,
@@ -792,6 +946,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         source_tab: RequestTab | None,
     ) -> None:
         """Notifies sibling tabs that the persisted copy changed elsewhere."""
+        if not self._admission_open():
+            return
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if not isinstance(tab, RequestTab) or not tab.request_data:
@@ -876,157 +1032,32 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def _handle_save_mcp_client(
         self, source_tab: McpClientTab, connection: McpClientConnection
     ) -> None:
-        snapshot = mcp_client_snapshot_from_tab(source_tab)
-        result = self._mcp_save_orchestrator.save_profile(
-            snapshot,
-            self._tabs,
-            stale_context=self._stale_context_for_mcp_client_tab(source_tab),
-        )
-        if result.action == SaveAction.CANCELLED:
-            return
-
-        if result.action == SaveAction.OVERWRITE:
-            saved = result.request
-            if saved is None:
-                logger.error(
-                    "mcp_client_save_overwrite_failed reason=missing_snapshot profile_id=%s",
-                    connection.id,
-                )
-                return
-            self._apply_mcp_save_result_to_tab(source_tab, saved)
-            self.mcp_client_persisted.emit(connection.id, saved, source_tab)
-            tab_index = self._index_of_tab(source_tab)
-            if tab_index is not None:
-                self._header.set_tab_label(tab_index, saved.name)
-            self.mcp_client_saved.emit()
-            return
-
-        if result.action == SaveAction.CREATED_NEW and result.request is not None:
-            tab_index = self._index_of_tab(source_tab)
-            if tab_index is not None:
-                self._header.set_tab_label(tab_index, result.request.name)
-            self._apply_mcp_save_result_to_tab(source_tab, result.request)
-            self.save_tabs_state()
-            self.mcp_client_saved.emit()
+        tabs_presenter_save.save_mcp_client(self, source_tab, connection)
 
     def _handle_save_as_mcp_client(
         self, source_tab: McpClientTab, connection: McpClientConnection
     ) -> None:
-        snapshot = mcp_client_snapshot_from_tab(source_tab)
-        result = self._mcp_save_orchestrator.save_as_profile(snapshot, self._tabs)
-        if result.action != SaveAction.SAVE_AS or result.request is None:
-            return
-
-        new_conn = result.request
-        tab_index = self._index_of_tab(source_tab)
-        if tab_index is not None:
-            self._header.set_tab_label(tab_index, new_conn.name)
-        self._apply_mcp_save_result_to_tab(source_tab, new_conn)
-        self.save_tabs_state()
-        self.mcp_client_save_as_completed.emit(new_conn, result.collection_id or "")
+        tabs_presenter_save.save_as_mcp_client(self, source_tab, connection)
 
     def _handle_save_websocket(
         self, source_tab: WebSocketTab, connection: WebSocketConnection
     ) -> None:
-        snapshot = connection_snapshot_from_tab(source_tab)
-        result = self._ws_save_orchestrator.save_profile(
-            snapshot,
-            self._tabs,
-            stale_context=self._stale_context_for_websocket_tab(source_tab),
-        )
-        if result.action == SaveAction.CANCELLED:
-            return
-
-        if result.action == SaveAction.OVERWRITE:
-            saved = result.request
-            if saved is None:
-                logger.error(
-                    "ws_save_overwrite_failed reason=missing_snapshot ws_id=%s",
-                    connection.id,
-                )
-                return
-            self._apply_ws_save_result_to_tab(source_tab, saved)
-            self.websocket_persisted.emit(connection.id, saved, source_tab)
-            tab_index = self._index_of_tab(source_tab)
-            if tab_index is not None:
-                self._header.set_tab_label(tab_index, saved.name)
-            self.websocket_saved.emit()
-            return
-
-        if result.action == SaveAction.CREATED_NEW and result.request is not None:
-            tab_index = self._index_of_tab(source_tab)
-            if tab_index is not None:
-                self._header.set_tab_label(tab_index, result.request.name)
-            self._apply_ws_save_result_to_tab(source_tab, result.request)
-            self.save_tabs_state()
-            self.websocket_saved.emit()
+        tabs_presenter_save.save_websocket(self, source_tab, connection)
 
     def _handle_save_as_websocket(
         self, source_tab: WebSocketTab, connection: WebSocketConnection
     ) -> None:
-        snapshot = connection_snapshot_from_tab(source_tab)
-        result = self._ws_save_orchestrator.save_as_profile(snapshot, self._tabs)
-        if result.action != SaveAction.SAVE_AS or result.request is None:
-            return
-
-        new_conn = result.request
-        tab_index = self._index_of_tab(source_tab)
-        if tab_index is not None:
-            self._header.set_tab_label(tab_index, new_conn.name)
-        self._apply_ws_save_result_to_tab(source_tab, new_conn)
-        self.save_tabs_state()
-        self.websocket_save_as_completed.emit(new_conn, result.collection_id or "")
+        tabs_presenter_save.save_as_websocket(self, source_tab, connection)
 
     def _handle_save_request(self, source_tab: RequestTab, request_data: RequestData) -> None:
-        result = self._save_orchestrator.save_request(
-            request_data,
-            self._tabs,
-            stale_context=self._stale_context_for_tab(source_tab),
-        )
-        if result.action == SaveAction.CANCELLED:
-            return
-
-        if result.action == SaveAction.OVERWRITE:
-            snapshot = result.request
-            if snapshot is None:
-                logger.error(
-                    "save_request_overwrite_failed reason=missing_snapshot request_id=%s",
-                    request_data.id,
-                )
-                return
-            source_tab.request_data = snapshot
-            source_tab.persisted_baseline = snapshot_persisted_fields(snapshot)
-            source_tab.stale_persisted = False
-            self.request_persisted.emit(request_data.id, snapshot, source_tab)
-            self._sync_tab_labels_for_request(request_data.id, request_data.name)
-            self.request_saved.emit()
-            return
-
-        if result.action == SaveAction.CREATED_NEW and result.request is not None:
-            tab_index = self._index_of_tab(source_tab)
-            if tab_index is not None:
-                self._header.set_tab_label(tab_index, result.request.name)
-            self._apply_save_result_to_tab(source_tab, result.request)
-            self.save_tabs_state()
-            self.request_saved.emit()
+        tabs_presenter_save.save_request(self, source_tab, request_data)
 
     def _handle_save_as_request(self, source_tab: RequestTab, request_data: RequestData) -> None:
-        result = self._save_orchestrator.save_as_request(request_data, self._tabs)
-        if result.action != SaveAction.SAVE_AS or result.request is None:
-            return
-
-        new_request = result.request
-        tab_index = self._index_of_tab(source_tab)
-        if tab_index is not None:
-            self._header.set_tab_label(tab_index, new_request.name)
-        source_tab.request_data = new_request
-        source_tab.request_editor.request_data = new_request
-        self._apply_save_result_to_tab(source_tab, new_request)
-
-        self.save_tabs_state()
-        self.request_save_as_completed.emit(new_request, result.collection_id or "")
+        tabs_presenter_save.save_as_request(self, source_tab, request_data)
 
     def _handle_copy_curl_request(self, request_data: RequestData) -> None:
+        if not self._admission_open():
+            return
         try:
             curl_cmd = CurlGenerator.generate(
                 request_data, self._current_variables, self._template_service

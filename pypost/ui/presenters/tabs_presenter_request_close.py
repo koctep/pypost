@@ -31,6 +31,11 @@ def close_tabs_for_request_ids(
         ):
             indices_to_close.append(i)
     for index in reversed(indices_to_close):
+        tab = presenter._tabs.widget(index)
+        if isinstance(tab, RequestTab):
+            result = presenter.teardown_tab(tab)
+            if result.outcome != "success":
+                continue
         presenter._tabs.removeTab(index)
     if presenter._request_tab_count() == 0:
         presenter.add_new_tab(save_state=False)

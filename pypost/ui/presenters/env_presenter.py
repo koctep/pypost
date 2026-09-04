@@ -1,6 +1,6 @@
 from __future__ import annotations
-
 import logging
+import threading
 from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
@@ -20,13 +20,10 @@ from pypost.core.environment_import import load_import_candidates
 from pypost.core.environment_variable_resolver import resolve_environment_variables
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_server_registry import MCPServerRegistry
+from pypost.core.lifecycle import TeardownResult
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.storage_interface import StorageInterface
-from pypost.core.variable_name_validation import (
-    validate_variable_name,
-    validation_failure_reason,
-)
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import (
@@ -36,6 +33,7 @@ from pypost.ui.collection_item_dialogs import (
 )
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.presenters.mcp_controls_presenter import McpControlsPresenter
+from pypost.ui.presenters import env_presenter_lifecycle
 from pypost.ui.widget_ids import (
     ENV_BAR,
     ENV_MANAGE_BUTTON,
@@ -55,6 +53,7 @@ class EnvPresenter(QObject):
     environments_loaded = Signal()
     environment_selected = Signal(object)  # payload: Environment | None
     environment_updated = Signal(str)  # payload: environment_id
+    environment_update_disposition = Signal(int, str)
     environment_manager_closed = Signal()  # payload: None
 
     def __init__(
@@ -79,10 +78,18 @@ class EnvPresenter(QObject):
         self._current_env_index: int = 0
         self._env_snapshot = EnvVariableSnapshot()
         self._pending_env_manager_refresh = False
-        self._storage_gateway = EnvironmentStorageGateway(storage, parent=self)
+        self._lifecycle_lock = threading.RLock()
+        self._teardown_lock = threading.Lock()
+        self._root_teardown_started = False
+        self._teardown_started = False
+        self._teardown_result: TeardownResult | None = None
+        self._storage_gateway = EnvironmentStorageGateway(storage, parent=self, metrics=metrics)
         self._storage_gateway.load_completed.connect(self._on_storage_load_completed)
         self._storage_gateway.load_failed.connect(self._on_storage_load_failed)
         self._storage_gateway.save_failed.connect(self._on_storage_save_failed)
+        self._storage_gateway.save_outcome.connect(
+            lambda sequence, outcome: self._on_storage_save_outcome(sequence, outcome)
+        )
 
         self._mcp_manager.set_variable_supplier(self._env_snapshot.snapshot_variables)
         self._mcp_manager.set_hidden_keys_supplier(self._env_snapshot.snapshot_hidden_keys)
@@ -143,6 +150,8 @@ class EnvPresenter(QObject):
         return set()
 
     def apply_settings(self, settings: AppSettings) -> None:
+        if self._admission_closed():
+            return
         self._settings = settings
 
     def _selected_environment(self) -> Environment | None:
@@ -151,6 +160,8 @@ class EnvPresenter(QObject):
 
     def select_environment_index(self, index: int) -> None:
         """Select environment by combo index (0 = No Environment)."""
+        if self._admission_closed():
+            return
         self._env_selector.setCurrentIndex(index)
 
     def current_environment_index(self) -> int:
@@ -184,85 +195,133 @@ class EnvPresenter(QObject):
     def wait_storage_idle(self, timeout_ms: int = 30000) -> bool:
         return self._storage_gateway.wait_idle(timeout_ms)
 
+    def begin_root_teardown(self) -> None:
+        """Close UI admission while accepted request updates are still drained."""
+        with self._lifecycle_lock:
+            self._root_teardown_started = True
+
+    def _admission_closed(self) -> bool:
+        return self._root_teardown_started or self._teardown_started
+
+    def teardown(self, timeout_ms: int | None = None) -> TeardownResult:
+        return env_presenter_lifecycle.teardown(self, timeout_ms)
+
+    def begin_teardown(self) -> None:
+        env_presenter_lifecycle.begin_teardown(self)
+
     def load_environments(self) -> None:
         """Loads from storage, populates combo, emits current vars."""
-        if self._encryption_enabled():
-            logger.info("environment_storage_async_load_dispatched")
-            self._storage_gateway.load_async()
-            return
-        environments = self._storage.load_environments()
-        self._apply_loaded_environments(environments)
-        self.environments_loaded.emit()
+        with self._lifecycle_lock:
+            if self._admission_closed():
+                logger.info("environment_load_rejected reason=teardown")
+                return
+            if self._encryption_enabled():
+                logger.info("environment_storage_async_load_dispatched")
+                self._storage_gateway.load_async()
+                return
+            environments = self._storage.load_environments()
+            self._apply_loaded_environments(environments)
+            self.environments_loaded.emit()
 
     def _encryption_enabled(self) -> bool:
         return resolve_encryption_enabled(self._settings)
 
-    def _save_environments(self) -> None:
-        if self._encryption_enabled():
-            logger.info(
-                "environment_storage_async_save_dispatched count=%d",
-                len(self._environments),
-            )
-            self._storage_gateway.save_async(self._environments)
-        else:
-            self._storage.save_environments(self._environments)
+    def _save_environments(
+        self,
+        *,
+        update_sequences: tuple[int, ...] = (),
+        accepted_during_teardown: bool = False,
+    ) -> bool:
+        with self._lifecycle_lock:
+            if self._admission_closed() and not accepted_during_teardown:
+                logger.info("environment_save_rejected reason=teardown")
+                return False
+            if self._encryption_enabled():
+                logger.info(
+                    "environment_storage_async_save_dispatched count=%d",
+                    len(self._environments),
+                )
+                self._storage_gateway.save_async(
+                    self._environments,
+                    update_sequences=update_sequences,
+                    accepted_during_teardown=accepted_during_teardown,
+                )
+                return True
+            try:
+                self._storage.save_environments(self._environments)
+            except Exception:
+                for sequence in update_sequences:
+                    self.environment_update_disposition.emit(sequence, "failed")
+                raise
+            for sequence in update_sequences:
+                self.environment_update_disposition.emit(sequence, "persisted")
+            return True
 
     def _apply_loaded_environments(self, environments: list[Environment]) -> None:
-        self._environments = environments
-        logger.info("load_environments_completed count=%d", len(self._environments))
-
-        self._env_selector.blockSignals(True)
-        self._env_selector.clear()
-        self._env_selector.addItem("No Environment", None)
-
-        selected_index = 0
-        for i, env in enumerate(self._environments):
-            self._env_selector.addItem(env.name, env)
-            if self._settings.last_environment_id == env.id:
-                selected_index = i + 1
-
-        self._env_selector.setCurrentIndex(selected_index)
-        self._current_env_index = selected_index
-        self._env_selector.blockSignals(False)
-
-        if selected_index > 0:
-            self._on_env_changed(selected_index)
+        env_presenter_lifecycle.apply_loaded_environments(self, environments)
 
     def _on_storage_load_completed(self, environments: list[Environment]) -> None:
-        self._apply_loaded_environments(environments)
-        if self._pending_env_manager_refresh:
-            self._pending_env_manager_refresh = False
-            self._on_env_changed(self._env_selector.currentIndex())
-        self.environments_loaded.emit()
+        env_presenter_lifecycle.on_storage_load_completed(self, environments)
+
+    def _on_storage_save_outcome(self, sequence: object, outcome: str) -> None:
+        env_presenter_lifecycle.on_storage_save_outcome(self, sequence, outcome)
 
     def _on_storage_load_failed(self, error: object) -> None:
-        logger.error("storage_load_failed error=%s", error)
-        self._apply_loaded_environments([])
-        self.environments_loaded.emit()
+        env_presenter_lifecycle.on_storage_load_failed(self, error)
 
     def _on_storage_save_failed(self, error: object) -> None:
-        message = str(error) if error else "Failed to save environments."
-        logger.error("storage_save_failed error=%s", message)
-        show_env_save_failed(self._widget, message)
+        env_presenter_lifecycle.on_storage_save_failed(self, error, show_env_save_failed)
 
-    def on_env_update(self, vars: dict) -> None:
+    def on_env_update(
+        self,
+        vars: dict,
+        sequence: int | None = None,
+        *,
+        accepted_during_teardown: bool = False,
+    ) -> None:
         """Merges post-request variable updates into current env."""
-        selected = self._env_selector.currentData()
-        if isinstance(selected, Environment):
-            logger.info(
-                "env_variables_updated_from_script env_id=%s env_name=%s var_count=%d",
-                selected.id,
-                selected.name,
-                len(vars),
-            )
-            selected.variables.update(vars)
-            self._save_environments()
-            logger.debug("environment_updated_emitted env_id=%s source=script", selected.id)
-            self.environment_updated.emit(selected.id)
-            self._on_env_changed(self._env_selector.currentIndex())
+        with self._lifecycle_lock:
+            if self._admission_closed() and not accepted_during_teardown:
+                logger.info("environment_update_rejected reason=teardown")
+                if sequence is not None:
+                    self.environment_update_disposition.emit(
+                        sequence, "rejected_after_cutoff"
+                    )
+                return
+            selected = self._env_selector.currentData()
+            if isinstance(selected, Environment):
+                logger.info(
+                    "env_variables_updated_from_script env_id=%s env_name=%s var_count=%d",
+                    selected.id,
+                    selected.name,
+                    len(vars),
+                )
+                selected.variables.update(vars)
+                if not self._save_environments(
+                    update_sequences=() if sequence is None else (sequence,),
+                    accepted_during_teardown=accepted_during_teardown,
+                ):
+                    return
+                if accepted_during_teardown:
+                    return
+                logger.debug("environment_updated_emitted env_id=%s source=script", selected.id)
+                self.environment_updated.emit(selected.id)
+                self._on_env_changed(self._env_selector.currentIndex())
+            elif sequence is not None:
+                self.environment_update_disposition.emit(sequence, "failed")
+
+    def accept_accepted_env_update(self, variables: dict, sequence: int) -> None:
+        """Persist a request update accepted before the root shutdown cutoff."""
+        self.on_env_update(
+            variables,
+            sequence,
+            accepted_during_teardown=True,
+        )
 
     def handle_variable_set_request(self, key, value: str) -> None:
         """Prompts for key if needed, saves variable to current env."""
+        if self._admission_closed():
+            return
         selected = self._env_selector.currentData()
         if not isinstance(selected, Environment):
             logger.warning("variable_set_request_no_env_selected")
@@ -281,6 +340,9 @@ class EnvPresenter(QObject):
             else:
                 return
 
+        if self._admission_closed():
+            return
+
         logger.info(
             "variable_set_in_env env_id=%s env_name=%s key=%s",
             selected.id,
@@ -294,22 +356,7 @@ class EnvPresenter(QObject):
         self._on_env_changed(self._env_selector.currentIndex())
 
     def _is_valid_variable_name(self, name: str) -> tuple[bool, str]:
-        """Validate variable name and record metrics/logging for the UI flow."""
-        is_valid, error_msg = validate_variable_name(name)
-        if is_valid:
-            self._metrics.track_variable_validation("valid")
-            return True, ""
-
-        reason = validation_failure_reason(name)
-        if reason:
-            self._metrics.track_variable_validation_failure(reason)
-        self._metrics.track_variable_validation("invalid")
-        logger.debug(
-            "variable_name_validation_attempt name=%s valid=False error=%s",
-            name,
-            reason or "unknown",
-        )
-        return False, error_msg
+        return env_presenter_lifecycle.validate_variable(self, name)
 
     def handle_open_environments(self) -> None:
         """Shortcut handler — opens EnvironmentDialog."""
@@ -317,6 +364,9 @@ class EnvPresenter(QObject):
 
     def _on_env_changed(self, index: int) -> None:
         """Resolves vars, saves config, and emits domain and variable signals."""
+        if self._admission_closed():
+            logger.info("environment_selection_ignored reason=teardown")
+            return
         selected = self._env_selector.itemData(index)
         variables: dict = {}
 
@@ -352,6 +402,8 @@ class EnvPresenter(QObject):
         self.environment_selected.emit(selected_env)
 
     def _open_env_manager(self) -> None:
+        if self._admission_closed():
+            return
         current_env_name = self._env_selector.currentText()
         if self._env_selector.currentIndex() == 0:
             current_env_name = None
@@ -367,6 +419,8 @@ class EnvPresenter(QObject):
         )
         dialog.exec()
         logger.info("env_manager_dialog_closed")
+        if self._admission_closed():
+            return
         self._environments = dialog.environments
         self._save_environments()
         logger.debug("environment_manager_closed_emitted")

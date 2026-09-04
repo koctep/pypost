@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 
 if TYPE_CHECKING:
     from pypost.ui.main_window import MainWindow
@@ -53,7 +53,21 @@ def wire_presenter_signals(window: MainWindow) -> None:
         window.mcp_controls.on_environment_manager_closed
     )
     window.tabs.variable_set_requested.connect(window.env.handle_variable_set_request)
-    window.tabs.env_update_requested.connect(window.env.on_env_update)
+    accepted_env_update = getattr(window.env, "accept_accepted_env_update", None)
+    if callable(accepted_env_update):
+        window.tabs.env_update_accepted.connect(
+            lambda sequence, variables: window.env.on_env_update(variables, sequence),
+            Qt.ConnectionType.QueuedConnection,
+        )
+    else:
+        legacy_env_update = getattr(window.env, "on_env_update", None)
+        if callable(legacy_env_update):
+            window.tabs.env_update_requested.connect(legacy_env_update)
+    window.env.environment_update_disposition.connect(
+        lambda sequence, disposition: window.tabs.record_env_update_disposition(
+            sequence, disposition
+        ),
+    )
     window.tabs.request_saved.connect(window.collections.refresh_tree)
     window.tabs.request_saved.connect(window.collections.restore_tree_state)
     window.tabs.request_saved.connect(window.mcp_controls.refresh_tools)

@@ -14,12 +14,13 @@ from tests.test_alert_manager import _make_payload
 
 pytestmark = pytest.mark.timeout(60)
 
-def _make_main_window(qapp, *, alert_manager=None):  # noqa: ARG001
+def _make_main_window(qapp, *, alert_manager=None, env_presenter=None):  # noqa: ARG001
     metrics = MagicMock()
     template_service = MagicMock()
     config_manager = MagicMock()
     mock_tabs = MagicMock()
     mock_collections = MagicMock()
+    env_presenter = env_presenter or MagicMock()
     with (
         patch("pypost.ui.main_window.StorageManager"),
         patch("pypost.ui.main_window.RequestManager"),
@@ -27,7 +28,7 @@ def _make_main_window(qapp, *, alert_manager=None):  # noqa: ARG001
         patch("pypost.ui.mcp_server_controller.MCPServerManager"),
         patch("pypost.ui.main_window.CollectionsPresenter", return_value=mock_collections),
         patch("pypost.ui.main_window.TabsPresenter", return_value=mock_tabs),
-        patch("pypost.ui.main_window.EnvPresenter"),
+        patch("pypost.ui.main_window.EnvPresenter", return_value=env_presenter),
         patch("pypost.ui.main_window.HistoryPanel"),
         patch("pypost.ui.main_window.MainWindow._build_layout"),
         patch("pypost.ui.main_window.wire_presenter_signals"),
@@ -114,6 +115,18 @@ def test_reload_alert_manager_closes_old_and_propagates_to_tabs(qapp, tmp_path):
         webhook_auth_header=None,
     )
     window.tabs.set_alert_manager.assert_called_once_with(new_manager)
+
+
+def test_main_window_supports_legacy_env_presenter_without_acceptance_method(qapp):
+    """Legacy environment doubles still receive the original update route."""
+    legacy_env = MagicMock()
+    del legacy_env.accept_accepted_env_update
+    window = _make_main_window(qapp, env_presenter=legacy_env)
+
+    consumer = window.tabs.set_environment_update_consumer.call_args.args[0]
+    consumer({"KEY": "value"}, 1)
+
+    legacy_env.on_env_update.assert_called_once_with({"KEY": "value"})
 
 def test_open_settings_reloads_alert_manager_when_webhook_changes(qapp, caplog):
     initial = MagicMock(spec=AlertManager)

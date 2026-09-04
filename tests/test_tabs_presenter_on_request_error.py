@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from pypost.models.settings import AppSettings
+from pypost.ui.presenters import tabs_presenter_save
 from pypost.ui.presenters.tabs_presenter import TabsPresenter
+from pypost.ui.request_save_orchestrator import SaveAction
 from tests.test_tabs_presenter import (
     FakeRequestManager,
     FakeStateManager,
@@ -148,3 +151,24 @@ def test_execution_error_message_does_not_expose_raw_detail_for_network(
     with patch("pypost.ui.presenters.tabs_presenter_worker.show_request_error") as mock_show:
         presenter._on_request_error(tab, exc)
         assert raw_detail not in mock_show.call_args[0][1]
+
+
+@pytest.mark.timeout(60)
+def test_extracted_save_errors_use_tabs_presenter_logger() -> None:
+    """Extracted save callbacks retain the established patchable logger."""
+    presenter = MagicMock()
+    presenter._admission_open.return_value = True
+    presenter._stale_context_for_tab.return_value = None
+    presenter._save_orchestrator.save_request.return_value = SimpleNamespace(
+        action=SaveAction.OVERWRITE,
+        request=None,
+    )
+
+    with patch("pypost.ui.presenters.tabs_presenter.logger") as tabs_logger:
+        tabs_presenter_save.save_request(
+            presenter,
+            MagicMock(),
+            _make_request("save-error", "Save Error", "GET"),
+        )
+
+    tabs_logger.error.assert_called_once()

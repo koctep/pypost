@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List
+import threading
 
-from PySide6.QtCore import Qt, Signal, QPoint
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -22,10 +22,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pypost.ui.collection_item_dialogs import confirm_clear_history
 from pypost.core.curl_generator import CurlGenerator
 from pypost.core.history_manager import HistoryManager
+from pypost.core.lifecycle import (
+    TeardownResult,
+    record_lifecycle_event,
+    record_teardown_metrics,
+    teardown_correlation_id,
+)
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.models.models import HistoryEntry, RequestData
+from pypost.ui.collection_item_dialogs import confirm_clear_history
 
 logger = logging.getLogger(__name__)
 
@@ -37,23 +44,81 @@ class HistoryPanel(QWidget):
     curl_copied = Signal()
 
     def __init__(
-        self, history_manager: HistoryManager, icons: dict | None = None, parent=None
+        self,
+        history_manager: HistoryManager,
+        icons: dict | None = None,
+        parent=None,
+        *,
+        metrics: MetricsTrackerProtocol | None = None,
     ) -> None:
         super().__init__(parent)
         self._history_manager = history_manager
         self._icons = icons or {}
-        self._entries: List[HistoryEntry] = []
-        self._entries_by_id: Dict[str, HistoryEntry] = {}
+        self._metrics = resolve_metrics(
+            metrics if metrics is not None else getattr(history_manager, "_metrics", None)
+        )
+        self._lifecycle_metric_owner = "history_panel"
+        self._entries: list[HistoryEntry] = []
+        self._entries_by_id: dict[str, HistoryEntry] = {}
+        self._teardown_lock = threading.Lock()
+        self._teardown_started = False
+        self._teardown_result: TeardownResult | None = None
 
         self._build_ui()
         self.refresh()
 
     def refresh(self) -> None:
         """Reloads entries from HistoryManager and re-applies filter."""
+        if self._teardown_started:
+            logger.info(
+                "lifecycle_late_delivery_ignored owner=history_panel kind=refresh "
+                "teardown_id=%s",
+                teardown_correlation_id(self),
+            )
+            record_lifecycle_event(
+                self, "late_signal_suppressed", metrics=self._metrics
+            )
+            return
         self._entries = self._history_manager.get_entries()
         self._entries_by_id = {entry.id: entry for entry in self._entries}
         logger.debug("history_panel_refreshed entry_count=%d", len(self._entries))
         self._apply_filter(self._filter_input.text())
+
+    def teardown(self, timeout_ms: int | None = None) -> TeardownResult:
+        """Fence panel callbacks without closing the shared history manager."""
+        budget_ms = 5000 if timeout_ms is None else max(0, timeout_ms)
+        with self._teardown_lock:
+            if self._teardown_result is not None:
+                return self._teardown_result
+            self._teardown_started = True
+            self._load_btn.setEnabled(False)
+            self._clear_btn.setEnabled(False)
+            logger.info(
+                "lifecycle_teardown_started owner=history_panel teardown_id=%s "
+                "timeout_ms=%d active_count=0 pending_count=0",
+                teardown_correlation_id(self),
+                budget_ms,
+            )
+            self._teardown_result = TeardownResult(
+                owner="history_panel",
+                outcome="success",
+                elapsed_ms=0,
+            )
+            logger.info(
+                "lifecycle_teardown_completed owner=history_panel teardown_id=%s "
+                "outcome=success elapsed_ms=0 deadline_ms=%d active_count=0 "
+                "pending_count=0",
+                teardown_correlation_id(self),
+                budget_ms,
+            )
+            record_teardown_metrics(self, self._teardown_result, self._metrics)
+            return self._teardown_result
+
+    def begin_teardown(self) -> None:
+        """Fence panel delivery before shared history persistence is drained."""
+        with self._teardown_lock:
+            if self._teardown_result is None:
+                self._teardown_started = True
 
     # ── UI Construction ───────────────────────────────────────────────────────
 
@@ -163,6 +228,16 @@ class HistoryPanel(QWidget):
 
     def _on_load_into_editor(self) -> None:
         """Converts selected HistoryEntry to RequestData and emits load_into_editor."""
+        if self._teardown_started:
+            logger.info(
+                "lifecycle_late_delivery_ignored owner=history_panel "
+                "kind=load_into_editor teardown_id=%s",
+                teardown_correlation_id(self),
+            )
+            record_lifecycle_event(
+                self, "late_signal_suppressed", metrics=self._metrics
+            )
+            return
         entry = self._selected_entry()
         if entry is None:
             return
@@ -179,6 +254,16 @@ class HistoryPanel(QWidget):
 
     def _on_clear_history(self) -> None:
         """Confirms then clears all history entries."""
+        if self._teardown_started:
+            logger.info(
+                "lifecycle_late_delivery_ignored owner=history_panel kind=clear "
+                "teardown_id=%s",
+                teardown_correlation_id(self),
+            )
+            record_lifecycle_event(
+                self, "late_signal_suppressed", metrics=self._metrics
+            )
+            return
         if not confirm_clear_history(self):
             return
         self._history_manager.clear()
@@ -187,6 +272,8 @@ class HistoryPanel(QWidget):
 
     def _on_context_menu(self, pos: QPoint) -> None:
         """Shows context menu with 'Copy as cURL' and 'Delete' actions for right-clicked entry."""
+        if self._teardown_started:
+            return
         item = self._list_widget.itemAt(pos)
         if item is None:
             return
@@ -210,6 +297,8 @@ class HistoryPanel(QWidget):
 
     def _copy_as_curl(self) -> None:
         """Copies the selected history entry as a cURL command to the clipboard."""
+        if self._teardown_started:
+            return
         entry = self._selected_entry()
         if entry is None:
             return

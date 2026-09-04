@@ -136,5 +136,48 @@ class TestMetricsRegistryTemplateRenderDuration(unittest.TestCase):
         )
 
 
+class TestMetricsRegistryLifecycle(unittest.TestCase):
+    def test_track_lifecycle_teardown_records_outcome_duration_and_work(self):
+        reg = MetricsRegistry()
+        reg.track_lifecycle_teardown(
+            "tabs_presenter", "incomplete", 0.25, active_count=2, pending_count=3
+        )
+
+        out = _scrape(reg)
+        self.assertIn(
+            'lifecycle_teardowns_total{outcome="incomplete",owner="tabs_presenter"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'lifecycle_teardown_duration_seconds_count{outcome="incomplete",owner="tabs_presenter"} 1.0',
+            out,
+        )
+        self.assertIn(
+            'lifecycle_teardown_active_workers{owner="tabs_presenter"} 2.0',
+            out,
+        )
+        self.assertIn(
+            'lifecycle_teardown_pending_work{owner="tabs_presenter"} 3.0',
+            out,
+        )
+
+    def test_track_lifecycle_events_and_outcomes_use_bounded_labels(self):
+        reg = MetricsRegistry()
+        reg.track_lifecycle_event("tabs_presenter", "late_signal_suppressed", 2)
+        reg.track_environment_update_disposition("persisted")
+        reg.track_history_io_failure("save")
+
+        out = _scrape(reg)
+        self.assertIn(
+            'lifecycle_events_total{event="late_signal_suppressed",owner="tabs_presenter"} 2.0',
+            out,
+        )
+        self.assertIn(
+            'environment_update_dispositions_total{disposition="persisted"} 1.0',
+            out,
+        )
+        self.assertIn('history_io_failures_total{operation="save"} 1.0', out)
+
+
 if __name__ == "__main__":
     unittest.main()

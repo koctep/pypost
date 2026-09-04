@@ -97,7 +97,10 @@ def compose_app(
         bool(settings.alert_webhook_url),
     )
 
-    history_kwargs: dict[str, Any] = {"defer_initial_load": True}
+    history_kwargs: dict[str, Any] = {
+        "defer_initial_load": True,
+        "metrics": metrics_manager,
+    }
     if data_dir is not None:
         history_kwargs["history_path"] = Path(data_dir) / "history.json"
     history_manager = HistoryManager(**history_kwargs)

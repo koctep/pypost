@@ -16,6 +16,31 @@ _MCP_VALIDATION_TRANSPORTS = frozenset({"http", "websocket", "unknown"})
 _MCP_VALIDATION_TYPES = frozenset(
     {"string", "integer", "integer_or_string", "number", "boolean", "array", "object", "unknown"}
 )
+_LIFECYCLE_OWNERS = frozenset(
+    {
+        "main_window",
+        "tabs_presenter",
+        "request_tab",
+        "history_panel",
+        "history_manager",
+        "environment_storage_gateway",
+        "env_presenter",
+    }
+)
+_LIFECYCLE_OUTCOMES = frozenset({"success", "incomplete", "failed"})
+_LIFECYCLE_EVENTS = frozenset(
+    {"cancellation_requested", "admission_rejected", "late_signal_suppressed"}
+)
+_ENVIRONMENT_DISPOSITIONS = frozenset(
+    {
+        "persisted",
+        "coalesced_into_newer_save",
+        "failed",
+        "incomplete",
+        "rejected_after_cutoff",
+    }
+)
+_HISTORY_IO_OPERATIONS = frozenset({"load", "save"})
 
 
 def _normalize_new_tab_source(source: str) -> str:
@@ -34,6 +59,10 @@ def _normalize_mcp_validation_label(value: str, allowed: frozenset[str]) -> str:
     return value if value in allowed else "unknown"
 
 
+def _normalize_lifecycle_label(value: str, allowed: frozenset[str]) -> str:
+    return value if value in allowed else "unknown"
+
+
 class MetricsRegistry:
     """Owns Prometheus counters and pure tracking methods."""
 
@@ -48,6 +77,52 @@ class MetricsRegistry:
         self._init_mcp_metrics()
         self._init_encryption_metrics()
         self._init_websocket_metrics()
+        self._init_lifecycle_metrics()
+
+    def _init_lifecycle_metrics(self) -> None:
+        """Register bounded presenter shutdown and admission metrics."""
+        self.lifecycle_teardowns = Counter(
+            "lifecycle_teardowns_total",
+            "Completed bounded lifecycle teardown attempts",
+            ["owner", "outcome"],
+            registry=self.registry,
+        )
+        self.lifecycle_teardown_duration_seconds = Histogram(
+            "lifecycle_teardown_duration_seconds",
+            "Duration of bounded lifecycle teardown attempts",
+            ["owner", "outcome"],
+            registry=self.registry,
+        )
+        self.lifecycle_teardown_active_workers = Gauge(
+            "lifecycle_teardown_active_workers",
+            "Active workers observed when lifecycle teardown began",
+            ["owner"],
+            registry=self.registry,
+        )
+        self.lifecycle_teardown_pending_work = Gauge(
+            "lifecycle_teardown_pending_work",
+            "Pending work observed when lifecycle teardown began",
+            ["owner"],
+            registry=self.registry,
+        )
+        self.lifecycle_events = Counter(
+            "lifecycle_events_total",
+            "Lifecycle admission, cancellation, and late-delivery events",
+            ["owner", "event"],
+            registry=self.registry,
+        )
+        self.environment_update_dispositions = Counter(
+            "environment_update_dispositions_total",
+            "Terminal dispositions of accepted environment updates",
+            ["disposition"],
+            registry=self.registry,
+        )
+        self.history_io_failures = Counter(
+            "history_io_failures_total",
+            "History load and save failures",
+            ["operation"],
+            registry=self.registry,
+        )
 
     def _init_gui_metrics(self) -> None:
         """Register GUI interaction counters."""
@@ -445,6 +520,45 @@ class MetricsRegistry:
 
     def track_history_load_into_editor(self) -> None:
         self.history_entries_loaded_into_editor.inc()
+
+    def track_lifecycle_teardown(
+        self,
+        owner: str,
+        outcome: str,
+        elapsed_seconds: float,
+        active_count: int,
+        pending_count: int,
+    ) -> None:
+        owner = _normalize_lifecycle_label(owner, _LIFECYCLE_OWNERS)
+        outcome = _normalize_lifecycle_label(outcome, _LIFECYCLE_OUTCOMES)
+        self.lifecycle_teardowns.labels(owner=owner, outcome=outcome).inc()
+        self.lifecycle_teardown_duration_seconds.labels(
+            owner=owner, outcome=outcome
+        ).observe(max(0.0, elapsed_seconds))
+        self.lifecycle_teardown_active_workers.labels(owner=owner).set(
+            max(0, active_count)
+        )
+        self.lifecycle_teardown_pending_work.labels(owner=owner).set(
+            max(0, pending_count)
+        )
+
+    def track_lifecycle_event(self, owner: str, event: str, count: int = 1) -> None:
+        self.lifecycle_events.labels(
+            owner=_normalize_lifecycle_label(owner, _LIFECYCLE_OWNERS),
+            event=_normalize_lifecycle_label(event, _LIFECYCLE_EVENTS),
+        ).inc(max(0, count))
+
+    def track_environment_update_disposition(self, disposition: str) -> None:
+        self.environment_update_dispositions.labels(
+            disposition=_normalize_lifecycle_label(
+                disposition, _ENVIRONMENT_DISPOSITIONS
+            )
+        ).inc()
+
+    def track_history_io_failure(self, operation: str) -> None:
+        self.history_io_failures.labels(
+            operation=_normalize_lifecycle_label(operation, _HISTORY_IO_OPERATIONS)
+        ).inc()
 
     def track_request_error(self, category: ErrorCategory) -> None:
         self.request_errors.labels(category=category.value).inc()

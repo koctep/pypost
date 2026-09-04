@@ -10,6 +10,7 @@ from PySide6.QtCore import QTimer
 
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.ui.collection_item_dialogs import show_request_error, show_request_failed_error
+from pypost.core.lifecycle import record_lifecycle_event, teardown_correlation_id
 
 if TYPE_CHECKING:
     from pypost.models.response import ResponseData
@@ -39,6 +40,37 @@ _ERROR_MESSAGES = {
 class TabsPresenterWorkerHandlers:
     """Worker signal handlers extracted from TabsPresenter."""
 
+    def _delivery_is_fenced(self, tab: RequestTab) -> bool:
+        if getattr(self, "_teardown_started", False) or id(tab) in getattr(
+            self, "_fenced_tabs", set()
+        ):
+            logger.info(
+                "lifecycle_late_delivery_ignored owner=tabs_presenter "
+                "operation=request teardown_id=%s",
+                teardown_correlation_id(self),
+            )
+            record_lifecycle_event(
+                self, "late_signal_suppressed", metrics=getattr(self, "_metrics", None)
+            )
+            return True
+        return False
+
+    def _claim_terminal(self, tab: RequestTab, generation: int | None = None) -> bool:
+        """Claim the single visible terminal effect for the active request generation."""
+        lock = getattr(self, "_teardown_lock", None)
+        if lock is None:
+            return False
+        with lock:
+            if self._delivery_is_fenced(tab):
+                return False
+            current = getattr(tab, "_request_generation", 0)
+            if generation is not None and generation != current:
+                return False
+            if getattr(tab, "_terminal_claimed", False):
+                return False
+            tab._terminal_claimed = True
+            return True
+
     def _discard_chunk_buffer(self: TabsPresenter, tab: RequestTab) -> None:
         """Stop pending flush timer and drop buffered chunks for *tab*.
 
@@ -56,7 +88,10 @@ class TabsPresenterWorkerHandlers:
         self: TabsPresenter,
         tab: RequestTab,
         response: ResponseData,
+        generation: int | None = None,
     ) -> None:
+        if not self._claim_terminal(tab, generation):
+            return
         self._clear_tab_worker(tab)
         self._discard_chunk_buffer(tab)
         method = tab.request_data.method if tab.request_data else "UNKNOWN"
@@ -75,7 +110,14 @@ class TabsPresenterWorkerHandlers:
         tab.response_view.size_label.setText(f"Size: {response.size} bytes")
         self.request_executed.emit()
 
-    def _on_request_error(self: TabsPresenter, tab: RequestTab, error) -> None:
+    def _on_request_error(
+        self: TabsPresenter,
+        tab: RequestTab,
+        error,
+        generation: int | None = None,
+    ) -> None:
+        if not self._claim_terminal(tab, generation):
+            return
         self._clear_tab_worker(tab)
         self._discard_chunk_buffer(tab)
         self._reset_tab_ui_state(tab)
@@ -111,6 +153,8 @@ class TabsPresenterWorkerHandlers:
         logs: list[str],
         err: object,
     ) -> None:
+        if self._delivery_is_fenced(tab):
+            return
         if logs:
             for line in str(logs).splitlines():
                 logger.debug("script_output tab_id=%s line=%s", id(tab), line)
@@ -126,9 +170,13 @@ class TabsPresenterWorkerHandlers:
     def _on_headers_received(
         self: TabsPresenter, tab: RequestTab, status: int, headers: dict
     ) -> None:
+        if self._delivery_is_fenced(tab):
+            return
         tab.response_view.status_label.setText(f"Status: {status}")
 
     def _on_chunk_received(self: TabsPresenter, tab: RequestTab, chunk: str) -> None:
+        if self._delivery_is_fenced(tab):
+            return
         tab_key = id(tab)
         self._chunk_buffers.setdefault(tab_key, []).append(chunk)
         timer = self._chunk_flush_timers.get(tab_key)
@@ -141,6 +189,9 @@ class TabsPresenterWorkerHandlers:
         timer.start()
 
     def _flush_chunk_buffer(self: TabsPresenter, tab: RequestTab) -> None:
+        if self._delivery_is_fenced(tab):
+            self._discard_chunk_buffer(tab)
+            return
         tab_key = id(tab)
         chunks = self._chunk_buffers.pop(tab_key, [])
         if not chunks:
@@ -156,6 +207,8 @@ class TabsPresenterWorkerHandlers:
         attempt: int,
         max_retries: int,
     ) -> None:
+        if self._delivery_is_fenced(tab):
+            return
         tab.request_editor.send_btn.setText(f"Retrying\u2026 ({attempt} of {max_retries})")
 
     def _clear_tab_worker(

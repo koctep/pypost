@@ -77,6 +77,23 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_history_load_into_editor(self) -> None: ...
 
+    def track_lifecycle_teardown(
+        self,
+        owner: str,
+        outcome: str,
+        elapsed_seconds: float,
+        active_count: int,
+        pending_count: int,
+    ) -> None: ...
+
+    def track_lifecycle_event(
+        self, owner: str, event: str, count: int = 1
+    ) -> None: ...
+
+    def track_environment_update_disposition(self, disposition: str) -> None: ...
+
+    def track_history_io_failure(self, operation: str) -> None: ...
+
     def track_request_error(self, category: ErrorCategory) -> None: ...
 
     def track_yaml_to_json_conversion_failed(self) -> None: ...
@@ -237,6 +254,27 @@ class NullMetrics:
         return None
 
     def track_history_load_into_editor(self) -> None:
+        return None
+
+    def track_lifecycle_teardown(
+        self,
+        owner: str,
+        outcome: str,
+        elapsed_seconds: float,
+        active_count: int,
+        pending_count: int,
+    ) -> None:
+        return None
+
+    def track_lifecycle_event(
+        self, owner: str, event: str, count: int = 1
+    ) -> None:
+        return None
+
+    def track_environment_update_disposition(self, disposition: str) -> None:
+        return None
+
+    def track_history_io_failure(self, operation: str) -> None:
         return None
 
     def track_request_error(self, category: ErrorCategory) -> None:

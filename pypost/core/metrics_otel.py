@@ -19,7 +19,13 @@ from pypost.core.metrics_registry import (
     _MCP_VALIDATION_STAGES,
     _MCP_VALIDATION_TRANSPORTS,
     _MCP_VALIDATION_TYPES,
+    _ENVIRONMENT_DISPOSITIONS,
+    _HISTORY_IO_OPERATIONS,
+    _LIFECYCLE_EVENTS,
+    _LIFECYCLE_OUTCOMES,
+    _LIFECYCLE_OWNERS,
     _normalize_mcp_validation_label,
+    _normalize_lifecycle_label,
     _normalize_new_tab_protocol,
     _normalize_new_tab_source,
 )
@@ -71,6 +77,18 @@ class OtelMetricsTracker:
             callbacks=[self._observe_websocket_active_sessions],
             description="Instantaneous number of active concurrent WebSocket sessions",
         )
+        self._lifecycle_teardown_active_workers_values: dict[str, int] = {}
+        self._lifecycle_teardown_pending_work_values: dict[str, int] = {}
+        self._meter.create_observable_gauge(
+            "lifecycle_teardown_active_workers",
+            callbacks=[self._observe_lifecycle_active_workers],
+            description="Active workers observed when lifecycle teardown began",
+        )
+        self._meter.create_observable_gauge(
+            "lifecycle_teardown_pending_work",
+            callbacks=[self._observe_lifecycle_pending_work],
+            description="Pending work observed when lifecycle teardown began",
+        )
 
     def _observe_mcp_server_up(self, options) -> Iterator[Observation]:
         yield Observation(self._mcp_server_ready)
@@ -81,6 +99,14 @@ class OtelMetricsTracker:
 
     def _observe_websocket_active_sessions(self, options) -> Iterator[Observation]:
         yield Observation(self._websocket_active_sessions_count)
+
+    def _observe_lifecycle_active_workers(self, options) -> Iterator[Observation]:
+        for owner, count in self._lifecycle_teardown_active_workers_values.items():
+            yield Observation(count, attributes={"owner": owner})
+
+    def _observe_lifecycle_pending_work(self, options) -> Iterator[Observation]:
+        for owner, count in self._lifecycle_teardown_pending_work_values.items():
+            yield Observation(count, attributes={"owner": owner})
 
     def _init_instruments(self) -> None:
         meter = self._meter
@@ -213,6 +239,27 @@ class OtelMetricsTracker:
         self._history_entries_loaded_into_editor = meter.create_counter(
             "history_entries_loaded_into_editor_total",
             description="Number of history entries loaded into the request editor",
+        )
+        self._lifecycle_teardowns = meter.create_counter(
+            "lifecycle_teardowns_total",
+            description="Completed bounded lifecycle teardown attempts",
+        )
+        self._lifecycle_teardown_duration_seconds = meter.create_histogram(
+            "lifecycle_teardown_duration_seconds",
+            description="Duration of bounded lifecycle teardown attempts",
+            unit="s",
+        )
+        self._lifecycle_events = meter.create_counter(
+            "lifecycle_events_total",
+            description="Lifecycle admission, cancellation, and late-delivery events",
+        )
+        self._environment_update_dispositions = meter.create_counter(
+            "environment_update_dispositions_total",
+            description="Terminal dispositions of accepted environment updates",
+        )
+        self._history_io_failures = meter.create_counter(
+            "history_io_failures_total",
+            description="History load and save failures",
         )
         self._request_errors = meter.create_counter(
             "request_errors_total",
@@ -433,6 +480,53 @@ class OtelMetricsTracker:
 
     def track_history_load_into_editor(self) -> None:
         self._history_entries_loaded_into_editor.add(1)
+
+    def track_lifecycle_teardown(
+        self,
+        owner: str,
+        outcome: str,
+        elapsed_seconds: float,
+        active_count: int,
+        pending_count: int,
+    ) -> None:
+        owner = _normalize_lifecycle_label(owner, _LIFECYCLE_OWNERS)
+        outcome = _normalize_lifecycle_label(outcome, _LIFECYCLE_OUTCOMES)
+        attributes = {"owner": owner, "outcome": outcome}
+        self._lifecycle_teardowns.add(1, attributes)
+        self._lifecycle_teardown_duration_seconds.record(
+            max(0.0, elapsed_seconds), attributes
+        )
+        self._lifecycle_teardown_active_workers_values[owner] = max(0, active_count)
+        self._lifecycle_teardown_pending_work_values[owner] = max(0, pending_count)
+
+    def track_lifecycle_event(self, owner: str, event: str, count: int = 1) -> None:
+        self._lifecycle_events.add(
+            max(0, count),
+            {
+                "owner": _normalize_lifecycle_label(owner, _LIFECYCLE_OWNERS),
+                "event": _normalize_lifecycle_label(event, _LIFECYCLE_EVENTS),
+            },
+        )
+
+    def track_environment_update_disposition(self, disposition: str) -> None:
+        self._environment_update_dispositions.add(
+            1,
+            {
+                "disposition": _normalize_lifecycle_label(
+                    disposition, _ENVIRONMENT_DISPOSITIONS
+                )
+            },
+        )
+
+    def track_history_io_failure(self, operation: str) -> None:
+        self._history_io_failures.add(
+            1,
+            {
+                "operation": _normalize_lifecycle_label(
+                    operation, _HISTORY_IO_OPERATIONS
+                )
+            },
+        )
 
     def track_request_error(self, category: ErrorCategory) -> None:
         self._request_errors.add(1, {"category": category.value})

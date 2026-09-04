@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, Qt, QTimer
@@ -20,6 +21,7 @@ from pypost.core.alert_manager import AlertManager
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.history_manager import HistoryManager
+from pypost.core.lifecycle import TeardownResult
 from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.qt.metrics import MetricsManager
@@ -30,11 +32,9 @@ from pypost.ui.styles.style_manager import StyleManager
 from pypost.core.template_service import TemplateService
 from pypost.models.settings import AppSettings
 from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed
-from pypost.ui.dialogs.about_dialog import AboutDialog
-from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.hotkeys import register_hotkey, register_hotkey_group, tag_action
 from pypost.ui.main_window_protocol_hotkeys import register_protocol_session_hotkeys
-from pypost.ui.dialogs.library_dialogs import LibraryManagerDialog
+from pypost.ui import main_window_lifecycle
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.main_window_signals import wire_presenter_signals
 from pypost.ui.mcp_server_controller import McpServerSettingsController
@@ -92,13 +92,16 @@ class MainWindow(QMainWindow):
             self.storage.apply_encryption_settings(self.state_manager.settings)
         self.style_manager = StyleManager()
         self.settings = self.state_manager.settings
+        self._teardown_lock = threading.Lock()
+        self._teardown_started = False
+        self._teardown_result: TeardownResult | None = None
         self.icons = self._load_icons()
         if history_manager is not None:
             logger.debug("history_manager_source source=injected")
             self.history_manager = history_manager
         else:
             logger.debug("history_manager_source source=new")
-            self.history_manager = HistoryManager(defer_initial_load=True)
+            self.history_manager = HistoryManager(defer_initial_load=True, metrics=self.metrics)
         self.collections = CollectionsPresenter(
             self.request_manager,
             self.state_manager,
@@ -138,6 +141,7 @@ class MainWindow(QMainWindow):
             self.metrics,
             mcp_registry=self.mcp_controller.registry,
         )
+        main_window_lifecycle.configure_env_update_consumer(self)
         self.mcp_controls = self.env.mcp_controls
         self.mcp_controls.set_server_controller(self.mcp_controller)
         self._build_layout()
@@ -161,23 +165,21 @@ class MainWindow(QMainWindow):
         return self._ui_ready
 
     def _on_startup_collections_loaded(self) -> None:
+        if getattr(self, "_teardown_started", False):
+            return
         self.collections.collections_loaded.disconnect(self._on_startup_collections_loaded)
         self._startup_collections_ready = True
         self._maybe_complete_startup_restore()
 
     def _on_startup_environments_loaded(self) -> None:
+        if getattr(self, "_teardown_started", False):
+            return
         self.env.environments_loaded.disconnect(self._on_startup_environments_loaded)
         self._startup_env_ready = True
         self._maybe_complete_startup_restore()
 
     def _maybe_complete_startup_restore(self) -> None:
-        if not (self._startup_collections_ready and self._startup_env_ready):
-            return
-        self.tabs.restore_tabs()
-        self.collections.restore_tree_state()
-        self.mcp_controller.start_enabled()
-        self._ui_ready = True
-        logger.info("main_window_ui_ready")
+        main_window_lifecycle.maybe_complete_startup_restore(self)
 
     def _load_icons(self) -> dict:
         d = Path(__file__).parent / "resources" / "icons"
@@ -346,31 +348,14 @@ class MainWindow(QMainWindow):
     def _alert_settings_changed(
         self, previous: AppSettings, updated: AppSettings
     ) -> bool:
-        return (
-            previous.alert_log_path != updated.alert_log_path
-            or previous.alert_webhook_url != updated.alert_webhook_url
-            or previous.alert_webhook_auth_header != updated.alert_webhook_auth_header
-        )
+        return main_window_lifecycle.alert_settings_changed(previous, updated)
 
     def _reload_alert_manager(self) -> None:
-        if self._alert_manager is not None:
-            self._alert_manager.close()
-        log_path = (
-            Path(self.settings.alert_log_path) if self.settings.alert_log_path else None
-        )
-        self._alert_manager = AlertManager(
-            log_path=log_path,
-            webhook_url=self.settings.alert_webhook_url,
-            webhook_auth_header=self.settings.alert_webhook_auth_header,
-        )
-        self.tabs.set_alert_manager(self._alert_manager)
-        logger.info(
-            "alert_manager_reloaded log_path=%s webhook_url_set=%s",
-            log_path,
-            bool(self.settings.alert_webhook_url),
-        )
+        main_window_lifecycle.reload_alert_manager(self, AlertManager)
 
     def apply_settings(self, settings: AppSettings) -> None:
+        if getattr(self, "_teardown_started", False):
+            return
         self.settings = settings
         app = QApplication.instance()
         if app:
@@ -381,6 +366,8 @@ class MainWindow(QMainWindow):
         self.env.apply_settings(settings)
 
     def open_settings(self) -> None:
+        if self._teardown_started:
+            return
         dialog = SettingsDialog(self.settings, self, storage=self.storage)
         try:
             if not dialog.exec():
@@ -397,6 +384,8 @@ class MainWindow(QMainWindow):
                 previous_settings, new_settings
             )
             self.settings = new_settings
+            if self._teardown_started:
+                return
             self.config_manager.save_config(self.settings)
             self.env.wait_storage_idle()
             self.storage.apply_encryption_settings(self.settings)
@@ -422,33 +411,44 @@ class MainWindow(QMainWindow):
             dialog.cleanup()
             dialog.deleteLater()
             QCoreApplication.processEvents()
-        self.env.reload_current_env()
+        if not self._teardown_started:
+            self.env.reload_current_env()
 
     def _on_metrics_start_failed(self, message: str) -> None:
+        if getattr(self, "_teardown_started", False):
+            return
         logger.error("metrics_server_start_failed_ui message=%s", message)
         show_metrics_server_start_failed(self, message)
 
+    def teardown(self, timeout_ms: int | None = None) -> TeardownResult:
+        return main_window_lifecycle.teardown(self, timeout_ms)
+
+    def _shutdown_for_exit(self) -> TeardownResult:
+        return main_window_lifecycle.shutdown_for_exit(
+            self, encryption_enabled_resolver=resolve_encryption_enabled
+        )
+
+    def closeEvent(self, event) -> None:
+        logger.info("main_window_close_event")
+        main_window_lifecycle.close_event(self, event)
+
     def handle_exit(self) -> None:
         logger.info("main_window_exit_requested")
-        self.state_manager.flush_pending_save()
-        if resolve_encryption_enabled(self.settings):
-            idle = self.env.wait_storage_idle()
-            logger.info("main_window_exit_storage_idle completed=%s", idle)
-        self.mcp_controller.stop_all()
-        QApplication.instance().quit()
+        main_window_lifecycle.handle_exit(self)
 
     def open_library_manager(self) -> None:
-        dialog = LibraryManagerDialog(parent=self)
-        dialog.exec()
+        main_window_lifecycle.open_library_manager(self)
 
     def handle_show_hotkeys(self) -> None:
-        HotkeysDialog(self).exec()
+        main_window_lifecycle.show_hotkeys(self)
 
     def handle_show_about(self) -> None:
-        AboutDialog(self).exec()
+        main_window_lifecycle.show_about(self)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        if getattr(self, "_teardown_started", False):
+            return
         if self._startup_settings_reapplied:
             return
         self._startup_settings_reapplied = True

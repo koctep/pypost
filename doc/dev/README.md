@@ -36,6 +36,7 @@ conventions.
 1. [Request Data Copy Policy](request_data_copy_policy.md)
 1. [State Manager](state_manager.md)
 1. [Presenter Architecture and Interaction Model (PYPOST-1082)](presenter_architecture.md)
+1. [Uniform Presenter Teardown Contract (PYPOST-1256)](presenter_teardown.md)
 1. [Headless Daemon Mode (PYPOST-1046)](daemon.md)
 
 ### Audits

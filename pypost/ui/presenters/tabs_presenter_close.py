@@ -47,6 +47,12 @@ def close_workspace_tab(
         ),
     ):
         return
+    from pypost.ui.presenters.tabs_presenter import RequestTab
+
+    if isinstance(tab, RequestTab):
+        result = presenter.teardown_tab(tab)
+        if result.outcome != "success":
+            return
     tab_presenter = getattr(tab, "presenter", None)
     teardown = getattr(tab_presenter, "teardown", None)
     if callable(teardown):
