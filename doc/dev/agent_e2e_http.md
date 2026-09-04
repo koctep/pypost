@@ -203,18 +203,19 @@ make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_mapping_compound_keys
 make test PYTEST_ARGS="tests/test_agent_e2e_http.py::test_mapping_compound_keys_gui_send_scenario_module_exists -q"
 ```
 
-### Mapping multi-URL GUI module (PYPOST-901 / PYPOST-955)
+### Mapping multi-URL GUI module (PYPOST-901 / PYPOST-955 / PYPOST-982)
 
 | Test | Role |
 | --- | --- |
 | `test_mapping_stub_two_distinct_urls_panel_outcomes` | Happy path — two Sends, panel asserts (901) |
 | `test_mapping_send_logs_http_stub_installed_url_router` | Mapping GUI install-log caplog smoke (957) |
 | `test_mapping_get_send_settle_timeout_includes_step_and_excerpt` | Forced GET Send settle timeout companion (955) |
+| `test_mapping_post_send_settle_timeout_includes_step_and_excerpt` | POST timeout (982) |
 
 Inventory gates in `tests/test_agent_e2e_http.py`:
 
 - `test_mapping_multi_url_gui_send_scenario_module_exists` — happy-path callable
-- `test_mapping_multi_url_settle_timeout_companion_exists` — companion callable
+- `test_mapping_multi_url_settle_timeout_companion_exists` — GET/POST companion callables
 
 Happy path: blank session, one Mapping stub (`SEED_GET_RESOLVED_URL` /
 `SEED_POST_RESOLVED_URL` → canned GET/POST), two Sends with panel asserts via
@@ -224,29 +225,48 @@ Happy path: blank session, one Mapping stub (`SEED_GET_RESOLVED_URL` /
 `wait_response_after_mapping_get_send` /
 `wait_response_after_mapping_post_send`).
 
-#### Timeout companion (PYPOST-955)
+#### Timeout companions (PYPOST-955 / PYPOST-982)
 
-`test_mapping_get_send_settle_timeout_includes_step_and_excerpt` mirrors the
+`test_mapping_get_send_settle_timeout_includes_step_and_excerpt` and
+`test_mapping_post_send_settle_timeout_includes_step_and_excerpt` mirror the
 golden Send and [dialog-settle](agent_dialog_settle.md) timeout companions:
-forces near-zero settle failure and asserts `UiWaitTimeoutError.diagnostics`
-carries stable step + excerpt.
+each forces near-zero settle failure and asserts
+`UiWaitTimeoutError.diagnostics` carries the method-specific step and a
+bounded response excerpt.
 
-1. Same module as happy path; GET-only Send under minimal Mapping stub.
-2. `wait_response_after_snapshot(session, lambda _: False, timeout=FORCED_SETTLE_TIMEOUT_S, …)` — same helper as happy path with a short budget (not 15 s).
-3. Timeout message shape includes step in parentheses:
+1. Same module as the happy path; each companion performs one method-specific
+   Send under a minimal Mapping stub (GET for PYPOST-955, POST for PYPOST-982).
+2. Call `wait_response_after_snapshot` with an always-false predicate and
+   `timeout=FORCED_SETTLE_TIMEOUT_S` — the same helper as the happy path with a
+   short budget (not 15 s).
+3. Timeout message shape includes the method-specific step in parentheses:
    `mapping multi-URL Send settle failed (wait_response_after_mapping_get_send): …`
-4. Assert `diagnostics["step"]` and presence/type of `response_excerpt`.
+   or
+   `mapping multi-URL Send settle failed (wait_response_after_mapping_post_send): …`.
+4. Assert `diagnostics["step"]` and that `diagnostics["response_excerpt"]` is
+   a string; the POST companion additionally requires it to be non-empty.
 
 | Constant | Value |
 | --- | --- |
-| `FORCED_SETTLE_TIMEOUT_S` | 0.05 (provided by the shared test helper `tests.helpers.agent_e2e_timeouts`; same policy as golden/dialog companions) |
+| `FORCED_SETTLE_TIMEOUT_S` | 0.05; provided by `tests.helpers.agent_e2e_timeouts` |
 | `SEND_SETTLE_TIMEOUT_S` | 15.0 (happy path only; from `tests.helpers.agent_e2e_send`) |
-| Companion `step` | `wait_response_after_mapping_get_send` |
+| GET companion `step` | `wait_response_after_mapping_get_send` |
+| POST companion `step` | `wait_response_after_mapping_post_send` |
 
 ```bash
-make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_mapping_multi_url.py -q"
-make test-agent-e2e PYTEST_ARGS="tests/test_agent_e2e_http_mapping_multi_url.py::test_mapping_get_send_settle_timeout_includes_step_and_excerpt -q"
-make test PYTEST_ARGS="tests/test_agent_e2e_http.py::test_mapping_multi_url_settle_timeout_companion_exists -q"
+mapping_module=tests/test_agent_e2e_http_mapping_multi_url.py
+get_timeout=test_mapping_get_send_settle_timeout_includes_step_and_excerpt
+post_timeout=test_mapping_post_send_settle_timeout_includes_step_and_excerpt
+inventory_module=tests/test_agent_e2e_http.py
+inventory_test=test_mapping_multi_url_settle_timeout_companion_exists
+
+make test-agent-e2e PYTEST_ARGS="${mapping_module} -q"
+make test-agent-e2e \
+  PYTEST_ARGS="${mapping_module}::${get_timeout} -q"
+make test-agent-e2e \
+  PYTEST_ARGS="${mapping_module}::${post_timeout} -q"
+make test \
+  PYTEST_ARGS="${inventory_module}::${inventory_test} -q"
 ```
 
 ### Seed POST Send (body path)
@@ -333,7 +353,8 @@ No extra env vars.
 | Mapping settle timeout missing `step` / excerpt | Run companion: |
 | | `make test-agent-e2e PYTEST_ARGS=` |
 | | `"tests/test_agent_e2e_http_mapping_multi_url.py::` |
-| | `test_mapping_get_send_settle_timeout_includes_step_and_excerpt -v"`. |
+| | `test_mapping_get_send_settle_timeout_includes_step_and_excerpt -v"` or |
+| | `test_mapping_post_send_settle_timeout_includes_step_and_excerpt -v"`. |
 | | Confirm `wait_response_after_snapshot` with impossible snapshot |
 | | predicate; see [agent_e2e_send_settle.md](agent_e2e_send_settle.md). |
 

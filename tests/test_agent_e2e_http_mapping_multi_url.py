@@ -175,3 +175,39 @@ def test_mapping_get_send_settle_timeout_includes_step_and_excerpt(
     assert diagnostics.get("step") == "wait_response_after_mapping_get_send"
     assert "response_excerpt" in diagnostics
     assert isinstance(diagnostics["response_excerpt"], str)
+
+
+def test_mapping_post_send_settle_timeout_includes_step_and_excerpt(
+    agent_e2e_session: AgentAppSession,
+    agent_e2e_http_stub: Any,
+) -> None:
+    """PYPOST-982: forced mapping POST Send settle timeout carries step + excerpt."""
+    session = agent_e2e_session
+    assert session.window.is_ui_ready is True
+    find_widget(session.window, URL_INPUT)
+    find_widget(session.window, METHOD_COMBO)
+    find_widget(session.window, SEND_BUTTON)
+    find_widget(session.window, REQUEST_BODY_EDIT)
+
+    responses = {
+        SEED_POST_RESOLVED_URL: CANNED_SEED_POST_OK,
+    }
+
+    with agent_e2e_http_stub(responses):
+        session.ui_fill(URL_INPUT, SEED_POST_RESOLVED_URL)
+        session.ui_select(METHOD_COMBO, "POST")
+        session.ui_fill(REQUEST_BODY_EDIT, SEED_POST_BODY)
+        session.ui_click(SEND_BUTTON)
+        with pytest.raises(UiWaitTimeoutError) as exc_info:
+            wait_response_after_snapshot(
+                session,
+                lambda _: False,
+                step="wait_response_after_mapping_post_send",
+                message_prefix=_MAPPING_SETTLE_PREFIX,
+                timeout=FORCED_SETTLE_TIMEOUT_S,
+            )
+
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics.get("step") == "wait_response_after_mapping_post_send"
+    assert isinstance(diagnostics.get("response_excerpt"), str)
+    assert diagnostics["response_excerpt"]
