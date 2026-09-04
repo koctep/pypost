@@ -17,6 +17,14 @@ logger = logging.getLogger(__name__)
 ReadImportFile = Callable[..., tuple[list[Collection], list[str]]]
 
 
+class CollectionImportCancelled(Exception):
+    """Raised internally to unwind a parse that was cooperatively cancelled.
+
+    Never crosses the worker boundary as an exception -- ``run()`` catches it
+    and emits ``parse_cancelled`` instead. See PYPOST-1229.
+    """
+
+
 def _callable_accepts_progress(func: Callable) -> bool:
     try:
         sig = inspect.signature(func)
@@ -46,6 +54,7 @@ class CollectionImportParseWorker(QThread):
     progress = parse_progress
     parse_completed = Signal(list, list)  # collections, parse_errors
     parse_failed = Signal(object)  # CollectionImportFileError or Exception
+    parse_cancelled = Signal()
 
     def __init__(self, path: Path, read_import_file: ReadImportFile) -> None:
         super().__init__()
@@ -55,8 +64,13 @@ class CollectionImportParseWorker(QThread):
     def run(self) -> None:
         logger.debug("collection_import_parse_worker_started path=%s", self._path)
         try:
+            if self.isInterruptionRequested():
+                raise CollectionImportCancelled()
+
             def _emit_progress(done: int, total: int) -> None:
                 self.parse_progress.emit(done, total)
+                if self.isInterruptionRequested():
+                    raise CollectionImportCancelled()
 
             if _callable_accepts_progress(self._read_import_file):
                 collections, parse_errors = self._read_import_file(
@@ -65,6 +79,10 @@ class CollectionImportParseWorker(QThread):
             else:
                 collections, parse_errors = self._read_import_file(self._path)
 
+            if self.isInterruptionRequested():
+                raise CollectionImportCancelled()
+
+            self.parse_completed.emit(collections, parse_errors)
             logger.debug(
                 "collection_import_parse_worker_completed path=%s count=%d "
                 "error_count=%d",
@@ -72,7 +90,9 @@ class CollectionImportParseWorker(QThread):
                 len(collections),
                 len(parse_errors),
             )
-            self.parse_completed.emit(collections, parse_errors)
+        except CollectionImportCancelled:
+            logger.info("collection_import_parse_worker_cancelled path=%s", self._path)
+            self.parse_cancelled.emit()
         except CollectionImportFileError as exc:
             logger.warning(
                 "collection_import_parse_worker_failed path=%s reason=%s",

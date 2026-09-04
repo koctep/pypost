@@ -115,10 +115,17 @@ class CollectionImportActions(QObject):
         return True
 
     def teardown(self, timeout_ms: int = 5000) -> bool:
-        """Safely disconnect, interrupt/wait, join, and reap background workers deterministically.
+        """Safely disconnect, interrupt/wait, join, and reap background workers
+        deterministically.
         """
         logger.info("collection_import_teardown_started timeout_ms=%d", timeout_ms)
         clean = True
+        interruption_requested = False
+        worker = self._worker
+        if self.is_busy() and worker is not None and worker.isRunning():
+            logger.warning("collection_import_worker_interrupting")
+            worker.requestInterruption()
+            interruption_requested = True
         if self.is_busy():
             clean = self.wait_idle(timeout_ms)
         worker = self._worker
@@ -136,12 +143,17 @@ class CollectionImportActions(QObject):
             except (RuntimeError, TypeError):
                 pass
             try:
+                worker.parse_cancelled.disconnect(self._on_parse_cancelled)
+            except (RuntimeError, TypeError):
+                pass
+            try:
                 worker.finished.disconnect(self._on_worker_finished)
             except (RuntimeError, TypeError):
                 pass
             if worker.isRunning():
                 logger.warning("collection_import_worker_interrupting")
                 worker.requestInterruption()
+                interruption_requested = True
                 if not worker.wait(100):
                     clean = False
                     logger.warning("collection_import_worker_interrupt_timeout")
@@ -150,6 +162,8 @@ class CollectionImportActions(QObject):
             worker.deleteLater()
             logger.debug("collection_import_worker_reaped")
             self._worker = None
+        elif interruption_requested:
+            logger.info("collection_import_worker_interrupted")
         self._set_state(CollectionImportState.IDLE)
         app = QApplication.instance()
         if app is not None:
@@ -175,6 +189,7 @@ class CollectionImportActions(QObject):
         worker.parse_progress.connect(self._on_parse_progress)
         worker.parse_completed.connect(self._on_parse_completed)
         worker.parse_failed.connect(self._on_parse_failed)
+        worker.parse_cancelled.connect(self._on_parse_cancelled)
         worker.finished.connect(self._on_worker_finished)
         self._worker = worker
         worker.start()
@@ -209,6 +224,14 @@ class CollectionImportActions(QObject):
             return
         logger.error("collection_import_parse_unexpected error=%s", error)
         show_collection_import_invalid_file_error(self._parent, str(error))
+
+    def _on_parse_cancelled(self) -> None:
+        """A cancelled parse should look and feel like nothing happened."""
+        logger.info(
+            "collection_import_parse_cancelled from_state=%s",
+            self._state.value,
+        )
+        self._set_state(CollectionImportState.IDLE)
 
     def _on_worker_finished(self) -> None:
         finished = self._worker
