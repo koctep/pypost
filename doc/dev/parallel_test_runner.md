@@ -15,8 +15,9 @@ Each worker subprocess is bound by a per-file wall-clock timeout (PYPOST-1192). 
 expires, the child is killed, the file is recorded as `timed_out`, and the overall run fails
 without hanging the pool. See [Worker timeout](#worker-timeout-pypost-1192).
 
-When `scripts/run_parallel_tests.py` is absent, the Makefile falls back to a single
-`python -m pytest` invocation (legacy path).
+When `scripts/run_parallel_tests.py` is absent, `make test` and `make test-cov` fail closed:
+the Makefile first removes root `.coverage.*` fragments, prints an actionable error, and exits
+with status 2. Neither target falls back to a serial `python -m pytest` invocation.
 
 Integration tests for the orchestrator live in `tests/test_run_parallel_tests.py`.
 
@@ -47,10 +48,11 @@ scripts/run_parallel_tests.py  (ThreadPoolExecutor)
 .coverage_parallel/.coverage.worker_*  →  coverage combine  →  report + htmlcov/
 ```
 
-Timeout is enforced **inside** the pool thread via `subprocess.run(..., timeout=...)`, not via
-`Future.result(timeout=...)`. A future-only timeout would stop the collector from waiting but
-would leave the hung child and pool thread running, so the orchestrator could still stall on
-shutdown.
+Timeout is enforced **per file** inside the pool thread via `subprocess.Popen` followed by
+`proc.communicate(timeout=...)`, not via `Future.result(timeout=...)`. On expiry, the worker
+terminates the file's process group and records `TIMED_OUT`. A future-only timeout would stop
+the collector from waiting but would leave the hung child and pool thread running, so the
+orchestrator could still stall on shutdown.
 
 Structured logging (`logger.*` on stderr) complements CLI progress on stdout; see
 `ai-tasks/PYPOST-1149/50-observability.md` and `ai-tasks/PYPOST-1192/50-observability.md`.
@@ -106,7 +108,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py [orches
 | Flag | Description |
 | --- | --- |
 | `-n N`, `--workers N`, `--workers=N`, `-nN` | Worker count (positive integer). Highest precedence for concurrency. |
-| `--worker-timeout N`, `--worker-timeout=N` | Per-file wall-clock bound in seconds (positive float). Highest precedence for timeout. Distinct from pytest-timeout `--timeout`, which remains passthrough. |
+| `--worker-timeout N`, `--worker-timeout=N` | Per-file wall-clock bound in seconds (positive finite float) or explicit `none` for unbounded execution. Highest precedence for timeout. Distinct from pytest-timeout `--timeout`, which remains passthrough. |
 | `--cov` | Enable per-file coverage collection and post-run combine/report (`--cov=pypost`, `htmlcov/`). Also accepts `--cov=package` passthrough into pytest args. |
 | `--report-json PATH`, `--report-json=PATH` | Write JSON summary after the run (see schema below). |
 
@@ -123,7 +125,10 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py [orches
 2. Environment variable `WORKER_TIMEOUT`
 3. Script product default `30` seconds (`DEFAULT_WORKER_TIMEOUT`)
 
-Invalid or non-positive CLI/env values are ignored and fall through to the next layer.
+If a CLI or environment timeout is supplied, it must be a positive finite number or the explicit
+`none` value. Invalid, non-positive, and non-finite values are rejected before discovery; they do
+not fall through to another layer. The next layer is consulted only when the higher-precedence
+value is absent.
 
 ### Dual defaults (script vs Make)
 
@@ -134,7 +139,7 @@ Invalid or non-positive CLI/env values are ignored and fall through to the next 
 
 Make uses 120 so legitimate slow suite files (for example makefile smoke modules around 64–87s)
 are not false-`TIMED_OUT` under the script's 30s product default. Direct script runs without
-Make still use 30 unless overridden.
+Make still use 30 unless overridden with a positive finite value or explicit `none`.
 
 Do not use bare `--timeout` as an orchestrator flag: pytest-timeout owns that name, and the
 parser forwards it into every worker.
@@ -147,25 +152,26 @@ parser forwards it into every worker.
 ```python
 DEFAULT_WORKER_TIMEOUT: float = 30.0
 
-def get_worker_timeout(cli_timeout: float | None = None) -> float:
+def get_worker_timeout(cli_timeout: float | str | None = None) -> float | None:
     """Determine effective per-worker timeout following precedence rules.
 
     Precedence:
-    1. Explicit CLI argument (--worker-timeout) — must be > 0
-    2. WORKER_TIMEOUT environment variable    — must parse as float > 0
+    1. Explicit CLI argument (--worker-timeout) — positive finite value or 'none'
+    2. WORKER_TIMEOUT environment variable    — positive finite value or 'none'
     3. DEFAULT_WORKER_TIMEOUT (30 seconds)
     """
 ```
 
 **Validation rules** (applied at each tier before accepting the value):
 
-| Tier | Source | Accepted when | Rejected and falls through when |
+| Tier | Source | Accepted when | Rejected before discovery |
 | --- | --- | --- | --- |
-| 1 — CLI | `cli_timeout` argument | `cli_timeout is not None and cli_timeout > 0` | `None`, `0.0`, any negative value |
-| 2 — Env | `os.environ["WORKER_TIMEOUT"]` | Parses as `float` **and** `> 0` | Empty string, whitespace-only, `"0"`, negative, non-numeric |
-| 3 — Default | `DEFAULT_WORKER_TIMEOUT` | Always | — |
+| 1 — CLI | `cli_timeout` argument | Positive finite number or explicit `none`; omitted means continue | Missing value, zero, negative, non-finite, or non-numeric value |
+| 2 — Env | `os.environ["WORKER_TIMEOUT"]` | Positive finite number or explicit `none`; absent means use default | Empty, whitespace-only, zero, negative, non-finite, or non-numeric value |
+| 3 — Default | `DEFAULT_WORKER_TIMEOUT` | Used when CLI and environment values are absent | — |
 
-The function never raises; invalid values at any tier cause silent fallthrough to the next.
+`get_worker_timeout` raises `RunnerValidationError` for an invalid supplied value. It returns
+`None` only for explicit `none`, which is the sole unbounded mode.
 
 **CLIParser flag handling** — two equivalent invocation styles are accepted:
 
@@ -174,8 +180,8 @@ scripts/run_parallel_tests.py --worker-timeout 42.5  # space-separated
 scripts/run_parallel_tests.py --worker-timeout=42.5  # equals-separated
 ```
 
-A bare `--worker-timeout` with no following value is silently ignored; resolution falls
-through to env/default.
+A bare `--worker-timeout` with no following value is rejected with a configuration error; it does
+not fall through to env/default.
 
 ### Test coverage for `get_worker_timeout` (PYPOST-1199)
 
@@ -186,9 +192,9 @@ and cover the full precedence matrix via `@pytest.mark.parametrize`:
 | Test | What it verifies |
 | --- | --- |
 | `test_get_worker_timeout_precedence` | CLI overrides env; env overrides default; default applies when both absent |
-| `test_get_worker_timeout_invalid_cli_fallthrough` | `0.0`, `-5.0`, `-1.0` all fall through to env or default |
-| `test_get_worker_timeout_invalid_env_fallthrough` | `""`, `"   "`, `"0"`, `"-10.0"`, `"invalid"`, `"abc"` all fall through to default |
-| `test_cli_parser_worker_timeout_flags` | Space-separated, equals-separated, and missing-value forms of `--worker-timeout` |
+| `test_get_worker_timeout_rejects_invalid_cli_values` | `0.0`, `-5.0`, and `-1.0` raise instead of being replaced by env/default |
+| `test_get_worker_timeout_rejects_invalid_env_values` | Invalid environment values raise when no valid CLI timeout takes precedence |
+| `test_cli_parser_worker_timeout_flags` | Space-separated and equals-separated values work; a missing value is rejected |
 
 All tests use `monkeypatch.setenv` / `monkeypatch.delenv` — no environment state leaks across
 test boundaries.
@@ -440,7 +446,7 @@ After completion:
 | Coverage below 70% fails run | Combined report enforces `--cov-fail-under` (default 70 from `pyproject.toml`) | Run `make test-cov`, inspect terminal report; override with `PYTEST_ARGS='--cov-fail-under=0'` only when debugging |
 | Stale `.coverage` or missing combine | Interrupted prior run | Re-run `make test-cov`; orchestrator clears `.coverage_parallel/` and root `.coverage` on start |
 | Single file debug | Full suite parallelism obscures failure | `make test PYTEST_ARGS='tests/test_foo.py -vv --tb=long'` (one subprocess) |
-| Orchestrator missing | Script deleted or wrong cwd | Makefile falls back to single-process pytest; restore script for parallel/Qt isolation |
+| Orchestrator missing | Script deleted or wrong cwd | Makefile cleans root `.coverage.*`, prints an error, and exits 2; restore script for parallel/Qt isolation |
 | JSON report huge | Per-file stdout/stderr embedded | By design for CI artifacts; omit `--report-json` for local runs |
 
 Focused orchestrator tests:
@@ -470,3 +476,44 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py \
 - `ai-tasks/PYPOST-1197/60-tech-debt.md` — process group isolation and technical debt analysis
 - `ai-tasks/PYPOST-1199/10-requirements.md` — requirements for `get_worker_timeout` precedence unit tests
 - `ai-tasks/PYPOST-1199/20-architecture.md` — architecture and parameterized test matrices for timeout resolution
+
+## PYPOST-1153 maintainability contracts
+
+The following contracts govern maintenance of the parallel runner and its Make entry points.
+
+### Invocation and selection
+
+- `make test` and `make test-cov` fail closed with an actionable error when
+  `scripts/run_parallel_tests.py` is missing; neither command silently falls back to serial
+  pytest. The rejected path cleans only root `.coverage.*` fragments.
+- Runner-owned options are removed from the original pytest argument sequence without changing
+  the order or spelling of other tokens. The `--` sentinel and every token after it are replayed
+  verbatim. A node-id resolves its backing file for discovery while the complete node-id is
+  retained for the child pytest process.
+- Worker counts must be positive. Per-file timeouts must be positive and finite, or explicitly
+  `none` for an unbounded worker; invalid supplied values are rejected before discovery.
+- Missing explicit targets, unmatched globs, and empty discovery are validation failures before
+  a worker pool is created.
+
+### Coverage and diagnostics
+
+- Worker processes collect isolated fragments under `.coverage_parallel/`; only the aggregate
+  phase combines data, generates reports, and enforces the threshold. `--cov=SOURCE` overrides
+  the project source, `--cov-report=SPEC` supplies report specifications, and
+  `--cov-fail-under=N` overrides the project threshold. Omitted values use project policy and
+  aggregate defaults. Aggregate cleanup removes runner-owned fragments before and after the run.
+- Lifecycle, validation, timeout, and coverage events use scalar fields and a correlated
+  `run_id`. Raw pytest arguments, node ids, test output, and environment contents are redacted
+  or omitted; timeout process-group cleanup remains correlated to the same run.
+
+Bounded Make examples:
+
+```bash
+make test WORKERS=2 WORKER_TIMEOUT=120 \
+  PYTEST_ARGS='tests/test_parallel_runner_followups_repro.py -q'
+make test-cov WORKERS=2 WORKER_TIMEOUT=120 \
+  PYTEST_ARGS='tests/test_parallel_runner_followups_repro.py -q'
+```
+
+PYPOST-1261 and PYPOST-1262 are existing, non-blocking baseline issues. They are not caused by
+these runner contracts and must not be duplicated as PYPOST-1153 follow-up tickets.

@@ -75,12 +75,9 @@ ignore_errors = true
 
 [tool.pytest.ini_options]
 pythonpath = "."
-# --cov-fail-under: enforces minimum line coverage for `pypost`.
-# Threshold set to 70% (project target; baseline 86%, raised from 60% in PYPOST-565).
 addopts = [
     "-v",
     "--tb=short",
-    "--cov-fail-under=70",
     "--strict-markers",
     "-m",
     "not slow",
@@ -95,3 +92,9 @@ log_cli = true
 log_cli_level = "WARNING"
 log_format = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
 log_date_format = "%H:%M:%S"
+
+[tool.coverage.run]
+source = ["pypost"]
+
+[tool.coverage.report]
+fail_under = 70

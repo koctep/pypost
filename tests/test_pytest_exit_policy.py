@@ -42,6 +42,54 @@ def _seed_minimal_project(workspace: Path) -> None:
     (pypost_dir / "__init__.py").write_text("", encoding="utf-8")
 
 
+def _prepare_missing_runner_workspace(tmp_path: Path) -> None:
+    shutil.copy(MAKEFILE, tmp_path / "Makefile")
+    (tmp_path / "pyproject.toml").write_text(_MINIMAL_PYPROJECT, encoding="utf-8")
+    _seed_minimal_project(tmp_path)
+    (tmp_path / "tests").mkdir()
+
+    install = subprocess.run(
+        ["make", f"PYTHON={sys.executable}", "install"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert install.returncode == 0, install.stderr
+
+
+def _seed_missing_runner_coverage_files(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Create root and nested coverage files for the missing-runner contract."""
+    fragment = tmp_path / ".coverage.worker-1"
+    fragment.write_text("disposable coverage data", encoding="utf-8")
+    preserved_root_file = tmp_path / ".coverage"
+    preserved_root_file.write_text("persistent coverage data", encoding="utf-8")
+    nested_fragment = tmp_path / "nested" / ".coverage.worker-2"
+    nested_fragment.parent.mkdir()
+    nested_fragment.write_text("nested coverage data", encoding="utf-8")
+    return fragment, preserved_root_file, nested_fragment
+
+
+def _assert_missing_runner_failure(
+    result: subprocess.CompletedProcess[str],
+    *,
+    target: str,
+    fragment: Path,
+    preserved_root_file: Path,
+    nested_fragment: Path,
+) -> None:
+    """Check the fail-closed result and scoped coverage cleanup."""
+    assert result.returncode != 0, (
+        f"make {target} must fail when the parallel runner is missing; "
+        f"stderr={result.stderr!r}"
+    )
+    assert "parallel runner unavailable" in result.stderr.lower()
+    assert not fragment.exists(), f"make {target} left a root coverage fragment"
+    assert preserved_root_file.exists(), f"make {target} removed the base coverage file"
+    assert nested_fragment.exists(), f"make {target} removed a nested coverage fragment"
+
+
 @pytest.mark.timeout(30)
 def test_pytest_returns_exit_code_5_for_empty_tests_dir(tmp_path: Path) -> None:
     """pytest natively exits 5 when no tests are collected."""
@@ -61,25 +109,13 @@ def test_pytest_returns_exit_code_5_for_empty_tests_dir(tmp_path: Path) -> None:
 
 
 @pytest.mark.timeout(75)
-def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path) -> None:
-    """make test must propagate pytest exit 5 — zero collection is a failure."""
-    shutil.copy(MAKEFILE, tmp_path / "Makefile")
-    (tmp_path / "pyproject.toml").write_text(_MINIMAL_PYPROJECT, encoding="utf-8")
-    _seed_minimal_project(tmp_path)
-    tests_dir = tmp_path / "tests"
-    tests_dir.mkdir()
-
-    install = subprocess.run(
-        ["make", f"PYTHON={sys.executable}", "install"],
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
+def test_make_test_fails_closed_when_parallel_runner_is_missing(tmp_path: Path) -> None:
+    """make test rejects a missing runner and cleans root coverage fragments."""
+    _prepare_missing_runner_workspace(tmp_path)
+    fragment, preserved_root_file, nested_fragment = _seed_missing_runner_coverage_files(
+        tmp_path
     )
-    assert install.returncode == 0, install.stderr
-
-    test_result = subprocess.run(
+    result = subprocess.run(
         ["make", f"PYTHON={sys.executable}", "PYTEST_ARGS=", "test"],
         cwd=tmp_path,
         capture_output=True,
@@ -87,13 +123,36 @@ def test_make_test_fails_with_exit_code_5_when_no_tests_collected(tmp_path: Path
         timeout=60,
         check=False,
     )
-    assert test_result.returncode != 0, (
-        f"make test must fail when no tests are collected; got exit "
-        f"{test_result.returncode}; stderr={test_result.stderr!r}"
+    _assert_missing_runner_failure(
+        result,
+        target="test",
+        fragment=fragment,
+        preserved_root_file=preserved_root_file,
+        nested_fragment=nested_fragment,
     )
-    assert f"Error {PYTEST_EXIT_NO_TESTS}" in test_result.stderr, (
-        f"make must report pytest exit {PYTEST_EXIT_NO_TESTS}; stderr="
-        f"{test_result.stderr!r}"
+
+
+@pytest.mark.timeout(75)
+def test_make_test_cov_fails_closed_when_parallel_runner_is_missing(tmp_path: Path) -> None:
+    """make test-cov rejects a missing runner and cleans root coverage fragments."""
+    _prepare_missing_runner_workspace(tmp_path)
+    fragment, preserved_root_file, nested_fragment = _seed_missing_runner_coverage_files(
+        tmp_path
+    )
+    result = subprocess.run(
+        ["make", f"PYTHON={sys.executable}", "PYTEST_ARGS=", "test-cov"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    _assert_missing_runner_failure(
+        result,
+        target="test-cov",
+        fragment=fragment,
+        preserved_root_file=preserved_root_file,
+        nested_fragment=nested_fragment,
     )
 
 
@@ -154,4 +213,3 @@ def test_pytest_retains_exit_code_5_when_policy_is_fail(tmp_path: Path) -> None:
         f"expected exit {PYTEST_EXIT_NO_TESTS}, got {result.returncode}; "
         f"stdout={result.stdout!r} stderr={result.stderr!r}"
     )
-

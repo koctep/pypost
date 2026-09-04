@@ -147,32 +147,32 @@ def test_pytest_exit_policy_timeout_budget() -> None:
     assert EXIT_POLICY_TEST_FILE.is_file(), f"{EXIT_POLICY_TEST_FILE} must exist"
     tree = ast.parse(EXIT_POLICY_TEST_FILE.read_text(encoding="utf-8"))
     func_node = _find_function_def(
-        tree, "test_make_test_fails_with_exit_code_5_when_no_tests_collected"
+        tree, "test_make_test_fails_closed_when_parallel_runner_is_missing"
     )
     assert func_node is not None, (
-        "Function test_make_test_fails_with_exit_code_5_when_no_tests_collected not found in "
+        "Function test_make_test_fails_closed_when_parallel_runner_is_missing not found in "
         f"{EXIT_POLICY_TEST_FILE}"
     )
 
     test_timeout = _extract_function_timeout(func_node, tree)
     assert test_timeout is not None, (
-        "test_make_test_fails_with_exit_code_5_when_no_tests_collected "
+        "test_make_test_fails_closed_when_parallel_runner_is_missing "
         "must declare a timeout marker"
     )
     assert test_timeout >= 60, (
-        f"test_make_test_fails_with_exit_code_5_when_no_tests_collected timeout ({test_timeout}s) "
+        f"test_make_test_fails_closed_when_parallel_runner_is_missing timeout ({test_timeout}s) "
         "must be at least 60s to prevent flaky timeouts under parallel contention"
     )
 
     subproc_timeouts = _extract_subprocess_timeouts(func_node, tree)
     assert subproc_timeouts, (
         "Expected internal subprocess.run calls with timeout in "
-        "test_make_test_fails_with_exit_code_5_when_no_tests_collected"
+        "test_make_test_fails_closed_when_parallel_runner_is_missing"
     )
     for timeout in subproc_timeouts:
         assert timeout >= 50, (
             f"Internal subprocess timeout ({timeout}s) in "
-            "test_make_test_fails_with_exit_code_5_when_no_tests_collected must be at least 50s"
+            "test_make_test_fails_closed_when_parallel_runner_is_missing must be at least 50s"
         )
 
 

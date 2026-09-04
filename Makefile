@@ -158,15 +158,15 @@ run-agent-ui-mcp: $(VENV_MARKER) ## Stdio agent-UI MCP sidecar (use module --htt
 	QT_QPA_PLATFORM=offscreen PYTHONPATH=. $(BIN)/python -m pypost.agent.ui_actions_mcp
 
 test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow integration tests)
-	@if [ -f scripts/run_parallel_tests.py ]; then \
-		QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py \
-			--workers $(WORKERS) \
-			--worker-timeout $(WORKER_TIMEOUT) \
-			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow"); \
-	else \
-		QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
-			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m "not slow"); \
-	fi
+	@if [ ! -f scripts/run_parallel_tests.py ]; then \
+		find . -maxdepth 1 -type f -name '.coverage.*' -delete; \
+		echo "parallel runner unavailable: scripts/run_parallel_tests.py is missing" >&2; \
+		exit 2; \
+	fi; \
+	QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py \
+		--workers $(WORKERS) \
+		--worker-timeout $(WORKER_TIMEOUT) \
+		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow")
 
 test-slow: $(VENV_MARKER) venv-test venv-otel ## Run slow integration tests only (Makefile install smoke)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
@@ -188,16 +188,15 @@ check-jira-mcp-path-freshness: $(VENV_MARKER) venv-test venv-otel ## Offline jir
 		tests/test_example_fixtures.py::test_jira_mcp_critical_rest_paths_rejects_url_drift -q
 
 test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage report
-	@if [ -f scripts/run_parallel_tests.py ]; then \
-		QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py --cov \
-			--workers $(WORKERS) \
-			--worker-timeout $(WORKER_TIMEOUT) \
-			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow"); \
-	else \
-		QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
-			$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ \
-			--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov); \
-	fi
+	@if [ ! -f scripts/run_parallel_tests.py ]; then \
+		find . -maxdepth 1 -type f -name '.coverage.*' -delete; \
+		echo "parallel runner unavailable: scripts/run_parallel_tests.py is missing" >&2; \
+		exit 2; \
+	fi; \
+	QT_QPA_PLATFORM=offscreen $(BIN)/python scripts/run_parallel_tests.py --cov \
+		--workers $(WORKERS) \
+		--worker-timeout $(WORKER_TIMEOUT) \
+		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow")
 
 test-agent-e2e: $(VENV_MARKER) venv-test venv-otel ## Broader agent e2e beyond golden (-m agent_e2e; PYTEST_ARGS overrides)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \

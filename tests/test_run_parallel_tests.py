@@ -18,9 +18,13 @@ import pytest
 from scripts.run_parallel_tests import (
     CLIParser,
     CoverageManager,
+    CoverageRequest,
     JsonReporter,
     NOTICE,
+    PytestArgvLayout,
     RunnerConfig,
+    RunResult,
+    RunnerValidationError,
     RunSummary,
     SubprocessTestExecutor,
     TestDiscovery,
@@ -183,25 +187,19 @@ def test_get_worker_timeout_precedence(
 
 
 @pytest.mark.parametrize("invalid_cli", [0.0, -5.0, -1.0])
-@pytest.mark.parametrize(
-    ("env_timeout", "expected"),
-    [
-        ("45.0", 45.0),
-        (None, 30.0),
-    ],
-)
-def test_get_worker_timeout_invalid_cli_fallthrough(
+@pytest.mark.parametrize("env_timeout", ["45.0", None])
+def test_get_worker_timeout_rejects_invalid_cli_values(
     monkeypatch: pytest.MonkeyPatch,
     invalid_cli: float,
     env_timeout: str | None,
-    expected: float,
 ) -> None:
-    """Invalid CLI timeout values (<= 0) fall through to env or default 30.0."""
+    """Invalid CLI timeout values are rejected rather than silently replaced."""
     if env_timeout is not None:
         monkeypatch.setenv("WORKER_TIMEOUT", env_timeout)
     else:
         monkeypatch.delenv("WORKER_TIMEOUT", raising=False)
-    assert get_worker_timeout(invalid_cli) == expected
+    with pytest.raises(RunnerValidationError):
+        get_worker_timeout(invalid_cli)
 
 
 @pytest.mark.parametrize(
@@ -215,19 +213,23 @@ def test_get_worker_timeout_invalid_cli_fallthrough(
         (42.0, 42.0),
     ],
 )
-def test_get_worker_timeout_invalid_env_fallthrough(
+def test_get_worker_timeout_rejects_invalid_env_values(
     monkeypatch: pytest.MonkeyPatch,
     invalid_env: str,
     cli_timeout: float | None,
     expected: float,
 ) -> None:
-    """Invalid env timeout values fall through to default unless valid CLI is provided."""
+    """Invalid environment timeout values are rejected unless CLI takes precedence."""
     monkeypatch.setenv("WORKER_TIMEOUT", invalid_env)
-    assert get_worker_timeout(cli_timeout) == expected
+    if cli_timeout is None:
+        with pytest.raises(RunnerValidationError):
+            get_worker_timeout(cli_timeout)
+    else:
+        assert get_worker_timeout(cli_timeout) == expected
 
 
 def test_cli_parser_worker_timeout_flags(monkeypatch: pytest.MonkeyPatch) -> None:
-    """CLIParser parses --worker-timeout in space, equals, or missing formats."""
+    """CLIParser parses --worker-timeout in space and equals formats."""
     monkeypatch.delenv("WORKER_TIMEOUT", raising=False)
     parser = CLIParser()
 
@@ -239,9 +241,8 @@ def test_cli_parser_worker_timeout_flags(monkeypatch: pytest.MonkeyPatch) -> Non
     config_equals = parser.parse_args(["--worker-timeout=42"])
     assert config_equals.worker_timeout == 42.0
 
-    # c) ["--worker-timeout"] (missing value) -> falls through to env/default 30.0 without error
-    config_missing = parser.parse_args(["--worker-timeout"])
-    assert config_missing.worker_timeout == 30.0
+    with pytest.raises(RunnerValidationError):
+        parser.parse_args(["--worker-timeout"])
 
 
 def test_discovery_finds_all_test_files(sample_test_workspace: Path) -> None:
@@ -293,10 +294,9 @@ def test_data_models_and_classes_instantiable(tmp_path: Path) -> None:
     assert summary.is_success is True
 
     cov_mgr = CoverageManager(repo_root=tmp_path, cov_dir=tmp_path / ".cov")
-    cov_mgr.prepare()
+    plan = cov_mgr.prepare(request=CoverageRequest())
     assert (tmp_path / ".cov").is_dir()
-    env = cov_mgr.get_env_for_worker(1)
-    assert "COVERAGE_FILE" in env
+    assert plan.worker_data_dir.is_dir()
 
     config = RunnerConfig(
         workers=1,
@@ -553,7 +553,9 @@ def test_parallel_runner_logs_run_config(
     assert any("parallel_test_run_started" in message for message in messages)
     assert any("workers=2" in message for message in messages)
     assert any("enable_coverage=True" in message for message in messages)
-    assert any("test_targets=tests" in message for message in messages)
+    assert any("target_selection=explicit" in message for message in messages)
+    assert any("target_count=1" in message for message in messages)
+    assert all("test_targets=" not in message for message in messages)
     assert any(f"report_json={json_path}" in message for message in messages)
     assert any("worker_timeout=30.0" in message for message in messages)
 
@@ -608,6 +610,23 @@ def test_parallel_runner_logs_run_summary(
         run_parallel_tests(config)
 
     messages = [record.getMessage() for record in caplog.records]
+    lifecycle_events = (
+        "parallel_test_run_started",
+        "test_discovery_started",
+        "test_discovery_completed",
+        "test_worker_pool_started",
+        "test_worker_pool_completed",
+        "parallel_test_run_completed",
+    )
+    for event in lifecycle_events:
+        assert any(event in message for message in messages)
+
+    run_ids = {
+        message.split("run_id=", 1)[1].split(" ", 1)[0]
+        for message in messages
+        if "run_id=" in message
+    }
+    assert len(run_ids) == 1
     assert any("parallel_test_run_completed" in message for message in messages)
     assert any("total_files=2" in message for message in messages)
     assert any("passed=2" in message for message in messages)
@@ -649,14 +668,23 @@ def test_parallel_runner_logs_coverage_threshold_warning(
         pytest_args=[],
         repo_root=sample_test_workspace,
         python_bin=Path(sys.executable),
+        coverage_fail_under=42,
     )
 
     with (
         caplog.at_level(logging.WARNING),
         patch.object(
             CoverageManager,
-            "combine_and_report",
-            return_value=(False, "TOTAL 10%"),
+            "report",
+            return_value=RunResult(
+                kind="coverage",
+                status="failed",
+                target=None,
+                exit_code=1,
+                duration_seconds=0.0,
+                message="Coverage failure: total of 10 is less than fail-under=42",
+                error_code="coverage_threshold",
+            ),
         ),
     ):
         run_parallel_tests(config)
@@ -666,8 +694,158 @@ def test_parallel_runner_logs_coverage_threshold_warning(
     ]
     assert any(
         "coverage_threshold_failed" in record.getMessage()
-        and "fail_under=70" in record.getMessage()
+        and "fail_under=42" in record.getMessage()
         for record in warning_records
+    )
+
+
+def test_parallel_runner_logs_validation_context_without_error_text(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Validation telemetry identifies the phase without duplicating user input or output."""
+    config = RunnerConfig(
+        workers=0,
+        enable_coverage=False,
+        report_json_path=None,
+        test_targets=["tests"],
+        pytest_args=[],
+        repo_root=tmp_path,
+        python_bin=Path(sys.executable),
+    )
+
+    with caplog.at_level(logging.INFO):
+        summary = run_parallel_tests(config)
+
+    assert summary.exit_code == 2
+    validation_records = [
+        record
+        for record in caplog.records
+        if "parallel_test_validation_failed" in record.getMessage()
+    ]
+    assert len(validation_records) == 1
+    message = validation_records[0].getMessage()
+    assert "phase=configuration" in message
+    assert "code=invalid_workers" in message
+    assert "worker_count=0" in message
+    assert "workers must be a positive integer" not in message
+    completed_records = [
+        record
+        for record in caplog.records
+        if "parallel_test_run_completed" in record.getMessage()
+    ]
+    assert len(completed_records) == 1
+    completed_message = completed_records[0].getMessage()
+    validation_run_id = message.split("run_id=", 1)[1].split(" ", 1)[0]
+    completed_run_id = completed_message.split("run_id=", 1)[1].split(" ", 1)[0]
+    assert completed_run_id == validation_run_id
+    assert "total_files=0" in completed_message
+    assert "passed=0" in completed_message
+    assert "failed=0" in completed_message
+    assert "scheduled_units=0" in completed_message
+    assert "coverage_status=disabled" in completed_message
+    assert "outcome=failed" in completed_message
+    assert "failure_phase=configuration" in completed_message
+    assert "failure_code=invalid_workers" in completed_message
+
+
+def test_main_logs_cli_validation_phase(
+    sample_test_workspace: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """CLI parsing failures emit one correlated terminal event without raw arguments."""
+    sensitive_target = "tests/test_alpha.py::test_secret[customer-token]"
+    with caplog.at_level(logging.INFO):
+        exit_code = main(
+            ["--workers", "0", sensitive_target],
+            repo_root=sample_test_workspace,
+        )
+
+    assert exit_code == 2
+    validation_records = [
+        record
+        for record in caplog.records
+        if "parallel_test_validation_failed" in record.getMessage()
+    ]
+    assert len(validation_records) == 1
+    message = validation_records[0].getMessage()
+    assert "phase=cli_parse" in message
+    assert "code=invalid_workers" in message
+    assert "positive integer" not in message
+    completed_records = [
+        record
+        for record in caplog.records
+        if "parallel_test_run_completed" in record.getMessage()
+    ]
+    assert len(completed_records) == 1
+    completed_message = completed_records[0].getMessage()
+    completed_run_id = completed_message.split("run_id=", 1)[1].split(" ", 1)[0]
+    validation_run_id = message.split("run_id=", 1)[1].split(" ", 1)[0]
+    assert completed_run_id == validation_run_id
+    assert "total_files=0" in completed_message
+    assert "passed=0" in completed_message
+    assert "failed=0" in completed_message
+    assert "skipped=0" in completed_message
+    assert "scheduled_units=0" in completed_message
+    assert "outcome=failed" in completed_message
+    assert "failure_phase=cli_parse" in completed_message
+    assert "failure_code=invalid_workers" in completed_message
+    assert sensitive_target not in message
+    assert sensitive_target not in completed_message
+
+
+def test_parallel_runner_logs_coverage_lifecycle(
+    sample_test_workspace: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Coverage runs expose preparation, aggregation, and report outcomes as scalar events."""
+    config = RunnerConfig(
+        workers=1,
+        enable_coverage=True,
+        report_json_path=None,
+        test_targets=["tests"],
+        pytest_args=[],
+        repo_root=sample_test_workspace,
+        python_bin=Path(sys.executable),
+    )
+
+    with caplog.at_level(logging.INFO):
+        summary = run_parallel_tests(config)
+
+    assert summary.coverage_result is not None
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("coverage_collection_prepared" in message for message in messages)
+    assert any("coverage_aggregation_started" in message for message in messages)
+    assert any("coverage_aggregation_completed" in message for message in messages)
+    assert any("coverage_report_started" in message for message in messages)
+    assert any("coverage_report_completed" in message for message in messages)
+    assert all("stdout=" not in message and "stderr=" not in message for message in messages)
+
+
+def test_coverage_aggregation_failure_is_structured(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Missing coverage fragments identify aggregation failure without report payloads."""
+    manager = CoverageManager(
+        repo_root=tmp_path,
+        cov_dir=tmp_path / ".coverage_parallel",
+        python_bin=Path(sys.executable),
+        run_id="coverage-test",
+    )
+    plan = manager.prepare(request=CoverageRequest())
+
+    with caplog.at_level(logging.ERROR):
+        result = manager.combine(plan=plan)
+
+    assert result.error_code == "coverage_no_data"
+    messages = [record.getMessage() for record in caplog.records]
+    assert any(
+        "coverage_aggregation_failed" in message
+        and "reason=no_data" in message
+        and "data_file_count=0" in message
+        and "run_id=coverage-test" in message
+        for message in messages
     )
 
 
@@ -730,13 +908,18 @@ def test_hung_worker_under_timeout_yields_timed_out(
         summary = run_parallel_tests(config)
 
     assert mock_kill_pg.called
+    assert mock_kill_pg.call_args.kwargs["run_id"]
     assert summary.is_success is False
     assert any(r.status == TestStatus.TIMED_OUT for r in summary.results)
-    assert any(
-        "worker_timeout" in record.getMessage()
-        and "timeout_seconds=" in record.getMessage()
-        for record in caplog.records
-    )
+    timeout_records = [
+        record for record in caplog.records if "worker_timeout" in record.getMessage()
+    ]
+    assert timeout_records
+    timeout_message = timeout_records[0].getMessage()
+    assert "timeout_seconds=" in timeout_message
+    assert "duration_seconds=" in timeout_message
+    assert "exit_code=-9" in timeout_message
+    assert "run_id=" in timeout_message
 
 
 @pytest.mark.timeout(15)
@@ -761,22 +944,37 @@ def test_worker_timeout_terminates_grandchild_process_group(tmp_path: Path) -> N
         encoding="utf-8",
     )
 
-    config = RunnerConfig(
-        workers=1,
-        enable_coverage=False,
-        report_json_path=None,
-        test_targets=[str(test_file)],
-        pytest_args=["-o", "addopts="],
+    config = CLIParser().parse_args(
+        [
+            "--workers=1",
+            "--worker-timeout=1",
+            "-o",
+            "addopts=",
+            str(test_file),
+        ],
         repo_root=tmp_path,
-        python_bin=Path(sys.executable),
-        worker_timeout=1.0,
     )
     executor = SubprocessTestExecutor(config)
+    layout = PytestArgvLayout.from_project(
+        tmp_path, config.original_argv, config.runner_spans
+    )
+    discovery = TestDiscovery().discover(
+        repo_root=tmp_path, target_records=config.target_records
+    )
+    assert not discovery.errors
+    assert len(discovery.units) == 1
 
     grandchild_pid: int | None = None
     try:
-        result = executor.run_test_file(test_file, index=1, total=1)
-        assert result.status == TestStatus.TIMED_OUT
+        result = executor.run_dispatch_unit(
+            unit=discovery.units[0],
+            layout=layout,
+            all_target_records=discovery.records,
+            index=1,
+            total=1,
+            coverage_plan=None,
+        )
+        assert result.status == "timed_out"
 
         assert pid_file.exists(), (
             f"Grandchild PID file was not created; stdout={result.stdout} stderr={result.stderr}"
@@ -813,7 +1011,7 @@ def test_kill_process_group_posix() -> None:
         patch("os.getpgid", return_value=1234),
         patch("os.killpg") as mock_killpg,
     ):
-        kill_process_group(1234)
+        kill_process_group(1234, run_id="timeout-run")
         mock_killpg.assert_called_once_with(1234, signal.SIGKILL)
 
 
@@ -840,7 +1038,7 @@ def test_kill_process_group_posix_suppresses_exceptions(
         patch("os.getpgid", return_value=1234),
         patch("os.killpg", side_effect=ProcessLookupError("No such process")),
     ):
-        kill_process_group(1234)
+        kill_process_group(1234, run_id="timeout-run")
 
     debug_records = [
         record for record in caplog.records if record.levelno == logging.DEBUG
@@ -849,6 +1047,7 @@ def test_kill_process_group_posix_suppresses_exceptions(
         "kill_process_group killpg failed" in record.getMessage()
         for record in debug_records
     )
+    assert all("run_id=timeout-run" in record.getMessage() for record in debug_records)
 
 
 @pytest.mark.timeout(10)
@@ -860,5 +1059,3 @@ def test_kill_process_group_win32() -> None:
     ):
         kill_process_group(5678)
         mock_kill.assert_called_once_with(5678, signal.SIGTERM)
-
-

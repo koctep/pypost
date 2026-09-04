@@ -356,6 +356,9 @@ def _assert_post_install_sanity(bin_python: Path) -> None:
 @pytest.fixture
 def make_workspace(tmp_path: Path) -> Path:
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    shutil.copy(REPO_ROOT / "scripts" / "run_parallel_tests.py", scripts_dir)
     _write_minimal_pyproject(tmp_path)
     _seed_minimal_project(tmp_path)
     return tmp_path

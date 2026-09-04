@@ -184,8 +184,24 @@ jobs:
               "import xml.etree.ElementTree as ET; \
                r = ET.parse('coverage.xml').getroot().get('line-rate','0'); \
                print(f'{float(r)*100:.1f}')")
-            THRESHOLD=70
-            if python -c "exit(0 if float('$COV') >= $THRESHOLD else 1)"; then
+            THRESHOLD=$(python - <<'PY'
+          from pathlib import Path
+          from scripts.run_parallel_tests import CoverageManager
+
+          _, threshold = CoverageManager(
+              Path.cwd(), Path(".coverage_parallel")
+          )._read_project_policy()
+          if threshold is None:
+              raise SystemExit("coverage report fail_under is not configured")
+          print(threshold)
+          PY
+            )
+            if python - "$COV" "$THRESHOLD" <<'PY'
+          import sys
+
+          raise SystemExit(0 if float(sys.argv[1]) >= float(sys.argv[2]) else 1)
+          PY
+            then
               STATUS=":white_check_mark: PASS"
             else
               STATUS=":x: FAIL (below ${THRESHOLD}% threshold)"
