@@ -239,7 +239,7 @@ carries stable step + excerpt.
 
 | Constant | Value |
 | --- | --- |
-| `FORCED_SETTLE_TIMEOUT_S` | 0.05 (module-local; same as golden/dialog companions) |
+| `FORCED_SETTLE_TIMEOUT_S` | 0.05 (provided by the shared test helper `tests.helpers.agent_e2e_timeouts`; same policy as golden/dialog companions) |
 | `SEND_SETTLE_TIMEOUT_S` | 15.0 (happy path only; from `tests.helpers.agent_e2e_send`) |
 | Companion `step` | `wait_response_after_mapping_get_send` |
 

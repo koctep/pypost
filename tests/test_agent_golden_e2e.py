@@ -32,6 +32,7 @@ from pypost.ui.widget_ids import (
 from pypost.ui.widgets.new_tab_protocol_picker import TabProtocol
 from tests.helpers.agent_e2e_response_panel import response_panel_excerpt
 from tests.helpers.agent_e2e_send_settle import wait_response_after_send
+from tests.helpers.agent_e2e_timeouts import FORCED_SETTLE_TIMEOUT_S
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -143,7 +144,7 @@ def test_agent_golden_settle_timeout_includes_step_and_excerpt(
                 session.wait_for_text(
                     RESPONSE_STATUS,
                     "Status: 999",
-                    timeout=0.05,
+                    timeout=FORCED_SETTLE_TIMEOUT_S,
                     in_current_tab=True,
                 )
             except UiWaitTimeoutError as exc:

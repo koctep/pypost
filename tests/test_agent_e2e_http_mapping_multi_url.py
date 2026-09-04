@@ -31,13 +31,13 @@ from tests.helpers.agent_e2e_response_panel import (
     subtree_by_name,
 )
 from tests.helpers.agent_e2e_send_settle import wait_response_after_snapshot
+from tests.helpers.agent_e2e_timeouts import FORCED_SETTLE_TIMEOUT_S
 
 pytestmark = [
     pytest.mark.timeout(60),
     pytest.mark.agent_e2e,
 ]
 
-FORCED_SETTLE_TIMEOUT_S = 0.05
 _MAPPING_SETTLE_PREFIX = "mapping multi-URL Send settle failed"
 _HTTP_LOGGER = "pypost.fixtures.agent_e2e_http"
 _STUB_INSTALLED_URL_ROUTER = "agent_e2e_http_stub_installed name=url_router"

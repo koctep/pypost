@@ -15,6 +15,7 @@ import pytest
 from pypost.agent import AgentAppSession, UiWaitTimeoutError, find_widget
 from pypost.ui.widget_ids import SETTINGS_BUTTON, SETTINGS_DIALOG
 from tests.helpers.agent_e2e_dialog_settle import run_product_dialog_settle
+from tests.helpers.agent_e2e_timeouts import FORCED_SETTLE_TIMEOUT_S
 
 pytestmark = [
     pytest.mark.timeout(60),
@@ -22,7 +23,6 @@ pytestmark = [
 ]
 
 DIALOG_SETTLE_TIMEOUT_S = 10.0
-FORCED_SETTLE_TIMEOUT_S = 0.05
 SETTLE_STEP = "wait_dialog_after_settings_open"
 _UI_WAIT_LOGGER = "pypost.agent.ui_wait"
 
