@@ -438,7 +438,7 @@ def test_presenter_connect_and_disconnect_lifecycle(qapp: QApplication):
         # Drive Open via listener path (keeps controller.state consistent with UI)
         controller.on_opened("")
         qapp.processEvents()
-        # Extra pump: silent mock must not overwrite Open with a late failure
+        # Extra pump: process queued UI work before asserting the opened state.
         qapp.processEvents()
 
         assert controller.state == SessionState.OPEN
@@ -459,14 +459,14 @@ def test_presenter_connect_and_disconnect_lifecycle(qapp: QApplication):
         controller.deleteLater()
 
 
-def test_presenter_lifecycle_open_overwritten_by_deferred_transport_failure(
+def test_presenter_open_state_survives_bounded_event_processing(
     qapp: QApplication,
 ):
-    """PYPOST-1181: Open UI must survive processEvents under hermetic transport.
+    """Verify Open UI stability during bounded event processing with silent transport.
 
-    Step 3 used DeferredFailTransport to prove the HostNotFound race class.
-    Step 4 isolates via ``_SilentMockTransport`` so no deferred failure can
-    overwrite Open → Disconnect after simulated handshake success.
+    The silent transport emits no callbacks after simulated handshake success,
+    so repeated event processing must preserve Open and its Disconnect/send
+    controls.
     """
     transports: list[_SilentMockTransport] = []
 
@@ -503,7 +503,7 @@ def test_presenter_lifecycle_open_overwritten_by_deferred_transport_failure(
         assert connect_btn.text() == "Disconnect"
         assert send_btn.isEnabled()
 
-        # Bounded pump: silent mock must not deliver late HostNotFound / FAILED.
+        # Bounded pump: silent mock emits no callbacks while Open state is observed.
         deadline = time.monotonic() + 0.5
         while time.monotonic() < deadline:
             qapp.processEvents()
