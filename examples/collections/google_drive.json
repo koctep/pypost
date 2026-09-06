@@ -29,6 +29,46 @@
       "secret": true
     },
     {
+      "name": "google_drive_upload_session_url",
+      "type": "string",
+      "default": "",
+      "description": "Resumable upload session URL returned in the initiation response Location header",
+      "required": true,
+      "secret": false
+    },
+    {
+      "name": "google_drive_chunk_length",
+      "type": "string",
+      "default": "262144",
+      "description": "Byte length of the current upload chunk",
+      "required": true,
+      "secret": false
+    },
+    {
+      "name": "google_drive_chunk_start",
+      "type": "string",
+      "default": "0",
+      "description": "Inclusive byte offset where the current chunk starts",
+      "required": true,
+      "secret": false
+    },
+    {
+      "name": "google_drive_chunk_end",
+      "type": "string",
+      "default": "262143",
+      "description": "Inclusive byte offset where the current chunk ends",
+      "required": true,
+      "secret": false
+    },
+    {
+      "name": "google_drive_file_size",
+      "type": "string",
+      "default": "1048576",
+      "description": "Total file size in bytes for the Content-Range header",
+      "required": true,
+      "secret": false
+    },
+    {
       "name": "file_id",
       "type": "string",
       "default": "root",
@@ -41,6 +81,10 @@
     "default": {
       "google_drive_base_url": "https://www.googleapis.com/drive/v3",
       "google_drive_upload_base_url": "https://www.googleapis.com/upload/drive/v3",
+      "google_drive_chunk_length": "262144",
+      "google_drive_chunk_start": "0",
+      "google_drive_chunk_end": "262143",
+      "google_drive_file_size": "1048576",
       "file_id": "root"
     }
   },
@@ -171,6 +215,49 @@
       "post_script": "",
       "expose_as_mcp": false,
       "mcp_description": "Upload a file with metadata and content using multipart upload.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "gdrive-files-upload-resumable-initiate",
+      "name": "Start Resumable File Upload",
+      "method": "POST",
+      "url": "{{ google_drive_upload_base_url }}/files?uploadType=resumable",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "fields": "id, name, mimeType, size"
+      },
+      "body": "{\n  \"name\": \"sample_large_file.bin\",\n  \"mimeType\": \"application/octet-stream\"\n}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": false,
+      "mcp_description": "Start a Google Drive v3 resumable upload session. Capture the Location response header as the session URL, then provide it to the chunk upload request.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "gdrive-files-upload-resumable-chunk",
+      "name": "Upload File Chunk (Resumable)",
+      "method": "PUT",
+      "url": "{{ google_drive_upload_session_url }}",
+      "headers": {
+        "Authorization": "Bearer {{ google_drive_access_token }}",
+        "Content-Type": "application/octet-stream",
+        "Content-Length": "{{ google_drive_chunk_length }}",
+        "Content-Range": "bytes {{ google_drive_chunk_start }}-{{ google_drive_chunk_end }}/{{ google_drive_file_size }}"
+      },
+      "params": {},
+      "body": "Replace this text with the current file-content chunk.",
+      "body_type": "text",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": false,
+      "mcp_description": "Upload one content chunk to the resumable session URL returned by the initiation request. Repeat with updated byte ranges after a 308 Resume Incomplete response; 200 OK or 201 Created completes the upload.",
       "mcp_params": {},
       "retry_policy": null
     },

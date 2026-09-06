@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import pytest
 
 from pypost.core.collection_serializer import read_collection_file
@@ -42,6 +43,59 @@ class TestGoogleDriveCollectionFixture:
 
         assert "google_drive_access_token" in var_map
         assert var_map["google_drive_access_token"].secret is True
+
+    def test_fixture_declares_resumable_upload_variables(self) -> None:
+        collection = read_collection_file(GOOGLE_DRIVE_COLLECTION_PATH)
+        var_map = {v.name: v for v in collection.variables}
+
+        expected_variables = {
+            "google_drive_upload_session_url",
+            "google_drive_chunk_length",
+            "google_drive_chunk_start",
+            "google_drive_chunk_end",
+            "google_drive_file_size",
+        }
+        missing = expected_variables - set(var_map)
+        assert not missing, f"Missing resumable-upload variables: {missing}"
+        for variable_name in expected_variables:
+            assert var_map[variable_name].secret is False
+
+    def test_fixture_declares_resumable_upload_request_contract(self) -> None:
+        collection = read_collection_file(GOOGLE_DRIVE_COLLECTION_PATH)
+        req_map = {request.id: request for request in collection.requests}
+
+        initiate = req_map["gdrive-files-upload-resumable-initiate"]
+        assert initiate.method == "POST"
+        assert initiate.url == (
+            "{{ google_drive_upload_base_url }}/files?uploadType=resumable"
+        )
+        assert initiate.headers["Authorization"] == (
+            "Bearer {{ google_drive_access_token }}"
+        )
+        assert initiate.headers["Content-Type"] == "application/json"
+        assert initiate.body_type == "json"
+        assert '"name"' in initiate.body
+        assert "Location" in initiate.mcp_description
+        assert "session" in initiate.mcp_description.lower()
+
+        chunk = req_map["gdrive-files-upload-resumable-chunk"]
+        assert chunk.method == "PUT"
+        assert chunk.url == "{{ google_drive_upload_session_url }}"
+        assert chunk.headers["Authorization"] == (
+            "Bearer {{ google_drive_access_token }}"
+        )
+        assert chunk.headers["Content-Type"] == "application/octet-stream"
+        assert chunk.headers["Content-Length"] == "{{ google_drive_chunk_length }}"
+        assert chunk.headers["Content-Range"] == (
+            "bytes {{ google_drive_chunk_start }}-{{ google_drive_chunk_end }}/"
+            "{{ google_drive_file_size }}"
+        )
+        assert chunk.body_type == "text"
+        assert chunk.body
+        chunk_description = chunk.mcp_description.lower()
+        assert "308" in chunk_description
+        assert "200" in chunk_description
+        assert "201" in chunk_description
 
     def test_fixture_declares_core_requests(self) -> None:
         collection = read_collection_file(GOOGLE_DRIVE_COLLECTION_PATH)

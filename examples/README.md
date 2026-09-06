@@ -32,7 +32,23 @@ The library manifest [`pypost-library.yaml`](pypost-library.yaml) declares:
   `9080`); used by test helpers. Not the primary “learn Jira + MCP” starter.
 - [`collections/google_drive.json`](collections/google_drive.json) — **End users.**
   Curated Google Drive API v3 collection demonstrating file listing, metadata retrieval,
-  binary content download, file creation, multipart upload, and file sharing permissions.
+  binary content download, file creation, multipart and resumable uploads, and file sharing
+  permissions.
+
+### Google Drive resumable uploads
+
+The Google Drive collection includes a two-stage resumable-upload example for large files:
+
+1. Run **Start Resumable File Upload**. It sends JSON metadata to the Google Drive v3 upload
+   endpoint and returns a short-lived session URL in the response `Location` header.
+2. Copy that opaque `Location` value into `google_drive_upload_session_url`, replace the example
+   chunk body with file content, and run **Upload File Chunk (Resumable)**.
+3. Update `google_drive_chunk_start`, `google_drive_chunk_end`, `google_drive_chunk_length`, and
+   `google_drive_file_size` for each subsequent chunk. A `308 Resume Incomplete` response means
+   more content is needed; `200 OK` or `201 Created` indicates completion.
+
+The fixture is a request reference, so it does not perform automatic chunking, retries, or live
+credential setup. Keep the access token private and treat the returned session URL as sensitive.
 
 
 ## Recommended import order (Jira Cloud pair)
