@@ -66,6 +66,7 @@ def test_open_mcp_servers_with_controller_logs_info_and_constructs_dialog(qapp, 
     manager = MagicMock()
     settings = AppSettings(mcp_host="127.0.0.1", mcp_port=9080)
     metrics = MagicMock()
+    library_service = MagicMock()
     env = Environment(id="env-1", name="Env 1", enable_mcp=True)
 
     controller = MagicMock(spec=McpServerController)
@@ -96,6 +97,7 @@ def test_open_mcp_servers_with_controller_logs_info_and_constructs_dialog(qapp, 
         current_environment=lambda: env,
         metrics=metrics,
         dialog_parent=parent,
+        library_service=library_service,
     )
     presenter.set_server_controller(controller)
 
@@ -119,6 +121,7 @@ def test_open_mcp_servers_with_controller_logs_info_and_constructs_dialog(qapp, 
         assert kwargs["configurations"] == controller.mcp_server_configurations
         assert kwargs["status_for"] == controller.mcp_server_status
         assert kwargs["save"] == controller.upsert_mcp_server
+        assert kwargs["save_library"] == controller.save_library_server
         assert kwargs["remove"] == controller.remove_mcp_server
         assert kwargs["start"] == controller.start_mcp_server
         assert kwargs["stop"] == controller.stop_mcp_server
@@ -128,6 +131,7 @@ def test_open_mcp_servers_with_controller_logs_info_and_constructs_dialog(qapp, 
         assert callable(kwargs["legacy_environment"])
         assert kwargs["legacy_host"] == "127.0.0.1"
         assert kwargs["legacy_port"] == 9080
+        assert kwargs["library_service"] == library_service
         assert kwargs["parent"] == parent
 
         mock_dialog_instance.exec.assert_called_once()

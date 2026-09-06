@@ -46,6 +46,46 @@ its widgets in the environment bar. The top-bar status is an aggregate
 running/failed count, while the dialog presents row-specific state, endpoint,
 collection, environment, activity, and scoped tool overview.
 
+### Library-backed local servers
+
+A local server may select a workspace collection or a collection from a
+connected library. The library path is not the row identity. The persisted
+selection is the tuple `library_id`, `manifest_id`, and
+`library_collection_path`; the manifest index is display metadata.
+`McpServerSettingsController` resolves that tuple through
+`LibraryManagerService` and re-reads the current connection and manifest
+before accepting a save. A disconnected library, changed manifest, or stale
+collection path produces a categorized validation error instead of silently
+switching to another collection.
+
+`LibraryMcpSourcePicker` performs connected-library and manifest collection
+discovery through cancellable workers. `_McpServerEditor` invalidates the
+active request when the dialog is cancelled or the source changes, so a late
+worker result cannot repopulate a different library selection. The editor also
+exposes the selected library profile and declared typed variables. Values are
+handed to the controller as a local overlay draft; secret fields are masked
+and their values are never written to logs or documentation.
+
+Library variable resolution is documented in
+[Library Manifest and Local Overlay](library_manifest_and_overlay.md). For an
+MCP row, effective values are layered from manifest and collection defaults,
+the active manifest/collection profile, local non-secret overrides, and local
+secrets, in that order of increasing precedence. A normal workspace
+`Environment.id` remains the row's `environment_id`; it is not required to be
+the name of a library preset. Workspace environment variables are used when
+that ID is selected, while an overlay profile can further specialize the
+library selection. Declared secret variables, overlay secrets, and workspace
+hidden keys are included in runtime masking.
+
+The controller saves a library row through `LibraryMcpSaveTransaction`. The
+checked settings store verifies serialized settings and overlay writes, uses a
+journal and durable backups for recovery, and restores both previous snapshots
+if registry installation or persistence fails. The registry validates the
+candidate runtime before installing it, so a failed save does not leave a
+partially installed row. Normal workspace rows and upstream proxy rows retain
+their existing save and runtime paths; library-only identity and overlay logic
+is not applied to them.
+
 ## Configuration and lifecycle
 
 `AppSettings.mcp_servers` is a list of `McpServerConfiguration` objects saved
@@ -126,6 +166,15 @@ metric labels. The existing `mcp_server_up` compatibility gauge remains true
 while at least one registry endpoint is running. Request counters and duration
 histograms remain aggregate; inspect the selected dialog row for its activity.
 
+Library-specific discovery, validation, and save events use bounded operation,
+outcome, and category labels. The Prometheus and optional OpenTelemetry
+trackers expose `mcp_library_discovery_total`, discovery duration and item
+histograms, `mcp_library_validation_total`, and save outcome and duration
+histograms. Logs include stable IDs, safe categories, counts, and durations;
+they exclude environment values, secret values, request payloads, and
+filesystem paths. See [PYPOST-1280 observability](../../ai-tasks/PYPOST-1280/50-observability.md)
+for the metric contract.
+
 ## Troubleshooting
 
 | Symptom | Check / resolution |
@@ -135,10 +184,12 @@ histograms remain aggregate; inspect the selected dialog row for its activity.
 | One client sees unexpected tools | Open **MCP Servers…**, select that endpoint, and use **Tools…**. Verify its collection selection and that requests are marked as MCP tools. |
 | An edit did not take effect | A running endpoint is persisted only after its replacement binds. Inspect the row state/error; the previous endpoint is retained on replacement failure. |
 | Environment changes do not affect a different server | This is expected. A server receives only the snapshot for its configured environment; edit/select that row's environment instead. |
+| A library selection is rejected | Reopen the editor and refresh connected libraries. Check that the connection, manifest ID, collection path, and selected workspace Environment ID still exist. The editor intentionally does not substitute a different collection or profile. |
+| A library discovery result is missing | Check whether the dialog was cancelled or the source/library changed while the worker was running. Cancelled or stale results are discarded; start discovery again. |
+| Library variables are unavailable at runtime | Supply required values through the selected profile, local override, or local secret field. Secret values are masked in the UI and stored only in the local overlay. |
 
 Run the focused checks after changing this subsystem:
 
 ```bash
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q \
-  tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py
+make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py'
 ```

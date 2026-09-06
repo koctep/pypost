@@ -16,6 +16,17 @@ _MCP_VALIDATION_TRANSPORTS = frozenset({"http", "websocket", "unknown"})
 _MCP_VALIDATION_TYPES = frozenset(
     {"string", "integer", "integer_or_string", "number", "boolean", "array", "object", "unknown"}
 )
+_MCP_LIBRARY_DISCOVERY_OPERATIONS = frozenset({"libraries", "collections"})
+_MCP_LIBRARY_DISCOVERY_OUTCOMES = frozenset({"success", "failure", "cancelled"})
+_MCP_LIBRARY_VALIDATION_CATEGORIES = frozenset(
+    {
+        "library_invalid", "manifest_invalid", "collection_missing",
+        "profile_missing", "profile_invalid", "success",
+    }
+)
+_MCP_LIBRARY_SAVE_OUTCOMES = frozenset(
+    {"commit", "rollback", "persistence_failure", "rollback_failure"}
+)
 _LIFECYCLE_OWNERS = frozenset(
     {
         "main_window",
@@ -381,6 +392,43 @@ class MetricsRegistry:
             registry=self.registry,
         )
 
+        self.mcp_library_discovery_total = Counter(
+            "mcp_library_discovery_total",
+            "Connected library and collection discovery outcomes",
+            ["operation", "outcome"],
+            registry=self.registry,
+        )
+        self.mcp_library_discovery_duration_seconds = Histogram(
+            "mcp_library_discovery_duration_seconds",
+            "Connected library and collection discovery duration",
+            ["operation", "outcome"],
+            registry=self.registry,
+        )
+        self.mcp_library_discovery_items = Histogram(
+            "mcp_library_discovery_items",
+            "Number of non-sensitive items returned by library discovery",
+            ["operation"],
+            registry=self.registry,
+        )
+        self.mcp_library_validation_failures = Counter(
+            "mcp_library_validation_total",
+            "Library-backed MCP runtime validation outcomes by safe category",
+            ["category"],
+            registry=self.registry,
+        )
+        self.mcp_library_save_outcomes = Counter(
+            "mcp_library_save_outcomes_total",
+            "Library-backed MCP save commit and rollback outcomes",
+            ["outcome"],
+            registry=self.registry,
+        )
+        self.mcp_library_save_duration_seconds = Histogram(
+            "mcp_library_save_duration_seconds",
+            "Library-backed MCP save duration by outcome",
+            ["outcome"],
+            registry=self.registry,
+        )
+
         self.mcp_active_env_changes = Counter(
             "mcp_active_env_changes_total",
             "Active environment changed while MCP server was running",
@@ -534,6 +582,32 @@ class MetricsRegistry:
         self.mcp_tool_call_duration_seconds.labels(
             method=method, status=status
         ).observe(duration_seconds)
+
+    def track_mcp_library_discovery(
+        self, operation: str, outcome: str, duration_seconds: float, item_count: int
+    ) -> None:
+        operation = _normalize_library_label(operation, _MCP_LIBRARY_DISCOVERY_OPERATIONS)
+        outcome = _normalize_library_label(outcome, _MCP_LIBRARY_DISCOVERY_OUTCOMES)
+        self.mcp_library_discovery_total.labels(operation=operation, outcome=outcome).inc()
+        self.mcp_library_discovery_duration_seconds.labels(
+            operation=operation, outcome=outcome
+        ).observe(max(0.0, duration_seconds))
+        self.mcp_library_discovery_items.labels(operation=operation).observe(max(0, item_count))
+
+    def track_mcp_library_validation(self, category: str) -> None:
+        self.mcp_library_validation_failures.labels(
+            category=_normalize_library_label(category, _MCP_LIBRARY_VALIDATION_CATEGORIES)
+        ).inc()
+
+    def track_mcp_library_save(
+        self, outcome: str, duration_seconds: float | None = None
+    ) -> None:
+        outcome = _normalize_library_label(outcome, _MCP_LIBRARY_SAVE_OUTCOMES)
+        self.mcp_library_save_outcomes.labels(outcome=outcome).inc()
+        if duration_seconds is not None:
+            self.mcp_library_save_duration_seconds.labels(outcome=outcome).observe(
+                max(0.0, duration_seconds)
+            )
 
     def track_mcp_active_env_changed(self) -> None:
         self.mcp_active_env_changes.inc()

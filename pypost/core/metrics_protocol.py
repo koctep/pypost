@@ -65,6 +65,16 @@ class MetricsTrackerProtocol(Protocol):
         self, method: str, status: str, duration_seconds: float
     ) -> None: ...
 
+    def track_mcp_library_discovery(
+        self, operation: str, outcome: str, duration_seconds: float, item_count: int
+    ) -> None: ...
+
+    def track_mcp_library_validation(self, category: str) -> None: ...
+
+    def track_mcp_library_save(
+        self, outcome: str, duration_seconds: float | None = None
+    ) -> None: ...
+
     def track_mcp_active_env_changed(self) -> None: ...
 
     def track_mcp_param_default_applied(self, method: str) -> None: ...
@@ -237,6 +247,19 @@ class NullMetrics:
 
     def track_mcp_tool_call_duration(
         self, method: str, status: str, duration_seconds: float
+    ) -> None:
+        return None
+
+    def track_mcp_library_discovery(
+        self, operation: str, outcome: str, duration_seconds: float, item_count: int
+    ) -> None:
+        return None
+
+    def track_mcp_library_validation(self, category: str) -> None:
+        return None
+
+    def track_mcp_library_save(
+        self, outcome: str, duration_seconds: float | None = None
     ) -> None:
         return None
 

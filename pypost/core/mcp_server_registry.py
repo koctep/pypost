@@ -58,12 +58,14 @@ class MCPServerRegistry(QObject):
         environment_lookup: Callable[[str], Environment | None] | None = None,
         metrics: MetricsTrackerProtocol | None = None,
         template_service: TemplateService | None = None,
+        library_service=None,
     ) -> None:
         super().__init__()
         self._collection_lookup = collection_lookup or (lambda _id: None)
         self._environment_lookup = environment_lookup or (lambda _id: None)
         self._metrics = metrics
         self._template_service = template_service
+        self.library_service = library_service
         self._configurations: dict[str, McpServerConfiguration] = {}
         self._managers: dict[str, MCPServerManager] = {}
         self._statuses: dict[str, McpServerStatus] = {}
@@ -82,6 +84,59 @@ class MCPServerRegistry(QObject):
             configuration.id, McpServerStatus(configuration.id, "stopped")
         )
         self._publish_instance_metrics()
+
+    def install(self, configuration: McpServerConfiguration) -> None:
+        """Install a validated configuration through the normal registry lifecycle."""
+        self.upsert(configuration)
+
+    def configuration(self, instance_id: str) -> McpServerConfiguration | None:
+        """Return an independent copy of a configured row."""
+        value = self._configurations.get(instance_id)
+        return value.model_copy(deep=True) if value is not None else None
+
+    def clear(self) -> None:
+        """Drop registry state before loading a fresh persisted configuration."""
+        self.stop_all()
+        self._configurations.clear()
+        self._statuses.clear()
+        self._managers.clear()
+
+    def snapshot(self) -> dict[str, McpServerConfiguration]:
+        """Return an isolated configuration snapshot for a higher-level transaction."""
+        return {key: value.model_copy(deep=True) for key, value in self._configurations.items()}
+
+    def restore_snapshot(self, snapshot: dict[str, McpServerConfiguration]) -> None:
+        """Restore configuration state without sharing it with another registry."""
+        self.stop_all()
+        self._configurations = {
+            key: value.model_copy(deep=True) for key, value in snapshot.items()
+        }
+        self._statuses = {key: McpServerStatus(key, "stopped") for key in self._configurations}
+        self._managers.clear()
+
+    def install_library_candidate(
+        self, candidate: McpServerConfiguration, candidate_overlay=None
+    ) -> None:
+        """Validate and install a library-backed configuration atomically."""
+        self.validate_library_candidate(candidate, candidate_overlay=candidate_overlay)
+        self.upsert(candidate)
+
+    def validate_library_candidate(
+        self, candidate: McpServerConfiguration, candidate_overlay=None
+    ) -> None:
+        """Preflight a library row without changing registry state."""
+        from pypost.core.library_runtime_resolver import LibraryRuntimeResolver
+
+        selection = candidate.library_selection
+        if selection is None:
+            raise ValueError("library_invalid: candidate has no library identity")
+        LibraryRuntimeResolver(
+            library_service=self.library_service,
+            environment_lookup=self._environment_lookup,
+        ).resolve(
+            selection, candidate.environment_id, candidate_overlay=candidate_overlay
+        )
+        self._validate_available_port(candidate)
 
     def start_enabled(self) -> None:
         """Best-effort startup: one broken row never blocks another endpoint."""
@@ -410,6 +465,22 @@ class MCPServerRegistry(QObject):
                     hidden_keys = set(environment.hidden_keys)
             return ([], env_vars, hidden_keys)
 
+        if configuration.library_id:
+            from pypost.core.library_runtime_resolver import LibraryRuntimeResolver
+
+            selection = configuration.library_selection
+            if selection is None:
+                return None
+            try:
+                runtime = LibraryRuntimeResolver(
+                    library_service=self.library_service,
+                    environment_lookup=self._environment_lookup,
+                ).resolve(
+                    selection, environment_id=configuration.environment_id
+                )
+            except ValueError:
+                return None
+            return (runtime.collection_requests, runtime.environment, runtime.hidden_keys)
         if not configuration.collection_id:
             return None
         collection = self._collection_lookup(configuration.collection_id)
@@ -425,6 +496,8 @@ class MCPServerRegistry(QObject):
     def _missing_reference(self, configuration: McpServerConfiguration) -> str:
         if configuration.server_type == "proxy":
             return "environment"
+        if configuration.library_id:
+            return "library, manifest, collection, or profile"
         if (
             not configuration.collection_id
             or self._collection_lookup(configuration.collection_id) is None

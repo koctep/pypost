@@ -74,6 +74,21 @@ class MetricsTrackingMixin:
     ) -> None:
         self._registry.track_mcp_tool_call_duration(method, status, duration_seconds)
 
+    def track_mcp_library_discovery(
+        self, operation: str, outcome: str, duration_seconds: float, item_count: int
+    ) -> None:
+        self._registry.track_mcp_library_discovery(
+            operation, outcome, duration_seconds, item_count
+        )
+
+    def track_mcp_library_validation(self, category: str) -> None:
+        self._registry.track_mcp_library_validation(category)
+
+    def track_mcp_library_save(
+        self, outcome: str, duration_seconds: float | None = None
+    ) -> None:
+        self._registry.track_mcp_library_save(outcome, duration_seconds)
+
     def track_mcp_active_env_changed(self) -> None:
         self._registry.track_mcp_active_env_changed()
 

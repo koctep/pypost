@@ -24,6 +24,10 @@ from pypost.core.metrics_registry import (
     _LIFECYCLE_EVENTS,
     _LIFECYCLE_OUTCOMES,
     _LIFECYCLE_OWNERS,
+    _MCP_LIBRARY_DISCOVERY_OPERATIONS,
+    _MCP_LIBRARY_DISCOVERY_OUTCOMES,
+    _MCP_LIBRARY_SAVE_OUTCOMES,
+    _MCP_LIBRARY_VALIDATION_CATEGORIES,
     _LIBRARY_OPERATIONS,
     _LIBRARY_OPERATION_OUTCOMES,
     _normalize_mcp_validation_label,
@@ -206,6 +210,32 @@ class OtelMetricsTracker:
         self._mcp_tool_call_duration_seconds = meter.create_histogram(
             "mcp_tool_call_duration_seconds",
             description="MCP tool call execution duration in seconds",
+            unit="s",
+        )
+        self._mcp_library_discovery_total = meter.create_counter(
+            "mcp_library_discovery_total",
+            description="Connected library and collection discovery outcomes",
+        )
+        self._mcp_library_discovery_duration_seconds = meter.create_histogram(
+            "mcp_library_discovery_duration_seconds",
+            description="Connected library and collection discovery duration",
+            unit="s",
+        )
+        self._mcp_library_discovery_items = meter.create_histogram(
+            "mcp_library_discovery_items",
+            description="Number of non-sensitive items returned by library discovery",
+        )
+        self._mcp_library_validation_total = meter.create_counter(
+            "mcp_library_validation_total",
+            description="Library-backed MCP runtime validation outcomes by safe category",
+        )
+        self._mcp_library_save_outcomes = meter.create_counter(
+            "mcp_library_save_outcomes_total",
+            description="Library-backed MCP save commit and rollback outcomes",
+        )
+        self._mcp_library_save_duration_seconds = meter.create_histogram(
+            "mcp_library_save_duration_seconds",
+            description="Library-backed MCP save duration by outcome",
             unit="s",
         )
         self._mcp_active_env_changes = meter.create_counter(
@@ -475,6 +505,43 @@ class OtelMetricsTracker:
         self._mcp_tool_call_duration_seconds.record(
             duration_seconds, {"method": method, "status": status}
         )
+
+    def track_mcp_library_discovery(
+        self, operation: str, outcome: str, duration_seconds: float, item_count: int
+    ) -> None:
+        operation = _normalize_library_label(
+            operation, _MCP_LIBRARY_DISCOVERY_OPERATIONS
+        )
+        outcome = _normalize_library_label(outcome, _MCP_LIBRARY_DISCOVERY_OUTCOMES)
+        attributes = {"operation": operation, "outcome": outcome}
+        self._mcp_library_discovery_total.add(1, attributes)
+        self._mcp_library_discovery_duration_seconds.record(
+            max(0.0, duration_seconds), attributes
+        )
+        self._mcp_library_discovery_items.record(
+            max(0, item_count), {"operation": operation}
+        )
+
+    def track_mcp_library_validation(self, category: str) -> None:
+        self._mcp_library_validation_total.add(
+            1,
+            {
+                "category": _normalize_library_label(
+                    category, _MCP_LIBRARY_VALIDATION_CATEGORIES
+                )
+            },
+        )
+
+    def track_mcp_library_save(
+        self, outcome: str, duration_seconds: float | None = None
+    ) -> None:
+        outcome = _normalize_library_label(outcome, _MCP_LIBRARY_SAVE_OUTCOMES)
+        attributes = {"outcome": outcome}
+        self._mcp_library_save_outcomes.add(1, attributes)
+        if duration_seconds is not None:
+            self._mcp_library_save_duration_seconds.record(
+                max(0.0, duration_seconds), attributes
+            )
 
     def track_mcp_active_env_changed(self) -> None:
         self._mcp_active_env_changes.add(1)

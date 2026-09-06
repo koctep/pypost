@@ -173,11 +173,27 @@ class LocalOverlayManager:
                 fd = os.open(tmp_file, flags, 0o600)
                 with open(fd, "w", encoding="utf-8") as f:
                     f.write(content)
+                    f.flush()
+                    os.fsync(f.fileno())
                 os.chmod(tmp_file, 0o600)
             else:
-                tmp_file.write_text(content, encoding="utf-8")
+                with open(tmp_file, "w", encoding="utf-8") as f:
+                    f.write(content)
+                    f.flush()
+                    try:
+                        os.fsync(f.fileno())
+                    except OSError:
+                        pass
 
             os.replace(tmp_file, target_file)
+            try:
+                directory_fd = os.open(target_dir, os.O_RDONLY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+            except OSError:
+                pass
             if os.name == "posix":
                 try:
                     os.chmod(target_file, 0o600)

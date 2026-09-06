@@ -38,6 +38,8 @@ class McpServerController(Protocol):
 
     def upsert_mcp_server(self, configuration: McpServerConfiguration) -> None: ...
 
+    def save_library_server(self, configuration, selection, handoff) -> None: ...
+
     def remove_mcp_server(self, instance_id: str) -> None: ...
 
     def start_mcp_server(self, instance_id: str) -> None: ...
@@ -61,6 +63,7 @@ class McpControlsPresenter(QObject):
         metrics: MetricsTrackerProtocol,
         dialog_parent: QWidget,
         mcp_registry: MCPServerRegistry | None = None,
+        library_service=None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -75,6 +78,7 @@ class McpControlsPresenter(QObject):
         # focused tests.  A configured registry owns all endpoint lifecycle instead, so an
         # active editor environment can no longer retarget a running MCP endpoint.
         self._mcp_registry = mcp_registry
+        self._library_service = library_service
         self._mcp_server_controller: McpServerController | None = None
         self._active_environment: Environment | None = None
 
@@ -131,6 +135,9 @@ class McpControlsPresenter(QObject):
     def set_server_controller(self, controller: McpServerController) -> None:
         """Attach the window's persistence/lifecycle API to the server manager UI."""
         self._mcp_server_controller = controller
+        if self._library_service is None:
+            registry = getattr(controller, "registry", None)
+            self._library_service = getattr(registry, "library_service", None)
 
     def legacy_server_running(self) -> bool:
         """True only while the single-server workflow owns a running endpoint."""
@@ -325,6 +332,7 @@ class McpControlsPresenter(QObject):
             configurations=controller.mcp_server_configurations,
             status_for=controller.mcp_server_status,
             save=controller.upsert_mcp_server,
+            save_library=getattr(controller, "save_library_server", None),
             remove=controller.remove_mcp_server,
             start=controller.start_mcp_server,
             stop=controller.stop_mcp_server,
@@ -334,6 +342,7 @@ class McpControlsPresenter(QObject):
             legacy_environment=self._selected_legacy_mcp_environment,
             legacy_host=settings.mcp_host,
             legacy_port=settings.mcp_port,
+            library_service=self._library_service,
             parent=self._dialog_parent,
         )
         dialog.exec()

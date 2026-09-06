@@ -486,6 +486,10 @@ All core operations emit structured `key=value` log events:
 
 ## Related Docs
 
+- [Multiple MCP Servers](mcp_server_registry.md#library-backed-local-servers) — selecting a
+  manifest collection for an MCP server, workspace Environment ID handling, checked
+  persistence, cancellation, and runtime masking.
+
 - [Collection Format v2](collection_format_v2.md) — Self-contained YAML/JSON collection format specification.
 - [Collection Loading](collection_loading.md) — Collection disk discovery and loading.
 - [Collection Storage](collection_storage.md) — Collection persistence architecture.

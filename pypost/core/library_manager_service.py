@@ -11,6 +11,7 @@ from pypost.core.library_connection_store import LibraryConnectionStore
 from pypost.core.library_manifest import find_and_read_manifest, validate_manifest_collections
 from pypost.core.library_status import LibraryStatusResolver
 from pypost.core.local_overlay_manager import LocalOverlayManager
+from pypost.core.collection_serializer import read_collection_file
 from pypost.models.git_library import GitAuthConfig, GitOperationResult
 from pypost.models.library_manifest import ManifestDiagnosticError
 from pypost.models.library_manager import (
@@ -59,6 +60,63 @@ class LibraryManagerService:
     def resolve_path(self, record: LibraryConnectionRecord) -> Path:
         """Return the record's exact local path without treating it as a library ID."""
         return record.local_path
+
+    def read_manifest(self, stable_id: str):
+        """Read the current manifest for a registered connection."""
+        record = self.get_connection(stable_id)
+        if record is None:
+            raise ValueError("library_invalid: selected library is no longer connected")
+        return find_and_read_manifest(self.resolve_path(record))[0]
+
+    def list_manifest_collections(self, stable_id: str) -> list[dict[str, Any]]:
+        """Return collection identities with merged manifest/collection metadata."""
+        record = self.get_connection(stable_id)
+        if record is None:
+            raise ValueError("library_invalid: selected library is no longer connected")
+        root = self.resolve_path(record)
+        manifest, _ = find_and_read_manifest(root)
+        missing = validate_manifest_collections(manifest, manifest_dir=root)
+        if missing:
+            raise ValueError("collection_missing: declared collection files are unavailable")
+        result = []
+        overlay = self.overlay_manager.get_overlay(record.stable_id)
+        for index, relative in enumerate(manifest.collections):
+            collection = read_collection_file(root / relative)
+            variables_by_name = {
+                variable.name: variable.model_dump(mode="json", by_alias=True)
+                for variable in manifest.variables
+            }
+            variables_by_name.update({
+                variable.name: variable.model_dump(mode="json", by_alias=True)
+                for variable in collection.variables
+            })
+            profiles: dict[str, dict[str, Any]] = {
+                str(profile_id): dict(values)
+                for profile_id, values in manifest.presets.items()
+            }
+            for profile_id, values in collection.presets.items():
+                profiles.setdefault(str(profile_id), {}).update(values)
+            result.append({
+                "library_id": record.stable_id,
+                "manifest_id": manifest.id,
+                "path": relative,
+                "index": index,
+                "name": collection.name,
+                "manifest_profiles": profiles,
+                "manifest_variables": list(variables_by_name.values()),
+                "overlay": overlay.model_dump(mode="json"),
+            })
+        return result
+
+    def read_collection(self, stable_id: str, relative_path: str):
+        """Read one manifest-declared collection after path validation."""
+        entries = self.list_manifest_collections(stable_id)
+        entry = next((item for item in entries if item["path"] == relative_path), None)
+        if entry is None:
+            raise ValueError("collection_missing: selected collection is not declared")
+        record = self.get_connection(stable_id)
+        assert record is not None
+        return read_collection_file(self.resolve_path(record) / relative_path)
 
     def inspect(self, record: LibraryConnectionRecord) -> LibraryStatusSnapshot:
         """Read a manifest and status snapshot for one connection."""

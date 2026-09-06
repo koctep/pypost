@@ -18,6 +18,10 @@ class McpServerConfiguration(BaseModel):
     host: str = "127.0.0.1"
     port: int = Field(ge=1024, le=65535)
     collection_id: Optional[str] = None
+    library_id: Optional[str] = None
+    manifest_id: Optional[str] = None
+    library_collection_path: Optional[str] = None
+    library_collection_index: Optional[int] = None
     environment_id: str
     server_type: Literal["local", "proxy"] = "local"
     upstream_url: Optional[str] = None
@@ -32,9 +36,27 @@ class McpServerConfiguration(BaseModel):
             if not self.upstream_url or not self.upstream_url.strip():
                 raise ValueError("Proxy MCP server requires a non-empty upstream_url")
         elif self.server_type == "local":
-            if not self.collection_id or not self.collection_id.strip():
+            if self.library_id:
+                required = (self.manifest_id, self.library_collection_path)
+                if not all(value and str(value).strip() for value in required):
+                    raise ValueError(
+                        "Library MCP server requires manifest and collection identity"
+                    )
+            elif not self.collection_id or not self.collection_id.strip():
                 raise ValueError("Local MCP server requires a non-empty collection_id")
         return self
+
+    @property
+    def library_selection(self) -> dict[str, object] | None:
+        """Return the stable library identity without exposing mutable model state."""
+        if not self.library_id:
+            return None
+        return {
+            "library_id": self.library_id,
+            "manifest_id": self.manifest_id,
+            "path": self.library_collection_path,
+            "index": self.library_collection_index,
+        }
 
 
 class AppSettings(BaseModel):

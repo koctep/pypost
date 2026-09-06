@@ -131,6 +131,37 @@ def test_track_mcp_tool_call_duration_records_histogram(otel_reader):
     )
 
 
+def test_track_mcp_library_metrics_records_bounded_labels_and_durations(otel_reader):
+    reader, provider = otel_reader
+    tracker = OtelMetricsTracker(meter=provider.get_meter("mcp-library-metrics-test"))
+    tracker.track_mcp_library_discovery("unexpected", "unexpected", -1.0, -3)
+    tracker.track_mcp_library_validation("unexpected")
+    tracker.track_mcp_library_save("unexpected", -1.0)
+
+    assert _counter_value(
+        reader,
+        "mcp_library_discovery_total",
+        {"operation": "unknown", "outcome": "unknown"},
+    ) == 1
+    assert _histogram_count(
+        reader,
+        "mcp_library_discovery_duration_seconds",
+        {"operation": "unknown", "outcome": "unknown"},
+    ) == 1
+    assert _histogram_count(
+        reader, "mcp_library_discovery_items", {"operation": "unknown"}
+    ) == 1
+    assert _counter_value(
+        reader, "mcp_library_validation_total", {"category": "unknown"}
+    ) == 1
+    assert _counter_value(
+        reader, "mcp_library_save_outcomes_total", {"outcome": "unknown"}
+    ) == 1
+    assert _histogram_count(
+        reader, "mcp_library_save_duration_seconds", {"outcome": "unknown"}
+    ) == 1
+
+
 def test_track_template_expression_render_duration_records_histogram(otel_reader):
     reader, provider = otel_reader
     tracker = OtelMetricsTracker(meter=provider.get_meter("template-duration-test"))
