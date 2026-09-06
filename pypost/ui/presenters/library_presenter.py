@@ -1240,6 +1240,24 @@ class LibraryPresenter(QObject):
             self._operation_failed(operation_id, "connect", error)
             raise
 
+    def copy_predefined_library(
+        self,
+        destination: Path | str,
+        library_id: str = "pypost-examples",
+    ) -> LibraryConnectionRecord:
+        """Copy a predefined library into editable storage and publish the new row."""
+        if self.manager_service is None or library_id != "pypost-examples":
+            raise ValueError("Only the bundled examples library can be copied here.")
+        self._operation_started(library_id, "copy_to_editable")
+        try:
+            record = self.manager_service.copy_predefined_library(destination)
+            self._add_connection_record(record)
+            self._operation_completed(library_id, "copy_to_editable")
+            return record
+        except Exception as error:
+            self._operation_failed(library_id, "copy_to_editable", error)
+            raise
+
     def _connect_local_library_record(self, path: Path) -> LibraryConnectionRecord:
         """Build and persist a local connection without touching the GUI model."""
         if self.manager_service is not None:

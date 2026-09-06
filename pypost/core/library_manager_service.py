@@ -12,6 +12,7 @@ from pypost.core.library_manifest import find_and_read_manifest, validate_manife
 from pypost.core.library_status import LibraryStatusResolver
 from pypost.core.local_overlay_manager import LocalOverlayManager
 from pypost.core.collection_serializer import read_collection_file
+from pypost.core.predefined_library import PredefinedLibraryService
 from pypost.models.git_library import GitAuthConfig, GitOperationResult
 from pypost.models.library_manifest import ManifestDiagnosticError
 from pypost.models.library_manager import (
@@ -34,12 +35,16 @@ class LibraryManagerService:
         connection_store: Optional[LibraryConnectionStore] = None,
         overlay_manager: Optional[LocalOverlayManager] = None,
         clock: Optional[Callable[[], datetime]] = None,
+        predefined_root: Optional[Path | str] = None,
+        predefined_library: Optional[PredefinedLibraryService] = None,
     ) -> None:
         self.git_service = git_service or GitLibraryService()
         self.connection_store = connection_store or LibraryConnectionStore()
         self.overlay_manager = overlay_manager or LocalOverlayManager()
         self.connection_store.legacy_base_dir = self.git_service.base_dir
         self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.predefined_library = predefined_library or PredefinedLibraryService(predefined_root)
+        self.diagnostics: list[str] = []
 
     @property
     def base_dir(self) -> Path:
@@ -48,7 +53,15 @@ class LibraryManagerService:
 
     def list_connections(self) -> list[LibraryConnectionRecord]:
         """Load explicit registrations and discover legacy managed clones."""
-        return self.connection_store.load(legacy_base_dir=self.git_service.base_dir)
+        records = self.connection_store.load(legacy_base_dir=self.git_service.base_dir)
+        predefined = self.predefined_library.discover()
+        self.diagnostics = list(self.connection_store.diagnostics)
+        self.diagnostics.extend(self.predefined_library.diagnostics)
+        if predefined is not None and all(
+            record.stable_id != predefined.stable_id for record in records
+        ):
+            return [predefined, *records]
+        return records
 
     def get_connection(self, stable_id: str) -> Optional[LibraryConnectionRecord]:
         """Return the authoritative current record for one connection."""
@@ -244,6 +257,11 @@ class LibraryManagerService:
             )
         )
 
+    def copy_predefined_library(self, destination: Path | str) -> LibraryConnectionRecord:
+        """Create and register an editable copy of the bundled examples."""
+        record = self.predefined_library.copy_to(destination)
+        return self.connection_store.add(record)
+
     def clone(
         self,
         url: str,
@@ -289,6 +307,8 @@ class LibraryManagerService:
 
     def check_dirty(self, record: LibraryConnectionRecord) -> tuple[bool, list[str]]:
         """Read dirty files using the record-aware Git boundary."""
+        if record.is_read_only:
+            return False, []
         return cast(tuple[bool, list[str]], self._git_call("check_dirty", record))
 
     def list_branches(
@@ -389,6 +409,8 @@ class LibraryManagerService:
 
     def _git_call(self, method_name: str, record: LibraryConnectionRecord, **kwargs: Any) -> Any:
         """Call a path-aware method for registrations and ID-based methods for clones."""
+        if record.is_read_only:
+            raise ValueError("The predefined library is read-only; copy it before editing.")
         if record.source_type == LibrarySourceType.REGISTERED:
             path_method = getattr(self.git_service, f"{method_name}_at", None)
             if callable(path_method):

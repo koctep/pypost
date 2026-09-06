@@ -423,6 +423,10 @@ class LibraryListWidget(QWidget):
             is_stale=bool(is_stale),
             diagnostic=getattr(entry, "diagnostic", None)
             or getattr(snapshot, "diagnostic", None),
+            is_read_only=bool(
+                getattr(entry, "is_read_only", False)
+                or getattr(getattr(entry, "connection", None), "is_read_only", False)
+            ),
         )
 
     @staticmethod
@@ -592,6 +596,8 @@ class LibraryListWidget(QWidget):
         row = self.row_for_library(library_id)
         if row is None:
             return []
+        if row.is_read_only:
+            return ["refresh", "copy_path", "copy_to_editable"]
         actions = ["refresh", "pull", "switch_branch", "copy_path", "disconnect"]
         if row.source_type != "Registered local directory":
             actions.append("delete")

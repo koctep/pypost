@@ -15,6 +15,7 @@ class LibrarySourceType(str, Enum):
 
     CLONED = "Cloned managed copy"
     REGISTERED = "Registered local directory"
+    PREDEFINED = "Predefined bundled library"
 
 
 class LibrarySyncStatus(str, Enum):
@@ -50,6 +51,7 @@ class LibraryConnectionRecord(BaseModel):
     display_name: Optional[str] = None
     manifest_id: Optional[str] = None
     remote_url: Optional[str] = None
+    is_read_only: bool = False
 
     @field_validator("stable_id")
     @classmethod
@@ -203,6 +205,7 @@ class LibraryRow:
     is_stale: bool
     diagnostic: Optional[str]
     display_text: str = ""
+    is_read_only: bool = False
 
     def __getitem__(self, field: str) -> Any:
         """Retain mapping-style access for existing lightweight UI callers."""
