@@ -15,21 +15,21 @@
 | --- | ---: | ---: | ---: |
 | `pypost/core/collection_item_dispatch.py` | — | 83 | 83 |
 | `pypost/core/http_client.py` | 198 | 381 | 418 |
-| `pypost/core/mcp_server_impl.py` | 231 | 325 | 325 |
+| `pypost/core/mcp_server_impl.py` | 231 | 370 | 407 |
 | `pypost/core/qt/metrics.py` | 286 | 63 | 70 |
-| `pypost/core/qt/metrics_tracking.py` | — | 145 | 145 |
+| `pypost/core/qt/metrics_tracking.py` | — | 163 | 180 |
 | `pypost/core/qt/metrics_websocket.py` | — | 40 | 45 |
 | `pypost/core/qt/worker.py` | 57 | 180 | 180 |
 | `pypost/core/request_manager.py` | 201 | 250 | 264 |
 | `pypost/core/request_service.py` | 95 | 437 | — |
 | `pypost/core/storage.py` | 80 | 364 | 380 |
-| `pypost/core/template_service.py` | 36 | 241 | 265 |
+| `pypost/core/template_service.py` | 36 | 260 | 265 |
 | `pypost/core/websocket_registry.py` | — | 129 | 131 |
-| `pypost/ui/mcp_server_controller.py` | — | 229 | 296 |
-| `pypost/ui/presenters/collections_presenter.py` | — | 498 | 535 |
-| `pypost/ui/presenters/env_presenter.py` | — | 378 | 432 |
-| `pypost/ui/presenters/mcp_controls_presenter.py` | — | 361 | 362 |
-| `pypost/ui/presenters/tabs_presenter.py` | — | 1064 | 1165 |
+| `pypost/ui/mcp_server_controller.py` | — | 722 | 795 |
+| `pypost/ui/presenters/collections_presenter.py` | — | 522 | 535 |
+| `pypost/ui/presenters/env_presenter.py` | — | 438 | 482 |
+| `pypost/ui/presenters/mcp_controls_presenter.py` | — | 370 | 407 |
+| `pypost/ui/presenters/tabs_presenter.py` | — | 1070 | 1165 |
 | `pypost/ui/widgets/mixins.py` | — | 396 | 411 |
 
 Regenerate:

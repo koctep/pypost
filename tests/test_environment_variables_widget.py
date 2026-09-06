@@ -101,3 +101,63 @@ class TestEnvironmentVariablesWidgetRowHelpers:
             assert widget.vars_table.rowCount() == 3
         finally:
             widget.close()
+
+    def test_mcp_override_toggle_unchecks_and_disables_hidden(self, qapp):
+        """PYPOST-1283: checking MCP Override for a row must unset+disable Hidden."""
+        env = Environment(name="Dev", variables={"jira_project_key": "PROJ"})
+        widget = self._widget_with_env(env)
+        try:
+            override_cb = widget.get_mcp_override_checkbox(0)
+            hidden_cb = widget.get_hidden_checkbox(0)
+            assert override_cb is not None
+            assert hidden_cb is not None
+
+            override_cb.setChecked(True)
+
+            assert hidden_cb.isChecked() is False
+            assert hidden_cb.isEnabled() is False
+            assert "jira_project_key" in env.mcp_overridable_keys
+            assert "jira_project_key" not in env.hidden_keys
+        finally:
+            widget.close()
+
+    def test_hidden_toggle_unchecks_and_disables_mcp_override(self, qapp):
+        """PYPOST-1283: checking Hidden for a row must unset+disable MCP Override."""
+        env = Environment(
+            name="Dev",
+            variables={"jira_project_key": "PROJ"},
+            mcp_overridable_keys={"jira_project_key"},
+        )
+        widget = self._widget_with_env(env)
+        try:
+            hidden_cb = widget.get_hidden_checkbox(0)
+            override_cb = widget.get_mcp_override_checkbox(0)
+            assert hidden_cb is not None
+            assert override_cb is not None
+
+            hidden_cb.setChecked(True)
+
+            assert override_cb.isChecked() is False
+            assert override_cb.isEnabled() is False
+            assert "jira_project_key" in env.hidden_keys
+            assert "jira_project_key" not in env.mcp_overridable_keys
+        finally:
+            widget.close()
+
+    def test_hidden_and_mcp_overridable_never_both_contain_same_key(self, qapp):
+        """PYPOST-1283: after any toggle sequence, the two sets stay disjoint per key."""
+        env = Environment(name="Dev", variables={"jira_project_key": "PROJ"})
+        widget = self._widget_with_env(env)
+        try:
+            hidden_cb = widget.get_hidden_checkbox(0)
+            override_cb = widget.get_mcp_override_checkbox(0)
+
+            hidden_cb.setChecked(True)
+            override_cb.setChecked(True)
+            hidden_cb.setChecked(False)
+            override_cb.setChecked(False)
+            hidden_cb.setChecked(True)
+
+            assert env.hidden_keys & env.mcp_overridable_keys == set()
+        finally:
+            widget.close()

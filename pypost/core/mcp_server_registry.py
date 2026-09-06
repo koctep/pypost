@@ -372,11 +372,15 @@ class MCPServerRegistry(QObject):
 
         variables = dict(environment.variables)
         hidden_keys = set(environment.hidden_keys)
+        overridable_keys = set(environment.mcp_overridable_keys)
 
         def supply_variables(snapshot: dict[str, str] = variables) -> dict[str, str]:
             return dict(snapshot)
 
         def supply_hidden_keys(snapshot: set[str] = hidden_keys) -> set[str]:
+            return set(snapshot)
+
+        def supply_overridable_keys(snapshot: set[str] = overridable_keys) -> set[str]:
             return set(snapshot)
 
         for instance_id in instance_ids:
@@ -385,6 +389,7 @@ class MCPServerRegistry(QObject):
                 continue
             manager.set_variable_supplier(supply_variables)
             manager.set_hidden_keys_supplier(supply_hidden_keys)
+            manager.set_overridable_keys_supplier(supply_overridable_keys)
 
     def remove(self, instance_id: str) -> None:
         with self._reconfiguration_lock:
@@ -454,16 +459,18 @@ class MCPServerRegistry(QObject):
 
     def _runtime_inputs(
         self, configuration: McpServerConfiguration
-    ) -> tuple[list, dict[str, str], set[str]] | None:
+    ) -> tuple[list, dict[str, str], set[str], set[str]] | None:
         if configuration.server_type == "proxy":
             env_vars = {}
             hidden_keys = set()
+            overridable_keys = set()
             if configuration.environment_id:
                 environment = self._environment_lookup(configuration.environment_id)
                 if environment is not None:
                     env_vars = dict(environment.variables)
                     hidden_keys = set(environment.hidden_keys)
-            return ([], env_vars, hidden_keys)
+                    overridable_keys = set(environment.mcp_overridable_keys)
+            return ([], env_vars, hidden_keys, overridable_keys)
 
         if configuration.library_id:
             from pypost.core.library_runtime_resolver import LibraryRuntimeResolver
@@ -480,7 +487,12 @@ class MCPServerRegistry(QObject):
                 )
             except ValueError:
                 return None
-            return (runtime.collection_requests, runtime.environment, runtime.hidden_keys)
+            return (
+                runtime.collection_requests,
+                runtime.environment,
+                runtime.hidden_keys,
+                runtime.overridable_keys,
+            )
         if not configuration.collection_id:
             return None
         collection = self._collection_lookup(configuration.collection_id)
@@ -491,6 +503,7 @@ class MCPServerRegistry(QObject):
             [request.model_copy(deep=True) for request in collection.requests],
             dict(environment.variables),
             set(environment.hidden_keys),
+            set(environment.mcp_overridable_keys),
         )
 
     def _missing_reference(self, configuration: McpServerConfiguration) -> str:
@@ -509,11 +522,12 @@ class MCPServerRegistry(QObject):
     def _start_manager(
         manager: MCPServerManager,
         configuration: McpServerConfiguration,
-        runtime: tuple[list, dict[str, str], set[str]],
+        runtime: tuple[list, dict[str, str], set[str], set[str]],
     ) -> None:
-        tools, variables, hidden_keys = runtime
+        tools, variables, hidden_keys, overridable_keys = runtime
         manager.set_variable_supplier(lambda: dict(variables))
         manager.set_hidden_keys_supplier(lambda: set(hidden_keys))
+        manager.set_overridable_keys_supplier(lambda: set(overridable_keys))
         if configuration.server_type == "proxy":
             manager.start_proxy_server(
                 port=configuration.port,

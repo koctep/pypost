@@ -854,3 +854,80 @@ def test_jira_mcp_discoverability_rejects_each_single_stripped_fragment(
     assert repr(dropped) in message
     for fragment in kept:
         assert repr(fragment) not in message
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1283: jira-create-issue body must JSON-escape structured-path fields.
+#
+
+
+def _render_jira_create_issue_body(mcp_request: dict[str, Any]) -> str:
+    request = _request_by_id(_load_jira_mcp_collection(), "jira-create-issue")
+    template_service = TemplateService()
+    variables = {
+        "jira_base_url": PLACEHOLDER_BASE_URL,
+        "jira_credentials": PLACEHOLDER_CREDENTIALS,
+        "jira_project_key": "DEMO",
+        "mcp": {"request": mcp_request},
+    }
+    return template_service.render_string(request.body, variables, render_path="mcp")
+
+
+def test_jira_create_issue_body_escapes_quotes_in_summary():
+    """A double quote in summary must not break the JSON body (PYPOST-1283)."""
+    rendered = _render_jira_create_issue_body(
+        {"summary": 'Test "quoted" summary'}
+    )
+
+    payload = json.loads(rendered)  # raises if the body is invalid JSON
+    assert payload["fields"]["summary"] == 'Test "quoted" summary'
+
+
+def test_jira_create_issue_body_escapes_backslash_in_summary():
+    """A backslash in summary must not break the JSON body (PYPOST-1283)."""
+    rendered = _render_jira_create_issue_body(
+        {"summary": "Path\\to\\thing"}
+    )
+
+    payload = json.loads(rendered)
+    assert payload["fields"]["summary"] == "Path\\to\\thing"
+
+
+def test_jira_create_issue_body_escapes_quotes_in_issue_type_and_project_key(
+    monkeypatch,
+):
+    """issue_type and jira_project_key are also interpolated raw and must escape."""
+    request = _request_by_id(_load_jira_mcp_collection(), "jira-create-issue")
+    template_service = TemplateService()
+    variables = {
+        "jira_base_url": PLACEHOLDER_BASE_URL,
+        "jira_credentials": PLACEHOLDER_CREDENTIALS,
+        "jira_project_key": 'DE"MO',
+        "mcp": {"request": {"issue_type": 'Weird"Type', "summary": "S"}},
+    }
+    rendered = template_service.render_string(
+        request.body, variables, render_path="mcp"
+    )
+
+    payload = json.loads(rendered)
+    assert payload["fields"]["issuetype"]["name"] == 'Weird"Type'
+    assert payload["fields"]["project"]["key"] == 'DE"MO'
+
+
+def test_jira_create_issue_body_defaults_still_render_valid_json():
+    """No mcp.request at all (GUI usage) must still produce valid JSON."""
+    request = _request_by_id(_load_jira_mcp_collection(), "jira-create-issue")
+    template_service = TemplateService()
+    variables = {
+        "jira_base_url": PLACEHOLDER_BASE_URL,
+        "jira_credentials": PLACEHOLDER_CREDENTIALS,
+        "jira_project_key": "DEMO",
+    }
+    rendered = template_service.render_string(
+        request.body, variables, render_path="mcp"
+    )
+
+    payload = json.loads(rendered)
+    assert payload["fields"]["summary"] == "New issue created from PyPost"
+    assert payload["fields"]["issuetype"]["name"] == "Task"
+    assert payload["fields"]["project"]["key"] == "DEMO"

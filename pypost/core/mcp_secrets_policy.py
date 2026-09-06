@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import re
-from typing import Iterable, Mapping, Set
+from typing import Any, Iterable, Mapping, Set
 
 from jinja2 import meta
 
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
+
+logger = logging.getLogger(__name__)
 
 _MCP_REQUEST_VAR_PATTERN = re.compile(r"mcp\.request\.([a-zA-Z0-9_]+)")
 
@@ -104,6 +107,36 @@ class McpSecretsPolicy:
         return McpSecretsPolicy.build_agent_input_schema(
             mcp_vars, env_names, hidden_keys
         )
+
+    @staticmethod
+    def effective_overridable_keys(
+        mcp_overridable_keys: Iterable[str], hidden_keys: Iterable[str]
+    ) -> Set[str]:
+        """Keys an agent may override right now: overridable minus Hidden.
+
+        Computed fresh from the two raw sets on every call so Hidden always
+        wins even if storage/import ever produced an inconsistent
+        ``Environment`` where a key is present in both sets.
+        """
+        return set(mcp_overridable_keys) - set(hidden_keys)
+
+    @staticmethod
+    def apply_permitted_overrides(
+        env_vars: Mapping[str, str],
+        arguments: Mapping[str, Any],
+        mcp_overridable_keys: Iterable[str],
+        hidden_keys: Iterable[str],
+    ) -> dict:
+        """Return a copy of ``env_vars`` with only permitted overrides applied."""
+        effective = McpSecretsPolicy.effective_overridable_keys(
+            mcp_overridable_keys, hidden_keys
+        )
+        merged = dict(env_vars)
+        for name, value in arguments.items():
+            if name in env_vars and name in effective:
+                merged[name] = value
+                logger.info("mcp_env_override_applied key=%s", name)
+        return merged
 
     @staticmethod
     def execution_environment_variables(

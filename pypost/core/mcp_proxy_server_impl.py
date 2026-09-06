@@ -49,6 +49,7 @@ class MCPProxyServerImpl:
         timeout: float = 30.0,
         variable_supplier: Callable[[], dict[str, str]] | None = None,
         hidden_keys_supplier: Callable[[], set[str]] | None = None,
+        overridable_keys_supplier: Callable[[], set[str]] | None = None,
         activity_log: McpActivityLog | None = None,
         metrics: MetricsTrackerProtocol | None = None,
         template_service: TemplateService | None = None,
@@ -60,6 +61,12 @@ class MCPProxyServerImpl:
         self.timeout = timeout
         self._variable_supplier = variable_supplier or (lambda: {})
         self._hidden_keys_supplier = hidden_keys_supplier or (lambda: set())
+        # PYPOST-1283: mirrored for parity with MCPServerImpl. The proxy forwards
+        # protocol calls to an upstream MCP server rather than executing local
+        # HTTP requests, so there is no local env-var override to enforce here;
+        # this supplier is threaded through only to keep the two implementations
+        # symmetric for callers that swap between them.
+        self._overridable_keys_supplier = overridable_keys_supplier or (lambda: set())
         self._activity_log = activity_log
         self._metrics = resolve_metrics(metrics)
         self._template_service = template_service
@@ -83,6 +90,11 @@ class MCPProxyServerImpl:
         self, supplier: Callable[[], set[str]] | None
     ) -> None:
         self._hidden_keys_supplier = supplier or (lambda: set())
+
+    def set_overridable_keys_supplier(
+        self, supplier: Callable[[], set[str]] | None
+    ) -> None:
+        self._overridable_keys_supplier = supplier or (lambda: set())
 
     def _resolve_headers(self) -> dict[str, str]:
         env_vars = self._variable_supplier()

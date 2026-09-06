@@ -138,6 +138,7 @@ class Environment(BaseModel):
     name: str = "New Environment"
     variables: Dict[str, str] = Field(default_factory=dict)
     hidden_keys: Set[str] = Field(default_factory=set)
+    mcp_overridable_keys: Set[str] = Field(default_factory=set)
     enable_mcp: bool = False
 
 

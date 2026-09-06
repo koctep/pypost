@@ -53,6 +53,27 @@ A caller can deliberately name another project.
 For the import steps and end-user-facing safety notes, see
 [`examples/README.md`](../../examples/README.md).
 
+`jira-create-issue` is additionally built as a **dual-mode** request usable
+both from the GUI (edit the Body editor directly) and from an MCP agent
+(structured `issue_type`/`summary`/`description` arguments, or a full
+`issue_payload` fallback) — see [Dual-Mode Example
+Requests](dual_mode_example_requests.md) for the template pattern and its
+`{% set %}` constraint.
+
+### Per-call `jira_project_key` override (PYPOST-1283)
+
+`jira_project_key` may additionally be marked MCP-overridable by listing it
+in the selected environment's `mcp_overridable_keys` (see
+`examples/environments/jira_cloud.json`, which does this by default). When
+overridable, an agent can pass `jira_project_key` as a call argument to
+target a different project for that one call, without editing the
+environment — subject to the same enforcement described in [MCP Secrets
+Policy § Per-variable MCP
+override](mcp_secrets_policy.md#per-variable-mcp-override-mcp_overridable_keys-pypost-1283).
+This is unrelated to the security-boundary caveat below: overriding the key
+still only changes which project the payload targets, not Jira's own
+authorization for that project.
+
 ## Configuration
 
 | Key | Committed example value | Handling |

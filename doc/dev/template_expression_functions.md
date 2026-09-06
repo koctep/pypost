@@ -106,7 +106,7 @@ Main components:
 
 - `pypost/core/function_registry.py` (`FunctionRegistry`)
   - Single source of truth for allow-listed template-callable names and implementations:
-    `urlencode`, `md5`, `base64`, `to_int`, `env`.
+    `urlencode`, `md5`, `base64`, `to_int`, `env`, `to_adf`, `to_json_string` (PYPOST-1283).
   - Exposes `allowed_names()`, `is_allowed()`, `is_strict_conversion()` (PYPOST-1120), `get()`,
     and `register_into_env(env)` to bind those callables onto `jinja2.Environment.globals`.
 - `pypost/core/template_expression_types.py` (`ValidationResult`, `ExpressionFailureProvenance`)
@@ -259,6 +259,13 @@ Supported functions:
   (PYPOST-1037, PYPOST-1038)
 - `env(var)` -> operating system environment variable value, or empty string if unset
   (PYPOST-1118)
+- `to_adf(var)` -> JSON-serialized Atlassian Document Format v1 document built from plain
+  text (PYPOST-1283); called unquoted in a JSON body, e.g. `"description": {{ to_adf(text) }}`
+- `to_json_string(var)` -> JSON-serialized string literal (quotes included), safely escaping
+  the value for a JSON string-literal position (PYPOST-1283); called unquoted, e.g.
+  `"summary": {{ to_json_string(text) }}`. See [Dual-Mode Example
+  Requests](dual_mode_example_requests.md) for the injection risk this closes and the full
+  usage pattern.
 
 ### Environment variable resolution (PYPOST-1118)
 

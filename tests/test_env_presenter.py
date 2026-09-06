@@ -95,6 +95,9 @@ class FakeMCPManager:
     def set_hidden_keys_supplier(self, supplier):
         self.hidden_keys_supplier = supplier
 
+    def set_overridable_keys_supplier(self, supplier):
+        self.overridable_keys_supplier = supplier
+
 
 def _make_mcp_manager():
     mgr = FakeMCPManager()

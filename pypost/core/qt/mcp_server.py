@@ -74,6 +74,7 @@ class MCPServerManager(QObject):
         self._current_host = "127.0.0.1"
         self._variable_supplier: Callable[[], dict[str, str]] | None = None
         self._hidden_keys_supplier: Callable[[], set[str]] | None = None
+        self._overridable_keys_supplier: Callable[[], set[str]] | None = None
         self._startup_notified = False
         self._start_error: str | None = None
         self._tools_signature: tuple[tuple[str, str], ...] = ()
@@ -107,6 +108,12 @@ class MCPServerManager(QObject):
         self._hidden_keys_supplier = supplier
         self._impl.set_hidden_keys_supplier(supplier)
 
+    def set_overridable_keys_supplier(
+        self, supplier: Callable[[], set[str]] | None
+    ) -> None:
+        self._overridable_keys_supplier = supplier
+        self._impl.set_overridable_keys_supplier(supplier)
+
     def start_server(
         self,
         port: int,
@@ -123,6 +130,7 @@ class MCPServerManager(QObject):
                 activity_log=self._activity_log,
                 variable_supplier=self._variable_supplier,
                 hidden_keys_supplier=self._hidden_keys_supplier,
+                overridable_keys_supplier=self._overridable_keys_supplier,
             )
 
         self._current_port = port
@@ -161,6 +169,7 @@ class MCPServerManager(QObject):
             timeout=timeout,
             variable_supplier=self._variable_supplier,
             hidden_keys_supplier=self._hidden_keys_supplier,
+            overridable_keys_supplier=self._overridable_keys_supplier,
             activity_log=self._activity_log,
             metrics=self._metrics,
             template_service=self._template_service,

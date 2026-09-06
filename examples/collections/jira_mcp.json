@@ -111,17 +111,33 @@
         "Authorization": "Basic {{ base64(jira_credentials) }}"
       },
       "params": {},
-      "body": "{{ mcp.request.issue_payload }}",
+      "body": "{% set has_payload = mcp is defined and mcp.request is defined and mcp.request.issue_payload is defined and mcp.request.issue_payload %}{% set has_issue_type = mcp is defined and mcp.request is defined and mcp.request.issue_type is defined %}{% set has_summary = mcp is defined and mcp.request is defined and mcp.request.summary is defined %}{% set has_description = mcp is defined and mcp.request is defined and mcp.request.description is defined %}{% set issue_type_value = mcp.request.issue_type if has_issue_type else \"Task\" %}{% set summary_value = mcp.request.summary if has_summary else \"New issue created from PyPost\" %}{% set description_value = mcp.request.description if has_description else \"\" %}{% if has_payload %}{{ mcp.request.issue_payload }}{% else %}{\"fields\": {\"project\": {\"key\": {{ to_json_string(jira_project_key) }}}, \"issuetype\": {\"name\": {{ to_json_string(issue_type_value) }}}, \"summary\": {{ to_json_string(summary_value) }}, \"description\": {{ to_adf(description_value) }}}}{% endif %}",
       "body_type": "json",
       "yaml_as_json": false,
       "post_script": "",
       "expose_as_mcp": true,
-      "mcp_description": "Create a Jira issue. If this endpoint's selected environment defines jira_project_key, use it (or the primary project if multiple comma-separated keys are defined) as the normal fields.project.key; when unset, specify the target project explicitly. issue_payload must be a serialized Jira Create issue JSON body; Jira Cloud rich-text descriptions use Atlassian Document Format.",
+      "mcp_description": "Create a Jira issue; usable from the GUI (fill in issue_type/summary/description directly in this request's Body editor - description is plain text, automatically converted to Jira's rich-text format) or from an MCP agent (pass issue_type/summary/description individually, or supply a full issue_payload as a fallback). If this endpoint's selected environment defines jira_project_key, use it (or the primary project if multiple comma-separated keys are defined) as the normal fields.project.key; when unset, specify the target project explicitly. jira_project_key may be overridden per call when the active environment marks it MCP-overridable.",
       "mcp_params": {
         "issue_payload": {
           "type": "string",
-          "description": "Serialized JSON body for POST /rest/api/3/issue. Use jira_project_key (or primary project when multiple keys are specified) as the normal fields.project.key when set, or specify the target project explicitly when unset; use another permitted project only when explicitly requested.",
-          "required": true
+          "description": "Optional fallback, used only when structured fields (issue_type/summary/description) are not sufficient: a serialized Jira Create issue JSON body for POST /rest/api/3/issue. Use jira_project_key (or primary project when multiple keys are specified) as the normal fields.project.key when set, or specify the target project explicitly when unset; use another permitted project only when explicitly requested.",
+          "required": false
+        },
+        "issue_type": {
+          "type": "string",
+          "description": "Jira issue type name, for example Task or Bug. Ignored when issue_payload is supplied. Defaults to Task when omitted.",
+          "required": false,
+          "default": "Task"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Jira issue summary (title). Ignored when issue_payload is supplied.",
+          "required": false
+        },
+        "description": {
+          "type": "string",
+          "description": "Plain-text issue description, automatically converted to Atlassian Document Format. Ignored when issue_payload is supplied.",
+          "required": false
         }
       },
       "retry_policy": null

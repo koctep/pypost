@@ -92,7 +92,9 @@ class TestFunctionRegistry(unittest.TestCase):
         reg = FunctionRegistry()
         self.assertEqual(
             reg.allowed_names(),
-            frozenset({"urlencode", "md5", "base64", "to_int", "env"}),
+            frozenset(
+                {"urlencode", "md5", "base64", "to_int", "env", "to_adf", "to_json_string"}
+            ),
         )
 
     def test_is_allowed(self):

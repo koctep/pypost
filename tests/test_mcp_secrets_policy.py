@@ -1,5 +1,6 @@
 """Tests for McpSecretsPolicy (PYPOST-554)."""
 
+import logging
 import unittest
 
 import pytest
@@ -144,6 +145,134 @@ class TestMcpSecretsPolicy(unittest.TestCase):
             req, TemplateService()
         )
         self.assertEqual(names, {"base_url"})
+
+    # -----------------------------------------------------------------
+    # PYPOST-1283 review fix: direct coverage for the SSRF-prevention
+    # override policy (previously exercised only indirectly via
+    # tests/test_mcp_environment_override_policy.py).
+    # -----------------------------------------------------------------
+
+    def test_effective_overridable_keys_key_in_both_sets_is_not_overridable(self):
+        """Hidden always wins: a key in both sets must be excluded."""
+        effective = McpSecretsPolicy.effective_overridable_keys(
+            mcp_overridable_keys={"jira_project_key", "api_key"},
+            hidden_keys={"api_key"},
+        )
+        self.assertEqual(effective, {"jira_project_key"})
+        self.assertNotIn("api_key", effective)
+
+    def test_effective_overridable_keys_key_in_neither_set_is_absent(self):
+        effective = McpSecretsPolicy.effective_overridable_keys(
+            mcp_overridable_keys={"jira_project_key"},
+            hidden_keys={"api_key"},
+        )
+        self.assertNotIn("base_url", effective)
+        self.assertEqual(effective, {"jira_project_key"})
+
+    def test_effective_overridable_keys_overridable_only_key_is_included(self):
+        effective = McpSecretsPolicy.effective_overridable_keys(
+            mcp_overridable_keys={"jira_project_key"},
+            hidden_keys=set(),
+        )
+        self.assertEqual(effective, {"jira_project_key"})
+
+    def test_effective_overridable_keys_computed_fresh_not_from_stored_flags(self):
+        """Even if storage produced an inconsistent Environment (key marked
+        both overridable and hidden), the function recomputes from the raw
+        sets every call rather than trusting any cached/stored result."""
+        first = McpSecretsPolicy.effective_overridable_keys(
+            mcp_overridable_keys={"dual_flagged"}, hidden_keys={"dual_flagged"}
+        )
+        second = McpSecretsPolicy.effective_overridable_keys(
+            mcp_overridable_keys={"dual_flagged"}, hidden_keys=set()
+        )
+        self.assertEqual(first, set())
+        self.assertEqual(second, {"dual_flagged"})
+
+    def test_apply_permitted_overrides_applies_only_effective_keys(self):
+        env_vars = {
+            "jira_project_key": "DEFAULT",
+            "api_key": "secret-value",
+            "base_url": "https://example.test",
+        }
+        arguments = {
+            "jira_project_key": "AGENT_SUPPLIED",
+            "api_key": "attacker-supplied",
+            "base_url": "https://attacker.example",
+        }
+        merged = McpSecretsPolicy.apply_permitted_overrides(
+            env_vars,
+            arguments,
+            mcp_overridable_keys={"jira_project_key", "api_key"},
+            hidden_keys={"api_key"},
+        )
+        # Overridable-only key: agent value wins.
+        self.assertEqual(merged["jira_project_key"], "AGENT_SUPPLIED")
+        # In both sets (hidden wins): original value preserved, not overridden.
+        self.assertEqual(merged["api_key"], "secret-value")
+        # In neither set: original value preserved, not overridden.
+        self.assertEqual(merged["base_url"], "https://example.test")
+
+    def test_apply_permitted_overrides_ignores_arguments_not_in_env_vars(self):
+        """An argument name that isn't a known env var must not be injected."""
+        merged = McpSecretsPolicy.apply_permitted_overrides(
+            env_vars={"jira_project_key": "DEFAULT"},
+            arguments={"jira_project_key": "AGENT", "unrelated_key": "ignored"},
+            mcp_overridable_keys={"jira_project_key", "unrelated_key"},
+            hidden_keys=set(),
+        )
+        self.assertEqual(
+            merged, {"jira_project_key": "AGENT"}
+        )
+        self.assertNotIn("unrelated_key", merged)
+
+    def test_apply_permitted_overrides_returns_copy_not_mutating_input(self):
+        env_vars = {"jira_project_key": "DEFAULT"}
+        McpSecretsPolicy.apply_permitted_overrides(
+            env_vars,
+            {"jira_project_key": "AGENT"},
+            mcp_overridable_keys={"jira_project_key"},
+            hidden_keys=set(),
+        )
+        self.assertEqual(env_vars, {"jira_project_key": "DEFAULT"})
+
+    def test_apply_permitted_overrides_logs_info_with_key_not_value(self):
+        """PYPOST-1283: applying an override must log at INFO with only the
+        key name, and the overriding value must never appear in the record."""
+        logger_name = "pypost.core.mcp_secrets_policy"
+        with self.assertLogs(logger_name, level=logging.INFO) as captured:
+            merged = McpSecretsPolicy.apply_permitted_overrides(
+                env_vars={"jira_project_key": "DEFAULT"},
+                arguments={"jira_project_key": "AGENT_SUPPLIED_SECRET_LOOKING_VALUE"},
+                mcp_overridable_keys={"jira_project_key"},
+                hidden_keys=set(),
+            )
+        self.assertEqual(merged["jira_project_key"], "AGENT_SUPPLIED_SECRET_LOOKING_VALUE")
+        applied_lines = [
+            line for line in captured.output if "mcp_env_override_applied" in line
+        ]
+        self.assertEqual(len(applied_lines), 1)
+        self.assertTrue(applied_lines[0].startswith("INFO:"))
+        self.assertIn("key=jira_project_key", applied_lines[0])
+        self.assertNotIn("AGENT_SUPPLIED_SECRET_LOOKING_VALUE", applied_lines[0])
+
+    def test_apply_permitted_overrides_does_not_log_for_rejected_keys(self):
+        """A key excluded by the effective-overridable policy must not emit
+        the applied-override log at all (no key, no value)."""
+        logger_name = "pypost.core.mcp_secrets_policy"
+        with self.assertLogs(logger_name, level=logging.DEBUG) as captured:
+            # assertLogs requires at least one record; log a sentinel so the
+            # absence of mcp_env_override_applied is meaningfully asserted.
+            logging.getLogger(logger_name).debug("sentinel")
+            McpSecretsPolicy.apply_permitted_overrides(
+                env_vars={"api_key": "secret-value"},
+                arguments={"api_key": "attacker-supplied"},
+                mcp_overridable_keys={"api_key"},
+                hidden_keys={"api_key"},
+            )
+        self.assertFalse(
+            any("mcp_env_override_applied" in line for line in captured.output)
+        )
 
 
 if __name__ == "__main__":

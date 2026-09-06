@@ -42,8 +42,13 @@ class _FakeMCPManager:
     def set_hidden_keys_supplier(self, supplier):  # noqa: ARG002
         return None
 
+    def set_overridable_keys_supplier(self, supplier):  # noqa: ARG002
+        return None
+
+
 def _empty_collections():
     return []
+
 
 def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa: ARG001
     with tempfile.TemporaryDirectory() as td:
@@ -91,6 +96,7 @@ def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa
                 assert isinstance(loaded_env, Environment)
                 assert loaded_env.hidden_keys == {"API_KEY"}
 
+
 def test_default_masked_toggle_log_after_persistence_round_trip(qapp, caplog):  # noqa: ARG001
     """PYPOST-489: default dialog masks key names after storage round-trip."""
     env_name = "Dev"
@@ -123,6 +129,7 @@ def test_default_masked_toggle_log_after_persistence_round_trip(qapp, caplog):  
             finally:
                 dialog.close()
 
+
 def test_hidden_toggle_persists_and_reveal_keeps_original_value(qapp):  # noqa: ARG001
     with tempfile.TemporaryDirectory() as td:
         with patch("pypost.core.storage.user_data_dir", return_value=td):
@@ -154,6 +161,7 @@ def test_hidden_toggle_persists_and_reveal_keeps_original_value(qapp):  # noqa: 
             assert len(reloaded) == 1
             assert reloaded[0].variables == {"API_KEY": "secret"}
             assert reloaded[0].hidden_keys == set()
+
 
 def test_presenter_load_shows_no_env_when_key_missing_for_encrypted_data(qapp):  # noqa: ARG001
     fernet = pytest.importorskip("cryptography.fernet")

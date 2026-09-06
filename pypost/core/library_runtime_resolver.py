@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 import time
 from typing import Any
@@ -30,6 +30,7 @@ class RuntimeInputs:
     environment: dict[str, Any]
     collection_requests: list[Any]
     hidden_keys: set[str]
+    overridable_keys: set[str] = field(default_factory=set)
 
 
 class LibraryRuntimeResolver:
@@ -158,10 +159,20 @@ class LibraryRuntimeResolver:
             variable.name for variable in collection.variables if variable.secret
         }
         hidden_keys |= set(getattr(overlay, "secrets", {}).keys())
+        overridable_keys: set[str] = set()
         if environment is not None:
             hidden_keys |= set(environment.hidden_keys)
+            # Library-sourced secrets (manifest/collection/overlay) have no
+            # override-permission concept; only an actual selected Environment
+            # can mark a variable MCP-overridable.
+            overridable_keys = set(environment.mcp_overridable_keys)
         return RuntimeInputs(
-            deepcopy(selection), profile_id, resolved.variables, requests, hidden_keys
+            deepcopy(selection),
+            profile_id,
+            resolved.variables,
+            requests,
+            hidden_keys,
+            overridable_keys,
         )
 
     def validate_selection(self, selection: dict[str, Any], profile_id: str) -> None:

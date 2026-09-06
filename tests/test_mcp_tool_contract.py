@@ -1,16 +1,19 @@
 """Tests for MCP tool contract preview (PYPOST-555)."""
 
 import json
+import logging
 import unittest
 
 import pytest
 
 import pypost.core.mcp_tool_contract as mcp_tool_contract
 from pypost.core.mcp_tool_contract import (
+    McpArgumentValidationError,
     build_mcp_tool_contract_preview,
     build_tool_input_schema,
     format_mcp_tool_contract_preview,
     normalize_mcp_tool_name,
+    validate_environment_overrides,
 )
 from pypost.core.template_service import TemplateService
 from pypost.models.models import McpToolParam, RequestData
@@ -303,3 +306,112 @@ def test_valid_defaults_accepted():
     # No default (None) is always valid
     p5 = McpToolParam(type="integer", default=None)
     assert p5.default is None
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1283 review fix: direct coverage for validate_environment_overrides
+# (previously exercised only indirectly via
+# tests/test_mcp_environment_override_policy.py).
+# ---------------------------------------------------------------------------
+
+
+class TestValidateEnvironmentOverrides(unittest.TestCase):
+    def test_overridable_only_key_is_accepted(self):
+        """A key present only in mcp_overridable_keys must pass silently."""
+        validate_environment_overrides(
+            arguments={"jira_project_key": "AGENT_PROJECT"},
+            env_vars={"jira_project_key": "DEFAULT"},
+            mcp_overridable_keys={"jira_project_key"},
+            hidden_keys=set(),
+        )  # no raise
+
+    def test_key_in_both_overridable_and_hidden_is_rejected(self):
+        """Hidden wins: a key in both sets must be rejected as override_not_permitted."""
+        with self.assertRaises(McpArgumentValidationError) as raised:
+            validate_environment_overrides(
+                arguments={"api_key": "attacker-value"},
+                env_vars={"api_key": "secret-value"},
+                mcp_overridable_keys={"api_key", "jira_project_key"},
+                hidden_keys={"api_key"},
+            )
+        self.assertEqual(raised.exception.parameter_name, "api_key")
+        self.assertEqual(raised.exception.kind, "override_not_permitted")
+        # Message must not leak the attempted or actual secret value.
+        self.assertNotIn("attacker-value", str(raised.exception))
+        self.assertNotIn("secret-value", str(raised.exception))
+
+    def test_key_in_neither_set_is_rejected(self):
+        """A known env var not flagged overridable at all must be rejected."""
+        with self.assertRaises(McpArgumentValidationError) as raised:
+            validate_environment_overrides(
+                arguments={"base_url": "https://attacker.example"},
+                env_vars={"base_url": "https://example.test"},
+                mcp_overridable_keys=set(),
+                hidden_keys=set(),
+            )
+        self.assertEqual(raised.exception.parameter_name, "base_url")
+        self.assertEqual(raised.exception.kind, "override_not_permitted")
+
+    def test_argument_not_matching_a_known_env_var_is_not_an_override_attempt(self):
+        """An argument name that isn't a known env var isn't an override at all
+        (e.g. an mcp.request.* structured-path argument) and must not raise."""
+        validate_environment_overrides(
+            arguments={"summary": "New issue"},
+            env_vars={"jira_project_key": "DEFAULT"},
+            mcp_overridable_keys=set(),
+            hidden_keys=set(),
+        )  # no raise
+
+    def test_recomputes_fresh_each_call_hidden_still_wins_despite_order(self):
+        """Order/iteration of the input sets must not affect the hidden-wins outcome."""
+        with self.assertRaises(McpArgumentValidationError):
+            validate_environment_overrides(
+                arguments={"dual_flagged": "x"},
+                env_vars={"dual_flagged": "y"},
+                mcp_overridable_keys={"dual_flagged", "other"},
+                hidden_keys={"unrelated", "dual_flagged"},
+            )
+
+    def test_rejected_hidden_override_logs_warning_with_key_and_reason(self):
+        """PYPOST-1283: the rejection log must fire at WARNING with the key
+        name and reason='hidden', and must never leak the attempted value."""
+        logger_name = "pypost.core.mcp_tool_contract"
+        with self.assertLogs(logger_name, level=logging.WARNING) as captured:
+            with self.assertRaises(McpArgumentValidationError):
+                validate_environment_overrides(
+                    arguments={"api_key": "attacker-value"},
+                    env_vars={"api_key": "secret-value"},
+                    mcp_overridable_keys={"api_key"},
+                    hidden_keys={"api_key"},
+                )
+        rejected_lines = [
+            line for line in captured.output if "mcp_env_override_rejected" in line
+        ]
+        self.assertEqual(len(rejected_lines), 1)
+        self.assertTrue(rejected_lines[0].startswith("WARNING:"))
+        self.assertIn("key=api_key", rejected_lines[0])
+        self.assertIn("reason=hidden", rejected_lines[0])
+        self.assertNotIn("attacker-value", rejected_lines[0])
+        self.assertNotIn("secret-value", rejected_lines[0])
+
+    def test_rejected_not_overridable_override_logs_warning_with_key_and_reason(self):
+        """PYPOST-1283: reason='not_overridable' must also be logged verbatim,
+        with no attempted or actual value present in the log record."""
+        logger_name = "pypost.core.mcp_tool_contract"
+        with self.assertLogs(logger_name, level=logging.WARNING) as captured:
+            with self.assertRaises(McpArgumentValidationError):
+                validate_environment_overrides(
+                    arguments={"base_url": "https://attacker.example"},
+                    env_vars={"base_url": "https://example.test"},
+                    mcp_overridable_keys=set(),
+                    hidden_keys=set(),
+                )
+        rejected_lines = [
+            line for line in captured.output if "mcp_env_override_rejected" in line
+        ]
+        self.assertEqual(len(rejected_lines), 1)
+        self.assertTrue(rejected_lines[0].startswith("WARNING:"))
+        self.assertIn("key=base_url", rejected_lines[0])
+        self.assertIn("reason=not_overridable", rejected_lines[0])
+        self.assertNotIn("https://attacker.example", rejected_lines[0])
+        self.assertNotIn("https://example.test", rejected_lines[0])

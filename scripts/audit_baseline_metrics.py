@@ -34,7 +34,11 @@ FILE_CAPS: dict[str, int] = {
     # PYPOST-1071: extraction target for the MCP persistence and lifecycle code moved out
     # of main_window.py; capped on creation at the ~10% headroom policy (269 measured)
     # so the relocated lines stay measured instead of growing outside the guard.
-    "pypost/ui/mcp_server_controller.py": 296,
+    # PYPOST-1280: library collection selection added cohesive growth here that never
+    # re-derived the cap; caught and reconciled while fixing PYPOST-1283 review
+    # regressions. Cap re-derived from measured 722 + ~10% headroom
+    # (ceil(722 * 1.10) = 795).
+    "pypost/ui/mcp_server_controller.py": 795,
     # PYPOST-987/PYPOST-989: import/export workflows remain delegated to action
     # objects; PYPOST-1025 extracted their panel assembly to collections_panel.py.
     # PYPOST-1071: accepted thin delegation — PYPOST-1005/1012/1013 added thin collection
@@ -49,16 +53,27 @@ FILE_CAPS: dict[str, int] = {
     "pypost/ui/presenters/tabs_presenter.py": 1165,
     # PYPOST-1071: MCP status controls, dialogs and scoped refresh routing moved to
     # pypost/ui/presenters/mcp_controls_presenter.py; cap re-derived from 392.
-    "pypost/ui/presenters/env_presenter.py": 432,
+    # PYPOST-1283: MCP env var override policy (set_overridable_keys_supplier wiring)
+    # is genuine cohesive growth in the presenter; cap re-derived from measured 438 +
+    # ~10% headroom (ceil(438 * 1.10) = 482).
+    "pypost/ui/presenters/env_presenter.py": 482,
     # PYPOST-1071: extraction target for the MCP controls moved out of env_presenter.py;
     # capped on creation at the ~10% headroom policy (329 measured) so the relocated
     # lines stay measured instead of growing outside the guard.
-    "pypost/ui/presenters/mcp_controls_presenter.py": 362,
+    # PYPOST-1280: library collection selection added cohesive growth here that never
+    # re-derived the cap; caught and reconciled while fixing PYPOST-1283 review
+    # regressions. Cap re-derived from measured 370 + ~10% headroom
+    # (ceil(370 * 1.10) = 407).
+    "pypost/ui/presenters/mcp_controls_presenter.py": 407,
     # PYPOST-1146: tracking delegation split into metrics_tracking.py and
     # metrics_websocket.py; metrics.py cap re-derived from post-extraction measurement (61).
     "pypost/core/qt/metrics.py": 70,
     # PYPOST-1146: non-WebSocket explicit delegation mixin; capped at ~10% headroom (130 measured).
-    "pypost/core/qt/metrics_tracking.py": 145,
+    # PYPOST-1280: library collection selection added cohesive growth here that never
+    # re-derived the cap; caught and reconciled while fixing PYPOST-1283 review
+    # regressions. Cap re-derived from measured 163 + ~10% headroom
+    # (ceil(163 * 1.10) = 180).
+    "pypost/core/qt/metrics_tracking.py": 180,
     # PYPOST-1146: WebSocket explicit delegation mixin; capped at ~10% headroom (40 measured).
     "pypost/core/qt/metrics_websocket.py": 45,
     "pypost/ui/widgets/mixins.py": 411,
@@ -81,7 +96,10 @@ FILE_CAPS: dict[str, int] = {
     "pypost/core/http_client.py": 418,
     "pypost/core/storage.py": 380,
     "pypost/core/qt/worker.py": 180,
-    "pypost/core/mcp_server_impl.py": 325,
+    # PYPOST-1283: dual-mode jira_mcp.json + overridable-keys plumbing is genuine
+    # cohesive growth; cap re-derived from measured 370 + ~10% headroom
+    # (ceil(370 * 1.10) = 407).
+    "pypost/core/mcp_server_impl.py": 407,
 }
 
 MAIN_WINDOW_CLASS = "MainWindow"

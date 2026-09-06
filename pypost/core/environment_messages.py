@@ -40,6 +40,13 @@ ACTION_MOVE_DOWN = "Move Down"
 COLUMN_VARIABLE = "Variable"
 COLUMN_VALUE = "Value"
 COLUMN_HIDDEN = "Hidden"
+COLUMN_MCP_OVERRIDE = "MCP Override"
+
+MCP_OVERRIDE_COLUMN_TOOLTIP = (
+    "When checked, an MCP agent may override this variable's value for a single "
+    "tool call. Mutually exclusive with Hidden: a Hidden variable can never be "
+    "marked MCP Override, and vice versa."
+)
 
 MCP_ENABLE_LABEL = "Enable MCP (Model Context Protocol)"
 MCP_ENABLE_TOOLTIP = (

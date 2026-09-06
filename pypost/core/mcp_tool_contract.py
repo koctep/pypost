@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -12,6 +13,8 @@ from pypost.core.mcp_secrets_policy import McpSecretsPolicy
 from pypost.core.template_service import TemplateService
 from pypost.models.models import _MCP_PARAM_TYPES, McpToolParam, RequestData
 
+
+logger = logging.getLogger(__name__)
 
 _INTEGER_OR_STRING_PATTERN = re.compile(r"^[+-]?[0-9]+$")
 
@@ -27,6 +30,12 @@ class McpArgumentValidationError(ValueError):
             message = (
                 f"Missing required MCP argument '{parameter_name}' "
                 f"(expected {expected_type})"
+            )
+        elif kind == "override_not_permitted":
+            message = (
+                f"MCP argument '{parameter_name}' attempts to override an "
+                "environment variable that is not permitted for override "
+                "(not marked overridable, or marked Hidden)"
             )
         else:
             message = (
@@ -116,6 +125,34 @@ def resolve_mcp_call_param_specs(
         complete, req, template_service, hidden_keys
     )
     return complete, visible
+
+
+def validate_environment_overrides(
+    arguments: Mapping[str, Any],
+    env_vars: Mapping[str, Any],
+    mcp_overridable_keys: Iterable[str],
+    hidden_keys: Iterable[str],
+) -> None:
+    """Reject a call argument that targets a known env var not permitted for override.
+
+    Enforcement point (not the storage point): recomputes the effective
+    overridable set fresh from ``mcp_overridable_keys``/``hidden_keys`` on
+    every call via ``McpSecretsPolicy.effective_overridable_keys``, so Hidden
+    always wins regardless of how the environment's flags were stored.
+    """
+    effective = McpSecretsPolicy.effective_overridable_keys(
+        mcp_overridable_keys, hidden_keys
+    )
+    hidden_set = set(hidden_keys)
+    overridable_set = set(mcp_overridable_keys)
+    for name in arguments:
+        if name in env_vars and name not in effective:
+            is_hidden = name in overridable_set and name in hidden_set
+            reason = "hidden" if is_hidden else "not_overridable"
+            logger.warning(
+                "mcp_env_override_rejected key=%s reason=%s", name, reason
+            )
+            raise McpArgumentValidationError(name, "override", "override_not_permitted")
 
 
 def validate_mcp_execution_arguments(

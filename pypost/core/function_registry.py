@@ -13,6 +13,8 @@ from urllib.parse import quote
 
 from jinja2 import Environment
 
+from pypost.core.adf import to_adf
+from pypost.core.json_string import to_json_string
 from pypost.core.template_expression_types import IntegerConversionError
 
 
@@ -57,6 +59,8 @@ _DEFAULT_CATALOG: dict[str, Callable[..., Any]] = {
     "base64": _base64_encode,
     "to_int": _to_int,
     "env": _env,
+    "to_adf": to_adf,
+    "to_json_string": to_json_string,
 }
 
 

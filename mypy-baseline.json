@@ -1,5 +1,5 @@
 {
-  "error_count": 180,
+  "error_count": 181,
   "errors": [
     {
       "code": "return-value",
@@ -510,6 +510,11 @@
       "code": "no-any-return",
       "message": "Returning Any from function declared to return \"bool\"",
       "path": "pypost/ui/widgets/code_editor.py"
+    },
+    {
+      "code": "attr-defined",
+      "message": "\"type[QHeaderView]\" has no attribute \"ResizeToContents\"",
+      "path": "pypost/ui/widgets/environments/environment_variables_widget.py"
     },
     {
       "code": "attr-defined",

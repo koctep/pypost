@@ -21,10 +21,12 @@ from pypost.core.environment_messages import (
     ACTION_MOVE_DOWN,
     ACTION_MOVE_UP,
     COLUMN_HIDDEN,
+    COLUMN_MCP_OVERRIDE,
     COLUMN_VALUE,
     COLUMN_VARIABLE,
     MCP_ENABLE_LABEL,
     MCP_ENABLE_TOOLTIP,
+    MCP_OVERRIDE_COLUMN_TOOLTIP,
 )
 from pypost.core.environment_ops import validate_environment_variable_name
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
@@ -41,6 +43,7 @@ logger = logging.getLogger(__name__)
 COL_VAR = 0
 COL_VAL = 1
 COL_HIDDEN = 2
+COL_MCP_OVERRIDE = 3
 
 
 class EnvironmentVariablesWidget(QWidget):
@@ -61,17 +64,21 @@ class EnvironmentVariablesWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        self.vars_table = QTableWidget(0, 3)
+        self.vars_table = QTableWidget(0, 4)
         self.vars_table.setHorizontalHeaderLabels(
-            [COLUMN_VARIABLE, COLUMN_VALUE, COLUMN_HIDDEN],
+            [COLUMN_VARIABLE, COLUMN_VALUE, COLUMN_HIDDEN, COLUMN_MCP_OVERRIDE],
         )
         header = self.vars_table.horizontalHeader()
         header.setSectionResizeMode(COL_VAR, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_VAL, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_HIDDEN, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(COL_MCP_OVERRIDE, QHeaderView.ResizeToContents)
         hidden_header = self.vars_table.horizontalHeaderItem(COL_HIDDEN)
         if hidden_header is not None:
             hidden_header.setToolTip(HIDDEN_COLUMN_TOOLTIP)
+        mcp_override_header = self.vars_table.horizontalHeaderItem(COL_MCP_OVERRIDE)
+        if mcp_override_header is not None:
+            mcp_override_header.setToolTip(MCP_OVERRIDE_COLUMN_TOOLTIP)
         self.vars_table.itemChanged.connect(self.on_var_changed)
         self.vars_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.vars_table.customContextMenuRequested.connect(self._on_vars_table_context_menu)
@@ -104,6 +111,7 @@ class EnvironmentVariablesWidget(QWidget):
         for i, (k, v) in enumerate(env.variables.items()):
             self.vars_table.setItem(i, COL_VAR, QTableWidgetItem(k))
             is_hidden = k in env.hidden_keys
+            is_overridable = k in env.mcp_overridable_keys
             value_item = self._make_value_item(v, is_hidden)
             self.vars_table.setItem(i, COL_VAL, value_item)
             self.vars_table.setCellWidget(
@@ -111,11 +119,22 @@ class EnvironmentVariablesWidget(QWidget):
                 COL_HIDDEN,
                 self._make_hidden_checkbox(is_hidden),
             )
+            self.vars_table.setCellWidget(
+                i,
+                COL_MCP_OVERRIDE,
+                self._make_mcp_override_checkbox(is_overridable),
+            )
+            self._apply_mutual_exclusion(i, is_hidden, is_overridable)
 
         self.vars_table.setCellWidget(
             len(env.variables),
             COL_HIDDEN,
             self._make_hidden_checkbox(False),
+        )
+        self.vars_table.setCellWidget(
+            len(env.variables),
+            COL_MCP_OVERRIDE,
+            self._make_mcp_override_checkbox(False),
         )
 
         self.vars_table.blockSignals(False)
@@ -141,6 +160,34 @@ class EnvironmentVariablesWidget(QWidget):
         if widget:
             return widget.findChild(QCheckBox)
         return None
+
+    def _make_mcp_override_checkbox(self, checked: bool = False) -> QWidget:
+        widget = QWidget()
+        cb = QCheckBox()
+        cb.setChecked(checked)
+        cb.toggled.connect(self._on_mcp_override_toggled)
+        layout = QHBoxLayout(widget)
+        layout.addWidget(cb)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setContentsMargins(0, 0, 0, 0)
+        return widget
+
+    def get_mcp_override_checkbox(self, row: int) -> QCheckBox | None:
+        widget = self.vars_table.cellWidget(row, COL_MCP_OVERRIDE)
+        if widget:
+            return widget.findChild(QCheckBox)
+        return None
+
+    def _apply_mutual_exclusion(
+        self, row: int, hidden: bool, overridable: bool
+    ) -> None:
+        """Keep the Hidden/MCP Override checkboxes for one row mutually exclusive."""
+        hidden_cb = self.get_hidden_checkbox(row)
+        override_cb = self.get_mcp_override_checkbox(row)
+        if hidden_cb is not None:
+            hidden_cb.setEnabled(not overridable)
+        if override_cb is not None:
+            override_cb.setEnabled(not hidden)
 
     def _make_value_item(self, value: str, is_hidden: bool) -> QTableWidgetItem:
         if not is_hidden:
@@ -236,9 +283,18 @@ class EnvironmentVariablesWidget(QWidget):
                 self.vars_table.blockSignals(True)
                 if checked:
                     env.hidden_keys.add(key)
+                    # Hidden always wins: a variable can never be both Hidden
+                    # and MCP-overridable at the same time.
+                    env.mcp_overridable_keys.discard(key)
+                    override_cb = self.get_mcp_override_checkbox(i)
+                    if override_cb is not None and override_cb.isChecked():
+                        override_cb.blockSignals(True)
+                        override_cb.setChecked(False)
+                        override_cb.blockSignals(False)
                 else:
                     env.hidden_keys.discard(key)
                 self._refresh_value_cell_for_hidden_toggle(i, key, checked, env)
+                self._apply_mutual_exclusion(i, checked, key in env.mcp_overridable_keys)
                 self.vars_table.blockSignals(False)
                 logger.info(
                     "env_hidden_flag_changed env_name=%s key=%s hidden=%s",
@@ -251,12 +307,50 @@ class EnvironmentVariablesWidget(QWidget):
                 )
                 return
 
+    def _on_mcp_override_toggled(self, checked: bool) -> None:
+        env = self._get_selected_env()
+        if env is None:
+            return
+
+        sender = self.sender()
+        for i in range(self.vars_table.rowCount()):
+            cb = self.get_mcp_override_checkbox(i)
+            if cb is sender:
+                k_item = self.vars_table.item(i, COL_VAR)
+                if not k_item or not k_item.text():
+                    return
+                key = k_item.text()
+                self.vars_table.blockSignals(True)
+                if checked:
+                    env.mcp_overridable_keys.add(key)
+                    # Mutual exclusion: overriding cannot coexist with Hidden.
+                    env.hidden_keys.discard(key)
+                    hidden_cb = self.get_hidden_checkbox(i)
+                    if hidden_cb is not None and hidden_cb.isChecked():
+                        hidden_cb.blockSignals(True)
+                        hidden_cb.setChecked(False)
+                        hidden_cb.blockSignals(False)
+                else:
+                    env.mcp_overridable_keys.discard(key)
+                self._apply_mutual_exclusion(i, key in env.hidden_keys, checked)
+                self.vars_table.blockSignals(False)
+                logger.info(
+                    "env_mcp_override_flag_changed env_name=%s key=%s overridable=%s",
+                    env.name,
+                    HiddenToggleLogPolicy.format_key_name(
+                        key,
+                        log_hidden_key_names=self._log_hidden_key_names,
+                    ),
+                    checked,
+                )
+                return
+
     def _append_trailing_add_row(self) -> None:
         self.vars_table.setRowCount(self.vars_table.rowCount() + 1)
+        row = self.vars_table.rowCount() - 1
+        self.vars_table.setCellWidget(row, COL_HIDDEN, self._make_hidden_checkbox(False))
         self.vars_table.setCellWidget(
-            self.vars_table.rowCount() - 1,
-            COL_HIDDEN,
-            self._make_hidden_checkbox(False),
+            row, COL_MCP_OVERRIDE, self._make_mcp_override_checkbox(False)
         )
 
     def _ensure_trailing_add_row_present(self) -> None:
@@ -275,10 +369,12 @@ class EnvironmentVariablesWidget(QWidget):
     ) -> None:
         new_vars: dict[str, str] = {}
         new_hidden: set[str] = set()
+        new_overridable: set[str] = set()
         for i in range(self.vars_table.rowCount()):
             k_item = self.vars_table.item(i, COL_VAR)
             v_item = self.vars_table.item(i, COL_VAL)
             cb = self.get_hidden_checkbox(i)
+            override_cb = self.get_mcp_override_checkbox(i)
 
             if k_item and k_item.text():
                 key = k_item.text().strip()
@@ -294,6 +390,7 @@ class EnvironmentVariablesWidget(QWidget):
                         continue
                     continue
                 is_hidden = cb.isChecked() if cb else False
+                is_overridable = override_cb.isChecked() if override_cb else False
                 if is_hidden:
                     new_hidden.add(key)
                     new_vars[key] = self._resolve_hidden_value_on_edit(
@@ -305,9 +402,13 @@ class EnvironmentVariablesWidget(QWidget):
                     )
                 else:
                     new_vars[key] = self._extract_real_value(v_item, "")
+                    # Hidden always wins even if both boxes were somehow checked.
+                    if is_overridable:
+                        new_overridable.add(key)
 
         env.variables = new_vars
         env.hidden_keys = new_hidden
+        env.mcp_overridable_keys = new_overridable
 
     def on_var_changed(self, item: QTableWidgetItem) -> None:
         env = self._get_selected_env()

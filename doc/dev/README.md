@@ -124,6 +124,7 @@ conventions.
 1. [CI-safe Jira MCP collection e2e (PYPOST-1053)](jira_mcp_collection_e2e.md)
 1. [Inbound MCP Trust Model (PYPOST-705)](mcp_trust_model.md)
 1. [MCP Secrets Policy](mcp_secrets_policy.md)
+1. [Dual-Mode (GUI + MCP) Example Requests (PYPOST-1283)](dual_mode_example_requests.md)
 1. [Bounded MCP WebSocket Probe Tool (PYPOST-1137)](websocket_mcp_probe_tool.md)
 1. [UI Action Tools — out-of-process packaging (PYPOST-918)](ui_actions.md)
 1. [jira-mcp example fixtures](

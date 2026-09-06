@@ -23,6 +23,7 @@ from pypost.core.mcp_tool_contract import (
     normalize_mcp_tool_name,
     resolve_mcp_call_param_specs,
     tool_description,
+    validate_environment_overrides,
     validate_mcp_execution_arguments,
 )
 from pypost.core.mcp_legacy_sse import build_legacy_sse_app
@@ -104,6 +105,7 @@ class MCPServerImpl:
         template_service: TemplateService | None = None,
         variable_supplier: Callable[[], dict[str, str]] | None = None,
         hidden_keys_supplier: Callable[[], set[str]] | None = None,
+        overridable_keys_supplier: Callable[[], set[str]] | None = None,
         activity_log: McpActivityLog | None = None,
         settings: AppSettings | None = None,
     ):
@@ -115,6 +117,7 @@ class MCPServerImpl:
         self._settings = settings
         self._variable_supplier = variable_supplier or (lambda: {})
         self._hidden_keys_supplier = hidden_keys_supplier or (lambda: set())
+        self._overridable_keys_supplier = overridable_keys_supplier or (lambda: set())
         self._call_tool_semaphore = asyncio.Semaphore(DEFAULT_MAX_CONCURRENT_MCP_CALLS)
         if template_service is not None:
             logger.debug(
@@ -184,12 +187,19 @@ class MCPServerImpl:
         try:
             env_vars = self._variable_supplier()
             hidden_keys = self._hidden_keys_supplier()
+            overridable_keys = self._overridable_keys_supplier()
+            # Reject-before-execute: validate any attempted environment
+            # variable override before the request ever runs.
+            validate_environment_overrides(
+                arguments, env_vars, overridable_keys, hidden_keys
+            )
             result = await run_in_threadpool(
                 self._execute_request_sync,
                 item,
                 arguments,
                 env_vars,
                 hidden_keys,
+                overridable_keys,
             )
             output_text = format_structured_tool_result(
                 result, env_vars=env_vars, hidden_keys=hidden_keys
@@ -227,13 +237,20 @@ class MCPServerImpl:
     ) -> None:
         self._hidden_keys_supplier = supplier or (lambda: set())
 
+    def set_overridable_keys_supplier(
+        self, supplier: Callable[[], set[str]] | None
+    ) -> None:
+        self._overridable_keys_supplier = supplier or (lambda: set())
+
     def _build_execution_variables(
         self,
         mcp_args: dict[str, Any],
         env_vars: dict[str, str],
         hidden_keys: set[str],
+        overridable_keys: set[str] | None = None,
         request_data: RequestData | None = None,
     ) -> dict[str, Any]:
+        overridable_keys = overridable_keys or set()
         merged_args, defaults_applied = dict(mcp_args or {}), 0
         if request_data is not None and request_data.mcp_params:
             for param_name, param_spec in request_data.mcp_params.items():
@@ -264,8 +281,11 @@ class MCPServerImpl:
             counts["mcp_arg_count"],
             defaults_applied,
         )
+        overridden_env_vars = McpSecretsPolicy.apply_permitted_overrides(
+            env_vars, mcp_args or {}, overridable_keys, hidden_keys
+        )
         resolved_env_vars = resolve_environment_variables(
-            env_vars,
+            overridden_env_vars,
             template_service=self._template_service,
             render_path="mcp",
         )
@@ -286,9 +306,10 @@ class MCPServerImpl:
         args: dict,
         env_vars: dict[str, str],
         hidden_keys: set[str],
+        overridable_keys: set[str] | None = None,
     ):
         variables = self._build_execution_variables(
-            args, env_vars, hidden_keys, request_data=request_data
+            args, env_vars, hidden_keys, overridable_keys, request_data=request_data
         )
         return self._create_request_service().execute(
             request_data, variables, hidden_keys=hidden_keys
@@ -307,7 +328,31 @@ class MCPServerImpl:
         _, visible_specs = resolve_mcp_call_param_specs(
             req, self._template_service, hidden_keys
         )
-        return build_tool_input_schema(visible_specs)
+        schema = build_tool_input_schema(visible_specs)
+        overridable_names = self._request_overridable_env_names(req, hidden_keys)
+        for name in sorted(overridable_names):
+            schema["properties"].setdefault(
+                name,
+                {
+                    "type": "string",
+                    "description": "Environment variable override (optional).",
+                },
+            )
+        return schema
+
+    def _request_overridable_env_names(
+        self, req: RequestData, hidden_keys: set[str]
+    ) -> set[str]:
+        """Overridable, non-hidden env-var names this request actually references."""
+        effective = McpSecretsPolicy.effective_overridable_keys(
+            self._overridable_keys_supplier(), hidden_keys
+        )
+        if not effective:
+            return set()
+        env_names = McpSecretsPolicy.extract_environment_variable_names(
+            req, self._template_service
+        )
+        return effective & env_names
 
     def create_app(self) -> Starlette:
         mcp_route, lifespan = build_streamable_http_route(self.server)

@@ -93,6 +93,9 @@ class EnvPresenter(QObject):
 
         self._mcp_manager.set_variable_supplier(self._env_snapshot.snapshot_variables)
         self._mcp_manager.set_hidden_keys_supplier(self._env_snapshot.snapshot_hidden_keys)
+        self._mcp_manager.set_overridable_keys_supplier(
+            self._env_snapshot.snapshot_overridable_keys
+        )
 
         # Build top-bar widget
         self._widget = QWidget()
@@ -389,7 +392,10 @@ class EnvPresenter(QObject):
         self._config_manager.save_config(self._settings)
         self._current_env_index = index
         hidden_keys = selected.hidden_keys if isinstance(selected, Environment) else set()
-        self._env_snapshot.update(variables, hidden_keys)
+        overridable_keys = (
+            selected.mcp_overridable_keys if isinstance(selected, Environment) else set()
+        )
+        self._env_snapshot.update(variables, hidden_keys, overridable_keys)
 
         keys = list(variables.keys()) if isinstance(selected, Environment) else None
         self.env_variables_changed.emit(variables)

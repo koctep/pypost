@@ -137,7 +137,7 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
-            assert dlg.vars_table.columnCount() == 3
+            assert dlg.vars_table.columnCount() == 4
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
             hidden_cb = dlg._get_hidden_checkbox(0)
             assert hidden_cb is not None

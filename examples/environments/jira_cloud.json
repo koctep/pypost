@@ -10,6 +10,9 @@
     "hidden_keys": [
       "jira_credentials"
     ],
+    "mcp_overridable_keys": [
+      "jira_project_key"
+    ],
     "enable_mcp": true
   }
 ]
