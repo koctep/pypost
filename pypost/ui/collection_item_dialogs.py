@@ -3,22 +3,41 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from collections.abc import Sequence
+from typing import Any, Protocol
 
-from PySide6.QtWidgets import QCheckBox, QFileDialog, QMessageBox, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from pypost.core.collection_messages import (
     DIALOG_TITLE_EXPORT_ALL_COLLECTIONS,
     DIALOG_TITLE_EXPORT_COLLECTION,
     DIALOG_TITLE_IMPORT_COLLECTION,
     DIALOG_TITLE_IMPORT_COLLECTION_CONFLICT,
+    DIALOG_TITLE_IMPORT_COLLECTION_LIBRARY,
+    DIALOG_TITLE_IMPORT_COLLECTION_LIBRARY_MODE,
     EXPORT_ALL_COLLECTIONS_FILE_DIALOG_CAPTION,
     EXPORT_ALL_COLLECTIONS_SUGGESTED_FILENAME,
     EXPORT_COLLECTION_FILE_DIALOG_CAPTION,
     EXPORT_COLLECTION_FILE_DIALOG_FILTER,
     IMPORT_COLLECTION_FILE_DIALOG_CAPTION,
     IMPORT_COLLECTION_FILE_DIALOG_FILTER,
+    BUTTON_IMPORT_LIBRARY_COPY,
+    BUTTON_IMPORT_LIBRARY_LINK,
     MSG_EXPORT_NO_COLLECTION_SELECTED,
+    MSG_IMPORT_LIBRARY_MODE,
+    MSG_IMPORT_LIBRARY_NO_COLLECTIONS,
     format_collection_import_conflict_message,
 )
 from pypost.core.import_conflicts import ImportConflictDecision
@@ -471,6 +490,123 @@ def prompt_import_collection_file(parent: QWidget) -> Path | None:
 
 def show_collection_import_invalid_file_error(parent: QWidget, message: str) -> None:
     QMessageBox.warning(parent, DIALOG_TITLE_IMPORT_COLLECTION, message)
+
+
+def _library_entry_value(entry: object, name: str, default: Any = "") -> Any:
+    """Read display data from either a typed entry or a lightweight test double."""
+    if isinstance(entry, dict):
+        return entry.get(name, default)
+    return getattr(entry, name, default)
+
+
+def _library_entry_label(entry: object) -> str:
+    """Build a safe, readable selector label without exposing connection settings."""
+    display_name = str(_library_entry_value(entry, "display_name", "") or "").strip()
+    collection_path = str(_library_entry_value(entry, "collection_path", "") or "").strip()
+    library_name = str(
+        _library_entry_value(entry, "library_name", "")
+        or _library_entry_value(entry, "library_id", "")
+        or "Unknown library"
+    ).strip()
+    if not display_name:
+        display_name = collection_path or "Unnamed collection"
+    if library_name:
+        return f"{library_name} — {display_name}"
+    return display_name
+
+
+def prompt_import_collection_library(
+    parent: QWidget, entries: Sequence[object]
+) -> list[object] | None:
+    """Let the user select one or more connected-library collections.
+
+    The dialog only returns selected descriptors. It does not resolve source files
+    or write active collections, so closing it is an entirely non-mutating action.
+    """
+    available = [entry for entry in entries if not _library_entry_value(entry, "error", None)]
+    if not available:
+        diagnostics = [
+            str(_library_entry_value(entry, "error", "Library unavailable"))
+            for entry in entries
+        ]
+        QMessageBox.information(
+            parent,
+            DIALOG_TITLE_IMPORT_COLLECTION_LIBRARY,
+            "\n".join([MSG_IMPORT_LIBRARY_NO_COLLECTIONS, "", *diagnostics]),
+        )
+        return None
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(DIALOG_TITLE_IMPORT_COLLECTION_LIBRARY)
+    layout = QVBoxLayout(dialog)
+    layout.addWidget(QLabel("Select collections to import:"))
+    collection_list = QListWidget(dialog)
+    collection_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+    layout.addWidget(collection_list)
+
+    for entry in entries:
+        item = QListWidgetItem(_library_entry_label(entry), collection_list)
+        item.setData(Qt.ItemDataRole.UserRole, entry)
+        diagnostic = _library_entry_value(entry, "error", None)
+        if diagnostic:
+            item.setToolTip(str(diagnostic))
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+
+    buttons = QDialogButtonBox(
+        QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+        parent=dialog,
+    )
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    layout.addWidget(buttons)
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return None
+
+    selected = [item.data(Qt.ItemDataRole.UserRole) for item in collection_list.selectedItems()]
+    return selected or None
+
+
+def prompt_library_import_mode(parent: QWidget) -> object | None:
+    """Ask whether selected library collections should be copied or linked."""
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(DIALOG_TITLE_IMPORT_COLLECTION_LIBRARY_MODE)
+    layout = QVBoxLayout(dialog)
+    layout.addWidget(QLabel(MSG_IMPORT_LIBRARY_MODE))
+    buttons = QDialogButtonBox(parent=dialog)
+    copy_button = buttons.addButton(
+        BUTTON_IMPORT_LIBRARY_COPY, QDialogButtonBox.ButtonRole.AcceptRole
+    )
+    link_button = buttons.addButton(
+        BUTTON_IMPORT_LIBRARY_LINK, QDialogButtonBox.ButtonRole.AcceptRole
+    )
+    buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
+    buttons.rejected.connect(dialog.reject)
+    layout.addWidget(buttons)
+
+    selected: list[object] = []
+
+    def choose_copy() -> None:
+        selected.append(_library_import_mode("COPY", "copy"))
+        dialog.accept()
+
+    def choose_link() -> None:
+        selected.append(_library_import_mode("LINK", "link"))
+        dialog.accept()
+
+    copy_button.clicked.connect(choose_copy)
+    link_button.clicked.connect(choose_link)
+    if dialog.exec() != QDialog.DialogCode.Accepted or not selected:
+        return None
+    return selected[0]
+
+
+def _library_import_mode(member: str, fallback: str) -> object:
+    """Use the core enum when available while keeping this dialog Qt-only testable."""
+    try:
+        from pypost.core.library_collection_import import LibraryImportMode
+    except (ImportError, ModuleNotFoundError):
+        return fallback
+    return getattr(LibraryImportMode, member, fallback)
 
 
 def prompt_collection_import_conflict(

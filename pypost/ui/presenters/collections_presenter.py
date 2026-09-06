@@ -63,6 +63,11 @@ class CollectionsPresenter(QObject):
             Callable[[Path], tuple[list[Collection], list[str]]] | None
         ) = None,
         serialize_collection: Callable[[Collection], dict] | None = build_export_payload,
+        library_manager: object | None = None,
+        library_import_service: object | None = None,
+        library_selector: Callable[[QWidget, list[object]], list[object] | None]
+        | None = None,
+        library_mode_selector: Callable[[QWidget], object | None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._request_manager = request_manager
@@ -131,6 +136,8 @@ class CollectionsPresenter(QObject):
         self._panel = build_collections_panel(
             self._view,
             import_collection=self.import_collections,
+            import_collection_from_file=self.import_collections_from_file,
+            import_collection_from_library=self.import_collections_from_library,
             export_collection=self.export_collection,
             export_all_collections=self.export_all_collections,
         )
@@ -143,6 +150,11 @@ class CollectionsPresenter(QObject):
             emit_collections_changed=self.collections_changed.emit,
             show_status=self._show_import_status,
             clear_status=self._clear_import_status,
+            metrics=self._metrics,
+            library_manager=library_manager,
+            library_import_service=library_import_service,
+            library_selector=library_selector,
+            library_mode_selector=library_mode_selector,
             parent=self,
         )
         self._export_actions = CollectionExportActions(
@@ -355,7 +367,19 @@ class CollectionsPresenter(QObject):
 
     def import_collections(self) -> None:
         """Run the Import Collection flow (delegated to CollectionImportActions)."""
-        self._import_actions.import_collections()
+        self.import_collections_from_file()
+
+    def import_collections_from_file(self) -> None:
+        """Run the standalone file import flow."""
+        self._import_actions.import_collections_from_file()
+
+    def import_collections_from_library(self) -> None:
+        """Run the connected-library import flow."""
+        self._import_actions.import_collections_from_library()
+
+    def refresh_linked_collection(self, collection_id: str) -> bool:
+        """Refresh a linked active collection from its connected library source."""
+        return self._import_actions.refresh_linked_collection(collection_id)
 
     def wait_import_idle(self, timeout_ms: int = 5000) -> bool:
         """Wait until collection import actions are completely idle."""

@@ -86,6 +86,90 @@ into the test-only `tests/helpers/collection_import_wait.py` module. It does not
 dependency or change the import lifecycle; it centralizes the test condition that an expected
 outcome is visible and the presenter has become idle.
 
+**PYPOST-1279** adds separate **From File** and **From Library** routes. The library route
+discovers collections declared by connected registered libraries and managed clones, lets the
+user select one or more entries, and asks whether the selected entries should be copied or linked.
+Library imports reuse the same validation, conflict, persistence, and result-summary contracts as
+file imports.
+
+## Library-backed import (PYPOST-1279)
+
+### Architecture
+
+```text
+CollectionsPresenter
+        │
+        ├─ From File ─────── CollectionImportActions ── CollectionImportParseWorker
+        │
+        └─ From Library ──── CollectionImportActions ── LibraryOperationWorker
+                                      │
+                                      └─ LibraryCollectionImportService (Qt-free)
+                                             ├─ list_entries()
+                                             ├─ resolve_entries()
+                                             └─ materialize_candidate()
+```
+
+`LibraryCollectionImportService` reads the library manifest and delegates collection parsing to
+`load_collection_import_candidates`. It never writes to a library source. The UI performs listing
+and selected-entry resolution in `LibraryOperationWorker`; conflict prompts and active-collection
+persistence remain on the GUI thread and use `plan_collection_import` plus
+`apply_imported_collections`.
+
+### Usage and API
+
+The service is injectable and does not require Qt:
+
+```python
+service = LibraryCollectionImportService(library_manager=library_manager)
+entries = service.list_entries()
+selected = [entry for entry in entries if entry.error is None]
+resolution = service.resolve_entries(selected)
+linked = [
+    service.materialize_candidate(candidate, LibraryImportMode.LINK)
+    for candidate in resolution.candidates
+]
+```
+
+`LibraryCollectionImportEntry` identifies a source with `library_id`, optional `manifest_id`, a
+normalized relative `collection_path`, and `collection_index` for a selected record in a bundled
+file. `LibraryCollectionImportResolution` keeps valid candidates and per-entry errors separate so
+one unavailable or malformed selection does not hide valid siblings.
+
+### Copy and Link semantics
+
+- **Copy** deep-copies the selected collection and clears library metadata. Later source changes
+  do not affect the active collection.
+- **Link** deep-copies the selected content and persists `Collection.library_link`, including the
+  library identity, manifest identity, relative path, and bundled-record index. The source remains
+  read-only. `LibraryCollectionImportService.refresh_linked_collection()` re-resolves the recorded
+  source and preserves the active collection ID.
+- Both modes use the existing name-conflict choices: Overwrite, Keep Both, or Skip. Planning is
+  completed before any active collection is written.
+
+### Manifest and path safety
+
+Only registered and cloned connections are considered. A manifest collection entry must resolve
+under the canonical connected-library root. Absolute paths, drive-qualified paths, backslashes,
+and `..` traversal are rejected both while listing and immediately before applying a selection.
+If a manifest, source file, or selected record disappears after listing, the active collection
+manager does not receive that unavailable selection and the user receives a bounded diagnostic;
+valid sibling selections may still be applied, while an entirely invalid selection leaves the
+active manager unchanged.
+
+### Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| **From Library** shows no usable entries | Confirm the connection has a readable `pypost-library.yaml`/`.yml` manifest and that its declared files exist under the library root. |
+| One entry is unavailable | Read the per-row diagnostic; another valid manifest entry can still be selected. |
+| Import reports a source changed or unavailable | Reopen the library picker to refresh the manifest view; selections are revalidated before writes. |
+| A Link refresh loads the wrong content | Confirm the persisted link includes `collection_index` for bundled files, then retry the refresh. |
+| Copy unexpectedly tracks source changes | Re-import with **Copy**; only **Link** stores `Collection.library_link`. |
+
+Library import lifecycle events are logged with bounded counts, modes, IDs, and exception types.
+The existing `gui_library_operations_total` metric records `collection_import_file`,
+`collection_import_library`, and `collection_import_refresh` outcomes.
+
 ## Architecture
 
 ```text

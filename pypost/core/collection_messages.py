@@ -8,6 +8,8 @@ DIALOG_TITLE_EXPORT_COLLECTION = "Export Collection"
 DIALOG_TITLE_EXPORT_ALL_COLLECTIONS = "Export All Collections"
 
 BUTTON_IMPORT_COLLECTION = "Import Collection…"
+BUTTON_IMPORT_COLLECTION_FROM_FILE = "From File"
+BUTTON_IMPORT_COLLECTION_FROM_LIBRARY = "From Library"
 BUTTON_EXPORT_COLLECTION = "Export Collection…"
 BUTTON_EXPORT_ALL_COLLECTIONS = "Export All Collections…"
 
@@ -23,6 +25,8 @@ MSG_EXPORT_NO_COLLECTION_SELECTED = (
 
 IMPORT_COLLECTION_FILE_DIALOG_CAPTION = "Import Collection"
 IMPORT_COLLECTION_FILE_DIALOG_FILTER = "JSON Files (*.json);;All Files (*)"
+DIALOG_TITLE_IMPORT_COLLECTION_LIBRARY = "Import Collections from Library"
+DIALOG_TITLE_IMPORT_COLLECTION_LIBRARY_MODE = "Library Import Mode"
 
 MSG_IMPORT_COLLECTION_CONFLICT = (
     'A collection named "{name}" already exists. What do you want to do with '
@@ -31,6 +35,13 @@ MSG_IMPORT_COLLECTION_CONFLICT = (
 MSG_IMPORT_NO_VALID_COLLECTIONS = "No valid collections found in this file."
 MSG_IMPORT_PREPARING = "Preparing collection import…"
 MSG_IMPORT_VALIDATING = "Validating collections ({done}/{total})…"
+MSG_IMPORT_LIBRARY_NO_COLLECTIONS = (
+    "No importable collections were found in the connected libraries."
+)
+MSG_IMPORT_LIBRARY_UNAVAILABLE = (
+    "Connected library collections are unavailable. Check the library connection and retry."
+)
+MSG_IMPORT_LIBRARY_MODE = "How should the selected library collections be imported?"
 
 MSG_FILE_UNREADABLE = "Could not read file: {reason}"
 MSG_FILE_NOT_JSON = "File is not valid JSON: {reason}"
@@ -52,6 +63,8 @@ SUMMARY_REQUESTS_IMPORTED = "Requests imported: {count}"
 SUMMARY_WEBSOCKETS_IMPORTED = "WebSockets imported: {count}"
 SUMMARY_RENAMED_HEADER = "Renamed on import:"
 SUMMARY_ERRORS_HEADER = "Entries that failed to import:"
+BUTTON_IMPORT_LIBRARY_COPY = "Copy"
+BUTTON_IMPORT_LIBRARY_LINK = "Link"
 
 
 def format_collection_import_conflict_message(name: str) -> str:

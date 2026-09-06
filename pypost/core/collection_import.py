@@ -260,6 +260,7 @@ def _materialize(
     if collection_id in taken_collection_ids:
         collection_id = str(uuid.uuid4())
     taken_collection_ids.add(collection_id)
+    library_link = getattr(source, "library_link", None)
     return Collection(
         id=collection_id,
         name=name,
@@ -270,6 +271,9 @@ def _materialize(
         requests=_reserve_requests(source.requests, taken_request_ids),
         websockets=_reserve_websockets(getattr(source, "websockets", []), taken_ws_ids),
         mcp_clients=[mcp.model_copy(deep=True) for mcp in getattr(source, "mcp_clients", [])],
+        library_link=(
+            library_link.model_copy(deep=True) if library_link is not None else None
+        ),
     )
 
 
@@ -346,6 +350,7 @@ def plan_collection_import(
             taken_ws_ids.difference_update(ws.id for ws in getattr(replaced, "websockets", []))
             new_requests = _reserve_requests(source.requests, taken_request_ids)
             new_websockets = _reserve_websockets(getattr(source, "websockets", []), taken_ws_ids)
+            library_link = getattr(source, "library_link", None)
             result[index] = Collection(
                 id=replaced.id,
                 name=replaced.name,
@@ -358,6 +363,9 @@ def plan_collection_import(
                 mcp_clients=[
                     mcp.model_copy(deep=True) for mcp in getattr(source, "mcp_clients", [])
                 ],
+                library_link=(
+                    library_link.model_copy(deep=True) if library_link is not None else None
+                ),
             )
             persisted.append(result[index])
             updated.append(name)

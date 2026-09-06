@@ -55,6 +55,9 @@ _LIBRARY_OPERATIONS = frozenset(
         "connect",
         "disconnect",
         "delete",
+        "collection_import_file",
+        "collection_import_library",
+        "collection_import_refresh",
     }
 )
 _LIBRARY_OPERATION_OUTCOMES = frozenset(

@@ -91,6 +91,31 @@ class RequestData(BaseModel):
     retry_policy: Optional[RetryPolicy] = None
 
 
+class LibraryCollectionLink(BaseModel):
+    """Source metadata for an active collection imported in Link mode.
+
+    ``collection_path`` is always relative to the connected library root.  The
+    import service is responsible for validating and normalizing it before a
+    link is created; keeping this model free of filesystem access makes it safe
+    to persist and use in non-Qt code.
+    """
+
+    library_id: str
+    manifest_id: Optional[str] = None
+    collection_path: str
+    collection_index: Optional[int] = None
+
+    @property
+    def source_path(self) -> str:
+        """Compatibility name for callers that call the entry a source path."""
+        return self.collection_path
+
+    @property
+    def manifest_path(self) -> str:
+        """Return the normalized path recorded in the library manifest."""
+        return self.collection_path
+
+
 class Collection(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "New Collection"
@@ -101,6 +126,11 @@ class Collection(BaseModel):
     requests: List[RequestData] = Field(default_factory=list)
     websockets: List[WebSocketConnection] = Field(default_factory=list)
     mcp_clients: List[McpClientConnection] = Field(default_factory=list)
+    # ``exclude_if`` keeps legacy Copy JSON stable while retaining Link
+    # metadata whenever it is present.
+    library_link: Optional[LibraryCollectionLink] = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class Environment(BaseModel):
