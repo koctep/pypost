@@ -27,6 +27,8 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_gui_collection_rename_action(self, item_type: str, status: str) -> None: ...
 
+    def track_gui_library_operation(self, operation: str, outcome: str) -> None: ...
+
     def track_gui_response_search_action(self, source: str, has_matches: bool) -> None: ...
 
     def track_gui_method_body_autoswitch(self, method: str) -> None: ...
@@ -182,6 +184,9 @@ class NullMetrics:
         return None
 
     def track_gui_collection_rename_action(self, item_type: str, status: str) -> None:
+        return None
+
+    def track_gui_library_operation(self, operation: str, outcome: str) -> None:
         return None
 
     def track_gui_response_search_action(self, source: str, has_matches: bool) -> None:

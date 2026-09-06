@@ -192,7 +192,7 @@ def open_library_manager(window: MainWindow) -> None:
     if not window._teardown_started:
         from pypost.ui.dialogs.library_dialogs import LibraryManagerDialog
 
-        LibraryManagerDialog(parent=window).exec()
+        LibraryManagerDialog(parent=window, metrics=window.metrics).exec()
 
 
 def show_hotkeys(window: MainWindow) -> None:

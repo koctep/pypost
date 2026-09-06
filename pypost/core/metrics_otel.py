@@ -24,7 +24,10 @@ from pypost.core.metrics_registry import (
     _LIFECYCLE_EVENTS,
     _LIFECYCLE_OUTCOMES,
     _LIFECYCLE_OWNERS,
+    _LIBRARY_OPERATIONS,
+    _LIBRARY_OPERATION_OUTCOMES,
     _normalize_mcp_validation_label,
+    _normalize_library_label,
     _normalize_lifecycle_label,
     _normalize_new_tab_protocol,
     _normalize_new_tab_source,
@@ -137,6 +140,10 @@ class OtelMetricsTracker:
         self._gui_collection_rename_actions = meter.create_counter(
             "gui_collection_rename_actions_total",
             description="Number of rename actions from collection context menu",
+        )
+        self._gui_library_operations = meter.create_counter(
+            "gui_library_operations_total",
+            description="Library Manager operations by bounded operation and outcome",
         )
         self._gui_response_search_actions = meter.create_counter(
             "gui_response_search_actions_total",
@@ -379,6 +386,17 @@ class OtelMetricsTracker:
     def track_gui_collection_rename_action(self, item_type: str, status: str) -> None:
         self._gui_collection_rename_actions.add(
             1, {"item_type": item_type, "status": status}
+        )
+
+    def track_gui_library_operation(self, operation: str, outcome: str) -> None:
+        self._gui_library_operations.add(
+            1,
+            {
+                "operation": _normalize_library_label(operation, _LIBRARY_OPERATIONS),
+                "outcome": _normalize_library_label(
+                    outcome, _LIBRARY_OPERATION_OUTCOMES
+                ),
+            },
         )
 
     def track_gui_response_search_action(self, source: str, has_matches: bool) -> None:

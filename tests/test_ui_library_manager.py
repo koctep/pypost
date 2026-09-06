@@ -226,7 +226,9 @@ class TestLibraryPresenter:
         overlay_mgr = MagicMock(spec=LocalOverlayManager)
 
         presenter = LibraryPresenter(service=service, overlay_manager=overlay_mgr)
-        deleted = presenter.delete_library("payments-library")
+        deleted = presenter.delete_library(
+            "payments-library", source_type="Cloned managed copy", confirmed=True
+        )
         assert deleted is True
         overlay_mgr.delete_overlay.assert_called_once_with("payments-library")
 

@@ -63,6 +63,9 @@ class GitRepoStatus(BaseModel):
     commit_hash: Optional[str] = None
     commit_message: Optional[str] = None
     tracking_branch: Optional[str] = None
+    remote_configured: Optional[bool] = None
+    remote_reachable: Optional[bool] = None
+    remote_url: Optional[str] = None
     ahead_count: int = 0
     behind_count: int = 0
     is_clean: bool = True

@@ -34,6 +34,9 @@ class MetricsTrackingMixin:
     def track_gui_collection_rename_action(self, item_type: str, status: str) -> None:
         self._registry.track_gui_collection_rename_action(item_type, status)
 
+    def track_gui_library_operation(self, operation: str, outcome: str) -> None:
+        self._registry.track_gui_library_operation(operation, outcome)
+
     def track_gui_response_search_action(self, source: str, has_matches: bool) -> None:
         self._registry.track_gui_response_search_action(source, has_matches)
 

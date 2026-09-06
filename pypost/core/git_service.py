@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pypost.core.git_auth import GitAuthEnvironmentManager, transient_git_auth_env
 from pypost.core.library_manifest import MANIFEST_CANDIDATE_NAMES
@@ -42,12 +42,29 @@ def sanitize_git_url(url: str) -> str:
         return ""
     try:
         parts = urlsplit(url)
+        netloc = parts.netloc
         if parts.username or parts.password:
-            netloc = parts.netloc
             if "@" in netloc:
                 _, host = netloc.rsplit("@", 1)
                 netloc = f"***:***@{host}"
-            return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+        sensitive = {
+            "access_token",
+            "api_key",
+            "auth",
+            "key",
+            "password",
+            "passphrase",
+            "secret",
+            "token",
+        }
+        query = urlencode(
+            [
+                (key, "***" if key.casefold() in sensitive else value)
+                for key, value in parse_qsl(parts.query, keep_blank_values=True)
+            ]
+        )
+        fragment = "***" if parts.fragment else ""
+        return urlunsplit((parts.scheme, netloc, parts.path, query, fragment))
     except Exception:
         pass
     return url
@@ -80,7 +97,19 @@ class GitLibraryService:
 
     def get_library_dir(self, library_id: str) -> Path:
         """Get the filesystem path for a specific collection library repository."""
-        return self.base_dir / library_id
+        if (
+            not library_id.strip()
+            or library_id in {".", ".."}
+            or "/" in library_id
+            or "\\" in library_id
+        ):
+            raise ValueError("Library ID must be a single non-empty path component.")
+        candidate = (self.base_dir / library_id).resolve(strict=False)
+        try:
+            candidate.relative_to(self.base_dir)
+        except ValueError as error:
+            raise ValueError("Library ID must resolve inside the managed library root.") from error
+        return candidate
 
     def is_git_installed(self) -> bool:
         """Check whether git executable is available on system PATH."""
@@ -186,7 +215,9 @@ class GitLibraryService:
 
         return default_code
 
-    def check_dirty(self, library_id: str) -> tuple[bool, list[str]]:
+    def check_dirty(
+        self, library_id: str, repo_path: Optional[Path | str] = None
+    ) -> tuple[bool, list[str]]:
         """Check whether repository working tree has uncommitted or untracked modifications.
 
         Args:
@@ -196,7 +227,7 @@ class GitLibraryService:
             tuple[bool, list[str]]: (is_dirty, list of modified/untracked file paths)
         """
         logger.debug("git_check_dirty_started library_id=%s", library_id)
-        repo_dir = self.get_library_dir(library_id)
+        repo_dir = Path(repo_path) if repo_path is not None else self.get_library_dir(library_id)
         if not repo_dir.exists() or not (repo_dir / ".git").exists():
             logger.debug("git_check_dirty_skipped_no_repo library_id=%s", library_id)
             return False, []
@@ -411,6 +442,7 @@ class GitLibraryService:
         auth: Optional[GitAuthConfig] = None,
         force: bool = False,
         timeout: Optional[float] = None,
+        repo_path: Optional[Path | str] = None,
     ) -> GitOperationResult:
         """Pull updates from remote repository with dirty check guard.
 
@@ -435,11 +467,11 @@ class GitLibraryService:
             branch,
             force,
         )
-        repo_dir = self.get_library_dir(library_id)
+        repo_dir = Path(repo_path) if repo_path is not None else self.get_library_dir(library_id)
 
         # Pre-pull dirty check guard
         if not force:
-            is_dirty, dirty_files = self.check_dirty(library_id)
+            is_dirty, dirty_files = self.check_dirty(library_id, repo_path=repo_path)
             if is_dirty:
                 logger.warning(
                     "git_pull_blocked_dirty_tree library_id=%s files=%s",
@@ -488,7 +520,12 @@ class GitLibraryService:
             output=stdout + stderr,
         )
 
-    def status(self, library_id: str, timeout: Optional[float] = None) -> GitRepoStatus:
+    def status(
+        self,
+        library_id: str,
+        timeout: Optional[float] = None,
+        repo_path: Optional[Path | str] = None,
+    ) -> GitRepoStatus:
         """Inspect repository status, active branch, commit details, and sync state.
 
         Args:
@@ -499,20 +536,13 @@ class GitLibraryService:
             GitRepoStatus: Snapshot of repository status.
         """
         logger.debug("git_status_started library_id=%s", library_id)
-        repo_dir = self.get_library_dir(library_id)
+        repo_dir = Path(repo_path) if repo_path is not None else self.get_library_dir(library_id)
 
         # Get current branch
         _, stdout_br, _ = self._run_git(
             ["branch", "--show-current"], cwd=repo_dir, timeout=5.0
         )
         current_branch = stdout_br.strip() or None
-
-        if not current_branch:
-            _, stdout_short, _ = self._run_git(
-                ["rev-parse", "--short", "HEAD"], cwd=repo_dir, timeout=5.0
-            )
-            if stdout_short.strip():
-                current_branch = f"HEAD ({stdout_short.strip()})"
 
         # Get latest commit hash
         _, stdout_hash, _ = self._run_git(
@@ -534,6 +564,10 @@ class GitLibraryService:
         )
         tracking_branch = (
             stdout_track.strip() if ret_track == 0 and stdout_track.strip() else None
+        )
+
+        remote_configured, remote_reachable, remote_url = self._remote_health(
+            repo_dir, tracking_branch
         )
 
         # Calculate ahead/behind counts
@@ -595,6 +629,9 @@ class GitLibraryService:
             commit_hash=commit_hash,
             commit_message=commit_message,
             tracking_branch=tracking_branch,
+            remote_configured=remote_configured,
+            remote_reachable=remote_reachable,
+            remote_url=remote_url,
             ahead_count=ahead_count,
             behind_count=behind_count,
             is_clean=is_clean,
@@ -602,8 +639,26 @@ class GitLibraryService:
             untracked_files=untracked_files,
         )
 
+    def _remote_health(
+        self, repo_dir: Path, tracking_branch: Optional[str]
+    ) -> tuple[bool, Optional[bool], Optional[str]]:
+        """Determine remote reachability separately from cached tracking refs."""
+        remote_name = tracking_branch.split("/", 1)[0] if tracking_branch else "origin"
+        ret_url, stdout_url, _ = self._run_git(
+            ["remote", "get-url", remote_name], cwd=repo_dir, timeout=5.0
+        )
+        if ret_url != 0 or not stdout_url.strip():
+            return False, None, None
+        ret_probe, _, _ = self._run_git(
+            ["ls-remote", remote_name], cwd=repo_dir, timeout=5.0
+        )
+        return True, ret_probe == 0, sanitize_git_url(stdout_url.strip())
+
     def list_branches(
-        self, library_id: str, timeout: Optional[float] = None
+        self,
+        library_id: str,
+        timeout: Optional[float] = None,
+        repo_path: Optional[Path | str] = None,
     ) -> list[GitBranchInfo]:
         """List all local and remote tracking branches for the library.
 
@@ -615,7 +670,7 @@ class GitLibraryService:
             list[GitBranchInfo]: List of branch metadata objects.
         """
         logger.debug("git_list_branches_started library_id=%s", library_id)
-        repo_dir = self.get_library_dir(library_id)
+        repo_dir = Path(repo_path) if repo_path is not None else self.get_library_dir(library_id)
         ret, stdout, stderr = self._run_git(
             ["branch", "--all", "--format=%(refname)|%(refname:short)|%(HEAD)|%(objectname)"],
             cwd=repo_dir,
@@ -671,6 +726,7 @@ class GitLibraryService:
         auth: Optional[GitAuthConfig] = None,
         force: bool = False,
         timeout: Optional[float] = None,
+        repo_path: Optional[Path | str] = None,
     ) -> GitOperationResult:
         """Checkout a branch with dirty tree safety guard.
 
@@ -695,11 +751,11 @@ class GitLibraryService:
             create,
             force,
         )
-        repo_dir = self.get_library_dir(library_id)
+        repo_dir = Path(repo_path) if repo_path is not None else self.get_library_dir(library_id)
 
         # Pre-checkout dirty check guard
         if not force:
-            is_dirty, dirty_files = self.check_dirty(library_id)
+            is_dirty, dirty_files = self.check_dirty(library_id, repo_path=repo_path)
             if is_dirty:
                 logger.warning(
                     "git_checkout_blocked_dirty_tree library_id=%s files=%s",
@@ -759,6 +815,7 @@ class GitLibraryService:
         files: Optional[list[str]] = None,
         auth: Optional[GitAuthConfig] = None,
         timeout: Optional[float] = None,
+        repo_path: Optional[Path | str] = None,
     ) -> GitOperationResult:
         """Stage specified (or all dirty) files and create a Git commit.
 
@@ -773,7 +830,7 @@ class GitLibraryService:
             GitOperationResult: Result of the commit operation.
         """
         logger.info("git_commit_started library_id=%s", library_id)
-        repo_dir = self.get_library_dir(library_id)
+        repo_dir = Path(repo_path) if repo_path is not None else self.get_library_dir(library_id)
 
         if not message or not message.strip():
             raise GitDiagnosticError(
@@ -840,6 +897,7 @@ class GitLibraryService:
         auth: Optional[GitAuthConfig] = None,
         set_upstream: bool = True,
         timeout: Optional[float] = None,
+        repo_path: Optional[Path | str] = None,
     ) -> GitOperationResult:
         """Push local commits to remote tracking branch with transient auth credentials.
 
@@ -860,7 +918,7 @@ class GitLibraryService:
             remote,
             branch,
         )
-        repo_dir = self.get_library_dir(library_id)
+        repo_dir = Path(repo_path) if repo_path is not None else self.get_library_dir(library_id)
 
         if not branch:
             _, stdout_br, _ = self._run_git(["branch", "--show-current"], cwd=repo_dir, timeout=5.0)
@@ -919,3 +977,113 @@ class GitLibraryService:
             repo_dir,
         )
         return False
+
+    def delete_library_at(self, repo_path: Path | str, library_id: str) -> bool:
+        """Delete an explicitly resolved managed path after its caller checked containment."""
+        path = Path(repo_path)
+        if not path.exists():
+            return False
+        shutil.rmtree(path)
+        logger.info("git_library_deleted library_id=%s", library_id)
+        return True
+
+    def commit_at(
+        self,
+        repo_path: Path | str,
+        library_id: str,
+        message: str,
+        files: Optional[list[str]] = None,
+        auth: Optional[GitAuthConfig] = None,
+        timeout: Optional[float] = None,
+    ) -> GitOperationResult:
+        """Commit in an explicitly resolved local repository."""
+        return self.commit(
+            library_id,
+            message=message,
+            files=files,
+            auth=auth,
+            timeout=timeout,
+            repo_path=repo_path,
+        )
+
+    def push_at(
+        self,
+        repo_path: Path | str,
+        library_id: str,
+        remote: str = "origin",
+        branch: Optional[str] = None,
+        auth: Optional[GitAuthConfig] = None,
+        set_upstream: bool = True,
+        timeout: Optional[float] = None,
+    ) -> GitOperationResult:
+        """Push from an explicitly resolved local repository."""
+        return self.push(
+            library_id,
+            remote=remote,
+            branch=branch,
+            auth=auth,
+            set_upstream=set_upstream,
+            timeout=timeout,
+            repo_path=repo_path,
+        )
+
+    def check_dirty_at(
+        self, repo_path: Path | str, library_id: str
+    ) -> tuple[bool, list[str]]:
+        """Check a registered repository without interpreting its path as an ID."""
+        return self.check_dirty(library_id, repo_path=repo_path)
+
+    def status_at(self, repo_path: Path | str, library_id: str) -> GitRepoStatus:
+        """Read status from an explicitly resolved repository path."""
+        return self.status(library_id, repo_path=repo_path)
+
+    def pull_at(
+        self,
+        repo_path: Path | str,
+        library_id: str,
+        remote: str = "origin",
+        branch: Optional[str] = None,
+        auth: Optional[GitAuthConfig] = None,
+        force: bool = False,
+        timeout: Optional[float] = None,
+    ) -> GitOperationResult:
+        """Pull from an explicitly resolved repository path."""
+        return self.pull(
+            library_id,
+            remote=remote,
+            branch=branch,
+            auth=auth,
+            force=force,
+            timeout=timeout,
+            repo_path=repo_path,
+        )
+
+    def checkout_at(
+        self,
+        repo_path: Path | str,
+        library_id: str,
+        branch: str,
+        create: bool = False,
+        auth: Optional[GitAuthConfig] = None,
+        force: bool = False,
+        timeout: Optional[float] = None,
+    ) -> GitOperationResult:
+        """Checkout a branch in an explicitly resolved repository path."""
+        return self.checkout(
+            library_id,
+            branch=branch,
+            create=create,
+            auth=auth,
+            force=force,
+            timeout=timeout,
+            repo_path=repo_path,
+        )
+
+    def list_branches_at(
+        self,
+        repo_path: Path | str,
+        library_id: str,
+        timeout: Optional[float] = None,
+    ) -> list[GitBranchInfo]:
+        """List branches from an explicitly resolved repository path."""
+        return self.list_branches(library_id, timeout=timeout, repo_path=repo_path)

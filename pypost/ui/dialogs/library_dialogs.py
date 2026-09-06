@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -29,6 +29,8 @@ from pypost.models.git_library import (
     GitAuthMode,
     GitBranchInfo,
 )
+from pypost.models.library_manager import LibrarySourceType
+from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.ui.presenters.library_presenter import LibraryPresenter
 from pypost.ui.widget_ids import (
     LIBRARY_BRANCH_SWITCH_DIALOG,
@@ -357,13 +359,14 @@ class LibraryManagerDialog(QDialog):
         self,
         presenter: Optional[LibraryPresenter] = None,
         parent: Optional[QWidget] = None,
+        metrics: MetricsTrackerProtocol | None = None,
     ) -> None:
         super().__init__(parent)
         set_widget_id(self, LIBRARY_MANAGER_DIALOG)
         self.setWindowTitle("Collection Libraries Manager")
         self.resize(800, 520)
 
-        self.presenter = presenter or LibraryPresenter()
+        self.presenter = presenter or LibraryPresenter(metrics=metrics)
 
         main_layout = QHBoxLayout(self)
 
@@ -391,73 +394,231 @@ class LibraryManagerDialog(QDialog):
 
         # Connect Presenter Signals
         self.presenter.libraries_loaded.connect(self._on_libraries_loaded)
-        self.presenter.status_updated.connect(lambda s: self.detail_panel.update_status(s))
+        self.presenter.entries_loaded.connect(self._on_entries_loaded)
+        self.presenter.entry_updated.connect(self._on_entry_updated)
+        self.presenter.status_updated.connect(self._on_status_updated)
+        self.presenter.operation_state_changed.connect(self._on_operation_state_changed)
+        self.presenter.operation_completed_for_library.connect(
+            self._on_operation_completed
+        )
+        self.presenter.operation_failed_for_library.connect(self._on_operation_failed)
+        self.presenter.operation_blocked.connect(self._on_operation_blocked)
+        self.presenter.branches_loaded.connect(self._on_branches_loaded)
+        self.presenter.dirty_files_loaded.connect(self._on_dirty_files_loaded)
         self.presenter.manifest_loaded.connect(lambda m: self.collections_panel.update_manifest(m))
 
         # Connect Widget Signals
         self.list_panel.library_selected.connect(self._on_library_selected)
+        self.list_panel.selection_cleared.connect(self._on_selection_cleared)
         self.list_panel.clone_clicked.connect(self._on_clone_clicked)
+        self.list_panel.connect_clicked.connect(self._on_connect_clicked)
 
         self.detail_panel.pull_clicked.connect(self._on_pull_clicked)
         self.detail_panel.commit_push_clicked.connect(self._on_commit_push_clicked)
         self.detail_panel.switch_branch_clicked.connect(self._on_switch_branch_clicked)
         self.detail_panel.delete_clicked.connect(self._on_delete_clicked)
+        self.detail_panel.refresh_clicked.connect(self._on_refresh_clicked)
+        self.detail_panel.copy_path_clicked.connect(self._on_copy_path_clicked)
+        self.detail_panel.disconnect_clicked.connect(self._on_disconnect_clicked)
 
         # Initial Load
         self.presenter.load_libraries()
 
-    def _on_libraries_loaded(self, libraries: List[str]) -> None:
-        current = self.presenter.selected_library_id
-        self.list_panel.set_libraries(libraries, current=current)
+    def _on_libraries_loaded(self, _libraries: List[str]) -> None:
+        """Keep the compatibility signal from replacing projected rows with IDs."""
+        self._on_entries_loaded(self.presenter.list_entries())
+
+    def _on_entries_loaded(self, entries: List[Any]) -> None:
+        """Render the presenter's complete row projections."""
+        self.list_panel.set_entries(entries)
+
+    def _on_entry_updated(self, library_id: str, status: object) -> None:
+        """Update one row and its detail view without disturbing other entries."""
+        self.list_panel.update_entry(library_id, status)
+        if library_id == self.presenter.selected_library_id:
+            self.detail_panel.update_status(status)  # type: ignore[arg-type]
+            record = self.presenter.get_connection_record(library_id)
+            self.detail_panel.set_source_type(record.source_type if record else None)
+
+    def _on_status_updated(self, status: object) -> None:
+        """Apply legacy status signals only to the library they describe."""
+        is_selected = getattr(status, "library_id", None) == self.presenter.selected_library_id
+        if status is None or is_selected:
+            self.detail_panel.update_status(status)  # type: ignore[arg-type]
+
+    def _on_operation_state_changed(
+        self, library_id: str, operation: str, active: bool
+    ) -> None:
+        """Show operation progress in both the affected row and selected details."""
+        self.list_panel.set_operation_state(library_id, operation, active)
+        if library_id == self.presenter.selected_library_id:
+            self.detail_panel.set_operation_state(operation, active)
+
+    def _on_selection_cleared(self) -> None:
+        """Clear presenter and detail state when filtering removes the selection."""
+        self.presenter.select_library(None, refresh=False)
+        self.detail_panel.clear_details()
+        self.collections_panel.update_manifest(None)
 
     def _on_library_selected(self, library_id: str) -> None:
-        self.presenter.select_library(library_id)
+        self.detail_panel.clear_details()
+        self.presenter.select_library(library_id, refresh=False)
         manifest = self.presenter.cached_manifest
         self.detail_panel.update_manifest(manifest, library_id=library_id)
+        record = self.presenter.get_connection_record(library_id)
+        self.detail_panel.set_source_type(record.source_type if record else None)
+        self.detail_panel.update_status(self.presenter.cached_status)  # type: ignore[arg-type]
+
+    def _on_branches_loaded(self, library_id: str, branches: List[GitBranchInfo]) -> None:
+        """Open branch selection only for the library that requested the listing."""
+        if library_id != self.presenter.selected_library_id:
+            return
+        status = self.presenter.cached_status
+        current_branch = status.current_branch if status else None
+        dialog = LibraryBranchSwitchDialog(
+            library_id, branches, current_branch=current_branch, parent=self
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.presenter.switch_branch_async(library_id, dialog.get_selected_branch())
+
+    def _on_operation_blocked(
+        self, library_id: str, operation: str, guard: object
+    ) -> None:
+        """Show the dirty-worktree safeguard after the worker checks local files."""
+        if operation not in {"pull", "switch_branch"}:
+            return
+        dirty_files = [str(item) for item in getattr(guard, "files", []) or []]
+        warning_dialog = LibraryDirtyPullWarningDialog(library_id, dirty_files, self)
+        if (
+            warning_dialog.exec() == QDialog.DialogCode.Accepted
+            and warning_dialog.action_selected == "commit_first"
+        ):
+            self._open_commit_push_dialog(library_id, dirty_files)
+
+    def _on_operation_completed(
+        self, library_id: str, operation: str, result: object
+    ) -> None:
+        """Announce only successful asynchronous lifecycle operations."""
+        if result is False or getattr(result, "success", True) is False:
+            return
+        if operation == "pull":
+            QMessageBox.information(
+                self, "Pull Complete", f"Library '{library_id}' is up to date."
+            )
+        elif operation == "switch_branch":
+            branch = getattr(result, "current_branch", None) or "the selected branch"
+            QMessageBox.information(self, "Branch Switched", f"Switched to {branch}.")
+        elif operation == "connect":
+            QMessageBox.information(
+                self, "Connected", "The local library was connected in place."
+            )
+        elif operation == "disconnect":
+            QMessageBox.information(
+                self, "Disconnected", f"Library '{library_id}' was disconnected."
+            )
+        elif operation == "delete":
+            QMessageBox.information(self, "Removed", f"Library '{library_id}' was removed.")
+        elif operation == "clone":
+            QMessageBox.information(self, "Success", "Library cloned successfully.")
+        elif operation == "commit":
+            QMessageBox.information(self, "Success", "Changes committed locally.")
+        elif operation == "push":
+            QMessageBox.information(self, "Success", "Changes pushed to remote.")
+        elif operation == "commit_and_push":
+            QMessageBox.information(
+                self, "Success", "Changes committed and pushed to remote."
+            )
+
+    def _on_operation_failed(self, _library_id: str, _operation: str, error: object) -> None:
+        """Show safe diagnostics for asynchronous failures; raw errors stay in the presenter."""
+        exception = error if isinstance(error, Exception) else RuntimeError("operation failed")
+        title, description = self.presenter.get_diagnostic_message(exception)
+        QMessageBox.critical(self, title, description)
 
     def _on_clone_clicked(self) -> None:
         dialog = LibraryCloneDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             url, lib_id, branch, auth = dialog.get_clone_params()
             try:
-                self.presenter.clone_library(
+                self.presenter.clone_library_async(
                     url=url, library_id=lib_id, branch=branch, auth=auth
                 )
-                QMessageBox.information(self, "Success", "Library cloned successfully.")
             except Exception as ex:
                 title, desc = self.presenter.get_diagnostic_message(ex)
                 QMessageBox.critical(self, title, desc)
+
+    def _on_connect_clicked(self) -> None:
+        """Register a selected directory in place after the user confirms a choice."""
+        path = QFileDialog.getExistingDirectory(self, "Connect Collection Library")
+        if not path:
+            return
+        try:
+            if not self.presenter.connect_local_library_async(Path(path)):
+                return
+        except Exception as ex:
+            title, desc = self.presenter.get_diagnostic_message(ex)
+            QMessageBox.critical(self, title, desc)
+
+    def _on_refresh_clicked(self) -> None:
+        lib_id = self.presenter.selected_library_id
+        if lib_id:
+            self.presenter.refresh_status_async(lib_id)
+
+    def _path_for_library(self, library_id: str) -> str:
+        """Return an exact path without reaching into the presenter's service union."""
+        path = self.presenter.get_local_path(library_id)
+        return str(path) if path else "Unavailable"
+
+    def _on_copy_path_clicked(self) -> None:
+        lib_id = self.presenter.selected_library_id
+        if not lib_id:
+            return
+        path = self._path_for_library(lib_id)
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.clipboard().setText(path)
+        QMessageBox.information(self, "Path Copied", f"Copied local path:\n{path}")
+
+    def _on_disconnect_clicked(self) -> None:
+        lib_id = self.presenter.selected_library_id
+        if not lib_id:
+            return
+        record = self.presenter.get_connection_record(lib_id)
+        if record is None:
+            QMessageBox.information(
+                self, "Library Unavailable", "The selected library is no longer connected."
+            )
+            return
+        name = record.display_name if record else lib_id
+        source = record.source_type.value if record else LibrarySourceType.CLONED.value
+        path = self._path_for_library(lib_id)
+        reply = QMessageBox.question(
+            self,
+            "Disconnect Library",
+            f"Disconnect '{name}' ({source}) at {path}?\nAll local files will be retained.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.presenter.disconnect_library_async(lib_id)
 
     def _on_pull_clicked(self) -> None:
         lib_id = self.presenter.selected_library_id
         if not lib_id:
             return
 
-        is_dirty, dirty_files = self.presenter.check_dirty(lib_id)
-        if is_dirty:
-            warning_dialog = LibraryDirtyPullWarningDialog(lib_id, dirty_files, self)
-            if (
-                warning_dialog.exec() == QDialog.DialogCode.Accepted
-                and warning_dialog.action_selected == "commit_first"
-            ):
-                self._open_commit_push_dialog(lib_id, dirty_files)
-            return
-
-        try:
-            self.presenter.pull_library(lib_id)
-            QMessageBox.information(
-                self, "Pull Complete", f"Library '{lib_id}' is now up-to-date with upstream."
-            )
-        except Exception as ex:
-            title, desc = self.presenter.get_diagnostic_message(ex)
-            QMessageBox.critical(self, title, desc)
+        self.presenter.pull_library_async(lib_id)
 
     def _on_commit_push_clicked(self) -> None:
         lib_id = self.presenter.selected_library_id
         if not lib_id:
             return
-        _, dirty_files = self.presenter.check_dirty(lib_id)
-        self._open_commit_push_dialog(lib_id, dirty_files)
+        self.presenter.check_dirty_async(lib_id)
+
+    def _on_dirty_files_loaded(self, library_id: str, dirty_files: List[str]) -> None:
+        """Open commit controls only after the worker has read the selected tree."""
+        if library_id == self.presenter.selected_library_id:
+            self._open_commit_push_dialog(library_id, dirty_files)
 
     def _open_commit_push_dialog(self, lib_id: str, dirty_files: List[str]) -> None:
         status = self.presenter.cached_status
@@ -470,15 +631,11 @@ class LibraryManagerDialog(QDialog):
             files = dialog.get_selected_files()
             try:
                 if dialog.selected_action == "commit_and_push":
-                    self.presenter.commit_and_push(
+                    self.presenter.commit_and_push_async(
                         lib_id, message=msg, files=files, branch=current_branch
                     )
-                    QMessageBox.information(
-                        self, "Success", "Changes committed and pushed to remote."
-                    )
                 elif dialog.selected_action == "commit":
-                    self.presenter.commit_library(lib_id, message=msg, files=files)
-                    QMessageBox.information(self, "Success", "Changes committed locally.")
+                    self.presenter.commit_library_async(lib_id, message=msg, files=files)
             except Exception as ex:
                 title, desc = self.presenter.get_diagnostic_message(ex)
                 QMessageBox.critical(self, title, desc)
@@ -488,46 +645,34 @@ class LibraryManagerDialog(QDialog):
         if not lib_id:
             return
 
-        is_dirty, _ = self.presenter.check_dirty(lib_id)
-        if is_dirty:
-            QMessageBox.warning(
-                self,
-                "Uncommitted Changes Detected",
-                "Cannot switch branches because you have uncommitted changes. "
-                "Please commit or stash your changes first.",
-            )
-            return
-
-        try:
-            branches = self.presenter.list_branches(lib_id, remote=True)
-            status = self.presenter.cached_status
-            current_branch = status.current_branch if status else None
-            dialog = LibraryBranchSwitchDialog(
-                lib_id, branches, current_branch=current_branch, parent=self
-            )
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                target_branch = dialog.get_selected_branch()
-                self.presenter.switch_branch(lib_id, branch=target_branch)
-                QMessageBox.information(
-                    self, "Branch Switched", f"Switched to branch '{target_branch}'."
-                )
-        except Exception as ex:
-            title, desc = self.presenter.get_diagnostic_message(ex)
-            QMessageBox.critical(self, title, desc)
+        self.presenter.list_branches_async(lib_id, remote=True)
 
     def _on_delete_clicked(self) -> None:
         lib_id = self.presenter.selected_library_id
         if not lib_id:
             return
 
+        record = self.presenter.get_connection_record(lib_id)
+        if record is None:
+            QMessageBox.information(
+                self, "Delete Unavailable", "The selected library is no longer connected."
+            )
+            return
+        if record.source_type == LibrarySourceType.REGISTERED:
+            QMessageBox.information(
+                self, "Delete Unavailable", "Registered local directories can only be disconnected."
+            )
+            return
+        name = record.display_name or lib_id
+        source = record.source_type.value
+        path = self._path_for_library(lib_id)
         reply = QMessageBox.question(
             self,
-            "Remove Library",
-            f"Are you sure you want to remove library '{lib_id}'? "
-            "This will delete local repository files and local secrets overlay.",
+            "Delete Local Clone",
+            f"Permanently delete '{name}' ({source}) at {path}?\n"
+            "The local clone, overlay, and local changes will be removed; the remote is unchanged.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
-            self.presenter.delete_library(lib_id)
-            QMessageBox.information(self, "Removed", f"Library '{lib_id}' has been removed.")
+            self.presenter.delete_library_async(lib_id, confirmed=True)

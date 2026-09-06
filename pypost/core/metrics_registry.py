@@ -41,6 +41,25 @@ _ENVIRONMENT_DISPOSITIONS = frozenset(
     }
 )
 _HISTORY_IO_OPERATIONS = frozenset({"load", "save"})
+_LIBRARY_OPERATIONS = frozenset(
+    {
+        "refresh",
+        "check_dirty",
+        "pull",
+        "commit",
+        "push",
+        "commit_and_push",
+        "switch_branch",
+        "list_branches",
+        "clone",
+        "connect",
+        "disconnect",
+        "delete",
+    }
+)
+_LIBRARY_OPERATION_OUTCOMES = frozenset(
+    {"started", "success", "failure", "blocked", "rejected"}
+)
 
 
 def _normalize_new_tab_source(source: str) -> str:
@@ -60,6 +79,10 @@ def _normalize_mcp_validation_label(value: str, allowed: frozenset[str]) -> str:
 
 
 def _normalize_lifecycle_label(value: str, allowed: frozenset[str]) -> str:
+    return value if value in allowed else "unknown"
+
+
+def _normalize_library_label(value: str, allowed: frozenset[str]) -> str:
     return value if value in allowed else "unknown"
 
 
@@ -165,6 +188,12 @@ class MetricsRegistry:
             "gui_collection_rename_actions_total",
             "Number of rename actions from collection context menu",
             ["item_type", "status"],
+            registry=self.registry,
+        )
+        self.gui_library_operations = Counter(
+            "gui_library_operations_total",
+            "Library Manager operations by bounded operation and outcome",
+            ["operation", "outcome"],
             registry=self.registry,
         )
 
@@ -426,6 +455,12 @@ class MetricsRegistry:
 
     def track_gui_collection_rename_action(self, item_type: str, status: str) -> None:
         self.gui_collection_rename_actions.labels(item_type=item_type, status=status).inc()
+
+    def track_gui_library_operation(self, operation: str, outcome: str) -> None:
+        self.gui_library_operations.labels(
+            operation=_normalize_library_label(operation, _LIBRARY_OPERATIONS),
+            outcome=_normalize_library_label(outcome, _LIBRARY_OPERATION_OUTCOMES),
+        ).inc()
 
     def track_gui_response_search_action(self, source: str, has_matches: bool) -> None:
         self.gui_response_search_actions.labels(
