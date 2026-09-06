@@ -33,6 +33,10 @@ Pass `predefined_root` when the application resource layout is known by the comp
 record has stable ID `pypost-examples`, source type `Predefined bundled library`, and
 `is_read_only=True`.
 
+When constructing a manager around an explicitly injected test or alternate connection store,
+pass `include_predefined=True` to include the template deliberately; the default application
+manager enables it automatically.
+
 ### `copy_predefined_library(destination)`
 
 Copies the validated examples to a new destination, rejects an existing destination or a path

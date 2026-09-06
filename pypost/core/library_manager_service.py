@@ -37,6 +37,7 @@ class LibraryManagerService:
         clock: Optional[Callable[[], datetime]] = None,
         predefined_root: Optional[Path | str] = None,
         predefined_library: Optional[PredefinedLibraryService] = None,
+        include_predefined: Optional[bool] = None,
     ) -> None:
         self.git_service = git_service or GitLibraryService()
         self.connection_store = connection_store or LibraryConnectionStore()
@@ -44,6 +45,12 @@ class LibraryManagerService:
         self.connection_store.legacy_base_dir = self.git_service.base_dir
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.predefined_library = predefined_library or PredefinedLibraryService(predefined_root)
+        self.include_predefined = (
+            include_predefined
+            if include_predefined is not None
+            else predefined_root is not None
+            or (connection_store is None and overlay_manager is None)
+        )
         self.diagnostics: list[str] = []
 
     @property
@@ -54,7 +61,7 @@ class LibraryManagerService:
     def list_connections(self) -> list[LibraryConnectionRecord]:
         """Load explicit registrations and discover legacy managed clones."""
         records = self.connection_store.load(legacy_base_dir=self.git_service.base_dir)
-        predefined = self.predefined_library.discover()
+        predefined = self.predefined_library.discover() if self.include_predefined else None
         self.diagnostics = list(self.connection_store.diagnostics)
         self.diagnostics.extend(self.predefined_library.diagnostics)
         if predefined is not None and all(
