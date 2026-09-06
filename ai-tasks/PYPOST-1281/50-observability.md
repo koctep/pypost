@@ -31,7 +31,7 @@ local template source.
 - [x] Logs use stable identifiers, categories, and exception types only.
 - [x] Invalid-content paths have warning diagnostics without secret or path payloads.
 - [x] Copy operation outcomes use the existing metrics seam.
-- [x] Focused tests and `make lint` passed.
+- [x] Focused tests, compatibility tests, and `make lint` passed.
 
 ## Notes
 

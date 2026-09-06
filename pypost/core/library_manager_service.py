@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+import shutil
 from typing import Any, Callable, Optional, cast
 
 from pypost.core.git_service import GitLibraryService, sanitize_git_url
@@ -267,7 +268,17 @@ class LibraryManagerService:
     def copy_predefined_library(self, destination: Path | str) -> LibraryConnectionRecord:
         """Create and register an editable copy of the bundled examples."""
         record = self.predefined_library.copy_to(destination)
-        return self.connection_store.add(record)
+        try:
+            return self.connection_store.add(record)
+        except Exception:
+            # The copy was created by this operation and is not usable without
+            # its registry entry.  Roll it back when registration fails so a
+            # duplicate or persistence error cannot leave an orphaned library.
+            copied_path = record.canonical_path
+            destination_path = Path(destination).expanduser().resolve(strict=False)
+            if copied_path == destination_path and copied_path.is_dir():
+                shutil.rmtree(copied_path)
+            raise
 
     def clone(
         self,

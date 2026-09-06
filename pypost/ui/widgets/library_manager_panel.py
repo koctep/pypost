@@ -53,6 +53,7 @@ from pypost.ui.widget_ids import (
     LIBRARY_DELETE_BUTTON,
     LIBRARY_DISCONNECT_BUTTON,
     LIBRARY_COPY_PATH_BUTTON,
+    LIBRARY_COPY_TO_EDITABLE_BUTTON,
     LIBRARY_DIRTY_BADGE,
     LIBRARY_LIST,
     LIBRARY_PULL_BUTTON,
@@ -630,6 +631,7 @@ class LibraryDetailWidget(QWidget):
     delete_clicked = Signal()
     refresh_clicked = Signal()
     copy_path_clicked = Signal()
+    copy_to_editable_clicked = Signal()
     disconnect_clicked = Signal()
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -716,6 +718,12 @@ class LibraryDetailWidget(QWidget):
         self.copy_path_button.clicked.connect(self.copy_path_clicked.emit)
         actions_layout.addWidget(self.copy_path_button)
 
+        self.copy_to_editable_button = QPushButton("Copy to Editable...", self)
+        set_widget_id(self.copy_to_editable_button, LIBRARY_COPY_TO_EDITABLE_BUTTON)
+        self.copy_to_editable_button.clicked.connect(self.copy_to_editable_clicked.emit)
+        self.copy_to_editable_button.setVisible(False)
+        actions_layout.addWidget(self.copy_to_editable_button)
+
         self.disconnect_button = QPushButton("Disconnect", self)
         set_widget_id(self.disconnect_button, LIBRARY_DISCONNECT_BUTTON)
         self.disconnect_button.clicked.connect(self.disconnect_clicked.emit)
@@ -750,8 +758,11 @@ class LibraryDetailWidget(QWidget):
         source = str(getattr(source_type, "value", source_type) or "")
         self.source_label.setText(f"Source: {source or 'Unavailable'}")
         is_clone = source == "Cloned managed copy"
+        is_predefined = source == "Predefined bundled library"
         self.delete_button.setVisible(is_clone)
         self.delete_button.setEnabled(is_clone and self.isEnabled())
+        self.copy_to_editable_button.setVisible(is_predefined)
+        self.copy_to_editable_button.setEnabled(is_predefined and self.isEnabled())
 
     def set_operation_state(self, operation: str, active: bool) -> None:
         """Render progress and disable controls while the selected operation runs."""

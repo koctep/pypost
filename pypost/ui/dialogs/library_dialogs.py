@@ -419,6 +419,7 @@ class LibraryManagerDialog(QDialog):
         self.detail_panel.delete_clicked.connect(self._on_delete_clicked)
         self.detail_panel.refresh_clicked.connect(self._on_refresh_clicked)
         self.detail_panel.copy_path_clicked.connect(self._on_copy_path_clicked)
+        self.detail_panel.copy_to_editable_clicked.connect(self._on_copy_to_editable_clicked)
         self.detail_panel.disconnect_clicked.connect(self._on_disconnect_clicked)
 
         # Initial Load
@@ -520,6 +521,12 @@ class LibraryManagerDialog(QDialog):
             QMessageBox.information(self, "Removed", f"Library '{library_id}' was removed.")
         elif operation == "clone":
             QMessageBox.information(self, "Success", "Library cloned successfully.")
+        elif operation == "copy_to_editable":
+            QMessageBox.information(
+                self,
+                "Copy Complete",
+                "The bundled library was copied into editable storage.",
+            )
         elif operation == "commit":
             QMessageBox.information(self, "Success", "Changes committed locally.")
         elif operation == "push":
@@ -578,6 +585,24 @@ class LibraryManagerDialog(QDialog):
 
         QApplication.clipboard().setText(path)
         QMessageBox.information(self, "Path Copied", f"Copied local path:\n{path}")
+
+    def _on_copy_to_editable_clicked(self) -> None:
+        """Copy the selected bundled library into a new editable directory."""
+        library_id = self.presenter.selected_library_id
+        if not library_id:
+            return
+        parent = QFileDialog.getExistingDirectory(
+            self,
+            "Choose Parent Directory for Editable Copy",
+        )
+        if not parent:
+            return
+        destination = Path(parent) / f"{library_id}-copy"
+        try:
+            self.presenter.copy_predefined_library(destination, library_id=library_id)
+        except Exception as error:
+            title, description = self.presenter.get_diagnostic_message(error)
+            QMessageBox.critical(self, title, description)
 
     def _on_disconnect_clicked(self) -> None:
         lib_id = self.presenter.selected_library_id

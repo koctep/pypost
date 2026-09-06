@@ -83,6 +83,49 @@ def test_invalid_predefined_root_is_reported_without_library_entry(tmp_path: Pat
     assert any("predefined" in diagnostic.lower() for diagnostic in service.diagnostics)
 
 
+def test_invalid_predefined_collection_is_rejected(tmp_path: Path):
+    """Discovery validates declared collection content, not only its path."""
+    root = tmp_path / "examples"
+    (root / "collections").mkdir(parents=True)
+    (root / "pypost-library.yaml").write_text(
+        "id: pypost-examples\nname: Examples\ncollections: [collections/broken.json]\n",
+        encoding="utf-8",
+    )
+    (root / "collections" / "broken.json").write_text("{not-json", encoding="utf-8")
+
+    service = _service(tmp_path, root)
+
+    assert service.predefined_library.discover() is None
+    assert any(
+        "collection" in diagnostic.lower()
+        for diagnostic in service.predefined_library.diagnostics
+    )
+
+
+def test_predefined_collections_are_importable(tmp_path: Path):
+    """The read-only predefined connection is an import source."""
+    from pypost.core.library_collection_import import LibraryCollectionImportService
+
+    service = _service(tmp_path)
+    entries = LibraryCollectionImportService(library_manager=service).list_entries()
+
+    assert any(entry.library_id == "pypost-examples" for entry in entries)
+
+
+def test_copy_registration_failure_rolls_back_directory(tmp_path: Path):
+    """A failed registry write cannot leave an unregistered editable copy."""
+    from unittest.mock import Mock
+
+    service = _service(tmp_path)
+    service.connection_store.add = Mock(side_effect=RuntimeError("registry unavailable"))
+    destination = tmp_path / "editable-examples"
+
+    with pytest.raises(RuntimeError, match="registry unavailable"):
+        service.copy_predefined_library(destination)
+
+    assert not destination.exists()
+
+
 def test_library_manager_presents_predefined_row(qapp: object, tmp_path: Path):
     """The existing Library Manager presenter exposes the template row."""
     presenter = LibraryPresenter(service=_service(tmp_path))
@@ -106,3 +149,18 @@ def test_predefined_row_exposes_only_safe_manager_actions(qapp: object, tmp_path
         "copy_path",
         "copy_to_editable",
     ]
+
+
+def test_predefined_detail_wires_editable_copy_button(qapp: object):
+    """The read-only detail view exposes and emits the editable-copy action."""
+    from pypost.ui.widgets.library_manager_panel import LibraryDetailWidget
+
+    detail = LibraryDetailWidget()
+    detail.setEnabled(True)
+    detail.set_source_type(LibrarySourceType.PREDEFINED)
+    triggered: list[bool] = []
+    detail.copy_to_editable_clicked.connect(lambda: triggered.append(True))
+
+    assert not detail.copy_to_editable_button.isHidden()
+    detail.copy_to_editable_button.click()
+    assert triggered == [True]

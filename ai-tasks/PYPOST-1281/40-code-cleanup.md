@@ -25,5 +25,7 @@
 ## Notes
 
 The repository reports 180 known baseline mypy errors; `make typecheck` confirms no new errors.
-Independent delegated review was unavailable in this session, so acceptance was performed by the
-orchestrator using the same artifact and gate criteria.
+The full `make check` gate completed with 336 passed, 4 known baseline failures, and 6 skips.
+The failures are unrelated to PYPOST-1281: malformed nested expression expectations,
+PYPOST-1077 verification snapshots, SOLID audit baselines, and template-service malformed
+nested-expression expectations. An independent remediation review returned PASS.

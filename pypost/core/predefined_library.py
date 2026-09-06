@@ -6,6 +6,7 @@ import logging
 import shutil
 from typing import Optional
 
+from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.library_manifest import find_and_read_manifest, validate_manifest_collections
 from pypost.models.library_manager import LibraryConnectionRecord, LibrarySourceType
 from pypost.models.library_manifest import ManifestDiagnosticError
@@ -59,6 +60,36 @@ class PredefinedLibraryService:
                 len(missing),
             )
             return None
+        root = self.root.expanduser().resolve(strict=False)
+        for relative in manifest.collections:
+            try:
+                collection_path = _declared_collection_path(root, relative)
+                _collections, parse_errors = load_collection_import_candidates(collection_path)
+            except Exception as error:  # noqa: BLE001 - discovery must reject bad bundles
+                self.diagnostics.append(
+                    f"Predefined library collection is invalid: {relative}."
+                )
+                logger.warning(
+                    "predefined_library_collection_invalid library_id=%s path=%s "
+                    "error_type=%s",
+                    self.DEFAULT_LIBRARY_ID,
+                    relative,
+                    type(error).__name__,
+                )
+                return None
+            if parse_errors or not _collections:
+                self.diagnostics.append(
+                    f"Predefined library collection is invalid: {relative}."
+                )
+                logger.warning(
+                    "predefined_library_collection_invalid library_id=%s path=%s "
+                    "parse_error_count=%d collection_count=%d",
+                    self.DEFAULT_LIBRARY_ID,
+                    relative,
+                    len(parse_errors),
+                    len(_collections),
+                )
+                return None
         logger.info(
             "predefined_library_discovery_completed library_id=%s collection_count=%d",
             manifest.id,
@@ -89,7 +120,12 @@ class PredefinedLibraryService:
             source_record.stable_id,
             target.name,
         )
-        shutil.copytree(source, target)
+        try:
+            shutil.copytree(source, target)
+        except Exception:
+            if target.is_dir():
+                shutil.rmtree(target, ignore_errors=True)
+            raise
         copied = PredefinedLibraryService(target).discover()
         if copied is None:
             shutil.rmtree(target, ignore_errors=True)
@@ -115,6 +151,16 @@ def _contains(parent: Path, child: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _declared_collection_path(root: Path, relative: str) -> Path:
+    """Resolve a manifest collection only when it stays inside the bundle."""
+    candidate = (root / relative).resolve(strict=False)
+    try:
+        candidate.relative_to(root)
+    except ValueError as error:
+        raise ValueError(f"Collection path escapes predefined library: {relative}") from error
+    return candidate
 
 
 __all__ = ["PredefinedLibraryService"]

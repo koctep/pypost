@@ -179,7 +179,7 @@ class LibraryCollectionImportService:
     def list_entries(
         self, connection: LibraryConnectionRecord | None = None
     ) -> list[LibraryCollectionImportEntry]:
-        """List declared collection files for registered and cloned libraries.
+        """List declared collection files for connected local libraries.
 
         A bad library or bad collection remains represented by a row with a
         diagnostic.  This lets the selector explain why an item is unavailable
@@ -487,7 +487,11 @@ class LibraryCollectionImportService:
 
     @staticmethod
     def _is_supported_source(record: LibraryConnectionRecord) -> bool:
-        return record.source_type in (LibrarySourceType.REGISTERED, LibrarySourceType.CLONED)
+        return record.source_type in (
+            LibrarySourceType.REGISTERED,
+            LibrarySourceType.CLONED,
+            LibrarySourceType.PREDEFINED,
+        )
 
     @staticmethod
     def _canonical_root(record: LibraryConnectionRecord) -> Path:
