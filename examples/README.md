@@ -30,6 +30,10 @@ The library manifest [`pypost-library.yaml`](pypost-library.yaml) declares:
 - [`collections/mcp.json`](collections/mcp.json) — **Contributors / local
   probing.** Local MCP/SSE probe against PyPost ports (`127.0.0.1:1080` /
   `9080`); used by test helpers. Not the primary “learn Jira + MCP” starter.
+- [`collections/google_drive.json`](collections/google_drive.json) — **End users.**
+  Curated Google Drive API v3 collection demonstrating file listing, metadata retrieval,
+  binary content download, file creation, multipart upload, and file sharing permissions.
+
 
 ## Recommended import order (Jira Cloud pair)
 

@@ -1,0 +1,236 @@
+{
+  "id": "google-drive-v3",
+  "name": "Google Drive API v3",
+  "description": "Curated Google Drive API v3 collection demonstrating file listing, metadata retrieval, media download, file creation, upload, and sharing permissions.",
+  "version": "2.0.0",
+  "variables": [
+    {
+      "name": "google_drive_base_url",
+      "type": "string",
+      "default": "https://www.googleapis.com/drive/v3",
+      "description": "Google Drive v3 REST base URL",
+      "required": true,
+      "secret": false
+    },
+    {
+      "name": "google_drive_upload_base_url",
+      "type": "string",
+      "default": "https://www.googleapis.com/upload/drive/v3",
+      "description": "Google Drive v3 Upload base URL",
+      "required": true,
+      "secret": false
+    },
+    {
+      "name": "google_drive_access_token",
+      "type": "string",
+      "default": "",
+      "description": "OAuth 2.0 Bearer access token for Google APIs",
+      "required": true,
+      "secret": true
+    },
+    {
+      "name": "file_id",
+      "type": "string",
+      "default": "root",
+      "description": "Target Google Drive file ID or 'root'",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "presets": {
+    "default": {
+      "google_drive_base_url": "https://www.googleapis.com/drive/v3",
+      "google_drive_upload_base_url": "https://www.googleapis.com/upload/drive/v3",
+      "file_id": "root"
+    }
+  },
+  "requests": [
+    {
+      "id": "gdrive-files-list",
+      "name": "List Files",
+      "method": "GET",
+      "url": "{{ google_drive_base_url }}/files",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "pageSize": "20",
+        "fields": "nextPageToken, files(id, name, mimeType, modifiedTime, size, parents)",
+        "q": "trashed = false",
+        "orderBy": "modifiedTime desc"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List files from Google Drive with query filters, ordering, and pagination.",
+      "mcp_params": {
+        "pageSize": {
+          "type": "string",
+          "description": "Number of files to return per page (default 20)",
+          "required": false,
+          "default": "20"
+        },
+        "q": {
+          "type": "string",
+          "description": "Search query filter (e.g. 'trashed = false')",
+          "required": false,
+          "default": "trashed = false"
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gdrive-files-get-metadata",
+      "name": "Get File Metadata",
+      "method": "GET",
+      "url": "{{ google_drive_base_url }}/files/{{ file_id }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "fields": "id, name, mimeType, description, starred, trashed, parents, createdTime, modifiedTime, size, webViewLink, owners"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Retrieve metadata for a specific Google Drive file by ID.",
+      "mcp_params": {
+        "file_id": {
+          "type": "string",
+          "description": "Google Drive file ID or 'root'",
+          "required": true,
+          "default": null
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gdrive-files-download-media",
+      "name": "Download File Content",
+      "method": "GET",
+      "url": "{{ google_drive_base_url }}/files/{{ file_id }}",
+      "headers": {
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "alt": "media"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": false,
+      "mcp_description": "Download binary file content from Google Drive.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "gdrive-files-create-metadata",
+      "name": "Create File Metadata (or Folder)",
+      "method": "POST",
+      "url": "{{ google_drive_base_url }}/files",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "fields": "id, name, mimeType, parents"
+      },
+      "body": "{\n  \"name\": \"New Folder or File\",\n  \"mimeType\": \"application/vnd.google-apps.folder\"\n}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Create file metadata or an empty folder in Google Drive.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "gdrive-files-upload-multipart",
+      "name": "Upload File (Multipart)",
+      "method": "POST",
+      "url": "{{ google_drive_upload_base_url }}/files?uploadType=multipart",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "multipart/related; boundary=foo_bar_baz",
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "fields": "id, name, mimeType, size"
+      },
+      "body": "--foo_bar_baz\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{\n  \"name\": \"sample_document.txt\"\n}\r\n--foo_bar_baz\r\nContent-Type: text/plain\r\n\r\nHello Google Drive from PyPost!\r\n--foo_bar_baz--",
+      "body_type": "text",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": false,
+      "mcp_description": "Upload a file with metadata and content using multipart upload.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "gdrive-permissions-list",
+      "name": "List File Permissions",
+      "method": "GET",
+      "url": "{{ google_drive_base_url }}/files/{{ file_id }}/permissions",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "fields": "permissions(id, type, role, emailAddress, displayName)"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List permissions (sharing) for a file in Google Drive.",
+      "mcp_params": {
+        "file_id": {
+          "type": "string",
+          "description": "Google Drive file ID",
+          "required": true,
+          "default": null
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gdrive-permissions-create",
+      "name": "Create File Permission (Share)",
+      "method": "POST",
+      "url": "{{ google_drive_base_url }}/files/{{ file_id }}/permissions",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "sendNotificationEmail": "false",
+        "fields": "id, type, role, emailAddress"
+      },
+      "body": "{\n  \"role\": \"reader\",\n  \"type\": \"user\",\n  \"emailAddress\": \"collaborator@example.com\"\n}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Share a Google Drive file with a user, group, or domain.",
+      "mcp_params": {
+        "file_id": {
+          "type": "string",
+          "description": "Google Drive file ID",
+          "required": true,
+          "default": null
+        }
+      },
+      "retry_policy": null
+    }
+  ]
+}
