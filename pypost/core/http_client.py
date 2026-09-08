@@ -1,3 +1,4 @@
+import codecs
 import logging
 import requests
 import time
@@ -201,6 +202,10 @@ class HTTPClient:
         content_parts = []
         # iter_content with None uses optimal chunk size from server (or fallback).
         # Default yields bytes; decode here so mocks and real responses stay aligned.
+        # The decoder is incremental because chunk boundaries fall wherever the
+        # network put them: a character split across two chunks would otherwise be
+        # replaced by U+FFFD in both halves.
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         for chunk in response.iter_content(chunk_size=None):
             if stop_flag and stop_flag():
                 # If cancelled, we break the loop.
@@ -209,16 +214,28 @@ class HTTPClient:
                 break
 
             if chunk:
-                if isinstance(chunk, bytes):
-                    chunk = chunk.decode("utf-8", errors="replace")
-                content_parts.append(chunk)
-                if stream_callback:
-                    stream_callback(chunk)
+                text = (
+                    decoder.decode(chunk) if isinstance(chunk, bytes) else chunk
+                )
+                # Empty when the chunk ended mid-character: the bytes are held
+                # until the rest of it arrives.
+                if text:
+                    content_parts.append(text)
+                    if stream_callback:
+                        stream_callback(text)
             
             # Check stop flag again after processing chunk to be responsive
             if stop_flag and stop_flag():
                 response.close()
                 break
+
+        # Flush bytes held back mid-character; a truncated stream yields U+FFFD
+        # here rather than silently dropping them.
+        trailing = decoder.decode(b"", final=True)
+        if trailing:
+            content_parts.append(trailing)
+            if stream_callback:
+                stream_callback(trailing)
 
         content = "".join(content_parts)
 

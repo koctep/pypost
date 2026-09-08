@@ -149,3 +149,48 @@ class TestHTTPClientInjection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHTTPClientChunkDecoding(unittest.TestCase):
+    """Chunk boundaries land wherever the network put them, not on characters."""
+
+    def setUp(self):
+        self.client = HTTPClient(
+            metrics=MagicMock(), template_service=TemplateService()
+        )
+        self.client.session = MagicMock()
+
+    def _send(self, chunks, stream_callback=None):
+        self.client.session.request.return_value = _make_response(chunks=chunks)
+        return self.client.send_request(
+            RequestData(method="GET", url="http://x"),
+            stream_callback=stream_callback,
+        )
+
+    def test_character_split_across_chunks_is_reassembled(self):
+        payload = "привет".encode("utf-8")
+        split = 3  # inside the second character
+        result = self._send([payload[:split], payload[split:]])
+
+        self.assertEqual("привет", result.body)
+        self.assertNotIn("\ufffd", result.body)
+
+    def test_streamed_chunks_carry_no_partial_characters(self):
+        payload = "日本語".encode("utf-8")
+        seen = []
+        self._send([payload[:2], payload[2:5], payload[5:]], stream_callback=seen.append)
+
+        self.assertNotIn("\ufffd", "".join(seen))
+        self.assertEqual("日本語", "".join(seen))
+
+    def test_truncated_trailing_character_is_reported_not_dropped(self):
+        payload = "日本語".encode("utf-8")
+        result = self._send([payload[:-1]])
+
+        self.assertEqual("日本\ufffd", result.body)
+
+    def test_str_chunks_still_pass_through(self):
+        result = self._send(["already ", "text"])
+
+        self.assertEqual("already text", result.body)
+
