@@ -49,6 +49,7 @@ class RequestService:
         history_manager: HistoryManager | None = None,
         alert_manager: AlertManager | None = None,
         default_retry_policy: RetryPolicy | None = None,
+        request_timeout: float = 30.0,
     ) -> None:
         self._metrics = metrics
         self._history_manager = history_manager
@@ -66,9 +67,14 @@ class RequestService:
             default_retry_policy.max_retries if default_retry_policy is not None else "N/A",
         )
         self.http_client = HTTPClient(
-            metrics=self._metrics, template_service=self._template_service
+            metrics=self._metrics,
+            template_service=self._template_service,
+            request_timeout=request_timeout,
         )
         self.mcp_client = MCPClientService()
+
+    def set_request_timeout(self, request_timeout: float) -> None:
+        self.http_client.request_timeout = request_timeout
 
     def _execute_mcp(
         self,

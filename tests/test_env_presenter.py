@@ -47,6 +47,9 @@ class FakeMCPManager:
         self.stopped += 1
         self._running = False
 
+    def set_request_timeout(self, request_timeout):
+        self.request_timeout = request_timeout
+
     def is_running(self):
         return self._running
 
@@ -85,6 +88,7 @@ class TestEnvPresenter(unittest.TestCase):
         p.apply_settings(settings)
 
         self.assertIs(p._settings, settings)
+        self.assertEqual(p._mcp_manager.request_timeout, settings.request_timeout)
 
     def test_load_environments_populates_combo(self):
         envs = [_make_env("e1", "Production"), _make_env("e2", "Staging")]

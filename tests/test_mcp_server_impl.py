@@ -45,6 +45,14 @@ class TestMCPServerImpl(unittest.TestCase):
         impl.register_tools([second])
         self.assertEqual(list(impl.tools_map.keys()), ["b"])
 
+    def test_request_timeout_can_be_updated(self):
+        impl = MCPServerImpl(request_timeout=11.0)
+        self.assertEqual(impl.request_service.http_client.request_timeout, 11.0)
+
+        impl.set_request_timeout(19.0)
+
+        self.assertEqual(impl.request_service.http_client.request_timeout, 19.0)
+
     def test_list_tools_builds_input_schema_from_mcp_request_placeholders(self):
         impl = MCPServerImpl()
         req = RequestData(

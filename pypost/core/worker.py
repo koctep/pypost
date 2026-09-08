@@ -32,6 +32,7 @@ class RequestWorker(QThread):
         template_service: TemplateService | None = None,
         alert_manager: AlertManager | None = None,
         default_retry_policy: RetryPolicy | None = None,
+        request_timeout: float = 30.0,
     ):
         super().__init__()
         self.request_data = request_data
@@ -52,7 +53,8 @@ class RequestWorker(QThread):
         self.service = RequestService(metrics=metrics, history_manager=history_manager,
                                       template_service=template_service,
                                       alert_manager=alert_manager,
-                                      default_retry_policy=default_retry_policy)
+                                      default_retry_policy=default_retry_policy,
+                                      request_timeout=request_timeout)
         self._stop_event = threading.Event()
 
     def stop(self):

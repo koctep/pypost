@@ -41,6 +41,18 @@ class TestHTTPClientSendRequest(unittest.TestCase):
         self.assertEqual({"k": "v"}, call_kwargs.get("json"))
         self.assertNotIn("data", call_kwargs)
 
+    def test_configured_timeout_is_forwarded_to_requests(self):
+        client = HTTPClient(
+            template_service=TemplateService(),
+            request_timeout=17.0,
+        )
+        client.session = MagicMock()
+        client.session.request.return_value = _make_response(status=200)
+
+        client.send_request(RequestData(method="GET", url="http://x"))
+
+        self.assertEqual(client.session.request.call_args.kwargs["timeout"], 17.0)
+
     def test_template_variables_substituted_in_url(self):
         self.mock_session.request.return_value = _make_response(status=200)
         req = RequestData(method="GET", url="{{ base }}/api")

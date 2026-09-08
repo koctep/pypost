@@ -17,16 +17,24 @@ class MCPServerManager(QObject):
     status_changed = Signal(bool)  # True = running, False = stopped
 
     def __init__(self, metrics: MetricsManager | None = None,
-                 template_service: TemplateService | None = None):
+                 template_service: TemplateService | None = None,
+                 request_timeout: float = 30.0):
         super().__init__()
         self._server_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._server_instance: Optional[uvicorn.Server] = None
-        self._impl = MCPServerImpl(metrics=metrics, template_service=template_service)
+        self._impl = MCPServerImpl(
+            metrics=metrics,
+            template_service=template_service,
+            request_timeout=request_timeout,
+        )
         if template_service is not None:
             logger.debug("MCPServerManager: propagating TemplateService id=%d", id(template_service))
         self._current_port = 1080
         self._current_host = "127.0.0.1"
+
+    def set_request_timeout(self, request_timeout: float) -> None:
+        self._impl.set_request_timeout(request_timeout)
 
     def start_server(self, port: int, tools: List[RequestData], host: str = "127.0.0.1"):
         if self.is_running():

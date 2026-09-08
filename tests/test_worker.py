@@ -90,6 +90,14 @@ class TestRequestWorkerError(unittest.TestCase):
         self.assertEqual(errors, [exc])
         self.assertEqual(finished, [])
 
+    def test_worker_forwards_request_timeout_to_service(self):
+        worker = RequestWorker(
+            RequestData(method="GET", url="http://x"),
+            request_timeout=17.0,
+        )
+
+        self.assertEqual(worker.service.http_client.request_timeout, 17.0)
+
 
 class TestRequestWorkerRetrySignal(unittest.TestCase):
 

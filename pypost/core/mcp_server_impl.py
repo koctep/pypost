@@ -18,7 +18,8 @@ from pypost.core.metrics import MetricsManager
 
 class MCPServerImpl:
     def __init__(self, name: str = "pypost-server", metrics: MetricsManager | None = None,
-                 template_service: TemplateService | None = None):
+                 template_service: TemplateService | None = None,
+                 request_timeout: float = 30.0):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData] = {}
         self._metrics = metrics
@@ -26,11 +27,15 @@ class MCPServerImpl:
         if template_service is not None:
             logger.debug("MCPServerImpl: using injected TemplateService id=%d", id(template_service))
         self.request_service = RequestService(metrics=self._metrics,
-                                              template_service=self._template_service)
+                                              template_service=self._template_service,
+                                              request_timeout=request_timeout)
 
         # Register handlers
         self.server.list_tools()(self.list_tools)
         self.server.call_tool()(self.call_tool)
+
+    def set_request_timeout(self, request_timeout: float) -> None:
+        self.request_service.set_request_timeout(request_timeout)
 
     async def list_tools(self) -> List[Tool]:
         tools = []

@@ -51,10 +51,13 @@ class MainWindow(QMainWindow):
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
         self.request_manager = RequestManager(self.storage)
         self.state_manager = StateManager(self.config_manager)
-        self.style_manager = StyleManager()
-        self.mcp_manager = MCPServerManager(metrics=self.metrics,
-                                            template_service=self.template_service)
         self.settings = self.state_manager.settings
+        self.style_manager = StyleManager()
+        self.mcp_manager = MCPServerManager(
+            metrics=self.metrics,
+            template_service=self.template_service,
+            request_timeout=self.settings.request_timeout,
+        )
         self.icons = self._load_icons()
         self.history_manager = HistoryManager()
         self.collections = CollectionsPresenter(

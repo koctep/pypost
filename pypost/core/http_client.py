@@ -18,9 +18,11 @@ SSE_PROBE_MAX_EVENTS = 5
 
 class HTTPClient:
     def __init__(self, metrics: MetricsManager | None = None,
-                 template_service: TemplateService | None = None):
+                 template_service: TemplateService | None = None,
+                 request_timeout: float = 30.0):
         self.session = requests.Session()
         self._metrics = metrics
+        self.request_timeout = request_timeout
         self._template_service = template_service if template_service is not None \
             else TemplateService()
         if template_service is not None:
@@ -54,7 +56,7 @@ class HTTPClient:
             'headers': headers,
             'params': params,
             'stream': True,
-            'timeout': 30.0
+            'timeout': self.request_timeout
         }
         
         if request_data.body_type == 'json' and body:

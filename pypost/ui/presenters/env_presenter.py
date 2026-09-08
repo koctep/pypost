@@ -168,6 +168,7 @@ class EnvPresenter(QObject):
     def apply_settings(self, settings: AppSettings) -> None:
         """Use the same settings instance as the other application services."""
         self._settings = settings
+        self._mcp_manager.set_request_timeout(settings.request_timeout)
 
     def _on_env_changed(self, index: int) -> None:
         """Resolves vars, starts/stops MCP, saves config, emits signals."""
