@@ -561,7 +561,11 @@ class TabsPresenter(QObject):
 
             for i in range(self._tabs.count()):
                 tab = self._tabs.widget(i)
-                if isinstance(tab, RequestTab) and tab.request_data.id == request_data.id:
+                if (
+                    isinstance(tab, RequestTab)
+                    and tab.request_data
+                    and tab.request_data.id == request_data.id
+                ):
                     self._tabs.setTabText(i, request_data.name)
                     tab.request_data = request_data
                     break

@@ -334,6 +334,21 @@ class TestTabsPresenter(unittest.TestCase):
         p._handle_save_request(req)
         self.assertEqual(len(received), 1)
 
+    def test_overwrite_save_tolerates_a_blank_tab(self):
+        req = _make_request("r1", "Existing")
+        rm = FakeRequestManager([req])
+        col_mock = MagicMock()
+        col_mock.id = "c1"
+        rm._requests["r1"] = (req, col_mock)
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab()  # blank tab: request_data is None
+        p.add_new_tab(req)
+
+        p._handle_save_request(req)
+
+        self.assertEqual(1, len(rm.saved))
+        self.assertEqual("Existing", p.widget.tabText(1))
+
 
 class TestOnRequestError(unittest.TestCase):
     @classmethod
