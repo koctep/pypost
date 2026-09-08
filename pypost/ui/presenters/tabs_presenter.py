@@ -166,7 +166,23 @@ class TabsPresenter(QObject):
             self.save_tabs_state()
 
     def close_tab(self, index: int) -> None:
+        tab = self._tabs.widget(index)
+        if tab is None:
+            return
+
         self._tabs.removeTab(index)
+        worker_is_running = (
+            isinstance(tab, RequestTab)
+            and tab.worker is not None
+            and tab.worker.isRunning()
+        )
+        if worker_is_running:
+            tab.worker.stop()
+            tab.worker.finished.connect(tab.deleteLater)
+            tab.worker.error.connect(tab.deleteLater)
+        else:
+            tab.deleteLater()
+
         if self._tabs.count() == 0:
             self.add_new_tab(save_state=False)
         self._position_add_tab_button()

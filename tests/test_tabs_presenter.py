@@ -85,8 +85,36 @@ class TestTabsPresenter(unittest.TestCase):
         p = self._make_presenter()
         p.add_new_tab()
         p.add_new_tab()
+        closed_tab = p.widget.widget(0)
+        closed_tab.deleteLater = MagicMock()
         self.assertEqual(p.widget.count(), 2)
         p.close_tab(0)
+        self.assertEqual(p.widget.count(), 1)
+        closed_tab.deleteLater.assert_called_once_with()
+
+    def test_close_tab_stops_worker_before_deleting_tab(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        closed_tab = p.widget.widget(0)
+        closed_tab.deleteLater = MagicMock()
+        worker = MagicMock()
+        worker.isRunning.return_value = True
+        closed_tab.worker = worker
+
+        p.close_tab(0)
+
+        worker.stop.assert_called_once_with()
+        closed_tab.deleteLater.assert_not_called()
+        worker.finished.connect.assert_called_once_with(closed_tab.deleteLater)
+        worker.error.connect.assert_called_once_with(closed_tab.deleteLater)
+
+    def test_close_tab_ignores_invalid_index(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+
+        p.close_tab(99)
+
         self.assertEqual(p.widget.count(), 1)
 
     def test_close_tab_ensures_at_least_one_tab(self):
