@@ -335,12 +335,13 @@ class EnvironmentDialog(QDialog):
                         typed = v_item.text() if v_item else ""
                         if typed != HIDDEN_MASK:
                             val = typed
-                        # Re-mask the display
+                        # Re-mask the existing item in place. Replacing the
+                        # item here deletes the native QTableWidgetItem while
+                        # Qt is still dispatching itemChanged for it, which
+                        # can cause a use-after-free and a segmentation fault.
                         self.vars_table.blockSignals(True)
-                        self.vars_table.setItem(
-                            i, COL_VAL,
-                            self._make_value_item(val, True),
-                        )
+                        v_item.setData(Qt.ItemDataRole.UserRole, val)
+                        v_item.setText(HIDDEN_MASK)
                         self.vars_table.blockSignals(False)
                     new_vars[key] = val
                 else:

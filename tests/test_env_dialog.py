@@ -135,9 +135,12 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
-            dlg.vars_table.setItem(0, 1, QTableWidgetItem("new"))
+            edited_item = QTableWidgetItem("new")
+            dlg.vars_table.setItem(0, 1, edited_item)
             assert env.variables["API_KEY"] == "new"
-            assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
+            masked_item = dlg.vars_table.item(0, 1)
+            assert masked_item is edited_item
+            assert masked_item.text() == HIDDEN_MASK
             hidden_cb = dlg._get_hidden_checkbox(0)
             assert hidden_cb is not None
             hidden_cb.setChecked(False)
