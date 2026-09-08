@@ -1,13 +1,12 @@
 # Technical Debt — PYPOST-434 (pytest / CI hygiene)
 
-This bugfix added `pythonpath = .` to `pytest.ini`.  No new code debt was introduced.
-Track optional follow-ups here.
+Pytest configuration and dependency metadata now live in `pyproject.toml`. Track optional
+follow-ups here.
 
 ## 1. CI lint gate
 
-`flake8` is installed in `.github/workflows/test.yml` but not executed.  Either add a lint
-step or remove the package from the install line.  The codebase currently has many flake8
-findings; a dedicated ticket should scope fixes or a phased rollout.
+Ruff is installed through the `dev` dependency group but is not executed in CI. The codebase has
+existing lint findings; a dedicated ticket should scope fixes before enabling a required lint gate.
 
 ## 2. Qt deprecation warnings
 

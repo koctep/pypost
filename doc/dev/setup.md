@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - pip (Python package installer)
 - Git
 
@@ -29,14 +29,14 @@ Alternatively, to do it manually:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 **Windows:**
 ```bash
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 **Key Dependencies:**
@@ -88,17 +88,15 @@ The project uses a `Makefile` to simplify common tasks:
 
 ### Makefile Behavior Notes
 
-- `venv` is driven by `$(VENV_MARKER)` and is version-aware
-  (`.venv/.initialized-<major.minor>`).
+- `venv` is driven by `$(VENV_MARKER)` and requires Python 3.11 or newer.
 - `run`, `test`, and `lint` depend on `$(VENV_MARKER)` only and do not trigger `install`.
 - If dependencies are missing, `run/test/lint` fail naturally with interpreter/module errors.
 - Use `make install` explicitly when dependencies must be installed or refreshed.
 
 ### Unit tests (pytest)
 
-The repository root is not installed as a package by default.  Root `pytest.ini` sets
-`pythonpath = .` so `import pypost` succeeds when pytest runs from the repo root **without**
-setting `PYTHONPATH` (see PYPOST-434).
+`make install` installs the repository as an editable package with the `dev` optional dependency
+group. Pytest and Ruff read their configuration from the root `pyproject.toml`.
 
 After `make install` (or with an activated venv that has test dependencies):
 
@@ -119,8 +117,8 @@ container so `actions/setup-python` toolcache builds match the runner libc.
 
 ## Troubleshooting
 
-- **Missing modules**: Ensure your virtual environment is activated and you have installed
-  requirements (`make install`).
+- **Missing modules**: Ensure your virtual environment is activated and the project is installed
+  (`make install`).
 - **Qt Platform plugin "xcb"**: On Linux, you might need to install `libxcb-cursor0` or similar
   system libraries if the app fails to launch.
 - **CI: missing Qt `.so` (e.g. `libEGL`, `libfontconfig`, `libglib-2.0`)**: Install the matching

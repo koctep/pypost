@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pypost"
+version = "0.1.0"
+description = "A lightweight graphical HTTP client for API testing"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "Ilya Ashchepkov" },
+]
+dependencies = [
+    "PySide6",
+    "requests",
+    "jinja2",
+    "pydantic>=2.0",
+    "platformdirs",
+    "mcp>=1.28,<2",
+    "starlette",
+    "uvicorn",
+    "prometheus-client",
+    "sseclient-py",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+
+[project.gui-scripts]
+pypost = "pypost.main:main"
+
+[tool.setuptools.packages.find]
+include = ["pypost*"]
+
+[tool.setuptools.package-data]
+"pypost.ui" = [
+    "resources/icons/*.svg",
+    "styles/*.qss",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-v --tb=short --cov-fail-under=50"
+log_cli = true
+log_cli_level = "WARNING"
+log_format = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
+log_date_format = "%H:%M:%S"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]

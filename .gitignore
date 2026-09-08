@@ -24,6 +24,7 @@ MANIFEST
 
 # Coverage
 .coverage
+.ruff_cache/
 htmlcov/
 coverage.xml
 junit.xml

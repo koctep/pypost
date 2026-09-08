@@ -1,44 +1,41 @@
-.PHONY: venv venv-test install run clean test test-cov lint
+.PHONY: venv install run clean test test-cov lint
 
-PYTHON := python3
-PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+PYTHON ?= python3
+MIN_PYTHON := 3.11
 VENV := .venv
 BIN := $(VENV)/bin
-VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
+VENV_MARKER := $(VENV)/.initialized-$(MIN_PYTHON)
 
 # Create virtual environment
 venv: $(VENV_MARKER)
 
 $(VENV_MARKER):
+	@$(PYTHON) -c 'import sys; required = (3, 11); current = sys.version_info[:2]; assert current >= required, "Python 3.11+ is required (found %d.%d)" % current'
 	$(PYTHON) -m venv $(VENV)
 	$(BIN)/python -m ensurepip --upgrade
 	$(BIN)/python -m pip install --upgrade pip
 	touch "$(VENV_MARKER)"
 
-# Create test virtual environment tools
-venv-test: $(VENV_MARKER)
-	$(BIN)/python -m pip install pytest flake8 pytest-cov
-
-# Install dependencies
-install: $(VENV_MARKER) venv-test
-	$(BIN)/python -m pip install -r requirements.txt
+# Install project and development dependencies
+install: $(VENV_MARKER)
+	$(BIN)/python -m pip install -e ".[dev]"
 
 # Run application
 run: $(VENV_MARKER)
-	PYTHONPATH=. $(BIN)/python pypost/main.py
+	$(BIN)/pypost
 
 # Run tests
 test: $(VENV_MARKER)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/
 
 # Run tests with coverage report (requires pytest-cov)
-test-cov: $(VENV_MARKER) venv-test
+test-cov: $(VENV_MARKER)
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/ \
 		--cov=pypost --cov-report=term-missing --cov-report=html:htmlcov
 
 # Linting
 lint: $(VENV_MARKER)
-	$(BIN)/python -m flake8 --jobs=1 pypost/
+	$(BIN)/python -m ruff check pypost/
 
 # Clean
 clean:

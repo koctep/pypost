@@ -42,9 +42,9 @@ To simplify the installation and startup process, a `Makefile` is provided in th
     *   Linux/macOS: `source .venv/bin/activate`
     *   Windows: `.venv\Scripts\activate`
 
-3.  Install dependencies:
+3.  Install the application:
     ```bash
-    pip install -r requirements.txt
+    pip install -e .
     ```
 
 ## Running
@@ -59,13 +59,13 @@ make run
 
 Make sure the virtual environment is activated, and run:
 ```bash
-PYTHONPATH=. python pypost/main.py
+pypost
 ```
 
 ## Development
 
 Additional commands for developers are available in the project:
 
-*   `make lint` — check code with linter (flake8).
+*   `make lint` — check code with Ruff.
 *   `make test` — run tests (pytest).
 *   `make clean` — clean temporary files and virtual environment.

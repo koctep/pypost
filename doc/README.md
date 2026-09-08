@@ -25,7 +25,7 @@ make run
 
 Or manually from the virtual environment:
 ```bash
-python pypost/main.py
+pypost
 ```
 
 ## Interface
