@@ -90,3 +90,57 @@ class MCPClientServiceTests(unittest.TestCase):
                 service.run("http://localhost:1080/sse", "list_tools", None)
 
         self.assertEqual(ctx.exception.category, ErrorCategory.UNKNOWN)
+
+
+class MCPClientSessionLifecycleTests(unittest.TestCase):
+    """The session must be entered as a context manager, not merely constructed.
+
+    ClientSession.__aenter__ starts the receive loop; without it initialize()
+    waits for a reply nothing is reading and the call dies on the total timeout.
+    """
+
+    @staticmethod
+    def _patched_transport():
+        streams = AsyncMock()
+        streams.__aenter__.return_value = (MagicMock(), MagicMock())
+        return patch(
+            "pypost.core.mcp_client_service.sse_client", return_value=streams
+        )
+
+    def test_list_tools_enters_the_session(self):
+        service = MCPClientService()
+        session = AsyncMock()
+        session.__aenter__.return_value = session
+        session.list_tools.return_value = MagicMock(
+            model_dump=MagicMock(return_value={"tools": []})
+        )
+
+        with self._patched_transport(), patch(
+            "pypost.core.mcp_client_service.ClientSession", return_value=session
+        ):
+            result = service.run("http://localhost:1080/sse", "list_tools", None)
+
+        session.__aenter__.assert_awaited_once()
+        session.initialize.assert_awaited_once()
+        self.assertEqual(200, result.status_code)
+
+    def test_call_tool_enters_the_session(self):
+        service = MCPClientService()
+        session = AsyncMock()
+        session.__aenter__.return_value = session
+        session.call_tool.return_value = MagicMock(
+            model_dump=MagicMock(return_value={"content": []})
+        )
+
+        with self._patched_transport(), patch(
+            "pypost.core.mcp_client_service.ClientSession", return_value=session
+        ):
+            service.run(
+                "http://localhost:1080/sse",
+                "call_tool",
+                {"name": "echo", "arguments": {"x": 1}},
+            )
+
+        session.__aenter__.assert_awaited_once()
+        session.call_tool.assert_awaited_once_with("echo", {"x": 1})
+

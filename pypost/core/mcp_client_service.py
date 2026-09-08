@@ -99,18 +99,20 @@ class MCPClientService:
             timeout=MCP_CONNECT_TIMEOUT,
             sse_read_timeout=MCP_SSE_READ_TIMEOUT,
         ) as (read_stream, write_stream):
-            session = ClientSession(read_stream, write_stream)
-            await session.initialize()
+            # ClientSession must be entered as a context manager: __aenter__ starts the
+            # receive loop, without which initialize() waits for a reply nothing reads.
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
 
-            if operation == "list_tools":
-                result = await session.list_tools()
-                return result.model_dump(mode="json")
-            elif operation == "call_tool":
-                name = call_params.get("name")
-                if not name:
-                    raise ValueError("call_tool requires 'name' in body")
-                arguments = call_params.get("arguments") or {}
-                result = await session.call_tool(name, arguments)
-                return result.model_dump(mode="json")
-            else:
-                raise ValueError(f"Unknown operation: {operation}")
+                if operation == "list_tools":
+                    result = await session.list_tools()
+                    return result.model_dump(mode="json")
+                elif operation == "call_tool":
+                    name = call_params.get("name")
+                    if not name:
+                        raise ValueError("call_tool requires 'name' in body")
+                    arguments = call_params.get("arguments") or {}
+                    result = await session.call_tool(name, arguments)
+                    return result.model_dump(mode="json")
+                else:
+                    raise ValueError(f"Unknown operation: {operation}")
