@@ -50,32 +50,26 @@ class TestWorkerRaceCondition(unittest.TestCase):
 
     def test_second_send_while_running_does_not_create_second_worker(self):
         """REQ-5.2c: firing a second send while a worker is running must not create another."""
-        from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab
+        from pypost.ui.presenters.request_execution import RequestExecution
         from pypost.models.settings import AppSettings
 
-        app = QApplication.instance() or QApplication([])
+        QApplication.instance() or QApplication([])
 
         request_data = RequestData(id="r1", name="Test", method="GET", url="http://x")
+        execution = RequestExecution(AppSettings(), metrics=MagicMock())
+        key = object()
 
-        rm = MagicMock()
-        rm.find_request.return_value = None
-        rm.get_collections.return_value = []
-        sm = MagicMock()
-        sm.get_open_tabs.return_value = []
-        sm.get_expanded_collections.return_value = []
-        sm.settings = AppSettings()
+        running = MagicMock()
+        running.isRunning.return_value = True
+        execution._by_key[key] = running
 
-        p = TabsPresenter(rm, sm, AppSettings(), metrics=MagicMock())
-        p.add_new_tab(request_data)
-        tab = p.widget.widget(0)
-
-        fake_worker = MagicMock()
-        fake_worker.isRunning.return_value = True
-        tab.worker = fake_worker
-
-        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
-            p._handle_send_request(request_data)
+        with patch(
+            "pypost.ui.presenters.request_execution.RequestWorker"
+        ) as MockWorker:
+            execution.send(key, request_data)
             MockWorker.assert_not_called()
+
+        running.stop.assert_called_once_with()
 
 
 if __name__ == "__main__":

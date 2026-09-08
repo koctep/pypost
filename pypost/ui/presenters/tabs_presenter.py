@@ -9,7 +9,7 @@ from PySide6.QtCore import QObject, Qt, Signal
 
 from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
-from pypost.core.worker import RequestWorker
+from pypost.ui.presenters.request_execution import RequestExecution
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.core.metrics import MetricsManager
@@ -22,9 +22,6 @@ from pypost.core.alert_manager import AlertManager
 from pypost.models.errors import ErrorCategory, ExecutionError
 
 logger = logging.getLogger(__name__)
-
-# How long teardown waits for a cancelled request worker to unwind.
-WORKER_SHUTDOWN_TIMEOUT_MS = 3000
 
 _ERROR_MESSAGES = {
     ErrorCategory.NETWORK: (
@@ -68,8 +65,6 @@ class RequestTab(QWidget):
         self.splitter.addWidget(self.response_view)
         self.layout.addWidget(self.splitter)
 
-        self.worker: RequestWorker | None = None
-
 
 class TabBarWithAddButton(QTabBar):
     """Tab bar that emits layout_changed so '+' button can be repositioned."""
@@ -86,7 +81,11 @@ class TabBarWithAddButton(QTabBar):
 
 
 class TabsPresenter(QObject):
-    """Owns the QTabWidget: opening, closing, restoring tabs and worker lifecycle."""
+    """Owns the QTabWidget: opening, closing and restoring tabs.
+
+    Requests in flight belong to RequestExecution; the slots here are view
+    updates driven by its signals.
+    """
 
     variable_set_requested = Signal(object, str)   # (key: str | None, value: str)
     env_update_requested = Signal(object)           # payload: dict (from RequestWorker)
@@ -112,7 +111,15 @@ class TabsPresenter(QObject):
         self._history_manager = history_manager
         self._template_service = template_service
         self._alert_manager = alert_manager
-        self._workers: set[RequestWorker] = set()
+        self._execution = RequestExecution(
+            settings,
+            metrics=metrics,
+            history_manager=history_manager,
+            template_service=template_service,
+            alert_manager=alert_manager,
+            parent=self,
+        )
+        self._wire_execution_signals()
         logger.debug("TabsPresenter: alert_manager_injected=%s", alert_manager is not None)
         self._current_variables: dict = {}
         self._current_hidden_keys: set = set()
@@ -175,17 +182,9 @@ class TabsPresenter(QObject):
             return
 
         self._tabs.removeTab(index)
-        worker_is_running = (
-            isinstance(tab, RequestTab)
-            and tab.worker is not None
-            and tab.worker.isRunning()
-        )
-        if worker_is_running:
-            tab.worker.stop()
-            # QThread.finished: fires once the thread actually ends, on every
-            # outcome, so the tab outlives the worker exactly as long as it must.
-            tab.worker.finished.connect(tab.deleteLater)
-        else:
+        # A tab whose request is still in flight must outlive the worker: release()
+        # cancels it and defers the deletion until the thread has actually ended.
+        if not self._execution.release(tab, tab.deleteLater):
             tab.deleteLater()
 
         if self._tabs.count() == 0:
@@ -224,32 +223,12 @@ class TabsPresenter(QObject):
 
     def shutdown_workers(self) -> None:
         """Cancel and join every request worker before application teardown."""
-        workers = [worker for worker in self._workers if worker.isRunning()]
-
-        for worker in workers:
-            worker.stop()
-        abandoned = 0
-        for worker in workers:
-            # Bounded: cancellation is cooperative and a worker blocked in a socket
-            # read cannot honour it, so an unbounded join holds the quit for as long
-            # as the request would have taken.
-            if not worker.wait(WORKER_SHUTDOWN_TIMEOUT_MS):
-                abandoned += 1
-
-        if workers:
-            logger.info(
-                "request_workers_shutdown count=%d abandoned=%d",
-                len(workers), abandoned,
-            )
-        if abandoned:
-            logger.warning(
-                "request_workers_shutdown_timeout count=%d timeout_ms=%d",
-                abandoned, WORKER_SHUTDOWN_TIMEOUT_MS,
-            )
+        self._execution.shutdown()
 
     def on_env_variables_changed(self, variables: dict) -> None:
         """Pushes new env vars to all open tabs."""
         self._current_variables = variables
+        self._execution.set_variables(variables)
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
@@ -293,6 +272,7 @@ class TabsPresenter(QObject):
     def apply_settings(self, settings: AppSettings) -> None:
         """Updates font/indent in all tabs."""
         self._settings = settings
+        self._execution.apply_settings(settings)
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
             if isinstance(tab, RequestTab):
@@ -370,6 +350,18 @@ class TabsPresenter(QObject):
         tab.request_editor.save_as_requested.connect(self._handle_save_as_request)
         tab.response_view.variable_set_requested.connect(self.variable_set_requested)
 
+    def _wire_execution_signals(self) -> None:
+        """Requests report back per tab; every slot below is a view update."""
+        self._execution.started.connect(self._on_request_started)
+        self._execution.cancelling.connect(self._on_request_cancelling)
+        self._execution.finished.connect(self._on_request_finished)
+        self._execution.failed.connect(self._on_request_error)
+        self._execution.script_output.connect(self._on_script_output)
+        self._execution.headers_received.connect(self._on_headers_received)
+        self._execution.chunk_received.connect(self._on_chunk_received)
+        self._execution.retry_attempt.connect(self._on_retry_attempt)
+        self._execution.env_update.connect(self.env_update_requested)
+
     def _handle_send_request(self, request_data: RequestData) -> None:
         sender_tab = None
         for i in range(self._tabs.count()):
@@ -381,72 +373,21 @@ class TabsPresenter(QObject):
         if not sender_tab:
             return
 
-        if sender_tab.worker is not None and not sender_tab.worker.isRunning():
-            logger.debug(
-                "stale_worker_cleared method=%s url=%s",
-                request_data.method, request_data.url,
-            )
-            sender_tab.worker = None
-
-        if sender_tab.worker is not None and sender_tab.worker.isRunning():
-            logger.info(
-                "request_stop_requested method=%s url=%s",
-                request_data.method, request_data.url,
-            )
-            sender_tab.worker.stop()
-            sender_tab.request_editor.send_btn.setEnabled(False)
-            sender_tab.request_editor.send_btn.setText("Stopping...")
-            return
-
-        logger.info(
-            "request_send_initiated method=%s url=%s request_id=%s",
-            request_data.method, request_data.url, request_data.id,
-        )
-
-        sender_tab.response_view.clear_body()
-        sender_tab.request_editor.send_btn.setText("Stop")
-
         collection_name = None
         result = self._request_manager.find_request(request_data.id)
         if result:
             _, found_collection = result
             collection_name = found_collection.name
 
-        worker = RequestWorker(
-            request_data,
-            variables=self._current_variables,
-            metrics=self._metrics,
-            history_manager=self._history_manager,
-            collection_name=collection_name,
-            template_service=self._template_service,
-            alert_manager=self._alert_manager,
-            default_retry_policy=self._settings.default_retry_policy,
-            request_timeout=self._settings.request_timeout,
-        )
-        worker.request_finished.connect(
-            lambda resp: self._on_request_finished(sender_tab, resp)
-        )
-        worker.error.connect(lambda err: self._on_request_error(sender_tab, err))
-        worker.env_update.connect(lambda vars: self.env_update_requested.emit(vars))
-        worker.script_output.connect(
-            lambda logs, err: self._on_script_output(sender_tab, logs, err)
-        )
-        worker.chunk_received.connect(lambda chunk: self._on_chunk_received(sender_tab, chunk))
-        worker.headers_received.connect(
-            lambda status, headers: self._on_headers_received(sender_tab, status, headers)
-        )
-        worker.retry_attempt.connect(
-            lambda attempt, max_r, _err, tab=sender_tab: self._on_retry_attempt(
-                tab, attempt, max_r
-            )
-        )
-        # Disposal hangs off the thread's own completion rather than the result
-        # signals: those fire from inside run(), and neither covers every outcome.
-        worker.finished.connect(worker.deleteLater)
-        worker.finished.connect(lambda w=worker: self._workers.discard(w))
-        sender_tab.worker = worker
-        self._workers.add(worker)
-        worker.start()
+        self._execution.send(sender_tab, request_data, collection_name)
+
+    def _on_request_started(self, tab: RequestTab) -> None:
+        tab.response_view.clear_body()
+        tab.request_editor.send_btn.setText("Stop")
+
+    def _on_request_cancelling(self, tab: RequestTab) -> None:
+        tab.request_editor.send_btn.setEnabled(False)
+        tab.request_editor.send_btn.setText("Stopping...")
 
     def load_request_from_history(self, request_data: RequestData) -> None:
         """Opens a new scratch tab pre-populated with data from a history entry."""
@@ -530,7 +471,6 @@ class TabsPresenter(QObject):
     def _reset_tab_ui_state(self, tab: RequestTab) -> None:
         tab.request_editor.send_btn.setEnabled(True)
         tab.request_editor.send_btn.setText("Send")
-        tab.worker = None
 
     def _position_add_tab_button(self) -> None:
         tab_count = self._tabs.count()

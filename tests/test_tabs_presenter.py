@@ -2,11 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtWidgets import QApplication
 
-from pypost.ui.presenters.tabs_presenter import (
-    WORKER_SHUTDOWN_TIMEOUT_MS,
-    RequestTab,
-    TabsPresenter,
-)
+from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 
@@ -96,23 +92,32 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(p.widget.count(), 1)
         closed_tab.deleteLater.assert_called_once_with()
 
-    def test_close_tab_stops_worker_before_deleting_tab(self):
+    def test_close_tab_defers_deletion_while_a_request_is_in_flight(self):
         p = self._make_presenter()
         p.add_new_tab()
         p.add_new_tab()
         closed_tab = p.widget.widget(0)
         closed_tab.deleteLater = MagicMock()
-        worker = MagicMock()
-        worker.isRunning.return_value = True
-        closed_tab.worker = worker
+        p._execution = MagicMock()
+        p._execution.release.return_value = True  # something was still running
 
         p.close_tab(0)
 
-        worker.stop.assert_called_once_with()
+        p._execution.release.assert_called_once_with(
+            closed_tab, closed_tab.deleteLater
+        )
         closed_tab.deleteLater.assert_not_called()
-        # QThread.finished, not the result signal: it fires on every outcome.
-        worker.finished.connect.assert_called_once_with(closed_tab.deleteLater)
-        worker.error.connect.assert_not_called()
+
+    def test_close_tab_deletes_immediately_when_nothing_is_running(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        closed_tab = p.widget.widget(0)
+        closed_tab.deleteLater = MagicMock()
+
+        p.close_tab(0)
+
+        closed_tab.deleteLater.assert_called_once_with()
 
     def test_close_tab_ignores_invalid_index(self):
         p = self._make_presenter()
@@ -129,57 +134,13 @@ class TestTabsPresenter(unittest.TestCase):
         p.close_tab(0)
         self.assertEqual(p.widget.count(), 1)
 
-    def test_shutdown_workers_stops_all_running_workers_before_waiting(self):
+    def test_shutdown_workers_delegates_to_the_execution(self):
         p = self._make_presenter()
-        p.add_new_tab()
-        first_tab = p.widget.widget(0)
-        first_worker = MagicMock()
-        first_worker.isRunning.return_value = True
-        first_tab.worker = first_worker
-        p.add_new_tab()
-        second_tab = p.widget.widget(1)
-        second_worker = MagicMock()
-        second_worker.isRunning.return_value = True
-        second_tab.worker = second_worker
-        p._workers.update({first_worker, second_worker})
+        p._execution = MagicMock()
 
         p.shutdown_workers()
 
-        first_worker.stop.assert_called_once_with()
-        second_worker.stop.assert_called_once_with()
-        first_worker.wait.assert_called_once_with(WORKER_SHUTDOWN_TIMEOUT_MS)
-        second_worker.wait.assert_called_once_with(WORKER_SHUTDOWN_TIMEOUT_MS)
-
-    def test_shutdown_workers_waits_for_worker_from_closed_tab(self):
-        p = self._make_presenter()
-        p.add_new_tab()
-        p.add_new_tab()
-        closed_tab = p.widget.widget(0)
-        worker = MagicMock()
-        worker.isRunning.return_value = True
-        closed_tab.worker = worker
-        p._workers.add(worker)
-
-        p.close_tab(0)
-        p.shutdown_workers()
-
-        self.assertEqual(worker.stop.call_count, 2)
-        worker.wait.assert_called_once_with(WORKER_SHUTDOWN_TIMEOUT_MS)
-
-    def test_shutdown_workers_gives_up_on_a_worker_that_will_not_stop(self):
-        p = self._make_presenter()
-        p.add_new_tab()
-        tab = p.widget.widget(0)
-        stuck = MagicMock()
-        stuck.isRunning.return_value = True
-        stuck.wait.return_value = False  # still running when the timeout expires
-        tab.worker = stuck
-        p._workers.add(stuck)
-
-        p.shutdown_workers()  # must return rather than block on the stuck worker
-
-        stuck.stop.assert_called_once_with()
-        stuck.wait.assert_called_once_with(WORKER_SHUTDOWN_TIMEOUT_MS)
+        p._execution.shutdown.assert_called_once_with()
 
     def test_restore_tabs_opens_saved_tabs(self):
         req = _make_request("r1", "Saved Request")
@@ -249,11 +210,48 @@ class TestTabsPresenter(unittest.TestCase):
         p.add_new_tab(req)
         tab = p.widget.widget(0)
 
-        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as worker_class:
+        with patch(
+            "pypost.ui.presenters.request_execution.RequestWorker"
+        ) as worker_class:
             worker_class.return_value.isRunning.return_value = False
             tab.request_editor.send_requested.emit(req)
 
         p._metrics.track_request_sent.assert_not_called()
+
+    def test_send_forwards_the_owning_collection_name(self):
+        req = _make_request("r1", "Test", "GET")
+        rm = FakeRequestManager([req])
+        p = TabsPresenter(rm, FakeStateManager(), AppSettings(), metrics=MagicMock())
+        p.add_new_tab(req)
+        tab = p.widget.widget(0)
+        p._execution = MagicMock()
+
+        tab.request_editor.send_requested.emit(req)
+
+        p._execution.send.assert_called_once()
+        sent_tab, sent_request, collection_name = p._execution.send.call_args[0]
+        self.assertIs(tab, sent_tab)
+        self.assertEqual(req.id, sent_request.id)
+        self.assertEqual(rm._requests["r1"][1].name, collection_name)
+
+    def test_started_puts_the_tab_into_the_sending_state(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+
+        p._on_request_started(tab)
+
+        self.assertEqual("Stop", tab.request_editor.send_btn.text())
+
+    def test_cancelling_disables_the_send_control(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+
+        p._on_request_cancelling(tab)
+
+        self.assertEqual("Stopping...", tab.request_editor.send_btn.text())
+        self.assertFalse(tab.request_editor.send_btn.isEnabled())
 
     def test_finished_does_not_duplicate_transport_response_metric(self):
         from pypost.models.response import ResponseData
@@ -509,7 +507,9 @@ class TestTabsPresenterAlertManagerPropagation(unittest.TestCase):
         p.add_new_tab(req)
         tab = p.widget.widget(0)
 
-        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
+        with patch(
+            "pypost.ui.presenters.request_execution.RequestWorker"
+        ) as MockWorker:
             mock_worker_instance = MagicMock()
             mock_worker_instance.isRunning.return_value = False
             MockWorker.return_value = mock_worker_instance
@@ -527,7 +527,9 @@ class TestTabsPresenterAlertManagerPropagation(unittest.TestCase):
         p.add_new_tab(req)
         tab = p.widget.widget(0)
 
-        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as MockWorker:
+        with patch(
+            "pypost.ui.presenters.request_execution.RequestWorker"
+        ) as MockWorker:
             mock_worker_instance = MagicMock()
             mock_worker_instance.isRunning.return_value = False
             MockWorker.return_value = mock_worker_instance
