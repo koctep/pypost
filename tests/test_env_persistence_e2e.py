@@ -2,6 +2,7 @@ import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager
@@ -97,9 +98,9 @@ def test_hidden_toggle_persists_and_reveal_keeps_original_value(qapp):  # noqa: 
                 dialog.on_env_selected(0)
                 assert dialog.vars_table.item(0, 1).text() == HIDDEN_MASK
 
-                hidden_cb = dialog._get_hidden_checkbox(0)
-                assert hidden_cb is not None
-                hidden_cb.setChecked(False)
+                dialog.vars_table.item(0, 2).setCheckState(
+                    Qt.CheckState.Unchecked,
+                )
                 assert dialog.vars_table.item(0, 1).text() == "secret"
                 assert environments[0].hidden_keys == set()
 

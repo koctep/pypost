@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
-    QWidget,
 )
 
 from pypost.core.environment_ops import clone_environment
@@ -170,25 +169,31 @@ class EnvironmentDialog(QDialog):
         self.load_list()
         self.env_list.setCurrentRow(insert_at)
 
-    def _make_hidden_checkbox(self, checked: bool = False) -> QWidget:
-        """Create a centered checkbox widget for the Hidden column."""
-        widget = QWidget()
-        cb = QCheckBox()
-        cb.setChecked(checked)
-        cb.toggled.connect(self._on_hidden_toggled)
-        layout = QHBoxLayout(widget)
-        layout.addWidget(cb)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setContentsMargins(0, 0, 0, 0)
-        return widget
+    def _make_hidden_item(self, checked: bool = False) -> QTableWidgetItem:
+        """Create a checkable item for the Hidden column.
 
-    def _get_hidden_checkbox(self, row: int) -> QCheckBox | None:
-        """Return the QCheckBox for the given table row."""
-        widget = self.vars_table.cellWidget(row, COL_HIDDEN)
-        if widget:
-            cb = widget.findChild(QCheckBox)
-            return cb
-        return None
+        A checkable item is used rather than a cell widget: Qt 6.11 crashes when a
+        QTableWidget cell widget is clicked repeatedly, and the item carries the same
+        state without an extra child widget to keep alive.
+        """
+        item = QTableWidgetItem()
+        item.setFlags(
+            Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+            | Qt.ItemFlag.ItemIsUserCheckable
+        )
+        item.setCheckState(
+            Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked,
+        )
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        return item
+
+    def _is_hidden(self, row: int) -> bool:
+        """Return the Hidden check state for the given table row."""
+        item = self.vars_table.item(row, COL_HIDDEN)
+        if item is None:
+            return False
+        return item.checkState() == Qt.CheckState.Checked
 
     def _make_value_item(self, value: str, is_hidden: bool) -> QTableWidgetItem:
         """Build a table item for value column preserving hidden real value in UserRole."""
@@ -230,64 +235,63 @@ class EnvironmentDialog(QDialog):
             is_hidden = k in env.hidden_keys
             value_item = self._make_value_item(v, is_hidden)
             self.vars_table.setItem(i, COL_VAL, value_item)
-            self.vars_table.setCellWidget(
-                i, COL_HIDDEN, self._make_hidden_checkbox(is_hidden),
+            self.vars_table.setItem(
+                i, COL_HIDDEN, self._make_hidden_item(is_hidden),
             )
 
         # Empty last row for adding new variables
-        self.vars_table.setCellWidget(
+        self.vars_table.setItem(
             len(env.variables), COL_HIDDEN,
-            self._make_hidden_checkbox(False),
+            self._make_hidden_item(False),
         )
 
         self.vars_table.blockSignals(False)
 
-    def _on_hidden_toggled(self, checked: bool) -> None:
-        """Handle hidden checkbox toggle for a variable row."""
+    def _on_hidden_changed(self, item: QTableWidgetItem) -> None:
+        """Handle the Hidden check state changing for a variable row."""
         env_row = self.env_list.currentRow()
         if env_row < 0:
             return
         env = self.environments[env_row]
 
-        # Find which table row this checkbox belongs to
-        sender = self.sender()
-        for i in range(self.vars_table.rowCount()):
-            cb = self._get_hidden_checkbox(i)
-            if cb is sender:
-                k_item = self.vars_table.item(i, COL_VAR)
-                if not k_item or not k_item.text():
-                    return
-                key = k_item.text()
-                self.vars_table.blockSignals(True)
-                if checked:
-                    env.hidden_keys.add(key)
-                    val_item = self.vars_table.item(i, COL_VAL)
-                    real_val = self._extract_real_value(
-                        val_item,
-                        env.variables.get(key, ""),
-                    )
-                    masked_item = self._make_value_item(real_val, True)
-                    self.vars_table.setItem(
-                        i, COL_VAL, masked_item,
-                    )
-                else:
-                    env.hidden_keys.discard(key)
-                    val_item = self.vars_table.item(i, COL_VAL)
-                    real_val = self._extract_real_value(
-                        val_item,
-                        env.variables.get(key, ""),
-                    )
-                    self.vars_table.setItem(
-                        i, COL_VAL, self._make_value_item(real_val, False),
-                    )
-                self.vars_table.blockSignals(False)
-                logger.info(
-                    "env_hidden_flag_changed env_name=%s key=%s hidden=%s",
-                    env.name,
-                    key,
-                    checked,
-                )
-                return
+        row = item.row()
+        k_item = self.vars_table.item(row, COL_VAR)
+        if not k_item or not k_item.text():
+            return
+
+        key = k_item.text()
+        checked = item.checkState() == Qt.CheckState.Checked
+        val_item = self.vars_table.item(row, COL_VAL)
+        real_val = self._extract_real_value(
+            val_item,
+            env.variables.get(key, ""),
+        )
+
+        self.vars_table.blockSignals(True)
+        if checked:
+            env.hidden_keys.add(key)
+        else:
+            env.hidden_keys.discard(key)
+        if val_item is None:
+            self.vars_table.setItem(
+                row, COL_VAL, self._make_value_item(real_val, checked),
+            )
+        elif checked:
+            # Mutate in place rather than replacing the item: replacing it while Qt
+            # dispatches itemChanged can free the native item still in use.
+            val_item.setData(Qt.ItemDataRole.UserRole, real_val)
+            val_item.setText(HIDDEN_MASK)
+        else:
+            val_item.setData(Qt.ItemDataRole.UserRole, None)
+            val_item.setText(real_val)
+        self.vars_table.blockSignals(False)
+
+        logger.info(
+            "env_hidden_flag_changed env_name=%s key=%s hidden=%s",
+            env.name,
+            key,
+            checked,
+        )
 
     def on_var_changed(self, item):
         env_row = self.env_list.currentRow()
@@ -296,6 +300,10 @@ class EnvironmentDialog(QDialog):
 
         env = self.environments[env_row]
 
+        if item.column() == COL_HIDDEN:
+            self._on_hidden_changed(item)
+            return
+
         # Add new row if editing last
         if item.row() == self.vars_table.rowCount() - 1:
             if item.text():
@@ -303,10 +311,10 @@ class EnvironmentDialog(QDialog):
                 self.vars_table.setRowCount(
                     self.vars_table.rowCount() + 1,
                 )
-                self.vars_table.setCellWidget(
+                self.vars_table.setItem(
                     self.vars_table.rowCount() - 1,
                     COL_HIDDEN,
-                    self._make_hidden_checkbox(False),
+                    self._make_hidden_item(False),
                 )
                 self.vars_table.blockSignals(False)
 
@@ -316,11 +324,10 @@ class EnvironmentDialog(QDialog):
         for i in range(self.vars_table.rowCount()):
             k_item = self.vars_table.item(i, COL_VAR)
             v_item = self.vars_table.item(i, COL_VAL)
-            cb = self._get_hidden_checkbox(i)
 
             if k_item and k_item.text():
                 key = k_item.text()
-                is_hidden = cb.isChecked() if cb else False
+                is_hidden = self._is_hidden(i)
                 if is_hidden:
                     new_hidden.add(key)
                     val = self._extract_real_value(

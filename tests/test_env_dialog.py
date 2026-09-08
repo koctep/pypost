@@ -2,6 +2,7 @@
 import pytest
 from unittest.mock import patch
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QTableWidgetItem
 
 from pypost.models.models import Environment
@@ -104,9 +105,7 @@ class TestEnvironmentDialog:
             dlg.on_env_selected(0)
             assert dlg.vars_table.columnCount() == 3
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
-            hidden_cb = dlg._get_hidden_checkbox(0)
-            assert hidden_cb is not None
-            assert hidden_cb.isChecked()
+            assert dlg._is_hidden(0)
         finally:
             dlg.close()
 
@@ -115,12 +114,11 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
-            hidden_cb = dlg._get_hidden_checkbox(0)
-            assert hidden_cb is not None
-            hidden_cb.setChecked(True)
+            hidden_item = dlg.vars_table.item(0, 2)
+            hidden_item.setCheckState(Qt.CheckState.Checked)
             assert "API_KEY" in env.hidden_keys
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
-            hidden_cb.setChecked(False)
+            hidden_item.setCheckState(Qt.CheckState.Unchecked)
             assert "API_KEY" not in env.hidden_keys
             assert dlg.vars_table.item(0, 1).text() == "secret"
         finally:
@@ -141,9 +139,7 @@ class TestEnvironmentDialog:
             masked_item = dlg.vars_table.item(0, 1)
             assert masked_item is edited_item
             assert masked_item.text() == HIDDEN_MASK
-            hidden_cb = dlg._get_hidden_checkbox(0)
-            assert hidden_cb is not None
-            hidden_cb.setChecked(False)
+            dlg.vars_table.item(0, 2).setCheckState(Qt.CheckState.Unchecked)
             assert dlg.vars_table.item(0, 1).text() == "new"
             assert env.hidden_keys == set()
         finally:
@@ -162,5 +158,39 @@ class TestEnvironmentDialog:
             assert env.variables == {"NEW_KEY": "secret"}
             assert env.hidden_keys == {"NEW_KEY"}
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
+        finally:
+            dlg.close()
+
+    def test_hidden_column_uses_checkable_item_not_cell_widget(self, qapp):
+        """Qt 6.11 segfaults on repeated clicks into a QTableWidget cell widget.
+
+        The Hidden column must therefore carry its state on the item itself. This
+        asserts the structure, not the absence of the crash -- reproducing that needs
+        a real display and cannot run headless.
+        """
+        env = Environment(
+            name="Dev",
+            variables={"API_KEY": "secret"},
+            hidden_keys={"API_KEY"},
+        )
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            for row in range(dlg.vars_table.rowCount()):
+                assert dlg.vars_table.cellWidget(row, 2) is None
+                item = dlg.vars_table.item(row, 2)
+                assert item is not None
+                assert item.flags() & Qt.ItemFlag.ItemIsUserCheckable
+        finally:
+            dlg.close()
+
+    def test_toggling_hidden_on_blank_row_is_ignored(self, qapp):
+        env = Environment(name="Dev", variables={})
+        dlg = EnvironmentDialog([env])
+        try:
+            dlg.on_env_selected(0)
+            dlg.vars_table.item(0, 2).setCheckState(Qt.CheckState.Checked)
+            assert env.hidden_keys == set()
+            assert env.variables == {}
         finally:
             dlg.close()
