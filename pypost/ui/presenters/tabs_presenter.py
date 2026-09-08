@@ -490,6 +490,9 @@ class TabsPresenter(QObject):
                 logger.debug("script_output tab_id=%s line=%s", id(tab), line)
         if err:
             logger.warning("script_error tab_id=%s error=%s", id(tab), err)
+            tab.response_view.set_script_error(err)
+        else:
+            tab.response_view.clear_script_error()
 
     def _on_headers_received(self, tab: RequestTab, status: int, headers: dict) -> None:
         tab.response_view.status_label.setText(f"Status: {status}")

@@ -42,6 +42,14 @@ class ResponseView(QWidget):
         self.status_layout.addWidget(self.size_label)
         self.status_layout.addSpacing(20)
 
+        # Post-script failures are reported here rather than in a dialog: the
+        # response is still worth reading and a modal would cover it.
+        self.script_error_label = QLabel("")
+        self.script_error_label.setStyleSheet("color: #c0392b; font-weight: bold;")
+        self.script_error_label.hide()
+        self.status_layout.addWidget(self.script_error_label)
+        self.status_layout.addSpacing(20)
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search...")
         self.search_input.setClearButtonEnabled(True)
@@ -265,6 +273,22 @@ class ResponseView(QWidget):
         self.size_label.setText("Size: -")
         self.search_input.clear()
         self.search_status_label.setText("")
+        self.clear_script_error()
+
+    def set_script_error(self, error: str) -> None:
+        """Shows a post-script failure beside the response status."""
+        if not error:
+            self.clear_script_error()
+            return
+        first_line = str(error).strip().splitlines()[0]
+        self.script_error_label.setText(f"Script error: {first_line}")
+        self.script_error_label.setToolTip(str(error))
+        self.script_error_label.show()
+
+    def clear_script_error(self) -> None:
+        self.script_error_label.clear()
+        self.script_error_label.setToolTip("")
+        self.script_error_label.hide()
 
     def append_body(self, text):
         """Appends text to the response body."""

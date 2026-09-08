@@ -110,8 +110,12 @@ class RequestWorker(QThread):
                     result.execution_error.category,
                     result.execution_error.detail,
                 )
-                self.error.emit(result.execution_error)
-                return
+                # A post-script failure leaves a real response behind. Report it
+                # through script_output, already emitted above, and still deliver
+                # the response rather than discarding it.
+                if result.execution_error.category is not ErrorCategory.SCRIPT:
+                    self.error.emit(result.execution_error)
+                    return
 
             stopped = self._stop_event.is_set()
             logger.debug(

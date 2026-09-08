@@ -90,6 +90,43 @@ class TestRequestWorkerError(unittest.TestCase):
         self.assertEqual(errors, [exc])
         self.assertEqual(finished, [])
 
+    def test_script_error_still_delivers_the_response(self):
+        from pypost.models.response import ResponseData
+        from pypost.core.request_service import ExecutionResult
+
+        worker = self._make_worker()
+        errors = []
+        finished = []
+        script_output = []
+        worker.error.connect(errors.append)
+        worker.finished.connect(finished.append)
+        worker.script_output.connect(
+            lambda logs, err: script_output.append((logs, err))
+        )
+
+        resp = ResponseData(
+            status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2
+        )
+        result = ExecutionResult(
+            response=resp,
+            updated_variables={},
+            script_logs=[],
+            script_error="NameError: x not defined",
+            execution_error=ExecutionError(
+                category=ErrorCategory.SCRIPT,
+                message="Post-script execution failed.",
+                detail="NameError: x not defined",
+            ),
+        )
+
+        with patch.object(worker.service, "execute", return_value=result):
+            worker.run()
+
+        self.assertEqual([], errors)
+        self.assertEqual(1, len(finished))
+        self.assertEqual(200, finished[0].status_code)
+        self.assertEqual([([], "NameError: x not defined")], script_output)
+
     def test_worker_forwards_request_timeout_to_service(self):
         worker = RequestWorker(
             RequestData(method="GET", url="http://x"),

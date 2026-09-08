@@ -334,6 +334,42 @@ class TestTabsPresenter(unittest.TestCase):
         p._handle_save_request(req)
         self.assertEqual(len(received), 1)
 
+    def test_script_error_is_shown_beside_the_response(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+
+        p._on_script_output(tab, [], "NameError: x not defined\n  at line 3")
+
+        label = tab.response_view.script_error_label
+        self.assertTrue(label.isVisibleTo(tab.response_view))
+        self.assertIn("NameError: x not defined", label.text())
+        self.assertNotIn("at line 3", label.text())
+        self.assertIn("at line 3", label.toolTip())
+
+    def test_script_error_is_cleared_on_a_clean_run(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+
+        p._on_script_output(tab, [], "boom")
+        p._on_script_output(tab, [], None)
+
+        self.assertEqual("", tab.response_view.script_error_label.text())
+        self.assertFalse(
+            tab.response_view.script_error_label.isVisibleTo(tab.response_view)
+        )
+
+    def test_clear_body_drops_a_stale_script_error(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+
+        p._on_script_output(tab, [], "boom")
+        tab.response_view.clear_body()
+
+        self.assertEqual("", tab.response_view.script_error_label.text())
+
     def test_overwrite_save_tolerates_a_blank_tab(self):
         req = _make_request("r1", "Existing")
         rm = FakeRequestManager([req])
