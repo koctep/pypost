@@ -19,7 +19,9 @@ class MetricsManager:
         self.registry = CollectorRegistry()
         self.server_instance = None
         self.thread = None
-        self.server_lock = threading.Lock()
+        # Reentrant: start_server takes this lock and then calls stop_server,
+        # which takes it again.
+        self.server_lock = threading.RLock()
 
         # Define metrics
         self._init_metrics()
