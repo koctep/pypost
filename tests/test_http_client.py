@@ -53,6 +53,17 @@ class TestHTTPClientSendRequest(unittest.TestCase):
 
         self.assertEqual(client.session.request.call_args.kwargs["timeout"], 17.0)
 
+    def test_transport_metrics_are_recorded_once(self):
+        metrics = MagicMock()
+        client = HTTPClient(metrics=metrics, template_service=TemplateService())
+        client.session = MagicMock()
+        client.session.request.return_value = _make_response(status=201)
+
+        client.send_request(RequestData(method="POST", url="http://x"))
+
+        metrics.track_request_sent.assert_called_once_with("POST")
+        metrics.track_response_received.assert_called_once_with("POST", "201")
+
     def test_template_variables_substituted_in_url(self):
         self.mock_session.request.return_value = _make_response(status=200)
         req = RequestData(method="GET", url="{{ base }}/api")

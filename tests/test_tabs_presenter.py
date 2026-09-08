@@ -186,6 +186,37 @@ class TestTabsPresenter(unittest.TestCase):
         p.handle_new_tab("test_source")
         self.assertEqual(p.widget.count(), 1)
 
+    def test_send_does_not_duplicate_transport_request_metric(self):
+        p = self._make_presenter()
+        req = _make_request("r1", "Test", "GET")
+        p.add_new_tab(req)
+        tab = p.widget.widget(0)
+
+        with patch("pypost.ui.presenters.tabs_presenter.RequestWorker") as worker_class:
+            worker_class.return_value.isRunning.return_value = False
+            tab.request_editor.send_requested.emit(req)
+
+        p._metrics.track_request_sent.assert_not_called()
+
+    def test_finished_does_not_duplicate_transport_response_metric(self):
+        from pypost.models.response import ResponseData
+
+        p = self._make_presenter()
+        req = _make_request("r1", "Test", "GET")
+        p.add_new_tab(req)
+        tab = p.widget.widget(0)
+        response = ResponseData(
+            status_code=200,
+            headers={},
+            body="ok",
+            elapsed_time=0.1,
+            size=2,
+        )
+
+        p._on_request_finished(tab, response)
+
+        p._metrics.track_response_received.assert_not_called()
+
     def test_handle_close_tab_closes_current(self):
         p = self._make_presenter()
         p.add_new_tab()

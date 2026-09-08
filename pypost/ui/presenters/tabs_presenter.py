@@ -372,8 +372,6 @@ class TabsPresenter(QObject):
             "request_send_initiated method=%s url=%s request_id=%s",
             request_data.method, request_data.url, request_data.id,
         )
-        if self._metrics:
-            self._metrics.track_request_sent(request_data.method)
 
         sender_tab.response_view.clear_body()
         sender_tab.request_editor.send_btn.setText("Stop")
@@ -431,8 +429,6 @@ class TabsPresenter(QObject):
             "request_finished method=%s status_code=%s elapsed_time=%.3fs size=%s",
             method, response.status_code, response.elapsed_time, response.size,
         )
-        if self._metrics:
-            self._metrics.track_response_received(method, str(response.status_code))
         tab.response_view.display_response(response)
         self._reset_tab_ui_state(tab)
         tab.response_view.status_label.setText(f"Status: {response.status_code}")
