@@ -6,9 +6,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from pypost.core.config_manager import ConfigManager
+from pypost.core.state_manager import StateManager
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
-from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.ui.widgets.mixins import HIDDEN_MASK
@@ -50,9 +50,8 @@ def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa
             with patch("pypost.core.config_manager.user_config_dir", return_value=td):
                 presenter = EnvPresenter(
                     storage=storage,
-                    config_manager=ConfigManager(),
+                    state_manager=StateManager(ConfigManager()),
                     mcp_manager=_FakeMCPManager(),
-                    settings=AppSettings(),
                     get_collections=_empty_collections,
                 )
                 presenter.load_environments()
@@ -70,9 +69,8 @@ def test_env_with_hidden_keys_survives_presenter_save_and_restart(qapp):  # noqa
 
                 presenter_after_restart = EnvPresenter(
                     storage=storage,
-                    config_manager=ConfigManager(),
+                    state_manager=StateManager(ConfigManager()),
                     mcp_manager=_FakeMCPManager(),
-                    settings=AppSettings(),
                     get_collections=_empty_collections,
                 )
                 presenter_after_restart.load_environments()

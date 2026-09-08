@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QObject, Signal
 
 from pypost.core.storage import StorageManager
-from pypost.core.config_manager import ConfigManager
+from pypost.core.state_manager import StateManager
 from pypost.core.mcp_server import MCPServerManager
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
@@ -27,17 +27,15 @@ class EnvPresenter(QObject):
     def __init__(
         self,
         storage: StorageManager,
-        config_manager: ConfigManager,
+        state_manager: StateManager,
         mcp_manager: MCPServerManager,
-        settings: AppSettings,
         get_collections: Callable,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._storage = storage
-        self._config_manager = config_manager
+        self._state_manager = state_manager
         self._mcp_manager = mcp_manager
-        self._settings = settings
         self._get_collections = get_collections
         self._environments: list[Environment] = []
         self._current_env_index: int = 0
@@ -165,9 +163,13 @@ class EnvPresenter(QObject):
         """Shortcut handler — opens EnvironmentDialog."""
         self._open_env_manager()
 
+    @property
+    def _settings(self) -> AppSettings:
+        """Read-only view of the settings StateManager owns."""
+        return self._state_manager.settings
+
     def apply_settings(self, settings: AppSettings) -> None:
-        """Use the same settings instance as the other application services."""
-        self._settings = settings
+        """Push what MCP caches; the settings themselves belong to StateManager."""
         self._mcp_manager.set_request_timeout(settings.request_timeout)
 
     def _on_env_changed(self, index: int) -> None:
@@ -180,7 +182,7 @@ class EnvPresenter(QObject):
                 "env_selected env_id=%s env_name=%s mcp_enabled=%s var_count=%d",
                 selected.id, selected.name, selected.enable_mcp, len(selected.variables),
             )
-            self._settings.last_environment_id = selected.id
+            self._state_manager.set_last_environment_id(selected.id)
             variables = selected.variables
 
             if selected.enable_mcp:
@@ -194,10 +196,9 @@ class EnvPresenter(QObject):
                 self._mcp_manager.stop_server()
         else:
             logger.info("env_deselected index=%d", index)
-            self._settings.last_environment_id = None
+            self._state_manager.set_last_environment_id(None)
             self._mcp_manager.stop_server()
 
-        self._config_manager.save_config(self._settings)
         self._current_env_index = index
 
         keys = list(variables.keys()) if isinstance(selected, Environment) else None

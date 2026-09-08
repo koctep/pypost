@@ -11,6 +11,24 @@ def qapp():
     yield app
 
 
+class _FakeStateManager:
+    """The real owner semantics, without touching disk."""
+
+    def __init__(self, *_args, **_kwargs):
+        self._settings = AppSettings()
+        self.saves = 0
+
+    @property
+    def settings(self):
+        return self._settings
+
+    def replace_settings(self, settings):
+        if settings is self._settings:
+            return
+        self._settings = settings
+        self.saves += 1
+
+
 def _make_window(qapp):
     """Build a MainWindow with all heavy dependencies mocked."""
     metrics = MagicMock()
@@ -19,7 +37,7 @@ def _make_window(qapp):
         patch("pypost.ui.main_window.StorageManager"),
         patch("pypost.ui.main_window.ConfigManager"),
         patch("pypost.ui.main_window.RequestManager"),
-        patch("pypost.ui.main_window.StateManager") as mock_sm,
+        patch("pypost.ui.main_window.StateManager", _FakeStateManager),
         patch("pypost.ui.main_window.MCPServerManager"),
         patch("pypost.ui.main_window.HistoryManager"),
         patch("pypost.ui.main_window.CollectionsPresenter"),
@@ -32,7 +50,6 @@ def _make_window(qapp):
         patch("pypost.ui.main_window.MainWindow._setup_shortcuts"),
         patch("pypost.ui.main_window.MainWindow.apply_settings"),
     ):
-        mock_sm.return_value.settings = AppSettings()
         from pypost.ui.main_window import MainWindow
         window = MainWindow(metrics=metrics, template_service=template_service)
     # Supply widget stubs that apply_settings references via the explicit loop.

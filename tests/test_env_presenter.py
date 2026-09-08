@@ -23,12 +23,30 @@ class FakeStorage:
         self.saved.append(list(envs))
 
 
-class FakeConfigManager:
-    def __init__(self):
-        self.saved = []
+class FakeStateManager:
+    """Stands in for the single settings owner."""
 
-    def save_config(self, settings):
-        self.saved.append(settings)
+    def __init__(self, settings=None):
+        self._settings = settings or AppSettings()
+        self.saves = 0
+
+    @property
+    def settings(self):
+        return self._settings
+
+    def replace_settings(self, settings):
+        if settings is self._settings:
+            return
+        self._settings = settings
+        self.saves += 1
+
+    def get_last_environment_id(self):
+        return self._settings.last_environment_id
+
+    def set_last_environment_id(self, env_id):
+        if self._settings.last_environment_id != env_id:
+            self._settings.last_environment_id = env_id
+            self.saves += 1
 
 
 class FakeMCPManager:
@@ -68,27 +86,42 @@ class TestEnvPresenter(unittest.TestCase):
 
     def _make_presenter(self, environments=None, collections=None):
         storage = FakeStorage(environments)
-        config = FakeConfigManager()
+        state = FakeStateManager()
         mcp = _make_mcp_manager()
-        settings = AppSettings()
 
         def get_collections():
             return collections or []
 
-        return EnvPresenter(storage, config, mcp, settings, get_collections)
+        return EnvPresenter(storage, state, mcp, get_collections)
 
     def test_widget_is_qwidget(self):
         p = self._make_presenter()
         self.assertIsInstance(p.widget, QWidget)
 
-    def test_apply_settings_updates_settings_reference(self):
+    def test_apply_settings_pushes_the_timeout_to_mcp(self):
         p = self._make_presenter()
-        settings = AppSettings(mcp_port=2345)
+        settings = AppSettings(request_timeout=41)
 
         p.apply_settings(settings)
 
-        self.assertIs(p._settings, settings)
-        self.assertEqual(p._mcp_manager.request_timeout, settings.request_timeout)
+        self.assertEqual(p._mcp_manager.request_timeout, 41)
+
+    def test_settings_are_read_from_the_owner_not_a_local_copy(self):
+        p = self._make_presenter()
+        adopted = AppSettings(mcp_port=2345)
+
+        p._state_manager.replace_settings(adopted)
+
+        self.assertIs(p._settings, adopted)
+
+    def test_selecting_an_environment_records_it_through_the_owner(self):
+        env = _make_env("e1", "Dev")
+        p = self._make_presenter([env])
+        p.load_environments()
+
+        p.env_selector.setCurrentIndex(1)
+
+        self.assertEqual("e1", p._state_manager.get_last_environment_id())
 
     def test_load_environments_populates_combo(self):
         envs = [_make_env("e1", "Production"), _make_env("e2", "Staging")]

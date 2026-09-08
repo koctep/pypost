@@ -145,6 +145,32 @@ class TestStateManagerPersistence(unittest.TestCase):
         self.assertEqual([], sm.get_expanded_collections())
         self.assertEqual([], sm.get_open_tabs())
 
+    def test_replace_settings_is_adopted_and_persisted(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+        adopted = AppSettings(font_size=21, mcp_port=2345)
+
+        sm.replace_settings(adopted)
+
+        self.assertIs(adopted, sm.settings)
+        self.assertEqual(21, StateManager(ConfigManager()).settings.font_size)
+
+    def test_replace_settings_with_the_same_object_skips_save(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+
+        with patch.object(cm, "save_config", wraps=cm.save_config) as wrapped:
+            sm.replace_settings(sm.settings)
+            wrapped.assert_not_called()
+
+    def test_typed_accessors_follow_a_replaced_settings_object(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+
+        sm.replace_settings(AppSettings(last_environment_id="env-7"))
+
+        self.assertEqual("env-7", sm.get_last_environment_id())
+
     def test_set_expanded_collections_noop_skips_save(self):
         cm, _td = self._cm_and_td()
         sm = StateManager(cm)

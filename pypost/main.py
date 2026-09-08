@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QApplication
 from pypost.ui.main_window import MainWindow
 from pypost.ui.styles.custom_style import PyPostStyle
 from pypost.core.config_manager import ConfigManager
+from pypost.core.state_manager import StateManager
 from pypost.core.metrics import MetricsManager
 from pypost.core.template_service import TemplateService
 from pypost.core.alert_manager import AlertManager
@@ -23,7 +24,8 @@ def main():
 
     # Initialize Config and Metrics
     config_manager = ConfigManager()
-    settings = config_manager.load_config()
+    state_manager = StateManager(config_manager)
+    settings = state_manager.settings
 
     metrics_manager = MetricsManager()
     metrics_manager.start_server(settings.metrics_host, settings.metrics_port)
@@ -52,6 +54,7 @@ def main():
         metrics=metrics_manager,
         template_service=template_service,
         config_manager=config_manager,
+        state_manager=state_manager,
         alert_manager=alert_manager,
     )
     window.show()

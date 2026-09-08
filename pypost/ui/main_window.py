@@ -18,6 +18,7 @@ from pypost.core.metrics import MetricsManager
 from pypost.core.history_manager import HistoryManager
 from pypost.core.template_service import TemplateService
 from pypost.core.alert_manager import AlertManager
+from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.dialogs.hotkeys_dialog import HotkeysDialog
 from pypost.ui.dialogs.about_dialog import AboutDialog
@@ -33,6 +34,7 @@ class MainWindow(QMainWindow):
         metrics: MetricsManager,
         template_service: TemplateService,
         config_manager: ConfigManager | None = None,
+        state_manager: StateManager | None = None,
         alert_manager: AlertManager | None = None,
     ) -> None:
         super().__init__()
@@ -50,8 +52,10 @@ class MainWindow(QMainWindow):
         self._alert_manager = alert_manager
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
         self.request_manager = RequestManager(self.storage)
-        self.state_manager = StateManager(self.config_manager)
-        self.settings = self.state_manager.settings
+        self.state_manager = (
+            state_manager if state_manager is not None
+            else StateManager(self.config_manager)
+        )
         self.style_manager = StyleManager()
         self.mcp_manager = MCPServerManager(
             metrics=self.metrics,
@@ -71,8 +75,8 @@ class MainWindow(QMainWindow):
             alert_manager=self._alert_manager,
         )
         self.env = EnvPresenter(
-            self.storage, self.config_manager, self.mcp_manager,
-            self.settings, self.request_manager.get_collections,
+            self.storage, self.state_manager, self.mcp_manager,
+            self.request_manager.get_collections,
         )
         self._build_layout()
         self._wire_signals()
@@ -86,6 +90,11 @@ class MainWindow(QMainWindow):
         self._shutdown_complete = False
         self.apply_settings(self.settings)
         logger.info("main_window_initialized")
+
+    @property
+    def settings(self) -> AppSettings:
+        """The application settings, owned by StateManager."""
+        return self.state_manager.settings
 
     def _load_icons(self) -> dict:
         d = Path(__file__).parent / 'resources' / 'icons'
@@ -167,8 +176,9 @@ class MainWindow(QMainWindow):
         sc("Ctrl+T", self.tabs.handle_switch_to_script_global)
 
     def apply_settings(self, settings) -> None:
-        self.settings = settings
-        self.state_manager.settings = settings
+        # The single point where a new settings object is adopted; StateManager
+        # persists it and every consumer is refreshed from the same instance.
+        self.state_manager.replace_settings(settings)
         self.env.apply_settings(settings)
         if self._alert_manager is not None:
             self._alert_manager.configure_webhook(
@@ -204,9 +214,7 @@ class MainWindow(QMainWindow):
             self.settings.metrics_host != new_settings.metrics_host
             or self.settings.metrics_port != new_settings.metrics_port
         )
-        self.settings = new_settings
-        self.config_manager.save_config(self.settings)
-        self.apply_settings(self.settings)
+        self.apply_settings(new_settings)
         if metrics_changed:
             logger.info(
                 "metrics_server_restarting host=%s port=%d",
