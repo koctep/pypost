@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import hashlib
 from pathlib import Path
 from typing import List
 from platformdirs import user_data_dir
@@ -14,6 +15,7 @@ class StorageManager:
         self.data_dir = Path(user_data_dir(app_name, app_author))
         self.collections_path = self.data_dir / "collections"
         self.environments_file = self.data_dir / "environments.json"
+        self._collection_files: dict[str, Path] = {}
         self._ensure_paths()
 
     def _ensure_paths(self):
@@ -44,23 +46,40 @@ class StorageManager:
                     e,
                 )
 
+    def _collection_file(self, collection_id: str) -> Path:
+        """Return a stable filename without exposing model data as a path."""
+        digest = hashlib.sha256(collection_id.encode("utf-8")).hexdigest()
+        return self.collections_path / f"{digest}.json"
+
     def save_collection(self, collection: Collection):
         # Ensure collections directory exists before saving (in case it was deleted)
         if not self.collections_path.exists():
             self.collections_path.mkdir(exist_ok=True, parents=True)
 
-        # Simplification: using collection name as filename.
-        file_path = self.collections_path / f"{collection.name}.json"
-        with open(file_path, 'w') as f:
+        file_path = self._collection_file(collection.id)
+        tmp_file = file_path.with_suffix(".json.tmp")
+        with open(tmp_file, 'w') as f:
             f.write(collection.model_dump_json(indent=2))
+        try:
+            os.replace(tmp_file, file_path)
+        except Exception:
+            tmp_file.unlink(missing_ok=True)
+            raise
 
-    def delete_collection(self, collection_name: str):
-        file_path = self.collections_path / f"{collection_name}.json"
-        if file_path.exists():
-            file_path.unlink()
+        previous_file = self._collection_files.get(collection.id)
+        if previous_file is not None and previous_file != file_path:
+            previous_file.unlink(missing_ok=True)
+        self._collection_files[collection.id] = file_path
+
+    def delete_collection(self, collection: Collection):
+        file_path = self._collection_files.pop(
+            collection.id, self._collection_file(collection.id)
+        )
+        file_path.unlink(missing_ok=True)
 
     def load_collections(self) -> List[Collection]:
         collections = []
+        self._collection_files.clear()
         if not self.collections_path.exists():
             return collections
 
@@ -69,7 +88,11 @@ class StorageManager:
                 try:
                     with open(self.collections_path / filename, 'r') as f:
                         data = json.load(f)
-                        collections.append(Collection(**data))
+                        collection = Collection(**data)
+                        collections.append(collection)
+                        self._collection_files[collection.id] = (
+                            self.collections_path / filename
+                        )
                 except Exception as e:
                     logger.warning(
                         "storage_collection_load_failed filename=%s error=%s",

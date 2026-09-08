@@ -101,7 +101,7 @@ class RequestManager:
         logger.info("delete_collection_started collection_id=%s", collection_id)
         for idx, col in enumerate(self.collections):
             if col.id == collection_id:
-                self.storage.delete_collection(col.name)
+                self.storage.delete_collection(col)
                 del self.collections[idx]
                 self._rebuild_index()
                 logger.info(
@@ -168,7 +168,6 @@ class RequestManager:
             if col.id == collection_id:
                 old_name = col.name
                 col.name = normalized_name
-                self.storage.delete_collection(old_name)
                 self.storage.save_collection(col)
                 self._rebuild_index()
                 logger.info(
