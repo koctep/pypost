@@ -44,7 +44,7 @@ class TestRequestWorkerError(unittest.TestCase):
 
         worker = self._make_worker()
         finished = []
-        worker.finished.connect(lambda r: finished.append(r))
+        worker.request_finished.connect(lambda r: finished.append(r))
 
         resp = ResponseData(status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2)
         result = ExecutionResult(
@@ -64,7 +64,7 @@ class TestRequestWorkerError(unittest.TestCase):
         errors = []
         finished = []
         worker.error.connect(errors.append)
-        worker.finished.connect(finished.append)
+        worker.request_finished.connect(finished.append)
         exc = ExecutionError(
             category=ErrorCategory.NETWORK,
             message="no connection",
@@ -99,7 +99,7 @@ class TestRequestWorkerError(unittest.TestCase):
         finished = []
         script_output = []
         worker.error.connect(errors.append)
-        worker.finished.connect(finished.append)
+        worker.request_finished.connect(finished.append)
         worker.script_output.connect(
             lambda logs, err: script_output.append((logs, err))
         )
@@ -192,3 +192,23 @@ class TestRequestWorkerAlertManagerInjection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRequestWorkerThreadSignal(unittest.TestCase):
+    """The result signal must not shadow QThread.finished.
+
+    Disposal of the worker and of a closed tab hangs off the thread's own
+    completion signal; a Signal named `finished` on the subclass replaces it and
+    the thread's completion becomes unobservable.
+    """
+
+    def test_result_signal_does_not_shadow_the_thread_signal(self):
+        from PySide6.QtCore import QThread
+
+        worker = RequestWorker(RequestData(method="GET", url="http://x"))
+
+        self.assertIsNot(
+            type(worker).finished, type(worker).request_finished
+        )
+        self.assertIs(type(worker).finished, QThread.finished)
+

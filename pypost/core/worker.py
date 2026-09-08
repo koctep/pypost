@@ -14,7 +14,9 @@ from pypost.models.retry import RetryPolicy
 logger = logging.getLogger(__name__)
 
 class RequestWorker(QThread):
-    finished = Signal(ResponseData)
+    # Not named `finished`: QThread already defines that signal, and shadowing it
+    # left the thread's own completion unobservable.
+    request_finished = Signal(ResponseData)
     error = Signal(object)  # carries ExecutionError; falls back to str for cancellation
     retry_attempt = Signal(int, int, object)  # attempt, max_retries, ExecutionError
     env_update = Signal(dict)
@@ -122,7 +124,7 @@ class RequestWorker(QThread):
                 "worker_run_completed method=%s url=%s stopped=%s",
                 self.request_data.method, self.request_data.url, stopped,
             )
-            self.finished.emit(result.response)
+            self.request_finished.emit(result.response)
         except ExecutionError as exc:
             logger.error(
                 "RequestWorker failed category=%s detail=%s", exc.category, exc.detail

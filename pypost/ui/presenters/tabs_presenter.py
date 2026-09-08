@@ -182,8 +182,9 @@ class TabsPresenter(QObject):
         )
         if worker_is_running:
             tab.worker.stop()
+            # QThread.finished: fires once the thread actually ends, on every
+            # outcome, so the tab outlives the worker exactly as long as it must.
             tab.worker.finished.connect(tab.deleteLater)
-            tab.worker.error.connect(tab.deleteLater)
         else:
             tab.deleteLater()
 
@@ -422,7 +423,9 @@ class TabsPresenter(QObject):
             default_retry_policy=self._settings.default_retry_policy,
             request_timeout=self._settings.request_timeout,
         )
-        worker.finished.connect(lambda resp: self._on_request_finished(sender_tab, resp))
+        worker.request_finished.connect(
+            lambda resp: self._on_request_finished(sender_tab, resp)
+        )
         worker.error.connect(lambda err: self._on_request_error(sender_tab, err))
         worker.env_update.connect(lambda vars: self.env_update_requested.emit(vars))
         worker.script_output.connect(
@@ -437,10 +440,10 @@ class TabsPresenter(QObject):
                 tab, attempt, max_r
             )
         )
+        # Disposal hangs off the thread's own completion rather than the result
+        # signals: those fire from inside run(), and neither covers every outcome.
         worker.finished.connect(worker.deleteLater)
-        worker.error.connect(worker.deleteLater)
-        worker.finished.connect(lambda _response, w=worker: self._workers.discard(w))
-        worker.error.connect(lambda _error, w=worker: self._workers.discard(w))
+        worker.finished.connect(lambda w=worker: self._workers.discard(w))
         sender_tab.worker = worker
         self._workers.add(worker)
         worker.start()

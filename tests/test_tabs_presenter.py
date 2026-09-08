@@ -110,8 +110,9 @@ class TestTabsPresenter(unittest.TestCase):
 
         worker.stop.assert_called_once_with()
         closed_tab.deleteLater.assert_not_called()
+        # QThread.finished, not the result signal: it fires on every outcome.
         worker.finished.connect.assert_called_once_with(closed_tab.deleteLater)
-        worker.error.connect.assert_called_once_with(closed_tab.deleteLater)
+        worker.error.connect.assert_not_called()
 
     def test_close_tab_ignores_invalid_index(self):
         p = self._make_presenter()
