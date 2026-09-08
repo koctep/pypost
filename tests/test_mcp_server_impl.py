@@ -90,6 +90,21 @@ class TestMCPServerImpl(unittest.TestCase):
         self.assertIn("query", schema["properties"])
         self.assertEqual(set(schema["required"]), {"host", "query"})
 
+    def test_list_tools_schema_supports_bracket_keys_and_filtered_values(self):
+        impl = MCPServerImpl()
+        req = RequestData(
+            name="Echo",
+            expose_as_mcp=True,
+            url='http://example/{{ mcp.request["user-id"] | urlencode }}',
+            headers={"X-Token": "{{ mcp.request.token | upper }}"},
+        )
+
+        impl.register_tools([req])
+        schema = asyncio.run(impl.list_tools())[0].inputSchema
+
+        self.assertEqual(set(schema["properties"]), {"user-id", "token"})
+        self.assertEqual(set(schema["required"]), {"user-id", "token"})
+
     def test_list_tools_empty_when_no_tools(self):
         impl = MCPServerImpl()
         impl.register_tools([])

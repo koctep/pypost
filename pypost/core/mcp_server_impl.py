@@ -4,6 +4,7 @@ from collections import Counter
 from typing import Any, Dict, List, Set
 
 import jinja2
+from jinja2 import nodes
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp.types import TextContent, Tool
@@ -163,35 +164,29 @@ class MCPServerImpl:
             if not content:
                 continue
             try:
-                ast = self._template_service.parse(content)
-                meta_vars = jinja2.meta.find_undeclared_variables(ast)
-                for var in meta_vars:
-                    # check for mcp.request.x pattern
-                    # Jinja2 parses "mcp.request.x" as "mcp" with attributes
-                    # But find_undeclared_variables returns just "mcp".
-                    # We need to manually scan or trust "mcp" implies it.
-                    # Wait, find_undeclared_variables returns top-level names.
-                    # Template {{ mcp.request.foo }} returns just 'mcp'.
-                    # This is not specific enough to know 'foo'.
-
-                    # Alternative: Regex scan more robust for this pattern
-                    # since we look for {{ mcp.request.VAR }}
-                    pass
+                if self._template_service is not None:
+                    ast = self._template_service.parse(content)
+                else:
+                    ast = jinja2.Environment().parse(content)
+                for node in ast.find_all((nodes.Getattr, nodes.Getitem)):
+                    parent = node.node
+                    is_mcp_request = (
+                        isinstance(parent, nodes.Getattr)
+                        and parent.attr == "request"
+                        and isinstance(parent.node, nodes.Name)
+                        and parent.node.name == "mcp"
+                    )
+                    if not is_mcp_request:
+                        continue
+                    if isinstance(node, nodes.Getattr):
+                        vars_found.add(node.attr)
+                    elif (
+                        isinstance(node.arg, nodes.Const)
+                        and isinstance(node.arg.value, str)
+                    ):
+                        vars_found.add(node.arg.value)
             except Exception:
-                pass
-
-        # Regex fallback for deep variable extraction
-        import re
-        # Pattern: {{ mcp.request.VAR_NAME }} or {{ mcp.request['VAR_NAME'] }}
-        # Simple dot notation support
-        pat = r"\{\{\s*mcp\.request\.([a-zA-Z0-9_]+)\s*\}\}"
-        pattern = re.compile(pat)
-
-        for content in content_to_scan:
-            if not content:
-                continue
-            matches = pattern.findall(content)
-            vars_found.update(matches)
+                logger.warning("mcp_schema_template_parse_failed", exc_info=True)
 
         return vars_found
 
