@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import logging.handlers
+import queue
+import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +15,11 @@ import requests
 from platformdirs import user_data_dir
 
 logger = logging.getLogger(__name__)
+
+WEBHOOK_TIMEOUT_SECONDS = 5.0
+# Bounded: an unreachable webhook must not let alerts accumulate without limit.
+WEBHOOK_QUEUE_SIZE = 64
+WEBHOOK_SHUTDOWN_TIMEOUT_SECONDS = 6.0
 
 
 @dataclass
@@ -54,6 +62,9 @@ class AlertManager:
 
         self._webhook_url = webhook_url
         self._webhook_auth_header = webhook_auth_header
+        self._webhook_queue: queue.Queue = queue.Queue(maxsize=WEBHOOK_QUEUE_SIZE)
+        self._webhook_thread: threading.Thread | None = None
+        self._webhook_lock = threading.Lock()
 
         handler = logging.handlers.RotatingFileHandler(
             resolved,
@@ -87,7 +98,8 @@ class AlertManager:
         self._handler = handler  # owned reference for close()
 
     def close(self) -> None:
-        """Release the log handler and remove it from the logger."""
+        """Stop the webhook dispatcher and release the log handler."""
+        self._stop_dispatcher()
         try:
             self._handler.close()
         except Exception:  # noqa: BLE001
@@ -123,21 +135,89 @@ class AlertManager:
             payload.final_error_category, "yes" if self._webhook_url else "no",
         )
         if self._webhook_url:
-            self._send_webhook(payload)
+            self._enqueue_webhook(payload)
 
-    def _send_webhook(self, payload: AlertPayload) -> None:
+    def flush(self, timeout: float | None = None) -> None:
+        """Block until queued webhooks have been attempted.
+
+        For tests and teardown. Each attempt is bounded by the request timeout,
+        so this cannot wait indefinitely on an unreachable endpoint.
+        """
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while self._webhook_queue.unfinished_tasks:
+            if deadline is not None and time.monotonic() >= deadline:
+                logger.warning("alert_webhook_flush_timeout timeout=%.1f", timeout)
+                return
+            time.sleep(0.01)
+
+    def _enqueue_webhook(self, payload: AlertPayload) -> None:
+        """Hand the POST to a background thread.
+
+        emit() runs on the request thread, inside the failure the user is
+        already waiting on. Posting synchronously added the webhook timeout to
+        that wait, for an alert the user never sees.
+
+        The destination is captured here rather than read in the dispatcher, so
+        an alert raised under one configuration is not delivered to another.
+        """
+        item = (payload, self._webhook_url, self._webhook_auth_header)
+        self._ensure_dispatcher()
+        try:
+            self._webhook_queue.put_nowait(item)
+        except queue.Full:
+            logger.warning(
+                "alert_webhook_dropped reason=queue_full url=%r", self._webhook_url
+            )
+
+    def _ensure_dispatcher(self) -> None:
+        with self._webhook_lock:
+            if self._webhook_thread is not None and self._webhook_thread.is_alive():
+                return
+            self._webhook_thread = threading.Thread(
+                target=self._dispatch_webhooks,
+                name="pypost-alert-webhooks",
+                daemon=True,
+            )
+            self._webhook_thread.start()
+
+    def _stop_dispatcher(self) -> None:
+        with self._webhook_lock:
+            thread = self._webhook_thread
+            self._webhook_thread = None
+        if thread is None or not thread.is_alive():
+            return
+        self._webhook_queue.put(None)
+        thread.join(timeout=WEBHOOK_SHUTDOWN_TIMEOUT_SECONDS)
+        if thread.is_alive():
+            logger.warning(
+                "alert_webhook_dispatcher_stop_timeout timeout=%.1f",
+                WEBHOOK_SHUTDOWN_TIMEOUT_SECONDS,
+            )
+
+    def _dispatch_webhooks(self) -> None:
+        while True:
+            item = self._webhook_queue.get()
+            try:
+                if item is None:
+                    return
+                payload, url, auth_header = item
+                self._send_webhook(payload, url, auth_header)
+            finally:
+                self._webhook_queue.task_done()
+
+    def _send_webhook(
+        self, payload: AlertPayload, url: str, auth_header: Optional[str],
+    ) -> None:
         headers = {"Content-Type": "application/json"}
-        if self._webhook_auth_header:
-            headers["Authorization"] = self._webhook_auth_header
+        if auth_header:
+            headers["Authorization"] = auth_header
         try:
             resp = requests.post(
-                self._webhook_url,
+                url,
                 json=payload.to_dict(),
                 headers=headers,
-                timeout=5.0,
+                timeout=WEBHOOK_TIMEOUT_SECONDS,
             )
-            logger.debug("alert_webhook_ok url=%r status=%d", self._webhook_url, resp.status_code)
+            logger.debug("alert_webhook_ok url=%r status=%d", url, resp.status_code)
         except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "alert_webhook_failed url=%r error=%s", self._webhook_url, exc
-            )
+            logger.warning("alert_webhook_failed url=%r error=%s", url, exc)

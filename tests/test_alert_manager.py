@@ -3,11 +3,17 @@ import gc
 import json
 import logging
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from pypost.core.alert_manager import AlertManager, AlertPayload
+from pypost.core.alert_manager import (
+    WEBHOOK_QUEUE_SIZE,
+    AlertManager,
+    AlertPayload,
+)
 
 
 def _make_payload(**kwargs) -> AlertPayload:
@@ -101,6 +107,7 @@ class TestAlertManagerWebhook(unittest.TestCase):
         with patch("pypost.core.alert_manager.requests.post") as mock_post:
             mock_post.return_value = MagicMock(status_code=200)
             mgr.emit(_make_payload())
+            mgr.flush(timeout=2)
         mock_post.assert_called_once()
 
     def test_webhook_not_called_when_url_not_set(self):
@@ -118,6 +125,7 @@ class TestAlertManagerWebhook(unittest.TestCase):
         with patch("pypost.core.alert_manager.requests.post") as mock_post:
             mock_post.return_value = MagicMock(status_code=200)
             mgr.emit(_make_payload())
+            mgr.flush(timeout=2)
         _, kwargs = mock_post.call_args
         self.assertIn("Authorization", kwargs["headers"])
         self.assertEqual(kwargs["headers"]["Authorization"], "Bearer secret-token")
@@ -133,6 +141,7 @@ class TestAlertManagerWebhook(unittest.TestCase):
         ):
             # Must NOT raise
             mgr.emit(_make_payload())
+            mgr.flush(timeout=2)
 
     def test_webhook_timeout_does_not_propagate(self):
         import requests as req_lib
@@ -145,6 +154,7 @@ class TestAlertManagerWebhook(unittest.TestCase):
             side_effect=req_lib.Timeout("timed out"),
         ):
             mgr.emit(_make_payload())
+            mgr.flush(timeout=2)
 
     def test_webhook_sends_json_body(self):
         mgr = AlertManager(
@@ -155,6 +165,7 @@ class TestAlertManagerWebhook(unittest.TestCase):
         with patch("pypost.core.alert_manager.requests.post") as mock_post:
             mock_post.return_value = MagicMock(status_code=200)
             mgr.emit(p)
+            mgr.flush(timeout=2)
         _, kwargs = mock_post.call_args
         self.assertEqual(kwargs["json"], p.to_dict())
 
@@ -166,6 +177,7 @@ class TestAlertManagerWebhook(unittest.TestCase):
         with patch("pypost.core.alert_manager.requests.post") as mock_post:
             mock_post.return_value = MagicMock(status_code=200)
             mgr.emit(_make_payload())
+            mgr.flush(timeout=2)
         _, kwargs = mock_post.call_args
         self.assertEqual(kwargs["timeout"], 5.0)
 
@@ -179,6 +191,7 @@ class TestAlertManagerWebhook(unittest.TestCase):
         with patch("pypost.core.alert_manager.requests.post") as mock_post:
             mock_post.return_value = MagicMock(status_code=200)
             mgr.emit(_make_payload())
+            mgr.flush(timeout=2)
 
         args, kwargs = mock_post.call_args
         self.assertEqual(args[0], "http://hooks.example.com/new")
@@ -231,3 +244,74 @@ class TestAlertManagerAccumulation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAlertWebhookIsOffTheRequestThread(unittest.TestCase):
+    """emit() runs inside the failure the user is waiting on."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.log_path = Path(self.tmpdir) / "alerts.log"
+
+    def _manager(self, **kwargs):
+        mgr = AlertManager(log_path=self.log_path, **kwargs)
+        self.addCleanup(mgr.close)
+        return mgr
+
+    def test_emit_returns_before_a_slow_webhook_completes(self):
+        mgr = self._manager(webhook_url="http://hooks.example.com/alert")
+        release = threading.Event()
+
+        def slow_post(*_args, **_kwargs):
+            release.wait(5)
+            return MagicMock(status_code=200)
+
+        with patch("pypost.core.alert_manager.requests.post", side_effect=slow_post):
+            self.addCleanup(release.set)
+            started = time.monotonic()
+            mgr.emit(_make_payload())
+            elapsed = time.monotonic() - started
+
+            self.assertLess(elapsed, 1.0, "emit() waited for the webhook")
+            release.set()
+            mgr.flush(timeout=3)
+
+    def test_the_destination_is_captured_when_the_alert_is_raised(self):
+        """An alert must not be delivered to a webhook configured after it."""
+        mgr = self._manager(webhook_url="http://hooks.example.com/first")
+        release = threading.Event()
+        posted = []
+
+        def blocking_post(url, **_kwargs):
+            release.wait(5)
+            posted.append(url)
+            return MagicMock(status_code=200)
+
+        with patch(
+            "pypost.core.alert_manager.requests.post", side_effect=blocking_post
+        ):
+            mgr.emit(_make_payload())
+            mgr.configure_webhook("http://hooks.example.com/second", None)
+            release.set()
+            mgr.flush(timeout=3)
+
+        self.assertEqual(["http://hooks.example.com/first"], posted)
+
+    def test_a_full_queue_drops_rather_than_growing(self):
+        mgr = self._manager(webhook_url="http://hooks.example.com/alert")
+        release = threading.Event()
+
+        with patch(
+            "pypost.core.alert_manager.requests.post",
+            side_effect=lambda *a, **k: release.wait(5) or MagicMock(status_code=200),
+        ):
+            self.addCleanup(release.set)
+            for _ in range(WEBHOOK_QUEUE_SIZE + 20):
+                mgr.emit(_make_payload())
+
+            self.assertLessEqual(
+                mgr._webhook_queue.qsize(), WEBHOOK_QUEUE_SIZE
+            )
+            release.set()
+            mgr.flush(timeout=3)
+
