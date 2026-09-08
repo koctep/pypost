@@ -150,9 +150,9 @@ class RequestService:
         for attempt in range(max_retries + 1):  # attempt 0 = first try
             if stop_flag and stop_flag():
                 raise ExecutionError(
-                    category=ErrorCategory.NETWORK,
+                    category=ErrorCategory.CANCELLED,
                     message="Request cancelled",
-                    detail="Cancelled during retry delay",
+                    detail="Cancelled before attempt",
                 )
 
             logger.debug(
@@ -225,7 +225,7 @@ class RequestService:
                         request.method, request.url, attempt,
                     )
                     raise ExecutionError(
-                        category=ErrorCategory.NETWORK,
+                        category=ErrorCategory.CANCELLED,
                         message="Request cancelled",
                         detail="Cancelled during retry delay",
                     )

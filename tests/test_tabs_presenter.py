@@ -462,13 +462,26 @@ class TestOnRequestError(unittest.TestCase):
         from pypost.models.errors import ErrorCategory, ExecutionError
         p, tab = self._make_presenter_with_tab()
         exc = ExecutionError(
-            category=ErrorCategory.UNKNOWN,
-            message="something",
-            detail="request aborted by user",
+            category=ErrorCategory.CANCELLED,
+            message="Request cancelled",
+            detail="Cancelled before attempt",
         )
         with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
             p._on_request_error(tab, exc)
             mock_mb.critical.assert_not_called()
+
+    def test_server_error_mentioning_abort_is_still_reported(self):
+        """Cancellation is a category now, not a word to look for in the detail."""
+        from pypost.models.errors import ErrorCategory, ExecutionError
+        p, tab = self._make_presenter_with_tab()
+        exc = ExecutionError(
+            category=ErrorCategory.UNKNOWN,
+            message="something",
+            detail="Connection aborted by the remote host",
+        )
+        with patch("pypost.ui.presenters.tabs_presenter.QMessageBox") as mock_mb:
+            p._on_request_error(tab, exc)
+            mock_mb.critical.assert_called_once()
 
     def test_execution_error_message_does_not_expose_raw_detail_for_network(self):
         """NETWORK message uses URL not raw detail."""

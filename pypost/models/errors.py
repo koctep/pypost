@@ -4,6 +4,8 @@ from typing import Optional
 
 
 class ErrorCategory(str, enum.Enum):
+    # The user stopped the request. Not a failure, and not reported as one.
+    CANCELLED = "cancelled"
     NETWORK = "network"
     TIMEOUT = "timeout"
     TEMPLATE = "template"

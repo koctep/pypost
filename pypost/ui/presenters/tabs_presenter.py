@@ -10,6 +10,7 @@ from pypost.ui.widgets.request_editor import RequestWidget
 from pypost.ui.widgets.response_view import ResponseView
 from pypost.ui.presenters.request_execution import RequestExecution
 from pypost.ui.presenters.request_store import RequestStore
+from pypost.ui.presenters.error_presentation import describe
 from pypost.core.request_manager import RequestManager
 from pypost.core.state_manager import StateManager
 from pypost.core.metrics import MetricsManager
@@ -19,30 +20,9 @@ from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.save_dialog import SaveRequestDialog
 from pypost.core.template_service import TemplateService
 from pypost.core.alert_manager import AlertManager
-from pypost.models.errors import ErrorCategory, ExecutionError
+from pypost.models.errors import ExecutionError
 
 logger = logging.getLogger(__name__)
-
-_ERROR_MESSAGES = {
-    ErrorCategory.NETWORK: (
-        "Could not connect to {url}. Check that the server is running and reachable."
-    ),
-    ErrorCategory.TIMEOUT: (
-        "Request to {url} timed out. Try increasing the timeout or check server load."
-    ),
-    ErrorCategory.TEMPLATE: (
-        "Template rendering failed: {detail}. Check variable names and syntax."
-    ),
-    ErrorCategory.SCRIPT: (
-        "Post-script execution failed: {detail}. Review the script for errors."
-    ),
-    ErrorCategory.HISTORY: (
-        "History could not be recorded: {detail}."
-    ),
-    ErrorCategory.UNKNOWN: (
-        "An unexpected error occurred: {detail}."
-    ),
-}
 
 
 class RequestTab(QWidget):
@@ -416,34 +396,20 @@ class TabsPresenter(QObject):
     def _on_request_error(self, tab: RequestTab, error) -> None:
         self._reset_tab_ui_state(tab)
 
-        # Cancellation path (still a plain string)
-        if isinstance(error, str):
-            if "cancelled" in error.lower() or "aborted" in error.lower():
-                logger.info("request_cancelled error_msg=%s", error)
-                return
-            logger.error("request_error error_msg=%s", error)
-            QMessageBox.critical(self._tabs, "Error", f"Request failed: {error}")
+        url = tab.request_data.url if tab.request_data else ""
+        prompt = describe(error, url)
+        if prompt is None:
+            logger.info("request_cancelled error=%s", error)
             return
 
-        # Structured ExecutionError path
         if isinstance(error, ExecutionError):
-            if error.detail and (
-                "cancelled" in error.detail.lower() or "aborted" in error.detail.lower()
-            ):
-                logger.info("request_cancelled category=%s", error.category)
-                return
-
-            url = tab.request_data.url if tab.request_data else ""
-            template = _ERROR_MESSAGES.get(
-                error.category, _ERROR_MESSAGES[ErrorCategory.UNKNOWN]
-            )
-            user_msg = template.format(url=url, detail=error.detail or error.message)
-
             logger.error(
                 "request_error category=%s message=%s detail=%s",
                 error.category, error.message, error.detail,
             )
-            QMessageBox.critical(self._tabs, "Request Error", user_msg)
+        else:
+            logger.error("request_error error_msg=%s", error)
+        QMessageBox.critical(self._tabs, prompt.title, prompt.message)
 
     def _on_script_output(self, tab: RequestTab, logs, err) -> None:
         if logs:
