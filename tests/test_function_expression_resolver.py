@@ -46,3 +46,43 @@ class TestFunctionExpressionResolver(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestReferencePaths(unittest.TestCase):
+    def setUp(self):
+        self.resolver = FunctionExpressionResolver(FunctionRegistry())
+
+    def test_dotted_path_is_valid(self):
+        self.assertTrue(
+            self.resolver.validate_content("{{ mcp.request.city }}").is_valid
+        )
+
+    def test_quoted_subscript_is_valid(self):
+        self.assertTrue(
+            self.resolver.validate_content("{{ mcp.request['city'] }}").is_valid
+        )
+        self.assertTrue(
+            self.resolver.validate_content('{{ mcp.request["city"] }}').is_valid
+        )
+
+    def test_numeric_subscript_is_valid(self):
+        self.assertTrue(self.resolver.validate_content("{{ items[0] }}").is_valid)
+
+    def test_dotted_path_as_function_argument_is_valid(self):
+        self.assertTrue(
+            self.resolver.validate_content(
+                "{{ urlencode(mcp.request.city) }}"
+            ).is_valid
+        )
+
+    def test_underscore_prefixed_attribute_is_rejected(self):
+        for expression in ("{{ x.__class__ }}", "{{ x._private }}", "{{ x['_p'] }}"):
+            with self.subTest(expression=expression):
+                result = self.resolver.validate_content(expression)
+                self.assertFalse(result.is_valid)
+                self.assertEqual("invalid_syntax", result.code)
+
+    def test_call_on_a_path_segment_is_rejected(self):
+        result = self.resolver.validate_content("{{ a.b(c) }}")
+        self.assertFalse(result.is_valid)
+        self.assertEqual("invalid_syntax", result.code)
+

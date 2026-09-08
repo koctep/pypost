@@ -174,3 +174,30 @@ class TestTemplateServiceObservability(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTemplateServiceReferencePaths(unittest.TestCase):
+    def setUp(self):
+        self.svc = TemplateService()
+
+    def test_render_dotted_path_from_nested_context(self):
+        result = self.svc.render_string(
+            "https://api/x?q={{ mcp.request.city }}",
+            {"mcp": {"request": {"city": "Berlin"}}},
+        )
+        self.assertEqual("https://api/x?q=Berlin", result)
+
+    def test_render_subscript_path_from_nested_context(self):
+        result = self.svc.render_string(
+            "{{ mcp.request['city'] }}",
+            {"mcp": {"request": {"city": "Berlin"}}},
+        )
+        self.assertEqual("Berlin", result)
+
+    def test_render_function_over_dotted_path(self):
+        result = self.svc.render_string(
+            "{{ urlencode(mcp.request.city) }}",
+            {"mcp": {"request": {"city": "a b"}}},
+        )
+        self.assertEqual("a%20b", result)
+

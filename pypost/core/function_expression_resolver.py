@@ -4,8 +4,20 @@ from pypost.core.function_registry import FunctionRegistry
 from pypost.core.template_expression_types import ValidationResult
 
 
+_ROOT = r"[a-zA-Z_][a-zA-Z0-9_]*"
+# Attribute and subscript segments must not start with an underscore: Jinja2 resolves
+# `a.b` and `a["b"]` through getattr, so allowing them would expose dunder traversal.
+_ATTRIBUTE = r"[a-zA-Z][a-zA-Z0-9_]*"
+_SUBSCRIPT = r"""\[\s*(?:'[a-zA-Z][^']*'|"[a-zA-Z][^"]*"|\d+)\s*\]"""
+
+
 class FunctionExpressionResolver:
-    _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+    # A reference is a root name optionally followed by attribute or subscript
+    # segments, so a template can navigate into a nested context value such as
+    # {{ mcp.request.city }}.
+    _REFERENCE_RE = re.compile(
+        rf"^{_ROOT}(?:\.{_ATTRIBUTE}|{_SUBSCRIPT})*$"
+    )
     _FUNCTION_SIGNATURE_RE = re.compile(
         r"^(?P<func>[a-zA-Z_][a-zA-Z0-9_]*)\((?P<args>.*)\)$"
     )
@@ -24,7 +36,7 @@ class FunctionExpressionResolver:
         return ValidationResult.valid()
 
     def _validate_expression(self, expression: str) -> ValidationResult | None:
-        if self._IDENTIFIER_RE.fullmatch(expression):
+        if self._REFERENCE_RE.fullmatch(expression):
             return None
 
         parsed_expression = self._parse_function_expression(expression)
@@ -54,7 +66,7 @@ class FunctionExpressionResolver:
         if argument is None:
             return ValidationResult.error("invalid_arity", function_name)
 
-        if self._IDENTIFIER_RE.fullmatch(argument):
+        if self._REFERENCE_RE.fullmatch(argument):
             return None
 
         if not self._FUNCTION_SIGNATURE_RE.fullmatch(argument):
