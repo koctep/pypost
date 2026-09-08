@@ -29,6 +29,7 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-cov",
+    "pytest-timeout",
     "ruff",
 ]
 
@@ -47,6 +48,8 @@ include = ["pypost*"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 addopts = "-v --tb=short --cov-fail-under=50"
+faulthandler_timeout = 45
+timeout = 60
 log_cli = true
 log_cli_level = "WARNING"
 log_format = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"

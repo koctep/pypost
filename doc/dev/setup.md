@@ -115,6 +115,10 @@ CI runs the same suite on every push and pull request via `.github/workflows/tes
 packages so PySide6 can import under `QT_QPA_PLATFORM=offscreen`.  Jobs do not use a Docker
 container so `actions/setup-python` toolcache builds match the runner libc.
 
+`pytest-timeout` stops an individual test after 60 seconds and pytest prints thread stacks after
+45 seconds. The complete CI test job also has a 15-minute limit, which covers hangs outside an
+individual test (for example, session teardown or native Qt shutdown).
+
 ## Troubleshooting
 
 - **Missing modules**: Ensure your virtual environment is activated and the project is installed

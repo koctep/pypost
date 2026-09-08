@@ -1,16 +1,20 @@
 # PyPost Remediation Roadmap
 
-Audit of branch `fix/build-and-env-segfault` (HEAD `e83624f7`, base `48a112e6`). 26 defects and
-11 architectural weaknesses. 23 of the 26 predate the branch; the files carrying most findings are
-byte-identical to `master`.
+Audit of branch `fix/build-and-env-segfault` as it stood at `e83624f7` (base `48a112e6`). 26
+defects and 11 architectural weaknesses. 23 of the 26 predate the branch; the files carrying most
+findings are byte-identical to `master`.
 
 **Status marks:** `[ ]` not started · `[~]` started, not finished · `[X]` done.
 
-**Baseline at time of writing:** 374 tests pass (`QT_QPA_PLATFORM=offscreen`, 5.6 s);
-`ruff check pypost` reports 65 findings, `ruff check tests` reports 5.
+**Current status:** all remediation items are complete.
 
-**Phases are dependency-ordered.** Phase 3 is structural and should not start until the visible
-breakage from phases 1 and 2 is closed.
+**Starting baseline, before remediation:** 374 tests passed
+(`QT_QPA_PLATFORM=offscreen`, 5.6 s); `ruff check pypost` reported 65 findings and
+`ruff check tests` reported 5. These figures are retained as the point from which the work began,
+not as completion targets.
+
+**Phases are dependency-ordered.** The structural work in phase 3 followed the visible fixes in
+phases 1 and 2.
 
 ---
 
@@ -19,29 +23,33 @@ breakage from phases 1 and 2 is closed.
 Six user-visible features that do not work at all. Every item is a local change; none require
 design decisions beyond the two recorded in [Resolved decisions](#resolved-decisions).
 
-### [ ] B5 — Segfault when opening the environment manager
+### [X] B5 — Segfault when opening the environment manager
 
-Crash reproduces deterministically: Manage → Add environment → three single clicks in the empty
-variable-name cell → double-click. Under `wayland` it segfaults; under `offscreen` and `minimal`
-it does not, so CI can never observe it.
+Before the fix, the crash reproduced deterministically: Manage → Add environment → three single
+clicks in the empty variable-name cell → double-click. Under `wayland` it segfaulted; under
+`offscreen` and `minimal` it did not, so CI could not observe it.
 
 Root cause is upstream: a bare `QTableWidget` with any `setCellWidget`, containing no PyPost code
-at all, crashes identically on Qt/PySide6 6.11.2. What makes it reachable here is that the Hidden
-column uses a cell widget where Qt offers a checkable item.
+at all, crashes identically on Qt/PySide6 6.11.2. PyPost made it reachable because the Hidden
+column used a cell widget where Qt offers a checkable item.
 
-- `pypost/ui/dialogs/env_dialog.py:233,238,306` — the three `setCellWidget` calls.
-- `pypost/ui/dialogs/env_dialog.py:187` — the only `cellWidget` read in the entire project.
-- Replace with `QTableWidgetItem` carrying `Qt.ItemIsUserCheckable` and `setCheckState`.
-- Removes `_make_hidden_checkbox` (173-183), `_get_hidden_checkbox` (185-191), the whole
+- At audit time, `pypost/ui/dialogs/env_dialog.py:233,238,306` held the three `setCellWidget`
+  calls and line 187 held the only `cellWidget` read in the project.
+- The planned replacement was a `QTableWidgetItem` carrying `Qt.ItemIsUserCheckable` and
+  `setCheckState`.
+- This removed `_make_hidden_checkbox` (173-183), `_get_hidden_checkbox` (185-191), the whole
   `_on_hidden_toggled` (245-290) with its `self.sender()` row scan, and the `cb.isChecked()`
   reads in `on_var_changed` (319, 323).
-- **Watch out:** `itemChanged` also fires on check-state changes. `on_var_changed` currently
-  branches on column only for `COL_VAL` (330-333); it needs an explicit `COL_HIDDEN` branch, or
-  toggling the box will fall through to the "append a new row" path.
-- No test reads `cellWidget`, so nothing breaks on removal.
+- **Implementation constraint:** `itemChanged` also fires on check-state changes, so
+  `on_var_changed` now has an explicit `COL_HIDDEN` branch instead of falling through to the
+  "append a new row" path.
+- At audit time no test read `cellWidget`; the delivered structural regression now does.
 - **Verification:** the regression test in `tests/test_env_dialog.py` is structural — it asserts
   `checkState()` where `cellWidget()` used to be. It does not prove the segfault is gone. That
-  requires a manual run on a machine with a display; headless cannot cover it.
+  requires a display-backed run; headless cannot cover it.
+- **Delivered:** `db738b0b` replaced every Hidden-column cell widget with a checkable item and
+  added coverage for toggling, masking, renaming and the blank row. The display-backed Wayland
+  smoke result is recorded in [Verification status](#verification-status).
 
 ### [X] B1 — MCP tool arguments are never substituted
 
@@ -230,18 +238,31 @@ both are in. Landed as one commit per defect --
 ### [X] Write up the Qt bug
 
 `doc/qt-cell-widget-segfault.md` holds the ~30 line reproducer, the platform matrix, the
-variations that ruled out a PySide ownership problem, and the workaround. Reproduced again
-against the committed fix: wayland crashes, `offscreen` and `minimal` survive, the checkable-item
-variant survives under wayland.
+variations that ruled out a PySide ownership problem, and the workaround. In the final comparison,
+the cell-widget reproducer crashes under wayland and survives under `offscreen` and `minimal`;
+the checkable-item variant survives under wayland.
 
 Not filed upstream -- the user asked for the write-up only. `xcb` and a non-WSL compositor remain
 untested and should be checked before reporting.
 
-### [ ] Decide what CI can honestly cover
+### [X] Decide what CI can honestly cover
 
-374 green tests coexisted with five blockers and a segfault. CI runs `offscreen`, where B5 cannot
-reproduce under any amount of coverage, and B3's save path is unreachable without constructing
-widgets. This is an argument for phase 3, not for more tests of the same shape.
+The starting 374 green tests coexisted with five blockers and a segfault. CI runs `offscreen`,
+where B5 cannot reproduce under any amount of coverage. The guardrail is therefore defined
+explicitly:
+
+- The required PR gate is Ruff plus the complete pytest suite on CPython 3.11 and 3.13 under
+  `QT_QPA_PLATFORM=offscreen`, with the existing 50% line-coverage floor.
+- Headless Qt tests cover widget construction and application flows that do not depend on a real
+  compositor. This now includes B3's save-with-blank-tab path.
+- B5 is covered in CI only by a structural invariant: the Hidden column must use checkable items
+  and no cell widgets. CI does **not** claim to cover native Wayland/X11 input dispatch, window
+  manager behaviour or platform-plugin crashes.
+- The B5 click sequence remains a release smoke check on a real Wayland display. An `xcb` and a
+  non-WSL Wayland run are desirable before filing the Qt issue, but are not release gates.
+- `pytest-timeout` fails an individual test after 60 seconds and pytest's faulthandler prints
+  stacks after 45 seconds. The CI test job has a separate 15-minute ceiling so a session-level or
+  native-code hang cannot consume the runner's multi-hour default.
 
 ---
 
@@ -256,8 +277,10 @@ widgets. This is an argument for phase 3, not for more tests of the same shape.
 ## Verification status
 
 Reproduced and confirmed by running code: B1, B2, B3, B4, B5, R1, R2, C1, C2, and the branch
-attribution. Reasoned from reading, not executed: the phase 3 architectural items and the phase 4
-sweep.
+attribution. The final headless verification passes 486 tests and 9 subtests in about 6.3 seconds;
+`ruff check pypost tests` is clean. The phase 3 architectural items and the phase 4 sweep have
+targeted regression tests but were not re-audited independently after implementation.
 
-The one thing reading cannot settle: whether B5's fix actually removes the crash. That needs a
-manual run on a display.
+B5 also passed the original Add environment → three clicks → double-click sequence against the
+real WSLg `wayland` platform plugin. Its structural CI regression remains necessarily weaker than
+that display smoke check: `offscreen` cannot prove the absence of a platform-plugin crash.
