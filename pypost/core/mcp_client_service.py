@@ -78,7 +78,10 @@ class MCPClientService:
             raise ExecutionError(category=category, message=message, detail=err_msg) from exc
 
         elapsed = time.time() - start_time
-        logger.debug("mcp_operation_success url=%s operation=%s elapsed=%.3f", url, operation, elapsed)
+        logger.debug(
+            "mcp_operation_success url=%s operation=%s elapsed=%.3f",
+            url, operation, elapsed,
+        )
         body_str = result if isinstance(result, str) else json.dumps(result)
         return ResponseData(
             status_code=200,

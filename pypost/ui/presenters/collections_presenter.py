@@ -3,7 +3,7 @@ import logging
 from PySide6.QtWidgets import (
     QTreeView, QMenu, QMessageBox, QAbstractItemDelegate,
 )
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon
+from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtCore import QObject, Qt, Signal
 
 from pypost.models.models import RequestData

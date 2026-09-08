@@ -23,7 +23,10 @@ class AboutDialog(QDialog):
         layout.addWidget(version_label)
 
         # Description
-        desc_label = QLabel("A lightweight HTTP client for testing APIs.\nBuilt with Python and PySide6.")
+        desc_label = QLabel(
+            "A lightweight HTTP client for testing APIs.\n"
+            "Built with Python and PySide6."
+        )
         desc_label.setWordWrap(True)
         desc_label.setAlignment(Qt.AlignCenter)
         desc_label.setStyleSheet("margin: 10px 0;")

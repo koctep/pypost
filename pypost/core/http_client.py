@@ -31,11 +31,13 @@ class HTTPClient:
         else:
             logger.debug("HTTPClient: using default TemplateService")
 
-    def _prepare_request_kwargs(self, request_data: RequestData, variables: Dict[str, str]) -> Dict[str, Any]:
+    def _prepare_request_kwargs(
+        self, request_data: RequestData, variables: Dict[str, str],
+    ) -> Dict[str, Any]:
         """Prepares the arguments for requests.request by rendering templates."""
         # Render templates
         url = self._template_service.render_string(request_data.url, variables)
-        
+
         headers = {}
         for k, v in request_data.headers.items():
             rendered_k = self._template_service.render_string(k, variables)
@@ -59,7 +61,7 @@ class HTTPClient:
             'stream': True,
             'timeout': self.request_timeout
         }
-        
+
         if request_data.body_type == 'json' and body:
             try:
                 kwargs['json'] = json.loads(body)
@@ -67,7 +69,7 @@ class HTTPClient:
                 kwargs['data'] = body
         elif request_data.body_type != 'json':
             kwargs['data'] = body
-            
+
         return kwargs
 
     def _handle_sse_response(
@@ -209,7 +211,8 @@ class HTTPClient:
         for chunk in response.iter_content(chunk_size=None):
             if stop_flag and stop_flag():
                 # If cancelled, we break the loop.
-                # Note: This stops reading, but doesn't necessarily close socket immediately unless we close response.
+                # Note: this stops reading, but does not necessarily close the
+                # socket immediately unless we close the response.
                 response.close()
                 break
 
@@ -223,7 +226,7 @@ class HTTPClient:
                     content_parts.append(text)
                     if stream_callback:
                         stream_callback(text)
-            
+
             # Check stop flag again after processing chunk to be responsive
             if stop_flag and stop_flag():
                 response.close()

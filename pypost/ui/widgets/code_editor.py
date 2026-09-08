@@ -9,7 +9,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
         super().__init__(parent)
         self.indent_size = indent_size
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        
+
         self.update_indent_size(indent_size)
 
     def update_indent_size(self, new_size: int):
@@ -24,7 +24,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
         text = self.toPlainText()
         if not text:
             return
-            
+
         try:
             parsed = json.loads(text)
             formatted_json = json.dumps(parsed, indent=self.indent_size)
@@ -47,7 +47,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
         cursor = self.textCursor()
         cursor.select(QTextCursor.SelectionType.LineUnderCursor)
         line_text = cursor.selectedText()
-        
+
         # Calculate current indentation
         indent = ""
         for char in line_text:
@@ -55,38 +55,42 @@ class CodeEditor(VariableAwarePlainTextEdit):
                 indent += char
             else:
                 break
-        
+
         # Check if line ends with opening bracket
         trimmed_line = line_text.rstrip()
         if trimmed_line and trimmed_line[-1] in ('{', '['):
             indent += " " * self.indent_size  # Add indent_size spaces
-            
+
         # Insert new line with indentation
         self.insertPlainText("\n" + indent)
-        
+
     def _handle_closing_bracket(self, event: QKeyEvent):
         cursor = self.textCursor()
         current_line_text = cursor.block().text()
-        
+
         # Check if we are at the beginning of the line (ignoring whitespace)
         # to dedent only if it's the first non-whitespace char
         if current_line_text.strip() == "":
-             # Calculate indentation of the previous line to match context if possible, 
+             # Calculate indentation of the previous line to match context if possible,
              # or simply unindent by 4 spaces if currently indented
-             
+
              # Current approach: Dedent if the line consists only of indentation so far
              # and the user types '}' or ']'
-             
+
              # Get current indentation level
             indent_level = len(current_line_text) - len(current_line_text.lstrip())
-            
+
             if indent_level >= self.indent_size:
                 # Remove indent_size spaces from the start
                 cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
-                cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, self.indent_size)
+                cursor.movePosition(
+                    QTextCursor.MoveOperation.Right,
+                    QTextCursor.MoveMode.KeepAnchor,
+                    self.indent_size,
+                )
                 if cursor.selectedText() == " " * self.indent_size:
                     cursor.removeSelectedText()
-        
+
         super().keyPressEvent(event)
 
     def insertFromMimeData(self, source: QMimeData):

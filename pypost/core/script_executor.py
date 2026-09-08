@@ -27,7 +27,7 @@ class ScriptContext:
     def get(self, key: str, default: Any = None) -> Optional[str]:
         """Get an environment variable."""
         return self._variables.get(str(key), default)
-    
+
     def log(self, message: Any):
         """Log a message for debugging."""
         self._logs.append(str(message))
@@ -37,7 +37,7 @@ class ScriptContext:
 
     def is_modified(self) -> bool:
         return self._env_modified
-    
+
     def get_logs(self) -> list[str]:
         return self._logs
 
@@ -45,18 +45,23 @@ class ScriptExecutor:
     """
     Executes Python scripts within a controlled context.
     """
-    
+
     @staticmethod
-    def execute(script: str, request: RequestData, response: ResponseData, variables: Dict[str, str]) -> tuple[Dict[str, str], list[str], Optional[str]]:
+    def execute(
+        script: str,
+        request: RequestData,
+        response: ResponseData,
+        variables: Dict[str, str],
+    ) -> tuple[Dict[str, str], list[str], Optional[str]]:
         """
         Execute the provided script.
-        
+
         Args:
             script: The Python script code.
             request: The request data.
             response: The response data.
             variables: Current environment variables.
-            
+
         Returns:
             tuple: (updated_variables, logs, error_message)
             - updated_variables: The new state of variables (if modified) or None.
@@ -67,19 +72,19 @@ class ScriptExecutor:
             return variables, [], None
 
         context = ScriptContext(variables)
-        
+
         # Prepare execution environment
-        # We expose: 
+        # We expose:
         # - pypost: The context object
         # - request: RequestData (be careful, raw object)
         # - response: ResponseData
-        
+
         local_scope = {
             'pypost': context,
             'request': request,
             'response': response
         }
-        
+
         stdout_capture = io.StringIO()
         error_message = None
 
@@ -88,13 +93,13 @@ class ScriptExecutor:
                 exec(script, {}, local_scope)
         except Exception:
             error_message = traceback.format_exc()
-        
+
         logs = context.get_logs()
         captured_stdout = stdout_capture.getvalue()
         if captured_stdout:
             logs.append(f"[STDOUT] {captured_stdout}")
-            
+
         updated_vars = context.get_variables() if context.is_modified() else None
-        
+
         return updated_vars, logs, error_message
 

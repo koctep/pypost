@@ -1,6 +1,4 @@
-import os
 from pathlib import Path
-from PySide6.QtWidgets import QApplication
 
 class StyleManager:
     def __init__(self):
@@ -19,7 +17,7 @@ class StyleManager:
         try:
             # Sort files to ensure deterministic loading order (e.g. alphabetical)
             qss_files = sorted(self.styles_dir.glob("*.qss"))
-            
+
             for file_path in qss_files:
                 try:
                     with open(file_path, 'r') as f:
@@ -27,7 +25,7 @@ class StyleManager:
                         combined_style += f"\n/* File: {file_path.name} */\n{content}\n"
                 except Exception as e:
                     print(f"Error reading style file {file_path}: {e}")
-                    
+
         except Exception as e:
             print(f"Error scanning styles directory: {e}")
 
