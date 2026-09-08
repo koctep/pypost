@@ -333,12 +333,13 @@ class RequestService:
 
         # 3. Execute post-request script if exists
         if request.post_script:
-            updated_variables, script_logs, script_error = ScriptExecutor.execute(
+            updated, script_logs, script_error = ScriptExecutor.execute(
                 request.post_script,
                 request,
                 response,
                 variables
             )
+            updated_variables = updated or {}
 
         exec_error_from_script = None
         if script_error:

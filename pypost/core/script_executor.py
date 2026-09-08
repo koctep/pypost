@@ -69,7 +69,11 @@ class ScriptExecutor:
             - error_message: String describing an error if one occurred, else None.
         """
         if not script.strip():
-            return variables, [], None
+            # None, not the variables themselves: the contract above is that a
+            # dict means "the script changed these". Returning the current
+            # variables reports every one of them as an update, and the caller
+            # writes them all back into the active environment.
+            return None, [], None
 
         context = ScriptContext(variables)
 

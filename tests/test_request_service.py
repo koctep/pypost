@@ -335,3 +335,39 @@ class TestRetryExhaustionDetail(unittest.TestCase):
         self.assertIn("Connection refused by 10.0.0.1:443", detail)
         self.assertIn("retries_attempted: 1", detail)
 
+
+class TestBlankPostScript(unittest.TestCase):
+    """A script that does nothing must not report every variable as changed."""
+
+    def _service(self):
+        return RequestService(template_service=TemplateService())
+
+    def _execute(self, post_script):
+        service = self._service()
+        request = RequestData(
+            method="GET", url="http://x", post_script=post_script,
+        )
+        response = ResponseData(
+            status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2,
+        )
+        with patch.object(
+            service.http_client, "send_request", return_value=response,
+        ):
+            return service.execute(request, {"API_KEY": "secret", "HOST": "prod"})
+
+    def test_whitespace_only_script_reports_no_variable_updates(self):
+        result = self._execute("   \n\t ")
+
+        self.assertEqual({}, result.updated_variables)
+
+    def test_a_script_that_sets_nothing_reports_no_variable_updates(self):
+        result = self._execute("pypost.log('hello')")
+
+        self.assertEqual({}, result.updated_variables)
+        self.assertEqual(["hello"], result.script_logs)
+
+    def test_a_script_that_sets_a_variable_reports_the_new_state(self):
+        result = self._execute("pypost.env.set('TOKEN', 'abc')")
+
+        self.assertEqual("abc", result.updated_variables["TOKEN"])
+
