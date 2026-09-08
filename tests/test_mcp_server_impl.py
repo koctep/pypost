@@ -45,6 +45,24 @@ class TestMCPServerImpl(unittest.TestCase):
         impl.register_tools([second])
         self.assertEqual(list(impl.tools_map.keys()), ["b"])
 
+    def test_register_tools_keeps_requests_with_colliding_normalized_names(self):
+        impl = MCPServerImpl()
+        first = RequestData(
+            id="first-id", name="Fetch User", expose_as_mcp=True, url="http://first"
+        )
+        second = RequestData(
+            id="second-id", name="Fetch-User", expose_as_mcp=True, url="http://second"
+        )
+
+        impl.register_tools([first, second])
+        first_mapping = {name: request.id for name, request in impl.tools_map.items()}
+        impl.register_tools([second, first])
+        second_mapping = {name: request.id for name, request in impl.tools_map.items()}
+
+        self.assertEqual(len(first_mapping), 2)
+        self.assertEqual(set(first_mapping.values()), {"first-id", "second-id"})
+        self.assertEqual(first_mapping, second_mapping)
+
     def test_request_timeout_can_be_updated(self):
         impl = MCPServerImpl(request_timeout=11.0)
         self.assertEqual(impl.request_service.http_client.request_timeout, 11.0)

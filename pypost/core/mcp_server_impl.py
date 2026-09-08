@@ -1,19 +1,24 @@
+import hashlib
 import logging
-from typing import List, Dict, Any, Set
-from starlette.applications import Starlette
+from collections import Counter
+from typing import Any, Dict, List, Set
 
-logger = logging.getLogger(__name__)
-from starlette.responses import Response
-from starlette.routing import Mount, Route
+import jinja2
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
-from mcp.types import Tool, TextContent
-from pypost.models.models import RequestData
-import jinja2
-from pypost.core.template_service import TemplateService
+from mcp.types import TextContent, Tool
+from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
-from pypost.core.request_service import RequestService
+from starlette.responses import Response
+from starlette.routing import Mount, Route
+
 from pypost.core.metrics import MetricsManager
+from pypost.core.request_service import RequestService
+from pypost.core.template_service import TemplateService
+from pypost.models.models import RequestData
+
+
+logger = logging.getLogger(__name__)
 
 
 class MCPServerImpl:
@@ -25,7 +30,10 @@ class MCPServerImpl:
         self._metrics = metrics
         self._template_service = template_service
         if template_service is not None:
-            logger.debug("MCPServerImpl: using injected TemplateService id=%d", id(template_service))
+            logger.debug(
+                "MCPServerImpl: using injected TemplateService id=%d",
+                id(template_service),
+            )
         self.request_service = RequestService(metrics=self._metrics,
                                               template_service=self._template_service,
                                               request_timeout=request_timeout)
@@ -101,14 +109,27 @@ class MCPServerImpl:
 
     def register_tools(self, requests: List[RequestData]):
         self.tools_map.clear()
-        for req in requests:
-            if req.expose_as_mcp:
-                tool_name = self._normalize_name(req.name)
-                self.tools_map[tool_name] = req
+        exposed = [req for req in requests if req.expose_as_mcp]
+        normalized = [self._normalize_name(req.name) for req in exposed]
+        name_counts = Counter(normalized)
+
+        for req, base_name in zip(exposed, normalized):
+            tool_name = base_name
+            if name_counts[base_name] > 1:
+                suffix = hashlib.sha256(req.id.encode("utf-8")).hexdigest()[:8]
+                tool_name = f"{base_name}_{suffix}"
+
+            candidate = tool_name
+            discriminator = 2
+            while candidate in self.tools_map:
+                candidate = f"{tool_name}_{discriminator}"
+                discriminator += 1
+            self.tools_map[candidate] = req
 
     def _normalize_name(self, name: str) -> str:
         # Lowercase, spaces->underscores, remove non-alnum
-        return "".join(c if c.isalnum() else "_" for c in name.lower())
+        normalized = "".join(c if c.isalnum() else "_" for c in name.lower())
+        return normalized or "request"
 
     def _generate_schema(self, req: RequestData) -> dict:
         # Parse {{ mcp.request.x }} variables
