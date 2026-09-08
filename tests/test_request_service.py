@@ -112,10 +112,17 @@ class TestRequestServiceInjection(unittest.TestCase):
         self.assertIs(ts, svc._template_service)
         self.assertIs(ts, svc.http_client._template_service)
 
-    def test_no_injection_sets_template_service_to_none(self):
-        """RequestService() with no template_service stores None (no silent fallback)."""
+    def test_no_injection_falls_back_to_a_default_service(self):
+        """Previously stored None, to avoid a silent fallback.
+
+        That left three render paths where only one checked, so a service built
+        without one raised on MCP requests and stopped recording history. The
+        fallback is not silent: the constructor logs which one it is using, as
+        HTTPClient already did.
+        """
         svc = RequestService()
-        self.assertIsNone(svc._template_service)
+        self.assertIsNotNone(svc._template_service)
+        self.assertIs(svc._template_service, svc.http_client._template_service)
 
 
 class TestRequestServiceHistory(unittest.TestCase):
@@ -370,4 +377,38 @@ class TestBlankPostScript(unittest.TestCase):
         result = self._execute("pypost.env.set('TOKEN', 'abc')")
 
         self.assertEqual("abc", result.updated_variables["TOKEN"])
+
+
+class TestWithoutAnInjectedTemplateService(unittest.TestCase):
+    """Three paths render templates; only one of them used to check for None."""
+
+    def test_a_default_template_service_is_always_available(self):
+        self.assertIsNotNone(RequestService()._template_service)
+
+    def test_an_mcp_request_does_not_raise_on_a_missing_template_service(self):
+        service = RequestService()
+        response = ResponseData(
+            status_code=200, headers={}, body="[]", elapsed_time=0.1, size=2,
+        )
+        request = RequestData(method="MCP", url="http://localhost:1080/sse")
+
+        with patch.object(service.mcp_client, "run", return_value=response) as run:
+            result = service.execute(request, {})
+
+        run.assert_called_once()
+        self.assertIsNone(result.execution_error)
+
+    def test_history_is_still_recorded_without_a_template_service(self):
+        history = MagicMock()
+        service = RequestService(history_manager=history)
+        response = ResponseData(
+            status_code=200, headers={}, body="ok", elapsed_time=0.1, size=2,
+        )
+
+        with patch.object(
+            service.http_client, "send_request", return_value=response,
+        ):
+            service.execute(RequestData(method="GET", url="http://x"), {})
+
+        history.append.assert_called_once()
 

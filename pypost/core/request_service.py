@@ -53,7 +53,12 @@ class RequestService:
     ) -> None:
         self._metrics = metrics
         self._history_manager = history_manager
-        self._template_service = template_service
+        # Defaulted, as HTTPClient already does: three paths here render templates
+        # and only one of them checked for None, so a service constructed without
+        # one raised on MCP requests and silently stopped recording history.
+        self._template_service = (
+            template_service if template_service is not None else TemplateService()
+        )
         self._alert_manager = alert_manager
         self._default_retry_policy = default_retry_policy
         if template_service is not None:
@@ -61,6 +66,8 @@ class RequestService:
                 "RequestService: using injected TemplateService id=%d",
                 id(template_service),
             )
+        else:
+            logger.debug("RequestService: using default TemplateService")
         logger.debug(
             "RequestService: default_retry_policy_injected=%s max_retries=%s",
             default_retry_policy is not None,
@@ -282,21 +289,20 @@ class RequestService:
             variables = {}
 
         # 1. Template render guard — convert Jinja2 errors to ExecutionError(TEMPLATE)
-        if self._template_service:
-            try:
-                self._template_service.render_string(
-                    request.url, variables, strict=True,
-                )
-            except Exception as exc:
-                logger.error(
-                    "template_render_failed url=%r detail=%s",
-                    request.url, exc,
-                )
-                raise ExecutionError(
-                    category=ErrorCategory.TEMPLATE,
-                    message="Template rendering failed.",
-                    detail=str(exc),
-                ) from exc
+        try:
+            self._template_service.render_string(
+                request.url, variables, strict=True,
+            )
+        except Exception as exc:
+            logger.error(
+                "template_render_failed url=%r detail=%s",
+                request.url, exc,
+            )
+            raise ExecutionError(
+                category=ErrorCategory.TEMPLATE,
+                message="Template rendering failed.",
+                detail=str(exc),
+            ) from exc
 
         # 2. Execute request, catching structured errors
         try:
