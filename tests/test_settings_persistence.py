@@ -113,6 +113,38 @@ class TestStateManagerPersistence(unittest.TestCase):
         sm2 = StateManager(ConfigManager())
         self.assertEqual(sm2.get_last_environment_id(), "env-99")
 
+    def test_expanded_collections_persist_when_caller_mutates_the_getter_result(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+
+        current = sm.get_expanded_collections()
+        current.append("c1")
+        sm.set_expanded_collections(current)
+
+        sm2 = StateManager(ConfigManager())
+        self.assertEqual(["c1"], sm2.get_expanded_collections())
+
+    def test_open_tabs_persist_when_caller_mutates_the_getter_result(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+
+        current = sm.get_open_tabs()
+        current.append("r1")
+        sm.set_open_tabs(current)
+
+        sm2 = StateManager(ConfigManager())
+        self.assertEqual(["r1"], sm2.get_open_tabs())
+
+    def test_getters_do_not_expose_stored_state(self):
+        cm, _td = self._cm_and_td()
+        sm = StateManager(cm)
+
+        sm.get_expanded_collections().append("c1")
+        sm.get_open_tabs().append("r1")
+
+        self.assertEqual([], sm.get_expanded_collections())
+        self.assertEqual([], sm.get_open_tabs())
+
     def test_set_expanded_collections_noop_skips_save(self):
         cm, _td = self._cm_and_td()
         sm = StateManager(cm)

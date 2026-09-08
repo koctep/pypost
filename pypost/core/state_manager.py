@@ -18,19 +18,21 @@ class StateManager:
         self.config_manager.save_config(self.settings)
 
     def get_expanded_collections(self) -> List[str]:
-        return self.settings.expanded_collections
+        # Copy, so a caller mutating the result cannot silently edit stored state and
+        # then compare equal to it in the setter below.
+        return list(self.settings.expanded_collections)
 
     def set_expanded_collections(self, ids: List[str]):
         if self.settings.expanded_collections != ids:
-            self.settings.expanded_collections = ids
+            self.settings.expanded_collections = list(ids)
             self.save()
 
     def get_open_tabs(self) -> List[str]:
-        return self.settings.open_tabs
+        return list(self.settings.open_tabs)
 
     def set_open_tabs(self, ids: List[str]):
         if self.settings.open_tabs != ids:
-            self.settings.open_tabs = ids
+            self.settings.open_tabs = list(ids)
             self.save()
 
     def get_last_environment_id(self) -> Optional[str]:
