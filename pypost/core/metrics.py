@@ -245,28 +245,32 @@ class MetricsManager:
             self._current_host = host
             self._current_port = port
 
+            # Built here rather than inside the thread: stop_server has to see the
+            # instance as soon as start_server returns, or a stop arriving first
+            # finds None, never asks the server to exit, and leaves it serving.
+            self.server_instance = self._build_server(host, port)
+
             self.thread = threading.Thread(target=self._run_uvicorn, daemon=True)
             self.thread.start()
             logger.info("Metrics server started on %s:%d", host, port)
 
-    def _run_uvicorn(self):
-        app = self._create_app()
-        # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
+    def _build_server(self, host: str, port: int) -> uvicorn.Server:
         config = uvicorn.Config(
-            app=app,
-            host=self._current_host,
-            port=self._current_port,
+            app=self._create_app(),
+            host=host,
+            port=port,
             loop="asyncio",
             log_level="warning",
         )
-        self.server_instance = uvicorn.Server(config)
-
+        server = uvicorn.Server(config)
         # Override signal handlers to avoid main thread conflict
-        self.server_instance.install_signal_handlers = lambda: None
+        server.install_signal_handlers = lambda: None
+        return server
 
+    def _run_uvicorn(self):
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         loop.run_until_complete(self.server_instance.serve())
 
     def stop_server(self):

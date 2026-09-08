@@ -45,6 +45,11 @@ class MCPServerManager(QObject):
         self._impl.register_tools(tools)
         self._stop_event.clear()
 
+        # Built here rather than inside the thread: stop_server has to see the
+        # instance as soon as start_server returns, or a stop arriving first finds
+        # None, never asks the server to exit, and leaves it serving.
+        self._server_instance = self._build_server(host, port)
+
         self._server_thread = threading.Thread(target=self._run_uvicorn, daemon=True)
         self._server_thread.start()
         logger.info("MCP server started on %s:%d", host, port)
@@ -64,6 +69,7 @@ class MCPServerManager(QObject):
             # Wait for thread to finish (with timeout to avoid freeze)
             self._server_thread.join(timeout=2.0)
             self._server_thread = None
+            self._server_instance = None
 
         logger.info("MCP server stopped")
         self.status_changed.emit(False)
@@ -77,16 +83,17 @@ class MCPServerManager(QObject):
             self.stop_server()
             self.start_server(self._current_port, tools, self._current_host)
 
+    def _build_server(self, host: str, port: int) -> uvicorn.Server:
+        config = uvicorn.Config(
+            app=self._impl.create_app(), host=host, port=port, loop="asyncio",
+        )
+        server = uvicorn.Server(config)
+        # Override install_signal_handlers because we are not in main thread
+        server.install_signal_handlers = lambda: None
+        return server
+
     def _run_uvicorn(self):
-        app = self._impl.create_app()
         # Ensure we run a new event loop for this thread
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
-        config = uvicorn.Config(app=app, host=self._current_host, port=self._current_port, loop="asyncio")
-        self._server_instance = uvicorn.Server(config)
-        
-        # Override install_signal_handlers because we are not in main thread
-        self._server_instance.install_signal_handlers = lambda: None
-        
         loop.run_until_complete(self._server_instance.serve())
