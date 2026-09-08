@@ -1,7 +1,6 @@
 import logging
 import threading
-from PySide6.QtCore import QThread, Signal, QObject
-from typing import Dict, List, Optional
+from PySide6.QtCore import QThread, Signal
 from pypost.models.models import RequestData
 from pypost.models.response import ResponseData
 from pypost.models.errors import ErrorCategory, ExecutionError
@@ -96,12 +95,21 @@ class RequestWorker(QThread):
                 request_name=self.request_data.name,
                 retry_callback=on_retry,
             )
-            
+
             if result.script_logs or result.script_error:
                 self.script_output.emit(result.script_logs, result.script_error)
-            
+
             if result.updated_variables:
                 self.env_update.emit(result.updated_variables)
+
+            if result.execution_error is not None:
+                logger.error(
+                    "RequestWorker failed category=%s detail=%s",
+                    result.execution_error.category,
+                    result.execution_error.detail,
+                )
+                self.error.emit(result.execution_error)
+                return
 
             stopped = self._stop_event.is_set()
             logger.debug(

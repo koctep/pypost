@@ -56,6 +56,40 @@ class TestRequestWorkerError(unittest.TestCase):
         self.assertEqual(len(finished), 1)
         self.assertEqual(finished[0].status_code, 200)
 
+    def test_worker_emits_error_from_execution_result(self):
+        from pypost.models.response import ResponseData
+        from pypost.core.request_service import ExecutionResult
+
+        worker = self._make_worker()
+        errors = []
+        finished = []
+        worker.error.connect(errors.append)
+        worker.finished.connect(finished.append)
+        exc = ExecutionError(
+            category=ErrorCategory.NETWORK,
+            message="no connection",
+            detail="connection refused",
+        )
+        result = ExecutionResult(
+            response=ResponseData(
+                status_code=0,
+                headers={},
+                body="error",
+                elapsed_time=0.0,
+                size=5,
+            ),
+            updated_variables={},
+            script_logs=[],
+            script_error=None,
+            execution_error=exc,
+        )
+
+        with patch.object(worker.service, "execute", return_value=result):
+            worker.run()
+
+        self.assertEqual(errors, [exc])
+        self.assertEqual(finished, [])
+
 
 class TestRequestWorkerRetrySignal(unittest.TestCase):
 
@@ -66,7 +100,6 @@ class TestRequestWorkerRetrySignal(unittest.TestCase):
     def test_worker_emits_retry_attempt_signal(self):
         from pypost.core.request_service import ExecutionResult
         from pypost.models.response import ResponseData
-        from pypost.models.retry import RetryPolicy
 
         worker = self._make_worker()
         retry_events = []
