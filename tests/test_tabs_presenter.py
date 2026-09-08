@@ -234,6 +234,17 @@ class TestTabsPresenter(unittest.TestCase):
         self.assertEqual(req.id, sent_request.id)
         self.assertEqual(rm._requests["r1"][1].name, collection_name)
 
+    def test_a_retry_discards_what_the_failed_attempt_streamed(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        p._on_chunk_received(tab, "partial body from attempt 1")
+
+        p._on_retry_attempt(tab, 1, 3)
+
+        self.assertEqual("", tab.response_view.body_view.toPlainText())
+        self.assertIn("Retrying", tab.request_editor.send_btn.text())
+
     def test_started_puts_the_tab_into_the_sending_state(self):
         p = self._make_presenter()
         p.add_new_tab()

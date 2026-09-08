@@ -301,9 +301,12 @@ class TestAlertWebhookIsOffTheRequestThread(unittest.TestCase):
         mgr = self._manager(webhook_url="http://hooks.example.com/alert")
         release = threading.Event()
 
+        def blocking_post(*_args, **_kwargs):
+            release.wait(5)
+            return MagicMock(status_code=200)
+
         with patch(
-            "pypost.core.alert_manager.requests.post",
-            side_effect=lambda *a, **k: release.wait(5) or MagicMock(status_code=200),
+            "pypost.core.alert_manager.requests.post", side_effect=blocking_post,
         ):
             self.addCleanup(release.set)
             for _ in range(WEBHOOK_QUEUE_SIZE + 20):

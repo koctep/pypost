@@ -431,6 +431,9 @@ class TabsPresenter(QObject):
         tab.response_view.size_label.setText(f"Size: {size_bytes} bytes")
 
     def _on_retry_attempt(self, tab: RequestTab, attempt: int, max_retries: int) -> None:
+        # Whatever the failed attempt streamed is not part of the answer. Without
+        # this the next attempt appends to it and the bodies concatenate.
+        tab.response_view.clear_body()
         tab.request_editor.send_btn.setText(
             f"Retrying\u2026 ({attempt} of {max_retries})"
         )
