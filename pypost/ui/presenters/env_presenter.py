@@ -235,7 +235,8 @@ class EnvPresenter(QObject):
         logger.info("env_manager_dialog_closed")
         self._storage.save_environments(self._environments)
         self.load_environments()
-        self._on_env_changed(self._env_selector.currentIndex())
+        if self._env_selector.currentIndex() == 0:
+            self._on_env_changed(0)
 
     def _get_mcp_tools(self) -> list:
         """Returns expose_as_mcp requests from current collections."""

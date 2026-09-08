@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from PySide6.QtWidgets import QApplication, QWidget
 
 from pypost.ui.presenters.env_presenter import EnvPresenter
@@ -243,6 +243,31 @@ class TestEnvPresenter(unittest.TestCase):
         p.load_environments()
         # stays at index 0 (No Environment), on_env_changed NOT triggered for index 0
         self.assertEqual(len(received), 0)
+
+    @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
+    def test_env_manager_emits_selected_environment_once(self, dialog_class):
+        env = _make_env("e1", "Dev", {"TOKEN": "abc"})
+        p = self._make_presenter([env])
+        p._settings.last_environment_id = env.id
+        p.load_environments()
+        received = []
+        p.env_variables_changed.connect(received.append)
+
+        p.handle_open_environments()
+
+        dialog_class.return_value.exec.assert_called_once_with()
+        self.assertEqual(received, [{"TOKEN": "abc"}])
+
+    @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
+    def test_env_manager_emits_deselection_for_empty_environment_list(self, dialog_class):
+        p = self._make_presenter([])
+        received = []
+        p.env_variables_changed.connect(received.append)
+
+        p.handle_open_environments()
+
+        dialog_class.return_value.exec.assert_called_once_with()
+        self.assertEqual(received, [{}])
 
 
 if __name__ == "__main__":
