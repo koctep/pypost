@@ -111,6 +111,12 @@ class RequestService:
             headers_callback(response.status_code, response.headers)
         return response
 
+    @staticmethod
+    def _with_attempts(detail: str | None, attempt: int) -> str:
+        """Record how many attempts were made without discarding the cause."""
+        suffix = f"retries_attempted: {attempt}"
+        return f"{detail} ({suffix})" if detail else suffix
+
     def _execute_http_with_retry(
         self,
         request: RequestData,
@@ -165,7 +171,9 @@ class RequestService:
             except ExecutionError as exc:
                 last_error = exc
                 if attempt == max_retries:
-                    last_error.detail = f"retries_attempted: {attempt}"
+                    last_error.detail = self._with_attempts(
+                        last_error.detail, attempt,
+                    )
                     self._emit_exhaustion_alert(request, request_name, max_retries, last_error)
                     raise last_error
                 logger.warning(
@@ -181,7 +189,7 @@ class RequestService:
                     last_error = ExecutionError(
                         category=ErrorCategory.NETWORK,
                         message=f"HTTP {response.status_code}",
-                        detail=f"retries_attempted: {attempt}",
+                        detail=self._with_attempts(None, attempt),
                     )
                     self._emit_exhaustion_alert(
                         request, request_name, max_retries, last_error
@@ -194,7 +202,7 @@ class RequestService:
                 last_error = ExecutionError(
                     category=ErrorCategory.NETWORK,
                     message=f"HTTP {response.status_code}",
-                    detail=f"retries_attempted: {attempt}",
+                    detail=self._with_attempts(None, attempt),
                 )
 
             # Emit retry signal and track metrics

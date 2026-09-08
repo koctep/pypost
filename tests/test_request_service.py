@@ -311,3 +311,27 @@ class TestExecuteTemplateGuard(unittest.TestCase):
 
         self.assertEqual(ErrorCategory.TEMPLATE, ctx.exception.category)
 
+
+class TestRetryExhaustionDetail(unittest.TestCase):
+    def test_original_cause_survives_the_attempt_count(self):
+        service = RequestService(
+            template_service=TemplateService(),
+            default_retry_policy=RetryPolicy(
+                max_retries=1, retry_delay_seconds=0, retry_backoff_multiplier=1,
+            ),
+        )
+        cause = ExecutionError(
+            category=ErrorCategory.NETWORK,
+            message="no connection",
+            detail="Connection refused by 10.0.0.1:443",
+        )
+
+        with patch.object(service.http_client, "send_request", side_effect=cause):
+            result = service.execute(
+                RequestData(method="GET", url="http://x"), {}
+            )
+
+        detail = result.execution_error.detail
+        self.assertIn("Connection refused by 10.0.0.1:443", detail)
+        self.assertIn("retries_attempted: 1", detail)
+
