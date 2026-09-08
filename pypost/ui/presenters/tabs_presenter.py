@@ -23,6 +23,9 @@ from pypost.models.errors import ErrorCategory, ExecutionError
 
 logger = logging.getLogger(__name__)
 
+# How long teardown waits for a cancelled request worker to unwind.
+WORKER_SHUTDOWN_TIMEOUT_MS = 3000
+
 _ERROR_MESSAGES = {
     ErrorCategory.NETWORK: (
         "Could not connect to {url}. Check that the server is running and reachable."
@@ -224,11 +227,24 @@ class TabsPresenter(QObject):
 
         for worker in workers:
             worker.stop()
+        abandoned = 0
         for worker in workers:
-            worker.wait()
+            # Bounded: cancellation is cooperative and a worker blocked in a socket
+            # read cannot honour it, so an unbounded join holds the quit for as long
+            # as the request would have taken.
+            if not worker.wait(WORKER_SHUTDOWN_TIMEOUT_MS):
+                abandoned += 1
 
         if workers:
-            logger.info("request_workers_shutdown count=%d", len(workers))
+            logger.info(
+                "request_workers_shutdown count=%d abandoned=%d",
+                len(workers), abandoned,
+            )
+        if abandoned:
+            logger.warning(
+                "request_workers_shutdown_timeout count=%d timeout_ms=%d",
+                abandoned, WORKER_SHUTDOWN_TIMEOUT_MS,
+            )
 
     def on_env_variables_changed(self, variables: dict) -> None:
         """Pushes new env vars to all open tabs."""

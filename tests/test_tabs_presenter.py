@@ -2,7 +2,11 @@ import unittest
 from unittest.mock import MagicMock, patch
 from PySide6.QtWidgets import QApplication
 
-from pypost.ui.presenters.tabs_presenter import TabsPresenter, RequestTab
+from pypost.ui.presenters.tabs_presenter import (
+    WORKER_SHUTDOWN_TIMEOUT_MS,
+    RequestTab,
+    TabsPresenter,
+)
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 
@@ -142,8 +146,8 @@ class TestTabsPresenter(unittest.TestCase):
 
         first_worker.stop.assert_called_once_with()
         second_worker.stop.assert_called_once_with()
-        first_worker.wait.assert_called_once_with()
-        second_worker.wait.assert_called_once_with()
+        first_worker.wait.assert_called_once_with(WORKER_SHUTDOWN_TIMEOUT_MS)
+        second_worker.wait.assert_called_once_with(WORKER_SHUTDOWN_TIMEOUT_MS)
 
     def test_shutdown_workers_waits_for_worker_from_closed_tab(self):
         p = self._make_presenter()
@@ -159,7 +163,22 @@ class TestTabsPresenter(unittest.TestCase):
         p.shutdown_workers()
 
         self.assertEqual(worker.stop.call_count, 2)
-        worker.wait.assert_called_once_with()
+        worker.wait.assert_called_once_with(WORKER_SHUTDOWN_TIMEOUT_MS)
+
+    def test_shutdown_workers_gives_up_on_a_worker_that_will_not_stop(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        tab = p.widget.widget(0)
+        stuck = MagicMock()
+        stuck.isRunning.return_value = True
+        stuck.wait.return_value = False  # still running when the timeout expires
+        tab.worker = stuck
+        p._workers.add(stuck)
+
+        p.shutdown_workers()  # must return rather than block on the stuck worker
+
+        stuck.stop.assert_called_once_with()
+        stuck.wait.assert_called_once_with(WORKER_SHUTDOWN_TIMEOUT_MS)
 
     def test_restore_tabs_opens_saved_tabs(self):
         req = _make_request("r1", "Saved Request")
