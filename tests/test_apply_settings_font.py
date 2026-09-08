@@ -81,6 +81,21 @@ class TestApplySettingsFont:
         window.env.apply_settings.assert_called_once_with(settings)
         window.tabs.apply_settings.assert_called_once_with(settings)
 
+    def test_wiring_keeps_the_mcp_tool_list_following_the_collections(self, qapp):
+        """The tool list is a view of the collections and must follow them."""
+        window = _make_window(qapp)
+        window.history_panel = MagicMock()
+        from pypost.ui.main_window import MainWindow
+
+        MainWindow._wire_signals(window)
+
+        window.tabs.request_saved.connect.assert_any_call(
+            window.env.refresh_mcp_tools
+        )
+        window.collections.collections_changed.connect.assert_any_call(
+            window.env.refresh_mcp_tools
+        )
+
     def test_apply_settings_reconfigures_alert_webhook(self, qapp):
         window = _make_window(qapp)
         window._alert_manager = MagicMock()

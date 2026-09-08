@@ -109,7 +109,13 @@ class MCPServerImpl:
         return self.request_service.execute(request_data, context)
 
     def register_tools(self, requests: List[RequestData]):
-        self.tools_map.clear()
+        """Replace the exposed tool list.
+
+        The new map is built to one side and swapped in, so a list_tools call
+        running on the server thread iterates one map or the other and never a
+        half-built one.
+        """
+        mapping: Dict[str, RequestData] = {}
         exposed = [req for req in requests if req.expose_as_mcp]
         normalized = [self._normalize_name(req.name) for req in exposed]
         name_counts = Counter(normalized)
@@ -122,10 +128,12 @@ class MCPServerImpl:
 
             candidate = tool_name
             discriminator = 2
-            while candidate in self.tools_map:
+            while candidate in mapping:
                 candidate = f"{tool_name}_{discriminator}"
                 discriminator += 1
-            self.tools_map[candidate] = req
+            mapping[candidate] = req
+
+        self.tools_map = mapping
 
     def _normalize_name(self, name: str) -> str:
         # Lowercase, spaces->underscores, remove non-alnum

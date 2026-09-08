@@ -239,6 +239,15 @@ class EnvPresenter(QObject):
         if self._env_selector.currentIndex() == 0:
             self._on_env_changed(0)
 
+    def refresh_mcp_tools(self) -> None:
+        """Re-expose the current requests.
+
+        The MCP server's tool list is a view of the collections; saving,
+        renaming or deleting a request has to reach it or it serves a stale
+        list until the environment is reselected.
+        """
+        self._mcp_manager.update_tools(self._get_mcp_tools())
+
     def _get_mcp_tools(self) -> list:
         """Returns expose_as_mcp requests from current collections."""
         tools = []

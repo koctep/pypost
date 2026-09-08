@@ -166,3 +166,20 @@ class TestMCPServerImpl(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RegisterToolsSwapTests(unittest.TestCase):
+    """The tool map is swapped, not mutated: the server thread reads it live."""
+
+    def test_a_previously_read_map_is_not_mutated_by_a_later_registration(self):
+        impl = MCPServerImpl()
+        first = RequestData(id="r1", name="A", expose_as_mcp=True)
+        impl.register_tools([first])
+        observed = impl.tools_map
+
+        impl.register_tools([RequestData(id="r2", name="B", expose_as_mcp=True)])
+
+        self.assertEqual(["a"], list(observed.keys()))
+        self.assertEqual(["b"], list(impl.tools_map.keys()))
+        self.assertIsNot(observed, impl.tools_map)
+

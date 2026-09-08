@@ -57,7 +57,11 @@ class MCPServerManager(QObject):
         return self._server_host.is_running()
 
     def update_tools(self, tools: List[RequestData]):
-        if self.is_running():
-            # Restart to refresh tools
-            self.stop_server()
-            self.start_server(self._current_port, tools, self._current_host)
+        """Refresh the exposed tools in place.
+
+        The server reads the tool map on each list_tools call, so there is
+        nothing to restart -- and restarting would rebind the port and blink the
+        status indicator every time a request is saved.
+        """
+        self._impl.register_tools(tools)
+        logger.debug("mcp_tools_updated count=%d", len(self._impl.tools_map))

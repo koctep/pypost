@@ -142,6 +142,9 @@ class MainWindow(QMainWindow):
         self.tabs.env_update_requested.connect(self.env.on_env_update)
         self.tabs.request_saved.connect(self.collections.load_collections)
         self.tabs.request_saved.connect(self.collections.restore_tree_state)
+        # The MCP tool list is a view of the collections; keep it current.
+        self.tabs.request_saved.connect(self.env.refresh_mcp_tools)
+        self.collections.collections_changed.connect(self.env.refresh_mcp_tools)
         self.tabs.request_executed.connect(self.history_panel.refresh)
         self.history_panel.load_into_editor.connect(self.tabs.load_request_from_history)
 

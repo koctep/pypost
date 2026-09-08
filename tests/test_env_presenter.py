@@ -68,6 +68,9 @@ class FakeMCPManager:
     def set_request_timeout(self, request_timeout):
         self.request_timeout = request_timeout
 
+    def update_tools(self, tools):
+        self.updated_tools = list(tools)
+
     def is_running(self):
         return self._running
 
@@ -213,6 +216,16 @@ class TestEnvPresenter(unittest.TestCase):
         p._on_env_changed(1)
         self.assertEqual(len(p._mcp_manager.started), 1)
         self.assertEqual(p._mcp_manager.started[0][0], 1080)
+
+    def test_refresh_mcp_tools_republishes_the_current_requests(self):
+        exposed = RequestData(id="r1", name="Exposed", expose_as_mcp=True)
+        hidden = RequestData(id="r2", name="Hidden", expose_as_mcp=False)
+        collection = Collection(id="c1", name="API", requests=[exposed, hidden])
+        p = self._make_presenter(collections=[collection])
+
+        p.refresh_mcp_tools()
+
+        self.assertEqual(["r1"], [r.id for r in p._mcp_manager.updated_tools])
 
     def test_mcp_tools_filtered_by_expose_flag(self):
         req_exposed = RequestData(id="r1", name="Tool", expose_as_mcp=True)
