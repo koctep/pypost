@@ -37,3 +37,11 @@ class TestSettingsDialogRequestTimeout:
             assert dlg.get_settings().request_timeout == 99
         finally:
             dlg.close()
+
+    def test_accept_preserves_alert_log_path(self, qapp):
+        dlg = SettingsDialog(AppSettings(alert_log_path="/tmp/pypost-alerts.log"))
+        try:
+            dlg.accept()
+            assert dlg.get_settings().alert_log_path == "/tmp/pypost-alerts.log"
+        finally:
+            dlg.close()

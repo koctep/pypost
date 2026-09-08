@@ -160,6 +160,7 @@ class SettingsDialog(QDialog):
             default_retry_policy=retry_policy,
             alert_webhook_url=webhook_url,
             alert_webhook_auth_header=webhook_auth,
+            alert_log_path=self.current_settings.alert_log_path,
         )
         super().accept()
 
