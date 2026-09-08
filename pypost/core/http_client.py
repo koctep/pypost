@@ -170,27 +170,8 @@ class HTTPClient:
                 headers.setdefault("Accept", "text/event-stream")
                 kwargs["headers"] = headers
             response = self.session.request(**kwargs)
-        except requests.Timeout as exc:
-            logger.error("Request timed out: %s %s", request_data.method, url)
-            raise ExecutionError(
-                category=ErrorCategory.TIMEOUT,
-                message=f"Request to {url} timed out.",
-                detail=str(exc),
-            ) from exc
-        except requests.ConnectionError as exc:
-            logger.error("Connection failed: %s %s", request_data.method, url)
-            raise ExecutionError(
-                category=ErrorCategory.NETWORK,
-                message=f"Could not connect to {url}.",
-                detail=str(exc),
-            ) from exc
         except requests.RequestException as exc:
-            logger.error("Request failed: %s %s — %s", request_data.method, url, exc)
-            raise ExecutionError(
-                category=ErrorCategory.UNKNOWN,
-                message="An unexpected request error occurred.",
-                detail=str(exc),
-            ) from exc
+            raise self._as_execution_error(exc, url, request_data.method) from exc
 
         if headers_callback:
             headers_callback(response.status_code, dict(response.headers))
@@ -201,6 +182,70 @@ class HTTPClient:
         ):
             return self._handle_sse_response(response, request_data, start_time)
 
+        try:
+            content = self._read_body(
+                response, stream_callback, stop_flag,
+            )
+        except requests.RequestException as exc:
+            # The body arrives after the response object does. A reset or a read
+            # timeout part-way through is still a transport failure, and has to be
+            # reported -- and retried -- as one rather than escaping raw.
+            response.close()
+            raise self._as_execution_error(exc, url, request_data.method) from exc
+
+        end_time = time.time()
+
+        # 3. Process response
+        if self._metrics:
+            self._metrics.track_response_received(
+                request_data.method, str(response.status_code),
+            )
+        logger.debug(
+            "request_complete method=%s status=%d elapsed_ms=%.0f size=%d",
+            request_data.method,
+            response.status_code,
+            (end_time - start_time) * 1000,
+            len(content.encode("utf-8")),
+        )
+        return ResponseData(
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            body=content,
+            elapsed_time=end_time - start_time,
+            size=len(content.encode("utf-8")),
+        )
+
+    def _as_execution_error(
+        self, exc: Exception, url: str, method: str,
+    ) -> ExecutionError:
+        """Map a transport failure onto the category the UI and retry policy read."""
+        if isinstance(exc, requests.Timeout):
+            logger.error("Request timed out: %s %s", method, url)
+            return ExecutionError(
+                category=ErrorCategory.TIMEOUT,
+                message=f"Request to {url} timed out.",
+                detail=str(exc),
+            )
+        if isinstance(exc, requests.ConnectionError):
+            logger.error("Connection failed: %s %s", method, url)
+            return ExecutionError(
+                category=ErrorCategory.NETWORK,
+                message=f"Could not connect to {url}.",
+                detail=str(exc),
+            )
+        logger.error("Request failed: %s %s — %s", method, url, exc)
+        return ExecutionError(
+            category=ErrorCategory.UNKNOWN,
+            message="An unexpected request error occurred.",
+            detail=str(exc),
+        )
+
+    def _read_body(
+        self,
+        response,
+        stream_callback: Callable[[str], None] | None,
+        stop_flag: Callable[[], bool] | None,
+    ) -> str:
         content_parts = []
         # iter_content with None uses optimal chunk size from server (or fallback).
         # Default yields bytes; decode here so mocks and real responses stay aligned.
@@ -240,24 +285,4 @@ class HTTPClient:
             if stream_callback:
                 stream_callback(trailing)
 
-        content = "".join(content_parts)
-
-        end_time = time.time()
-
-        # 3. Process response
-        if self._metrics:
-            self._metrics.track_response_received(request_data.method, str(response.status_code))
-        logger.debug(
-            "request_complete method=%s status=%d elapsed_ms=%.0f size=%d",
-            request_data.method,
-            response.status_code,
-            (end_time - start_time) * 1000,
-            len(content.encode("utf-8")),
-        )
-        return ResponseData(
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            body=content,
-            elapsed_time=end_time - start_time,
-            size=len(content.encode('utf-8')) # Calculate size from content
-        )
+        return "".join(content_parts)

@@ -194,3 +194,50 @@ class TestHTTPClientChunkDecoding(unittest.TestCase):
 
         self.assertEqual("already text", result.body)
 
+
+class TestHTTPClientMidStreamFailures(unittest.TestCase):
+    """The body arrives after the response object; failures there are transport failures."""
+
+    def setUp(self):
+        self.client = HTTPClient(
+            metrics=MagicMock(), template_service=TemplateService()
+        )
+        self.client.session = MagicMock()
+
+    def _send_with_stream_error(self, exc):
+        resp = _make_response()
+        resp.iter_content.side_effect = exc
+        self.client.session.request.return_value = resp
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client.send_request(RequestData(method="GET", url="http://x"))
+        return resp, ctx.exception
+
+    def test_connection_reset_mid_stream_is_a_network_error(self):
+        _resp, error = self._send_with_stream_error(
+            requests_lib.ConnectionError("reset by peer")
+        )
+
+        self.assertEqual(ErrorCategory.NETWORK, error.category)
+        self.assertIn("reset by peer", error.detail)
+
+    def test_read_timeout_mid_stream_is_a_timeout(self):
+        _resp, error = self._send_with_stream_error(
+            requests_lib.ReadTimeout("read timed out")
+        )
+
+        self.assertEqual(ErrorCategory.TIMEOUT, error.category)
+
+    def test_chunked_encoding_error_is_reported_not_raised_raw(self):
+        _resp, error = self._send_with_stream_error(
+            requests_lib.exceptions.ChunkedEncodingError("truncated")
+        )
+
+        self.assertEqual(ErrorCategory.UNKNOWN, error.category)
+
+    def test_the_response_is_closed_when_the_stream_fails(self):
+        resp, _error = self._send_with_stream_error(
+            requests_lib.ConnectionError("reset by peer")
+        )
+
+        resp.close.assert_called()
+
