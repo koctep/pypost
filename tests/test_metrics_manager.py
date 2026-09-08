@@ -99,12 +99,21 @@ class TestMetricsManagerRetryExhaustion(unittest.TestCase):
 
     def test_track_request_retry_exhaustion(self):
         mm = MetricsManager()
-        mm.track_request_retry_exhaustion("https://api.example/x")
+        mm.track_request_retry_exhaustion("get")
         out = _scrape(mm)
         self.assertIn(
-            'request_retry_exhaustions_total{endpoint="https://api.example/x"} 1.0',
+            'request_retry_exhaustions_total{method="GET"} 1.0',
             out,
         )
+
+    def test_retry_exhaustion_is_not_labelled_per_url(self):
+        """A label per distinct URL is unbounded cardinality."""
+        mm = MetricsManager()
+        mm.track_request_retry_exhaustion("GET")
+        mm.track_request_retry_exhaustion("GET")
+        out = _scrape(mm)
+        self.assertNotIn("endpoint=", out)
+        self.assertIn('request_retry_exhaustions_total{method="GET"} 2.0', out)
 
 
 class TestMetricsManagerMcpResource(unittest.TestCase):

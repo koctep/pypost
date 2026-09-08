@@ -233,7 +233,21 @@ class TestExhaustionAlert(unittest.TestCase):
         svc.http_client.send_request.side_effect = exc
         req = _make_request(max_retries=1)
         svc.execute(req)
-        metrics.track_request_retry_exhaustion.assert_called_once_with(req.url)
+        metrics.track_request_retry_exhaustion.assert_called_once_with(req.method)
+
+    def test_the_endpoint_is_still_reported_through_the_alert(self):
+        """Dropped from the metric label, not lost: alerts carry the endpoint."""
+        alert_manager = MagicMock(spec=AlertManager)
+        svc = _make_service(alert_manager=alert_manager)
+        svc.http_client.send_request.side_effect = ExecutionError(
+            category=ErrorCategory.NETWORK, message="fail",
+        )
+        req = _make_request(max_retries=1)
+
+        svc.execute(req)
+
+        payload = alert_manager.emit.call_args[0][0]
+        self.assertEqual(req.url, payload.endpoint)
 
     def test_alert_manager_emit_called_on_exhaustion(self):
         alert_manager = MagicMock(spec=AlertManager)
@@ -300,7 +314,7 @@ class TestRetryableStatusExhaustion(unittest.TestCase):
         svc.http_client.send_request.return_value = _make_response(502)
         req = _make_request(max_retries=0)
         svc.execute(req)
-        metrics.track_request_retry_exhaustion.assert_called_once_with(req.url)
+        metrics.track_request_retry_exhaustion.assert_called_once_with(req.method)
 
     def test_alert_manager_emit_on_status_exhaustion(self):
         alert_manager = MagicMock(spec=AlertManager)

@@ -142,7 +142,10 @@ class MetricsManager:
         self._request_retry_exhaustions_total = Counter(
             'request_retry_exhaustions_total',
             'Outbound HTTP requests where all configured retries were exhausted',
-            ['endpoint'],
+            # Labelled by method, not by URL: a label per distinct URL, query
+            # string included, is unbounded cardinality. The alert payload
+            # carries the endpoint for anyone who needs to know which one.
+            ['method'],
             registry=self.registry,
         )
         self.template_expression_render_attempts = Counter(
@@ -305,8 +308,8 @@ class MetricsManager:
             method=method.upper(), status_category=status_category
         ).inc()
 
-    def track_request_retry_exhaustion(self, endpoint: str) -> None:
-        self._request_retry_exhaustions_total.labels(endpoint=endpoint).inc()
+    def track_request_retry_exhaustion(self, method: str) -> None:
+        self._request_retry_exhaustions_total.labels(method=method.upper()).inc()
 
     def track_template_expression_render_attempt(
         self, render_path: str, outcome: str,

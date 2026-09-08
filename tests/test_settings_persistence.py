@@ -145,6 +145,10 @@ class TestStateManagerPersistence(unittest.TestCase):
         self.assertEqual([], sm.get_expanded_collections())
         self.assertEqual([], sm.get_open_tabs())
 
+    def test_metrics_bind_to_loopback_by_default(self):
+        """The metrics endpoint also mounts the MCP server, and neither is authenticated."""
+        self.assertEqual("127.0.0.1", AppSettings().metrics_host)
+
     def test_replace_settings_is_adopted_and_persisted(self):
         cm, _td = self._cm_and_td()
         sm = StateManager(cm)

@@ -18,7 +18,9 @@ class AppSettings(BaseModel):
     mcp_port: int = 1080
     mcp_host: str = "127.0.0.1"
     metrics_port: int = 9080
-    metrics_host: str = "0.0.0.0"
+    # Loopback by default: the metrics endpoint also mounts the MCP server, and
+    # neither is authenticated. Binding every interface is opt-in.
+    metrics_host: str = "127.0.0.1"
     default_retry_policy: Optional[RetryPolicy] = None
     alert_webhook_url: Optional[str] = None
     alert_webhook_auth_header: Optional[str] = None
