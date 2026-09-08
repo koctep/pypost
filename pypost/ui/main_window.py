@@ -83,6 +83,7 @@ class MainWindow(QMainWindow):
         self.tabs.restore_tabs()
         self.collections.restore_tree_state()
         self._startup_settings_reapplied = False
+        self._shutdown_complete = False
         self.apply_settings(self.settings)
         logger.info("main_window_initialized")
 
@@ -223,6 +224,18 @@ class MainWindow(QMainWindow):
     def handle_exit(self) -> None:
         logger.info("main_window_exit_requested")
         QApplication.instance().quit()
+
+    def shutdown(self) -> None:
+        """Release background workers and services before process teardown."""
+        if self._shutdown_complete:
+            return
+        self._shutdown_complete = True
+
+        self.tabs.shutdown_workers()
+        self.mcp_manager.stop_server()
+        if self._alert_manager is not None:
+            self._alert_manager.close()
+        logger.info("main_window_shutdown_completed")
 
     def handle_show_hotkeys(self) -> None:
         HotkeysDialog(self).exec()

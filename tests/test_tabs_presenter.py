@@ -124,6 +124,43 @@ class TestTabsPresenter(unittest.TestCase):
         p.close_tab(0)
         self.assertEqual(p.widget.count(), 1)
 
+    def test_shutdown_workers_stops_all_running_workers_before_waiting(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        first_tab = p.widget.widget(0)
+        first_worker = MagicMock()
+        first_worker.isRunning.return_value = True
+        first_tab.worker = first_worker
+        p.add_new_tab()
+        second_tab = p.widget.widget(1)
+        second_worker = MagicMock()
+        second_worker.isRunning.return_value = True
+        second_tab.worker = second_worker
+        p._workers.update({first_worker, second_worker})
+
+        p.shutdown_workers()
+
+        first_worker.stop.assert_called_once_with()
+        second_worker.stop.assert_called_once_with()
+        first_worker.wait.assert_called_once_with()
+        second_worker.wait.assert_called_once_with()
+
+    def test_shutdown_workers_waits_for_worker_from_closed_tab(self):
+        p = self._make_presenter()
+        p.add_new_tab()
+        p.add_new_tab()
+        closed_tab = p.widget.widget(0)
+        worker = MagicMock()
+        worker.isRunning.return_value = True
+        closed_tab.worker = worker
+        p._workers.add(worker)
+
+        p.close_tab(0)
+        p.shutdown_workers()
+
+        self.assertEqual(worker.stop.call_count, 2)
+        worker.wait.assert_called_once_with()
+
     def test_restore_tabs_opens_saved_tabs(self):
         req = _make_request("r1", "Saved Request")
         p = self._make_presenter(requests=[req], open_tabs=["r1"])

@@ -58,9 +58,11 @@ def main():
 
     exit_code = app.exec()
 
-    # Stop metrics server on exit
     logger.info("PyPost shutting down")
-    metrics_manager.stop_server()
+    try:
+        window.shutdown()
+    finally:
+        metrics_manager.stop_server()
 
     sys.exit(exit_code)
 

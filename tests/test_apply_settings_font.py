@@ -42,6 +42,17 @@ def _make_window(qapp):
 
 class TestApplySettingsFont:
 
+    def test_shutdown_releases_background_services_once(self, qapp):
+        window = _make_window(qapp)
+        window._alert_manager = MagicMock()
+
+        window.shutdown()
+        window.shutdown()
+
+        window.tabs.shutdown_workers.assert_called_once_with()
+        window.mcp_manager.stop_server.assert_called_once_with()
+        window._alert_manager.close.assert_called_once_with()
+
     def test_apply_settings_synchronizes_settings_consumers(self, qapp):
         window = _make_window(qapp)
         settings = AppSettings(font_size=16, mcp_port=2345)

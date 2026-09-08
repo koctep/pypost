@@ -109,6 +109,7 @@ class TabsPresenter(QObject):
         self._history_manager = history_manager
         self._template_service = template_service
         self._alert_manager = alert_manager
+        self._workers: set[RequestWorker] = set()
         logger.debug("TabsPresenter: alert_manager_injected=%s", alert_manager is not None)
         self._current_variables: dict = {}
         self._current_hidden_keys: set = set()
@@ -216,6 +217,18 @@ class TabsPresenter(QObject):
             if isinstance(tab, RequestTab) and tab.request_data and tab.request_data.id:
                 open_ids.append(tab.request_data.id)
         self._state_manager.set_open_tabs(open_ids)
+
+    def shutdown_workers(self) -> None:
+        """Cancel and join every request worker before application teardown."""
+        workers = [worker for worker in self._workers if worker.isRunning()]
+
+        for worker in workers:
+            worker.stop()
+        for worker in workers:
+            worker.wait()
+
+        if workers:
+            logger.info("request_workers_shutdown count=%d", len(workers))
 
     def on_env_variables_changed(self, variables: dict) -> None:
         """Pushes new env vars to all open tabs."""
@@ -410,7 +423,10 @@ class TabsPresenter(QObject):
         )
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
+        worker.finished.connect(lambda _response, w=worker: self._workers.discard(w))
+        worker.error.connect(lambda _error, w=worker: self._workers.discard(w))
         sender_tab.worker = worker
+        self._workers.add(worker)
         worker.start()
 
     def load_request_from_history(self, request_data: RequestData) -> None:
