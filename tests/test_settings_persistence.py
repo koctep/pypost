@@ -58,6 +58,26 @@ class TestConfigManagerPersistence(unittest.TestCase):
                 s = ConfigManager().load_config()
                 self.assertEqual(s, AppSettings())
 
+    def test_failed_replace_preserves_file_and_revision(self):
+        with tempfile.TemporaryDirectory() as td:
+            with patch("pypost.core.config_manager.user_config_dir", return_value=td):
+                cm = ConfigManager()
+                settings = AppSettings(font_size=14)
+                cm.save_config(settings)
+                original = cm.config_path.read_text(encoding="utf-8")
+                settings.font_size = 22
+
+                with patch(
+                    "pypost.core.config_manager.os.replace",
+                    side_effect=OSError("replace failed"),
+                ):
+                    with self.assertRaisesRegex(OSError, "replace failed"):
+                        cm.save_config(settings)
+
+                self.assertEqual(settings.revision, 1)
+                self.assertEqual(cm.config_path.read_text(encoding="utf-8"), original)
+                self.assertFalse(cm.config_path.with_suffix(".json.tmp").exists())
+
 
 class TestStateManagerPersistence(unittest.TestCase):
     def _cm_and_td(self):
