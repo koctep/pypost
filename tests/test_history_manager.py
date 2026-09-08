@@ -4,6 +4,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from pypost.core.history_manager import HistoryManager
 from pypost.models.models import HistoryEntry
@@ -145,3 +146,62 @@ def _manager_at(tmp_dir: str, max_entries: int = 500, path: Path | None = None) 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHistoryManagerDurability(unittest.TestCase):
+    """History replaces its file atomically, as the other stores do."""
+
+    def test_failed_replace_keeps_the_previous_history(self):
+        with tempfile.TemporaryDirectory() as td:
+            hm = _manager_at(td)
+            hm.append(_make_entry(url="https://example.com/first"))
+            hm.flush()
+            before = Path(td, "history.json").read_text(encoding="utf-8")
+
+            with patch(
+                "pypost.core.history_manager.os.replace",
+                side_effect=OSError("replace failed"),
+            ):
+                hm.append(_make_entry(url="https://example.com/second"))
+                hm.flush()
+
+            self.assertEqual(
+                before, Path(td, "history.json").read_text(encoding="utf-8")
+            )
+
+    def test_failed_replace_leaves_no_temporary_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            hm = _manager_at(td)
+
+            with patch(
+                "pypost.core.history_manager.os.replace",
+                side_effect=OSError("replace failed"),
+            ):
+                hm.append(_make_entry())
+                hm.flush()
+
+            self.assertFalse(Path(td, "history.json.tmp").exists())
+
+    def test_flush_waits_for_a_save_started_on_another_thread(self):
+        """Behavioural cover for flush(), not a probe of the publication race.
+
+        The race it guards against -- flush() reading _save_thread before
+        _save_async has published it -- has too narrow a window to provoke
+        reliably, so this asserts the contract rather than the timing.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            hm = _manager_at(td)
+
+            def append_from_another_thread():
+                hm.append(_make_entry(url="https://example.com/other"))
+
+            worker = threading.Thread(target=append_from_another_thread)
+            worker.start()
+            worker.join()
+            hm.flush()
+
+            saved = json.loads(Path(td, "history.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                ["https://example.com/other"], [e["url"] for e in saved]
+            )
+

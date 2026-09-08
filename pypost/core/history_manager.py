@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -108,10 +109,7 @@ class HistoryManager:
                     snapshot = list(self._entries)
                 _t0 = time.monotonic()
                 try:
-                    self._history_path.parent.mkdir(parents=True, exist_ok=True)
-                    data = [e.model_dump() for e in snapshot]
-                    with open(self._history_path, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=2)
+                    self._write(snapshot)
                     logger.debug(
                         "history_manager_saved count=%d elapsed_ms=%.1f",
                         len(snapshot),
@@ -129,8 +127,29 @@ class HistoryManager:
                         return
                     self._save_pending = False
 
-        self._save_thread = t = threading.Thread(target=_run, daemon=True)
-        t.start()
+        thread = threading.Thread(target=_run, daemon=True)
+        # Published under the lock: flush() reads this field, and a save started
+        # from another thread must not be waited on before it is recorded.
+        with self._save_lock:
+            self._save_thread = thread
+        thread.start()
+
+    def _write(self, entries: List[HistoryEntry]) -> None:
+        """Replace history.json atomically.
+
+        A plain write truncates first, so a crash or a full disk part-way
+        through leaves no history at all rather than the previous history.
+        """
+        self._history_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self._history_path.with_suffix(".json.tmp")
+        data = [e.model_dump() for e in entries]
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp_path, self._history_path)
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
 
     def flush(self) -> None:
         """Block until any in-progress async save has completed.
