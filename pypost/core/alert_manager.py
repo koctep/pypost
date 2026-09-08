@@ -104,6 +104,15 @@ class AlertManager:
     def __exit__(self, *_: object) -> None:
         self.close()
 
+    def configure_webhook(
+        self,
+        webhook_url: Optional[str],
+        webhook_auth_header: Optional[str],
+    ) -> None:
+        """Apply webhook settings without replacing the log handler."""
+        self._webhook_url = webhook_url
+        self._webhook_auth_header = webhook_auth_header
+
     def emit(self, payload: AlertPayload) -> None:
         """Write JSON alert to the rotating log file and optionally send to webhook."""
         self._logger.info(json.dumps(payload.to_dict()))

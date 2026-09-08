@@ -169,6 +169,11 @@ class MainWindow(QMainWindow):
         self.settings = settings
         self.state_manager.settings = settings
         self.env.apply_settings(settings)
+        if self._alert_manager is not None:
+            self._alert_manager.configure_webhook(
+                settings.alert_webhook_url,
+                settings.alert_webhook_auth_header,
+            )
         logger.debug("apply_settings_start font_size=%d", settings.font_size)
         app = QApplication.instance()
         if app:

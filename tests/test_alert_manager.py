@@ -66,7 +66,11 @@ class TestAlertManagerLogFile(unittest.TestCase):
         mgr = self._make_manager()
         for i in range(3):
             mgr.emit(_make_payload(retries_attempted=i))
-        lines = [l for l in self.log_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        lines = [
+            line
+            for line in self.log_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
         self.assertEqual(len(lines), 3)
 
     def test_log_file_created_automatically(self):
@@ -165,6 +169,21 @@ class TestAlertManagerWebhook(unittest.TestCase):
         _, kwargs = mock_post.call_args
         self.assertEqual(kwargs["timeout"], 5.0)
 
+    def test_configure_webhook_applies_new_url_and_auth(self):
+        mgr = AlertManager(log_path=self.log_path)
+        mgr.configure_webhook(
+            "http://hooks.example.com/new",
+            "Bearer new-token",
+        )
+
+        with patch("pypost.core.alert_manager.requests.post") as mock_post:
+            mock_post.return_value = MagicMock(status_code=200)
+            mgr.emit(_make_payload())
+
+        args, kwargs = mock_post.call_args
+        self.assertEqual(args[0], "http://hooks.example.com/new")
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer new-token")
+
 
 class TestAlertManagerAccumulation(unittest.TestCase):
     """Regression tests for handler accumulation via id() reuse and missing close()."""
@@ -176,7 +195,13 @@ class TestAlertManagerAccumulation(unittest.TestCase):
     def _line_count(self) -> int:
         if not self.log_path.exists():
             return 0
-        return len([l for l in self.log_path.read_text(encoding="utf-8").splitlines() if l.strip()])
+        return len(
+            [
+                line
+                for line in self.log_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+        )
 
     def test_no_accumulation_via_close(self):
         """Each closed manager writes exactly one line; N+1 managers write N+1 lines."""

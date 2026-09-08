@@ -53,6 +53,21 @@ class TestApplySettingsFont:
         window.env.apply_settings.assert_called_once_with(settings)
         window.tabs.apply_settings.assert_called_once_with(settings)
 
+    def test_apply_settings_reconfigures_alert_webhook(self, qapp):
+        window = _make_window(qapp)
+        window._alert_manager = MagicMock()
+        settings = AppSettings(
+            alert_webhook_url="http://hooks.example.com/new",
+            alert_webhook_auth_header="Bearer new-token",
+        )
+
+        window.apply_settings(settings)
+
+        window._alert_manager.configure_webhook.assert_called_once_with(
+            "http://hooks.example.com/new",
+            "Bearer new-token",
+        )
+
     def test_font_size_applied_after_stylesheet(self, qapp):
         window = _make_window(qapp)
         settings = AppSettings(font_size=16)
