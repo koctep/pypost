@@ -116,6 +116,41 @@ class TestMetricsManagerRetryExhaustion(unittest.TestCase):
         self.assertIn('request_retry_exhaustions_total{method="GET"} 2.0', out)
 
 
+class TestMetricsResourceThroughTheProtocol(unittest.TestCase):
+    """Driven through the SDK handler, which is where it was broken.
+
+    Calling read_resource directly with a string passed while the protocol
+    path -- an AnyUrl, and a different contents type -- could not work at all.
+    """
+
+    def _read(self, mm, uri):
+        from mcp import types
+
+        handler = mm.mcp_server.request_handlers[types.ReadResourceRequest]
+        request = types.ReadResourceRequest(
+            method="resources/read",
+            params=types.ReadResourceRequestParams(uri=uri),
+        )
+        return asyncio.run(handler(request))
+
+    def test_the_advertised_resource_can_be_read(self):
+        mm = MetricsManager()
+
+        listed = asyncio.run(mm.list_resources())
+        result = self._read(mm, listed[0].uri)
+
+        contents = result.root.contents
+        self.assertEqual(1, len(contents))
+        self.assertIn("gui_send_clicks_total", contents[0].text)
+        self.assertEqual("text/plain", contents[0].mimeType)
+
+    def test_an_unknown_resource_is_rejected(self):
+        mm = MetricsManager()
+
+        with self.assertRaises(Exception):
+            self._read(mm, "metrics://nope")
+
+
 class TestMetricsManagerMcpResource(unittest.TestCase):
     def test_read_resource_metrics_success(self):
         mm = MetricsManager()

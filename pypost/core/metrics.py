@@ -3,13 +3,16 @@ from starlette.applications import Starlette
 from starlette.routing import Mount
 from prometheus_client import make_asgi_app, CollectorRegistry, Counter, generate_latest
 from mcp.server import Server
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.sse import SseServerTransport
-from mcp.types import Resource, TextResourceContents
+from mcp.types import Resource
 
 from pypost.core.asgi_server_host import AsgiServerHost
 from pypost.models.errors import ErrorCategory
 
 logger = logging.getLogger(__name__)
+
+METRICS_RESOURCE_URI = "metrics://all"
 
 
 class MetricsManager:
@@ -164,23 +167,26 @@ class MetricsManager:
     # MCP Resource Handlers
     async def list_resources(self) -> list[Resource]:
         return [Resource(
-            uri="metrics://all",
+            uri=METRICS_RESOURCE_URI,
             name="All Metrics",
             description="Prometheus metrics in text format",
             mimeType="text/plain"
         )]
 
-    async def read_resource(self, uri: str) -> list[TextResourceContents]:
-        if uri == "metrics://all":
+    async def read_resource(self, uri) -> list[ReadResourceContents]:
+        # The SDK hands this an AnyUrl, which never compares equal to a string.
+        if str(uri) == METRICS_RESOURCE_URI:
             # Track access via existing metric
             self.track_mcp_request_received("read_resource:metrics")
             try:
                 data = generate_latest(self.registry).decode('utf-8')
                 self.track_mcp_response_sent("read_resource:metrics", "success")
-                return [TextResourceContents(
-                    uri=uri,
-                    mimeType="text/plain",
-                    text=data
+                # ReadResourceContents, not TextResourceContents: the SDK reads
+                # .content and .mime_type off what it is given, and builds the
+                # wire type itself.
+                return [ReadResourceContents(
+                    content=data,
+                    mime_type="text/plain",
                 )]
             except Exception:
                 self.track_mcp_response_sent("read_resource:metrics", "error")
