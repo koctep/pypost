@@ -9,6 +9,11 @@ logger = logging.getLogger(__name__)
 class RequestManager:
     """
     Manages the lifecycle of requests and collections, abstracting storage operations.
+
+    Everything handed out crosses into the UI, so it is copied on the way out and
+    on the way in. Sharing the stored object instead lets an unsaved edit in an
+    editor reach the collection -- and, through the MCP tool list, the requests a
+    background server executes -- with nothing having been saved.
     """
     def __init__(self, storage_manager: StorageManager):
         self.storage = storage_manager
@@ -29,14 +34,19 @@ class RequestManager:
                 self._request_index[req.id] = (req, col)
 
     def get_collections(self) -> List[Collection]:
-        return self.collections
+        """Copies: a caller mutating the result must not edit stored state."""
+        return [col.model_copy(deep=True) for col in self.collections]
 
     def find_request(self, request_id: str) -> Optional[Tuple[RequestData, Collection]]:
         """
         Finds a request by ID.
-        Returns a tuple (RequestData, Collection) or None if not found.
+        Returns a copied tuple (RequestData, Collection) or None if not found.
         """
-        return self._request_index.get(request_id)
+        found = self._request_index.get(request_id)
+        if found is None:
+            return None
+        request, collection = found
+        return request.model_copy(deep=True), collection.model_copy(deep=True)
 
     def save_request(self, request: RequestData, collection_id: str):
         """
@@ -52,16 +62,20 @@ class RequestManager:
         if not target_collection:
             raise ValueError(f"Collection with ID {collection_id} not found")
 
+        # Copied on the way in as well: the caller keeps editing its own object
+        # after saving, and those edits must not reach the collection unsaved.
+        stored = request.model_copy(deep=True)
+
         # Update or Add
         found = False
         for i, req in enumerate(target_collection.requests):
-            if req.id == request.id:
-                target_collection.requests[i] = request
+            if req.id == stored.id:
+                target_collection.requests[i] = stored
                 found = True
                 break
 
         if not found:
-            target_collection.requests.append(request)
+            target_collection.requests.append(stored)
 
         # Persist
         self.storage.save_collection(target_collection)
@@ -76,7 +90,8 @@ class RequestManager:
         new_col = Collection(id=str(uuid.uuid4()), name=name, requests=[])
         self.collections.append(new_col)
         self.storage.save_collection(new_col)
-        return new_col
+        self._rebuild_index()
+        return new_col.model_copy(deep=True)
 
     def delete_request(self, request_id: str) -> bool:
         """Deletes a request by ID from its collection."""

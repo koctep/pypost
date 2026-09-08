@@ -120,3 +120,53 @@ class TestRequestManagerDeleteIndex(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRequestManagerBoundaryCopies(unittest.TestCase):
+    """Domain objects are copied on the way out of the core, and on the way in.
+
+    Handing out the stored object lets an unsaved edit in an editor reach the
+    collection, and through the MCP tool list the requests a background server
+    executes, with nothing having been saved.
+    """
+
+    def setUp(self):
+        self.request = RequestData(id="r1", name="Get users", url="http://real")
+        self.collection = Collection(id="c1", name="Team API", requests=[self.request])
+        self.storage = FakeStorageManager([self.collection])
+        self.manager = RequestManager(self.storage)
+
+    def _stored_url(self):
+        return self.manager.find_request("r1")[0].url
+
+    def test_mutating_find_request_result_does_not_reach_storage(self):
+        found, _collection = self.manager.find_request("r1")
+        found.url = "http://edited-but-never-saved"
+
+        self.assertEqual("http://real", self._stored_url())
+
+    def test_mutating_find_request_collection_does_not_reach_storage(self):
+        _request, collection = self.manager.find_request("r1")
+        collection.requests.clear()
+
+        self.assertIsNotNone(self.manager.find_request("r1"))
+
+    def test_mutating_get_collections_result_does_not_reach_storage(self):
+        collections = self.manager.get_collections()
+        collections[0].requests[0].url = "http://edited-but-never-saved"
+        collections[0].name = "Renamed but never saved"
+
+        self.assertEqual("http://real", self._stored_url())
+        self.assertEqual("Team API", self.manager.get_collections()[0].name)
+
+    def test_editing_a_request_after_saving_it_does_not_reach_storage(self):
+        outgoing = RequestData(id="r2", name="New", url="http://saved")
+        self.manager.save_request(outgoing, "c1")
+
+        outgoing.url = "http://edited-after-save"
+
+        self.assertEqual("http://saved", self.manager.find_request("r2")[0].url)
+
+    def test_find_request_still_returns_none_for_an_unknown_id(self):
+        self.assertIsNone(self.manager.find_request("nope"))
+
