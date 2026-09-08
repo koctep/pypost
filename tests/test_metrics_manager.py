@@ -1,10 +1,8 @@
 """Unit tests for MetricsManager Prometheus counter tracking (PYPOST-79)."""
 
 import asyncio
-import threading
-import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 from prometheus_client import generate_latest
 
@@ -132,86 +130,30 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class MetricsServerLifecycleTests(unittest.TestCase):
-    """start_server on a live server must restart it, not deadlock.
+class MetricsServerDelegationTests(unittest.TestCase):
+    """The lifecycle itself lives in AsgiServerHost; this only checks the wiring."""
 
-    start_server holds server_lock while calling stop_server, which takes the
-    same lock; a non-reentrant lock hangs the caller there forever.
-    """
-
-    @staticmethod
-    def _fake_uvicorn(manager):
-        """Stand in for _run_uvicorn: alive until stop_server asks it to exit."""
-        def run(self):
-            while not self.server_instance.should_exit:
-                time.sleep(0.01)
-        return patch.object(type(manager), "_run_uvicorn", run)
-
-    def _release_on_cleanup(self, manager):
-        """Stop the fake server without taking server_lock.
-
-        Cleaning up through stop_server would itself block on the lock the
-        deadlock leaves held, turning a failed assertion into a hung suite.
-        """
-        def release():
-            if manager.server_instance is not None:
-                manager.server_instance.should_exit = True
-        self.addCleanup(release)
-
-    def test_start_on_a_live_server_does_not_deadlock(self):
+    def _manager(self):
         manager = MetricsManager()
-        with self._fake_uvicorn(manager):
-            manager.start_server("127.0.0.1", 9099)
-            self._release_on_cleanup(manager)
+        manager._server_host = MagicMock()
+        return manager
 
-            done = threading.Event()
+    def test_start_server_delegates(self):
+        manager = self._manager()
+        manager.start_server("127.0.0.1", 9099)
+        manager._server_host.start.assert_called_once_with("127.0.0.1", 9099)
 
-            def restart():
-                manager.start_server("127.0.0.1", 9100)
-                done.set()
+    def test_stop_server_delegates(self):
+        manager = self._manager()
+        manager.stop_server()
+        manager._server_host.stop.assert_called_once_with()
 
-            worker = threading.Thread(target=restart, daemon=True)
-            worker.start()
+    def test_restart_server_delegates(self):
+        manager = self._manager()
+        manager.restart_server("127.0.0.1", 9101)
+        manager._server_host.restart.assert_called_once_with("127.0.0.1", 9101)
 
-            self.assertTrue(
-                done.wait(5), "start_server deadlocked against its own stop_server"
-            )
-            self.assertEqual(9100, manager._current_port)
 
-    def test_server_is_reachable_the_moment_start_returns(self):
-        """Built in the caller, not in the thread.
-
-        Assigning it inside _run_uvicorn lets a stop that arrives first read
-        None, skip should_exit, and leave the server serving.
-        """
-        manager = MetricsManager()
-        with self._fake_uvicorn(manager):
-            manager.start_server("127.0.0.1", 9099)
-            self._release_on_cleanup(manager)
-
-            self.assertIsNotNone(manager.server_instance)
-
-    def test_stop_right_after_start_asks_the_server_to_exit(self):
-        manager = MetricsManager()
-        with self._fake_uvicorn(manager):
-            manager.start_server("127.0.0.1", 9099)
-            server = manager.server_instance
-            self._release_on_cleanup(manager)
-
-            manager.stop_server()
-
-            self.assertTrue(server.should_exit)
-            self.assertIsNone(manager.server_instance)
-            self.assertIsNone(manager.thread)
-
-    def test_restart_server_rebinds_the_new_port(self):
-        manager = MetricsManager()
-        with self._fake_uvicorn(manager):
-            manager.start_server("127.0.0.1", 9099)
-            self._release_on_cleanup(manager)
-
-            manager.restart_server("127.0.0.1", 9101)
-
-            self.assertEqual(9101, manager._current_port)
-            self.assertTrue(manager.thread.is_alive())
+if __name__ == "__main__":
+    unittest.main()
 

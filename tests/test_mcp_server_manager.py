@@ -1,52 +1,56 @@
-"""Lifecycle tests for MCPServerManager (thread and uvicorn ownership)."""
-import time
+"""MCPServerManager delegates its server lifecycle to AsgiServerHost."""
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 from pypost.core.mcp_server import MCPServerManager
+from pypost.models.models import RequestData
 
 
 class MCPServerManagerLifecycleTests(unittest.TestCase):
-    @staticmethod
-    def _fake_uvicorn(manager):
-        """Stand in for _run_uvicorn: alive until stop_server asks it to exit."""
-        def run(self):
-            while not self._server_instance.should_exit:
-                time.sleep(0.01)
-        return patch.object(type(manager), "_run_uvicorn", run)
-
-    def _release_on_cleanup(self, manager):
-        def release():
-            if manager._server_instance is not None:
-                manager._server_instance.should_exit = True
-        self.addCleanup(release)
-
-    def test_server_is_reachable_the_moment_start_returns(self):
-        """Built in the caller, not in the thread.
-
-        Assigning it inside _run_uvicorn lets a stop that arrives first read
-        None, skip should_exit, and leave the server serving.
-        """
+    def _manager(self):
         manager = MCPServerManager()
-        with self._fake_uvicorn(manager):
-            manager.start_server(1099, [])
-            self._release_on_cleanup(manager)
+        manager._server_host = MagicMock()
+        return manager
 
-            self.assertIsNotNone(manager._server_instance)
-            self.assertTrue(manager.is_running())
+    def test_start_registers_tools_and_starts_the_host(self):
+        manager = self._manager()
+        tool = RequestData(method="GET", url="http://x", name="T", expose_as_mcp=True)
 
-    def test_stop_right_after_start_asks_the_server_to_exit(self):
-        manager = MCPServerManager()
-        with self._fake_uvicorn(manager):
-            manager.start_server(1099, [])
-            server = manager._server_instance
-            self._release_on_cleanup(manager)
+        manager.start_server(1099, [tool], host="127.0.0.1")
 
-            manager.stop_server()
+        manager._server_host.start.assert_called_once_with("127.0.0.1", 1099)
+        self.assertEqual([tool], list(manager._impl.tools_map.values()))
 
-            self.assertTrue(server.should_exit)
-            self.assertIsNone(manager._server_instance)
-            self.assertFalse(manager.is_running())
+    def test_start_emits_running_status(self):
+        manager = self._manager()
+        seen = []
+        manager.status_changed.connect(seen.append)
+
+        manager.start_server(1099, [])
+
+        self.assertEqual([True], seen)
+
+    def test_stop_on_a_running_server_stops_the_host_and_emits(self):
+        manager = self._manager()
+        manager._server_host.is_running.return_value = True
+        seen = []
+        manager.status_changed.connect(seen.append)
+
+        manager.stop_server()
+
+        manager._server_host.stop.assert_called_once_with()
+        self.assertEqual([False], seen)
+
+    def test_stop_on_a_stopped_server_does_nothing(self):
+        manager = self._manager()
+        manager._server_host.is_running.return_value = False
+        seen = []
+        manager.status_changed.connect(seen.append)
+
+        manager.stop_server()
+
+        manager._server_host.stop.assert_not_called()
+        self.assertEqual([], seen)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,4 @@
 import logging
-import threading
-import asyncio
-import uvicorn
 from starlette.applications import Starlette
 from starlette.routing import Mount
 from prometheus_client import make_asgi_app, CollectorRegistry, Counter, generate_latest
@@ -9,6 +6,7 @@ from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp.types import Resource, TextResourceContents
 
+from pypost.core.asgi_server_host import AsgiServerHost
 from pypost.models.errors import ErrorCategory
 
 logger = logging.getLogger(__name__)
@@ -17,11 +15,9 @@ logger = logging.getLogger(__name__)
 class MetricsManager:
     def __init__(self):
         self.registry = CollectorRegistry()
-        self.server_instance = None
-        self.thread = None
-        # Reentrant: start_server takes this lock and then calls stop_server,
-        # which takes it again.
-        self.server_lock = threading.RLock()
+        self._server_host = AsgiServerHost(
+            "metrics", self._create_app, log_level="warning",
+        )
 
         # Define metrics
         self._init_metrics()
@@ -238,57 +234,18 @@ class MetricsManager:
 
     def start_server(self, host: str, port: int):
         """Start the metrics server (Prometheus + MCP)."""
-        with self.server_lock:
-            if self.thread and self.thread.is_alive():
-                self.stop_server()
-
-            self._current_host = host
-            self._current_port = port
-
-            # Built here rather than inside the thread: stop_server has to see the
-            # instance as soon as start_server returns, or a stop arriving first
-            # finds None, never asks the server to exit, and leaves it serving.
-            self.server_instance = self._build_server(host, port)
-
-            self.thread = threading.Thread(target=self._run_uvicorn, daemon=True)
-            self.thread.start()
-            logger.info("Metrics server started on %s:%d", host, port)
-
-    def _build_server(self, host: str, port: int) -> uvicorn.Server:
-        config = uvicorn.Config(
-            app=self._create_app(),
-            host=host,
-            port=port,
-            loop="asyncio",
-            log_level="warning",
-        )
-        server = uvicorn.Server(config)
-        # Override signal handlers to avoid main thread conflict
-        server.install_signal_handlers = lambda: None
-        return server
-
-    def _run_uvicorn(self):
-        # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.server_instance.serve())
+        self._server_host.start(host, port)
 
     def stop_server(self):
         """Stop the metrics server."""
-        with self.server_lock:
-            if self.server_instance:
-                self.server_instance.should_exit = True
-
-            if self.thread:
-                self.thread.join(timeout=2.0)
-                self.thread = None
-                self.server_instance = None
-                logger.info("Metrics server stopped")
+        self._server_host.stop()
 
     def restart_server(self, host: str, port: int):
         """Restart the metrics server with new settings."""
-        self.stop_server()
-        self.start_server(host, port)
+        self._server_host.restart(host, port)
+
+    def is_running(self) -> bool:
+        return self._server_host.is_running()
 
     # Tracking methods
     def track_gui_send_click(self):
