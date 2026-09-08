@@ -42,6 +42,17 @@ def _make_window(qapp):
 
 class TestApplySettingsFont:
 
+    def test_apply_settings_synchronizes_settings_consumers(self, qapp):
+        window = _make_window(qapp)
+        settings = AppSettings(font_size=16, mcp_port=2345)
+
+        window.apply_settings(settings)
+
+        assert window.settings is settings
+        assert window.state_manager.settings is settings
+        window.env.apply_settings.assert_called_once_with(settings)
+        window.tabs.apply_settings.assert_called_once_with(settings)
+
     def test_font_size_applied_after_stylesheet(self, qapp):
         window = _make_window(qapp)
         settings = AppSettings(font_size=16)

@@ -164,6 +164,8 @@ class MainWindow(QMainWindow):
 
     def apply_settings(self, settings) -> None:
         self.settings = settings
+        self.state_manager.settings = settings
+        self.env.apply_settings(settings)
         logger.debug("apply_settings_start font_size=%d", settings.font_size)
         app = QApplication.instance()
         if app:

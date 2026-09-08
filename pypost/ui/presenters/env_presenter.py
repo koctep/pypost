@@ -165,6 +165,10 @@ class EnvPresenter(QObject):
         """Shortcut handler — opens EnvironmentDialog."""
         self._open_env_manager()
 
+    def apply_settings(self, settings: AppSettings) -> None:
+        """Use the same settings instance as the other application services."""
+        self._settings = settings
+
     def _on_env_changed(self, index: int) -> None:
         """Resolves vars, starts/stops MCP, saves config, emits signals."""
         selected = self._env_selector.itemData(index)

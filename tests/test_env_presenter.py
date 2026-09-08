@@ -78,6 +78,14 @@ class TestEnvPresenter(unittest.TestCase):
         p = self._make_presenter()
         self.assertIsInstance(p.widget, QWidget)
 
+    def test_apply_settings_updates_settings_reference(self):
+        p = self._make_presenter()
+        settings = AppSettings(mcp_port=2345)
+
+        p.apply_settings(settings)
+
+        self.assertIs(p._settings, settings)
+
     def test_load_environments_populates_combo(self):
         envs = [_make_env("e1", "Production"), _make_env("e2", "Staging")]
         p = self._make_presenter(envs)
