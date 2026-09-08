@@ -276,7 +276,9 @@ class RequestService:
         # 1. Template render guard — convert Jinja2 errors to ExecutionError(TEMPLATE)
         if self._template_service:
             try:
-                self._template_service.render_string(request.url, variables)
+                self._template_service.render_string(
+                    request.url, variables, strict=True,
+                )
             except Exception as exc:
                 logger.error(
                     "template_render_failed url=%r detail=%s",

@@ -201,3 +201,25 @@ class TestTemplateServiceReferencePaths(unittest.TestCase):
         )
         self.assertEqual("a%20b", result)
 
+
+class TestTemplateServiceStrictRendering(unittest.TestCase):
+    def setUp(self):
+        self.svc = TemplateService()
+
+    def test_strict_raises_on_invalid_placeholder(self):
+        with self.assertRaises(ValueError):
+            self.svc.render_string("{{ nope(db) }}", {"db": "x"}, strict=True)
+
+    def test_strict_raises_on_render_error(self):
+        with self.assertRaises(Exception):
+            self.svc.render_string("{{ unclosed", {}, strict=True)
+
+    def test_lenient_default_still_falls_back(self):
+        content = "{{ nope(db) }}"
+        self.assertEqual(content, self.svc.render_string(content, {"db": "x"}))
+
+    def test_strict_returns_rendered_content_when_valid(self):
+        self.assertEqual(
+            "hello", self.svc.render_string("{{ db }}", {"db": "hello"}, strict=True)
+        )
+

@@ -299,3 +299,15 @@ class TestRequestServiceRetryPolicyResolution(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestExecuteTemplateGuard(unittest.TestCase):
+    def test_invalid_url_placeholder_raises_template_execution_error(self):
+        service = RequestService(template_service=TemplateService())
+        request = RequestData(method="GET", url="http://x/{{ nope(db) }}")
+
+        with self.assertRaises(ExecutionError) as ctx:
+            service.execute(request, {"db": "v"})
+
+        self.assertEqual(ErrorCategory.TEMPLATE, ctx.exception.category)
+

@@ -45,6 +45,7 @@ class TemplateService:
 
     def render_string(
         self, content: str, variables: dict, render_path: str = "runtime",
+        strict: bool = False,
     ) -> str:
         """
         Renders a string template with provided variables using Jinja2.
@@ -52,6 +53,10 @@ class TemplateService:
         Args:
             content: The string containing variables like {{ var_name }}
             variables: A dictionary of variable names and values
+            render_path: Label recorded on the render metrics.
+            strict: Raise instead of returning the unrendered content. Callers that
+                are about to put the result on the wire pass True; preview callers
+                keep the lenient default so a half-typed placeholder still renders.
 
         Returns:
             The rendered string with variables substituted.
@@ -98,6 +103,8 @@ class TemplateService:
             )
             return rendered
         except ValueError:
+            if strict:
+                raise
             logger.warning(
                 "template_render_fallback_to_original render_path=%s error_type=%s "
                 "token_count=%d",
@@ -111,6 +118,8 @@ class TemplateService:
                 self._metrics.track_template_expression_render_attempt(
                     render_path=render_path, outcome="render_error",
                 )
+            if strict:
+                raise
             logger.warning(
                 "template_render_fallback_to_original render_path=%s error_type=%s "
                 "token_count=%d",
