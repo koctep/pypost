@@ -12,11 +12,9 @@ from typing import Callable
 
 from pypost.core.config_manager import ConfigManager
 from pypost.core.mcp_activity_log import McpActivityEntry
-from pypost.core.mcp_server_registry import MCPServerRegistry, McpServerStatus
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.mcp_server_registry import McpServerStatus
 from pypost.core.qt.mcp_server import MCPServerManager
-from pypost.core.template_service import TemplateService
-from pypost.models.models import Collection, Environment
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry
 from pypost.models.settings import AppSettings, McpServerConfiguration
 
 logger = logging.getLogger(__name__)
@@ -34,34 +32,13 @@ class McpServerSettingsController:
         *,
         settings_provider: Callable[[], AppSettings],
         config_manager: ConfigManager,
-        collection_lookup: Callable[[str], Collection | None],
-        environment_lookup: Callable[[str], Environment | None],
-        metrics: MetricsTrackerProtocol,
-        template_service: TemplateService,
-        mcp_manager: MCPServerManager | None = None,
-        registry: MCPServerRegistry | None = None,
+        mcp_manager: MCPServerManager,
+        registry: QtMCPServerRegistry,
     ) -> None:
         self._settings_provider = settings_provider
         self._config_manager = config_manager
-        if mcp_manager is not None:
-            logger.debug("mcp_manager_source source=injected")
-            self.manager = mcp_manager
-        else:
-            logger.debug("mcp_manager_source source=new")
-            self.manager = MCPServerManager(
-                metrics=metrics, template_service=template_service
-            )
-        if registry is not None:
-            logger.debug("mcp_registry_source source=injected")
-            self.registry = registry
-        else:
-            logger.debug("mcp_registry_source source=new")
-            self.registry = MCPServerRegistry(
-                collection_lookup=collection_lookup,
-                environment_lookup=environment_lookup,
-                metrics=metrics,
-                template_service=template_service,
-            )
+        self.manager = mcp_manager
+        self.registry = registry
         self.registry.reconfiguration_finished.connect(
             self._on_mcp_server_reconfiguration_finished
         )
@@ -107,7 +84,7 @@ class McpServerSettingsController:
             # started", which is the first question asked about a silent endpoint.
             logger.debug("mcp_server_activity_unavailable instance_id=%s", instance_id)
             return []
-        return manager.activity_log.get_entries()
+        return manager.activity_entries()
 
     def upsert_mcp_server(self, configuration: McpServerConfiguration) -> None:
         """Save one endpoint configuration without disturbing other endpoints."""
@@ -217,9 +194,8 @@ class McpServerSettingsController:
     def _save_mcp_server_configurations(self, reason: str) -> None:
         """Persist the endpoint rows; ``reason`` names the mutation for operators.
 
-        Logged before the write because ``ConfigManager.save_config`` swallows failures
-        and reports them as its own ``config_save_failed`` ERROR — pairing the two lines
-        is what identifies *which* MCP mutation was lost.
+        Logged before the write so a typed ``ConfigPersistenceError`` still has the
+        mutation reason in the preceding structured event.
         """
         logger.info(
             "mcp_servers_persist_requested reason=%s count=%d",

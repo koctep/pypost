@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, Qt, QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QApplication,
     QHBoxLayout,
     QMainWindow,
     QPushButton,
@@ -18,12 +18,10 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.core.alert_manager import AlertManager
-from pypost.core.config_manager import ConfigManager
+from pypost.core.config_manager import ConfigManager, ConfigRecoveryNotice
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.history_manager import HistoryManager
 from pypost.core.lifecycle import TeardownResult
-from pypost.core.mcp_server_registry import MCPServerRegistry
-from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
@@ -35,6 +33,7 @@ from pypost.ui.collection_item_dialogs import show_metrics_server_start_failed
 from pypost.ui.hotkeys import register_hotkey, register_hotkey_group, tag_action
 from pypost.ui.main_window_protocol_hotkeys import register_protocol_session_hotkeys
 from pypost.ui import main_window_lifecycle
+from pypost.ui import main_window_settings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from pypost.ui.main_window_signals import wire_presenter_signals
 from pypost.ui.mcp_server_controller import McpServerSettingsController
@@ -51,13 +50,19 @@ class MainWindow(QMainWindow):
         self,
         metrics: MetricsManager,
         template_service: TemplateService,
-        config_manager: ConfigManager | None = None,
+        *,
+        config_manager: ConfigManager,
+        settings: AppSettings,
+        state_manager: StateManager,
+        history_manager: HistoryManager,
+        storage: StorageManager,
+        request_manager: RequestManager,
+        mcp_controller: McpServerSettingsController,
+        alert_manager_factory: Callable[..., AlertManager],
         alert_manager: AlertManager | None = None,
-        history_manager: HistoryManager | None = None,
-        storage: StorageManager | None = None,
-        request_manager: RequestManager | None = None,
-        mcp_manager: MCPServerManager | None = None,
-        mcp_registry: MCPServerRegistry | None = None,
+        defer_startup: bool = False,
+        alert_log_path_override: Path | None = None,
+        default_alert_log_path: Path | None = None,
     ) -> None:
         super().__init__()
         set_widget_id(self, MAIN_WINDOW)
@@ -67,41 +72,26 @@ class MainWindow(QMainWindow):
         self.metrics.connect_start_failed(self._on_metrics_start_failed)
         self.template_service = template_service
         VariableHoverResolver.set_template_service(template_service)
-        if storage is not None:
-            logger.debug("storage_source source=injected")
-            self.storage = storage
-        else:
-            logger.debug("storage_source source=new")
-            self.storage = StorageManager(metrics=self.metrics)
-        if config_manager is not None:
-            logger.debug("config_manager_source source=injected")
-            self.config_manager = config_manager
-        else:
-            logger.debug("config_manager_source source=new")
-            self.config_manager = ConfigManager()
+        self.storage = storage
+        self.config_manager = config_manager
         self._alert_manager = alert_manager
+        self._alert_manager_factory = alert_manager_factory
+        self._alert_log_path_override = alert_log_path_override
+        self._default_alert_log_path = default_alert_log_path
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
-        if request_manager is not None:
-            logger.debug("request_manager_source source=injected")
-            self.request_manager = request_manager
-        else:
-            logger.debug("request_manager_source source=new")
-            self.request_manager = RequestManager(self.storage, defer_initial_load=True)
-        self.state_manager = StateManager(self.config_manager, parent=self)
-        if storage is None:
-            self.storage.apply_encryption_settings(self.state_manager.settings)
+        self.request_manager = request_manager
+        if state_manager.settings is not settings:
+            raise ValueError("MainWindow and StateManager must share one AppSettings instance")
+        self.state_manager = state_manager
+        self.state_manager.setParent(self)
+        self.state_manager.persistence_failed.connect(self._on_settings_persistence_failed)
         self.style_manager = StyleManager()
-        self.settings = self.state_manager.settings
+        self._settings = settings
         self._teardown_lock = threading.Lock()
         self._teardown_started = False
         self._teardown_result: TeardownResult | None = None
         self.icons = self._load_icons()
-        if history_manager is not None:
-            logger.debug("history_manager_source source=injected")
-            self.history_manager = history_manager
-        else:
-            logger.debug("history_manager_source source=new")
-            self.history_manager = HistoryManager(defer_initial_load=True, metrics=self.metrics)
+        self.history_manager = history_manager
         self.collections = CollectionsPresenter(
             self.request_manager,
             self.state_manager,
@@ -109,20 +99,7 @@ class MainWindow(QMainWindow):
             self.icons,
             storage=self.storage,
         )
-        self.mcp_controller = McpServerSettingsController(
-            settings_provider=lambda: self.settings,
-            config_manager=self.config_manager,
-            collection_lookup=lambda collection_id: self.collections.collection_by_id(
-                collection_id
-            ),
-            environment_lookup=lambda environment_id: self.env.environment_by_id(
-                environment_id
-            ),
-            metrics=self.metrics,
-            template_service=self.template_service,
-            mcp_manager=mcp_manager,
-            registry=mcp_registry,
-        )
+        self.mcp_controller = mcp_controller
         self.tabs = TabsPresenter(
             self.request_manager,
             self.state_manager,
@@ -140,6 +117,7 @@ class MainWindow(QMainWindow):
             self.request_manager.get_collections,
             self.metrics,
             mcp_registry=self.mcp_controller.registry,
+            state_manager=self.state_manager,
         )
         main_window_lifecycle.configure_env_update_consumer(self)
         self.mcp_controls = self.env.mcp_controls
@@ -153,16 +131,30 @@ class MainWindow(QMainWindow):
         self._ui_ready = False
         self.collections.collections_loaded.connect(self._on_startup_collections_loaded)
         self.env.environments_loaded.connect(self._on_startup_environments_loaded)
-        self.collections.load_collections_async()
-        self.env.load_environments()
         self._startup_settings_reapplied = False
         self.apply_settings(self.settings)
+        if isinstance(self.config_manager.recovery_notice, ConfigRecoveryNotice):
+            QTimer.singleShot(0, self._show_settings_recovery_notice)
         logger.info("main_window_initialized")
+        if not defer_startup:
+            self.start_initial_loads()
+
+    def start_initial_loads(self) -> None:
+        """Start background loads after the composition root owns this window."""
+        if self._teardown_started:
+            return
+        self.collections.load_collections_async()
+        self.env.load_environments()
 
     @property
     def is_ui_ready(self) -> bool:
         """True after startup collections+env loads and restore gate completed."""
         return self._ui_ready
+
+    @property
+    def settings(self) -> AppSettings:
+        """The composition-root snapshot; its identity is stable for this window."""
+        return self._settings
 
     def _on_startup_collections_loaded(self) -> None:
         if getattr(self, "_teardown_started", False):
@@ -351,68 +343,21 @@ class MainWindow(QMainWindow):
         return main_window_lifecycle.alert_settings_changed(previous, updated)
 
     def _reload_alert_manager(self) -> None:
-        main_window_lifecycle.reload_alert_manager(self, AlertManager)
+        main_window_lifecycle.reload_alert_manager(
+            self, self._alert_manager_factory
+        )
 
     def apply_settings(self, settings: AppSettings) -> None:
-        if getattr(self, "_teardown_started", False):
-            return
-        self.settings = settings
-        app = QApplication.instance()
-        if app:
-            self.style_manager.apply_appearance(
-                app, theme=settings.theme, font_size=settings.font_size
-            )
-        self.tabs.apply_settings(settings)
-        self.env.apply_settings(settings)
+        main_window_settings.apply_settings(self, settings)
 
     def open_settings(self) -> None:
-        if self._teardown_started:
-            return
-        dialog = SettingsDialog(self.settings, self, storage=self.storage)
-        try:
-            if not dialog.exec():
-                return
-            new_settings = dialog.get_settings()
-            if not new_settings:
-                return
-            previous_settings = self.settings
-            metrics_changed = (
-                previous_settings.metrics_host != new_settings.metrics_host
-                or previous_settings.metrics_port != new_settings.metrics_port
-            )
-            alert_settings_changed = self._alert_settings_changed(
-                previous_settings, new_settings
-            )
-            self.settings = new_settings
-            if self._teardown_started:
-                return
-            self.config_manager.save_config(self.settings)
-            self.env.wait_storage_idle()
-            self.storage.apply_encryption_settings(self.settings)
-            self.apply_settings(self.settings)
-            if alert_settings_changed:
-                self._reload_alert_manager()
-            if metrics_changed:
-                logger.info(
-                    "metrics_server_restarting host=%s port=%d",
-                    self.settings.metrics_host,
-                    self.settings.metrics_port,
-                )
-                self.metrics.restart_server(self.settings.metrics_host, self.settings.metrics_port)
-            logger.info(
-                "settings_applied font_size=%d indent_size=%d request_timeout=%d "
-                "env_encryption_enabled=%s env_encryption_key_source=%s",
-                self.settings.font_size, self.settings.indent_size,
-                self.settings.request_timeout,
-                self.settings.env_encryption_enabled,
-                self.settings.env_encryption_key_source,
-            )
-        finally:
-            dialog.cleanup()
-            dialog.deleteLater()
-            QCoreApplication.processEvents()
-        if not self._teardown_started:
-            self.env.reload_current_env()
+        main_window_settings.open_settings(self, SettingsDialog)
+
+    def _on_settings_persistence_failed(self, message: str) -> None:
+        main_window_settings.show_persistence_failure(self, message)
+
+    def _show_settings_recovery_notice(self) -> None:
+        main_window_settings.show_recovery_notice(self)
 
     def _on_metrics_start_failed(self, message: str) -> None:
         if getattr(self, "_teardown_started", False):

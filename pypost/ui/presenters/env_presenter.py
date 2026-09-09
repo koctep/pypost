@@ -16,12 +16,16 @@ from PySide6.QtWidgets import (
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.env_variable_snapshot import EnvVariableSnapshot
-from pypost.core.environment_import import load_import_candidates
 from pypost.core.environment_variable_resolver import resolve_environment_variables
+from pypost.core.environment_variable_validation import (
+    EnvironmentVariableValidationError,
+    apply_environment_variable_updates,
+)
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
-from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.lifecycle import TeardownResult
 from pypost.core.qt.mcp_server import MCPServerManager
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry
+from pypost.core.qt.state_manager import StateManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Environment
@@ -34,6 +38,7 @@ from pypost.ui.collection_item_dialogs import (
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.presenters.mcp_controls_presenter import McpControlsPresenter
 from pypost.ui.presenters import env_presenter_lifecycle
+from pypost.ui.presenters import env_presenter_dialog
 from pypost.ui.widget_ids import (
     ENV_BAR,
     ENV_MANAGE_BUTTON,
@@ -64,7 +69,8 @@ class EnvPresenter(QObject):
         settings: AppSettings,
         get_collections: Callable,
         metrics: MetricsTrackerProtocol,
-        mcp_registry: MCPServerRegistry | None = None,
+        mcp_registry: QtMCPServerRegistry | None = None,
+        state_manager: StateManager | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -72,6 +78,7 @@ class EnvPresenter(QObject):
         self._config_manager = config_manager
         self._mcp_manager = mcp_manager
         self._settings = settings
+        self._state_manager = state_manager
         self._get_collections = get_collections
         self._metrics = metrics
         self._environments: list[Environment] = []
@@ -296,7 +303,16 @@ class EnvPresenter(QObject):
                     selected.name,
                     len(vars),
                 )
-                selected.variables.update(vars)
+                try:
+                    apply_environment_variable_updates(selected, vars)
+                except EnvironmentVariableValidationError as exc:
+                    logger.warning(
+                        "environment_update_rejected reason=%s",
+                        exc.validation.failure.value if exc.validation.failure else "unknown",
+                    )
+                    if sequence is not None:
+                        self.environment_update_disposition.emit(sequence, "failed")
+                    return
                 if not self._save_environments(
                     update_sequences=() if sequence is None else (sequence,),
                     accepted_during_teardown=accepted_during_teardown,
@@ -343,13 +359,18 @@ class EnvPresenter(QObject):
         if self._admission_closed():
             return
 
+        try:
+            apply_environment_variable_updates(selected, {target_key: value})
+        except EnvironmentVariableValidationError as exc:
+            show_invalid_variable_name_error(self._widget, str(exc))
+            return
+
         logger.info(
             "variable_set_in_env env_id=%s env_name=%s key=%s",
             selected.id,
             selected.name,
             target_key,
         )
-        selected.variables[target_key] = value
         self._save_environments()
         logger.debug("environment_updated_emitted env_id=%s source=manual_set", selected.id)
         self.environment_updated.emit(selected.id)
@@ -378,15 +399,20 @@ class EnvPresenter(QObject):
                 selected.enable_mcp,
                 len(selected.variables),
             )
-            self._settings.last_environment_id = selected.id
+            selected_environment_id = selected.id
             variables = resolve_environment_variables(selected.variables)
             selected_env: Environment | None = selected
         else:
             logger.info("env_deselected index=%d", index)
-            self._settings.last_environment_id = None
+            selected_environment_id = None
             selected_env = None
 
-        self._config_manager.save_config(self._settings)
+        if self._state_manager is not None:
+            self._state_manager.set_last_environment_id(selected_environment_id)
+        else:
+            # Compatibility seam for isolated presenter tests and embedders.
+            self._settings.last_environment_id = selected_environment_id
+            self._config_manager.save_config(self._settings)
         self._current_env_index = index
         hidden_keys = selected.hidden_keys if isinstance(selected, Environment) else set()
         self._env_snapshot.update(variables, hidden_keys)
@@ -402,31 +428,4 @@ class EnvPresenter(QObject):
         self.environment_selected.emit(selected_env)
 
     def _open_env_manager(self) -> None:
-        if self._admission_closed():
-            return
-        current_env_name = self._env_selector.currentText()
-        if self._env_selector.currentIndex() == 0:
-            current_env_name = None
-
-        logger.info("env_manager_dialog_opened current_env=%s", current_env_name)
-        dialog = EnvironmentDialog(
-            self._environments,
-            self._widget,
-            current_env_name,
-            log_hidden_key_names=self._settings.log_hidden_key_names,
-            read_import_file=lambda path: load_import_candidates(path, self._storage),
-            serialize_export_records=self._storage.serialize_environment_records,
-        )
-        dialog.exec()
-        logger.info("env_manager_dialog_closed")
-        if self._admission_closed():
-            return
-        self._environments = dialog.environments
-        self._save_environments()
-        logger.debug("environment_manager_closed_emitted")
-        self.environment_manager_closed.emit()
-        if self._encryption_enabled():
-            self._pending_env_manager_refresh = True
-        self.load_environments()
-        if not self._encryption_enabled():
-            self._on_env_changed(self._env_selector.currentIndex())
+        env_presenter_dialog.open_environment_manager(self, EnvironmentDialog)

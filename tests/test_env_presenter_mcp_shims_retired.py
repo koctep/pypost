@@ -133,7 +133,14 @@ def test_main_window_provides_public_mcp_controls():
         window = MainWindow(
             metrics=MagicMock(),
             template_service=MagicMock(),
+            config_manager=MagicMock(recovery_notice=None),
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
+            storage=MagicMock(),
+            request_manager=MagicMock(),
+            mcp_controller=MagicMock(),
+            alert_manager_factory=MagicMock(),
         )
 
     assert hasattr(window, "mcp_controls"), "MainWindow must have public 'mcp_controls' attribute"

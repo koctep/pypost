@@ -1,24 +1,83 @@
-"""Independent lifecycle owner for persisted MCP server configurations."""
+"""Qt-independent state machine for persisted MCP server configurations.
+
+The registry deliberately knows neither ``QObject`` nor the concrete server
+runtime.  Composition roots provide a ``McpServerRuntimeFactory``; Qt signal
+forwarding lives in :mod:`pypost.core.qt.mcp_server_registry`.
+"""
 from __future__ import annotations
 
 import logging
-import socket
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable, Literal
-
-from PySide6.QtCore import QObject, Signal
+from typing import Callable, Literal, Protocol, Sequence
 
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
-from pypost.core.qt.mcp_server import MCPServerManager
-from pypost.core.template_service import TemplateService
-from pypost.models.models import Collection, Environment
+from pypost.core.mcp_server_validation import (
+    validate_available_port,
+    validate_bind_available,
+    validate_references,
+)
+from pypost.models.models import Collection, Environment, RequestData
 from pypost.models.settings import McpServerConfiguration
+from pypost.models.websocket import WebSocketConnection
 
 logger = logging.getLogger(__name__)
 
 ServerState = Literal["stopped", "starting", "running", "failed"]
+StatusListener = Callable[[str, ServerState, str], None]
+ReconfigurationListener = Callable[[str, bool], None]
+
+
+class McpServerRuntime(Protocol):
+    """Lifecycle surface required by the registry from any server runtime."""
+
+    @property
+    def last_start_error(self) -> str | None: ...
+
+    @property
+    def is_listening(self) -> bool: ...
+
+    def connect_status_changed(self, callback: Callable[[bool], None]) -> None: ...
+
+    def connect_start_failed(self, callback: Callable[[str], None]) -> None: ...
+
+    def set_variable_supplier(
+        self, supplier: Callable[[], dict[str, str]] | None
+    ) -> None: ...
+
+    def set_hidden_keys_supplier(
+        self, supplier: Callable[[], set[str]] | None
+    ) -> None: ...
+
+    def start_server(
+        self,
+        port: int,
+        tools: Sequence[RequestData | WebSocketConnection],
+        host: str = "127.0.0.1",
+    ) -> None: ...
+
+    def start_proxy_server(
+        self,
+        port: int,
+        upstream_url: str,
+        upstream_transport: str = "streamable_http",
+        headers: dict[str, str] | None = None,
+        host: str = "127.0.0.1",
+        name: str = "pypost-proxy",
+        timeout: float = 30.0,
+    ) -> None: ...
+
+    def stop_server(self) -> None: ...
+
+    def is_running(self) -> bool: ...
+
+    def update_tools(self, tools: list[RequestData]) -> bool: ...
+
+    def activity_entries(self) -> list: ...
+
+
+McpServerRuntimeFactory = Callable[[], McpServerRuntime]
 
 
 @dataclass(frozen=True)
@@ -36,20 +95,17 @@ class _PendingReconfiguration:
 
     previous_configuration: McpServerConfiguration
     replacement: McpServerConfiguration
-    previous_manager: MCPServerManager
-    candidate_manager: MCPServerManager
+    previous_manager: McpServerRuntime
+    candidate_manager: McpServerRuntime
 
 
-class MCPServerRegistry(QObject):
-    """Own one ``MCPServerManager`` per configured MCP endpoint.
+class MCPServerRegistry:
+    """Own one abstract server runtime per configured MCP endpoint.
 
     Collection requests and environment data are copied before they reach a
     manager, preventing a UI selection or a later mutable collection edit from
     changing another endpoint's tool map or credentials.
     """
-
-    status_changed = Signal(str, str, str)  # instance id, state, message
-    reconfiguration_finished = Signal(str, bool)  # instance id, committed
 
     def __init__(
         self,
@@ -57,31 +113,46 @@ class MCPServerRegistry(QObject):
         collection_lookup: Callable[[str], Collection | None] | None = None,
         environment_lookup: Callable[[str], Environment | None] | None = None,
         metrics: MetricsTrackerProtocol | None = None,
-        template_service: TemplateService | None = None,
+        runtime_factory: McpServerRuntimeFactory | None = None,
     ) -> None:
-        super().__init__()
         self._collection_lookup = collection_lookup or (lambda _id: None)
         self._environment_lookup = environment_lookup or (lambda _id: None)
         self._metrics = metrics
-        self._template_service = template_service
+        self._runtime_factory = runtime_factory
         self._configurations: dict[str, McpServerConfiguration] = {}
-        self._managers: dict[str, MCPServerManager] = {}
+        self._managers: dict[str, McpServerRuntime] = {}
         self._statuses: dict[str, McpServerStatus] = {}
         self._pending_reconfigurations: dict[str, _PendingReconfiguration] = {}
         self._reconfiguration_lock = threading.RLock()
+        self._status_listeners: list[StatusListener] = []
+        self._reconfiguration_listeners: list[ReconfigurationListener] = []
+
+    def connect_status_changed(self, listener: StatusListener) -> None:
+        """Subscribe to state changes without imposing an event-loop framework."""
+        with self._reconfiguration_lock:
+            self._status_listeners.append(listener)
+
+    def connect_reconfiguration_finished(
+        self, listener: ReconfigurationListener
+    ) -> None:
+        with self._reconfiguration_lock:
+            self._reconfiguration_listeners.append(listener)
 
     def get(self, instance_id: str) -> McpServerConfiguration | None:
         """Return the configuration for instance_id, or None if not found."""
-        return self._configurations.get(instance_id)
+        with self._reconfiguration_lock:
+            configuration = self._configurations.get(instance_id)
+            return configuration.model_copy(deep=True) if configuration else None
 
     def upsert(self, configuration: McpServerConfiguration) -> None:
         """Persist an in-memory configuration after globally checking its port."""
-        self._validate_available_port(configuration)
-        self._configurations[configuration.id] = configuration.model_copy(deep=True)
-        self._statuses.setdefault(
-            configuration.id, McpServerStatus(configuration.id, "stopped")
-        )
-        self._publish_instance_metrics()
+        with self._reconfiguration_lock:
+            self._validate_available_port(configuration)
+            self._configurations[configuration.id] = configuration.model_copy(deep=True)
+            self._statuses.setdefault(
+                configuration.id, McpServerStatus(configuration.id, "stopped")
+            )
+            self._publish_instance_metrics()
 
     def start_enabled(self) -> None:
         """Best-effort startup: one broken row never blocks another endpoint."""
@@ -152,7 +223,7 @@ class MCPServerRegistry(QObject):
         previous = self._configuration(instance_id)
         replacement = McpServerConfiguration.model_validate(configuration.model_dump())
         self._validate_available_port(replacement)
-        self._validate_replacement_references(instance_id, replacement)
+        self._validate_replacement_references(replacement)
         if (replacement.host, replacement.port) != (previous.host, previous.port):
             self._validate_os_port(replacement.host, replacement.port)
         was_running = self.is_running(instance_id)
@@ -168,9 +239,7 @@ class MCPServerRegistry(QObject):
                 f"{self._missing_reference(replacement)}"
             )
         previous_manager = self._managers[instance_id]
-        candidate = MCPServerManager(
-            metrics=self._metrics, template_service=self._template_service
-        )
+        candidate = self._make_runtime()
         pending = _PendingReconfiguration(
             previous_configuration=previous.model_copy(deep=True),
             replacement=replacement.model_copy(deep=True),
@@ -179,12 +248,12 @@ class MCPServerRegistry(QObject):
         )
         with self._reconfiguration_lock:
             self._pending_reconfigurations[instance_id] = pending
-        candidate.status_changed.connect(
+        candidate.connect_status_changed(
             lambda running: self._complete_reconfiguration(instance_id, candidate)
             if running
             else None
         )
-        candidate.start_failed.connect(
+        candidate.connect_start_failed(
             lambda message: self._rollback_reconfiguration(instance_id, candidate, message)
         )
 
@@ -343,30 +412,35 @@ class MCPServerRegistry(QObject):
             self._publish_instance_metrics()
 
     def is_running(self, instance_id: str) -> bool:
-        manager = self._managers.get(instance_id)
-        return manager is not None and manager.is_running()
+        with self._reconfiguration_lock:
+            manager = self._managers.get(instance_id)
+            return manager is not None and manager.is_running()
 
-    def manager_for(self, instance_id: str) -> MCPServerManager:
-        return self._managers[instance_id]
+    def manager_for(self, instance_id: str) -> McpServerRuntime:
+        with self._reconfiguration_lock:
+            return self._managers[instance_id]
 
     def status(self, instance_id: str) -> McpServerStatus:
-        self._refresh_async_failure(instance_id)
-        manager = self._managers.get(instance_id)
-        if manager is not None and manager.is_running():
-            current = self._statuses[instance_id]
-            if current.state == "starting":
-                self._set_status(instance_id, "running")
-        return self._statuses[instance_id]
+        with self._reconfiguration_lock:
+            self._refresh_async_failure(instance_id)
+            manager = self._managers.get(instance_id)
+            if manager is not None and manager.is_running():
+                current = self._statuses[instance_id]
+                if current.state == "starting":
+                    self._set_status(instance_id, "running")
+            return self._statuses[instance_id]
 
     def list_statuses(self) -> list[McpServerStatus]:
-        return [self._statuses[key] for key in self._configurations]
+        with self._reconfiguration_lock:
+            return [self._statuses[key] for key in self._configurations]
 
     def list_configurations(self) -> list[McpServerConfiguration]:
         """Return independent configuration copies in their persisted order."""
-        return [
-            configuration.model_copy(deep=True)
-            for configuration in self._configurations.values()
-        ]
+        with self._reconfiguration_lock:
+            return [
+                configuration.model_copy(deep=True)
+                for configuration in self._configurations.values()
+            ]
 
     def wait_for_state(self, instance_id: str, state: ServerState, timeout: float) -> bool:
         deadline = time.monotonic() + timeout
@@ -392,10 +466,11 @@ class MCPServerRegistry(QObject):
             )
 
     def _configuration(self, instance_id: str) -> McpServerConfiguration:
-        try:
-            return self._configurations[instance_id]
-        except KeyError as exc:
-            raise KeyError(f"Unknown MCP server instance: {instance_id}") from exc
+        with self._reconfiguration_lock:
+            try:
+                return self._configurations[instance_id]
+            except KeyError as exc:
+                raise KeyError(f"Unknown MCP server instance: {instance_id}") from exc
 
     def _runtime_inputs(
         self, configuration: McpServerConfiguration
@@ -434,7 +509,7 @@ class MCPServerRegistry(QObject):
 
     @staticmethod
     def _start_manager(
-        manager: MCPServerManager,
+        manager: McpServerRuntime,
         configuration: McpServerConfiguration,
         runtime: tuple[list, dict[str, str], set[str]],
     ) -> None:
@@ -455,7 +530,7 @@ class MCPServerRegistry(QObject):
             manager.start_server(configuration.port, tools, configuration.host)
 
     def _complete_reconfiguration(
-        self, instance_id: str, candidate: MCPServerManager
+        self, instance_id: str, candidate: McpServerRuntime
     ) -> None:
         with self._reconfiguration_lock:
             pending = self._pending_reconfigurations.get(instance_id)
@@ -466,10 +541,10 @@ class MCPServerRegistry(QObject):
             self._managers[instance_id] = candidate
             pending.previous_manager.stop_server()
             self._set_status(instance_id, "running")
-            self.reconfiguration_finished.emit(instance_id, True)
+            self._notify_reconfiguration_finished(instance_id, True)
 
     def _watch_reconfiguration(
-        self, instance_id: str, candidate: MCPServerManager
+        self, instance_id: str, candidate: McpServerRuntime
     ) -> None:
         """Finish or roll back a candidate when Qt has no running event loop.
 
@@ -496,7 +571,7 @@ class MCPServerRegistry(QObject):
         )
 
     def _rollback_reconfiguration(
-        self, instance_id: str, candidate: MCPServerManager, message: str
+        self, instance_id: str, candidate: McpServerRuntime, message: str
     ) -> None:
         with self._reconfiguration_lock:
             pending = self._pending_reconfigurations.get(instance_id)
@@ -518,7 +593,7 @@ class MCPServerRegistry(QObject):
                     "running",
                     "Replacement failed; the previous endpoint remains available.",
                 )
-                self.reconfiguration_finished.emit(instance_id, False)
+                self._notify_reconfiguration_finished(instance_id, False)
                 return
             runtime = self._runtime_inputs(pending.previous_configuration)
             if runtime is None:
@@ -528,49 +603,38 @@ class MCPServerRegistry(QObject):
                     f"{instance_id} rollback failed: missing "
                     f"{self._missing_reference(pending.previous_configuration)}",
                 )
-                self.reconfiguration_finished.emit(instance_id, False)
+                self._notify_reconfiguration_finished(instance_id, False)
                 return
             self._set_status(instance_id, "starting")
             self._start_manager(
                 pending.previous_manager, pending.previous_configuration, runtime
             )
-            self.reconfiguration_finished.emit(instance_id, False)
+            self._notify_reconfiguration_finished(instance_id, False)
 
     def _validate_available_port(self, configuration: McpServerConfiguration) -> None:
-        """Reject a globally reserved port without changing registry state."""
-        for instance_id, existing in self._configurations.items():
-            if instance_id != configuration.id and existing.port == configuration.port:
-                raise ValueError(
-                    f"MCP server port {configuration.port} is already used by {instance_id}"
-                )
+        validate_available_port(configuration, self._configurations.values())
 
     def _validate_replacement_references(
-        self, instance_id: str, configuration: McpServerConfiguration
+        self, configuration: McpServerConfiguration
     ) -> None:
-        if configuration.server_type == "local":
-            if (
-                not configuration.collection_id
-                or self._collection_lookup(configuration.collection_id) is None
-            ):
-                raise ValueError(f"MCP server {instance_id} references a missing collection")
-        if (
-            configuration.environment_id
-            and self._environment_lookup(configuration.environment_id) is None
-        ):
-            raise ValueError(f"MCP server {instance_id} references a missing environment")
+        validate_references(
+            configuration,
+            collection_lookup=self._collection_lookup,
+            environment_lookup=self._environment_lookup,
+        )
 
     @staticmethod
     def _validate_os_port(host: str, port: int) -> None:
-        """Preflight an external bind conflict before stopping a live endpoint."""
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                probe.bind((host, port))
-        except OSError as exc:
-            raise ValueError(f"MCP server port {port} is unavailable: {exc}") from exc
+        validate_bind_available(host, port)
 
-    def _new_manager(self, instance_id: str, port: int) -> MCPServerManager:
-        manager = MCPServerManager(metrics=self._metrics, template_service=self._template_service)
+    def _make_runtime(self) -> McpServerRuntime:
+        if self._runtime_factory is None:
+            raise RuntimeError("MCP server runtime factory was not configured")
+        return self._runtime_factory()
+
+    def _new_manager(self, instance_id: str, port: int) -> McpServerRuntime:
+        """Create and observe a runtime (legacy method name kept for callers)."""
+        manager = self._make_runtime()
 
         def on_status_changed(running: bool) -> None:
             """Keep an asynchronous startup failure from becoming ``stopped``.
@@ -593,8 +657,8 @@ class MCPServerRegistry(QObject):
                 return
             self._set_status(instance_id, "stopped")
 
-        manager.status_changed.connect(on_status_changed)
-        manager.start_failed.connect(
+        manager.connect_status_changed(on_status_changed)
+        manager.connect_start_failed(
             lambda message: self._set_status(
                 instance_id, "failed", f"{instance_id} on port {port}: {message}"
             )
@@ -602,22 +666,40 @@ class MCPServerRegistry(QObject):
         return manager
 
     def _set_status(self, instance_id: str, state: ServerState, message: str = "") -> None:
-        status = McpServerStatus(instance_id, state, message)
-        self._statuses[instance_id] = status
-        logger.info(
-            "mcp_registry_status instance_id=%s state=%s message_present=%s",
-            instance_id,
-            state,
-            bool(message),
-        )
-        self._publish_instance_metrics()
-        self.status_changed.emit(instance_id, state, message)
+        with self._reconfiguration_lock:
+            status = McpServerStatus(instance_id, state, message)
+            self._statuses[instance_id] = status
+            logger.info(
+                "mcp_registry_status instance_id=%s state=%s message_present=%s",
+                instance_id,
+                state,
+                bool(message),
+            )
+            self._publish_instance_metrics()
+        self._notify_status_changed(instance_id, state, message)
+
+    def _notify_status_changed(
+        self, instance_id: str, state: ServerState, message: str
+    ) -> None:
+        with self._reconfiguration_lock:
+            listeners = tuple(self._status_listeners)
+        for listener in listeners:
+            listener(instance_id, state, message)
+
+    def _notify_reconfiguration_finished(
+        self, instance_id: str, committed: bool
+    ) -> None:
+        with self._reconfiguration_lock:
+            listeners = tuple(self._reconfiguration_listeners)
+        for listener in listeners:
+            listener(instance_id, committed)
 
     def _publish_instance_metrics(self) -> None:
         if self._metrics is None:
             return
-        counts = {
-            state: sum(status.state == state for status in self._statuses.values())
-            for state in ("stopped", "starting", "running", "failed")
-        }
+        with self._reconfiguration_lock:
+            counts = {
+                state: sum(status.state == state for status in self._statuses.values())
+                for state in ("stopped", "starting", "running", "failed")
+            }
         self._metrics.set_mcp_server_instance_counts(counts)

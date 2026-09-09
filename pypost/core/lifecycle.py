@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 import threading
+from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
@@ -30,6 +31,73 @@ class TeardownResult:
     pending_count: int = 0
     failure_kind: str | None = None
     dispositions: dict[int, str] | None = None
+
+
+@dataclass(frozen=True)
+class CleanupFailure:
+    """One resource cleanup that failed without blocking later cleanups."""
+
+    owner: str
+    error: BaseException
+
+
+class ApplicationLifecycle:
+    """Thread-safe LIFO owner for resources built by the composition root."""
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._shutdown_complete = threading.Event()
+        self._cleanups: list[tuple[str, Callable[[], object]]] = []
+        self._closed = False
+        self._failures: tuple[CleanupFailure, ...] = ()
+
+    @property
+    def is_closed(self) -> bool:
+        with self._lock:
+            return self._closed
+
+    @property
+    def owner_names(self) -> tuple[str, ...]:
+        with self._lock:
+            return tuple(name for name, _cleanup in self._cleanups)
+
+    def own(self, name: str, cleanup: Callable[[], object]) -> None:
+        """Register cleanup immediately after acquiring a resource."""
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("cannot register a resource after shutdown")
+            self._cleanups.append((name, cleanup))
+
+    def shutdown(self) -> tuple[CleanupFailure, ...]:
+        """Clean every owner once, in reverse creation order."""
+        with self._lock:
+            if self._closed:
+                if self._shutdown_complete.is_set():
+                    return self._failures
+                wait_for_owner = True
+                cleanups: tuple[tuple[str, Callable[[], object]], ...] = ()
+            else:
+                wait_for_owner = False
+                self._closed = True
+                cleanups = tuple(reversed(self._cleanups))
+
+        if wait_for_owner:
+            self._shutdown_complete.wait()
+            with self._lock:
+                return self._failures
+
+        failures: list[CleanupFailure] = []
+        for name, cleanup in cleanups:
+            try:
+                cleanup()
+            except BaseException as exc:
+                failures.append(CleanupFailure(name, exc))
+
+        with self._lock:
+            self._failures = tuple(failures)
+            result = self._failures
+        self._shutdown_complete.set()
+        return result
 
 
 @dataclass(frozen=True)

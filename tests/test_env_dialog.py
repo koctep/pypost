@@ -6,7 +6,8 @@ import logging
 
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QTableWidgetItem
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTableWidgetItem
 
 from pypost.models.models import Environment
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
@@ -16,6 +17,19 @@ pytestmark = pytest.mark.timeout(60)
 
 
 class TestEnvironmentDialog:
+    def test_dialog_exposes_explicit_save_and_cancel_actions(self, qapp):
+        dlg = EnvironmentDialog([Environment(name="Dev")])
+        try:
+            save = dlg.button_box.button(QDialogButtonBox.StandardButton.Save)
+            cancel = dlg.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+            assert save is not None
+            assert cancel is not None
+
+            cancel.click()
+            assert dlg.result() == QDialog.DialogCode.Rejected
+        finally:
+            dlg.close()
+
     def test_dialog_does_not_mutate_input_environments(self, qapp):
         env = Environment(name="Dev", variables={"k": "v"}, enable_mcp=False)
         input_envs = [env]
@@ -139,9 +153,9 @@ class TestEnvironmentDialog:
             dlg.on_env_selected(0)
             assert dlg.vars_table.columnCount() == 3
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
-            hidden_cb = dlg._get_hidden_checkbox(0)
-            assert hidden_cb is not None
-            assert hidden_cb.isChecked()
+            hidden_item = dlg._get_hidden_item(0)
+            assert hidden_item is not None
+            assert hidden_item.checkState() == Qt.CheckState.Checked
         finally:
             dlg.close()
 
@@ -150,12 +164,12 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
-            hidden_cb = dlg._get_hidden_checkbox(0)
-            assert hidden_cb is not None
-            hidden_cb.setChecked(True)
+            hidden_item = dlg._get_hidden_item(0)
+            assert hidden_item is not None
+            hidden_item.setCheckState(Qt.CheckState.Checked)
             assert "API_KEY" in dlg.environments[0].hidden_keys
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
-            hidden_cb.setChecked(False)
+            hidden_item.setCheckState(Qt.CheckState.Unchecked)
             assert "API_KEY" not in dlg.environments[0].hidden_keys
             assert dlg.vars_table.item(0, 1).text() == "secret"
         finally:
@@ -173,9 +187,9 @@ class TestEnvironmentDialog:
             dlg.vars_table.setItem(0, 1, QTableWidgetItem("new"))
             assert dlg.environments[0].variables["API_KEY"] == "new"
             assert dlg.vars_table.item(0, 1).text() == HIDDEN_MASK
-            hidden_cb = dlg._get_hidden_checkbox(0)
-            assert hidden_cb is not None
-            hidden_cb.setChecked(False)
+            hidden_item = dlg._get_hidden_item(0)
+            assert hidden_item is not None
+            hidden_item.setCheckState(Qt.CheckState.Unchecked)
             assert dlg.vars_table.item(0, 1).text() == "new"
             assert dlg.environments[0].hidden_keys == set()
         finally:
@@ -202,10 +216,10 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
-            hidden_cb = dlg._get_hidden_checkbox(0)
-            assert hidden_cb is not None
+            hidden_item = dlg._get_hidden_item(0)
+            assert hidden_item is not None
             with caplog.at_level(logging.INFO):
-                hidden_cb.setChecked(True)
+                hidden_item.setCheckState(Qt.CheckState.Checked)
             assert any(
                 "env_hidden_flag_changed env_name=Dev key=******** hidden=True" in r.message
                 for r in caplog.records
@@ -219,10 +233,10 @@ class TestEnvironmentDialog:
         dlg = EnvironmentDialog([env], log_hidden_key_names=True)
         try:
             dlg.on_env_selected(0)
-            hidden_cb = dlg._get_hidden_checkbox(0)
-            assert hidden_cb is not None
+            hidden_item = dlg._get_hidden_item(0)
+            assert hidden_item is not None
             with caplog.at_level(logging.INFO):
-                hidden_cb.setChecked(True)
+                hidden_item.setCheckState(Qt.CheckState.Checked)
             assert any(
                 "env_hidden_flag_changed env_name=Dev key=API_KEY hidden=True" in r.message
                 for r in caplog.records
@@ -312,13 +326,24 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
-    def test_clear_name_still_removes_variable(self, qapp):
+    @patch(
+        "pypost.ui.widgets.environments.environment_variables_widget"
+        ".show_invalid_variable_name_error",
+    )
+    def test_clear_existing_name_reverts_and_requires_explicit_delete(
+        self, mock_invalid_error, qapp
+    ):
         env = Environment(name="Dev", variables={"k": "v"})
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
             dlg.vars_table.item(0, 0).setText("")
-            assert "k" not in dlg.environments[0].variables
+            assert dlg.environments[0].variables == {"k": "v"}
+            assert dlg.vars_table.item(0, 0).text() == "k"
+            mock_invalid_error.assert_called_once_with(
+                dlg._vars_widget,
+                "Variable name cannot be empty.",
+            )
         finally:
             dlg.close()
 
@@ -716,9 +741,9 @@ class TestEnvironmentDialog:
             assert dlg.vars_table.item(0, 1).text() == "https://dev.api"
             assert dlg.vars_table.item(1, 0).text() == "API_KEY"
             assert dlg.vars_table.item(1, 1).text() == HIDDEN_MASK
-            hidden_cb = dlg._get_hidden_checkbox(1)
-            assert hidden_cb is not None
-            assert hidden_cb.isChecked() is True
+            hidden_item = dlg._get_hidden_item(1)
+            assert hidden_item is not None
+            assert hidden_item.checkState() == Qt.CheckState.Checked
             assert dlg.mcp_check.isEnabled() is True
             assert dlg.mcp_check.isChecked() is True
         finally:

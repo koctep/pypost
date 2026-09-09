@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pypost.core.config_manager import ConfigManager
-from pypost.models.settings import AppSettings
+from pypost.models.settings import AppSettings, update_settings_snapshot
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 
 pytestmark = pytest.mark.timeout(120)
@@ -44,9 +44,13 @@ def _make_main_window(qapp, config_manager):  # noqa: ARG001
             metrics=metrics,
             template_service=template_service,
             config_manager=config_manager,
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
             storage=storage,
             request_manager=MagicMock(),
+            mcp_controller=MagicMock(),
+            alert_manager_factory=MagicMock(),
         )
     window.env = MagicMock()
     window.env.wait_storage_idle = MagicMock()
@@ -93,7 +97,7 @@ def test_open_settings_alert_fields_round_trip_via_settings_json(qapp, tmp_path,
     with patch("pypost.core.config_manager.user_config_dir", return_value=str(config_dir)):
         config_manager = ConfigManager()
         window = _make_main_window(qapp, config_manager)
-        window.settings = config_manager.load_config()
+        update_settings_snapshot(window.settings, config_manager.load_config())
 
         log_path = str(tmp_path / "custom-alerts.log")
         webhook_url = "https://hooks.example.com/pypost"

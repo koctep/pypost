@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 from PySide6.QtTest import QTest
 
-from pypost.core.config_manager import ConfigManager
+from pypost.core.config_manager import ConfigManager, ConfigPersistenceError
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
@@ -103,35 +103,37 @@ class TestStateManagerPersistence(unittest.TestCase):
 
     def test_set_expanded_collections_persists(self):
         cm, _td = self._cm_and_td()
-        sm = StateManager(cm)
+        sm = StateManager(cm, cm.load_config())
         sm.set_expanded_collections(["c1", "c2"])
         sm.flush_pending_save()
 
         cm2 = ConfigManager()
-        sm2 = StateManager(cm2)
+        sm2 = StateManager(cm2, cm2.load_config())
         self.assertEqual(sm2.get_expanded_collections(), ["c1", "c2"])
 
     def test_set_open_tabs_persists(self):
         cm, _td = self._cm_and_td()
-        sm = StateManager(cm)
+        sm = StateManager(cm, cm.load_config())
         sm.set_open_tabs(["r1", "r2"])
         sm.flush_pending_save()
 
-        sm2 = StateManager(ConfigManager())
+        cm2 = ConfigManager()
+        sm2 = StateManager(cm2, cm2.load_config())
         self.assertEqual(sm2.get_open_tabs(), ["r1", "r2"])
 
     def test_set_last_environment_id_persists(self):
         cm, _td = self._cm_and_td()
-        sm = StateManager(cm)
+        sm = StateManager(cm, cm.load_config())
         sm.set_last_environment_id("env-99")
         sm.flush_pending_save()
 
-        sm2 = StateManager(ConfigManager())
+        cm2 = ConfigManager()
+        sm2 = StateManager(cm2, cm2.load_config())
         self.assertEqual(sm2.get_last_environment_id(), "env-99")
 
     def test_set_expanded_collections_noop_skips_save(self):
         cm, _td = self._cm_and_td()
-        sm = StateManager(cm)
+        sm = StateManager(cm, cm.load_config())
         with patch.object(cm, "save_config", wraps=cm.save_config) as wrapped:
             sm.set_expanded_collections([])
             wrapped.assert_not_called()
@@ -146,7 +148,7 @@ class TestStateManagerPersistence(unittest.TestCase):
 
     def test_rapid_ui_state_changes_coalesce_to_single_save(self):
         cm, _td = self._cm_and_td()
-        sm = StateManager(cm)
+        sm = StateManager(cm, cm.load_config())
         with patch.object(cm, "save_config", wraps=cm.save_config) as wrapped:
             sm.set_expanded_collections(["a"])
             sm.set_expanded_collections(["a", "b"])
@@ -157,24 +159,26 @@ class TestStateManagerPersistence(unittest.TestCase):
             sm.flush_pending_save()
             self.assertEqual(wrapped.call_count, 1)
 
-        sm2 = StateManager(ConfigManager())
+        cm2 = ConfigManager()
+        sm2 = StateManager(cm2, cm2.load_config())
         self.assertEqual(sm2.get_expanded_collections(), ["b"])
         self.assertEqual(sm2.get_open_tabs(), ["r1", "r2"])
 
     def test_flush_pending_save_noop_when_nothing_pending(self):
         cm, _td = self._cm_and_td()
-        sm = StateManager(cm)
+        sm = StateManager(cm, cm.load_config())
         with patch.object(cm, "save_config", wraps=cm.save_config) as wrapped:
             sm.flush_pending_save()
             wrapped.assert_not_called()
 
     def test_save_immediately_persists_without_waiting_for_debounce(self):
         cm, _td = self._cm_and_td()
-        sm = StateManager(cm)
+        sm = StateManager(cm, cm.load_config())
         sm.set_expanded_collections(["immediate"])
         sm.save()
 
-        sm2 = StateManager(ConfigManager())
+        cm2 = ConfigManager()
+        sm2 = StateManager(cm2, cm2.load_config())
         self.assertEqual(sm2.get_expanded_collections(), ["immediate"])
 
 def test_state_manager_debounced_save_persists_after_timer(qapp):  # noqa: ARG001
@@ -182,14 +186,15 @@ def test_state_manager_debounced_save_persists_after_timer(qapp):  # noqa: ARG00
     with tempfile.TemporaryDirectory() as td:
         with patch("pypost.core.config_manager.user_config_dir", return_value=td):
             cm = ConfigManager()
-            sm = StateManager(cm)
+            sm = StateManager(cm, cm.load_config())
             with patch.object(cm, "save_config", wraps=cm.save_config) as wrapped:
                 sm.set_expanded_collections(["debounced"])
                 wrapped.assert_not_called()
                 QTest.qWait(350)
                 wrapped.assert_called_once()
 
-            sm2 = StateManager(ConfigManager())
+            cm2 = ConfigManager()
+            sm2 = StateManager(cm2, cm2.load_config())
             assert sm2.get_expanded_collections() == ["debounced"]
 
 def test_request_timeout_survives_settings_dialog_save_and_restart(qapp):  # noqa: ARG001
@@ -245,7 +250,8 @@ class TestConfigManagerErrorLogging(unittest.TestCase):
                     side_effect=OSError("disk full"),
                 ):
                     with self.assertLogs("pypost.core.config_manager", level="ERROR") as logs:
-                        cm.save_config(AppSettings())
+                        with self.assertRaises(ConfigPersistenceError):
+                            cm.save_config(AppSettings())
                 self.assertTrue(
                     any("config_save_failed" in line for line in logs.output)
                 )

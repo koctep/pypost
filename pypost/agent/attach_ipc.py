@@ -260,6 +260,7 @@ class AgentUiAttachHost:
         self._stop = threading.Event()
         self._clients: list[socket.socket] = []
         self._clients_lock = threading.Lock()
+        self._client_threads: set[threading.Thread] = set()
 
     @property
     def endpoint(self) -> str:
@@ -305,24 +306,29 @@ class AgentUiAttachHost:
         """Stop accepting; close peers; remove the socket file."""
         self._stop.set()
         server = self._server
-        self._server = None
         if server is not None:
             try:
                 server.close()
-            except OSError:
-                pass
-        with self._clients_lock:
-            clients = list(self._clients)
-            self._clients.clear()
-        for client in clients:
-            try:
-                client.close()
             except OSError:
                 pass
         thread = self._thread
         self._thread = None
         if thread is not None and thread.is_alive():
             thread.join(timeout=2.0)
+        self._server = None
+        with self._clients_lock:
+            clients = list(self._clients)
+            self._clients.clear()
+            client_threads = tuple(self._client_threads)
+        for client in clients:
+            try:
+                client.close()
+            except OSError:
+                pass
+        current = threading.current_thread()
+        for client_thread in client_threads:
+            if client_thread is not current and client_thread.is_alive():
+                client_thread.join(timeout=2.0)
         path = Path(self._endpoint)
         if path.exists():
             try:
@@ -350,12 +356,15 @@ class AgentUiAttachHost:
                 self._endpoint,
                 peer_count,
             )
-            threading.Thread(
+            client_thread = threading.Thread(
                 target=self._serve_client,
                 args=(client,),
                 name="pypost-agent-ui-attach-client",
                 daemon=True,
-            ).start()
+            )
+            with self._clients_lock:
+                self._client_threads.add(client_thread)
+            client_thread.start()
 
     def _serve_client(self, client: socket.socket) -> None:
         try:
@@ -379,6 +388,7 @@ class AgentUiAttachHost:
             with self._clients_lock:
                 if client in self._clients:
                     self._clients.remove(client)
+                self._client_threads.discard(threading.current_thread())
                 peer_count = len(self._clients)
             logger.info(
                 "agent_ui_attach_client_closed endpoint=%s peers=%d",

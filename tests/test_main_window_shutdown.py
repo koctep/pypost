@@ -6,7 +6,8 @@ from unittest.mock import MagicMock, patch
 
 from PySide6.QtWidgets import QApplication
 
-from pypost.models.settings import AppSettings
+from pypost.core.config_manager import ConfigPersistenceError
+from pypost.models.settings import AppSettings, update_settings_snapshot
 
 pytestmark = pytest.mark.timeout(120)
 
@@ -36,7 +37,14 @@ def _make_window(qapp):
         window = MainWindow(
             metrics=metrics,
             template_service=template_service,
+            config_manager=MagicMock(recovery_notice=None),
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
+            storage=MagicMock(),
+            request_manager=MagicMock(),
+            mcp_controller=MagicMock(),
+            alert_manager_factory=MagicMock(),
         )
     window.settings_btn = MagicMock()
     window.env = MagicMock()
@@ -45,24 +53,37 @@ def _make_window(qapp):
 
 def test_handle_exit_waits_for_storage_when_encryption_enabled(qapp, monkeypatch):
     window = _make_window(qapp)
-    window.settings = AppSettings(env_encryption_enabled=True)
-    with patch("pypost.ui.main_window.QApplication") as mock_qapp:
-        mock_qapp.instance.return_value = MagicMock()
+    update_settings_snapshot(window.settings, AppSettings(env_encryption_enabled=True))
+    with patch.object(QApplication, "instance", return_value=MagicMock()):
         window.handle_exit()
     window.env.wait_storage_idle.assert_called_once()
 
 def test_handle_exit_skips_storage_wait_when_encryption_disabled(qapp):
     window = _make_window(qapp)
-    window.settings = AppSettings(env_encryption_enabled=False)
-    with patch("pypost.ui.main_window.QApplication") as mock_qapp:
-        mock_qapp.instance.return_value = MagicMock()
+    update_settings_snapshot(window.settings, AppSettings(env_encryption_enabled=False))
+    with patch.object(QApplication, "instance", return_value=MagicMock()):
         window.handle_exit()
     window.env.wait_storage_idle.assert_not_called()
 
 def test_handle_exit_flushes_pending_state_manager_save(qapp):
     window = _make_window(qapp)
-    window.settings = AppSettings(env_encryption_enabled=False)
-    with patch("pypost.ui.main_window.QApplication") as mock_qapp:
-        mock_qapp.instance.return_value = MagicMock()
+    update_settings_snapshot(window.settings, AppSettings(env_encryption_enabled=False))
+    with patch.object(QApplication, "instance", return_value=MagicMock()):
         window.handle_exit()
     window.state_manager.flush_pending_save.assert_called_once()
+
+
+def test_shutdown_stays_open_when_pending_settings_cannot_be_flushed(qapp, tmp_path):
+    window = _make_window(qapp)
+    window.state_manager.flush_pending_save.side_effect = ConfigPersistenceError(
+        tmp_path / "settings.json",
+        "replace_settings_file",
+    )
+
+    with patch.object(window.mcp_controller, "stop_all") as stop_all:
+        result = window._shutdown_for_exit()
+
+    assert result.outcome == "failed"
+    assert result.failure_kind == "settings_save_failed"
+    window.env.wait_storage_idle.assert_not_called()
+    stop_all.assert_not_called()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -80,3 +81,9 @@ class AppSettings(BaseModel):
         if len(ports) != len(set(ports)):
             raise ValueError("MCP server configurations must use unique ports")
         return self
+
+
+def update_settings_snapshot(target: AppSettings, source: AppSettings) -> None:
+    """Update an authoritative settings object without changing its identity."""
+    for field_name in AppSettings.model_fields:
+        setattr(target, field_name, deepcopy(getattr(source, field_name)))

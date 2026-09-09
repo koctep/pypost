@@ -13,10 +13,11 @@ from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
 from pypost.core.mcp_activity_log import McpActivityEntry
-from pypost.core.mcp_server_registry import MCPServerRegistry, McpServerStatus
+from pypost.core.mcp_server_registry import McpServerStatus
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.qt.mcp_server import MCPServerManager
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings, McpServerConfiguration
 from pypost.ui.collection_item_dialogs import show_mcp_server_start_failed
@@ -60,7 +61,7 @@ class McpControlsPresenter(QObject):
         current_environment: Callable[[], Environment | None],
         metrics: MetricsTrackerProtocol,
         dialog_parent: QWidget,
-        mcp_registry: MCPServerRegistry | None = None,
+        mcp_registry: QtMCPServerRegistry | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)

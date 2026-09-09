@@ -3,9 +3,10 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Optional, Set
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pypost.models.collection_variable import CollectionVariable
+from pypost.models.environment_variable import normalize_environment_variables
 from pypost.models.retry import RetryPolicy
 from pypost.models.mcp_client import McpClientConnection
 from pypost.models.websocket import WebSocketConnection
@@ -104,11 +105,26 @@ class Collection(BaseModel):
 
 
 class Environment(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "New Environment"
     variables: Dict[str, str] = Field(default_factory=dict)
     hidden_keys: Set[str] = Field(default_factory=set)
     enable_mcp: bool = False
+
+    @field_validator("variables", mode="before")
+    @classmethod
+    def _validate_variables(cls, value: Any) -> dict[str, str]:
+        return normalize_environment_variables(value or {})
+
+    @model_validator(mode="after")
+    def _normalize_hidden_keys(self) -> "Environment":
+        normalized = {
+            key.strip() for key in self.hidden_keys if key.strip() in self.variables
+        }
+        object.__setattr__(self, "hidden_keys", normalized)
+        return self
 
 
 class HistoryEntry(BaseModel):

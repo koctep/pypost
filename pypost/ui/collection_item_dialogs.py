@@ -226,6 +226,27 @@ def show_env_save_failed(parent: QWidget, message: str) -> None:
     QMessageBox.warning(parent, "Save Failed", message)
 
 
+def show_settings_save_failed(parent: QWidget, message: str) -> None:
+    QMessageBox.critical(parent, "Settings Save Failed", message)
+
+
+def show_settings_recovery_warning(
+    parent: QWidget,
+    original_path: Path,
+    quarantine_path: Path | None,
+) -> None:
+    if quarantine_path is None:
+        detail = f"The invalid file could not be moved: {original_path}"
+    else:
+        detail = f"The invalid file was moved to: {quarantine_path}"
+    QMessageBox.warning(
+        parent,
+        "Settings Recovered",
+        "PyPost could not read the settings file and started with defaults.\n\n"
+        + detail,
+    )
+
+
 def show_no_environment_selected(parent: QWidget) -> None:
     QMessageBox.warning(
         parent,

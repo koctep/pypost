@@ -15,6 +15,7 @@ from PySide6.QtCore import QObject, Signal
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_proxy_server_impl import MCPProxyServerImpl
 from pypost.core.mcp_server_impl import MCPServerImpl
+from pypost.core.qt.websocket_probe_executor import execute_qt_websocket_probe
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.server_bind import (
     drain_pending_tasks,
@@ -65,6 +66,7 @@ class MCPServerManager(QObject):
             metrics=metrics,
             template_service=template_service,
             activity_log=self._activity_log,
+            websocket_probe_executor=execute_qt_websocket_probe,
         )
         if template_service is not None:
             logger.debug(
@@ -81,6 +83,18 @@ class MCPServerManager(QObject):
     @property
     def activity_log(self) -> McpActivityLog:
         return self._activity_log
+
+    def activity_entries(self) -> list[McpActivityEntry]:
+        """Return an immutable activity snapshot through the runtime protocol."""
+        return self._activity_log.get_entries()
+
+    def connect_status_changed(self, callback: Callable[[bool], None]) -> None:
+        """Connect without exposing Qt signal types to the core registry."""
+        self.status_changed.connect(callback)
+
+    def connect_start_failed(self, callback: Callable[[str], None]) -> None:
+        """Connect without exposing Qt signal types to the core registry."""
+        self.start_failed.connect(callback)
 
     @property
     def last_start_error(self) -> str | None:
@@ -123,6 +137,7 @@ class MCPServerManager(QObject):
                 activity_log=self._activity_log,
                 variable_supplier=self._variable_supplier,
                 hidden_keys_supplier=self._hidden_keys_supplier,
+                websocket_probe_executor=execute_qt_websocket_probe,
             )
 
         self._current_port = port

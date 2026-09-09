@@ -19,7 +19,7 @@ from pypost.core.mcp_proxy_headers import (
     sanitize_proxy_headers,
 )
 from pypost.core.mcp_proxy_server_impl import MCPProxyServerImpl
-from pypost.core.mcp_server_registry import MCPServerRegistry
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry as MCPServerRegistry
 from pypost.core.mcp_transport_routes import (
     MCP_LEGACY_SSE_MOUNT_PATH,
     MCP_STREAMABLE_HTTP_PATH,
@@ -375,7 +375,7 @@ class TestMcpProxyRegistryIntegration(unittest.TestCase):
 
     def test_registry_starts_proxy_server_without_collection(self):
         """MCPServerRegistry starts proxy server without requiring a collection."""
-        registry = MCPServerRegistry()
+        registry = MCPServerRegistry(runtime_factory=MCPServerManager)
         config = McpServerConfiguration(
             id="proxy-jira",
             name="Jira Proxy",
@@ -395,7 +395,7 @@ class TestMcpProxyRegistryIntegration(unittest.TestCase):
 
     def test_registry_reconciles_proxy_references_without_collection(self):
         """reconcile_references keeps proxy server enabled even if no collection matches."""
-        registry = MCPServerRegistry()
+        registry = MCPServerRegistry(runtime_factory=MCPServerManager)
         config = McpServerConfiguration(
             id="proxy-jira",
             port=2099,

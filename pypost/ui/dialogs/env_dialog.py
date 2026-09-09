@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, List
 
-from PySide6.QtWidgets import QDialog, QHBoxLayout
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QVBoxLayout
 
 from pypost.core.environment_ops import clone_environments
 from pypost.models.models import Environment
@@ -43,9 +43,20 @@ class EnvironmentDialog(QDialog):
             get_selected_env=self._selected_environment,
         )
 
-        layout = QHBoxLayout(self)
-        layout.addWidget(self._env_list_widget, 1)
-        layout.addWidget(self._vars_widget, 3)
+        content_layout = QHBoxLayout()
+        content_layout.addWidget(self._env_list_widget, 1)
+        content_layout.addWidget(self._vars_widget, 3)
+
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel,
+        )
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(content_layout)
+        layout.addWidget(self.button_box)
 
         self._env_list_widget.environment_selected.connect(self.on_env_selected)
 
@@ -96,8 +107,8 @@ class EnvironmentDialog(QDialog):
     def _apply_environment_rename(self, row: int, new_name: str) -> bool:
         return self._env_list_widget.apply_environment_rename(row, new_name)
 
-    def _get_hidden_checkbox(self, row: int):
-        return self._vars_widget.get_hidden_checkbox(row)
+    def _get_hidden_item(self, row: int):
+        return self._vars_widget.get_hidden_item(row)
 
     def _delete_variable_at_row(self, row: int) -> None:
         self._vars_widget.delete_variable_at_row(row)

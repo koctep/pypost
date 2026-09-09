@@ -35,6 +35,15 @@ class EnvironmentImportFileError(Exception):
     """Raised for unreadable, malformed, or wrong-shaped import files."""
 
 
+def _json_object_without_duplicates(pairs: list[tuple[str, object]]) -> dict:
+    result: dict = {}
+    for key, value in pairs:
+        if key in result:
+            raise EnvironmentImportFileError(f'Duplicate JSON key "{key}".')
+        result[key] = value
+    return result
+
+
 @dataclass(frozen=True)
 class ImportPlanResult:
     """The outcome of planning an import: the new target list plus a summary."""
@@ -69,7 +78,7 @@ def load_import_candidates(
         raise EnvironmentImportFileError(f"Could not read file: {exc}") from exc
 
     try:
-        data = json.loads(text)
+        data = json.loads(text, object_pairs_hook=_json_object_without_duplicates)
     except json.JSONDecodeError as exc:
         raise EnvironmentImportFileError(f"File is not valid JSON: {exc}") from exc
 

@@ -1,5 +1,5 @@
 {
-  "error_count": 180,
+  "error_count": 179,
   "errors": [
     {
       "code": "return-value",
@@ -405,11 +405,6 @@
       "code": "attr-defined",
       "message": "\"type[Qt]\" has no attribute \"CustomContextMenu\"",
       "path": "pypost/ui/presenters/collections_presenter.py"
-    },
-    {
-      "code": "assignment",
-      "message": "Incompatible types in assignment (expression has type \"None\", variable has type \"str\")",
-      "path": "pypost/ui/presenters/env_presenter.py"
     },
     {
       "code": "arg-type",

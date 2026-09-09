@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import logging
+import time
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QElapsedTimer, QObject, Signal
+from PySide6.QtWidgets import QApplication
 
+from pypost.core.lifecycle import TeardownResult
 from pypost.core.qt.collection_storage_worker import CollectionStorageWorker
 from pypost.core.storage_interface import StorageInterface
 
@@ -23,6 +26,8 @@ class CollectionStorageGateway(QObject):
         self._storage = storage
         self._worker: CollectionStorageWorker | None = None
         self._pending_load = False
+        self._teardown_started = False
+        self._teardown_result: TeardownResult | None = None
 
     def is_busy(self) -> bool:
         return self._worker is not None and self._worker.isRunning()
@@ -31,6 +36,9 @@ class CollectionStorageGateway(QObject):
         return self.is_busy() or self._pending_load
 
     def load_async(self) -> None:
+        if self._teardown_started:
+            logger.info("collection_storage_load_rejected reason=teardown")
+            return
         if self.is_busy():
             self._pending_load = True
             logger.debug("collection_storage_gateway_load_queued")
@@ -46,10 +54,42 @@ class CollectionStorageGateway(QObject):
         logger.debug("collection_storage_gateway_load_started")
 
     def _on_load_finished(self, collections: list) -> None:
-        self.load_completed.emit(collections)
+        if not self._teardown_started:
+            self.load_completed.emit(collections)
 
     def _on_load_failed(self, error: object) -> None:
-        self.load_failed.emit(error)
+        if not self._teardown_started:
+            self.load_failed.emit(error)
+
+    def teardown(self, timeout_ms: int = 5000) -> TeardownResult:
+        """Fence callbacks and wait for the startup storage worker."""
+        if self._teardown_result is not None:
+            return self._teardown_result
+        started = time.monotonic()
+        budget_ms = max(0, timeout_ms)
+        active_count = int(self.is_busy())
+        pending_count = int(self._pending_load)
+        self._teardown_started = True
+        self._pending_load = False
+        timer = QElapsedTimer()
+        timer.start()
+        app = QApplication.instance()
+        while self._worker is not None and timer.elapsed() < budget_ms:
+            if app is not None:
+                app.processEvents()
+            worker = self._worker
+            if worker is not None:
+                worker.wait(min(10, max(0, budget_ms - timer.elapsed())))
+        settled = self._worker is None or not self._worker.isRunning()
+        self._teardown_result = TeardownResult(
+            owner="collection_storage_gateway",
+            outcome="success" if settled else "incomplete",
+            elapsed_ms=int((time.monotonic() - started) * 1000),
+            active_count=active_count,
+            pending_count=pending_count,
+            failure_kind=None if settled else "timeout",
+        )
+        return self._teardown_result
 
     def _on_worker_finished(self) -> None:
         finished = self._worker

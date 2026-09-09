@@ -59,9 +59,13 @@ def _make_main_window(qapp, storage, config_manager, request_manager=None):  # n
             metrics=metrics,
             template_service=template_service,
             config_manager=config_manager,
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
             storage=storage,
             request_manager=request_manager,
+            mcp_controller=MagicMock(),
+            alert_manager_factory=MagicMock(),
         )
     window.env = MagicMock()
     window.env.wait_storage_idle = MagicMock()

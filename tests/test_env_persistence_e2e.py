@@ -5,6 +5,8 @@ import logging
 import tempfile
 from unittest.mock import MagicMock, patch
 
+from PySide6.QtCore import Qt
+
 from pypost.core.config_manager import ConfigManager
 from pypost.core.storage import StorageManager
 from pypost.models.models import Environment
@@ -109,10 +111,10 @@ def test_default_masked_toggle_log_after_persistence_round_trip(qapp, caplog):  
             dialog = EnvironmentDialog(reloaded)
             try:
                 dialog.on_env_selected(0)
-                hidden_cb = dialog._get_hidden_checkbox(0)
-                assert hidden_cb is not None
+                hidden_item = dialog._get_hidden_item(0)
+                assert hidden_item is not None
                 with caplog.at_level(logging.INFO):
-                    hidden_cb.setChecked(True)
+                    hidden_item.setCheckState(Qt.CheckState.Checked)
                 assert any(
                     f"env_hidden_flag_changed env_name={env_name} key={HIDDEN_MASK} hidden=True"
                     in r.message
@@ -140,9 +142,9 @@ def test_hidden_toggle_persists_and_reveal_keeps_original_value(qapp):  # noqa: 
                 dialog.on_env_selected(0)
                 assert dialog.vars_table.item(0, 1).text() == HIDDEN_MASK
 
-                hidden_cb = dialog._get_hidden_checkbox(0)
-                assert hidden_cb is not None
-                hidden_cb.setChecked(False)
+                hidden_item = dialog._get_hidden_item(0)
+                assert hidden_item is not None
+                hidden_item.setCheckState(Qt.CheckState.Unchecked)
                 assert dialog.vars_table.item(0, 1).text() == "secret"
                 assert dialog.environments[0].hidden_keys == set()
 

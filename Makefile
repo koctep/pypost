@@ -3,7 +3,8 @@
 	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
 	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
-	check-license-inventory lint-docs check-docs-links check-lock-all test-gui-batch
+	check-license-inventory lint-docs check-docs-links check-lock-all test-gui-batch \
+	test-env-wayland-crash
 
 .DEFAULT_GOAL := help
 
@@ -175,6 +176,10 @@ test-slow: $(VENV_MARKER) venv-test venv-otel ## Run slow integration tests only
 test-gui-batch: $(VENV_MARKER) venv-test venv-otel ## Verify bounded GUI batch isolation
 	QT_QPA_PLATFORM=offscreen PYTHONPATH=. $(BIN)/python scripts/repro_gui_batch_segfault.py \
 		--mode=bounded --batch-size=$(GUI_BATCH_SIZE)
+
+test-env-wayland-crash: $(VENV_MARKER) venv-test ## Verify env editor clicks on real Wayland
+	PYPOST_RUN_WAYLAND_TESTS=1 PYTHONPATH=. $(BIN)/python -m pytest \
+		tests/test_environment_dialog_crash_harness.py -m wayland
 
 test-mcp-collection-e2e: $(VENV_MARKER) venv-test venv-otel ## Run Jira MCP e2e
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest tests/test_mcp_collection_e2e.py

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pypost.core.alert_manager import AlertManager
+from pypost.core.config_manager import ConfigPersistenceError
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.lifecycle import (
     TeardownResult,
@@ -68,6 +69,7 @@ def teardown(window: MainWindow, timeout_ms: int | None = None) -> TeardownResul
             owner
             for owner in (
                 getattr(window, "tabs", None),
+                getattr(window, "collections", None),
                 getattr(window, "history_panel", None),
                 getattr(window, "history_manager", None),
                 getattr(window, "env", None),
@@ -122,7 +124,15 @@ def teardown(window: MainWindow, timeout_ms: int | None = None) -> TeardownResul
             allocated = int(budget_ms * slots_left / len(owners))
             remaining = max(0, int((deadline - time.monotonic()) * 1000))
             owner_budget = min(allocated, remaining)
-            results.append(owner.teardown(timeout_ms=owner_budget))
+            owner_result = owner.teardown(timeout_ms=owner_budget)
+            if isinstance(owner_result, bool):
+                owner_result = TeardownResult(
+                    owner="collections_presenter",
+                    outcome="success" if owner_result else "incomplete",
+                    elapsed_ms=0,
+                    failure_kind=None if owner_result else "timeout",
+                )
+            results.append(owner_result)
 
         if any(result.outcome == "failed" for result in results):
             outcome, failure_kind = "failed", "owner_failure"
@@ -162,13 +172,21 @@ def shutdown_for_exit(
     existing = getattr(window, "_teardown_result", None)
     if isinstance(existing, TeardownResult):
         return existing
-    window.state_manager.flush_pending_save()
+    try:
+        window.state_manager.flush_pending_save()
+    except ConfigPersistenceError:
+        logger.error("lifecycle_shutdown_blocked reason=settings_save_failed")
+        return TeardownResult(
+            owner="main_window",
+            outcome="failed",
+            elapsed_ms=0,
+            failure_kind="settings_save_failed",
+        )
     result = window.teardown(timeout_ms=5000)
     if result.outcome != "success":
         return result
     if encryption_enabled_resolver(window.settings):
         window.env.wait_storage_idle(timeout_ms=0)
-    window.mcp_controller.stop_all()
     return result
 
 
@@ -219,11 +237,17 @@ def alert_settings_changed(previous: AppSettings, updated: AppSettings) -> bool:
 
 def reload_alert_manager(
     window: MainWindow,
-    alert_manager_factory: Callable[..., AlertManager] = AlertManager,
+    alert_manager_factory: Callable[..., AlertManager],
 ) -> None:
     if window._alert_manager is not None:
         window._alert_manager.close()
-    log_path = Path(window.settings.alert_log_path) if window.settings.alert_log_path else None
+    override = getattr(window, "_alert_log_path_override", None)
+    fallback = getattr(window, "_default_alert_log_path", None)
+    log_path = (
+        override
+        or (Path(window.settings.alert_log_path) if window.settings.alert_log_path else None)
+        or fallback
+    )
     window._alert_manager = alert_manager_factory(
         log_path=log_path,
         webhook_url=window.settings.alert_webhook_url,

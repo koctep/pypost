@@ -61,7 +61,14 @@ def _make_encrypted_startup_window(qapp, mock_env, mock_collections):  # noqa: A
         window = MainWindow(
             metrics=metrics,
             template_service=template_service,
+            config_manager=MagicMock(recovery_notice=None),
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
+            storage=MagicMock(),
+            request_manager=MagicMock(),
+            mcp_controller=MagicMock(),
+            alert_manager_factory=MagicMock(),
         )
     window.settings_btn = MagicMock()
     return window, mock_tabs, mock_collections

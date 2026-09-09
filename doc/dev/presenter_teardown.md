@@ -72,7 +72,8 @@ fails. The root calls owners in this order:
 1. Mark the root fence and propagate one safe `teardown_id` to its children.
 2. Begin teardown for tabs, the history panel, and the history manager. The environment presenter
    receives a root fence through `begin_root_teardown()` so normal UI admission closes early.
-3. Teardown request tabs, then the history panel, then the history manager.
+3. Teardown request tabs and collection loaders/importers, then the history panel and history
+   manager. Collection startup completion is fenced before its storage worker is drained.
 4. Before environment teardown, drain request-produced environment updates accepted through the
    tabs cutoff into `EnvPresenter.accept_accepted_env_update()`.
 5. Teardown the environment presenter and aggregate child counts and outcomes.
@@ -153,10 +154,11 @@ handling; late failures after fencing do not open a dialog or mutate the UI.
 
 ### MainWindow
 
-`MainWindow` is the lifecycle composition root. It owns the tabs presenter, history panel, history
-manager, and environment presenter, and installs the request-to-environment consumer during
-composition. It is also responsible for applying the aggregate result to the close/exit decision;
-child owners must not independently quit the application.
+`MainWindow` is the UI lifecycle owner. It owns the tabs presenter, history panel, history manager,
+and environment presenter, and installs the request-to-environment consumer during composition.
+It is responsible for applying the aggregate UI result to the close/exit decision; child owners
+must not independently quit the application. The process-level composition root is
+`ComposedApp`, documented in [application lifecycle](application_lifecycle.md).
 
 ## Logs and metrics
 

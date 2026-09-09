@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from pypost.core.mcp_activity_log import McpActivityEntry
-from pypost.core.mcp_server_registry import MCPServerRegistry, McpServerStatus
-from pypost.models.models import Collection
+from pypost.core.mcp_server_registry import McpServerStatus
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry as MCPServerRegistry
 from pypost.models.settings import AppSettings, McpServerConfiguration
 from pypost.ui.mcp_server_controller import McpServerSettingsController
 
@@ -51,10 +51,6 @@ def test_mcp_server_controller_configurations_returns_deep_copies():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -78,10 +74,6 @@ def test_mcp_server_controller_status_delegates_to_registry():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -97,16 +89,12 @@ def test_mcp_server_activity_returns_entries_when_manager_found():
     registry = MagicMock(spec=MCPServerRegistry)
     manager = MagicMock()
     entry = McpActivityEntry.new_list_tools(tool_count=3)
-    manager.activity_log.get_entries.return_value = [entry]
+    manager.activity_entries.return_value = [entry]
     registry.manager_for.return_value = manager
 
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -125,10 +113,6 @@ def test_mcp_server_activity_handles_keyerror_with_debug_log(caplog):
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -149,10 +133,6 @@ def test_upsert_mcp_server_creates_and_persists_new_configuration(caplog):
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -177,10 +157,6 @@ def test_upsert_mcp_server_updates_existing_stopped_configuration(caplog):
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -205,10 +181,6 @@ def test_upsert_mcp_server_reconfigures_running_server_without_settings_mutation
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -229,10 +201,6 @@ def test_remove_mcp_server_removes_from_registry_and_settings(caplog):
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -254,10 +222,6 @@ def test_start_and_stop_mcp_server():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -282,10 +246,6 @@ def test_reconfiguration_finished_persists_when_committed():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )
@@ -298,23 +258,19 @@ def test_reconfiguration_finished_persists_when_committed():
     assert len(config_manager.saved) == 1
 
 
-def test_collection_lookup_passed_to_registry():
-    col_a = Collection(id="col-a", name="Collection A")
+def test_controller_uses_injected_registry_without_constructing_infrastructure():
     settings = AppSettings()
     config_manager = FakeConfigManager()
-    lookup_mock = MagicMock(return_value=col_a)
+    registry = MagicMock(spec=MCPServerRegistry)
 
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lookup_mock,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
+        mcp_manager=MagicMock(),
+        registry=registry,
     )
 
-    assert controller.registry._collection_lookup("col-a") == col_a
-    lookup_mock.assert_called_once_with("col-a")
+    assert controller.registry is registry
 
 
 def test_start_enabled_and_stop_all():
@@ -325,10 +281,6 @@ def test_start_enabled_and_stop_all():
     controller = McpServerSettingsController(
         settings_provider=lambda: settings,
         config_manager=config_manager,
-        collection_lookup=lambda _id: None,
-        environment_lookup=lambda _id: None,
-        metrics=MagicMock(),
-        template_service=MagicMock(),
         mcp_manager=MagicMock(),
         registry=registry,
     )

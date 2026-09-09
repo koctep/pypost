@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -364,7 +365,16 @@ class CollectionsPresenter(QObject):
     def teardown(self, timeout_ms: int = 5000) -> bool:
         """Tears down import actions and presenter resources cleanly."""
         logger.info("collections_presenter_teardown_started timeout_ms=%d", timeout_ms)
-        result = self._import_actions.teardown(timeout_ms=timeout_ms)
+        loader_clean = True
+        remaining_ms = timeout_ms
+        if self._async_loader is not None:
+            started = time.monotonic()
+            loader_result = self._async_loader.teardown(timeout_ms=timeout_ms)
+            loader_clean = loader_result.outcome == "success"
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            remaining_ms = max(0, timeout_ms - elapsed_ms)
+        result = self._import_actions.teardown(timeout_ms=remaining_ms)
+        result = result and loader_clean
         self._panel.close()
         logger.info("collections_presenter_teardown_completed clean=%s", result)
         return result
