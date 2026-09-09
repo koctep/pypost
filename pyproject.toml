@@ -87,6 +87,7 @@ markers = [
     "slow: network-heavy or slow integration tests (excluded from default CI)",
     "live_jira: explicitly opted-in smoke against a protected Jira site",
     "agent_e2e: agent UI e2e / env-pack scenarios (select with -m agent_e2e)",
+    "wayland: native Wayland GUI subprocess tests (opt in with PYPOST_RUN_WAYLAND_TESTS=1)",
 ]
 log_cli = true
 log_cli_level = "WARNING"

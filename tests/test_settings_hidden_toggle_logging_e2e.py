@@ -5,6 +5,8 @@ import pytest
 import logging
 from unittest.mock import MagicMock, patch
 
+from PySide6.QtCore import Qt
+
 from pypost.models.models import Environment
 from pypost.models.settings import AppSettings
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
@@ -87,10 +89,10 @@ def _make_integration_window(qapp, env_presenter):  # noqa: ARG001
 
 def _toggle_hidden_during_exec(dialog: EnvironmentDialog, caplog) -> None:
     dialog.on_env_selected(0)
-    hidden_cb = dialog._get_hidden_checkbox(0)
-    assert hidden_cb is not None
+    hidden_item = dialog._get_hidden_item(0)
+    assert hidden_item is not None
     with caplog.at_level(logging.INFO):
-        hidden_cb.setChecked(True)
+        hidden_item.setCheckState(Qt.CheckState.Checked)
 
 def _patch_env_dialog_exec(caplog):
     def exec_and_toggle(self):

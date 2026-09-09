@@ -4,7 +4,9 @@ import pytest
 
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QTableWidgetItem
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QStyle, QStyleOptionViewItem, QTableWidgetItem
 
 from pypost.core.constants import HIDDEN_MASK
 from pypost.models.models import Environment
@@ -25,12 +27,69 @@ class TestEnvironmentVariablesWidgetRowHelpers:
         env = Environment(name="Dev", variables={"API_KEY": "secret"})
         widget = self._widget_with_env(env)
         try:
-            hidden_cb = widget.get_hidden_checkbox(0)
-            assert hidden_cb is not None
-            hidden_cb.setChecked(True)
+            hidden_item = widget.get_hidden_item(0)
+            assert hidden_item is not None
+            hidden_item.setCheckState(Qt.CheckState.Checked)
             assert widget.vars_table.item(0, 1).text() == HIDDEN_MASK
-            hidden_cb.setChecked(False)
+            hidden_item.setCheckState(Qt.CheckState.Unchecked)
             assert widget.vars_table.item(0, 1).text() == "secret"
+        finally:
+            widget.close()
+
+    def test_hidden_column_uses_checkable_items_without_cell_widgets(self, qapp):
+        env = Environment(
+            name="Dev",
+            variables={"API_KEY": "secret"},
+            hidden_keys={"API_KEY"},
+        )
+        widget = self._widget_with_env(env)
+        try:
+            for row in range(widget.vars_table.rowCount()):
+                assert widget.vars_table.cellWidget(row, 2) is None
+                hidden_item = widget.get_hidden_item(row)
+                assert hidden_item is not None
+                assert hidden_item.flags() & Qt.ItemFlag.ItemIsUserCheckable
+                assert not hidden_item.flags() & Qt.ItemFlag.ItemIsEditable
+        finally:
+            widget.close()
+
+    def test_hidden_item_can_be_toggled_with_keyboard(self, qapp):
+        env = Environment(name="Dev", variables={"API_KEY": "secret"})
+        widget = self._widget_with_env(env)
+        try:
+            widget.show()
+            widget.vars_table.setCurrentCell(0, 2)
+            widget.vars_table.setFocus()
+            QTest.keyClick(widget.vars_table, Qt.Key.Key_Space)
+            assert widget.get_hidden_item(0).checkState() == Qt.CheckState.Checked
+            assert env.hidden_keys == {"API_KEY"}
+            assert widget.vars_table.item(0, 1).text() == HIDDEN_MASK
+        finally:
+            widget.close()
+
+    def test_hidden_item_can_be_toggled_with_mouse(self, qapp):
+        env = Environment(name="Dev", variables={"API_KEY": "secret"})
+        widget = self._widget_with_env(env)
+        try:
+            widget.show()
+            qapp.processEvents()
+            hidden_item = widget.get_hidden_item(0)
+            index = widget.vars_table.model().index(0, 2)
+            option = QStyleOptionViewItem()
+            widget.vars_table.itemDelegate().initStyleOption(option, index)
+            option.rect = widget.vars_table.visualItemRect(hidden_item)
+            indicator_rect = widget.vars_table.style().subElementRect(
+                QStyle.SubElement.SE_ItemViewItemCheckIndicator,
+                option,
+                widget.vars_table,
+            )
+            QTest.mouseClick(
+                widget.vars_table.viewport(),
+                Qt.MouseButton.LeftButton,
+                pos=indicator_rect.center(),
+            )
+            assert hidden_item.checkState() == Qt.CheckState.Checked
+            assert env.hidden_keys == {"API_KEY"}
         finally:
             widget.close()
 

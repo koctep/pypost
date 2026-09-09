@@ -6,7 +6,6 @@ from typing import Callable
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
-    QHBoxLayout,
     QHeaderView,
     QMenu,
     QTableWidget,
@@ -106,16 +105,12 @@ class EnvironmentVariablesWidget(QWidget):
             is_hidden = k in env.hidden_keys
             value_item = self._make_value_item(v, is_hidden)
             self.vars_table.setItem(i, COL_VAL, value_item)
-            self.vars_table.setCellWidget(
-                i,
-                COL_HIDDEN,
-                self._make_hidden_checkbox(is_hidden),
-            )
+            self.vars_table.setItem(i, COL_HIDDEN, self._make_hidden_item(is_hidden))
 
-        self.vars_table.setCellWidget(
+        self.vars_table.setItem(
             len(env.variables),
             COL_HIDDEN,
-            self._make_hidden_checkbox(False),
+            self._make_hidden_item(False),
         )
 
         self.vars_table.blockSignals(False)
@@ -125,22 +120,20 @@ class EnvironmentVariablesWidget(QWidget):
         if env is not None:
             env.enable_mcp = checked
 
-    def _make_hidden_checkbox(self, checked: bool = False) -> QWidget:
-        widget = QWidget()
-        cb = QCheckBox()
-        cb.setChecked(checked)
-        cb.toggled.connect(self._on_hidden_toggled)
-        layout = QHBoxLayout(widget)
-        layout.addWidget(cb)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setContentsMargins(0, 0, 0, 0)
-        return widget
+    def _make_hidden_item(self, checked: bool = False) -> QTableWidgetItem:
+        item = QTableWidgetItem()
+        flags = item.flags() | Qt.ItemFlag.ItemIsUserCheckable
+        item.setFlags(flags & ~Qt.ItemFlag.ItemIsEditable)
+        item.setCheckState(
+            Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked,
+        )
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        item.setToolTip(HIDDEN_COLUMN_TOOLTIP)
+        item.setData(Qt.ItemDataRole.AccessibleTextRole, COLUMN_HIDDEN)
+        return item
 
-    def get_hidden_checkbox(self, row: int) -> QCheckBox | None:
-        widget = self.vars_table.cellWidget(row, COL_HIDDEN)
-        if widget:
-            return widget.findChild(QCheckBox)
-        return None
+    def get_hidden_item(self, row: int) -> QTableWidgetItem | None:
+        return self.vars_table.item(row, COL_HIDDEN)
 
     def _make_value_item(self, value: str, is_hidden: bool) -> QTableWidgetItem:
         if not is_hidden:
@@ -220,43 +213,41 @@ class EnvironmentVariablesWidget(QWidget):
             self._make_value_item(real_val, hidden),
         )
 
-    def _on_hidden_toggled(self, checked: bool) -> None:
+    def _on_hidden_item_changed(self, item: QTableWidgetItem) -> None:
         env = self._get_selected_env()
         if env is None:
             return
 
-        sender = self.sender()
-        for i in range(self.vars_table.rowCount()):
-            cb = self.get_hidden_checkbox(i)
-            if cb is sender:
-                k_item = self.vars_table.item(i, COL_VAR)
-                if not k_item or not k_item.text():
-                    return
-                key = k_item.text()
-                self.vars_table.blockSignals(True)
-                if checked:
-                    env.hidden_keys.add(key)
-                else:
-                    env.hidden_keys.discard(key)
-                self._refresh_value_cell_for_hidden_toggle(i, key, checked, env)
-                self.vars_table.blockSignals(False)
-                logger.info(
-                    "env_hidden_flag_changed env_name=%s key=%s hidden=%s",
-                    env.name,
-                    HiddenToggleLogPolicy.format_key_name(
-                        key,
-                        log_hidden_key_names=self._log_hidden_key_names,
-                    ),
-                    checked,
-                )
-                return
+        row = item.row()
+        k_item = self.vars_table.item(row, COL_VAR)
+        if not k_item or not k_item.text():
+            return
+
+        key = k_item.text()
+        checked = item.checkState() == Qt.CheckState.Checked
+        self.vars_table.blockSignals(True)
+        if checked:
+            env.hidden_keys.add(key)
+        else:
+            env.hidden_keys.discard(key)
+        self._refresh_value_cell_for_hidden_toggle(row, key, checked, env)
+        self.vars_table.blockSignals(False)
+        logger.info(
+            "env_hidden_flag_changed env_name=%s key=%s hidden=%s",
+            env.name,
+            HiddenToggleLogPolicy.format_key_name(
+                key,
+                log_hidden_key_names=self._log_hidden_key_names,
+            ),
+            checked,
+        )
 
     def _append_trailing_add_row(self) -> None:
         self.vars_table.setRowCount(self.vars_table.rowCount() + 1)
-        self.vars_table.setCellWidget(
+        self.vars_table.setItem(
             self.vars_table.rowCount() - 1,
             COL_HIDDEN,
-            self._make_hidden_checkbox(False),
+            self._make_hidden_item(False),
         )
 
     def _ensure_trailing_add_row_present(self) -> None:
@@ -278,7 +269,7 @@ class EnvironmentVariablesWidget(QWidget):
         for i in range(self.vars_table.rowCount()):
             k_item = self.vars_table.item(i, COL_VAR)
             v_item = self.vars_table.item(i, COL_VAL)
-            cb = self.get_hidden_checkbox(i)
+            hidden_item = self.get_hidden_item(i)
 
             if k_item and k_item.text():
                 key = k_item.text().strip()
@@ -293,7 +284,11 @@ class EnvironmentVariablesWidget(QWidget):
                     ):
                         continue
                     continue
-                is_hidden = cb.isChecked() if cb else False
+                is_hidden = (
+                    hidden_item.checkState() == Qt.CheckState.Checked
+                    if hidden_item
+                    else False
+                )
                 if is_hidden:
                     new_hidden.add(key)
                     new_vars[key] = self._resolve_hidden_value_on_edit(
@@ -312,6 +307,10 @@ class EnvironmentVariablesWidget(QWidget):
     def on_var_changed(self, item: QTableWidgetItem) -> None:
         env = self._get_selected_env()
         if env is None:
+            return
+
+        if item.column() == COL_HIDDEN:
+            self._on_hidden_item_changed(item)
             return
 
         if item.row() == self.vars_table.rowCount() - 1 and item.text():

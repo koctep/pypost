@@ -96,8 +96,8 @@ class EnvironmentDialog(QDialog):
     def _apply_environment_rename(self, row: int, new_name: str) -> bool:
         return self._env_list_widget.apply_environment_rename(row, new_name)
 
-    def _get_hidden_checkbox(self, row: int):
-        return self._vars_widget.get_hidden_checkbox(row)
+    def _get_hidden_item(self, row: int):
+        return self._vars_widget.get_hidden_item(row)
 
     def _delete_variable_at_row(self, row: int) -> None:
         self._vars_widget.delete_variable_at_row(row)
