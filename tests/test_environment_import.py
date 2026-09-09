@@ -85,6 +85,33 @@ def test_load_import_candidates_raises_on_malformed_json(tmp_path, monkeypatch):
         load_import_candidates(bad_file, storage)
 
 
+def test_load_import_candidates_rejects_duplicate_json_keys(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    import_file = tmp_path / "duplicate.json"
+    import_file.write_text(
+        '{"name":"Dev","variables":{"A":"1","A":"2"}}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(EnvironmentImportFileError, match="Duplicate JSON key"):
+        load_import_candidates(import_file, storage)
+
+
+def test_load_import_candidates_reports_normalized_duplicate_key(tmp_path, monkeypatch):
+    storage = _make_storage(tmp_path, monkeypatch)
+    import_file = tmp_path / "duplicate-normalized.json"
+    import_file.write_text(
+        json.dumps({"name": "Dev", "variables": {"A": "1", " A ": "2"}}),
+        encoding="utf-8",
+    )
+
+    environments, parse_errors = load_import_candidates(import_file, storage)
+
+    assert environments == []
+    assert len(parse_errors) == 1
+    assert 'Variable "A" already exists.' in parse_errors[0]
+
+
 def test_load_import_candidates_reports_partial_decrypt_failure(tmp_path, monkeypatch):
     fernet = pytest.importorskip("cryptography.fernet")
     storage = _make_storage(tmp_path, monkeypatch)

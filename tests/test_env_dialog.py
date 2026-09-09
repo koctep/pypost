@@ -7,7 +7,7 @@ import logging
 from unittest.mock import patch
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QTableWidgetItem
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTableWidgetItem
 
 from pypost.models.models import Environment
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
@@ -17,6 +17,19 @@ pytestmark = pytest.mark.timeout(60)
 
 
 class TestEnvironmentDialog:
+    def test_dialog_exposes_explicit_save_and_cancel_actions(self, qapp):
+        dlg = EnvironmentDialog([Environment(name="Dev")])
+        try:
+            save = dlg.button_box.button(QDialogButtonBox.StandardButton.Save)
+            cancel = dlg.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+            assert save is not None
+            assert cancel is not None
+
+            cancel.click()
+            assert dlg.result() == QDialog.DialogCode.Rejected
+        finally:
+            dlg.close()
+
     def test_dialog_does_not_mutate_input_environments(self, qapp):
         env = Environment(name="Dev", variables={"k": "v"}, enable_mcp=False)
         input_envs = [env]
@@ -313,13 +326,24 @@ class TestEnvironmentDialog:
         finally:
             dlg.close()
 
-    def test_clear_name_still_removes_variable(self, qapp):
+    @patch(
+        "pypost.ui.widgets.environments.environment_variables_widget"
+        ".show_invalid_variable_name_error",
+    )
+    def test_clear_existing_name_reverts_and_requires_explicit_delete(
+        self, mock_invalid_error, qapp
+    ):
         env = Environment(name="Dev", variables={"k": "v"})
         dlg = EnvironmentDialog([env])
         try:
             dlg.on_env_selected(0)
             dlg.vars_table.item(0, 0).setText("")
-            assert "k" not in dlg.environments[0].variables
+            assert dlg.environments[0].variables == {"k": "v"}
+            assert dlg.vars_table.item(0, 0).text() == "k"
+            mock_invalid_error.assert_called_once_with(
+                dlg._vars_widget,
+                "Variable name cannot be empty.",
+            )
         finally:
             dlg.close()
 

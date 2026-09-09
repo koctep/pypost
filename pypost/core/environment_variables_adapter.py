@@ -15,6 +15,9 @@ from pypost.core.environment_secrets_codec import (
     EncryptedValueEnvelopeV2,
     EnvironmentSecretsCodec,
 )
+from pypost.core.environment_variable_validation import (
+    validate_environment_variable_keys,
+)
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.models.models import Environment
@@ -150,7 +153,9 @@ class EnvironmentVariablesAdapter:
         )
 
     def deserialize_environment(self, raw_env: dict[str, Any]) -> Environment:
-        variables_raw: dict[str, Any] = dict(raw_env.get("variables", {}))
+        variables_raw = validate_environment_variable_keys(
+            dict(raw_env.get("variables", {})),
+        )
         decoded_variables: dict[str, str] = {}
         decrypted_count = 0
         for key, value in variables_raw.items():
@@ -161,6 +166,11 @@ class EnvironmentVariablesAdapter:
 
         normalized = dict(raw_env)
         normalized["variables"] = decoded_variables
+        normalized["hidden_keys"] = {
+            str(key).strip()
+            for key in raw_env.get("hidden_keys", [])
+            if str(key).strip() in decoded_variables
+        }
         logger.info(
             "environment_deserialized env_name=%s decrypted_count=%d total_variables=%d",
             normalized.get("name", "unknown"),

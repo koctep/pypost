@@ -160,3 +160,86 @@ class TestEnvironmentVariablesWidgetRowHelpers:
             assert widget.vars_table.rowCount() == 3
         finally:
             widget.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_variables_widget"
+        ".show_invalid_variable_name_error",
+    )
+    def test_duplicate_rename_is_atomic(self, mock_invalid_error, qapp):
+        env = Environment(
+            name="Dev",
+            variables={"A": "1", "B": "2"},
+            hidden_keys={"B"},
+        )
+        widget = self._widget_with_env(env)
+        try:
+            original_row_id = widget._draft.row(1).row_id
+            widget.vars_table.item(1, 0).setText("A")
+
+            assert env.variables == {"A": "1", "B": "2"}
+            assert env.hidden_keys == {"B"}
+            assert widget.vars_table.item(1, 0).text() == "B"
+            assert widget.vars_table.currentRow() == 1
+            assert widget._draft.row(1).row_id == original_row_id
+            mock_invalid_error.assert_called_once_with(
+                widget,
+                'Variable "A" already exists.',
+            )
+        finally:
+            widget.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_variables_widget"
+        ".show_invalid_variable_name_error",
+    )
+    def test_duplicate_in_trailing_row_does_not_change_model(
+        self, mock_invalid_error, qapp
+    ):
+        env = Environment(
+            name="Dev",
+            variables={"SECRET": "original-secret"},
+            hidden_keys={"SECRET"},
+        )
+        widget = self._widget_with_env(env)
+        try:
+            trailing = len(env.variables)
+            widget.vars_table.item(trailing, 1).setText("new")
+            widget.get_hidden_item(trailing).setCheckState(Qt.CheckState.Checked)
+            widget.vars_table.item(trailing, 0).setText(" SECRET ")
+
+            assert env.variables == {"SECRET": "original-secret"}
+            assert env.hidden_keys == {"SECRET"}
+            assert widget.vars_table.item(0, 1).text() == HIDDEN_MASK
+            assert widget._draft.row(trailing).value == "new"
+            assert widget._draft.row(trailing).hidden is True
+            assert widget.vars_table.item(trailing, 0).text() == ""
+            mock_invalid_error.assert_called_once()
+            assert "original-secret" not in str(mock_invalid_error.call_args)
+        finally:
+            widget.close()
+
+    @patch(
+        "pypost.ui.widgets.environments.environment_variables_widget"
+        ".show_invalid_variable_name_error",
+    )
+    def test_invalid_hidden_rename_preserves_value_order_and_flag(
+        self, mock_invalid_error, qapp
+    ):
+        env = Environment(
+            name="Dev",
+            variables={"VISIBLE": "one", "SECRET": "s3cr3t"},
+            hidden_keys={"SECRET"},
+        )
+        widget = self._widget_with_env(env)
+        try:
+            widget.vars_table.item(1, 0).setText("bad-key")
+
+            assert list(env.variables.items()) == [
+                ("VISIBLE", "one"),
+                ("SECRET", "s3cr3t"),
+            ]
+            assert env.hidden_keys == {"SECRET"}
+            assert widget.vars_table.item(1, 1).text() == HIDDEN_MASK
+            mock_invalid_error.assert_called_once()
+        finally:
+            widget.close()

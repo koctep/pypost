@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtWidgets import QInputDialog, QWidget
+from PySide6.QtWidgets import QDialog, QInputDialog, QWidget
 
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
@@ -658,6 +658,36 @@ class TestEnvPresenter(unittest.TestCase):
             serializer.__func__,
             p._storage.serialize_environment_records.__func__,
         )
+
+    @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
+    def test_open_env_manager_applies_only_accepted_working_copy(self, mock_dialog):
+        original = _make_env("e1", "Dev", {"A": "1"})
+        changed = _make_env("e1", "Dev", {"A": "2"})
+        p = self._make_presenter([original])
+        p.load_environments()
+        p._storage.saved.clear()
+        mock_dialog.return_value.environments = [changed]
+        mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Accepted
+
+        p._open_env_manager()
+
+        self.assertEqual(len(p._storage.saved), 1)
+        self.assertEqual(p._storage.saved[0][0].variables, {"A": "2"})
+
+    @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
+    def test_open_env_manager_discards_rejected_working_copy(self, mock_dialog):
+        original = _make_env("e1", "Dev", {"A": "1"})
+        changed = _make_env("e1", "Dev", {"A": "2"})
+        p = self._make_presenter([original])
+        p.load_environments()
+        p._storage.saved.clear()
+        mock_dialog.return_value.environments = [changed]
+        mock_dialog.return_value.exec.return_value = QDialog.DialogCode.Rejected
+
+        p._open_env_manager()
+
+        self.assertEqual(p._environments[0].variables, {"A": "1"})
+        self.assertEqual(p._storage.saved, [])
 
     @patch("pypost.ui.presenters.env_presenter.EnvironmentDialog")
     def test_open_env_manager_passes_working_serialize_export_records(
