@@ -61,6 +61,9 @@ class MainWindow(QMainWindow):
         request_manager: RequestManager | None = None,
         mcp_manager: MCPServerManager | None = None,
         mcp_registry: MCPServerRegistry | None = None,
+        defer_startup: bool = False,
+        alert_log_path_override: Path | None = None,
+        default_alert_log_path: Path | None = None,
     ) -> None:
         super().__init__()
         set_widget_id(self, MAIN_WINDOW)
@@ -78,6 +81,8 @@ class MainWindow(QMainWindow):
             self.storage = StorageManager(metrics=self.metrics)
         self.config_manager = config_manager
         self._alert_manager = alert_manager
+        self._alert_log_path_override = alert_log_path_override
+        self._default_alert_log_path = default_alert_log_path
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
         if request_manager is not None:
             logger.debug("request_manager_source source=injected")
@@ -156,13 +161,20 @@ class MainWindow(QMainWindow):
         self._ui_ready = False
         self.collections.collections_loaded.connect(self._on_startup_collections_loaded)
         self.env.environments_loaded.connect(self._on_startup_environments_loaded)
-        self.collections.load_collections_async()
-        self.env.load_environments()
         self._startup_settings_reapplied = False
         self.apply_settings(self.settings)
         if isinstance(self.config_manager.recovery_notice, ConfigRecoveryNotice):
             QTimer.singleShot(0, self._show_settings_recovery_notice)
         logger.info("main_window_initialized")
+        if not defer_startup:
+            self.start_initial_loads()
+
+    def start_initial_loads(self) -> None:
+        """Start background loads after the composition root owns this window."""
+        if self._teardown_started:
+            return
+        self.collections.load_collections_async()
+        self.env.load_environments()
 
     @property
     def is_ui_ready(self) -> bool:

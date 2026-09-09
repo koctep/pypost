@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, Qt
 from PySide6.QtWidgets import QApplication, QWidget
 
 from pypost.agent.seed_loader import inject_seed
@@ -224,21 +224,16 @@ class AgentAppSession:
         composed = self._composed
         if composed is not None:
             try:
-                composed.mcp_registry.stop_all()
+                failures = composed.shutdown()
+                if failures:
+                    logger.error(
+                        "agent_session_resource_cleanup_incomplete failure_count=%d",
+                        len(failures),
+                    )
             except Exception:
-                logger.exception("agent_session_mcp_stop_failed")
-            try:
-                composed.window.handle_exit()
-            except Exception:
-                logger.exception("agent_session_handle_exit_failed")
-            try:
-                composed.window.close()
-            except Exception:
-                logger.exception("agent_session_window_close_failed")
-            try:
-                composed.metrics.stop_server()
-            except Exception:
-                logger.exception("agent_session_metrics_stop_failed")
+                logger.exception("agent_session_composed_shutdown_failed")
+            QCoreApplication.processEvents()
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
             QCoreApplication.processEvents()
             gc.collect()
 

@@ -182,34 +182,40 @@ domain model и не удаляет существующую переменну�
 Критерий завершения этапа: все пути записи используют один актуальный snapshot, запись атомарна,
 ошибка видима вызывающему коду, а UI-state не может откатить preferences.
 
-## [ ] 4. Сделать lifecycle ресурсов полным и симметричным
+## [x] 4. Сделать lifecycle ресурсов полным и симметричным
 
-### [ ] 4.1. Назначить владельцев ресурсов
+### [x] 4.1. Назначить владельцев ресурсов
 
-- [ ] Включить `AlertManager` в объектный граф `ComposedApp` и общий shutdown contract.
-- [ ] Определить единственного владельца для metrics server, MCP registry, alert handlers,
+- [x] Включить `AlertManager` в объектный граф `ComposedApp` и общий shutdown contract.
+- [x] Определить единственного владельца для metrics server, MCP registry, alert handlers,
   history workers, storage workers и attach host.
-- [ ] Останавливать владельцев в обратном порядке их создания.
-- [ ] Сделать shutdown идемпотентным для normal close, startup failure и частично созданного
+- [x] Останавливать владельцев в обратном порядке их создания.
+- [x] Сделать shutdown идемпотентным для normal close, startup failure и частично созданного
   приложения.
 
-### [ ] 4.2. Закрыть утечки и нарушение изоляции
+### [x] 4.2. Закрыть утечки и нарушение изоляции
 
-- [ ] Вызывать `AlertManager.close()` при каждом штатном и аварийном завершении session.
-- [ ] При переданном `data_dir` направлять default alert log в изолированный data directory
+- [x] Вызывать `AlertManager.close()` при каждом штатном и аварийном завершении session.
+- [x] При переданном `data_dir` направлять default alert log в изолированный data directory
   либо принимать отдельный `alert_log_path` в composition API.
-- [ ] Не писать в реальный пользовательский home из `AgentAppSession` и тестовых fixtures.
-- [ ] Если `compose_app` падает после запуска metrics server, гарантированно остановить уже
+- [x] Не писать в реальный пользовательский home из `AgentAppSession` и тестовых fixtures.
+- [x] Если `compose_app` падает после запуска metrics server, гарантированно остановить уже
   созданные ресурсы.
 
-### [ ] 4.3. Проверить lifecycle стресс-тестами
+### [x] 4.3. Проверить lifecycle стресс-тестами
 
-- [ ] Выполнить серию start/ready/shutdown в одном процессе.
-- [ ] Проверять отсутствие роста logging handlers, открытых файлов, Qt top-level widgets и
+- [x] Выполнить серию start/ready/shutdown в одном процессе.
+- [x] Проверять отсутствие роста logging handlers, открытых файлов, Qt top-level widgets и
   фоновых threads после каждого цикла.
-- [ ] Покрыть исключение на каждом шаге composition и проверить rollback ранее созданных
+- [x] Покрыть исключение на каждом шаге composition и проверить rollback ранее созданных
   ресурсов.
-- [ ] Проверить normal desktop close, agent shutdown и attach-host failure одним контрактом.
+- [x] Проверить normal desktop close, agent shutdown и attach-host failure одним контрактом.
+
+Результат проверки 2026-09-10: единый LIFO shutdown/rollback contract покрыт для 13 точек
+composition; четыре последовательных agent start/ready/shutdown (один прогрев и три измеряемых
+цикла) не увеличивают число alert handlers, файловых дескрипторов, Qt top-level widgets и
+фоновых threads. Связанные unit/UI/lifecycle-наборы — 117 passed; socket-based
+agent/attach-набор — 18 passed вне sandbox.
 
 Критерий завершения этапа: после shutdown не остаётся принадлежащих приложению handlers,
 файловых дескрипторов, listener threads или Qt owners; partial startup полностью откатывается.

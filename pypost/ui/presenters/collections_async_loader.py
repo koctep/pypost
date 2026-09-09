@@ -10,6 +10,7 @@ from typing import Callable
 from PySide6.QtCore import QObject, Signal
 
 from pypost.core.qt.collection_storage_gateway import CollectionStorageGateway
+from pypost.core.lifecycle import TeardownResult
 from pypost.core.request_manager import RequestManager
 from pypost.core.storage_interface import StorageInterface
 
@@ -49,6 +50,10 @@ class CollectionsAsyncLoader(QObject):
     def load_async(self) -> None:
         logger.info("collection_storage_async_load_dispatched")
         self._gateway.load_async()
+
+    def teardown(self, timeout_ms: int = 5000) -> TeardownResult:
+        """Fence completion delivery and drain the startup loader."""
+        return self._gateway.teardown(timeout_ms)
 
     def _on_load_completed(self, collections: list) -> None:
         self._finish_load(collections)

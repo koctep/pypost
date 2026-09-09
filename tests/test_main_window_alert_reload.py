@@ -2,7 +2,6 @@
 
 import json
 import logging
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,6 +12,7 @@ from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from tests.test_alert_manager import _make_payload
 
 pytestmark = pytest.mark.timeout(60)
+
 
 def _make_main_window(qapp, *, alert_manager=None, env_presenter=None):  # noqa: ARG001
     metrics = MagicMock()
@@ -57,6 +57,7 @@ def _make_main_window(qapp, *, alert_manager=None, env_presenter=None):  # noqa:
     window.settings_btn = MagicMock()
     return window
 
+
 def _open_settings_with_webhook_url(window, webhook_url: str) -> AppSettings:
     original_init = SettingsDialog.__init__
 
@@ -77,6 +78,7 @@ def _open_settings_with_webhook_url(window, webhook_url: str) -> AppSettings:
         window.open_settings()
     return window.settings
 
+
 def _open_settings_with_alert_log_path(window, log_path: str) -> AppSettings:
     original_init = SettingsDialog.__init__
 
@@ -96,6 +98,7 @@ def _open_settings_with_alert_log_path(window, log_path: str) -> AppSettings:
     ):
         window.open_settings()
     return window.settings
+
 
 def test_reload_alert_manager_closes_old_and_propagates_to_tabs(qapp, tmp_path):
     old_manager = MagicMock(spec=AlertManager)
@@ -123,6 +126,20 @@ def test_reload_alert_manager_closes_old_and_propagates_to_tabs(qapp, tmp_path):
     window.tabs.set_alert_manager.assert_called_once_with(new_manager)
 
 
+def test_reload_alert_manager_keeps_isolated_default_path(qapp, tmp_path):
+    old_manager = MagicMock(spec=AlertManager)
+    window = _make_main_window(qapp, alert_manager=old_manager)
+    isolated_log = tmp_path / "pypost-alerts.log"
+    window._default_alert_log_path = isolated_log
+    update_settings_snapshot(window.settings, AppSettings(alert_log_path=""))
+
+    with patch("pypost.ui.main_window.AlertManager") as alert_factory:
+        alert_factory.return_value = MagicMock(spec=AlertManager)
+        window._reload_alert_manager()
+
+    assert alert_factory.call_args.kwargs["log_path"] == isolated_log
+
+
 def test_main_window_supports_legacy_env_presenter_without_acceptance_method(qapp):
     """Legacy environment doubles still receive the original update route."""
     legacy_env = MagicMock()
@@ -133,6 +150,7 @@ def test_main_window_supports_legacy_env_presenter_without_acceptance_method(qap
     consumer({"KEY": "value"}, 1)
 
     legacy_env.on_env_update.assert_called_once_with({"KEY": "value"})
+
 
 def test_open_settings_reloads_alert_manager_when_webhook_changes(qapp, caplog):
     initial = MagicMock(spec=AlertManager)
@@ -154,6 +172,7 @@ def test_open_settings_reloads_alert_manager_when_webhook_changes(qapp, caplog):
     initial.close.assert_called_once()
     window.tabs.set_alert_manager.assert_called_with(new_manager)
     assert any("alert_manager_reloaded" in r.message for r in caplog.records)
+
 
 def test_open_settings_skips_reload_when_alert_fields_unchanged(qapp):
     manager = MagicMock(spec=AlertManager)
@@ -181,6 +200,7 @@ def test_open_settings_skips_reload_when_alert_fields_unchanged(qapp):
 
     mock_reload.assert_not_called()
     assert window._alert_manager is manager
+
 
 def test_open_settings_emit_after_log_path_change_writes_to_new_file(qapp, tmp_path):
     old_log = tmp_path / "alerts-old.log"

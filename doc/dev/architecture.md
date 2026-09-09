@@ -113,6 +113,10 @@ ConfigManager.load_config() → AppSettings
     └─ MainWindow(…injected services…) → StateManager (same AppSettings object)
 ```
 
+`ComposedApp` registers each acquired resource in an idempotent LIFO lifecycle owner. Partial
+composition, normal desktop exit, agent shutdown, and attach-host startup failure therefore share
+one rollback contract. See [application resource lifecycle](application_lifecycle.md).
+
 The same `ConfigManager` instance is injected into `MainWindow` so `settings.json` is read once
 (PYPOST-404). Do not lazy-create `ConfigManager` inside `MainWindow` in production. See
 [testability.md](testability.md#composition-root) and

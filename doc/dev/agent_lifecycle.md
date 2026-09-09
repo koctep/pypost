@@ -27,7 +27,7 @@ flowchart LR
   Session --> Factory
   Factory --> MW[MainWindow]
   Session -->|processEvents poll| Ready[is_ui_ready]
-  Session -->|shutdown| MW
+  Session -->|shutdown| Factory
 ```
 
 ### Event-loop model
@@ -54,7 +54,8 @@ wait: `agent_session_ready`. See [logging.md](logging.md).
 ### Isolation
 
 Agent sessions default to temporary `config_dir` / `data_dir` and an ephemeral
-metrics port so parallel/CI runs do not contend with user dirs or fixed ports.
+metrics port so parallel/CI runs do not contend with user dirs or fixed ports. The default alert
+log also follows `data_dir`; it does not fall back to the real user data directory.
 `compose_app(..., apply_log_level=False)` avoids resetting the process log level
 when a harness already configured logging.
 
@@ -139,9 +140,10 @@ re-raising (PYPOST-841). Ready timeout also logs `agent_session_ready_timeout`.
 
 ### `shutdown() -> None`
 
-Idempotent. Stops MCP if running, calls `handle_exit()`, closes the window,
-stops metrics, cleans temp dirs. Failures in individual steps are logged with
-`agent_session_*_failed` events and do not skip later cleanup.
+Idempotent. Delegates the whole composed graph to `ComposedApp.shutdown()`, processes deferred Qt
+deletion, then cleans temporary directories. The shared LIFO owner drains the window's nested MCP,
+history, request and storage work before closing alerts and metrics. Failures in individual steps
+are logged and do not skip later cleanup. See [application lifecycle](application_lifecycle.md).
 
 ### `MainWindow.is_ui_ready`
 

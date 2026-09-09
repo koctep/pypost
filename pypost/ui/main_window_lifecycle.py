@@ -69,6 +69,7 @@ def teardown(window: MainWindow, timeout_ms: int | None = None) -> TeardownResul
             owner
             for owner in (
                 getattr(window, "tabs", None),
+                getattr(window, "collections", None),
                 getattr(window, "history_panel", None),
                 getattr(window, "history_manager", None),
                 getattr(window, "env", None),
@@ -123,7 +124,15 @@ def teardown(window: MainWindow, timeout_ms: int | None = None) -> TeardownResul
             allocated = int(budget_ms * slots_left / len(owners))
             remaining = max(0, int((deadline - time.monotonic()) * 1000))
             owner_budget = min(allocated, remaining)
-            results.append(owner.teardown(timeout_ms=owner_budget))
+            owner_result = owner.teardown(timeout_ms=owner_budget)
+            if isinstance(owner_result, bool):
+                owner_result = TeardownResult(
+                    owner="collections_presenter",
+                    outcome="success" if owner_result else "incomplete",
+                    elapsed_ms=0,
+                    failure_kind=None if owner_result else "timeout",
+                )
+            results.append(owner_result)
 
         if any(result.outcome == "failed" for result in results):
             outcome, failure_kind = "failed", "owner_failure"
@@ -233,7 +242,13 @@ def reload_alert_manager(
 ) -> None:
     if window._alert_manager is not None:
         window._alert_manager.close()
-    log_path = Path(window.settings.alert_log_path) if window.settings.alert_log_path else None
+    override = getattr(window, "_alert_log_path_override", None)
+    fallback = getattr(window, "_default_alert_log_path", None)
+    log_path = (
+        override
+        or (Path(window.settings.alert_log_path) if window.settings.alert_log_path else None)
+        or fallback
+    )
     window._alert_manager = alert_manager_factory(
         log_path=log_path,
         webhook_url=window.settings.alert_webhook_url,

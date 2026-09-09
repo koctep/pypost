@@ -106,6 +106,7 @@ def test_compose_app_loads_once_and_shares_settings_identity(qapp, tmp_path):
             settings=kwargs["settings"],
             state_manager=kwargs["state_manager"],
             mcp_controller=SimpleNamespace(registry=registry),
+            start_initial_loads=MagicMock(),
         )
 
     with (
@@ -129,6 +130,7 @@ def test_compose_app_loads_once_and_shares_settings_identity(qapp, tmp_path):
     window_kwargs = window_cls.call_args.kwargs
     assert window_kwargs["settings"] is authoritative
     assert window_kwargs["state_manager"] is state_manager
+    assert window_kwargs["defer_startup"] is True
     assert composed.settings is composed.window.settings
     assert composed.settings is composed.window.state_manager.settings
 
