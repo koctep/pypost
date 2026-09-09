@@ -10,7 +10,9 @@ from unittest.mock import MagicMock, patch
 import anyio
 import pytest
 
-from pypost.core.mcp_server_registry import MCPServerRegistry, _PendingReconfiguration
+from pypost.core.mcp_server_registry import _PendingReconfiguration
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry as MCPServerRegistry
+from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.request_service import ExecutionResult
 from pypost.models.models import Collection, Environment, RequestData
@@ -72,6 +74,7 @@ def _registry(
     collection_by_id = {collection.id: collection for collection in collections}
     environment_by_id = {environment.id: environment for environment in environments}
     return MCPServerRegistry(
+        runtime_factory=MCPServerManager,
         collection_lookup=collection_by_id.get,
         environment_lookup=environment_by_id.get,
     )
@@ -340,7 +343,11 @@ def test_refresh_collection_updates_only_its_selected_manager():
 
 def test_refresh_environment_replaces_only_selected_immutable_snapshot():
     collection = Collection(id="collection", requests=[])
-    alpha = Environment(id="alpha", variables={"base_url": "alpha.example"}, hidden_keys=["secret"])
+    alpha = Environment(
+        id="alpha",
+        variables={"base_url": "alpha.example", "secret": "hidden"},
+        hidden_keys=["secret"],
+    )
     beta = Environment(id="beta", variables={"base_url": "beta.example"})
     registry = _registry([collection], [alpha, beta])
     registry.upsert(
@@ -367,7 +374,10 @@ def test_refresh_environment_replaces_only_selected_immutable_snapshot():
 
     variables_supplier = alpha_manager.set_variable_supplier.call_args.args[0]
     hidden_keys_supplier = alpha_manager.set_hidden_keys_supplier.call_args.args[0]
-    assert variables_supplier() == {"base_url": "alpha.example"}
+    assert variables_supplier() == {
+        "base_url": "alpha.example",
+        "secret": "hidden",
+    }
     assert hidden_keys_supplier() == {"secret"}
     beta_manager.set_variable_supplier.assert_not_called()
     beta_manager.set_hidden_keys_supplier.assert_not_called()
@@ -379,6 +389,7 @@ def test_reconcile_references_stops_only_server_with_deleted_input():
     environment = Environment(id="environment", variables={})
     collections = {alpha.id: alpha, beta.id: beta}
     registry = MCPServerRegistry(
+        runtime_factory=MCPServerManager,
         collection_lookup=collections.get,
         environment_lookup=lambda environment_id: (
             environment if environment_id == environment.id else None
@@ -634,6 +645,7 @@ def test_registry_reports_aggregate_lifecycle_counts_without_instance_metadata()
     environment = Environment(id="environment", variables={})
     metrics = MagicMock()
     registry = MCPServerRegistry(
+        runtime_factory=MCPServerManager,
         collection_lookup=lambda _id: collection,
         environment_lookup=lambda _id: environment,
         metrics=metrics,
@@ -663,6 +675,7 @@ def test_instance_tool_registration_does_not_overwrite_aggregate_lifecycle_metri
     environment = Environment(id="environment", variables={})
     metrics = MagicMock()
     registry = MCPServerRegistry(
+        runtime_factory=MCPServerManager,
         collection_lookup=lambda _id: collection,
         environment_lookup=lambda _id: environment,
         metrics=metrics,
@@ -694,6 +707,7 @@ def test_bind_failure_status_signal_does_not_overwrite_failed_metric_state():
     environment = Environment(id="environment", variables={})
     metrics = MagicMock()
     registry = MCPServerRegistry(
+        runtime_factory=MCPServerManager,
         collection_lookup=lambda _id: collection,
         environment_lookup=lambda _id: environment,
         metrics=metrics,

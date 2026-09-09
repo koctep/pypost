@@ -23,10 +23,6 @@ class TestMainWindow(unittest.TestCase):
         return McpServerSettingsController(
             settings_provider=lambda: settings,
             config_manager=config_manager,
-            collection_lookup=lambda _collection_id: None,
-            environment_lookup=lambda _environment_id: None,
-            metrics=MagicMock(),
-            template_service=MagicMock(),
             mcp_manager=MagicMock(),
             registry=registry,
         )
@@ -190,6 +186,10 @@ class TestMainWindow(unittest.TestCase):
                 settings=mock_sm.return_value.settings,
                 state_manager=mock_sm.return_value,
                 history_manager=MagicMock(),
+                storage=MagicMock(),
+                request_manager=MagicMock(),
+                mcp_controller=MagicMock(),
+                alert_manager_factory=MagicMock(),
             )
             window.settings_btn = MagicMock()
 
@@ -267,7 +267,8 @@ class TestMainWindow(unittest.TestCase):
                 history_manager=history_manager,
                 storage=storage,
                 request_manager=request_manager,
-                mcp_manager=mcp_manager,
+                mcp_controller=MagicMock(manager=mcp_manager),
+                alert_manager_factory=MagicMock(),
             )
         self.assertIs(metrics, window.metrics)
         self.assertIs(template_service, window.template_service)
@@ -321,6 +322,10 @@ class TestMainWindow(unittest.TestCase):
                 settings=mock_sm.return_value.settings,
                 state_manager=mock_sm.return_value,
                 history_manager=MagicMock(),
+                storage=MagicMock(),
+                request_manager=MagicMock(),
+                mcp_controller=MagicMock(),
+                alert_manager_factory=MagicMock(),
             )
             splitter = window.centralWidget().layout().itemAt(1).widget()
             sidebar = splitter.widget(0)
@@ -367,6 +372,10 @@ class TestMainWindow(unittest.TestCase):
                 settings=mock_sm.return_value.settings,
                 state_manager=mock_sm.return_value,
                 history_manager=history_manager,
+                storage=MagicMock(),
+                request_manager=MagicMock(),
+                mcp_controller=MagicMock(),
+                alert_manager_factory=MagicMock(),
             )
 
             with patch.object(window.statusBar(), "showMessage") as mock_show_message:

@@ -39,16 +39,13 @@ from pypost.core.request_service import ExecutionResult, RequestService
 from pypost.core.template_service import TemplateService
 from pypost.core.websocket_mcp_tools import (
     build_websocket_mcp_tool_schema,
-    execute_websocket_probe,
     resolve_websocket_mcp_call_specs,
 )
 from pypost.models.models import RequestData
 from pypost.models.settings import AppSettings
 from pypost.models.websocket import WebSocketConnection
 
-
 logger = logging.getLogger(__name__)
-
 DEFAULT_MAX_CONCURRENT_MCP_CALLS = 4
 
 
@@ -106,6 +103,7 @@ class MCPServerImpl:
         hidden_keys_supplier: Callable[[], set[str]] | None = None,
         activity_log: McpActivityLog | None = None,
         settings: AppSettings | None = None,
+        websocket_probe_executor: Callable[..., List[TextContent]] | None = None,
     ):
         self.server = Server(name)
         self.tools_map: Dict[str, RequestData | WebSocketConnection] = {}
@@ -113,6 +111,7 @@ class MCPServerImpl:
         self._activity_log = activity_log
         self._template_service = template_service
         self._settings = settings
+        self._websocket_probe_executor = websocket_probe_executor
         self._variable_supplier = variable_supplier or (lambda: {})
         self._hidden_keys_supplier = hidden_keys_supplier or (lambda: set())
         self._call_tool_semaphore = asyncio.Semaphore(DEFAULT_MAX_CONCURRENT_MCP_CALLS)
@@ -169,8 +168,10 @@ class MCPServerImpl:
             method, mcp_arg_count, started, self._metrics, self._activity_log
         )
         if isinstance(item, WebSocketConnection):
+            if self._websocket_probe_executor is None:
+                raise RuntimeError("WebSocket probe executor was not configured")
             return await run_in_threadpool(
-                execute_websocket_probe,
+                self._websocket_probe_executor,
                 item,
                 arguments,
                 env_vars=self._variable_supplier(),
@@ -305,8 +306,7 @@ class MCPServerImpl:
     def _generate_schema(self, req: RequestData) -> dict:
         hidden_keys = self._hidden_keys_supplier()
         _, visible_specs = resolve_mcp_call_param_specs(
-            req, self._template_service, hidden_keys
-        )
+            req, self._template_service, hidden_keys)
         return build_tool_input_schema(visible_specs)
 
     def create_app(self) -> Starlette:

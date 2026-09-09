@@ -12,11 +12,11 @@ creation order and continues after an individual cleanup failure.
 | metrics listener/thread | `ComposedApp` | `MetricsManager.stop_server()` |
 | alert file handler | `ComposedApp` | current `MainWindow._alert_manager.close()` |
 | tabs, collection/history workers, environment storage workers | `MainWindow` | bounded `MainWindow._shutdown_for_exit()` / `teardown()` |
-| persisted MCP registry listeners | `MainWindow` | `McpServerSettingsController.stop_all()` |
+| persisted MCP registry runtimes | `ComposedApp` | `QtMCPServerRegistry.stop_all()` |
 | desktop attach listener and clients | `ComposedApp` | `AgentUiAttachHost.stop()` |
 
-The resulting top-level order is `attach host -> MainWindow and its child owners -> alert handler
--> metrics listener`. Child owners use their existing bounded teardown order. Calling shutdown
+The resulting top-level order is `attach host -> MainWindow and its child owners -> MCP registry
+-> alert handler -> metrics listener`. Child owners use their existing bounded teardown order. Calling shutdown
 again returns the cached cleanup result and does not invoke a resource twice.
 
 ## Startup rollback

@@ -110,7 +110,9 @@ ConfigManager.load_config() → AppSettings
     ├─ StorageManager.apply_encryption_settings(settings)
     ├─ RequestManager(storage, defer_initial_load=True)
     ├─ MCPServerManager(metrics, template_service)
-    └─ MainWindow(…injected services…) → StateManager (same AppSettings object)
+    ├─ QtMCPServerRegistry(runtime_factory, lookups, metrics)
+    ├─ McpServerSettingsController(settings, manager, registry)
+    └─ MainWindow(…all services injected…) → presenters/widgets
 ```
 
 `ComposedApp` registers each acquired resource in an idempotent LIFO lifecycle owner. Partial
@@ -122,11 +124,10 @@ The same `ConfigManager` instance is injected into `MainWindow` so `settings.jso
 [testability.md](testability.md#composition-root) and
 [PYPOST-404 dev notes](../../ai-tasks/PYPOST-404/70-dev-docs.md).
 
-`MainWindow` still constructs `StyleManager` and presenters/widgets internally.
-`StorageManager`, `RequestManager`, and `MCPServerManager` are created in `main.py` and injected
-(PYPOST-695). `HistoryManager` is created in `main.py` and injected (PYPOST-694). Remaining
-partial composition root items are tracked in
-[architecture_audit.md](architecture_audit.md#executive-summary) (PYPOST-684).
+`MainWindow` constructs only `StyleManager` and presenters/widgets. Infrastructure services,
+the MCP registry/controller and the alert-manager factory are created in `main.py` and injected;
+the constructor has no production fallbacks. An AST contract test prevents those constructors
+from returning to the window.
 
 ### Headless daemon composition root (`daemon.py`)
 
@@ -171,8 +172,9 @@ The application uses classes (often Pydantic models or dataclasses) to define st
   request. Masking uses `SensitiveDataMaskingPolicy`. The UI `HistoryPanel` reads and filters;
   see [request_execution.md](request_execution.md) and
   [sensitive_data_masking_policy.md](sensitive_data_masking_policy.md).
-- **MCP stack**: `MCPServerManager` owns lifecycle (thread, uvicorn, Qt signals);
-  `MCPServerImpl` exposes Starlette routes and tool list/call. Inbound MCP tools execute via
+- **MCP stack**: the Qt-free `MCPServerRegistry` owns configuration/state transitions against an
+  injected runtime protocol. `QtMCPServerRegistry` forwards notifications as Qt signals, while
+  `MCPServerManager` owns lifecycle (thread and uvicorn). `MCPServerImpl` exposes Starlette routes and tool list/call. Inbound MCP tools execute via
   per-call `RequestService` instances; outbound MCP-as-HTTP uses `MCPClientService` from
   `RequestService._execute_mcp()`. See [mcp_integration.md](mcp_integration.md) and
   [mcp_secrets_policy.md](mcp_secrets_policy.md).

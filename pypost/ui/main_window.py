@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -21,8 +22,6 @@ from pypost.core.config_manager import ConfigManager, ConfigRecoveryNotice
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.history_manager import HistoryManager
 from pypost.core.lifecycle import TeardownResult
-from pypost.core.mcp_server_registry import MCPServerRegistry
-from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.request_manager import RequestManager
 from pypost.core.qt.state_manager import StateManager
@@ -55,12 +54,12 @@ class MainWindow(QMainWindow):
         config_manager: ConfigManager,
         settings: AppSettings,
         state_manager: StateManager,
+        history_manager: HistoryManager,
+        storage: StorageManager,
+        request_manager: RequestManager,
+        mcp_controller: McpServerSettingsController,
+        alert_manager_factory: Callable[..., AlertManager],
         alert_manager: AlertManager | None = None,
-        history_manager: HistoryManager | None = None,
-        storage: StorageManager | None = None,
-        request_manager: RequestManager | None = None,
-        mcp_manager: MCPServerManager | None = None,
-        mcp_registry: MCPServerRegistry | None = None,
         defer_startup: bool = False,
         alert_log_path_override: Path | None = None,
         default_alert_log_path: Path | None = None,
@@ -73,42 +72,26 @@ class MainWindow(QMainWindow):
         self.metrics.connect_start_failed(self._on_metrics_start_failed)
         self.template_service = template_service
         VariableHoverResolver.set_template_service(template_service)
-        if storage is not None:
-            logger.debug("storage_source source=injected")
-            self.storage = storage
-        else:
-            logger.debug("storage_source source=new")
-            self.storage = StorageManager(metrics=self.metrics)
+        self.storage = storage
         self.config_manager = config_manager
         self._alert_manager = alert_manager
+        self._alert_manager_factory = alert_manager_factory
         self._alert_log_path_override = alert_log_path_override
         self._default_alert_log_path = default_alert_log_path
         logger.debug("MainWindow: alert_manager_injected=%s", alert_manager is not None)
-        if request_manager is not None:
-            logger.debug("request_manager_source source=injected")
-            self.request_manager = request_manager
-        else:
-            logger.debug("request_manager_source source=new")
-            self.request_manager = RequestManager(self.storage, defer_initial_load=True)
+        self.request_manager = request_manager
         if state_manager.settings is not settings:
             raise ValueError("MainWindow and StateManager must share one AppSettings instance")
         self.state_manager = state_manager
         self.state_manager.setParent(self)
         self.state_manager.persistence_failed.connect(self._on_settings_persistence_failed)
-        if storage is None:
-            self.storage.apply_encryption_settings(settings)
         self.style_manager = StyleManager()
         self._settings = settings
         self._teardown_lock = threading.Lock()
         self._teardown_started = False
         self._teardown_result: TeardownResult | None = None
         self.icons = self._load_icons()
-        if history_manager is not None:
-            logger.debug("history_manager_source source=injected")
-            self.history_manager = history_manager
-        else:
-            logger.debug("history_manager_source source=new")
-            self.history_manager = HistoryManager(defer_initial_load=True, metrics=self.metrics)
+        self.history_manager = history_manager
         self.collections = CollectionsPresenter(
             self.request_manager,
             self.state_manager,
@@ -116,20 +99,7 @@ class MainWindow(QMainWindow):
             self.icons,
             storage=self.storage,
         )
-        self.mcp_controller = McpServerSettingsController(
-            settings_provider=lambda: self.settings,
-            config_manager=self.config_manager,
-            collection_lookup=lambda collection_id: self.collections.collection_by_id(
-                collection_id
-            ),
-            environment_lookup=lambda environment_id: self.env.environment_by_id(
-                environment_id
-            ),
-            metrics=self.metrics,
-            template_service=self.template_service,
-            mcp_manager=mcp_manager,
-            registry=mcp_registry,
-        )
+        self.mcp_controller = mcp_controller
         self.tabs = TabsPresenter(
             self.request_manager,
             self.state_manager,
@@ -373,7 +343,9 @@ class MainWindow(QMainWindow):
         return main_window_lifecycle.alert_settings_changed(previous, updated)
 
     def _reload_alert_manager(self) -> None:
-        main_window_lifecycle.reload_alert_manager(self, AlertManager)
+        main_window_lifecycle.reload_alert_manager(
+            self, self._alert_manager_factory
+        )
 
     def apply_settings(self, settings: AppSettings) -> None:
         main_window_settings.apply_settings(self, settings)

@@ -22,9 +22,9 @@ from pypost.core.environment_variable_validation import (
     apply_environment_variable_updates,
 )
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
-from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.lifecycle import TeardownResult
 from pypost.core.qt.mcp_server import MCPServerManager
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry
 from pypost.core.qt.state_manager import StateManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.storage_interface import StorageInterface
@@ -69,7 +69,7 @@ class EnvPresenter(QObject):
         settings: AppSettings,
         get_collections: Callable,
         metrics: MetricsTrackerProtocol,
-        mcp_registry: MCPServerRegistry | None = None,
+        mcp_registry: QtMCPServerRegistry | None = None,
         state_manager: StateManager | None = None,
         parent: QObject | None = None,
     ) -> None:

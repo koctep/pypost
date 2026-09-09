@@ -37,6 +37,10 @@ def _make_window(qapp):
             settings=mock_sm.return_value.settings,
             state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
+            storage=MagicMock(),
+            request_manager=MagicMock(),
+            mcp_controller=MagicMock(),
+            alert_manager_factory=MagicMock(),
         )
     return window
 

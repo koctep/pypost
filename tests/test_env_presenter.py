@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QDialog, QInputDialog, QWidget
 
 from pypost.core.key_provider import EnvironmentEncryptionError
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
-from pypost.core.mcp_server_registry import MCPServerRegistry
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry as MCPServerRegistry
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.models.models import Environment, Collection, RequestData
 from pypost.models.settings import AppSettings, McpServerConfiguration

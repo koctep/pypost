@@ -220,38 +220,49 @@ agent/attach-набор — 18 passed вне sandbox.
 Критерий завершения этапа: после shutdown не остаётся принадлежащих приложению handlers,
 файловых дескрипторов, listener threads или Qt owners; partial startup полностью откатывается.
 
-## [ ] 5. Восстановить архитектурные границы core/Qt/UI
+## [x] 5. Восстановить архитектурные границы core/Qt/UI
 
-### [ ] 5.1. Разделить `MCPServerRegistry`
+### [x] 5.1. Разделить `MCPServerRegistry`
 
-- [ ] Вынести Qt-независимую модель registry и state transitions в `core`.
-- [ ] Ввести protocol/factory для server runtime вместо импорта конкретного
+- [x] Вынести Qt-независимую модель registry и state transitions в `core`.
+- [x] Ввести protocol/factory для server runtime вместо импорта конкретного
   `core.qt.MCPServerManager`.
-- [ ] Перенести `QObject` и Qt signals в тонкий Qt/UI adapter.
-- [ ] Отделить проверку конфигурации и ссылок от управления сокетами и процессом сервера.
-- [ ] Определить thread-affinity всех state transitions.
-- [ ] Защитить registry state от одновременного изменения watcher thread и UI thread либо
+- [x] Перенести `QObject` и Qt signals в тонкий Qt/UI adapter.
+- [x] Отделить проверку конфигурации и ссылок от управления сокетами и процессом сервера.
+- [x] Определить thread-affinity всех state transitions.
+- [x] Защитить registry state от одновременного изменения watcher thread и UI thread либо
   маршалить все мутации на одного владельца event loop.
 
-### [ ] 5.2. Завершить composition root
+### [x] 5.2. Завершить composition root
 
-- [ ] Создавать concrete adapters, repositories, managers и lifecycle owner только в
+- [x] Создавать concrete adapters, repositories, managers и lifecycle owner только в
   `compose_app`.
-- [ ] Передавать `MainWindow` готовые presenter dependencies без fallback-конструкторов
+- [x] Передавать `MainWindow` готовые presenter dependencies без fallback-конструкторов
   production-сервисов.
-- [ ] Убрать повторные чтения config и скрытое создание storage/history/registry из UI-классов.
-- [ ] Добавить архитектурный import-test, запрещающий `core -> core.qt` и `core -> ui`, кроме
+- [x] Убрать повторные чтения config и скрытое создание storage/history/registry из UI-классов.
+- [x] Добавить архитектурный import-test, запрещающий `core -> core.qt` и `core -> ui`, кроме
   явно задокументированных adapter modules.
 
-### [ ] 5.3. Не допустить обхода шифрования новым repository-слоем
+### [x] 5.3. Не допустить обхода шифрования новым repository-слоем
 
-- [ ] Перед подключением текущих `pypost/ports` и `pypost/adapters` определить migration plan
+- [x] Перед подключением текущих `pypost/ports` и `pypost/adapters` определить migration plan
   со старого storage format.
-- [ ] Не сохранять `Environment.model_dump()` напрямую, если environment содержит hidden values.
-- [ ] Пропустить environment persistence через существующий secrets codec/encryption policy.
-- [ ] Добавить contract tests, запрещающие plaintext hidden values в repository output.
-- [ ] Подключить repositories к runtime либо удалить неиспользуемый параллельный persistence
+- [x] Не сохранять `Environment.model_dump()` напрямую, если environment содержит hidden values.
+- [x] Пропустить environment persistence через существующий secrets codec/encryption policy.
+- [x] Добавить contract tests, запрещающие plaintext hidden values в repository output.
+- [x] Подключить repositories к runtime либо удалить неиспользуемый параллельный persistence
   path; не поддерживать две расходящиеся реализации без явной миграционной границы.
+
+Результат проверки 2026-09-10: framework-neutral `core` больше не импортирует PySide6,
+`core.qt` или `ui`; registry использует runtime protocol/factory и отдельный Qt signal adapter,
+а 100 конкурентных runtime callbacks проходят через единый lock boundary. Все desktop-сервисы,
+MCP controller/registry и alert factory собираются в `compose_app`; `MainWindow` не содержит
+infrastructure fallbacks. Неподключённые repository-прототипы из `pypost/ports` и
+`pypost/adapters` оставлены за явной migration boundary, runtime-import запрещён AST-тестом,
+а hidden environment value подтверждённо не попадает в plaintext и корректно round-trip'ится.
+Связанный Qt/offscreen-набор — 154 passed, 1 agent lifecycle test deselected; socket-based
+MCP/WebSocket-набор — 84 passed вне sandbox; полный application lifecycle-набор, включая
+повторные реальные session cycles, — 22 passed.
 
 Критерий завершения этапа: `core` не зависит от Qt, UI не создаёт infrastructure services,
 а все environment repositories соблюдают единый encryption contract.

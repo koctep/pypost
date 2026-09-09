@@ -31,13 +31,13 @@ item dispatch uses a strategy registry
 | `HistoryManager` | `main.py` | `MainWindow` → `TabsPresenter` → `RequestWorker` → `RequestService` |
 | `StorageManager` | `main.py` (`apply_encryption_settings` before UI) | `MainWindow`, presenters, workers |
 | `RequestManager` | `main.py` (`defer_initial_load=True`) | `MainWindow` → presenters |
-| `MCPServerManager` | `main.py` | `MainWindow` → the MCP chain below |
-| `MCPServerRegistry` | the MCP controller (or injected) | the MCP chain below |
+| `MCPServerManager` | `main.py` | `McpServerSettingsController` → the MCP chain below |
+| `QtMCPServerRegistry` | `main.py` | `McpServerSettingsController` → the MCP chain below |
+| `McpServerSettingsController` | `main.py` | `MainWindow` → presenters |
 
-MCP chain (PYPOST-1071): `MainWindow` → `McpServerSettingsController` → `EnvPresenter` →
-`McpControlsPresenter`. The controller builds `MCPServerRegistry` itself unless one is passed
-to `MainWindow(mcp_registry=...)`; `pypost/main.py` passes none and reads back
-`window.mcp_controller.registry` (PYPOST-1085).
+MCP chain (PYPOST-1071): `compose_app` → `QtMCPServerRegistry` +
+`McpServerSettingsController` → `MainWindow` → `EnvPresenter` → `McpControlsPresenter`.
+The controller and window have no fallback infrastructure constructors (stage 5).
 
 See [PYPOST-378 dev notes](../../ai-tasks/PYPOST-378/70-dev-docs.md) for the full
 `TemplateService` chain and [template_service.md](template_service.md) for lifecycle design

@@ -62,6 +62,8 @@ def _make_main_window(qapp, storage, config_manager):  # noqa: ARG001
             history_manager=MagicMock(),
             storage=storage,
             request_manager=MagicMock(),
+            mcp_controller=MagicMock(),
+            alert_manager_factory=MagicMock(),
         )
     window.env = MagicMock()
     window.env.wait_storage_idle = MagicMock()

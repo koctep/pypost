@@ -49,6 +49,10 @@ def _make_main_window(qapp, *, alert_manager=None, env_presenter=None):  # noqa:
             state_manager=mock_sm.return_value,
             alert_manager=alert_manager,
             history_manager=MagicMock(),
+            storage=MagicMock(),
+            request_manager=MagicMock(),
+            mcp_controller=MagicMock(),
+            alert_manager_factory=AlertManager,
         )
     window.env = MagicMock()
     window.env.wait_storage_idle = MagicMock()
@@ -112,7 +116,7 @@ def test_reload_alert_manager_closes_old_and_propagates_to_tabs(qapp, tmp_path):
         ),
     )
 
-    with patch("pypost.ui.main_window.AlertManager") as mock_am_cls:
+    with patch.object(window, "_alert_manager_factory") as mock_am_cls:
         new_manager = MagicMock(spec=AlertManager)
         mock_am_cls.return_value = new_manager
         window._reload_alert_manager()
@@ -133,7 +137,7 @@ def test_reload_alert_manager_keeps_isolated_default_path(qapp, tmp_path):
     window._default_alert_log_path = isolated_log
     update_settings_snapshot(window.settings, AppSettings(alert_log_path=""))
 
-    with patch("pypost.ui.main_window.AlertManager") as alert_factory:
+    with patch.object(window, "_alert_manager_factory") as alert_factory:
         alert_factory.return_value = MagicMock(spec=AlertManager)
         window._reload_alert_manager()
 
@@ -158,7 +162,7 @@ def test_open_settings_reloads_alert_manager_when_webhook_changes(qapp, caplog):
     update_settings_snapshot(window.settings, AppSettings())
 
     with (
-        patch("pypost.ui.main_window.AlertManager") as mock_am_cls,
+        patch.object(window, "_alert_manager_factory") as mock_am_cls,
         caplog.at_level(logging.INFO),
     ):
         new_manager = MagicMock(spec=AlertManager)

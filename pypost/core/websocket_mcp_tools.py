@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any, Iterable, List, Optional, Set
+from typing import Any, Callable, Iterable, List, Optional, Protocol, Set
 
 from mcp.types import TextContent
 
@@ -19,10 +19,10 @@ from pypost.core.mcp_tool_contract import (
     normalize_mcp_tool_name,
 )
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
-from pypost.core.qt.websocket_probe_runner import WebSocketProbeRunner
 from pypost.core.template_service import TemplateService
 from pypost.core.websocket_probe import (
     WebSocketProbeConfig,
+    WebSocketProbeResult,
     calculate_effective_probe_limits,
     format_probe_transcript,
 )
@@ -34,6 +34,25 @@ from pypost.models.websocket import WebSocketConnection
 logger = logging.getLogger(__name__)
 
 _MCP_REQUEST_VAR_PATTERN = re.compile(r"mcp\.request\.([a-zA-Z0-9_]+)")
+
+
+class WebSocketProbeRunnerProtocol(Protocol):
+    """Framework-neutral lifecycle used by the MCP probe orchestration."""
+
+    result: WebSocketProbeResult | None
+
+    def start(self) -> None: ...
+
+    def isFinished(self) -> bool: ...
+
+    def terminate(self) -> None: ...
+
+    def wait(self, timeout_ms: int) -> bool: ...
+
+
+WebSocketProbeRunnerFactory = Callable[
+    [WebSocketProbeConfig], WebSocketProbeRunnerProtocol
+]
 
 
 def extract_websocket_mcp_variables(conn: WebSocketConnection) -> Set[str]:
@@ -167,6 +186,8 @@ def execute_websocket_probe(
     template_service: Optional[TemplateService] = None,
     metrics: Optional[MetricsTrackerProtocol] = None,
     activity_log: Optional[McpActivityLog] = None,
+    runner_factory: WebSocketProbeRunnerFactory,
+    process_events: Callable[[], None],
 ) -> List[TextContent]:
     """Resolve template variables, run the bounded probe, and return a sanitized transcript.
 
@@ -237,7 +258,7 @@ def execute_websocket_probe(
     )
 
     # 3. Execute probe on a short-lived QThread
-    runner = WebSocketProbeRunner(config)
+    runner = runner_factory(config)
     runner.start()
 
     # Pump the Qt event loop while we wait for the runner to finish.
@@ -246,8 +267,7 @@ def execute_websocket_probe(
     wait_deadline_ms = eff_dur + 3000  # hard deadline + 3 s grace
     wait_started = time.monotonic()
     while not runner.isFinished():
-        from PySide6.QtCore import QCoreApplication
-        QCoreApplication.processEvents()
+        process_events()
         elapsed_ms = (time.monotonic() - wait_started) * 1000.0
         if elapsed_ms >= wait_deadline_ms:
             break

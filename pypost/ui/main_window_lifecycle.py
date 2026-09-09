@@ -187,7 +187,6 @@ def shutdown_for_exit(
         return result
     if encryption_enabled_resolver(window.settings):
         window.env.wait_storage_idle(timeout_ms=0)
-    window.mcp_controller.stop_all()
     return result
 
 
@@ -238,7 +237,7 @@ def alert_settings_changed(previous: AppSettings, updated: AppSettings) -> bool:
 
 def reload_alert_manager(
     window: MainWindow,
-    alert_manager_factory: Callable[..., AlertManager] = AlertManager,
+    alert_manager_factory: Callable[..., AlertManager],
 ) -> None:
     if window._alert_manager is not None:
         window._alert_manager.close()

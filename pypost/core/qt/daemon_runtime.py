@@ -9,7 +9,8 @@ from PySide6.QtCore import QCoreApplication, QObject, QTimer
 from pypost.core.config_manager import ConfigManager, StrictConfigError
 from pypost.core.daemon_config import ResolvedDaemonPaths
 from pypost.core.daemon_storage import DaemonDataError
-from pypost.core.mcp_server_registry import MCPServerRegistry
+from pypost.core.qt.mcp_server import MCPServerManager
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry as MCPServerRegistry
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.storage import StorageManager
 from pypost.core.template_service import TemplateService
@@ -122,11 +123,14 @@ class DaemonRuntime(QObject):
                     f"affected_count={len(server_ids)}"
                 ) from exc
             metrics = self._metrics or MetricsManager()
+            template_service = TemplateService(metrics)
             registry = MCPServerRegistry(
                 collection_lookup=collections.get,
                 environment_lookup=environments.get,
                 metrics=metrics,
-                template_service=TemplateService(metrics),
+                runtime_factory=lambda: MCPServerManager(
+                    metrics=metrics, template_service=template_service
+                ),
             )
             for configuration in enabled:
                 registry.upsert(configuration.model_copy(deep=True))

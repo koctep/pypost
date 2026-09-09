@@ -42,14 +42,16 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
+from PySide6.QtCore import QCoreApplication
 from PySide6.QtWebSockets import QWebSocket
 
 from pypost.core.daemon_storage import load_collections_snapshot_strict
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.qt.websocket_probe_runner import WebSocketProbeRunner
+from pypost.core.qt.websocket_probe_executor import execute_qt_websocket_probe
 from pypost.core.template_service import TemplateService
 from pypost.core.websocket_mcp_tools import (
     build_websocket_mcp_preview,
@@ -339,6 +341,8 @@ class TestWebSocketProbeExecutionAndSanitization:
             env_vars={},
             hidden_keys=set(),
             settings=AppSettings(),
+            runner_factory=WebSocketProbeRunner,
+            process_events=QCoreApplication.processEvents,
         )
 
         assert len(contents) == 1
@@ -385,6 +389,8 @@ class TestWebSocketProbeExecutionAndSanitization:
             env_vars={},
             hidden_keys=set(),
             settings=AppSettings(),
+            runner_factory=WebSocketProbeRunner,
+            process_events=QCoreApplication.processEvents,
         )
 
         assert len(contents) == 1
@@ -412,6 +418,8 @@ class TestWebSocketProbeExecutionAndSanitization:
             env_vars={},
             hidden_keys=set(),
             settings=AppSettings(ws_mcp_probe_max_duration_ms=500),
+            runner_factory=WebSocketProbeRunner,
+            process_events=QCoreApplication.processEvents,
         )
 
         assert len(contents) == 1
@@ -547,13 +555,12 @@ class TestMCPServerImplWebSocketIntegration:
             url="ws://unused",
             mcp_params={"count": McpToolParam(type="integer", required=True)},
         )
-        impl = MCPServerImpl()
-        impl.register_tools([conn])
         probe = MagicMock(return_value=[])
+        impl = MCPServerImpl(websocket_probe_executor=probe)
+        impl.register_tools([conn])
 
-        with patch("pypost.core.mcp_server_impl.execute_websocket_probe", probe):
-            with pytest.raises(Exception) as raised:
-                asyncio.run(impl.call_tool("ws_typed_feed", {"count": "bad"}))
+        with pytest.raises(Exception) as raised:
+            asyncio.run(impl.call_tool("ws_typed_feed", {"count": "bad"}))
 
         assert type(raised.value).__name__ == "McpArgumentValidationError"
         assert "count" in str(raised.value)
@@ -580,7 +587,7 @@ class TestMCPServerImplWebSocketIntegration:
             url="http://example.com",
         )
 
-        impl = MCPServerImpl()
+        impl = MCPServerImpl(websocket_probe_executor=execute_qt_websocket_probe)
         impl.register_tools([http_req, conn])
 
         tools = asyncio.run(impl.list_tools())

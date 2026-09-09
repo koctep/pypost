@@ -77,6 +77,8 @@ _COMPOSITION_STEPS = (
     "storage_manager",
     "request_manager",
     "mcp_manager",
+    "mcp_registry",
+    "mcp_controller",
     "main_window",
     "initial_loads",
 )
@@ -98,6 +100,8 @@ def test_compose_failure_rolls_back_every_acquired_owner(
     window = MagicMock()
     window._alert_manager = alert
     window.mcp_controller.registry = MagicMock()
+    registry = MagicMock()
+    registry.stop_all.side_effect = lambda: events.append("mcp_registry")
     window._shutdown_for_exit.side_effect = lambda: (
         events.append("main_window")
         or TeardownResult("main_window", "success", 0)
@@ -141,6 +145,8 @@ def test_compose_failure_rolls_back_every_acquired_owner(
         "StorageManager": build("storage_manager", MagicMock()),
         "RequestManager": build("request_manager", MagicMock()),
         "MCPServerManager": build("mcp_manager", MagicMock()),
+        "QtMCPServerRegistry": build("mcp_registry", registry),
+        "McpServerSettingsController": build("mcp_controller", MagicMock()),
         "MainWindow": build("main_window", window),
     }
     for name, replacement in replacements.items():
@@ -157,6 +163,8 @@ def test_compose_failure_rolls_back_every_acquired_owner(
     expected: list[str] = []
     if failure_index > _COMPOSITION_STEPS.index("main_window"):
         expected.append("main_window")
+    if failure_index > _COMPOSITION_STEPS.index("mcp_registry"):
+        expected.append("mcp_registry")
     if failure_index > _COMPOSITION_STEPS.index("alert_manager"):
         expected.append("alert_manager")
     if failure_index > _COMPOSITION_STEPS.index("metrics_manager"):
@@ -180,6 +188,7 @@ def test_composed_app_owns_reloaded_alert_attach_window_and_metrics(
     reloaded_alert = MagicMock()
     reloaded_alert.close.side_effect = lambda: events.append("alert_manager")
     registry = MagicMock()
+    registry.stop_all.side_effect = lambda: events.append("mcp_registry")
     window = MagicMock()
     window._alert_manager = original_alert
     window.mcp_controller.registry = registry
@@ -199,6 +208,7 @@ def test_composed_app_owns_reloaded_alert_attach_window_and_metrics(
     monkeypatch.setattr(main_module, "StorageManager", lambda **_kwargs: MagicMock())
     monkeypatch.setattr(main_module, "RequestManager", lambda *_args, **_kwargs: MagicMock())
     monkeypatch.setattr(main_module, "MCPServerManager", lambda **_kwargs: MagicMock())
+    monkeypatch.setattr(main_module, "QtMCPServerRegistry", lambda **_kwargs: registry)
     monkeypatch.setattr(main_module, "MainWindow", lambda **_kwargs: window)
 
     composed = main_module.compose_app(
@@ -215,12 +225,19 @@ def test_composed_app_owns_reloaded_alert_attach_window_and_metrics(
     assert composed.lifecycle_owner_names == (
         "metrics_server",
         "alert_manager",
+        "mcp_registry",
         "main_window",
         "attach_host",
     )
     assert composed.shutdown() == ()
     assert composed.shutdown() == ()
-    assert events == ["attach_host", "main_window", "alert_manager", "metrics_server"]
+    assert events == [
+        "attach_host",
+        "main_window",
+        "mcp_registry",
+        "alert_manager",
+        "metrics_server",
+    ]
     original_alert.close.assert_not_called()
 
 

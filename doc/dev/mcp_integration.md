@@ -113,8 +113,9 @@ This class contains the actual business logic of the MCP server.
 
 ### 3. Multiple-endpoint registry (`pypost/core/mcp_server_registry.py`, PYPOST-1044)
 
-The application-level lifecycle owner is `MCPServerRegistry`: it maps every
-persisted `McpServerConfiguration` to its own `MCPServerManager` /
+The Qt-independent state owner is `MCPServerRegistry`: it maps every persisted
+`McpServerConfiguration` to an abstract runtime supplied by a factory. Production maps that
+protocol to an `MCPServerManager` /
 `MCPServerImpl` runtime. Each row selects one collection, environment, host,
 and globally unique port. Requests and environment/hidden-key values are
 copied into that runtime, preventing UI selection from retargeting another
@@ -123,20 +124,20 @@ persistence, migration, observability, and troubleshooting details.
 
 ### 4. `McpServerSettingsController` (`pypost/ui/mcp_server_controller.py`, PYPOST-1071)
 
-The UI-side owner of MCP **persistence and lifecycle**. PYPOST-1044 placed this behaviour in
-`MainWindow`; PYPOST-1071 extracted it, leaving the window as composition root plus startup
-readiness gate.
+The UI-side owner of MCP **persistence and commands**. PYPOST-1044 placed this behaviour in
+`MainWindow`; PYPOST-1071 extracted it. Stage 5 moved all construction to `compose_app`, leaving
+the window with only presenter/widget composition and the startup readiness gate.
 
-*   **Responsibility**: Build (or accept an injected) `MCPServerRegistry` and
-    `MCPServerManager`, load persisted rows at construction, mutate
+*   **Responsibility**: Accept an injected registry and legacy manager, load persisted rows at
+    construction, mutate
     `AppSettings.mcp_servers` and save through `ConfigManager`, and issue per-endpoint
     start / stop / remove / reconfigure commands.
-*   **Construction**: `MainWindow` instantiates
-    `McpServerSettingsController(settings_provider=…, config_manager=…, collection_lookup=…, environment_lookup=…, metrics=…, template_service=…, mcp_manager=…, registry=…)`
-    (`pypost/ui/main_window.py:107`), directly passing collaborator lookup callables. `MainWindow` no longer re-publishes `mcp_manager` or `mcp_registry` attribute aliases (PYPOST-1085).
+*   **Construction**: `compose_app()` creates the runtime factory, Qt registry adapter and
+    controller, then passes the ready controller to `MainWindow`. The window no longer
+    re-publishes `mcp_manager` or `mcp_registry` aliases (PYPOST-1085).
 *   **Readiness gate**: `start_enabled()` is a pass-through the window calls only from
     `_maybe_complete_startup_restore()` (`pypost/ui/main_window.py:166`), after both
-    collections and environments have loaded. `stop_all()` runs at shutdown.
+    collections and environments have loaded. `ComposedApp` owns `stop_all()` at shutdown.
 *   **Transactional edits**: it connects to `MCPServerRegistry.reconfiguration_finished`
     and persists a running-row edit **only** when the replacement endpoint bound
     (`committed=true`).
@@ -222,7 +223,7 @@ former monolithic `MetricsManager` into focused modules:
 ### Server Startup
 
 1.  `McpServerSettingsController` loads every persisted `AppSettings.mcp_servers`
-    row into `MCPServerRegistry` while the window composes it, and logs
+    row into `MCPServerRegistry` during composition, and logs
     `mcp_persisted_servers_loaded count=… enabled_count=…`.
 2.  After collections and environments are both loaded, `MainWindow` calls
     `mcp_controller.start_enabled()`, which starts each enabled row independently.

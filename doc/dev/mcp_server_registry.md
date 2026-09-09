@@ -8,23 +8,27 @@ collection and one environment, binds to its own port, and owns an independent
 runtime. This lets separate MCP clients use different tool catalogs and
 credentials at the same time.
 
-The primary developer entry point is `MCPServerRegistry` in
-`pypost/core/mcp_server_registry.py`. The legacy `MCPServerManager` remains
+The state-machine entry point is the Qt-independent `MCPServerRegistry` in
+`pypost/core/mcp_server_registry.py`. Desktop and daemon composition use the thin
+`QtMCPServerRegistry` adapter from `pypost/core/qt/mcp_server_registry.py`.
+The legacy `MCPServerManager` remains
 the single-endpoint transport primitive used by each registry row; it is no
 longer the owner of the application-wide multi-server lifecycle.
 
 ## Architecture
 
-`McpServerSettingsController` (`pypost/ui/mcp_server_controller.py`, PYPOST-1071)
-constructs the registry with ID-based collection and environment lookups, then
-loads persisted rows before asynchronous collection and environment loading
-starts. `MainWindow` composes that controller and keeps only the readiness
+`compose_app()` constructs the registry with ID-based collection and environment
+lookups, then injects it and the legacy manager into `McpServerSettingsController`
+(`pypost/ui/mcp_server_controller.py`, PYPOST-1071). The controller loads persisted rows
+before asynchronous collection and environment loading starts. `MainWindow` receives the
+ready controller and keeps only the readiness
 gate: once both sources are ready it calls `mcp_controller.start_enabled()`,
 which starts every row with `enabled=True`. Startup is best-effort: a missing
 reference or bind failure marks that row failed and does not interrupt another
 endpoint.
 
-For each started row the registry creates one `MCPServerManager`, which in turn
+For each started row the registry asks its injected `McpServerRuntimeFactory` for one runtime.
+The production factory creates an `MCPServerManager`, which in turn
 owns one `MCPServerImpl`, activity log, uvicorn server, and background thread.
 Before starting it, the registry deep-copies the selected collection requests
 and snapshots the selected environment variables and hidden keys. A later
@@ -142,3 +146,14 @@ Run the focused checks after changing this subsystem:
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q \
   tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py
 ```
+## Thread-affinity contract
+
+Public commands (`upsert`, `start`, `stop`, `remove`, refresh and reconfigure) originate on the
+owning UI or daemon event-loop thread. Runtime success/failure callbacks and the bounded
+reconfiguration watcher may originate on worker threads. `MCPServerRegistry` protects all
+shared status, configuration and pending-replacement state with one re-entrant lock and emits
+framework-neutral callbacks from the completing thread.
+
+`QtMCPServerRegistry` is the only bridge from those callbacks to Qt. It emits Qt signals, so
+QObject receivers are delivered according to Qt auto-connection/thread-affinity rules. UI code
+must not mutate registry dictionaries or attach directly to runtime worker signals.

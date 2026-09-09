@@ -11,7 +11,7 @@ from pypost.core.config_manager import ConfigManager
 from pypost.core.history_manager import HistoryManager
 from pypost.core.lifecycle import ApplicationLifecycle, CleanupFailure
 from pypost.core.qt.mcp_server import MCPServerManager
-from pypost.core.mcp_server_registry import MCPServerRegistry
+from pypost.core.qt.mcp_server_registry import QtMCPServerRegistry
 from pypost.core.qt.metrics import MetricsManager
 from pypost.core.qt.state_manager import StateManager
 from pypost.core.request_manager import RequestManager
@@ -19,6 +19,7 @@ from pypost.core.storage import StorageManager
 from pypost.core.template_service import TemplateService
 from pypost.models.settings import AppSettings
 from pypost.ui.main_window import MainWindow
+from pypost.ui.mcp_server_controller import McpServerSettingsController
 
 _LOG_LEVELS = {
     "CRITICAL": logging.CRITICAL,
@@ -56,7 +57,7 @@ class ComposedApp:
     window: MainWindow
     metrics: MetricsManager
     mcp_manager: MCPServerManager
-    mcp_registry: MCPServerRegistry
+    mcp_registry: QtMCPServerRegistry
     config_manager: ConfigManager
     settings: AppSettings
     _lifecycle: ApplicationLifecycle
@@ -89,7 +90,6 @@ def _shutdown_window(window: MainWindow) -> None:
         # An interactive close remains cancellable, but a final composition
         # rollback must not retain threads or listeners after reporting failure.
         window.teardown(timeout_ms=5000)
-        window.mcp_controller.stop_all()
     window.hide()
     window.deleteLater()
     if result.outcome != "success":
@@ -196,6 +196,37 @@ def compose_app(
         )
         logger.info("mcp_manager_created id=%d", id(mcp_manager))
 
+        def collection_lookup(collection_id: str):
+            return (
+                window.collections.collection_by_id(collection_id)
+                if window is not None
+                else None
+            )
+
+        def environment_lookup(environment_id: str):
+            return (
+                window.env.environment_by_id(environment_id)
+                if window is not None
+                else None
+            )
+
+        mcp_registry = QtMCPServerRegistry(
+            collection_lookup=collection_lookup,
+            environment_lookup=environment_lookup,
+            metrics=metrics_manager,
+            runtime_factory=lambda: MCPServerManager(
+                metrics=metrics_manager,
+                template_service=template_service,
+            ),
+        )
+        lifecycle.own("mcp_registry", mcp_registry.stop_all)
+        mcp_controller = McpServerSettingsController(
+            settings_provider=lambda: settings,
+            config_manager=config_manager,
+            mcp_manager=mcp_manager,
+            registry=mcp_registry,
+        )
+
         window = MainWindow(
             metrics=metrics_manager,
             template_service=template_service,
@@ -206,7 +237,8 @@ def compose_app(
             history_manager=history_manager,
             storage=storage,
             request_manager=request_manager,
-            mcp_manager=mcp_manager,
+            mcp_controller=mcp_controller,
+            alert_manager_factory=AlertManager,
             defer_startup=True,
             alert_log_path_override=alert_path_override,
             default_alert_log_path=default_alert_log_path,
@@ -218,7 +250,7 @@ def compose_app(
             window=window,
             metrics=metrics_manager,
             mcp_manager=mcp_manager,
-            mcp_registry=window.mcp_controller.registry,
+            mcp_registry=mcp_registry,
             config_manager=config_manager,
             settings=settings,
             _lifecycle=lifecycle,
