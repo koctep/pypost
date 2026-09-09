@@ -186,6 +186,9 @@ class TestMainWindow(unittest.TestCase):
             window = MainWindow(
                 metrics=metrics,
                 template_service=template_service,
+                config_manager=MagicMock(recovery_notice=None),
+                settings=mock_sm.return_value.settings,
+                state_manager=mock_sm.return_value,
                 history_manager=MagicMock(),
             )
             window.settings_btn = MagicMock()
@@ -258,6 +261,8 @@ class TestMainWindow(unittest.TestCase):
                 metrics=metrics,
                 template_service=template_service,
                 config_manager=config_manager,
+                settings=mock_sm.return_value.settings,
+                state_manager=mock_sm.return_value,
                 alert_manager=alert_manager,
                 history_manager=history_manager,
                 storage=storage,
@@ -270,6 +275,7 @@ class TestMainWindow(unittest.TestCase):
         self.assertIs(alert_manager, window._alert_manager)
         self.assertIs(history_manager, window.history_manager)
         self.assertIs(storage, window.storage)
+        self.assertIs(request_manager, window.request_manager)
         self.assertIs(mcp_manager, window.mcp_controller.manager)
         self.assertFalse(hasattr(window, "mcp_manager"))
         self.assertFalse(hasattr(window, "mcp_registry"))
@@ -311,6 +317,9 @@ class TestMainWindow(unittest.TestCase):
             window = MainWindow(
                 metrics=metrics,
                 template_service=template_service,
+                config_manager=MagicMock(recovery_notice=None),
+                settings=mock_sm.return_value.settings,
+                state_manager=mock_sm.return_value,
                 history_manager=MagicMock(),
             )
             splitter = window.centralWidget().layout().itemAt(1).widget()
@@ -355,6 +364,8 @@ class TestMainWindow(unittest.TestCase):
                 metrics=metrics,
                 template_service=template_service,
                 config_manager=config_manager,
+                settings=mock_sm.return_value.settings,
+                state_manager=mock_sm.return_value,
                 history_manager=history_manager,
             )
 

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pypost.core.alert_manager import AlertManager
+from pypost.core.config_manager import ConfigPersistenceError
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.lifecycle import (
     TeardownResult,
@@ -162,7 +163,16 @@ def shutdown_for_exit(
     existing = getattr(window, "_teardown_result", None)
     if isinstance(existing, TeardownResult):
         return existing
-    window.state_manager.flush_pending_save()
+    try:
+        window.state_manager.flush_pending_save()
+    except ConfigPersistenceError:
+        logger.error("lifecycle_shutdown_blocked reason=settings_save_failed")
+        return TeardownResult(
+            owner="main_window",
+            outcome="failed",
+            elapsed_ms=0,
+            failure_kind="settings_save_failed",
+        )
     result = window.teardown(timeout_ms=5000)
     if result.outcome != "success":
         return result

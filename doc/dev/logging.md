@@ -354,7 +354,7 @@ Every event below is emitted by the `ui/mcp_server_controller` logger.
 | `mcp_server_activity_unavailable` | DEBUG | `instance_id` |
 
 `reason` is one of `create`, `update`, `remove`, `start`, `stop`, `reconfigure`. The event is
-logged **before** the write, because `ConfigManager.save_config` swallows the failure and
+logged **before** the write, because `ConfigManager.save_config` raises a typed failure and
 reports its own `config_save_failed` ERROR — the adjacent pair identifies which MCP mutation
 was lost. Counts only: collection ids, environment ids, hosts and ports never appear in
 these messages; `instance_id` is the one opaque identifier permitted, and the registry

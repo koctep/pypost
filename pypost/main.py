@@ -12,6 +12,7 @@ from pypost.core.history_manager import HistoryManager
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.qt.metrics import MetricsManager
+from pypost.core.qt.state_manager import StateManager
 from pypost.core.request_manager import RequestManager
 from pypost.core.storage import StorageManager
 from pypost.core.template_service import TemplateService
@@ -69,6 +70,7 @@ def compose_app(
         config_kwargs["config_dir"] = config_dir
     config_manager = ConfigManager(**config_kwargs)
     settings = config_manager.load_config()
+    state_manager = StateManager(config_manager, settings)
 
     if metrics_host is not None:
         settings.metrics_host = metrics_host
@@ -126,6 +128,8 @@ def compose_app(
         metrics=metrics_manager,
         template_service=template_service,
         config_manager=config_manager,
+        settings=settings,
+        state_manager=state_manager,
         alert_manager=alert_manager,
         history_manager=history_manager,
         storage=storage,

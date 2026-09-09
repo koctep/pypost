@@ -217,9 +217,8 @@ class McpServerSettingsController:
     def _save_mcp_server_configurations(self, reason: str) -> None:
         """Persist the endpoint rows; ``reason`` names the mutation for operators.
 
-        Logged before the write because ``ConfigManager.save_config`` swallows failures
-        and reports them as its own ``config_save_failed`` ERROR — pairing the two lines
-        is what identifies *which* MCP mutation was lost.
+        Logged before the write so a typed ``ConfigPersistenceError`` still has the
+        mutation reason in the preceding structured event.
         """
         logger.info(
             "mcp_servers_persist_requested reason=%s count=%d",

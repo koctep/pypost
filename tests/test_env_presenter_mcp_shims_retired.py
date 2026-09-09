@@ -133,6 +133,9 @@ def test_main_window_provides_public_mcp_controls():
         window = MainWindow(
             metrics=MagicMock(),
             template_service=MagicMock(),
+            config_manager=MagicMock(recovery_notice=None),
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
         )
 

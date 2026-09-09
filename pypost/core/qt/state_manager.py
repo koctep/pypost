@@ -19,9 +19,9 @@ from __future__ import annotations
 import logging
 from typing import Final, List, Optional, Tuple
 
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer, Signal
 
-from pypost.core.config_manager import ConfigManager
+from pypost.core.config_manager import ConfigManager, ConfigPersistenceError
 from pypost.models.settings import AppSettings
 
 logger = logging.getLogger(__name__)
@@ -42,10 +42,17 @@ class StateManager(QObject):
     changes are not lost inside the debounce window.
     """
 
-    def __init__(self, config_manager: ConfigManager, parent: QObject | None = None):
+    persistence_failed = Signal(str)
+
+    def __init__(
+        self,
+        config_manager: ConfigManager,
+        settings: AppSettings,
+        parent: QObject | None = None,
+    ):
         super().__init__(parent)
         self.config_manager = config_manager
-        self.settings: AppSettings = self.config_manager.load_config()
+        self.settings = settings
         self._save_pending = False
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
@@ -55,8 +62,13 @@ class StateManager(QObject):
     def save(self) -> None:
         """Persists the current state to disk immediately."""
         self._save_timer.stop()
+        try:
+            self.config_manager.save_config(self.settings)
+        except ConfigPersistenceError as exc:
+            self._save_pending = True
+            self.persistence_failed.emit(str(exc))
+            raise
         self._save_pending = False
-        self.config_manager.save_config(self.settings)
         logger.debug("state_manager_save_immediate")
 
     def flush_pending_save(self) -> None:
@@ -66,19 +78,19 @@ class StateManager(QObject):
         self.save()
 
     def get_expanded_collections(self) -> List[str]:
-        return self.settings.expanded_collections
+        return list(self.settings.expanded_collections)
 
     def set_expanded_collections(self, ids: List[str]) -> None:
         if self.settings.expanded_collections != ids:
-            self.settings.expanded_collections = ids
+            self.settings.expanded_collections = list(ids)
             self._schedule_save()
 
     def get_open_tabs(self) -> List[str]:
-        return self.settings.open_tabs
+        return list(self.settings.open_tabs)
 
     def set_open_tabs(self, ids: List[str]) -> None:
         if self.settings.open_tabs != ids:
-            self.settings.open_tabs = ids
+            self.settings.open_tabs = list(ids)
             self._schedule_save()
 
     def get_last_environment_id(self) -> Optional[str]:
@@ -100,6 +112,9 @@ class StateManager(QObject):
     def _on_debounced_save_timeout(self) -> None:
         if not self._save_pending:
             return
-        self._save_pending = False
-        self.config_manager.save_config(self.settings)
+        try:
+            self.save()
+        except ConfigPersistenceError as exc:
+            logger.error("state_manager_save_debounced_failed error=%s", exc)
+            return
         logger.debug("state_manager_save_debounced")

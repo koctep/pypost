@@ -82,6 +82,9 @@ def _make_integration_window(qapp, env_presenter):  # noqa: ARG001
         window = MainWindow(
             metrics=metrics,
             template_service=template_service,
+            config_manager=MagicMock(recovery_notice=None),
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
         )
     window.env = env_presenter

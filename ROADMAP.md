@@ -133,46 +133,51 @@ baseline (179 известных ошибок) проходят. Полный su
 Критерий завершения этапа: никакое невалидное или конфликтующее редактирование не изменяет
 domain model и не удаляет существующую переменную.
 
-## [ ] 3. Исправить split-brain настроек и persistence
+## [x] 3. Исправить split-brain настроек и persistence
 
-### [ ] 3.1. Сначала закрепить найденный откат тестом
+### [x] 3.1. Сначала закрепить найденный откат тестом
 
-- [ ] Добавить integration test:
+- [x] Добавить integration test:
   `изменить theme -> сохранить Settings -> изменить open_tabs -> дождаться debounce`.
-- [ ] Проверять, что новый theme и остальные preferences остаются на диске.
-- [ ] Добавить аналогичные проверки для `last_environment_id` и `expanded_collections`.
-- [ ] Проверить object identity или эквивалентный single-source-of-truth invariant между
+- [x] Проверять, что новый theme и остальные preferences остаются на диске.
+- [x] Добавить аналогичные проверки для `last_environment_id` и `expanded_collections`.
+- [x] Проверить object identity или эквивалентный single-source-of-truth invariant между
   `MainWindow`, `StateManager` и composition root.
 
-### [ ] 3.2. Создать одного владельца состояния настроек
+### [x] 3.2. Создать одного владельца состояния настроек
 
-- [ ] Загружать `AppSettings` ровно один раз в composition root.
-- [ ] Передавать загруженный snapshot в `StateManager`, а не разрешать ему повторный load.
-- [ ] После сохранения `SettingsDialog` обновлять тот же authoritative snapshot.
-- [ ] Удалить либо исправить stale `ComposedApp.settings`, чтобы он не ссылался на другой объект.
-- [ ] Не позволять `MainWindow` создавать собственные `ConfigManager/StateManager` в production
+- [x] Загружать `AppSettings` ровно один раз в composition root.
+- [x] Передавать загруженный snapshot в `StateManager`, а не разрешать ему повторный load.
+- [x] После сохранения `SettingsDialog` обновлять тот же authoritative snapshot.
+- [x] Удалить либо исправить stale `ComposedApp.settings`, чтобы он не ссылался на другой объект.
+- [x] Не позволять `MainWindow` создавать собственные `ConfigManager/StateManager` в production
   path; тестовые defaults заменить явными fixtures/factories.
 
-### [ ] 3.3. Сделать запись настроек атомарной и честной
+### [x] 3.3. Сделать запись настроек атомарной и честной
 
-- [ ] Записывать JSON во временный файл в том же каталоге.
-- [ ] Flush/fsync данные перед `os.replace`, где это поддерживается.
-- [ ] Увеличивать revision только для snapshot, который действительно будет сохранён.
-- [ ] При ошибке не изменять in-memory revision и не оставлять обрезанный основной файл.
-- [ ] Возвращать явный результат либо выбрасывать типизированную persistence-ошибку вместо
+- [x] Записывать JSON во временный файл в том же каталоге.
+- [x] Flush/fsync данные перед `os.replace`, где это поддерживается.
+- [x] Увеличивать revision только для snapshot, который действительно будет сохранён.
+- [x] При ошибке не изменять in-memory revision и не оставлять обрезанный основной файл.
+- [x] Возвращать явный результат либо выбрасывать типизированную persistence-ошибку вместо
   проглатывания `Exception`.
-- [ ] На UI-уровне показывать пользователю ошибку сохранения preferences.
-- [ ] Добавить recovery policy для повреждённого JSON: backup/quarantine и явное сообщение,
+- [x] На UI-уровне показывать пользователю ошибку сохранения preferences.
+- [x] Добавить recovery policy для повреждённого JSON: backup/quarantine и явное сообщение,
   а не молчаливый переход к defaults.
 
-### [ ] 3.4. Устранить гонку полных перезаписей
+### [x] 3.4. Устранить гонку полных перезаписей
 
-- [ ] Сериализовать обновления preferences и debounced UI-state через один repository/store.
-- [ ] Перед записью UI-state объединять только принадлежащие ему поля с актуальными
+- [x] Сериализовать обновления preferences и debounced UI-state через один repository/store.
+- [x] Перед записью UI-state объединять только принадлежащие ему поля с актуальными
   preferences.
-- [ ] Покрыть случай, когда debounce был запланирован до открытия SettingsDialog, а срабатывает
+- [x] Покрыть случай, когда debounce был запланирован до открытия SettingsDialog, а срабатывает
   после сохранения новых preferences.
-- [ ] Покрыть flush pending state при завершении приложения.
+- [x] Покрыть flush pending state при завершении приложения.
+
+Результат проверки 2026-09-09: связанный settings/MainWindow/environment-набор — 181 passed;
+дополнительные daemon/MCP/environment persistence и agent lifecycle tests — 32 passed
+(два socket-теста запущены вне sandbox). Flake8, mypy baseline (179 известных ошибок) и
+архитектурные LOC-caps проходят.
 
 Критерий завершения этапа: все пути записи используют один актуальный snapshot, запись атомарна,
 ошибка видима вызывающему коду, а UI-state не может откатить preferences.

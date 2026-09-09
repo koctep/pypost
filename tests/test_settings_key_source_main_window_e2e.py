@@ -57,6 +57,8 @@ def _make_main_window(qapp, storage, config_manager):  # noqa: ARG001
             metrics=metrics,
             template_service=template_service,
             config_manager=config_manager,
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             history_manager=MagicMock(),
             storage=storage,
             request_manager=MagicMock(),

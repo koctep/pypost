@@ -25,6 +25,7 @@ from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.core.mcp_server_registry import MCPServerRegistry
 from pypost.core.lifecycle import TeardownResult
 from pypost.core.qt.mcp_server import MCPServerManager
+from pypost.core.qt.state_manager import StateManager
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.storage_interface import StorageInterface
 from pypost.models.models import Environment
@@ -69,6 +70,7 @@ class EnvPresenter(QObject):
         get_collections: Callable,
         metrics: MetricsTrackerProtocol,
         mcp_registry: MCPServerRegistry | None = None,
+        state_manager: StateManager | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -76,6 +78,7 @@ class EnvPresenter(QObject):
         self._config_manager = config_manager
         self._mcp_manager = mcp_manager
         self._settings = settings
+        self._state_manager = state_manager
         self._get_collections = get_collections
         self._metrics = metrics
         self._environments: list[Environment] = []
@@ -396,15 +399,20 @@ class EnvPresenter(QObject):
                 selected.enable_mcp,
                 len(selected.variables),
             )
-            self._settings.last_environment_id = selected.id
+            selected_environment_id = selected.id
             variables = resolve_environment_variables(selected.variables)
             selected_env: Environment | None = selected
         else:
             logger.info("env_deselected index=%d", index)
-            self._settings.last_environment_id = None
+            selected_environment_id = None
             selected_env = None
 
-        self._config_manager.save_config(self._settings)
+        if self._state_manager is not None:
+            self._state_manager.set_last_environment_id(selected_environment_id)
+        else:
+            # Compatibility seam for isolated presenter tests and embedders.
+            self._settings.last_environment_id = selected_environment_id
+            self._config_manager.save_config(self._settings)
         self._current_env_index = index
         hidden_keys = selected.hidden_keys if isinstance(selected, Environment) else set()
         self._env_snapshot.update(variables, hidden_keys)

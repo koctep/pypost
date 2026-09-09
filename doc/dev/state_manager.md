@@ -26,8 +26,14 @@ ConfigManager.load_config() → AppSettings (single in-memory object)
 
 ### Shared `AppSettings` object
 
-`MainWindow` sets `self.settings = self.state_manager.settings`. Presenters and dialogs read
-preference fields from that same object. This is intentional: one JSON file, one loaded model.
+The composition root loads one `AppSettings`, passes it to `StateManager`, and injects both into
+`MainWindow`. The window exposes a read-only `settings` property, and rejects a state manager
+backed by a different object. Presenters and dialogs therefore read the same authoritative
+snapshot.
+
+Settings-dialog results are first persisted as a candidate. Only after that atomic write succeeds
+are their fields copied into the authoritative object; the object itself is never replaced. This
+keeps presenters and an already scheduled debounce on the current preferences.
 
 `StateManager` does **not** duplicate or subset the model on disk. It restricts **which fields
 it mutates through its public API** (`_UI_STATE_FIELDS` in `state_manager.py`).
@@ -41,8 +47,11 @@ it mutates through its public API** (`_UI_STATE_FIELDS` in `state_manager.py`).
 | Application exit | `state_manager.flush_pending_save()` | Immediate flush of pending UI state |
 | Tests / forced persist | `StateManager.save()` or `flush_pending_save()` | Immediate |
 
-Full settings JSON is written on every save. Partial field updates on disk are out of scope
-until file size or write latency becomes a measured problem.
+Full settings JSON is written on every save. `ConfigManager` serializes writes with a lock, writes
+and fsyncs a temporary file in the config directory, then replaces `settings.json`. A failed write
+raises `ConfigPersistenceError`, does not advance the in-memory revision, and leaves the previous
+primary file intact. Malformed JSON is moved to a timestamped quarantine file before defaults are
+used, and the startup UI reports that recovery.
 
 ## API / Usage
 
@@ -77,13 +86,14 @@ if self.state_manager.get_open_tabs() != tab_ids:
 ### Example (test)
 
 ```python
+sm = StateManager(config_manager, authoritative_settings)
 sm.set_expanded_collections(["c1"])
 sm.flush_pending_save()  # required before asserting on disk
 ```
 
 ## Configuration
 
-Debounce interval: `_UI_STATE_SAVE_DEBOUNCE_MS = 300` in `pypost/core/state_manager.py`
+Debounce interval: `_UI_STATE_SAVE_DEBOUNCE_MS = 300` in `pypost/core/qt/state_manager.py`
 (not user-configurable).
 
 ## Related documentation
@@ -99,7 +109,7 @@ Debounce interval: `_UI_STATE_SAVE_DEBOUNCE_MS = 300` in `pypost/core/state_mana
 | Symptom | Likely cause | Action |
 | --- | --- | --- |
 | Test expects immediate disk write after `set_*` | Debounce defers write | Call `flush_pending_save()` or process Qt event loop until timer fires |
-| Preference change not visible in UI | Wrong object reference | Ensure code uses `MainWindow.settings`, not a copied `AppSettings` |
+| Preference change not visible in UI | Wrong object reference | Verify composition injected the same object into `MainWindow` and `StateManager` |
 | UI state lost on normal quit | Flush not called | Verify `MainWindow.handle_exit()` calls `flush_pending_save()` |
 | Unsaved WS draft id in `open_tabs` | Persist skipped registry gate | Omit ids not in `WebSocketRegistry` |
 | Settings dialog change overwritten | Saving UI state after dialog | Settings path uses immediate save; UI fields should not reset preferences |

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pypost.core.alert_manager import AlertManager
-from pypost.models.settings import AppSettings
+from pypost.models.settings import AppSettings, update_settings_snapshot
 from pypost.ui.dialogs.settings_dialog import SettingsDialog
 from tests.test_alert_manager import _make_payload
 
@@ -18,6 +18,7 @@ def _make_main_window(qapp, *, alert_manager=None, env_presenter=None):  # noqa:
     metrics = MagicMock()
     template_service = MagicMock()
     config_manager = MagicMock()
+    config_manager.recovery_notice = None
     mock_tabs = MagicMock()
     mock_collections = MagicMock()
     env_presenter = env_presenter or MagicMock()
@@ -44,6 +45,8 @@ def _make_main_window(qapp, *, alert_manager=None, env_presenter=None):  # noqa:
             metrics=metrics,
             template_service=template_service,
             config_manager=config_manager,
+            settings=mock_sm.return_value.settings,
+            state_manager=mock_sm.return_value,
             alert_manager=alert_manager,
             history_manager=MagicMock(),
         )
@@ -98,9 +101,12 @@ def test_reload_alert_manager_closes_old_and_propagates_to_tabs(qapp, tmp_path):
     old_manager = MagicMock(spec=AlertManager)
     window = _make_main_window(qapp, alert_manager=old_manager)
     log_path = tmp_path / "alerts.log"
-    window.settings = AppSettings(
-        alert_webhook_url="https://hooks.example.com/new",
-        alert_log_path=str(log_path),
+    update_settings_snapshot(
+        window.settings,
+        AppSettings(
+            alert_webhook_url="https://hooks.example.com/new",
+            alert_log_path=str(log_path),
+        ),
     )
 
     with patch("pypost.ui.main_window.AlertManager") as mock_am_cls:
@@ -131,7 +137,7 @@ def test_main_window_supports_legacy_env_presenter_without_acceptance_method(qap
 def test_open_settings_reloads_alert_manager_when_webhook_changes(qapp, caplog):
     initial = MagicMock(spec=AlertManager)
     window = _make_main_window(qapp, alert_manager=initial)
-    window.settings = AppSettings()
+    update_settings_snapshot(window.settings, AppSettings())
 
     with (
         patch("pypost.ui.main_window.AlertManager") as mock_am_cls,
@@ -152,7 +158,7 @@ def test_open_settings_reloads_alert_manager_when_webhook_changes(qapp, caplog):
 def test_open_settings_skips_reload_when_alert_fields_unchanged(qapp):
     manager = MagicMock(spec=AlertManager)
     window = _make_main_window(qapp, alert_manager=manager)
-    window.settings = AppSettings(font_size=14)
+    update_settings_snapshot(window.settings, AppSettings(font_size=14))
 
     original_init = SettingsDialog.__init__
 
@@ -181,7 +187,7 @@ def test_open_settings_emit_after_log_path_change_writes_to_new_file(qapp, tmp_p
     new_log = tmp_path / "alerts-new.log"
     initial = AlertManager(log_path=old_log)
     window = _make_main_window(qapp, alert_manager=initial)
-    window.settings = AppSettings(alert_log_path=str(old_log))
+    update_settings_snapshot(window.settings, AppSettings(alert_log_path=str(old_log)))
 
     initial.emit(_make_payload(request_name="before-reload"))
 
