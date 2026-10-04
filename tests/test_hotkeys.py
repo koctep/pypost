@@ -81,3 +81,124 @@ def test_hotkeys_dialog_uses_parent_actions(qapp):
         if dialog.table.item(row, 1).text()
     ]
     assert "New Tab" in table_labels
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1285: documentation rows must not make real shortcuts ambiguous
+# ---------------------------------------------------------------------------
+
+_ACTIVATION_SKIP = "window activation unavailable on this QPA platform"
+
+
+class _ActivatedWindow:
+    """Show and activate a bare QWidget with a focused QLineEdit; close on exit."""
+
+    def __enter__(self):
+        from PySide6.QtWidgets import QLineEdit, QVBoxLayout
+
+        self.window = QWidget()
+        self.line_edit = QLineEdit(self.window)
+        QVBoxLayout(self.window).addWidget(self.line_edit)
+        return self
+
+    def activate(self) -> None:
+        from PySide6.QtTest import QTest
+        from PySide6.QtWidgets import QApplication
+
+        self.window.show()
+        self.window.activateWindow()
+        if not QTest.qWaitForWindowActive(self.window, 2000):
+            pytest.skip(_ACTIVATION_SKIP)
+        self.line_edit.setFocus()
+        QApplication.processEvents()
+
+    def click(self, key, modifier=None) -> None:
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        from PySide6.QtWidgets import QApplication
+
+        QTest.keyClick(self.line_edit, key, modifier or Qt.KeyboardModifier.NoModifier)
+        QApplication.processEvents()
+
+    def __exit__(self, *_exc) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        self.window.close()
+        QApplication.processEvents()
+        self.window.deleteLater()
+        QApplication.processEvents()
+
+
+def test_documentation_row_does_not_make_bound_shortcut_ambiguous(qapp):
+    """E1: F5 / Ctrl+Return doc rows leave the real binding unambiguous."""
+    from unittest.mock import MagicMock
+
+    from PySide6.QtCore import Qt
+
+    from pypost.ui.hotkeys import register_hotkey_documentation
+
+    spy = MagicMock()
+    with _ActivatedWindow() as ctx:
+        register_hotkey(
+            ctx.window,
+            section="Request Editor",
+            label="Send Request",
+            keys=("F5", "Ctrl+Return"),
+            slot=spy,
+            order=1,
+        )
+        register_hotkey_documentation(
+            ctx.window, section="WebSocket Session", label="Connect / Disconnect",
+            keys=("F5",), order=1,
+        )
+        register_hotkey_documentation(
+            ctx.window, section="WebSocket Session", label="Send Message",
+            keys=("Ctrl+Return",), order=2,
+        )
+        ctx.activate()
+        ctx.click(Qt.Key.Key_F5)
+        assert spy.call_count == 1, "F5 did not reach the bound slot (ambiguous)"
+        ctx.click(Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+        assert spy.call_count == 2, "Ctrl+Return did not reach the bound slot (ambiguous)"
+
+
+def test_documentation_row_displays_native_text(qapp):
+    """E2: a doc row shows the native Ctrl+Return text."""
+    from PySide6.QtGui import QKeySequence
+
+    from pypost.ui.hotkeys import register_hotkey_documentation
+
+    root = QWidget()
+    register_hotkey_documentation(
+        root, section="WebSocket Session", label="Send Message",
+        keys=("Ctrl+Return",), order=1,
+    )
+    rows = collect_hotkey_rows(root)
+    native = QKeySequence("Ctrl+Return").toString(QKeySequence.SequenceFormat.NativeText)
+    assert ("Send Message", native) in rows
+
+
+def test_focus_url_ctrl_l_not_ambiguous_with_protocol_doc_rows(qapp):
+    """E3: Ctrl+L and Alt+D reach Focus URL Bar despite protocol doc rows."""
+    from unittest.mock import MagicMock
+
+    from PySide6.QtCore import Qt
+
+    from pypost.ui.main_window_protocol_hotkeys import register_protocol_session_hotkeys
+
+    spy = MagicMock()
+    with _ActivatedWindow() as ctx:
+        register_hotkey(
+            ctx.window,
+            section="Request Editor",
+            label="Focus URL Bar",
+            keys=("Ctrl+L", "Alt+D"),
+            slot=spy,
+            order=4,
+        )
+        register_protocol_session_hotkeys(ctx.window, MagicMock())
+        ctx.activate()
+        ctx.click(Qt.Key.Key_D, Qt.KeyboardModifier.AltModifier)
+        assert spy.call_count == 1, "Alt+D guard regressed"
+        ctx.click(Qt.Key.Key_L, Qt.KeyboardModifier.ControlModifier)
+        assert spy.call_count == 2, "Ctrl+L did not reach the bound slot (ambiguous)"

@@ -295,13 +295,16 @@ class MainWindow(QMainWindow):
             ),
             order=5,
         )
-        register_hotkey(
+        register_hotkey_group(
             self,
             section="Request Editor",
             label="Send Request",
-            keys=("F5", "Ctrl+Return"),
-            slot=self.tabs.handle_send_request_global,
+            bindings=(
+                ("F5", self.tabs.handle_f5_global),
+                ("Ctrl+Return", self.tabs.handle_ctrl_return_global),
+            ),
             order=1,
+            collapse_keys=False,
         )
         register_hotkey(
             self,

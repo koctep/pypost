@@ -22,7 +22,7 @@ To create and configure a WebSocket connection:
    - **Params**: Configure query parameters appended to the connection URL.
    - **Headers**: Add custom HTTP handshake headers (for example, `Authorization` or `Origin`).
    - **Subprotocols**: Specify comma-separated WebSocket subprotocols (e.g., `graphql-ws`, `v1`).
-4. Click **Connect** (or press `F5` / `Ctrl+Enter` while focused on the URL bar).
+4. Click **Connect** (or press `F5`).
 
 The connection status badge displays current lifecycle state: `DISCONNECTED`, `CONNECTING`,
 `CONNECTED`, `CLOSING`, or `RECONNECTING`. When connected, handshake configuration fields
@@ -41,7 +41,7 @@ The message composer at the bottom of the WebSocket tab allows drafting and send
 
 ### Sending
 
-Click **Send** or press `Ctrl+Enter` inside the composer editor to transmit the active message.
+Click **Send** or press `Ctrl+Enter` to transmit the active message.
 Messages sent appear immediately in the stream inspector as outbound (`OUT`) frames.
 
 ## Presets and Sequences
