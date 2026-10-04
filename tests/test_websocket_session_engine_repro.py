@@ -126,11 +126,11 @@ def test_websocket_transport_and_listener_protocols():
         def open(self, target: HandshakeTarget) -> None:
             pass
 
-        def send_text(self, message: str) -> None:
-            pass
+        def send_text(self, message: str) -> bool:
+            return True
 
-        def send_binary(self, payload: bytes) -> None:
-            pass
+        def send_binary(self, payload: bytes) -> bool:
+            return True
 
         def ping(self, payload: bytes = b"") -> None:
             pass
@@ -395,11 +395,13 @@ def test_websocket_session_controller_lifecycle_with_mock_transport(qapp):
         def open(self, target: HandshakeTarget) -> None:
             self.opened_target = target
 
-        def send_text(self, message: str) -> None:
+        def send_text(self, message: str) -> bool:
             self.sent_texts.append(message)
+            return True
 
-        def send_binary(self, payload: bytes) -> None:
+        def send_binary(self, payload: bytes) -> bool:
             self.sent_bins.append(payload)
+            return True
 
         def ping(self, payload: bytes = b"") -> None:
             self.pings.append(payload)
@@ -503,11 +505,11 @@ def test_websocket_session_controller_heartbeat_timeout(qapp):
         def open(self, target: HandshakeTarget) -> None:
             pass
 
-        def send_text(self, message: str) -> None:
-            pass
+        def send_text(self, message: str) -> bool:
+            return True
 
-        def send_binary(self, payload: bytes) -> None:
-            pass
+        def send_binary(self, payload: bytes) -> bool:
+            return True
 
         def ping(self, payload: bytes = b"") -> None:
             pass

@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 from PySide6.QtCore import QByteArray, QObject, QUrl
-from PySide6.QtNetwork import QNetworkRequest, QSslConfiguration, QSslSocket
+from PySide6.QtNetwork import QAbstractSocket, QNetworkRequest, QSslConfiguration, QSslSocket
 from PySide6.QtWebSockets import (
     QWebSocket,
     QWebSocketHandshakeOptions,
@@ -188,16 +188,20 @@ class QtWebSocketTransport(WebSocketTransport):
         else:
             self._socket.open(request)
 
-    def send_text(self, message: str) -> None:
-        """Send a UTF-8 text message frame."""
+    def send_text(self, message: str) -> bool:
+        """Return whether the connected socket accepted the complete text message."""
+        if self._socket.state() != QAbstractSocket.SocketState.ConnectedState:
+            return False
         byte_size = len(message.encode("utf-8"))
         logger.debug("QtWebSocketTransport sending text frame (%d bytes)", byte_size)
-        self._socket.sendTextMessage(message)
+        return self._socket.sendTextMessage(message) == byte_size
 
-    def send_binary(self, payload: bytes) -> None:
-        """Send a binary message frame."""
+    def send_binary(self, payload: bytes) -> bool:
+        """Return whether the connected socket accepted the complete binary message."""
+        if self._socket.state() != QAbstractSocket.SocketState.ConnectedState:
+            return False
         logger.debug("QtWebSocketTransport sending binary frame (%d bytes)", len(payload))
-        self._socket.sendBinaryMessage(QByteArray(payload))
+        return self._socket.sendBinaryMessage(QByteArray(payload)) == len(payload)
 
     def ping(self, payload: bytes = b"") -> None:
         """Send a WebSocket ping control frame."""

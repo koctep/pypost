@@ -132,6 +132,18 @@ See [mcp_client_draft_tab.md](dev/mcp_client_draft_tab.md).
 | `websocket_session_start_refused_total` | Counter | `reason` | Session start attempts refused by concurrency policy (`reason`: `max_concurrent`, `disabled`) |
 | `websocket_probe_duration_seconds` | Histogram | `outcome` | MCP WebSocket probe execution wall time in seconds (`outcome`: `success`, `timeout`, `limit_reached`, `error`) |
 
+For WebSocket tab sends, `websocket_messages_total{direction="outbound",kind="text"}` or
+`kind="binary"` increases once when the open transport accepts the complete message.
+`websocket_message_bytes_total{direction="outbound"}` increases by that message's payload
+size at the same point. Text size is the UTF-8 encoded byte length; binary size is the raw
+payload length. An accepted empty message adds one message and zero bytes.
+
+Blocked or invalid attempts and rejected or incomplete transport handoffs change neither
+counter. These counters report PyPost's acceptance for transmission, not receipt by the peer.
+The stream inspector's `out` direction is a display value; `outbound` is the public metric
+label. See the [WebSocket session engine](dev/websocket_session_engine.md#outbound-send-metrics)
+for the signal and adapter contract.
+
 ### Environment encryption
 
 | Metric | Type | Labels | Meaning |

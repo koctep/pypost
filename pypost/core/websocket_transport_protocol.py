@@ -87,12 +87,12 @@ class WebSocketTransport(Protocol):
         """Initiate asynchronous handshake connection to target."""
         ...
 
-    def send_text(self, message: str) -> None:
-        """Send a UTF-8 text frame."""
+    def send_text(self, message: str) -> bool:
+        """Return whether an open transport accepted the complete UTF-8 text frame."""
         ...
 
-    def send_binary(self, payload: bytes) -> None:
-        """Send a binary frame."""
+    def send_binary(self, payload: bytes) -> bool:
+        """Return whether an open transport accepted the complete binary frame."""
         ...
 
     def ping(self, payload: bytes = b"") -> None:

@@ -450,6 +450,9 @@ class WebSocketPresenter(QObject):
             self._tab.state_badge.set_metrics(subprotocol=subprotocol)
 
     def _on_frame_sent(self, frame: Any) -> None:
+        if self._metrics is not None:
+            self._metrics.track_websocket_message("outbound", frame.payload_format.value)
+            self._metrics.track_websocket_message_bytes("outbound", frame.byte_size)
         entry = build_stream_entry(
             frame,
             env_vars=self._env_vars,
