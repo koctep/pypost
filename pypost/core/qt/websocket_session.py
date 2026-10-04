@@ -157,11 +157,18 @@ class WebSocketSessionController(QObject):
         self._transport.open(effective_target)
 
     def send_text(self, message: str) -> None:
-        """Send UTF-8 text message frame and emit frame_sent."""
+        """Send UTF-8 text message and emit frame_sent after acceptance."""
         if self._transport is not None and self._state == SessionState.OPEN:
             byte_size = len(message.encode("utf-8"))
             logger.debug("Sending WebSocket text frame (%d bytes)", byte_size)
-            self._transport.send_text(message)
+            if not self._transport.send_text(message):
+                logger.warning(
+                    "websocket_send_rejected kind=text bytes=%d state=%s",
+                    byte_size,
+                    self._state.value,
+                )
+                return
+            logger.debug("websocket_send_accepted kind=text bytes=%d", byte_size)
             frame = RawFrame(
                 direction=FrameDirection.OUT,
                 payload_format=FrameType.TEXT,
@@ -172,11 +179,18 @@ class WebSocketSessionController(QObject):
             self.frame_sent.emit(frame)
 
     def send_binary(self, payload: bytes) -> None:
-        """Send raw binary frame and emit frame_sent."""
+        """Send raw binary frame and emit frame_sent after acceptance."""
         if self._transport is not None and self._state == SessionState.OPEN:
             byte_size = len(payload)
             logger.debug("Sending WebSocket binary frame (%d bytes)", byte_size)
-            self._transport.send_binary(payload)
+            if not self._transport.send_binary(payload):
+                logger.warning(
+                    "websocket_send_rejected kind=binary bytes=%d state=%s",
+                    byte_size,
+                    self._state.value,
+                )
+                return
+            logger.debug("websocket_send_accepted kind=binary bytes=%d", byte_size)
             frame = RawFrame(
                 direction=FrameDirection.OUT,
                 payload_format=FrameType.BINARY,

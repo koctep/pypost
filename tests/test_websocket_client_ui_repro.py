@@ -387,11 +387,11 @@ class _SilentMockTransport:
     def open(self, target: HandshakeTarget) -> None:
         self.opened_target = target
 
-    def send_text(self, message: str) -> None:
-        pass
+    def send_text(self, message: str) -> bool:
+        return True
 
-    def send_binary(self, payload: bytes) -> None:
-        pass
+    def send_binary(self, payload: bytes) -> bool:
+        return True
 
     def ping(self, payload: bytes = b"") -> None:
         pass

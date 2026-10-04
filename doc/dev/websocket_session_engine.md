@@ -104,8 +104,10 @@ sequenceDiagram
         App->>Ctrl: send_text("Hello")
         Ctrl->>Trans: send_text("Hello")
         Trans->>QWS: sendTextMessage("Hello")
-        QWS-->>Srv: WS Text Frame ("Hello")
+        QWS-->>Trans: accepted payload byte count (5)
+        Trans-->>Ctrl: true (complete handoff)
         Ctrl-->>App: frame_sent(RawFrame(OUT, TEXT, "Hello", 5))
+        QWS-->>Srv: WS Text Frame (delivery not asserted by frame_sent)
 
         Srv-->>QWS: WS Text Frame ("World")
         QWS-->>Trans: textMessageReceived("World")
@@ -369,8 +371,8 @@ class MockTransport(WebSocketTransport):
     def open(self, target: HandshakeTarget) -> None:
         if self.listener:
             self.listener.on_opened("mock-subproto")
-    def send_text(self, message: str) -> None: ...
-    def send_binary(self, payload: bytes) -> None: ...
+    def send_text(self, message: str) -> bool: return True
+    def send_binary(self, payload: bytes) -> bool: return True
     def ping(self, payload: bytes = b"") -> None: ...
     def close(self, code: int = 1000, reason: str = "") -> None: ...
     def abort(self) -> None: ...
@@ -392,6 +394,38 @@ When constructing `TabsPresenter` in the same suites, also inject a hermetic
 `protocol_picker` so close-last-tab never blocks on a modal menu. See
 [websocket_ui_client.md](websocket_ui_client.md) § Hermetic Connect/Disconnect
 and TabsPresenter isolation.
+
+## Outbound Send Metrics
+
+`WebSocketTransport.send_text(message)` and `send_binary(payload)` return `True` only when an
+open transport accepts the complete payload. `QtWebSocketTransport` checks the socket's
+connected state and compares the byte count returned by Qt with the UTF-8 text length or raw
+binary length. A connected socket accepting a zero-byte payload returns `True`. A rejected or
+partial handoff returns `False`; a transport exception does not emit a successful-send signal.
+
+`WebSocketSessionController.send_text` and `send_binary` emit one `frame_sent(RawFrame)` only
+after that acceptance. The frame's `byte_size` is the original payload length: UTF-8 bytes for
+text, raw bytes for binary. `WebSocketPresenter._on_frame_sent` then calls
+`track_websocket_message("outbound", "text" | "binary")` once and
+`track_websocket_message_bytes("outbound", frame.byte_size)` once through its injected metrics
+tracker. The byte counter has no `kind` label. This shared signal covers Send, `Ctrl+Return`,
+presets, sequences, and other WebSocket tab send paths without counting stream display twice.
+
+The counters measure acceptance for transmission by PyPost, not peer receipt or an
+acknowledgment. Blocked or invalid attempts, rejected or incomplete handoffs, and exceptions
+do not increment them. An accepted empty text or binary message increments the message count
+by one and the byte count by zero. The stream inspector uses `out` for display; the public
+metrics direction is `outbound`. Control frames are outside these message counts. See the
+[metrics catalog](../prometheus_monitoring.md#websocket-sessions-and-streams).
+
+The existing metrics tracker and exporter configuration applies; these counters add no new
+settings or environment variables. To diagnose a zero outbound count after a send, verify the
+session reached `Open`, the transport accepted the full payload, and a metrics tracker was
+injected into the presenter. The controller logs `websocket_send_accepted` at `DEBUG` for a
+complete handoff and `websocket_send_rejected` at `WARNING` for a rejected one; neither event
+contains the payload. The contract is covered by
+`tests/test_websocket_outbound_metrics_repro.py` and the Qt adapter tests in
+`tests/test_websocket_session_engine_repro.py`.
 
 ---
 
