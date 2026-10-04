@@ -113,15 +113,23 @@ def register_hotkey_documentation(
     order: int,
     collapse_keys: bool = False,
 ) -> QAction:
-    """Register a help-dialog row without binding shortcuts (display only)."""
+    """Register a display-only help-dialog row.
+
+    The action never receives a ``QKeySequence``: every key is stored as
+    platform-native text in ``ALT_KEYS_PROPERTY``, so a documentation row can
+    never make a real binding with the same key ambiguous.
+    """
     action = QAction(label, parent)
     tag_action(
         action,
         section=section,
         order=order,
-        keys=keys,
         collapse_keys=collapse_keys,
         label=label,
+    )
+    native = QKeySequence.SequenceFormat.NativeText
+    action.setProperty(
+        ALT_KEYS_PROPERTY, [QKeySequence(key).toString(native) for key in keys]
     )
     parent.addAction(action)
     return action

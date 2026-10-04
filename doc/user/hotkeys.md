@@ -43,8 +43,8 @@ and **Save As WebSocket Profile** only while a WebSocket tab exists in the works
 
 | Action | Shortcut | Description |
 | ------ | -------- | ----------- |
-| Connect / Disconnect | `F5` / `Ctrl+Enter` | Connect from URL bar; Send when Composer is focused |
-| Send Message | `Ctrl+Enter` | Sends the active message from the Composer |
+| Connect / Disconnect | `F5` | Connects or disconnects the session |
+| Send Message | `Ctrl+Enter` | Sends the active Composer message from anywhere in the tab |
 | Save WebSocket Profile | `Ctrl+S` | Saves the WebSocket profile to a collection |
 | Save As WebSocket Profile | `Ctrl+Shift+S` | Saves to a new collection profile |
 | Focus URL Bar | `Ctrl+L` / `Alt+D` | Highlights the WebSocket URL input |
@@ -61,8 +61,8 @@ workspace.
 
 | Action | Shortcut | Description |
 | ------ | -------- | ----------- |
-| Connect / Disconnect | `F5` / `Ctrl+Enter` | Connect from URL; Invoke when args form focused |
-| Invoke Tool | `Ctrl+Enter` | Invokes the selected remote tool with current arguments |
+| Connect / Disconnect | `F5` | Connects or disconnects the session |
+| Invoke Tool | `Ctrl+Enter` | Invokes the selected tool from anywhere in the tab |
 | Save MCP Client Profile | `Ctrl+S` | Saves the MCP Client profile to a collection |
 | Save As MCP Client Profile | `Ctrl+Shift+S` | Saves to a new collection profile |
 | Focus URL Bar | `Ctrl+L` / `Alt+D` | Highlights the MCP Client URL input |

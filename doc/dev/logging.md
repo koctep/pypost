@@ -454,6 +454,7 @@ Treat `endpoint` and webhook `target` as potentially sensitive — see
 | `open_tabs_filter` | INFO | `omitted_draft_count`, `persisted_ws_count`, `persisted_mcp_count` | `tabs_presenter_draft` |
 | `websocket_draft_dirty_close_prompt` | INFO | `connection_id`, `choice` | `tabs_presenter_draft` |
 | `websocket_draft_clean_close` | INFO | `connection_id` | `tabs_presenter_draft` |
+| `hotkey_routed` | DEBUG | `key=f5\|ctrl_return`, `tab_kind=http\|websocket\|mcp_client\|none`, `action=connect_toggle\|send_request\|send_message\|invoke_tool\|noop` (+ `reason=target_unavailable` when the handler returned early) | `tabs_presenter_hotkeys` ([PYPOST-1285](https://pypost.atlassian.net/browse/PYPOST-1285), see [hotkeys.md](hotkeys.md#send-key-routing-f5--ctrlreturn)) |
 | `copy_curl_success` | INFO | `request_id`, `length` | `tabs_presenter` |
 | `save_as_flow_started` | INFO | `source_request_id` | save orchestrator |
 | `save_request_new_succeeded` | INFO | `request_id`, `name`, `collection_id` | save orchestrator |

@@ -1,4 +1,9 @@
-"""WebSocket and MCP Client session hotkey registration for MainWindow."""
+"""WebSocket and MCP Client session hotkey registration for MainWindow.
+
+The session rows are display-only Help entries. The real bindings live in
+``MainWindow._setup_shortcuts``: F5 routes to Connect / Disconnect and
+Ctrl+Return routes to Send Message / Invoke Tool on the active tab.
+"""
 
 from __future__ import annotations
 
@@ -21,7 +26,7 @@ def register_protocol_session_hotkeys(
         parent,
         section="WebSocket Session",
         label="Connect / Disconnect",
-        keys=("F5", "Ctrl+Return"),
+        keys=("F5",),
         order=1,
     )
     register_hotkey_documentation(
@@ -50,7 +55,7 @@ def register_protocol_session_hotkeys(
         parent,
         section="MCP Client",
         label="Connect / Disconnect",
-        keys=("F5", "Ctrl+Return"),
+        keys=("F5",),
         order=1,
     )
     register_hotkey_documentation(

@@ -675,20 +675,28 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
     def active_tab_kind(self) -> TabProtocol | None:
         return tab_hotkeys.active_tab_kind(self)
 
-    def handle_send_request_global(self) -> None:
+    def handle_f5_global(self) -> None:
+        """F5: Connect / Disconnect on WS / MCP tabs, Send Request on HTTP tabs."""
         if not self._admission_open():
             return
-        tab_hotkeys.handle_send_request_global(self)
+        tab_hotkeys.handle_f5_global(self)
+
+    def handle_ctrl_return_global(self) -> None:
+        """Ctrl+Return: Send Message / Invoke Tool on WS / MCP, Send Request on HTTP."""
+        if not self._admission_open():
+            return
+        tab_hotkeys.handle_ctrl_return_global(self)
 
     def handle_websocket_connect_global(self) -> None:
         if not self._admission_open():
             return
         tab_hotkeys.handle_websocket_connect_global(self)
 
-    def handle_websocket_send_global(self) -> None:
+    def handle_websocket_send_message_global(self) -> None:
+        """Send the composer message on the active WebSocket tab."""
         if not self._admission_open():
             return
-        tab_hotkeys.handle_websocket_send_global(self)
+        tab_hotkeys.handle_websocket_send_message_global(self)
 
     def handle_websocket_format_json_global(self) -> None:
         if not self._admission_open():
@@ -704,11 +712,6 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         if not self._admission_open():
             return
         tab_hotkeys.handle_mcp_client_invoke_global(self)
-
-    def handle_mcp_client_send_global(self) -> None:
-        if not self._admission_open():
-            return
-        tab_hotkeys.handle_mcp_client_send_global(self)
 
     def handle_focus_url(self) -> None:
         if not self._admission_open():
