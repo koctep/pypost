@@ -256,6 +256,10 @@ class OtelMetricsTracker:
                 "(not inbound MCP server traffic)"
             ),
         )
+        self._mcp_client_disconnect = meter.create_counter(
+            "mcp_client_disconnect_total",
+            description="Established outbound MCP Client sessions ended by reason",
+        )
         self._mcp_client_list_tools = meter.create_counter(
             "mcp_client_list_tools_total",
             description=(
@@ -551,6 +555,9 @@ class OtelMetricsTracker:
 
     def track_mcp_client_connect(self, result: str) -> None:
         self._mcp_client_connect.add(1, {"result": result})
+
+    def track_mcp_client_disconnect(self, reason: str) -> None:
+        self._mcp_client_disconnect.add(1, {"reason": reason})
 
     def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
         self._mcp_client_list_tools.add(

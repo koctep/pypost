@@ -100,23 +100,33 @@ The observability server on port 9080 increments `mcp_requests_received_total` a
 
 ### MCP Client (outbound discovery and invoke)
 
-These counters are **outbound** Connect / Refresh `list_tools` and
-Invoke `call_tool` on the MCP Client tab. Do not sum them with inbound
+These counters cover **outbound** MCP Client tab sessions and Connect /
+Refresh `list_tools` and Invoke `call_tool`. Do not sum them with inbound
 `mcp_requests_received_total`.
 
 | Metric | Type | Labels | Meaning |
 | --- | --- | --- | --- |
 | `mcp_client_connect_total` | Counter | `result` | Connect settle (`success` / `error`) |
+| `mcp_client_disconnect_total` | Counter | `reason` | Established tab session ended |
 | `mcp_client_list_tools_total` | Counter | `result`, `operation` | Connect or Refresh settle |
 | `mcp_client_call_tool_total` | Counter | `result` | Invoke worker settle (`success` / `error`) |
 
 `mcp_client_call_tool_total{result="success"}` includes parsed
 `CallToolResult` bodies with `isError: true` (failed **call**, not
 failed Connect). Client-side validation and stale worker results do
-not increment. `McpClientPresenter` records them via optional
-`metrics=`. The blank-tab factory does not inject
-`TabsPresenter._metrics` (785 LOC cap). Tests inject `MetricsRegistry`.
-See [mcp_client_draft_tab.md](dev/mcp_client_draft_tab.md).
+not increment. `McpClientPresenter` records them via `metrics=`, supplied
+by the workspace from `TabsPresenter._metrics`.
+
+Disconnect reasons are `user` (button or F5), `error` (terminal session
+release), and `teardown` (tab close, profile deletion, or application
+teardown). Failed/cancelled Connect and current nonterminal Refresh/Invoke
+errors add no disconnect. Repeated cleanup adds no count. Emission is
+best effort and may lose increments on tracker failure. This aggregate
+counter does not provide individual session durations. The same name and
+`reason` attribute are available through OpenTelemetry; disabled metrics
+use the no-op tracker. See the
+[session-end contract](dev/mcp_client_draft_tab.md#session-end-counter-pypost-1289)
+for lifecycle API and failure handling.
 
 ### WebSocket sessions and streams
  

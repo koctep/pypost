@@ -187,7 +187,7 @@ class McpClientPresenter:
             "mcp_client_disconnect_initiated connection_id=%s",
             self.connection.id,
         )
-        self._release_session()
+        self._release_session(reason="user")
         self._sync_ui()
 
     def teardown(self) -> None:
@@ -196,7 +196,7 @@ class McpClientPresenter:
             "mcp_client_presenter_teardown connection_id=%s",
             self.connection.id,
         )
-        self._release_session()
+        self._release_session(reason="teardown")
         self._sync_ui()
 
     def select_tool(self, name: str | None) -> None:
@@ -636,7 +636,10 @@ class McpClientPresenter:
         else:
             worker.deleteLater()
 
-    def _release_session(self) -> None:
+    def _release_session(self, *, reason: str) -> None:
+        had_session = (
+            self._state == McpClientSessionState.CONNECTED and self._session is not None
+        )
         self._outbound_generation += 1
         self._list_in_flight = False
         self._invoke_in_flight = False
@@ -644,6 +647,11 @@ class McpClientPresenter:
         self._error_text = ""
         self._session = None
         self._state = McpClientSessionState.DISCONNECTED
+        if had_session:
+            try:
+                self._metrics.track_mcp_client_disconnect(reason)
+            except Exception:
+                logger.warning("mcp_client_disconnect_metric_failed reason=%s", reason)
         self._catalog = {}
         self._selected_name = None
         self._drop_worker()

@@ -81,6 +81,8 @@ class MetricsTrackerProtocol(Protocol):
 
     def track_mcp_client_connect(self, result: str) -> None: ...
 
+    def track_mcp_client_disconnect(self, reason: str) -> None: ...
+
     def track_mcp_client_list_tools(self, result: str, operation: str) -> None: ...
 
     def track_mcp_client_call_tool(self, result: str) -> None: ...
@@ -270,6 +272,9 @@ class NullMetrics:
         return None
 
     def track_mcp_client_connect(self, result: str) -> None:
+        return None
+
+    def track_mcp_client_disconnect(self, reason: str) -> None:
         return None
 
     def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
