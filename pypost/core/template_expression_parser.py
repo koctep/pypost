@@ -49,12 +49,39 @@ def identifier_names(expression: str) -> tuple[str, ...]:
     return tuple(match.group(1) for match in _IDENTIFIER_RE.finditer(expression))
 
 
+@dataclass(frozen=True)
+class ArgumentParseResult:
+    """Outcome of parsing a function argument string."""
+
+    argument: str | None
+    has_multiple_arguments: bool
+    is_malformed: bool
+
+
 def split_single_argument(arguments: str) -> str | None:
     """Return one top-level argument, respecting nested calls and quoted strings."""
+    return parse_function_argument(arguments).argument
+
+
+def parse_function_argument(raw_arg: str) -> ArgumentParseResult:
+    """Parse an argument string, distinguishing arity violations from syntax malformations.
+
+    Args:
+        raw_arg: Raw text within outer function parentheses.
+
+    Returns:
+        ArgumentParseResult indicating:
+        - argument: The single argument string if well-formed or extractable, else None.
+        - has_multiple_arguments: True if top-level comma encountered at depth 0.
+        - is_malformed: True if parentheses or quotes are unbalanced.
+    """
     depth = 0
     quote: str | None = None
     escaped = False
-    for char in arguments:
+    has_multiple_arguments = False
+    had_negative_depth = False
+
+    for char in raw_arg:
         if escaped:
             escaped = False
         elif char == "\\" and quote is not None:
@@ -68,6 +95,28 @@ def split_single_argument(arguments: str) -> str | None:
             depth += 1
         elif char == ")":
             depth -= 1
-        elif char == "," and depth == 0:
-            return None
-    return arguments.strip() if depth == 0 and quote is None else None
+            if depth < 0:
+                had_negative_depth = True
+        elif char == "," and depth == 0 and not had_negative_depth:
+            has_multiple_arguments = True
+
+    is_malformed = depth != 0 or quote is not None or had_negative_depth
+    if has_multiple_arguments:
+        return ArgumentParseResult(
+            argument=None,
+            has_multiple_arguments=True,
+            is_malformed=is_malformed,
+        )
+
+    if is_malformed:
+        return ArgumentParseResult(
+            argument=None,
+            has_multiple_arguments=False,
+            is_malformed=True,
+        )
+
+    return ArgumentParseResult(
+        argument=raw_arg.strip(),
+        has_multiple_arguments=False,
+        is_malformed=False,
+    )
