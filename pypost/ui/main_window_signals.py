@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 def wire_presenter_signals(window: MainWindow) -> None:
     """Connect collections, tabs, env, and history panel cross-presenter signals."""
+    if getattr(window, "_presenter_signals_wired", False) is True:
+        logger.debug("wire_presenter_signals_already_wired")
+        return
+    window._presenter_signals_wired = True  # type: ignore[attr-defined]
     logger.debug("wire_presenter_signals_started")
     window.collections.open_request_in_tab.connect(window.tabs.add_new_tab)
     window.collections.open_request_in_isolated_tab.connect(window.tabs.add_new_tab)
