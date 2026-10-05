@@ -12,7 +12,7 @@ kind only. Keyboard focus does not matter
 
 | User action | Keys | Handler |
 | --- | --- | --- |
-| Connect / Disconnect | `F5` | `handle_f5_global` → `_F5_ROUTES[WEBSOCKET]` → `handle_websocket_connect_global` (toggle) |
+| Connect / Disconnect | `F5` | `handle_f5_global` → `_F5_ROUTES[WEBSOCKET]` → `handle_websocket_connect_toggle` (toggle) |
 | Send message | `Ctrl+Return` | `handle_ctrl_return_global` → `_CTRL_RETURN_ROUTES[WEBSOCKET]` → `handle_websocket_send_message_global` |
 | Focus URL | `Ctrl+L`, `Alt+D` | `handle_focus_url` |
 | Format JSON | `Ctrl+Shift+F` | `handle_websocket_format_json_global` → `WebSocketComposer.format_json_payload` |
@@ -44,13 +44,14 @@ def active_tab_kind(presenter: TabsPresenter) -> TabProtocol | None: ...
 def handle_f5_global(presenter: TabsPresenter) -> None: ...
 def handle_ctrl_return_global(presenter: TabsPresenter) -> None: ...
 # Route handlers: True when the action ran, False when the tab/presenter is missing.
-def handle_websocket_connect_global(presenter: TabsPresenter) -> bool: ...
+def handle_websocket_connect_toggle(presenter: TabsPresenter) -> bool: ...
 def handle_websocket_send_message_global(presenter: TabsPresenter) -> bool: ...
 ```
 
-`handle_websocket_connect_global` toggles through the private `_on_connect_clicked`. A public
-toggle API and a rename are tracked in
-[PYPOST-1296](https://pypost.atlassian.net/browse/PYPOST-1296).
+`handle_websocket_connect_toggle` invokes `ws_tab.presenter.toggle_connection()`
+([PYPOST-1296](https://pypost.atlassian.net/browse/PYPOST-1296)). Backward-compatibility alias
+`handle_websocket_connect_global` is retained.
+
 
 ## Tests
 

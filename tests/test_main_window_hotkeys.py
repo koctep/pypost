@@ -12,7 +12,9 @@ from PySide6.QtWidgets import QApplication
 from pypost.models.models import Collection
 from pypost.models.settings import AppSettings
 from pypost.ui.hotkeys import SECTION_ORDER
+from pypost.ui.presenters import tabs_presenter_hotkeys
 from pypost.ui.presenters.tabs_presenter import TabsPresenter, WebSocketTab
+from pypost.ui.presenters.websocket_presenter import WebSocketPresenter
 from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.new_tab_protocol_picker import TabProtocol
 from tests.helpers.qt_activation import (
@@ -75,7 +77,7 @@ class TestMainWindowWebSocketHotkeys(unittest.TestCase):
         presenter = self._make_presenter()
         tab = self._add_ws_tab(presenter)
         connect_spy = MagicMock()
-        tab.presenter._on_connect_clicked = connect_spy
+        tab.presenter.toggle_connection = connect_spy
 
         presenter.handle_f5_global()
 
@@ -292,7 +294,7 @@ class TestCtrlReturnF5RoutingWebSocket(unittest.TestCase):
         send_spy = MagicMock()
         connect_spy = MagicMock()
         self.tab.presenter.handle_send_message = send_spy
-        self.tab.presenter._on_connect_clicked = connect_spy
+        self.tab.presenter.toggle_connection = connect_spy
         return send_spy, connect_spy
 
     def _spy_open(self) -> tuple[MagicMock, MagicMock, MagicMock]:
@@ -561,7 +563,7 @@ class TestHotkeyRoutedLogging(unittest.TestCase):
         presenter = _make_tabs_presenter()
         tab = presenter.add_blank_websocket_tab(save_state=False)
         tab.presenter.handle_send_message = MagicMock()
-        tab.presenter._on_connect_clicked = MagicMock()
+        tab.presenter.toggle_connection = MagicMock()
         self.assertEqual(
             self._routed_lines(presenter, "F5"),
             ["hotkey_routed key=f5 tab_kind=websocket action=connect_toggle"],
@@ -1025,3 +1027,39 @@ class TestTabsPresenterDeadFacadesRemoved(unittest.TestCase):
                     f"TabsPresenter should not have dead facade method {method_name!r}",
                 )
 
+
+class TestWebSocketToggleConnectionAndRouterNaming(unittest.TestCase):
+    """PYPOST-1296: Verify public toggle_connection method and renamed router functions."""
+
+    @pytest.mark.timeout(10)
+    def test_websocket_presenter_exposes_public_toggle_connection(self) -> None:
+        """WebSocketPresenter must provide a public toggle_connection method."""
+        self.assertTrue(
+            hasattr(WebSocketPresenter, "toggle_connection"),
+            "WebSocketPresenter must expose public toggle_connection() method",
+        )
+        self.assertTrue(
+            callable(getattr(WebSocketPresenter, "toggle_connection", None)),
+            "WebSocketPresenter.toggle_connection must be callable",
+        )
+
+    @pytest.mark.timeout(10)
+    def test_router_functions_renamed_to_toggle(self) -> None:
+        """tabs_presenter_hotkeys must export handle_*_connect_toggle functions."""
+        self.assertTrue(
+            hasattr(tabs_presenter_hotkeys, "handle_websocket_connect_toggle"),
+            "tabs_presenter_hotkeys must define handle_websocket_connect_toggle",
+        )
+        self.assertTrue(
+            hasattr(tabs_presenter_hotkeys, "handle_mcp_client_connect_toggle"),
+            "tabs_presenter_hotkeys must define handle_mcp_client_connect_toggle",
+        )
+        routes = tabs_presenter_hotkeys._F5_ROUTES
+        self.assertEqual(
+            routes[TabProtocol.WEBSOCKET],
+            ("connect_toggle", tabs_presenter_hotkeys.handle_websocket_connect_toggle),
+        )
+        self.assertEqual(
+            routes[TabProtocol.MCP_CLIENT],
+            ("connect_toggle", tabs_presenter_hotkeys.handle_mcp_client_connect_toggle),
+        )

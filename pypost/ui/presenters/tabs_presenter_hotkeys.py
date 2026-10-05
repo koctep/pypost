@@ -64,12 +64,15 @@ def handle_ctrl_return_global(presenter: TabsPresenter) -> None:
     _dispatch("ctrl_return", presenter, _CTRL_RETURN_ROUTES)
 
 
-def handle_websocket_connect_global(presenter: TabsPresenter) -> bool:
+def handle_websocket_connect_toggle(presenter: TabsPresenter) -> bool:
     ws_tab = current_websocket_tab(presenter)
     if ws_tab is None or ws_tab.presenter is None:
         return False
-    ws_tab.presenter._on_connect_clicked()
+    ws_tab.presenter.toggle_connection()
     return True
+
+
+handle_websocket_connect_global = handle_websocket_connect_toggle
 
 
 def handle_websocket_send_message_global(presenter: TabsPresenter) -> bool:
@@ -87,7 +90,7 @@ def handle_websocket_format_json_global(presenter: TabsPresenter) -> None:
     ws_tab.composer.format_json_payload()
 
 
-def handle_mcp_client_connect_global(presenter: TabsPresenter) -> bool:
+def handle_mcp_client_connect_toggle(presenter: TabsPresenter) -> bool:
     mcp_tab = current_mcp_client_tab(presenter)
     if mcp_tab is None:
         return False
@@ -100,6 +103,9 @@ def handle_mcp_client_connect_global(presenter: TabsPresenter) -> bool:
     else:
         mcp_tab.presenter.connect_requested()
     return True
+
+
+handle_mcp_client_connect_global = handle_mcp_client_connect_toggle
 
 
 def handle_mcp_client_invoke_global(presenter: TabsPresenter) -> bool:
@@ -163,8 +169,8 @@ def _send_http_request(presenter: TabsPresenter) -> bool:
 
 # Single source of truth for global send-key routing: tab kind -> (log label, handler).
 _F5_ROUTES: _Routes = {
-    TabProtocol.MCP_CLIENT: ("connect_toggle", handle_mcp_client_connect_global),
-    TabProtocol.WEBSOCKET: ("connect_toggle", handle_websocket_connect_global),
+    TabProtocol.MCP_CLIENT: ("connect_toggle", handle_mcp_client_connect_toggle),
+    TabProtocol.WEBSOCKET: ("connect_toggle", handle_websocket_connect_toggle),
     TabProtocol.HTTP: ("send_request", _send_http_request),
 }
 _CTRL_RETURN_ROUTES: _Routes = {
