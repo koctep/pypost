@@ -224,6 +224,9 @@ guards, and `MainWindow` wiring:
 ```bash
 make test PYTEST_ARGS='tests/test_hotkeys.py tests/test_main_window_hotkeys.py -v'
 ```
+
+Window activation and simulated key click testing across test suites is standardized via
+`tests/helpers/qt_activation.py` (see [qt_activation_helper.md](qt_activation_helper.md)).
  
 ## Out of scope for help dialog
  

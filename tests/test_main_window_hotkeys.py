@@ -14,6 +14,11 @@ from pypost.ui.hotkeys import SECTION_ORDER
 from pypost.ui.presenters.tabs_presenter import TabsPresenter, WebSocketTab
 from pypost.ui.widgets.mcp_client import McpClientTab
 from pypost.ui.widgets.new_tab_protocol_picker import TabProtocol
+from tests.helpers.qt_activation import (
+    ACTIVATION_SKIP as _ACTIVATION_SKIP,
+    activate_window,
+    click_key,
+)
 from tests.test_request_save_orchestrator import _mock_save_dialog
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager
 
@@ -661,8 +666,6 @@ class TestProtocolSessionHelpRows(unittest.TestCase):
         self.assertEqual(bound, [], "documentation rows bind live shortcuts")
 
 
-_ACTIVATION_SKIP = "window activation unavailable on this QPA platform"
-
 # Help rows from collect_hotkey_rows(MainWindow) captured at 1b990ba5, excluding the
 # WS / MCP "Connect / Disconnect" rows (changed by PYPOST-1285).
 _EXPECTED_OTHER_HELP_ROWS: list[tuple[str, str]] = [
@@ -750,22 +753,13 @@ class TestMainWindowSendKeyWiring(unittest.TestCase):
         QApplication.processEvents()
 
     def _activate(self) -> None:
-        from PySide6.QtTest import QTest
-
-        self.window.show()
         self._shown = True
-        self.window.activateWindow()
-        if not QTest.qWaitForWindowActive(self.window, 2000):
-            pytest.skip(_ACTIVATION_SKIP)
-        self.focus_target.setFocus()
-        QApplication.processEvents()
+        activate_window(self.window, self.focus_target, timeout_ms=2000)
 
     def _click(self, key, modifier=None) -> None:
         from PySide6.QtCore import Qt
-        from PySide6.QtTest import QTest
 
-        QTest.keyClick(self.focus_target, key, modifier or Qt.KeyboardModifier.NoModifier)
-        QApplication.processEvents()
+        click_key(self.focus_target, key, modifier or Qt.KeyboardModifier.NoModifier)
 
     def test_f5_key_dispatches_f5_router_once(self):
         """F5 dispatches only to the F5 router."""
