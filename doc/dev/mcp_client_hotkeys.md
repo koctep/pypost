@@ -13,7 +13,7 @@ Keyboard focus does not matter
 
 | User action | Keys | Handler |
 | --- | --- | --- |
-| Connect / Disconnect | `F5` | `handle_f5_global` → `_F5_ROUTES[MCP_CLIENT]` → `handle_mcp_client_connect_global` (toggle by session state) |
+| Connect / Disconnect | `F5` | `handle_f5_global` → `_F5_ROUTES[MCP_CLIENT]` → `handle_mcp_client_connect_toggle` (toggle by session state) |
 | Invoke tool | `Ctrl+Return` | `handle_ctrl_return_global` → `_CTRL_RETURN_ROUTES[MCP_CLIENT]` → `handle_mcp_client_invoke_global` |
 | Focus URL | `Ctrl+L`, `Alt+D` | `handle_focus_url` |
 | Save / Save As | `Ctrl+S`, `Ctrl+Shift+S` | `McpClientTab` actions (PYPOST-1172) |
@@ -44,12 +44,14 @@ def current_mcp_client_tab(presenter: TabsPresenter) -> McpClientTab | None: ...
 def handle_f5_global(presenter: TabsPresenter) -> None: ...
 def handle_ctrl_return_global(presenter: TabsPresenter) -> None: ...
 # Route handlers: True when the action ran, False when no MCP tab is active.
-def handle_mcp_client_connect_global(presenter: TabsPresenter) -> bool: ...
+def handle_mcp_client_connect_toggle(presenter: TabsPresenter) -> bool: ...
 def handle_mcp_client_invoke_global(presenter: TabsPresenter) -> bool: ...
 ```
 
-`handle_mcp_client_connect_global` toggles despite its name. A rename is tracked in
-[PYPOST-1296](https://pypost.atlassian.net/browse/PYPOST-1296).
+`handle_mcp_client_connect_toggle` reflects bidirectional toggle semantics
+([PYPOST-1296](https://pypost.atlassian.net/browse/PYPOST-1296)). Backward-compatibility alias
+`handle_mcp_client_connect_global` is retained.
+
 
 ## Tests
 

@@ -304,11 +304,15 @@ class WebSocketPresenter(QObject):
         logger.info("websocket_disconnect_initiated session_id=%s", self._session_id)
         self._session_controller.close(1000, "user requested disconnect")
 
-    def _on_connect_clicked(self) -> None:
+    def toggle_connection(self) -> None:
+        """Toggle connection state between connected/connecting and disconnected."""
         if self.state in (SessionState.CONNECTING, SessionState.RECONNECTING, SessionState.OPEN):
             self.handle_disconnect()
         else:
             self.handle_connect()
+
+    def _on_connect_clicked(self) -> None:
+        self.toggle_connection()
 
     def handle_send_message(self) -> None:
         """Transmit the message in the composer over the active connection."""

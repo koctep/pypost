@@ -141,8 +141,8 @@ The route tables map the active tab kind (`TabProtocol`) to a `(log label, handl
 | Active tab | F5 (`_F5_ROUTES`) | Ctrl+Return (`_CTRL_RETURN_ROUTES`) |
 | --- | --- | --- |
 | HTTP | `_send_http_request` (`send_request`) | `_send_http_request` (`send_request`) |
-| WebSocket | `handle_websocket_connect_global` (`connect_toggle`) | `handle_websocket_send_message_global` (`send_message`) |
-| MCP Client | `handle_mcp_client_connect_global` (`connect_toggle`) | `handle_mcp_client_invoke_global` (`invoke_tool`) |
+| WebSocket | `handle_websocket_connect_toggle` (`connect_toggle`) | `handle_websocket_send_message_global` (`send_message`) |
+| MCP Client | `handle_mcp_client_connect_toggle` (`connect_toggle`) | `handle_mcp_client_invoke_global` (`invoke_tool`) |
 | none | no-op | no-op |
 
 - Routing depends **only** on `active_tab_kind`. Keyboard focus does not matter (the old
@@ -157,9 +157,13 @@ The route tables map the active tab kind (`TabProtocol`) to a `(log label, handl
   `TestHotkeyRoutedLogging::test_route_tables_cover_every_tab_kind` fails if a `TabProtocol` is
   missing.
 
-The WebSocket "connect" handler calls the private `_on_connect_clicked`, and the
-`*_connect_global` names actually toggle. A public toggle API and a rename are tracked in
-[PYPOST-1296](https://pypost.atlassian.net/browse/PYPOST-1296).
+### Public toggle API and router rename (PYPOST-1296)
+
+`WebSocketPresenter` provides `toggle_connection()` as a public method, replacing dependence on the
+private `_on_connect_clicked` UI button slot. The routing functions in `tabs_presenter_hotkeys.py`
+are named `handle_websocket_connect_toggle` and `handle_mcp_client_connect_toggle`, aligning with
+the `connect_toggle` routing action. Backward-compatibility aliases (`handle_*_connect_global`)
+are retained.
 
 ### Dispatch architecture and facade cleanup (PYPOST-1291)
 
