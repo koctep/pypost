@@ -288,6 +288,70 @@ def test_wire_presenter_signals_connects_env_domain_signals_to_mcp_controls() ->
 
 ---
 
+## Signal Stress, Benchmarking, and Wiring Idempotency (PYPOST-1242)
+
+To ensure stability under rapid user interactions and automated test runs, cross-presenter signal
+dispatch must be idempotent, resilient against burst activity, and bounded in latency.
+
+### 1. Wiring Idempotency Guard
+
+When UI components or test fixtures invoke `wire_presenter_signals(window)` multiple times on
+the same `MainWindow` instance, Qt signal-slot bindings could otherwise be registered repeatedly.
+Duplicate connections trigger duplicate handler execution (e.g., duplicate MCP server restarts or
+redundant cache refreshes).
+
+To prevent duplicate connections, `wire_presenter_signals` enforces an idempotency guard:
+
+```python
+def wire_presenter_signals(window: MainWindow) -> None:
+    """Connect collections, tabs, env, and history panel cross-presenter signals."""
+    if getattr(window, "_presenter_signals_wired", False) is True:
+        logger.debug("wire_presenter_signals_already_wired")
+        return
+    window._presenter_signals_wired = True  # type: ignore[attr-defined]
+    logger.debug("wire_presenter_signals_started")
+    ...
+```
+
+If `window._presenter_signals_wired` is already set, `wire_presenter_signals` logs
+`wire_presenter_signals_already_wired` at `DEBUG` level and immediately returns.
+
+### 2. High-Frequency Burst Stress Testing
+
+Burst stress and dispatch benchmarks are implemented in
+[`test_pypost_1242_failing_repro.py`](file:///home/src/tests/test_pypost_1242_failing_repro.py)
+to validate event loop stability under heavy loads:
+
+- **Sequential Switching Stress (`test_rapid_environment_switching_burst_stress`)**:
+  - Simulates 60 rapid, sequential environment dropdown selections across 5 mock environments.
+  - Verifies final state convergence between `EnvPresenter._env_selector` and
+    `McpControlsPresenter._active_environment`.
+  - Confirms zero signal dropouts and consistent active environment propagation.
+
+- **Variable Mutation Stress (`test_high_frequency_variable_update_burst`)**:
+  - Simulates 120 consecutive variable dictionary updates via `EnvPresenter.on_env_update`.
+  - Verifies that all 120 emitted `environment_updated` signals are dispatched without dropped
+    events, deadlocks, or corruption of the variable key-value storage.
+
+### 3. Latency Guardrails and Non-Blocking Event Pump
+
+During burst stress runs, asynchronous Qt events are processed synchronously using
+`QCoreApplication.processEvents()` after each emission. This drains pending signals and simulates
+real-world UI event loop dispatch.
+
+The benchmark asserts strict latency guardrails to catch event loop bottlenecks:
+
+| Metric | Guardrail Limit | Description |
+|---|---|---|
+| **Average Switch Latency** | <= 5.0 ms | Mean dispatch duration across 60 environment switches |
+| **Peak Update Latency** | <= 50.0 ms | Maximum duration observed across 120 variable updates |
+| **Batch Burst Duration** | <= 2.0 s | Cumulative limit for 60-switch or 120-update batch |
+
+These guardrails ensure that high-frequency background updates or rapid environment cycling do
+not degrade UI responsiveness or cause unbounded queue growth.
+
+---
+
 ## Troubleshooting
 
 - **MCP Tools Not Updating on Environment Switch**:
@@ -301,3 +365,6 @@ def test_wire_presenter_signals_connects_env_domain_signals_to_mcp_controls() ->
   - Verify `EnvPresenter._open_env_manager` emits `self.environment_manager_closed.emit()`.
   - Ensure `McpControlsPresenter.on_environment_manager_closed` executes and iterates over
     all current environments.
+- **Duplicate Slot Execution or Repeated Handler Calls**:
+  - Ensure signal wiring is performed via `main_window_signals.wire_presenter_signals(window)`.
+  - Verify `window._presenter_signals_wired` flag is respected to prevent duplicate connections.
