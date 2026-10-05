@@ -163,8 +163,33 @@ For release notes:
   the WS composer or invokes from the MCP invoke form. Ctrl+Return always sends / invokes. It
   never connects or disconnects, wherever focus is.
 
+## Ambiguous shortcut activation logging
+ 
+To prevent duplicate shortcut registrations from failing silently at runtime, secondary and
+group `QShortcut` instances created via `register_hotkey` and `register_hotkey_group` observe Qt's
+`QShortcut.activatedAmbiguously` signal.
+ 
+When Qt detects multiple competing handlers claiming the triggered key sequence, it emits this signal
+and `pypost/ui/hotkeys.py` logs a structured warning:
+ 
+```text
+hotkey_ambiguous key=<key_sequence>
+```
+ 
+This gives developers and operators immediate log visibility into key sequence conflicts.
+ 
+## Window-wide shortcut uniqueness guard
+ 
+To catch shortcut collisions at build and test time:
+ 
+- `pypost.ui.hotkeys.collect_live_shortcuts(root: QWidget) -> list[tuple[str, str, str]]` collects
+  all live key sequence bindings across `QShortcut` instances and functional `QAction` objects
+  attached to the window tree.
+- `TestMainWindowShortcutUniqueness` in `tests/test_main_window_hotkeys.py` asserts that zero duplicate
+  live key sequences exist across `MainWindow`.
+ 
 ## QAction metadata properties
-
+ 
 | Property | Purpose |
 | --- | --- |
 | `pypost_hotkey_section` | Section header (General, Tabs, Request Editor) |
@@ -172,23 +197,24 @@ For release notes:
 | `pypost_hotkey_alt_keys` | Extra key strings for display / alternate bindings |
 | `pypost_hotkey_collapse_keys` | Display as `Alt+1 ... Alt+9` when true |
 | `pypost_hotkey_label` | Help text override when menu text differs |
-
+ 
 ## Hotkeys dialog
-
+ 
 `HotkeysDialog(parent)` calls `collect_hotkey_rows(parent)` and renders a read-only table.
 The parent must be `MainWindow` (or a widget subtree containing tagged actions).
-
+ 
 ## Tests
-
+ 
 `tests/test_hotkeys.py` covers formatting, collection order, dialog population, and the
 documentation-row guards. `tests/test_main_window_hotkeys.py` covers send-key routing per tab
-kind, `hotkey_routed` logging and `MainWindow` wiring:
-
+kind, `hotkey_routed` logging, ambiguous activation warning logging, window-wide uniqueness
+guards, and `MainWindow` wiring:
+ 
 ```bash
 make test PYTEST_ARGS='tests/test_hotkeys.py tests/test_main_window_hotkeys.py -v'
 ```
-
+ 
 ## Out of scope for help dialog
-
+ 
 Shortcuts not registered via these helpers (e.g. F2 rename in environment list, Ctrl+F in
 response search) do not appear in Help → Hotkeys unless adopted later.

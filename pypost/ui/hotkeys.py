@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 
+from PySide6.QtCore import SIGNAL
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import QWidget
+
+logger = logging.getLogger(__name__)
 
 SECTION_PROPERTY = "pypost_hotkey_section"
 ORDER_PROPERTY = "pypost_hotkey_order"
@@ -135,6 +139,11 @@ def register_hotkey_documentation(
     return action
 
 
+def _on_shortcut_ambiguous(key: str) -> None:
+    """Log a warning when Qt detects an ambiguous shortcut activation."""
+    logger.warning("hotkey_ambiguous key=%s", key)
+
+
 def register_hotkey(
     parent: QWidget,
     *,
@@ -161,6 +170,9 @@ def register_hotkey(
     for alt_key in keys[1:]:
         shortcut = QShortcut(QKeySequence(alt_key), parent)
         shortcut.activated.connect(slot)
+        shortcut.activatedAmbiguously.connect(
+            lambda k=alt_key: _on_shortcut_ambiguous(k)
+        )
     return action
 
 
@@ -185,4 +197,51 @@ def register_hotkey_group(
     for key, slot in bindings:
         shortcut = QShortcut(QKeySequence(key), parent)
         shortcut.activated.connect(slot)
+        shortcut.activatedAmbiguously.connect(
+            lambda k=key: _on_shortcut_ambiguous(k)
+        )
     return action
+
+
+def collect_live_shortcuts(root: QWidget) -> list[tuple[str, str, str]]:
+    """Return all live key sequence bindings across root shortcuts and actions.
+
+    Returns a list of tuples: (normalized_key_string, context_description, owner_description).
+    """
+    native = QKeySequence.SequenceFormat.NativeText
+    results: list[tuple[str, str, str]] = []
+
+    # 1. QShortcut instances attached to root or its descendants
+    for shortcut in root.findChildren(QShortcut):
+        if not shortcut.isEnabled():
+            continue
+        key_str = shortcut.key().toString(native)
+        if not key_str:
+            continue
+        parent = shortcut.parent()
+        parent_name = (
+            parent.objectName() or parent.__class__.__name__
+            if parent is not None
+            else "unknown"
+        )
+        context = str(shortcut.context())
+        results.append((key_str, context, f"QShortcut({parent_name})"))
+
+    # 2. QAction instances attached to root or its descendants with active shortcuts
+    for action in root.findChildren(QAction):
+        if action.shortcut().isEmpty():
+            continue
+        # Documentation rows must not bind shortcuts; if they have receivers or triggers,
+        # count them as live actions
+        has_receiver = action.receivers(SIGNAL("triggered(bool)")) > 0
+        if not has_receiver and action.property(SECTION_PROPERTY):
+            # Pure untriggered documentation action
+            continue
+        key_str = action.shortcut().toString(native)
+        if not key_str:
+            continue
+        owner = action.text().replace("&", "") or str(action.property(LABEL_PROPERTY)) or "QAction"
+        context = str(action.shortcutContext())
+        results.append((key_str, context, f"QAction({owner})"))
+
+    return results
