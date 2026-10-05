@@ -219,11 +219,16 @@ The parent must be `MainWindow` (or a widget subtree containing tagged actions).
 `tests/test_hotkeys.py` covers formatting, collection order, dialog population, and the
 documentation-row guards. `tests/test_main_window_hotkeys.py` covers send-key routing per tab
 kind, `hotkey_routed` logging, ambiguous activation warning logging, window-wide uniqueness
-guards, and `MainWindow` wiring:
+guards, empty-tab-state invariants (`TestCtrlReturnF5RoutingHttp`), and `MainWindow` wiring:
  
 ```bash
 make test PYTEST_ARGS='tests/test_hotkeys.py tests/test_main_window_hotkeys.py -v'
 ```
+
+Empty-state hotkey behavior is verified via `TestCtrlReturnF5RoutingHttp::test_keys_noop_without_tabs`,
+which asserts that pressing F5 and Ctrl+Return with no open tabs performs a true no-op (maintains
+tab counts, leaves active tab as None, and records `hotkey_routed ... tab_kind=none action=noop`).
+All routing tests in this group include descriptive one-line docstrings and conformance checks.
 
 Window activation and simulated key click testing across test suites is standardized via
 `tests/helpers/qt_activation.py` (see [qt_activation_helper.md](qt_activation_helper.md)).
