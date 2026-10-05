@@ -98,6 +98,9 @@ class MetricsTrackingMixin:
     def track_mcp_client_connect(self, result: str) -> None:
         self._registry.track_mcp_client_connect(result)
 
+    def track_mcp_client_disconnect(self, reason: str) -> None:
+        self._registry.track_mcp_client_disconnect(reason)
+
     def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
         self._registry.track_mcp_client_list_tools(result, operation)
 

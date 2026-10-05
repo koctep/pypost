@@ -14,6 +14,7 @@ from pypost.core.lifecycle import (
     record_teardown_metrics,
     teardown_correlation_id,
 )
+from pypost.ui.widgets.mcp_client import McpClientTab
 
 if TYPE_CHECKING:
     from pypost.core.qt.worker import RequestWorker
@@ -99,6 +100,8 @@ def teardown(presenter: TabsPresenter, timeout_ms: int | None = None) -> Teardow
             tab = presenter._tabs.widget(index)
             if isinstance(tab, RequestTab):
                 request_tabs.append(tab)
+            elif isinstance(tab, McpClientTab):
+                tab.presenter.teardown()
         workers = [tab.worker for tab in request_tabs if tab.worker is not None]
         active_count = sum(int(worker.isRunning()) for worker in workers)
         pending_count = len(presenter._chunk_buffers) + len(

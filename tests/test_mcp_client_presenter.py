@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pypost.core.metrics_protocol import MetricsTrackerProtocol
-from pypost.models.mcp_client import McpClientConnection
+from pypost.core.metrics_protocol import MetricsTrackerProtocol, NullMetrics
+from pypost.models.mcp_client import McpClientConnection, McpClientSessionState
 from pypost.models.response import ResponseData
 from pypost.ui.presenters.mcp_client_presenter import McpClientPresenter
 
@@ -139,3 +139,146 @@ def test_refresh_initiated_log_omits_url_and_headers(caplog) -> None:
     joined = " ".join(messages)
     assert "http://" not in joined
     assert "headers" not in joined.lower()
+
+
+class _DisconnectRecorder(NullMetrics):
+    """Record session ends while retaining no-op metrics for other operations."""
+
+    def __init__(self) -> None:
+        self.reasons: list[str] = []
+
+    def track_mcp_client_disconnect(self, reason: str) -> None:
+        self.reasons.append(reason)
+
+
+@pytest.fixture
+def disconnect_presenter() -> tuple[McpClientPresenter, _DisconnectRecorder]:
+    metrics = _DisconnectRecorder()
+    presenter = McpClientPresenter(
+        McpClientConnection(url="http://example.invalid/mcp"),
+        metrics=metrics,
+    )
+    return presenter, metrics
+
+
+def _settle_connect(presenter: McpClientPresenter) -> None:
+    """Deliver a valid Connect result without starting a worker or transport."""
+    presenter._on_list_ok(
+        presenter._outbound_generation,
+        "connect",
+        ResponseData(
+            status_code=200,
+            headers={},
+            body='{"tools": []}',
+            elapsed_time=0.01,
+            size=13,
+        ),
+    )
+    assert presenter.state == McpClientSessionState.CONNECTED
+
+
+def test_disconnect_counts_once_per_established_session(disconnect_presenter) -> None:
+    presenter, metrics = disconnect_presenter
+    _settle_connect(presenter)
+
+    presenter.disconnect_requested()
+    assert presenter.state == McpClientSessionState.DISCONNECTED
+    assert metrics.reasons == ["user"]
+    presenter.disconnect_requested()
+    presenter.teardown()
+    assert metrics.reasons == ["user"]
+
+    _settle_connect(presenter)
+    presenter.disconnect_requested()
+    assert metrics.reasons == ["user", "user"]
+
+
+def test_teardown_counts_once_for_established_session(disconnect_presenter) -> None:
+    presenter, metrics = disconnect_presenter
+    _settle_connect(presenter)
+
+    presenter.teardown()
+    assert presenter.state == McpClientSessionState.DISCONNECTED
+    assert metrics.reasons == ["teardown"]
+    presenter.teardown()
+    presenter.disconnect_requested()
+    assert metrics.reasons == ["teardown"]
+
+
+def test_terminal_error_release_counts_once_for_established_session(disconnect_presenter) -> None:
+    presenter, metrics = disconnect_presenter
+    _settle_connect(presenter)
+
+    # Ordinary operation failures are nonterminal; exercise the release boundary.
+    presenter._release_session(reason="error")
+    assert presenter.state == McpClientSessionState.DISCONNECTED
+    assert metrics.reasons == ["error"]
+    presenter._release_session(reason="error")
+    presenter.teardown()
+    assert metrics.reasons == ["error"]
+
+
+def test_failed_connect_does_not_count_disconnect(disconnect_presenter, caplog) -> None:
+    presenter, metrics = disconnect_presenter
+    with caplog.at_level(logging.ERROR, logger="pypost.ui.presenters.mcp_client_presenter"):
+        presenter._on_list_error(presenter._outbound_generation, "connect", "connect failed")
+    assert "mcp_client_list_tools_failed" in caplog.text
+    assert presenter.state == McpClientSessionState.FAILED
+    presenter.disconnect_requested()
+    presenter.teardown()
+    assert metrics.reasons == []
+
+
+def test_cancelled_connect_does_not_count_disconnect(disconnect_presenter) -> None:
+    presenter, metrics = disconnect_presenter
+    presenter._state = McpClientSessionState.CONNECTING
+    presenter._list_in_flight = True
+
+    presenter.disconnect_requested()
+    presenter.teardown()
+    assert presenter.state == McpClientSessionState.DISCONNECTED
+    assert metrics.reasons == []
+
+
+def test_tracker_failure_does_not_interrupt_release(disconnect_presenter, caplog) -> None:
+    presenter, metrics = disconnect_presenter
+    _settle_connect(presenter)
+    presenter._tab = MagicMock()
+    worker = MagicMock()
+    presenter._worker = worker
+    metrics.track_mcp_client_disconnect = MagicMock(side_effect=RuntimeError("secret"))
+    with caplog.at_level(logging.WARNING, logger="pypost.ui.presenters.mcp_client_presenter"):
+        presenter.disconnect_requested()
+        presenter.teardown()
+    assert presenter.state == McpClientSessionState.DISCONNECTED
+    assert presenter._session is None
+    assert presenter._worker is None
+    presenter._tab.clear_tools.assert_called()
+    presenter._tab.clear_invoke.assert_called()
+    metrics.track_mcp_client_disconnect.assert_called_once_with("user")
+    assert "mcp_client_disconnect_metric_failed reason=user" in caplog.text
+    assert "secret" not in caplog.text
+
+
+def test_stale_connect_result_cannot_reestablish_released_session(disconnect_presenter) -> None:
+    presenter, metrics = disconnect_presenter
+    _settle_connect(presenter)
+    generation = presenter._outbound_generation
+    presenter.disconnect_requested()
+    presenter._on_list_ok(generation, "connect", _ok_response())
+    presenter.teardown()
+    assert presenter.state == McpClientSessionState.DISCONNECTED
+    assert metrics.reasons == ["user"]
+
+
+@pytest.mark.parametrize("kind", ["refresh", "invoke"])
+def test_nonterminal_error_does_not_count_disconnect(disconnect_presenter, caplog, kind) -> None:
+    presenter, metrics = disconnect_presenter
+    _settle_connect(presenter)
+    callback = presenter._on_list_error if kind == "refresh" else presenter._on_invoke_error
+    with caplog.at_level(logging.ERROR, logger="pypost.ui.presenters.mcp_client_presenter"):
+        callback(presenter._outbound_generation, kind, "operation failed")
+    event = "mcp_client_list_tools_failed" if kind == "refresh" else "mcp_client_call_tool_failed"
+    assert event in caplog.text
+    assert presenter.state == McpClientSessionState.CONNECTED
+    assert metrics.reasons == []

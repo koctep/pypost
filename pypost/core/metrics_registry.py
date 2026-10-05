@@ -448,6 +448,12 @@ class MetricsRegistry:
             ["result"],
             registry=self.registry,
         )
+        self.mcp_client_disconnect = Counter(
+            "mcp_client_disconnect_total",
+            "Established outbound MCP Client sessions ended by reason",
+            ["reason"],
+            registry=self.registry,
+        )
         self.mcp_client_list_tools = Counter(
             "mcp_client_list_tools_total",
             "Outbound MCP Client list_tools outcomes by Connect or Refresh",
@@ -617,6 +623,9 @@ class MetricsRegistry:
 
     def track_mcp_client_connect(self, result: str) -> None:
         self.mcp_client_connect.labels(result=result).inc()
+
+    def track_mcp_client_disconnect(self, reason: str) -> None:
+        self.mcp_client_disconnect.labels(reason=reason).inc()
 
     def track_mcp_client_list_tools(self, result: str, operation: str) -> None:
         self.mcp_client_list_tools.labels(

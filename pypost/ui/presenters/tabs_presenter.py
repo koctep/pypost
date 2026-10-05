@@ -323,6 +323,7 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             connection,
             env_vars=self._current_variables,
             hidden_keys=self._current_hidden_keys,
+            metrics=self._metrics,
         )
         tab = McpClientTab(connection, presenter)
         if make_mcp_client_saved_predicate(self._request_manager)(connection.id):

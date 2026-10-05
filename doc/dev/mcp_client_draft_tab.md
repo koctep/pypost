@@ -69,8 +69,8 @@ import `request_editor`. See
   `invoke_requested`, `set_variables` / `set_hidden_keys`,
   `resolve_outbound_fields` (GUI thread), sync `execute_outbound`,
   generation + `_list_in_flight` / `_invoke_in_flight`, and three apply
-  paths (Connect vs Refresh vs Invoke). Optional `metrics=` (factory
-  does not inject; `tabs_presenter.py` stays untouched). Lazy-imports
+  paths (Connect vs Refresh vs Invoke). Optional `metrics=` is injected
+  from `TabsPresenter._metrics` by the workspace factory. Lazy-imports
   `MCPClientService` (inject `mcp_client=` in tests).
 - **`mcp_client_arg_schema`**: Qt-free classifier (`simple_form` /
   `json_only` / `no_args`) and `list_arg_fields`.
@@ -341,7 +341,51 @@ drafts**, `confirm_close_websocket_draft` may prompt Discard / Keep
 before teardown ([websocket_draft_tab.md](websocket_draft_tab.md)).
 MCP Client drafts have no dirty-close prompt. Teardown bumps
 generation, drops the worker, clears tools, invoke chrome, and the
-result pane, and is idempotent when never connected.
+result pane. Repeated teardown is idempotent, including after a user
+disconnect. Profile-deletion close and application teardown also release
+MCP presenters through `teardown()` before removing their sessions.
+
+### Session-end counter (PYPOST-1289)
+
+`mcp_client_disconnect_total` counts established outbound tab sessions
+that end. An established session has `CONNECTED` state and a local
+session marker after successful Connect discovery. It is not an open
+transport: `MCPClientService.run` opens and closes a transport for each
+operation, and those transport exits do not count as tab disconnects.
+
+| Reason | Session-ending action |
+| --- | --- |
+| `user` | Disconnect button or F5 while connected. |
+| `error` | A terminal failure releases an established tab session. |
+| `teardown` | Tab close, profile deletion, or application teardown. |
+
+`McpClientPresenter._release_session(*, reason: str)` owns the count
+guard. It clears the session marker and state and invalidates callbacks
+before attempting emission, so repeated disconnect or teardown adds no
+count. A subsequent successful Connect creates a new countable session.
+Failed or cancelled Connect attempts, stale callbacks, and nonterminal
+Refresh or Invoke failures add no disconnect count. Current operation
+errors do not terminate an established session; `error` is supported and
+tested at the release boundary for future terminal-error callers.
+
+For lifecycle integrations, call `disconnect_requested()` for user
+action or `teardown()` for cleanup. Any future terminal-error path must
+use `_release_session(reason="error")` and synchronize the UI, rather
+than emit directly. The tracker API is
+`track_mcp_client_disconnect(reason: str) -> None`; callers must supply
+one of the three fixed reasons, never external input.
+
+The injected `MetricsTrackerProtocol` reaches `MetricsRegistry` through
+the Qt `MetricsTrackingMixin`, or `OtelMetricsTracker` for OpenTelemetry.
+Both export the same counter name with only a `reason` label/attribute;
+`NullMetrics` implements a no-op when metrics are disabled. The counter
+contains no connection identity, address, tool arguments, or credentials.
+
+Emission is best effort. Tracker exceptions produce
+`mcp_client_disconnect_metric_failed reason=...` at WARNING without the
+exception contents; worker and UI cleanup continues. There is no retry,
+so a failed emission can lose an increment. Aggregate counts do not
+encode individual start/end timestamps or guarantee session durations.
 
 `_request_tab_count` already includes `McpClientTab`. Closing the last
 HTTP tab while an MCP Client tab remains must not treat the strip as
@@ -580,8 +624,9 @@ connection and presenter.
 Builds `McpClientConnection()` + `McpClientPresenter` (with cached env
 kwargs) + `McpClientTab`, inserts before the plus tab with title
 **New MCP Client**, optionally calls `save_tabs_state` (which still
-omits the draft id). Does **not** pass `metrics=` (FILE_CAPS inventory;
-no growth this story). GUI tests inject `metrics=` on the presenter.
+omits the draft id). The shared `_insert_mcp_client_tab` factory passes
+`metrics=self._metrics` to both draft and saved-profile presenters.
+Isolated tests can inject their own tracker through `metrics=`.
 
 ### `TabsPresenter.close_tab(index)`
 
@@ -597,6 +642,9 @@ Otherwise `teardown()` if present, then `removeTab`. Empty strip calls
 
 No settings or environment variables for the draft shell.
 
+The session-end counter adds no configuration. Existing metrics backend
+and exporter settings apply; see [Prometheus monitoring](../prometheus_monitoring.md).
+
 Observability (no URL dumps, no header maps, no secrets, no tool names):
 
 | Event | Level | When |
@@ -604,6 +652,7 @@ Observability (no URL dumps, no header maps, no secrets, no tool names):
 | `mcp_client_connect_initiated` | INFO | Connect clicked (`connection_id`) |
 | `mcp_client_refresh_initiated` | INFO | Refresh clicked (`connection_id`) |
 | `mcp_client_disconnect_initiated` | INFO | Disconnect clicked (`connection_id`) |
+| `mcp_client_disconnect_metric_failed` | WARNING | Disconnect emission failed (`reason` only) |
 | `mcp_client_presenter_teardown` | INFO | `close_tab` teardown (`connection_id`) |
 | `mcp_client_list_tools_succeeded` | INFO | Parsed tools (`kind`, `tool_count`) |
 | `mcp_client_list_rejected` | WARNING | Empty resolved URL; no `run` |
@@ -630,14 +679,13 @@ Outbound Prometheus counters (distinct from inbound
 | Metric | Labels | Meaning |
 | --- | --- | --- |
 | `mcp_client_connect_total` | `result` | Connect settle only (`success` / `error`) |
+| `mcp_client_disconnect_total` | `reason` | Established session ended (`user`, `error`, `teardown`) |
 | `mcp_client_list_tools_total` | `result`, `operation` | Connect or Refresh settle |
 | `mcp_client_call_tool_total` | `result` | Invoke worker settle only |
 
 Stale worker results and client-side validation do not increment
-counters. Factory does not wire `TabsPresenter._metrics`; scrape of live
-GUI Connect / Invoke waits on a later `metrics=` injection
-([PYPOST-1184](https://pypost.atlassian.net/browse/PYPOST-1184) / Step 7
-note). Tests inject `MetricsRegistry`.
+counters. The workspace supplies `TabsPresenter._metrics` to the
+presenter; tests may inject `MetricsRegistry`.
 
 Picker still increments
 `gui_new_tab_actions_total{protocol=mcp_client}`.
@@ -669,6 +717,24 @@ Connect/Refresh errors or **Refreshing tools...**. Invoke errors and
 URL placeholder is `http://127.0.0.1:1080/mcp`.
 
 ## Troubleshooting
+
+### Disconnect count is missing or lower than expected
+
+Confirm Connect reached `CONNECTED` before the release and that the
+presenter received the configured tracker rather than `NullMetrics`.
+Check the existing exporter configuration and inspect
+`mcp_client_disconnect_total{reason="user"}` after a user disconnect.
+For a tracker failure, investigate the WARNING event
+`mcp_client_disconnect_metric_failed`; cleanup still completes and does
+not retry the lost increment. Do not call the tracker again from a close
+handler: all lifecycle routes must share the presenter's release guard.
+
+An absent `reason="error"` series is expected with current nonterminal
+Refresh/Invoke failures. Inspect their operation outcome counters instead.
+Repeated teardown, failed Connect, and cancelled Connect intentionally
+leave the disconnect count unchanged. Compare successful Connect counts
+with disconnects for aggregate activity; exact session duration requires
+additional time-based data that this counter does not collect.
 
 ### MCP Client confirm still looks like HTTP
 

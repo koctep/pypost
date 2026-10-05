@@ -75,6 +75,9 @@ def close_tabs_for_mcp_client_ids(
                 continue
         indices_to_close.append(i)
     for index in reversed(indices_to_close):
+        tab = presenter._tabs.widget(index)
+        if isinstance(tab, McpClientTab):
+            tab.presenter.teardown()
         presenter._tabs.removeTab(index)
     if presenter._request_tab_count() == 0:
         presenter.add_new_tab(save_state=False)
