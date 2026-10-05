@@ -27,6 +27,11 @@ def pytest_runtest_logreport(report: TestReport) -> None:
 def pytest_report_teststatus(report: TestReport, config):
     if report.when != "call":
         return None
+    if hasattr(report, "wasxfail"):
+        if report.skipped:
+            return "xfailed", "x", f"XFAIL [{format_duration(report.duration)}]"
+        if report.passed:
+            return "xpassed", "X", f"XPASS [{format_duration(report.duration)}]"
     letters = {"passed": ".", "failed": "F", "skipped": "s", "error": "E"}
     letter = letters.get(report.outcome, "?")
     word = f"{report.outcome.upper()} [{format_duration(report.duration)}]"

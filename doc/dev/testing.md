@@ -2079,12 +2079,16 @@ When adding an intentional error-path test that emits a new ERROR pattern, add a
 `tests/expected_log_allowlist.yaml` in the same PR. Prefer structured event prefixes
 (`request_execution_failed`, `mcp_operation_failed`, etc.) over raw message substrings.
 
-### Per-test duration display (PYPOST-790)
+### Per-test duration display (PYPOST-790 / PYPOST-1116)
 
 The in-repo plugin `tests/_pytest_plugins/duration_report.py` (loaded via `tests/conftest.py`)
 augments verbose pytest output:
 
 - Each completed test line shows **call duration**: `PASSED [1.23s]` or `FAILED [450ms]`.
+- Expected failures (`XFAIL [duration]`) and unexpected passes (`XPASS [duration]`) preserve
+  their native pytest categories (`xfailed` / `xpassed`) and status letters (`x` / `X`) rather
+  than being masked as plain skipped or passed (PYPOST-1116).
+- Terminal summary flags (`-ra`, `-rs`, `-rA`) correctly display xfail reasons and do not crash.
 - After the session, a **top 5 slowest tests** block is printed (sorted by call duration).
 
 This applies to `make test`, `pyproject.toml` pytest defaults, and CI. The existing `--durations=0`
