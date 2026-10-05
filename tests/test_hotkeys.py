@@ -1,5 +1,5 @@
 import pytest
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QWidget
 
 from pypost.ui.hotkeys import (
@@ -161,3 +161,38 @@ def test_focus_url_ctrl_l_not_ambiguous_with_protocol_doc_rows(qapp):
         assert spy.call_count == 1, "Alt+D guard regressed"
         ctx.click(Qt.Key.Key_L, Qt.KeyboardModifier.ControlModifier)
         assert spy.call_count == 2, "Ctrl+L did not reach the bound slot (ambiguous)"
+
+
+def test_collect_hotkey_rows_formats_all_keys_with_native_text(qapp, monkeypatch):
+    """PYPOST-1294: all displayed keys (primary, alt, group) use NativeText."""
+    root = QWidget()
+    register_hotkey(
+        root,
+        section="Request Editor",
+        label="Send Request",
+        keys=("F5", "Ctrl+Return"),
+        slot=lambda: None,
+        order=1,
+    )
+    register_hotkey_group(
+        root,
+        section="Tabs",
+        label="Switch to Tab 1-9",
+        bindings=tuple((f"Alt+{i}", lambda: None) for i in range(1, 10)),
+        order=1,
+        collapse_keys=True,
+    )
+
+    original_to_string = QKeySequence.toString
+
+    def fake_to_string(self, fmt=None):
+        if fmt == QKeySequence.SequenceFormat.NativeText:
+            raw = original_to_string(self, QKeySequence.SequenceFormat.PortableText)
+            return f"NATIVE({raw})"
+        return original_to_string(self, fmt)
+
+    monkeypatch.setattr(QKeySequence, "toString", fake_to_string)
+
+    rows = dict(collect_hotkey_rows(root))
+    assert rows["Send Request"] == "NATIVE(F5) / NATIVE(Ctrl+Return)"
+    assert rows["Switch to Tab 1-9"] == "NATIVE(Alt+1) ... NATIVE(Alt+9)"

@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import pytest
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QApplication
 
 from pypost.models.models import Collection
@@ -710,9 +711,23 @@ class TestProtocolSessionHelpRows(unittest.TestCase):
         self.assertEqual(bound, [], "documentation rows bind live shortcuts")
 
 
+def _to_native_spec(spec: str) -> str:
+    if not spec:
+        return ""
+    native = QKeySequence.SequenceFormat.NativeText
+    if " ... " in spec:
+        first, last = spec.split(" ... ")
+        return (
+            f"{QKeySequence(first).toString(native)} ... "
+            f"{QKeySequence(last).toString(native)}"
+        )
+    parts = spec.split(" / ")
+    return " / ".join(QKeySequence(p).toString(native) for p in parts)
+
+
 # Help rows from collect_hotkey_rows(MainWindow) captured at 1b990ba5, excluding the
 # WS / MCP "Connect / Disconnect" rows (changed by PYPOST-1285).
-_EXPECTED_OTHER_HELP_ROWS: list[tuple[str, str]] = [
+_EXPECTED_OTHER_HELP_ROWS_SPEC: list[tuple[str, str]] = [
     ("General", ""),
     ("Quit Application", "Ctrl+Q"),
     ("Settings", "Ctrl+, / F12"),
@@ -737,6 +752,10 @@ _EXPECTED_OTHER_HELP_ROWS: list[tuple[str, str]] = [
     ("MCP Client", ""),
     ("Invoke Tool", "Ctrl+Return"),
     ("Focus URL Bar", "Ctrl+L / Alt+D"),
+]
+
+_EXPECTED_OTHER_HELP_ROWS: list[tuple[str, str]] = [
+    (label, _to_native_spec(spec)) for label, spec in _EXPECTED_OTHER_HELP_ROWS_SPEC
 ]
 
 
