@@ -469,11 +469,15 @@ class TestCtrlReturnF5RoutingMcpClient(unittest.TestCase):
         self.assertEqual(self.disconnect_spy.call_count, 1)
 
 
+_ROUTING_LOGGER = "pypost.ui.presenters.tabs_presenter_hotkeys"
+
+
 @pytest.mark.usefixtures("qapp")
 class TestCtrlReturnF5RoutingHttp(unittest.TestCase):
     """PYPOST-1285 group C: HTTP regression guards."""
 
     def test_f5_sends_http_request(self):
+        """F5 with an active HTTP tab triggers sending the HTTP request."""
         presenter = _make_tabs_presenter()
         presenter.add_new_tab(save_state=False)
         tab = presenter._current_tab()
@@ -484,6 +488,7 @@ class TestCtrlReturnF5RoutingHttp(unittest.TestCase):
         send_spy.assert_called_once()
 
     def test_ctrl_return_sends_http_request(self):
+        """Ctrl+Return with an active HTTP tab triggers sending the HTTP request."""
         presenter = _make_tabs_presenter()
         presenter.add_new_tab(save_state=False)
         tab = presenter._current_tab()
@@ -494,13 +499,52 @@ class TestCtrlReturnF5RoutingHttp(unittest.TestCase):
         send_spy.assert_called_once()
 
     def test_keys_noop_without_tabs(self):
+        """F5 and Ctrl+Return with no open tabs do nothing and leave tab state empty."""
         presenter = _make_tabs_presenter()
         self.assertIsNone(presenter.active_tab_kind())
-        _press(presenter, "F5")
-        _press(presenter, "Ctrl+Return")
+        self.assertIsNone(presenter._current_tab())
+        self.assertEqual(presenter.widget.count(), 1)
+        with self.assertLogs(_ROUTING_LOGGER, level="DEBUG") as captured:
+            _press(presenter, "F5")
+            _press(presenter, "Ctrl+Return")
+        self.assertIsNone(presenter.active_tab_kind())
+        self.assertIsNone(presenter._current_tab())
+        self.assertEqual(presenter.widget.count(), 1)
+        routed = [r.getMessage() for r in captured.records if r.msg.startswith("hotkey_routed")]
+        self.assertEqual(
+            routed,
+            [
+                "hotkey_routed key=f5 tab_kind=none action=noop",
+                "hotkey_routed key=ctrl_return tab_kind=none action=noop",
+            ],
+        )
 
+    def test_routing_http_tests_conformance_and_docstrings(self):
+        """All tests in TestCtrlReturnF5RoutingHttp must have docstrings and assertions."""
+        import inspect
 
-_ROUTING_LOGGER = "pypost.ui.presenters.tabs_presenter_hotkeys"
+        for name in (
+            "test_f5_sends_http_request",
+            "test_ctrl_return_sends_http_request",
+            "test_keys_noop_without_tabs",
+        ):
+            method = getattr(self, name)
+            self.assertTrue(
+                bool(method.__doc__ and method.__doc__.strip()),
+                f"{name} is missing a docstring",
+            )
+
+        src = inspect.getsource(self.test_keys_noop_without_tabs)
+        self.assertIn(
+            "widget.count()",
+            src,
+            "test_keys_noop_without_tabs must assert widget.count()",
+        )
+        self.assertIn(
+            "hotkey_routed",
+            src,
+            "test_keys_noop_without_tabs must assert hotkey_routed log",
+        )
 
 
 @pytest.mark.usefixtures("qapp")
