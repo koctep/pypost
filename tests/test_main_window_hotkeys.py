@@ -833,3 +833,118 @@ class TestMainWindowSendKeyWiring(unittest.TestCase):
             if row[0] != "Connect / Disconnect"
         ]
         self.assertEqual(rows, _EXPECTED_OTHER_HELP_ROWS)
+
+
+@pytest.mark.usefixtures("qapp")
+class TestHotkeyAmbiguousLogging(unittest.TestCase):
+    """PYPOST-1290: ambiguous shortcut activations emit a warning log."""
+
+    def test_ambiguous_activation_on_registered_hotkey_logs_warning(self):
+        from PySide6.QtWidgets import QWidget
+
+        from pypost.ui.hotkeys import register_hotkey
+
+        root = QWidget()
+        try:
+            # register_hotkey creates QShortcut for keys[1:] (alt keys)
+            register_hotkey(
+                root,
+                section="General",
+                label="Action A",
+                keys=("Ctrl+Shift+Z", "F12"),
+                slot=lambda: None,
+                order=1,
+            )
+            # Find the created QShortcut
+            from PySide6.QtGui import QShortcut
+
+            shortcuts = root.findChildren(QShortcut)
+            self.assertTrue(shortcuts, "QShortcut was not created by register_hotkey")
+            shortcut = shortcuts[0]
+
+            with self.assertLogs("pypost.ui.hotkeys", level="WARNING") as log_ctx:
+                shortcut.activatedAmbiguously.emit()
+
+            self.assertTrue(
+                any(
+                    "hotkey_ambiguous key=F12" in record.getMessage()
+                    for record in log_ctx.records
+                ),
+                f"Expected warning log not found in: {[r.getMessage() for r in log_ctx.records]}",
+            )
+        finally:
+            root.deleteLater()
+
+
+@pytest.mark.usefixtures("qapp")
+class TestMainWindowShortcutUniqueness(unittest.TestCase):
+    """PYPOST-1290: all live window shortcuts must be bound at most once."""
+
+    def setUp(self) -> None:
+        from PySide6.QtWidgets import QWidget
+
+        from pypost.ui.hotkeys import collect_live_shortcuts
+        from pypost.ui.main_window import MainWindow
+
+        mock_tabs = MagicMock()
+        mock_collections = MagicMock()
+        with (
+            patch("pypost.ui.main_window.StorageManager"),
+            patch("pypost.ui.main_window.ConfigManager"),
+            patch("pypost.ui.main_window.RequestManager"),
+            patch("pypost.ui.main_window.StateManager") as mock_sm,
+            patch("pypost.ui.mcp_server_controller.MCPServerManager"),
+            patch(
+                "pypost.ui.main_window.CollectionsPresenter",
+                return_value=mock_collections,
+            ),
+            patch("pypost.ui.main_window.TabsPresenter", return_value=mock_tabs),
+            patch("pypost.ui.main_window.EnvPresenter") as mock_env_cls,
+            patch("pypost.ui.main_window.HistoryPanel", return_value=QWidget()),
+            patch("pypost.ui.main_window.wire_presenter_signals"),
+            patch("pypost.ui.main_window.MainWindow.apply_settings"),
+            patch(
+                "pypost.ui.main_window.resolve_encryption_enabled",
+                return_value=False,
+            ),
+        ):
+            mock_sm.return_value.settings = AppSettings()
+            mock_collections.panel = QWidget()
+            mock_tabs.widget = QWidget()
+            mock_env_cls.return_value.widget = QWidget()
+            self.window = MainWindow(
+                metrics=MagicMock(),
+                template_service=MagicMock(),
+                history_manager=MagicMock(),
+            )
+        self.collect_live_shortcuts = collect_live_shortcuts
+
+    def tearDown(self) -> None:
+        from pypost.core.lifecycle import TeardownResult
+
+        self.window._shutdown_for_exit = lambda: TeardownResult("main_window", "success", 0)
+        self.window.deleteLater()
+        QApplication.processEvents()
+
+    def test_collect_live_shortcuts_has_no_duplicates(self):
+        """MainWindow must have zero duplicate live key sequences across shortcuts and actions."""
+        live_bindings = self.collect_live_shortcuts(self.window)
+        seen: dict[str, list[str]] = {}
+        for key, context, owner in live_bindings:
+            seen.setdefault(key, []).append(f"{owner} ({context})")
+
+        duplicates = {k: v for k, v in seen.items() if len(v) > 1}
+        self.assertEqual(duplicates, {}, "Duplicate live key sequences found on MainWindow")
+
+    def test_collect_live_shortcuts_detects_deliberate_duplicate(self):
+        """Adding a duplicate QShortcut to MainWindow is caught by uniqueness check."""
+        from PySide6.QtGui import QKeySequence, QShortcut
+
+        extra_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self.window)
+        try:
+            live_bindings = self.collect_live_shortcuts(self.window)
+            ctrl_q_bindings = [b for b in live_bindings if b[0] == "Ctrl+Q"]
+            self.assertGreaterEqual(len(ctrl_q_bindings), 2, "Duplicate Ctrl+Q was not detected")
+        finally:
+            extra_shortcut.deleteLater()
+
