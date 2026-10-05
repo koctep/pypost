@@ -10,6 +10,7 @@ from pypost.core.template_expression_parser import (
     function_names,
     identifier_names,
     lex_template_expressions,
+    parse_function_argument,
     split_single_argument,
 )
 from pypost.core.template_expression_tokenizer import tokenize_template_expressions
@@ -269,9 +270,25 @@ class FunctionExpressionResolver:
         function_name: str,
         args: str,
     ) -> ValidationResult | None:
-        argument = self._extract_single_argument(args)
-        if argument is None:
+        parsed_arg = parse_function_argument(args)
+        if parsed_arg.has_multiple_arguments and not parsed_arg.is_malformed:
             return ValidationResult.error("invalid_arity", function_name)
+
+        if parsed_arg.is_malformed:
+            if self._FUNCTION_SIGNATURE_RE.fullmatch(args.strip()):
+                validation_error = self._validate_expression(args.strip())
+                if validation_error:
+                    if validation_error.code == "invalid_arity":
+                        return ValidationResult.error("invalid_argument", function_name)
+                    return validation_error
+            return ValidationResult.error("invalid_argument", function_name)
+
+        if parsed_arg.has_multiple_arguments:
+            return ValidationResult.error("invalid_arity", function_name)
+
+        argument = parsed_arg.argument
+        if argument is None:
+            return ValidationResult.error("invalid_argument", function_name)
 
         if self._SAFE_PATH_RE.fullmatch(argument):
             return None
