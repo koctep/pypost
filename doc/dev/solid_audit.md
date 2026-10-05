@@ -40,6 +40,7 @@ LOC baselines and caps so god-object regressions (especially `MainWindow` growth
 
 | Component | Responsibility |
 | --- | --- |
+| `Makefile` | Provide standard `baseline-metrics` and `check-baseline-metrics` targets |
 | `scripts/audit_baseline_metrics.py` | Define monitored paths and caps; measure and render |
 | `ai-tasks/PYPOST-376/baseline-metrics.md` | Store the canonical generated snapshot |
 | `tests/test_solid_audit_baseline.py` | Enforce caps and exact snapshot equality |
@@ -68,19 +69,18 @@ Authoritative generated snapshot (all module caps):
 **Regenerate snapshot:**
 
 ```bash
-.venv/bin/python scripts/audit_baseline_metrics.py \
-  --markdown ai-tasks/PYPOST-376/baseline-metrics.md
+make baseline-metrics
 ```
 
 **Verify caps (local or CI):**
 
 ```bash
-.venv/bin/python scripts/audit_baseline_metrics.py --check
+make check-baseline-metrics
 make test PYTEST_ARGS='tests/test_solid_audit_baseline.py -v'
 ```
 
-Use `--json PATH` when a machine-readable measurement report is needed. With no output flag,
-the command prints the canonical Markdown to stdout.
+Use `--json PATH` on `scripts/audit_baseline_metrics.py` when a machine-readable measurement
+report is needed. With no output flag, the command prints the canonical Markdown to stdout.
 
 ### Configuration and maintenance
 

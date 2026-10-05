@@ -35,6 +35,5 @@
 Regenerate:
 
 ```sh
-.venv/bin/python scripts/audit_baseline_metrics.py \
-  --markdown ai-tasks/PYPOST-376/baseline-metrics.md
+make baseline-metrics
 ```
