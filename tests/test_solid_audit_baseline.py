@@ -64,3 +64,29 @@ class TestSolidAuditBaseline(unittest.TestCase):
             [],
             msg="Baseline cap violations:\n" + "\n".join(violations),
         )
+
+    def test_regeneration_instructions_prescribe_make_target(self):
+        rendered = _baseline.format_markdown(_baseline.measure_all())
+        self.assertIn(
+            "make baseline-metrics",
+            rendered,
+            msg="Baseline markdown instructions should prescribe 'make baseline-metrics'",
+        )
+        self.assertNotIn(
+            ".venv/bin/python",
+            rendered,
+            msg="Baseline markdown instructions must not prescribe raw .venv invocations",
+        )
+
+    def test_makefile_defines_baseline_metrics_targets(self):
+        makefile_text = (_SCRIPTS.parent / "Makefile").read_text(encoding="utf-8")
+        self.assertIn(
+            "\nbaseline-metrics:",
+            makefile_text,
+            msg="Makefile must define baseline-metrics target",
+        )
+        self.assertIn(
+            "\ncheck-baseline-metrics:",
+            makefile_text,
+            msg="Makefile must define check-baseline-metrics target",
+        )

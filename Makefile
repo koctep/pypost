@@ -3,7 +3,8 @@
 	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
 	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
-	check-license-inventory lint-docs check-docs-links check-lock-all test-gui-batch
+	check-license-inventory lint-docs check-docs-links check-lock-all test-gui-batch \
+	baseline-metrics check-baseline-metrics
 
 .DEFAULT_GOAL := help
 
@@ -242,6 +243,13 @@ refresh-ci-duration-evidence: $(VENV_MARKER) ## Print agent-e2e overlap timings 
 
 check-ci-duration-evidence: $(VENV_MARKER) ## Verify testing.md documents CI duration refresh procedure
 	$(BIN)/python scripts/refresh_ci_duration_evidence.py --check
+
+baseline-metrics: $(VENV_MARKER) ## Regenerate baseline-metrics.md LOC snapshot
+	$(BIN)/python scripts/audit_baseline_metrics.py \
+		--markdown ai-tasks/PYPOST-376/baseline-metrics.md
+
+check-baseline-metrics: $(VENV_MARKER) ## Verify SOLID audit module inventory caps
+	$(BIN)/python scripts/audit_baseline_metrics.py --check
 
 clean: ## Remove virtual environment and Python cache directories
 	rm -rf $(VENV)
