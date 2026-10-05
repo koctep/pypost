@@ -29,7 +29,7 @@
 | `pypost/ui/presenters/collections_presenter.py` | — | 522 | 535 |
 | `pypost/ui/presenters/env_presenter.py` | — | 438 | 482 |
 | `pypost/ui/presenters/mcp_controls_presenter.py` | — | 370 | 407 |
-| `pypost/ui/presenters/tabs_presenter.py` | — | 1074 | 1165 |
+| `pypost/ui/presenters/tabs_presenter.py` | — | 1053 | 1165 |
 | `pypost/ui/widgets/mixins.py` | — | 396 | 411 |
 
 Regenerate:

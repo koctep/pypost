@@ -688,31 +688,10 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
             return
         tab_hotkeys.handle_ctrl_return_global(self)
 
-    def handle_websocket_connect_global(self) -> None:
-        if not self._admission_open():
-            return
-        tab_hotkeys.handle_websocket_connect_global(self)
-
-    def handle_websocket_send_message_global(self) -> None:
-        """Send the composer message on the active WebSocket tab."""
-        if not self._admission_open():
-            return
-        tab_hotkeys.handle_websocket_send_message_global(self)
-
     def handle_websocket_format_json_global(self) -> None:
         if not self._admission_open():
             return
         tab_hotkeys.handle_websocket_format_json_global(self)
-
-    def handle_mcp_client_connect_global(self) -> None:
-        if not self._admission_open():
-            return
-        tab_hotkeys.handle_mcp_client_connect_global(self)
-
-    def handle_mcp_client_invoke_global(self) -> None:
-        if not self._admission_open():
-            return
-        tab_hotkeys.handle_mcp_client_invoke_global(self)
 
     def handle_focus_url(self) -> None:
         if not self._admission_open():

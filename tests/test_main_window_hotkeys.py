@@ -71,7 +71,7 @@ class TestMainWindowWebSocketHotkeys(unittest.TestCase):
         connect_spy = MagicMock()
         tab.presenter._on_connect_clicked = connect_spy
 
-        presenter.handle_websocket_connect_global()
+        presenter.handle_f5_global()
 
         connect_spy.assert_called_once()
 
@@ -177,7 +177,7 @@ class TestMainWindowMcpClientHotkeys(unittest.TestCase):
         connect_spy = MagicMock()
         tab.presenter.connect_requested = connect_spy
 
-        presenter.handle_mcp_client_connect_global()
+        presenter.handle_f5_global()
 
         connect_spy.assert_called_once()
 
@@ -235,7 +235,7 @@ class TestMainWindowMcpClientHotkeys(unittest.TestCase):
         invoke_spy = MagicMock()
         tab.presenter.invoke_requested = invoke_spy
 
-        presenter.handle_mcp_client_invoke_global()
+        presenter.handle_ctrl_return_global()
 
         invoke_spy.assert_called_once()
 
@@ -947,4 +947,24 @@ class TestMainWindowShortcutUniqueness(unittest.TestCase):
             self.assertGreaterEqual(len(ctrl_q_bindings), 2, "Duplicate Ctrl+Q was not detected")
         finally:
             extra_shortcut.deleteLater()
+
+
+class TestTabsPresenterDeadFacadesRemoved(unittest.TestCase):
+    """PYPOST-1291: Verify uncalled facade methods are removed from TabsPresenter."""
+
+    @pytest.mark.timeout(10)
+    def test_uncalled_facade_methods_removed(self) -> None:
+        """TabsPresenter must not expose dead protocol-specific facade methods."""
+        uncalled_facades = (
+            "handle_websocket_connect_global",
+            "handle_websocket_send_message_global",
+            "handle_mcp_client_connect_global",
+            "handle_mcp_client_invoke_global",
+        )
+        for method_name in uncalled_facades:
+            with self.subTest(method=method_name):
+                self.assertFalse(
+                    hasattr(TabsPresenter, method_name),
+                    f"TabsPresenter should not have dead facade method {method_name!r}",
+                )
 

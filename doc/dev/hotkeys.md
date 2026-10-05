@@ -154,6 +154,17 @@ The WebSocket "connect" handler calls the private `_on_connect_clicked`, and the
 `*_connect_global` names actually toggle. A public toggle API and a rename are tracked in
 [PYPOST-1296](https://pypost.atlassian.net/browse/PYPOST-1296).
 
+### Dispatch architecture and facade cleanup (PYPOST-1291)
+
+`TabsPresenter` exposes `handle_f5_global()` and `handle_ctrl_return_global()` as the sole entry
+points for global shortcut triggers, delegating directly to `tabs_presenter_hotkeys.py`.
+
+The legacy protocol-specific facade methods (`handle_websocket_connect_global`,
+`handle_websocket_send_message_global`, `handle_mcp_client_connect_global`, and
+`handle_mcp_client_invoke_global`) were removed from `TabsPresenter`. Callers must trigger
+shortcuts via `handle_f5_global()` or `handle_ctrl_return_global()`, ensuring all dispatches pass
+through the route tables and emit structured `hotkey_routed` events.
+
 ### Behavior change (PYPOST-1285)
 
 For release notes:
