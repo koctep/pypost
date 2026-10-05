@@ -33,6 +33,31 @@ function catalog, the exact `jira-list-boards` pagination inputs and determinist
 and the deferred environment presenter's constructor seam. The existing focused tests retain
 runtime, fixture, and two-signal restore-order coverage.
 
+### Structural Markdown AST Verification (PYPOST-1259)
+
+The dialog audit report validator in `tests/test_pypost_1077_verification_artifacts.py`
+parses the audit report structurally using lightweight AST helpers:
+
+- `MarkdownSection`: dataclass encapsulating section `title`, heading `level`, and `content`.
+- `_parse_markdown_sections`: partitions documents into heading-bound sections, ignoring code
+  blocks and providing case-insensitive section lookups.
+- `_parse_markdown_table`: parses GitHub-Flavored Markdown tables into row dictionaries mapping
+  normalized column headers to cell text values.
+- `_normalize_prose`: collapses contiguous whitespace sequences and strips inline markdown
+  formatting (links, emphasis, inline code) for reflow-agnostic prose comparisons.
+
+This AST architecture decouples contract validation from formatting churn such as
+line-wrapping, table column padding, whitespace variations, and non-breaking heading
+reordering. At the same time, it strictly enforces semantic architectural invariants:
+
+1. **Complete inventory coverage:** all 9 dialog modules must appear exactly once.
+2. **Positive line counts:** valid numeric LOC for all rows, summing to 1,790 total LOC
+   and 486 LOC for `mcp_servers_dialog.py`.
+3. **MCP dialog distinction:** explicit categorization of the 3 MCP dialogs versus
+   standard dialogs.
+4. **Testability & verdict assertions:** all 9 modules present in testability summaries with
+   required audit verdicts and scope statements intact.
+
 ## Usage
 
 Run the focused offline verification through the Makefile:
