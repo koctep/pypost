@@ -9,6 +9,7 @@ from pypost.ui.hotkeys import (
     register_hotkey_group,
     tag_action,
 )
+from tests.helpers.qt_activation import ActivatedWindow as _ActivatedWindow
 
 pytestmark = pytest.mark.timeout(30)
 
@@ -86,48 +87,6 @@ def test_hotkeys_dialog_uses_parent_actions(qapp):
 # ---------------------------------------------------------------------------
 # PYPOST-1285: documentation rows must not make real shortcuts ambiguous
 # ---------------------------------------------------------------------------
-
-_ACTIVATION_SKIP = "window activation unavailable on this QPA platform"
-
-
-class _ActivatedWindow:
-    """Show and activate a bare QWidget with a focused QLineEdit; close on exit."""
-
-    def __enter__(self):
-        from PySide6.QtWidgets import QLineEdit, QVBoxLayout
-
-        self.window = QWidget()
-        self.line_edit = QLineEdit(self.window)
-        QVBoxLayout(self.window).addWidget(self.line_edit)
-        return self
-
-    def activate(self) -> None:
-        from PySide6.QtTest import QTest
-        from PySide6.QtWidgets import QApplication
-
-        self.window.show()
-        self.window.activateWindow()
-        if not QTest.qWaitForWindowActive(self.window, 2000):
-            pytest.skip(_ACTIVATION_SKIP)
-        self.line_edit.setFocus()
-        QApplication.processEvents()
-
-    def click(self, key, modifier=None) -> None:
-        from PySide6.QtCore import Qt
-        from PySide6.QtTest import QTest
-        from PySide6.QtWidgets import QApplication
-
-        QTest.keyClick(self.line_edit, key, modifier or Qt.KeyboardModifier.NoModifier)
-        QApplication.processEvents()
-
-    def __exit__(self, *_exc) -> None:
-        from PySide6.QtWidgets import QApplication
-
-        self.window.close()
-        QApplication.processEvents()
-        self.window.deleteLater()
-        QApplication.processEvents()
-
 
 def test_documentation_row_does_not_make_bound_shortcut_ambiguous(qapp):
     """E1: F5 / Ctrl+Return doc rows leave the real binding unambiguous."""
