@@ -36,15 +36,17 @@ def format_shortcut_display(keys: Sequence[str], *, collapse: bool = False) -> s
 
 
 def _keys_from_action(action: QAction) -> list[str]:
+    native = QKeySequence.SequenceFormat.NativeText
     alt = action.property(ALT_KEYS_PROPERTY)
-    if alt and action.shortcut().isEmpty():
-        return list(alt)
+    alt_keys = [QKeySequence(key).toString(native) for key in alt] if alt else []
+    if alt_keys and action.shortcut().isEmpty():
+        return alt_keys
     keys: list[str] = []
-    primary = action.shortcut().toString(QKeySequence.SequenceFormat.NativeText)
+    primary = action.shortcut().toString(native)
     if primary:
         keys.append(primary)
-    if alt:
-        keys.extend(alt)
+    if alt_keys:
+        keys.extend(alt_keys)
     return keys
 
 
@@ -96,12 +98,17 @@ def tag_action(
     if label:
         action.setProperty(LABEL_PROPERTY, label)
     if keys:
-        primary = action.shortcut().toString(QKeySequence.SequenceFormat.NativeText)
+        native = QKeySequence.SequenceFormat.NativeText
+        primary = action.shortcut().toString(native)
         if not primary:
             action.setShortcut(QKeySequence(keys[0]))
+            primary = action.shortcut().toString(native)
             extra = keys[1:]
         else:
-            extra = [key for key in keys if key != primary]
+            extra = [
+                key for key in keys
+                if QKeySequence(key).toString(native) != primary
+            ]
         if extra:
             action.setProperty(ALT_KEYS_PROPERTY, list(extra))
     if collapse_keys:

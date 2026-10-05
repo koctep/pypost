@@ -118,8 +118,15 @@ Guard tests:
 
 These guards cover display-only rows only. A window-wide check that every live key sequence is
 bound once is tracked in [PYPOST-1290](https://pypost.atlassian.net/browse/PYPOST-1290).
-Showing every Help key as native text is tracked in
-[PYPOST-1294](https://pypost.atlassian.net/browse/PYPOST-1294).
+
+### Platform-native text display (NativeText)
+
+All displayed keys collected for the Help dialog are normalized to platform-native text
+(`QKeySequence.SequenceFormat.NativeText`) in `_keys_from_action` (`pypost/ui/hotkeys.py`).
+This ensures that primary shortcuts, alternative keys (`ALT_KEYS_PROPERTY`), grouped bindings
+(`register_hotkey_group`), and display-only documentation rows (`register_hotkey_documentation`)
+all render with consistent native modifier symbols (e.g. ⌘ and ⌥ on macOS) and never mix
+portable text with native text.
 
 ## Send key routing (F5 / Ctrl+Return)
 
@@ -229,6 +236,12 @@ Empty-state hotkey behavior is verified via `TestCtrlReturnF5RoutingHttp::test_k
 which asserts that pressing F5 and Ctrl+Return with no open tabs performs a true no-op (maintains
 tab counts, leaves active tab as None, and records `hotkey_routed ... tab_kind=none action=noop`).
 All routing tests in this group include descriptive one-line docstrings and conformance checks.
+
+Platform-neutral snapshot verification is implemented in `TestMainWindowSendKeyWiring`:
+`_EXPECTED_OTHER_HELP_ROWS` transforms portable key specifications through `_to_native_spec`,
+ensuring snapshot assertions succeed across Linux, Windows, and macOS.
+Universal `NativeText` formatting across primary, alternative, and group keys is verified by
+`tests/test_hotkeys.py::test_collect_hotkey_rows_formats_all_keys_with_native_text`.
 
 Window activation and simulated key click testing across test suites is standardized via
 `tests/helpers/qt_activation.py` (see [qt_activation_helper.md](qt_activation_helper.md)).
