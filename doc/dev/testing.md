@@ -2002,6 +2002,47 @@ pytest tests/test_dialogs_audit.py -v
 Report: [ai-tasks/PYPOST-374/30-dialogs-audit-report.md](../../ai-tasks/PYPOST-374/30-dialogs-audit-report.md).
 See also [solid_audit.md](solid_audit.md#individual-dialog-audit-pypost-374).
 
+### Audit scripts CLI testing (PYPOST-1258)
+
+Dedicated unit test coverage in `tests/test_audit_scripts_cli.py` exercises CLI argument parsing,
+file exports, check modes, and error handling for both `scripts/audit_baseline_metrics.py` and
+`scripts/audit_dialogs_inventory.py`.
+
+#### Tested CLI flags and output contracts
+
+- `scripts/audit_baseline_metrics.py`:
+  - Default stdout output (no flags): prints canonical Markdown baseline metrics table.
+  - `--json PATH`: serializes monitored file LOC and class spans to a JSON file.
+  - `--markdown PATH`: renders Markdown baseline metrics report and writes to a file
+    (automatically creating parent directories when needed).
+  - Combined `--json PATH --markdown PATH`: exports both file formats in a single invocation.
+  - `--check`: validates monitored module lines against configured caps in `FILE_CAPS`.
+- `scripts/audit_dialogs_inventory.py`:
+  - Default stdout output (no flags): prints tab-separated (TSV) dialog inventory data.
+  - `--markdown`: formats dialog inventory into a Markdown table printed to stdout.
+  - `--json`: serializes dialog inventory modules and line counts to JSON on stdout.
+  - `--check`: validates that `ai-tasks/PYPOST-374/30-dialogs-audit-report.md` covers all dialogs.
+
+#### Exit code and stream validation contracts
+
+Tests run `main(argv)` with mocked or temporary file arguments and capture output via `capsys`:
+
+- **Exit code 0 (Success)**: Clean runs (`--check` passing, normal stdout output, or successful
+  file export). All normal output routes to stdout (or target files); stderr remains empty
+  (`captured.err == ""`).
+- **Exit code 1 (Check violation / missing report)**: `--check` failing cap thresholds or finding
+  missing dialog modules in the audit report returns exit code 1 and routes actionable error
+  diagnostics to stderr (`captured.err`).
+- **Exit code 2 (Invalid arguments)**: Unrecognized flags (e.g. `--invalid-flag`), missing
+  option arguments (e.g. `--json` without path), or unexpected positional arguments raise
+  `SystemExit(2)` from `argparse` with usage diagnostics routed to stderr.
+
+Focused test command:
+
+```bash
+make test PYTEST_ARGS='tests/test_audit_scripts_cli.py -v'
+```
+
 ## Error-path test logging (PYPOST-568)
 
 Many passing tests deliberately exercise failure paths (worker exceptions, retry

@@ -44,6 +44,7 @@ LOC baselines and caps so god-object regressions (especially `MainWindow` growth
 | `scripts/audit_baseline_metrics.py` | Define monitored paths and caps; measure and render |
 | `ai-tasks/PYPOST-376/baseline-metrics.md` | Store the canonical generated snapshot |
 | `tests/test_solid_audit_baseline.py` | Enforce caps and exact snapshot equality |
+| `tests/test_audit_scripts_cli.py` | CLI parsing, exports, checks, error handling (PYPOST-1258) |
 | `doc/dev/solid_audit.md` | Explain policy, maintenance, and summary values |
 
 `measure_all()` reads the configured modules, counts physical file lines, and uses the Python
