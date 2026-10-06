@@ -399,12 +399,29 @@ def get_worker_timeout(cli_timeout: float | str | None = None) -> float | None:
     2. WORKER_TIMEOUT environment variable
     3. DEFAULT_WORKER_TIMEOUT (30 seconds)
     """
+    timeout_env = os.environ.get("WORKER_TIMEOUT")
+    parsed_env: float | None = None
+    env_error: RunnerValidationError | None = None
+
+    if timeout_env is not None:
+        try:
+            parsed_env = parse_worker_timeout(timeout_env.strip(), "WORKER_TIMEOUT")
+        except RunnerValidationError as exc:
+            env_error = exc
+            logger.warning(
+                "invalid_worker_timeout_env value=%r error=%s",
+                timeout_env,
+                exc.message,
+            )
+
     if cli_timeout is not None:
         return parse_worker_timeout(cli_timeout, "--worker-timeout")
 
-    timeout_env = os.environ.get("WORKER_TIMEOUT")
+    if env_error is not None:
+        raise env_error
+
     if timeout_env is not None:
-        return parse_worker_timeout(timeout_env.strip(), "WORKER_TIMEOUT")
+        return parsed_env
 
     return DEFAULT_WORKER_TIMEOUT
 
