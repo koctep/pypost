@@ -20,8 +20,13 @@ EXIT_POLICY_TEST_FILE = TESTS_DIR / "test_pytest_exit_policy.py"
 MAKEFILE_TEST_FILE = TESTS_DIR / "test_makefile.py"
 SPLIT_MAKEFILE_TEST_FILES = (
     TESTS_DIR / "test_makefile_recipes.py",
-    TESTS_DIR / "test_makefile_lifecycle.py",
-    TESTS_DIR / "test_makefile_targets.py",
+    TESTS_DIR / "test_makefile_markers.py",
+    TESTS_DIR / "test_makefile_stamp_test_idempotency.py",
+    TESTS_DIR / "test_makefile_stamp_otel_idempotency.py",
+    TESTS_DIR / "test_makefile_install_stamp_contract.py",
+    TESTS_DIR / "test_makefile_exit_behavior.py",
+    TESTS_DIR / "test_makefile_target_install_test.py",
+    TESTS_DIR / "test_makefile_target_filtering.py",
 )
 
 
@@ -142,6 +147,7 @@ def _count_tests_in_file(path: Path) -> int:
     return count
 
 
+@pytest.mark.timeout(30)
 def test_pytest_exit_policy_timeout_budget() -> None:
     """Verify test_pytest_exit_policy.py defines adequate timeout budgets."""
     assert EXIT_POLICY_TEST_FILE.is_file(), f"{EXIT_POLICY_TEST_FILE} must exist"
@@ -176,6 +182,7 @@ def test_pytest_exit_policy_timeout_budget() -> None:
         )
 
 
+@pytest.mark.timeout(30)
 def test_makefile_split_files_exist_and_declare_bounded_timeouts() -> None:
     """Verify split Makefile test suite files exist and declare <= 60s timeouts."""
     for split_file in SPLIT_MAKEFILE_TEST_FILES:
@@ -190,6 +197,7 @@ def test_makefile_split_files_exist_and_declare_bounded_timeouts() -> None:
         )
 
 
+@pytest.mark.timeout(30)
 def test_makefile_monolithic_test_count_bounded() -> None:
     """Verify tests/test_makefile.py does not contain > 35 tests."""
     if not MAKEFILE_TEST_FILE.is_file():
@@ -202,13 +210,19 @@ def test_makefile_monolithic_test_count_bounded() -> None:
     )
 
 
+@pytest.mark.timeout(30)
 def test_makefile_suite_files_line_length() -> None:
     """Verify all modified/created Makefile test suite files have line length <= 100."""
     files_to_check = [
         TESTS_DIR / "makefile_test_helpers.py",
         TESTS_DIR / "test_makefile_recipes.py",
-        TESTS_DIR / "test_makefile_lifecycle.py",
-        TESTS_DIR / "test_makefile_targets.py",
+        TESTS_DIR / "test_makefile_markers.py",
+        TESTS_DIR / "test_makefile_stamp_test_idempotency.py",
+        TESTS_DIR / "test_makefile_stamp_otel_idempotency.py",
+        TESTS_DIR / "test_makefile_install_stamp_contract.py",
+        TESTS_DIR / "test_makefile_exit_behavior.py",
+        TESTS_DIR / "test_makefile_target_install_test.py",
+        TESTS_DIR / "test_makefile_target_filtering.py",
         TESTS_DIR / "test_makefile_slow_smoke.py",
         TESTS_DIR / "test_makefile_parallel_budget.py",
         TESTS_DIR / "test_pytest_exit_policy.py",
@@ -224,13 +238,19 @@ def test_makefile_suite_files_line_length() -> None:
     assert not long_lines, "Found lines exceeding 100 chars:\n" + "\n".join(long_lines)
 
 
+@pytest.mark.timeout(30)
 def test_makefile_suite_files_no_debug_prints() -> None:
     """Verify absence of debug print calls in Makefile test suite files."""
     files_to_check = [
         TESTS_DIR / "makefile_test_helpers.py",
         TESTS_DIR / "test_makefile_recipes.py",
-        TESTS_DIR / "test_makefile_lifecycle.py",
-        TESTS_DIR / "test_makefile_targets.py",
+        TESTS_DIR / "test_makefile_markers.py",
+        TESTS_DIR / "test_makefile_stamp_test_idempotency.py",
+        TESTS_DIR / "test_makefile_stamp_otel_idempotency.py",
+        TESTS_DIR / "test_makefile_install_stamp_contract.py",
+        TESTS_DIR / "test_makefile_exit_behavior.py",
+        TESTS_DIR / "test_makefile_target_install_test.py",
+        TESTS_DIR / "test_makefile_target_filtering.py",
         TESTS_DIR / "test_makefile_slow_smoke.py",
         TESTS_DIR / "test_makefile_parallel_budget.py",
         TESTS_DIR / "test_pytest_exit_policy.py",

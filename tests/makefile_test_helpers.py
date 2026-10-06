@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import fcntl
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 from pathlib import Path
@@ -70,6 +72,8 @@ def _run_make(
     timeout: int = 110,
     pytest_args: str | None = "",
 ) -> subprocess.CompletedProcess[str]:
+    if "clean" not in targets and not (workspace / ".venv").exists():
+        _materialize_prewarmed_venv(workspace)
     env = os.environ.copy()
     env.pop("PYTEST_ARGS", None)
     cmd = ["make", f"PYTHON={sys.executable}"]
@@ -353,15 +357,73 @@ def _assert_post_install_sanity(bin_python: Path) -> None:
         assert proc.returncode == 0, proc.stderr or proc.stdout
 
 
-@pytest.fixture
-def make_workspace(tmp_path: Path) -> Path:
-    shutil.copy(MAKEFILE, tmp_path / "Makefile")
-    scripts_dir = tmp_path / "scripts"
+_SHARED_BASE_VENV: Path | None = None
+
+
+def _get_shared_base_venv() -> Path:
+    global _SHARED_BASE_VENV
+    if _SHARED_BASE_VENV is not None and _SHARED_BASE_VENV.is_dir():
+        return _SHARED_BASE_VENV
+    base_dir = Path(tempfile.gettempdir()) / f"pypost_shared_base_venv_{PYTHON_VERSION}"
+    venv_dir = base_dir / ".venv"
+    marker = venv_dir / MARKER_NAME
+    if marker.is_file():
+        _SHARED_BASE_VENV = venv_dir
+        return _SHARED_BASE_VENV
+    lock_file = base_dir.with_suffix(".lock")
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_file, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            if not marker.is_file():
+                base_dir.mkdir(parents=True, exist_ok=True)
+                subprocess.run(
+                    [sys.executable, "-m", "venv", str(venv_dir)],
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    [
+                        str(venv_dir / "bin" / "python"),
+                        "-m",
+                        "pip",
+                        "install",
+                        "--quiet",
+                        "pytest>=8,<9",
+                        "flake8>=7,<8",
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+                marker.touch()
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+    _SHARED_BASE_VENV = venv_dir
+    return _SHARED_BASE_VENV
+
+
+def _materialize_prewarmed_venv(ws: Path) -> None:
+    base = _get_shared_base_venv()
+    target = ws / ".venv"
+    if not target.exists():
+        subprocess.run(
+            ["cp", "-al", str(base), str(target)],
+            check=True,
+            capture_output=True,
+        )
+
+
+@pytest.fixture(scope="class")
+def make_workspace(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    ws = tmp_path_factory.mktemp("ws")
+    shutil.copy(MAKEFILE, ws / "Makefile")
+    scripts_dir = ws / "scripts"
     scripts_dir.mkdir()
     shutil.copy(REPO_ROOT / "scripts" / "run_parallel_tests.py", scripts_dir)
-    _write_minimal_pyproject(tmp_path)
-    _seed_minimal_project(tmp_path)
-    return tmp_path
+    _write_minimal_pyproject(ws)
+    _seed_minimal_project(ws)
+    _materialize_prewarmed_venv(ws)
+    return ws
 
 
 @pytest.fixture

@@ -361,29 +361,41 @@ test-level timeouts are budgeted too tightly to absorb contention delays.
 
 ### Modular decomposition of monolithic suites
 
-In PYPOST-1234, the monolithic `tests/test_makefile.py` (952 lines, 65 tests, ~109s standalone
-execution) was decomposed into four focused, cohesive test suites:
+In PYPOST-1234 and PYPOST-1262, monolithic Makefile test suites (`tests/test_makefile.py`,
+and subsequently `tests/test_makefile_lifecycle.py` and `tests/test_makefile_targets.py`)
+were decomposed into focused, cohesive test suites to eliminate worker timeout failures:
 
 | Test suite module | Tests | Timeout | Scope / responsibilities |
 | --- | --- | --- | --- |
-| `tests/test_makefile_recipes.py` | 34 | 30s | Static checks, deps (`make -p`), lock files, help |
-| `tests/test_makefile_lifecycle.py` | 13 | 60s | Venv creation, clean, stamps, idempotency |
-| `tests/test_makefile_targets.py` | 11 | 60s | Target execution in isolated workspaces, exit codes |
-| `tests/test_makefile_slow_smoke.py` | 1 | 180s | Full pyproject install, imports (`@pytest.mark.slow`) |
+| `tests/test_makefile_recipes.py` | 34 | 30s | Static checks, deps (`make -p`), lock files |
+| `tests/test_makefile_markers.py` | 3 | 60s | Venv creation, clean, marker idempotency |
+| `tests/test_makefile_stamp_test_idempotency.py` | 4 | 60s | `.venv-test` stamp, skip-pip |
+| `tests/test_makefile_stamp_otel_idempotency.py` | 4 | 60s | `.venv-otel` stamp, skip-pip |
+| `tests/test_makefile_install_stamp_contract.py` | 2 | 60s | `make install` double stamp |
+| `tests/test_makefile_exit_behavior.py` | 3 | 60s | Clean exit 0, unknown targets exit nonzero |
+| `tests/test_makefile_target_install_test.py` | 4 | 60s | Tool install, pyproject, test run |
+| `tests/test_makefile_target_filtering.py` | 4 | 60s | Marker filtering, PYTEST_ARGS narrowing |
+| `tests/test_makefile_slow_smoke.py` | 1 | 180s | Full pyproject install (`@pytest.mark.slow`) |
 
 This decomposition splits the heavy Makefile test load across multiple worker processes during
-`make test`, cutting peak per-worker duration to ~25–60s under full parallel load and establishing
-a healthy >50% safety margin below the 120s ceiling. The slow smoke test is marked
-`@pytest.mark.slow` and isolated from fast `make test` runs, executing exclusively under
-`make test-slow`.
+`make test`, cutting peak per-worker duration to ~15–35s under full parallel load and establishing
+a robust margin below the 120s ceiling. The slow smoke test is marked `@pytest.mark.slow` and
+isolated from fast `make test` runs, executing exclusively under `make test-slow`.
 
-### Shared helper centralization
+### Shared helper centralization and pre-warmed virtualenv caching (PYPOST-1262)
 
 Shared workspace fixtures (`make_workspace`, `make_workspace_full_deps`), subprocess execution
 wrappers (`_run_make`, `_prerequisites`), pyproject seed generators, and post-install assertions
-were extracted into `tests/makefile_test_helpers.py`. This centralizes common fixture machinery,
-eliminates duplicate code across modular suites, and provides a stable import location for
-contract guards like `tests/test_makefile_install_seed_contract.py`.
+are centralized in `tests/makefile_test_helpers.py`.
+
+In PYPOST-1262, a pre-warmed virtual environment cache was introduced to prevent heavy
+contention from concurrent `python -m venv` and `pip install` operations:
+- A shared base virtualenv is initialized once in `/tmp/pypost_shared_base_venv_<PYTHON_VERSION>`
+  guarded by an exclusive file lock (`fcntl.flock(lock, fcntl.LOCK_EX)`).
+- Workspaces materialize the pre-warmed environment using `cp -al` (hardlinks) in milliseconds.
+- Class-scoped `make_workspace` fixtures reuse workspaces across tests in the same test class.
+This caching, combined with file decomposition, guarantees that each Makefile test file completes
+reliably within the 120s parallel worker timeout under full 8-worker parallel load.
 
 ### Subprocess timeout budgeting under contention
 

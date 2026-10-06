@@ -1415,13 +1415,42 @@ See `ai-tasks/PYPOST-88/70-dev-docs.md` for the full procedure.
 ## Makefile automation tests
 
 Root `Makefile` contracts are validated by modular test suites without touching the repository
-`.venv`. In PYPOST-1234, the monolithic `tests/test_makefile.py` was decomposed into focused
-suites to distribute execution across parallel runner workers and prevent worker timeouts:
+`.venv`. In PYPOST-1234, the monolithic `tests/test_makefile.py` was decomposed into focused suites.
+In PYPOST-1262, under full-suite parallel load, `tests/test_makefile_lifecycle.py` (13 tests) and
+`tests/test_makefile_targets.py` (11 tests) exceeded the 120s worker timeout (`WORKER_TIMEOUT=120`)
+due to cumulative virtualenv creation and `pip install` subprocess execution under worker
+contention. To guarantee deterministic execution well within the 120s worker timeout, they were
+further decomposed into 7 focused files (all with `pytestmark = pytest.mark.timeout(60)`):
 
 - `tests/test_makefile_recipes.py`: static recipe syntax, dependency graphs (`make -p`), lock files.
-- `tests/test_makefile_lifecycle.py`: virtual environment marker creation, `clean`, stamp tracking.
-- `tests/test_makefile_targets.py`: target execution in isolated temporary workspaces, exit codes.
+- `tests/test_makefile_markers.py`: virtualenv marker creation, `clean`, and marker idempotency.
+- `tests/test_makefile_stamp_test_idempotency.py`: `.venv-test` stamp invalidation and skip-pip.
+- `tests/test_makefile_stamp_otel_idempotency.py`: `.venv-otel` stamp invalidation and skip-pip.
+- `tests/test_makefile_install_stamp_contract.py`: `make install` double-stamp touch and contracts.
+- `tests/test_makefile_exit_behavior.py`: exit codes on clean, unknown targets, bare-venv lint.
+- `tests/test_makefile_target_install_test.py`: tool install, minimal pyproject, test execution.
+- `tests/test_makefile_target_filtering.py`: marker filtering, PYTEST_ARGS narrowing, lint.
 - `tests/test_makefile_slow_smoke.py`: slow editable install smoke with real `pyproject.toml`.
+
+### Pre-warmed shared base virtualenv caching (PYPOST-1262)
+
+To eliminate repetitive, slow `python -m venv` creations and package wheel extractions during
+parallel test execution, `tests/makefile_test_helpers.py` provides a pre-warmed shared virtualenv
+mechanism:
+
+- **Shared base caching (`_get_shared_base_venv`)**: Creates a base virtualenv in
+  `/tmp/pypost_shared_base_venv_<PYTHON_VERSION>` once with pre-installed `pytest` and `flake8`.
+  Concurrent process initialization is coordinated safely across test workers using an exclusive
+  file lock via `fcntl.flock(lock, fcntl.LOCK_EX)`.
+- **Fast hardlink workspace materialization (`_materialize_prewarmed_venv`)**: Workspaces
+  materialize their `.venv` using `cp -al <shared_base> <workspace>/.venv`, which creates hardlinks
+  for virtualenv files in single-digit milliseconds without copying data blocks or invoking pip.
+- **Class-scoped workspace fixture**: The `make_workspace` fixture uses `scope="class"`, sharing
+  the materialized workspace across related tests within a test class while keeping test classes
+  isolated.
+- **Worker timeout headroom**: By reducing per-file execution times from 90–120s down to ~15–35s,
+  every modular Makefile test suite completes reliably within the 120s parallel worker timeout
+  even under heavy 8-worker contention.
 
 Shared static parsers for `##` help lines and target recipe bodies live in
 `tests/makefile_contract_helpers.py` (`makefile_target_help_comment`,
@@ -1460,6 +1489,7 @@ tasks to avoid duplicate fixtures:
 | [PYPOST-938] | KEEP 873-style packaging doc locks; revisit criteria documented |
 | [PYPOST-954] | Shared `packaging_doc_lock` helper; UI-action MCP packaging locks hardened |
 | [PYPOST-1234] | Split monolithic test_makefile.py into focused suites and budget timeouts |
+| [PYPOST-1262] | Decompose lifecycle/targets into 7 files + pre-warmed venv caching |
 
 [PYPOST-274]: https://pypost.atlassian.net/browse/PYPOST-274
 [PYPOST-277]: https://pypost.atlassian.net/browse/PYPOST-277
@@ -1488,6 +1518,7 @@ tasks to avoid duplicate fixtures:
 [PYPOST-938]: https://pypost.atlassian.net/browse/PYPOST-938
 [PYPOST-954]: https://pypost.atlassian.net/browse/PYPOST-954
 [PYPOST-1234]: https://pypost.atlassian.net/browse/PYPOST-1234
+[PYPOST-1262]: https://pypost.atlassian.net/browse/PYPOST-1262
 
 | Area | What is checked |
 | ---- | ---------------- |
@@ -1500,7 +1531,7 @@ tasks to avoid duplicate fixtures:
 | Slow smoke seed contract | Isolated workspace seed mirrors packaging metadata from committed `pyproject.toml` (dynamic version attr, readme), not only dependency pins (PYPOST-943) |
 | Help output | `make help` exits 0 and prints non-empty stdout (PYPOST-800) |
 | Agent e2e target | deps (`venv-test` + `venv-otel`), help listing, recipe marker, selection smoke (861/872) |
-| Parallel budget & bounds | Modular test bounds, exit-policy subprocess timeouts (PYPOST-1234) |
+| Parallel budget & bounds | Modular test bounds, venv cache, timeouts (PYPOST-1234 / PYPOST-1262) |
 
 ### Packaging doc lock strategy (PYPOST-922 / PYPOST-938 / PYPOST-954)
 
@@ -1668,8 +1699,13 @@ make test PYTEST_ARGS='tests/test_makefile_install_seed_contract.py -v'
 
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
-  tests/test_makefile_recipes.py tests/test_makefile_lifecycle.py \
-  tests/test_makefile_targets.py -v
+  tests/test_makefile_recipes.py tests/test_makefile_markers.py \
+  tests/test_makefile_stamp_test_idempotency.py \
+  tests/test_makefile_stamp_otel_idempotency.py \
+  tests/test_makefile_install_stamp_contract.py \
+  tests/test_makefile_exit_behavior.py \
+  tests/test_makefile_target_install_test.py \
+  tests/test_makefile_target_filtering.py -v
 ```
 
 Slow install smoke (network-heavy; excluded from default `make test` and main CI job):
@@ -2161,8 +2197,11 @@ python scripts/audit_test_durations.py tests.txt
 - Re-run `scripts/parse_timeout_audit.py` when adding e2e/integration tests that may shift
   duration baselines (PYPOST-669).
 - Monolithic `tests/test_makefile.py` was decomposed into modular suites in PYPOST-1234
-  (`test_makefile_recipes.py`, `test_makefile_lifecycle.py`, `test_makefile_targets.py`,
-  and `test_makefile_slow_smoke.py`) with explicit per-module timeout budgets (<= 30–60s) to
+  and further decomposed into 7 focused suites in PYPOST-1262 (`test_makefile_markers.py`,
+  `test_makefile_stamp_test_idempotency.py`, `test_makefile_stamp_otel_idempotency.py`,
+  `test_makefile_install_stamp_contract.py`, `test_makefile_exit_behavior.py`,
+  `test_makefile_target_install_test.py`, `test_makefile_target_filtering.py`) with
+  explicit per-module timeout budgets (<= 60s) and pre-warmed virtualenv caching to
   guarantee execution well under the 120s worker timeout ceiling during parallel contention.
 - Optional verbose CI job: `--durations=10 --durations-min=5` on manual/workflow_dispatch runs
   (PYPOST-667).
