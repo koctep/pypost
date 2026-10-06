@@ -144,10 +144,10 @@ Make still use 30 unless overridden with a positive finite value or explicit `no
 Do not use bare `--timeout` as an orchestrator flag: pytest-timeout owns that name, and the
 parser forwards it into every worker.
 
-### `get_worker_timeout()` API and validation rules (PYPOST-1199)
+### `get_worker_timeout()` API and validation rules (PYPOST-1199 / PYPOST-1260)
 
-`get_worker_timeout` is a pure, side-effect-free resolver at
-[`scripts/run_parallel_tests.py`](file:///home/src/scripts/run_parallel_tests.py#L128-L148).
+`get_worker_timeout` resolves the effective per-worker timeout at
+[`scripts/run_parallel_tests.py`](file:///home/src/scripts/run_parallel_tests.py#L394-L427).
 
 ```python
 DEFAULT_WORKER_TIMEOUT: float = 30.0
@@ -173,6 +173,18 @@ def get_worker_timeout(cli_timeout: float | str | None = None) -> float | None:
 `get_worker_timeout` raises `RunnerValidationError` for an invalid supplied value. It returns
 `None` only for explicit `none`, which is the sole unbounded mode.
 
+#### Diagnostic logging for malformed environment timeout (PYPOST-1260)
+
+When `WORKER_TIMEOUT` in the environment is invalid or malformed:
+
+- A warning log (`invalid_worker_timeout_env value=%r error=%s`) is emitted to `stderr` via
+  `logging.getLogger("scripts.run_parallel_tests")`.
+- When an explicit CLI `--worker-timeout` is provided, it takes precedence, but the invalid
+  environment setting is not silently ignored—the diagnostic warning ensures CI configuration
+  typos are visible in job output.
+- When no CLI argument is provided, `RunnerValidationError` is raised following the warning log,
+  maintaining fail-closed behavior before test discovery or worker dispatch occurs.
+
 **CLIParser flag handling** — two equivalent invocation styles are accepted:
 
 ```bash
@@ -183,18 +195,24 @@ scripts/run_parallel_tests.py --worker-timeout=42.5  # equals-separated
 A bare `--worker-timeout` with no following value is rejected with a configuration error; it does
 not fall through to env/default.
 
-### Test coverage for `get_worker_timeout` (PYPOST-1199)
+### Test coverage for `get_worker_timeout` (PYPOST-1199 / PYPOST-1260)
 
 Unit tests live in
-[`tests/test_run_parallel_tests.py`](file:///home/src/tests/test_run_parallel_tests.py#L163-L244)
-and cover the full precedence matrix via `@pytest.mark.parametrize`:
+[`test_run_parallel_tests.py`](file:///home/src/tests/test_run_parallel_tests.py)
+and
+[`test_pypost_1260_failing_repro.py`](file:///home/src/tests/test_pypost_1260_failing_repro.py).
+They cover the full precedence matrix and diagnostic warning logs:
 
-| Test | What it verifies |
-| --- | --- |
-| `test_get_worker_timeout_precedence` | CLI overrides env; env overrides default; default applies when both absent |
-| `test_get_worker_timeout_rejects_invalid_cli_values` | `0.0`, `-5.0`, and `-1.0` raise instead of being replaced by env/default |
-| `test_get_worker_timeout_rejects_invalid_env_values` | Invalid environment values raise when no valid CLI timeout takes precedence |
-| `test_cli_parser_worker_timeout_flags` | Space-separated and equals-separated values work; a missing value is rejected |
+- `test_get_worker_timeout_precedence`: CLI overrides env; env overrides default;
+  default applies when both absent.
+- `test_get_worker_timeout_rejects_invalid_cli_values`: `0.0`, `-5.0`, and `-1.0`
+  raise instead of falling through to env/default.
+- `test_get_worker_timeout_rejects_invalid_env_values`: invalid environment values
+  raise when no CLI timeout takes precedence.
+- `test_get_worker_timeout_warns_on_invalid_env_with_cli_override`: invalid
+  environment emits diagnostic warning even with CLI override.
+- `test_cli_parser_worker_timeout_flags`: space-separated and equals-separated
+  flags work; missing value is rejected.
 
 All tests use `monkeypatch.setenv` / `monkeypatch.delenv` — no environment state leaks across
 test boundaries.
@@ -309,6 +327,7 @@ On `subprocess.TimeoutExpired`:
 
 | Level | Event | Fields |
 | --- | --- | --- |
+| WARNING | `invalid_worker_timeout_env` | `value`, `error` (diagnostic on malformed env timeout) |
 | WARNING | `worker_timeout` | `file`, `timeout_seconds` (primary operator signal at kill time) |
 | INFO | `test_file_completed` | `status=timed_out`, plus usual completion fields |
 | ERROR | `test_file_timed_out` | `file`, `exit_code`, `duration_seconds` (FAILURES pass; distinct from `test_file_failed`) |
@@ -316,6 +335,7 @@ On `subprocess.TimeoutExpired`:
 Example:
 
 ```text
+WARNING invalid_worker_timeout_env value='abc' error=WORKER_TIMEOUT received 'abc'
 WARNING worker_timeout file=tests/test_hang.py timeout_seconds=30.0
 ```
 
@@ -476,6 +496,12 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py \
 - `ai-tasks/PYPOST-1197/60-tech-debt.md` — process group isolation and technical debt analysis
 - `ai-tasks/PYPOST-1199/10-requirements.md` — requirements for `get_worker_timeout` precedence unit tests
 - `ai-tasks/PYPOST-1199/20-architecture.md` — architecture and parameterized test matrices for timeout resolution
+- `ai-tasks/PYPOST-1260/10-requirements.md` — requirements for diagnostic logging on
+  malformed `WORKER_TIMEOUT`
+- `ai-tasks/PYPOST-1260/20-architecture.md` — architecture design for non-blocking
+  diagnostic warnings
+- `ai-tasks/PYPOST-1260/50-observability.md` — structured logging specification for
+  `invalid_worker_timeout_env`
 
 ## PYPOST-1153 maintainability contracts
 
