@@ -24,9 +24,11 @@ the declarations below without contacting Jira or another external service.
 - **Encrypted-startup restore gate:** the `MainWindow` two-signal readiness barrier is covered
   by `tests/test_main_window_encrypted_startup.py`.
 
-The dialog report is documentation-as-contract. It must match discovery exactly: nine modules,
-1,790 LOC, and one `mcp_servers_dialog.py` entry at 486 LOC. Its three-MCP-dialog summary,
-testability table, and completion verdict must describe that same inventory.
+The dialog report is documentation-as-contract. It must match discovery exactly: every expected
+module name, per-module LOC, total LOC, and module count is derived from
+`discover_dialog_modules()` at test time, so the validator pins no snapshot figures. Its
+three-MCP-dialog summary, testability table, and completion verdict must describe that same
+inventory.
 
 The other validators parse test artifacts with Python ASTs. They lock the approved four-name
 function catalog, the exact `jira-list-boards` pagination inputs and deterministic call values,
@@ -50,13 +52,51 @@ This AST architecture decouples contract validation from formatting churn such a
 line-wrapping, table column padding, whitespace variations, and non-breaking heading
 reordering. At the same time, it strictly enforces semantic architectural invariants:
 
-1. **Complete inventory coverage:** all 9 dialog modules must appear exactly once.
-2. **Positive line counts:** valid numeric LOC for all rows, summing to 1,790 total LOC
-   and 486 LOC for `mcp_servers_dialog.py`.
+1. **Complete inventory coverage:** every discovered dialog module appears exactly once; each
+   missing, unknown, or duplicated module is reported by name.
+2. **Discovered line counts:** every row LOC is a positive number equal to the module's
+   discovered `total_lines`. The row sum and the LOC in the Scope and Total lines equal the
+   discovered total.
 3. **MCP dialog distinction:** explicit categorization of the 3 MCP dialogs versus
    standard dialogs.
-4. **Testability & verdict assertions:** all 9 modules present in testability summaries with
-   required audit verdicts and scope statements intact.
+4. **Testability & verdict assertions:** the testability summary lists exactly the discovered
+   modules, and the Scope module count and the `Individual audit complete for all <n> modules.`
+   verdict state the discovered module count (digits or an English word).
+
+The validator is the pure helper `_dialog_audit_report_errors(report_markdown, modules)`; the
+live test is a thin wrapper around it. It reports one message per violation and prints parsed
+integers, in the shapes `<module>: recorded LOC <r> != discovered LOC <d>` and
+`scope total LOC: declared <x> != discovered <total>`, so one failing run lists every value a
+report refresh must change.
+
+Regression coverage for the discovery-driven validator lives in
+`tests/test_pypost_1287_failing_repro.py` (PYPOST-1287). Cases 1-4 monkeypatch the module-level
+seams (`discover_dialog_modules`, `check_audit_report_covers`, `_DIALOG_AUDIT_REPORT`) to feed
+synthetic discovery and a synthetic report to the live test:
+
+1. A coherent report passes.
+2. Per-module LOC drift names the module, recorded LOC, and discovered LOC.
+3. A missing and an unknown module each appear on some message line; the message shape and
+   the R6 testability message are not asserted.
+4. Scope count and Scope/Total LOC drift report declared versus discovered integers.
+
+Case 5 (`test_live_report_inventory_loc_matches_discovery`) uses no seam and checks no message:
+it compares the real report's inventory LOC with real discovery as dictionaries.
+
+### Known Limitations
+
+- The stale-claim denylist still holds count-specific phrases such as `all eight modules`,
+  and prose figures such as the Executive Summary module count and `At 263 LOC` are not
+  checked against discovery; a report refresh re-checks them by hand. Count-agnostic
+  stale-claim and prose rules are tracked in PYPOST-1308.
+- The denylist also holds the bare figures `446` and `1,747`, matched as substrings of the
+  whole report, so a refreshed figure containing them (for example `2,446` or `11,747` LOC)
+  fails with a false stale-claim error. Word-bounded or removed entries are tracked in
+  PYPOST-1308.
+- The validator and the PYPOST-1259 Markdown helpers live in the PYPOST-1077 test module, and
+  both repro modules import private names from it; several validator branches have no
+  synthetic case. Extraction to a shared test helper with direct branch tests is tracked in
+  PYPOST-1310.
 
 ## Usage
 
@@ -75,6 +115,8 @@ To inspect or check the dialog report separately:
 .venv/bin/python scripts/audit_dialogs_inventory.py --check
 ```
 
+These direct script calls have no make target yet; one is tracked in PYPOST-1307.
+
 The live Jira operation remains separately protected. Do not enable it merely to validate these
 contracts; see [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md) for authorized opt-in use.
 
@@ -88,8 +130,27 @@ existing protected configuration and authorization requirements.
 
 ### Dialog artifact test reports missing coverage or inconsistent totals
 
-Regenerate the inventory, then reconcile every report aggregate, table row, and verdict with
-discovery. Do not exclude a dialog module from discovery.
+The report is refreshed by hand. The failure message lists every value to change, one line per
+violation, as recorded versus discovered (for example
+`<module>: recorded LOC <r> != discovered LOC <d>`). Update each inventory row, the Scope LOC
+and module count, the Total line, and the verdict count to the discovered values, then
+re-check prose figures by hand.
+
+When a dialog module is added or removed, also:
+
+- Add or remove its row in the Testability summary table. R6 (`_testability_errors`) fails
+  until that table lists exactly the discovered modules.
+- Add or remove its ``### `<module>.py` — <Class(es)>`` section under SOLID Assessment by
+  Dialog. The validator does not check these sections, so the refresh must.
+
+Verify with:
+
+```bash
+make test WORKERS=1 PYTEST_ARGS='tests/test_pypost_1077_verification_artifacts.py -q'
+```
+
+Do not exclude a dialog module from discovery. A make target for refreshing the inventory is
+tracked in PYPOST-1307.
 
 ### Function catalog assertion fails
 
