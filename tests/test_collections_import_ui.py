@@ -16,6 +16,7 @@ from pypost.core.collection_import_apply import (
 from pypost.core.collection_import_state import CollectionImportState
 from pypost.core.import_conflicts import ImportConflictDecision
 from pypost.core.request_manager import RequestManager
+from pypost.core.qt.collection_import_parse_worker import ReadImportFile
 from pypost.core.storage import StorageManager
 from pypost.models.models import Collection
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
@@ -43,7 +44,7 @@ _PATH = Path("/tmp/import.json")
 
 def _make_presenter(
     collections: list[Collection] | None = None,
-    read_import_file: Callable[[Path], tuple[list[Collection], list[str]]] | None = None,
+    read_import_file: ReadImportFile | None = None,
 ) -> tuple[CollectionsPresenter, FakeRequestManager]:
     manager = FakeRequestManager(list(collections or []))
     presenter = CollectionsPresenter(
@@ -60,8 +61,12 @@ def _make_presenter(
 def _reader(
     collections: list[Collection],
     parse_errors: list[str] | None = None,
-) -> Callable[[Path], tuple[list[Collection], list[str]]]:
-    def read(_path: Path) -> tuple[list[Collection], list[str]]:
+) -> ReadImportFile:
+    def read(
+        _path: Path, *, on_progress: Callable[[int, int], None]
+    ) -> tuple[list[Collection], list[str]]:
+        for done in range(1, len(collections) + 1):
+            on_progress(done, len(collections))
         return list(collections), list(parse_errors or [])
 
     return read
@@ -149,7 +154,9 @@ class TestImportCollections:
     def test_invalid_file_shows_error_and_changes_nothing(
         self, _mock_picker, mock_invalid, qapp
     ):
-        def raise_error(path):
+        def raise_error(
+            path: Path, *, on_progress: Callable[[int, int], None]
+        ) -> tuple[list[Collection], list[str]]:
             raise CollectionImportFileError("File is not valid JSON: boom")
 
         presenter, manager = _make_presenter(
@@ -468,7 +475,9 @@ class TestImportCollections:
     def test_logs_file_invalid_on_parse_failure(
         self, _mock_picker, mock_invalid, qapp, caplog
     ):
-        def raise_error(path):
+        def raise_error(
+            path: Path, *, on_progress: Callable[[int, int], None]
+        ) -> tuple[list[Collection], list[str]]:
             raise CollectionImportFileError("File is not valid JSON: boom")
 
         presenter, manager = _make_presenter(

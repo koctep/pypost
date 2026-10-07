@@ -12,12 +12,15 @@ Demonstrates:
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from pypost.core.qt.collection_import_parse_worker import ReadImportFile
+from pypost.models.models import Collection
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from tests.helpers.collections_tree import (
     FakeMetrics,
@@ -48,9 +51,15 @@ def _make_presenter(collections=None, read_import_file=None):
     return presenter, manager
 
 
-def _delayed_reader(collections, delay_seconds: float = 0.05):
-    def read(path):
+def _delayed_reader(
+    collections: list[Collection], delay_seconds: float = 0.05
+) -> ReadImportFile:
+    def read(
+        path: Path, *, on_progress: Callable[[int, int], None]
+    ) -> tuple[list[Collection], list[str]]:
         time.sleep(delay_seconds)
+        for done in range(1, len(collections) + 1):
+            on_progress(done, len(collections))
         return list(collections), []
 
     return read
@@ -160,4 +169,3 @@ def test_wait_import_idle_when_not_busy_returns_immediately_without_log(
         assert "collection_import_wait_idle_started" not in caplog.text
     finally:
         presenter.panel.close()
-

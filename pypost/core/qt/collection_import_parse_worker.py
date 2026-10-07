@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import inspect
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from typing import Protocol
 
 from PySide6.QtCore import QThread, Signal
 
@@ -14,7 +14,17 @@ from pypost.models.models import Collection
 
 logger = logging.getLogger(__name__)
 
-ReadImportFile = Callable[..., tuple[list[Collection], list[str]]]
+
+class ReadImportFile(Protocol):
+    """Read candidates and let checkpoint exceptions stop processing."""
+
+    def __call__(
+        self,
+        path: Path,
+        /,
+        *,
+        on_progress: Callable[[int, int], None],
+    ) -> tuple[list[Collection], list[str]]: ...
 
 
 class CollectionImportCancelled(Exception):
@@ -25,30 +35,8 @@ class CollectionImportCancelled(Exception):
     """
 
 
-def _callable_accepts_progress(func: Callable) -> bool:
-    try:
-        sig = inspect.signature(func)
-        for p in sig.parameters.values():
-            if p.kind == inspect.Parameter.VAR_KEYWORD:
-                return True
-            if p.name == "on_progress":
-                return True
-        positional = [
-            p
-            for p in sig.parameters.values()
-            if p.kind
-            in (
-                inspect.Parameter.POSITIONAL_ONLY,
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            )
-        ]
-        return len(positional) >= 2
-    except (ValueError, TypeError):
-        return False
-
-
 class CollectionImportParseWorker(QThread):
-    """Run ``read_import_file(path)`` off the GUI thread."""
+    """Read off the GUI thread with a progress and cancellation checkpoint."""
 
     parse_progress = Signal(int, int)  # done, total
     progress = parse_progress
@@ -72,12 +60,9 @@ class CollectionImportParseWorker(QThread):
                 if self.isInterruptionRequested():
                     raise CollectionImportCancelled()
 
-            if _callable_accepts_progress(self._read_import_file):
-                collections, parse_errors = self._read_import_file(
-                    self._path, on_progress=_emit_progress
-                )
-            else:
-                collections, parse_errors = self._read_import_file(self._path)
+            collections, parse_errors = self._read_import_file(
+                self._path, on_progress=_emit_progress
+            )
 
             if self.isInterruptionRequested():
                 raise CollectionImportCancelled()

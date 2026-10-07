@@ -112,6 +112,8 @@ def test_status_bar_lifecycle_transitions(_mock_picker, _mock_result, qapp):
     incoming = make_collection("c1", "Sample", [make_request("r1", "Req")])
 
     def _mock_reader(_path, on_progress=None):
+        if on_progress is not None:
+            on_progress(1, 1)
         return [incoming], []
 
     presenter, manager = _make_presenter(read_import_file=_mock_reader)

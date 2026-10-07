@@ -9,10 +9,13 @@ Step 3 failing repro verifying:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 
 from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.qt.collection_import_parse_worker import CollectionImportParseWorker
@@ -130,21 +133,41 @@ def test_load_collection_import_candidates_mixed_valid_invalid(tmp_path):
     assert progress_calls == [(1, 4), (2, 4), (3, 4), (4, 4)]
 
 
-def test_collection_import_parse_worker_supports_legacy_single_arg_reader(qapp):
-    """CollectionImportParseWorker runs without error when reader does not accept on_progress."""
+def test_collection_import_parse_worker_rejects_legacy_single_arg_reader(
+    qapp: QApplication, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Readers without the checkpoint keyword must fail before their body executes."""
     path = Path("/dummy/import.json")
+    calls: list[Path] = []
 
-    def legacy_reader(p):
+    def legacy_reader(p: Path) -> tuple[list[Collection], list[str]]:
+        calls.append(p)
         return [Collection(id="c1", name="C1")], []
 
     worker = CollectionImportParseWorker(path, legacy_reader)
     assert CollectionImportParseWorker.progress is CollectionImportParseWorker.parse_progress
 
-    results = []
-    worker.parse_completed.connect(lambda cols, errs: results.append((cols, errs)))
-    worker.start()
-    process_until(lambda: not worker.isRunning(), timeout_ms=5000)
-
-    assert len(results) == 1
-    assert len(results[0][0]) == 1
-    assert results[0][0][0].name == "C1"
+    completed: list[tuple[list[Collection], list[str]]] = []
+    failed: list[Exception] = []
+    cancelled: list[bool] = []
+    worker.parse_completed.connect(
+        lambda cols, errors: completed.append((cols, errors)), Qt.ConnectionType.DirectConnection
+    )
+    worker.parse_failed.connect(failed.append, Qt.ConnectionType.DirectConnection)
+    worker.parse_cancelled.connect(
+        lambda: cancelled.append(True), Qt.ConnectionType.DirectConnection
+    )
+    with caplog.at_level(logging.ERROR, logger="pypost.core.qt.collection_import_parse_worker"):
+        worker.start()
+        try:
+            assert worker.wait(5000), "legacy reader worker did not finish"
+            assert calls == [], "unsupported reader executed through a compatibility fallback"
+            assert len(failed) == 1
+            assert isinstance(failed[0], TypeError)
+            assert "on_progress" in str(failed[0])
+            assert completed == []
+            assert cancelled == []
+            assert "collection_import_parse_worker_failed" in caplog.text
+        finally:
+            worker.requestInterruption()
+            assert worker.wait(5000), "legacy reader worker cleanup did not finish"
