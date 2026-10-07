@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -11,6 +12,7 @@ from typing import Any
 import pytest
 
 from scripts.audit_dialogs_inventory import (
+    DialogModule,
     check_audit_report_covers,
     discover_dialog_modules,
 )
@@ -224,133 +226,202 @@ def _frozenset_values(node: ast.expr) -> set[str] | None:
     return values
 
 
+_NUMBER_WORDS = (
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+    "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+    "nineteen", "twenty",
+)
+_SCOPE_RE = re.compile(
+    r"Scope: pypost/ui/dialogs/ \((\w+) (?:dialog )?modules, ([\d,]+) LOC total\)"
+)
+_TOTAL_RE = re.compile(r"Total: ([\d,]+) LOC")
+_VERDICT_RE = re.compile(r"Individual audit complete for all (\w+) modules\.")
+_STALE_CLAIMS = (
+    "seven modules",
+    "eight modules",
+    "923 LOC",
+    "1,030 LOC",
+    "1,208 LOC",
+    "1,747 LOC",
+    "1,747",
+    "446 LOC",
+    "446",
+    "Two MCP read-only dialogs",
+    "Three MCP read-only dialogs",
+    "all seven modules",
+    "all eight modules",
+)
+_SEMANTIC_PHRASES = (
+    ("Three MCP dialogs", "executive summary must describe exactly three MCP dialogs"),
+    (
+        "The activity and tools dialogs are read-only",
+        "executive summary must limit the read-only claim to activity and tools",
+    ),
+    (
+        "server manager supports configuration and lifecycle changes",
+        "executive summary must state the server manager mutation capability",
+    ),
+)
+
+
+def _parse_int(text: str) -> int | None:
+    """Parse ``2,505``, ``2505`` or ``**2,505**`` into an int; None when not a number."""
+    digits = text.strip().strip("*").replace(",", "")
+    return int(digits) if digits.isdigit() else None
+
+
+def _parse_count(token: str) -> int | None:
+    """Parse a module count written as digits or an English word (zero to twenty)."""
+    word = token.strip().lower()
+    if word in _NUMBER_WORDS:
+        return _NUMBER_WORDS.index(word)
+    return _parse_int(word)
+
+
+def _search_normalized_lines(markdown: str, pattern: re.Pattern[str]) -> re.Match[str] | None:
+    """Return the first match of ``pattern`` on a ``_normalize_prose``-d report line."""
+    for line in markdown.splitlines():
+        match = pattern.search(_normalize_prose(line))
+        if match:
+            return match
+    return None
+
+
+def _inventory_errors(inventory: MarkdownSection, expected: dict[str, int]) -> list[str]:
+    """R2/R3 plus the inventory row sum of R4: rows against discovery."""
+    rows = _parse_markdown_table(inventory.content)
+    if not rows:
+        return ["module inventory table must not be empty"]
+    if "module" not in rows[0] or "loc" not in rows[0]:
+        return ["module inventory table must contain 'Module' and 'LOC' columns"]
+    errors: list[str] = []
+    names = [row.get("module", "") for row in rows]
+    errors.extend(
+        f"module inventory missing discovered dialog module: {name}"
+        for name in sorted(set(expected) - set(names))
+    )
+    errors.extend(
+        f"module inventory lists unknown dialog module: {name}"
+        for name in sorted(set(names) - set(expected))
+    )
+    errors.extend(
+        f"module inventory lists {name} more than once"
+        for name in sorted({n for n in names if names.count(n) > 1})
+    )
+    row_sum = 0
+    for row in rows:
+        name, raw = row.get("module", ""), row.get("loc", "")
+        loc = _parse_int(raw)
+        if loc is None or loc <= 0:
+            errors.append(f"invalid LOC in inventory for {name}: {raw!r}")
+            continue
+        row_sum += loc
+        if name in expected and loc != expected[name]:
+            errors.append(f"{name}: recorded LOC {loc} != discovered LOC {expected[name]}")
+    total = sum(expected.values())
+    if row_sum != total:
+        errors.append(f"inventory row sum: {row_sum} != discovered {total}")
+    return errors
+
+
+def _aggregate_errors(report_markdown: str, total: int) -> list[str]:
+    """R4: Scope and Total LOC against the discovered total."""
+    errors: list[str] = []
+    for label, pattern, group in (
+        ("scope total LOC", _SCOPE_RE, 2),
+        ("Total line LOC", _TOTAL_RE, 1),
+    ):
+        match = _search_normalized_lines(report_markdown, pattern)
+        if match is None:
+            errors.append(f"audit report missing {label} statement")
+            continue
+        declared = _parse_int(match.group(group))
+        if declared is None:
+            errors.append(f"{label} unparseable: {match.group(group)!r}")
+        elif declared != total:
+            errors.append(f"{label}: declared {declared} != discovered {total}")
+    return errors
+
+
+def _module_count_errors(
+    report_markdown: str, verdict: MarkdownSection | None, module_count: int
+) -> list[str]:
+    """R5: the Scope count token and the Verdict phrase against the discovered count."""
+    errors: list[str] = []
+    scope = _search_normalized_lines(report_markdown, _SCOPE_RE)
+    verdict_match = _VERDICT_RE.search(_normalize_prose(verdict.content)) if verdict else None
+    if verdict is not None and verdict_match is None:
+        errors.append(f"verdict must state completion for all {module_count} modules")
+    for label, match in (("scope module count", scope), ("verdict module count", verdict_match)):
+        if match is None:
+            continue
+        declared = _parse_count(match.group(1))
+        if declared is None:
+            errors.append(f"{label} unparseable: {match.group(1)!r}")
+        elif declared != module_count:
+            errors.append(f"{label}: declared {declared} != discovered {module_count}")
+    return errors
+
+
+def _testability_errors(testability: MarkdownSection, expected: dict[str, int]) -> list[str]:
+    """R6: the Testability summary covers exactly the discovered modules."""
+    rows = _parse_markdown_table(testability.content)
+    names = {row.get("dialog") or row.get("module", "") for row in rows}
+    return [
+        f"testability table missing dialog module: {name}"
+        for name in sorted(set(expected) - names)
+    ] + [
+        f"testability table lists unknown dialog module: {name}"
+        for name in sorted(names - set(expected))
+    ]
+
+
+def _dialog_audit_report_errors(
+    report_markdown: str,
+    modules: Sequence[DialogModule],
+) -> list[str]:
+    """Return one human-readable error per contract violation; empty list means valid.
+
+    Every expected figure (module set, per-module LOC, total LOC, module count) is derived
+    from ``modules``; nothing is pinned to a snapshot of the dialog package.
+    """
+    expected = {module.filename: module.total_lines for module in modules}
+    sections = _parse_markdown_sections(report_markdown)
+    errors = [
+        f"audit report missing section: {name}"
+        for name in ("module inventory", "testability summary", "executive summary", "verdict")
+        if name not in sections
+    ]
+    inventory = sections.get("module inventory")
+    if inventory:
+        errors.extend(_inventory_errors(inventory, expected))
+    errors.extend(_aggregate_errors(report_markdown, sum(expected.values())))
+    errors.extend(_module_count_errors(report_markdown, sections.get("verdict"), len(expected)))
+    testability = sections.get("testability summary")
+    if testability:
+        errors.extend(_testability_errors(testability, expected))
+
+    norm_report = _normalize_prose(report_markdown)
+    executive = sections.get("executive summary")
+    norm_exec = _normalize_prose(executive.content) if executive else ""
+    errors.extend(
+        message
+        for phrase, message in _SEMANTIC_PHRASES
+        if phrase not in norm_exec and phrase not in norm_report
+    )
+    errors.extend(
+        f"report retains contradictory stale claim: {claim}"
+        for claim in _STALE_CLAIMS
+        if claim in norm_report
+    )
+    return errors
+
+
 def test_dialog_audit_report_has_full_discovery_and_coherent_aggregates() -> None:
     modules = discover_dialog_modules()
     report = _DIALOG_AUDIT_REPORT.read_text(encoding="utf-8")
-    expected_filenames = {module.filename for module in modules}
-    errors: list[str] = []
-
-    issues = check_audit_report_covers(modules)
-    if issues:
-        errors.extend(issues)
-    if len(modules) != 9:
-        errors.append("dialog discovery must contain exactly nine modules")
-
-    sections = _parse_markdown_sections(report)
-    for required_name in (
-        "module inventory",
-        "testability summary",
-        "executive summary",
-        "verdict",
-    ):
-        if required_name not in sections:
-            errors.append(f"audit report missing section: {required_name}")
-
-    inventory_section = sections.get("module inventory")
-    if inventory_section:
-        inventory_rows = _parse_markdown_table(inventory_section.content)
-        if not inventory_rows:
-            errors.append("module inventory table must not be empty")
-        else:
-            if "module" not in inventory_rows[0] or "loc" not in inventory_rows[0]:
-                errors.append("module inventory table must contain 'Module' and 'LOC' columns")
-
-            inventory_filenames = [r.get("module", "") for r in inventory_rows]
-            if set(inventory_filenames) != expected_filenames:
-                errors.append("module inventory must cover every discovered dialog exactly once")
-            if len(inventory_filenames) != len(set(inventory_filenames)):
-                errors.append("module inventory contains duplicate dialog modules")
-
-            loc_values: list[int] = []
-            for r in inventory_rows:
-                loc_str = r.get("loc", "")
-                if loc_str.isdigit():
-                    loc_val = int(loc_str)
-                    if loc_val <= 0:
-                        errors.append(f"invalid non-positive LOC in inventory: {loc_str}")
-                    loc_values.append(loc_val)
-                else:
-                    errors.append(f"invalid non-numeric LOC in inventory: {loc_str}")
-
-            if sum(loc_values) != 1790:
-                errors.append(
-                    f"module inventory LOC rows must sum to 1,790 (got {sum(loc_values)})"
-                )
-
-            if not any(
-                r.get("module") == "mcp_servers_dialog.py" and r.get("loc") == "486"
-                for r in inventory_rows
-            ):
-                errors.append("module inventory must record mcp_servers_dialog.py at 486 LOC")
-
-    testability_section = sections.get("testability summary")
-    if testability_section:
-        testability_rows = _parse_markdown_table(testability_section.content)
-        testability_filenames = {
-            r.get("dialog") or r.get("module", "") for r in testability_rows
-        }
-        if testability_filenames != expected_filenames:
-            errors.append(
-                "testability table must have one row for each of the nine dialog modules"
-            )
-
-    norm_report = _normalize_prose(report)
-    norm_exec = (
-        _normalize_prose(sections["executive summary"].content)
-        if "executive summary" in sections
-        else ""
-    )
-    norm_verdict = (
-        _normalize_prose(sections["verdict"].content)
-        if "verdict" in sections
-        else ""
-    )
-
-    if (
-        "Scope: pypost/ui/dialogs/ (nine modules, 1,790 LOC total)" not in norm_report
-        and "Scope: pypost/ui/dialogs/ (nine dialog modules, 1,790 LOC total)" not in norm_report
-    ):
-        errors.append("scope must state nine modules and 1,790 LOC")
-
-    if "Three MCP dialogs" not in norm_exec and "Three MCP dialogs" not in norm_report:
-        errors.append("executive summary must describe exactly three MCP dialogs")
-
-    if (
-        "The activity and tools dialogs are read-only" not in norm_exec
-        and "The activity and tools dialogs are read-only" not in norm_report
-    ):
-        errors.append("executive summary must limit the read-only claim to activity and tools")
-
-    if (
-        "server manager supports configuration and lifecycle changes" not in norm_exec
-        and "server manager supports configuration and lifecycle changes" not in norm_report
-    ):
-        errors.append("executive summary must state the server manager mutation capability")
-
-    if (
-        "Individual audit complete for all nine modules." not in norm_verdict
-        and "Individual audit complete for all nine modules." not in norm_report
-    ):
-        errors.append("verdict must state completion for all nine modules")
-
-    for stale_claim in (
-        "seven modules",
-        "eight modules",
-        "923 LOC",
-        "1,030 LOC",
-        "1,208 LOC",
-        "1,747 LOC",
-        "1,747",
-        "446 LOC",
-        "446",
-        "Two MCP read-only dialogs",
-        "Three MCP read-only dialogs",
-        "all seven modules",
-        "all eight modules",
-    ):
-        if stale_claim in norm_report:
-            errors.append(f"report retains contradictory stale claim: {stale_claim}")
-
+    errors = list(check_audit_report_covers(modules))
+    errors.extend(_dialog_audit_report_errors(report, modules))
     assert not errors, "\n".join(errors)
 
 
