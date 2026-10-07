@@ -610,11 +610,13 @@ secret-store fixtures.
 and bulk re-encrypt paths using a mocked Vault KV HTTP response — no live Vault server required.
 
 `test_encryption_migration.py` and `test_encryption_migrate_cli.py` simulate key rotation
-mid-test by rewriting the env-channel registry file, then call `clear_registry_cache()` right
-after the rewrite so the next resolve reflects the new active key rather than risking a
-same-filesystem-tick stale-cache read from `MtimeFileCache`. See
+mid-test by rewriting the env-channel registry file. Since PYPOST-1114 `MtimeFileCache` keys on
+file content, so the next resolve always reflects the new active key without a manual cache
+clear. The `clear_registry_cache()` calls these tests still make right after the rewrite were
+added for the former same-tick race (PYPOST-1088) and are now redundant; their removal is tracked
+in [PYPOST-1313](https://pypost.atlassian.net/browse/PYPOST-1313). See
 [Environment Encryption at Rest — File-backed registry caching](environment_encryption_at_rest.md#file-backed-registry-caching-mtimefilecache)
-for the cache-invalidation entry points and the race they close (PYPOST-1088).
+for the cache identity, its limits, and the test-isolation entry points.
 
 Full regression:
 

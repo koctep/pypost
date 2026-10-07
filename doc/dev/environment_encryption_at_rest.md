@@ -93,45 +93,90 @@ are still registered.
 
 `EnvKeySource` and `SecretStoreKeySource` each cache their parsed JSON registry/spec file in a
 module-level `pypost.core.key_sources.file_cache.MtimeFileCache` instance (`_registry_cache` in
-`env.py`, `_spec_cache` in `secret_store.py`), keyed by `path.stat().st_mtime_ns`.
-`MtimeFileCache.get(path, loader)` re-parses only when the path or `st_mtime_ns` changes since the
-last call, so repeated key lookups within one process do not re-read and re-validate the
-registry/spec file on every call.
+`env.py`, `_spec_cache` in `secret_store.py`). Repeated key lookups within one process therefore do
+not re-parse and re-validate the registry/spec file on every call.
+
+**Cache identity (PYPOST-1114):** the cache key is `(path, sha256(file bytes))`. The file
+modification time (`st_mtime_ns`) is no longer read. `MtimeFileCache.get(path, loader)` works
+like this:
+
+1. Read the file and compute its SHA-256 digest. If the read fails (`OSError`, for example the
+   file is missing), clear the cache and return `None`.
+2. If the path and digest match the cached entry, return the cached value. The loader is not
+   called.
+3. Otherwise call `loader(path)`. If it returns `None`, clear the cache and return `None`.
+4. Read and hash the file again (post-load re-hash). Cache the value only if the digest is
+   unchanged. If the file changed while the loader ran, or the second read fails, the loaded value
+   is returned to the caller but not cached, so the next lookup reloads.
+
+What this guarantees:
+
+- A rewrite of the registry/spec file is always seen by the next lookup in the same process, even
+  when two writes land within one filesystem timestamp tick or the writer keeps the old mtime.
+  Callers do not need to clear the cache after a rewrite.
+- A `touch` (or any mtime change) with identical bytes does not trigger a re-parse.
+- A value loaded while the file was being rewritten is never cached under the pre-load digest.
+
+The digest is kept in the private `_digest` attribute. It is never logged or returned.
+
+**Cost:** every lookup reads the whole file and computes one SHA-256 digest. A miss reads the file
+three times (initial hash, loader, post-load re-hash). Registry/spec files are small, so this was
+accepted instead of a `stat()` pre-filter (see `ai-tasks/PYPOST-1114/60-tech-debt.md`).
+
+**Logging:** the hit path and the normal miss path log nothing. The post-load re-hash emits two
+`DEBUG` events on the `pypost.core.key_sources.file_cache` logger:
+
+| Event | When | Fields |
+| --- | --- | --- |
+| `file_cache_rewrite_during_load` | The digest after loading differs from the digest before loading | `path` |
+| `file_cache_recheck_failed` | The post-load re-read raises `OSError` | `path`, `reason` (the `OSError`) |
+
+Neither event includes file content or the digest. Both are self-healing: the next lookup reloads
+the file.
+
+**Limits:**
+
+- **A→B→A within one load:** if the file changes from A to B and back to A while the loader runs,
+  both digests are A's and the value loaded from B can be cached under A's digest. This needs two
+  rewrites inside one load and is accepted.
+- **Torn writes:** a lookup that reads a partially written file hashes and parses those partial
+  bytes. Writers must replace the file atomically (write to a temporary file, then `os.replace()`).
+- **No thread-safety:** the cache instance is not locked. Concurrent access from several threads
+  is not supported (unchanged from before PYPOST-1114).
+- **Historical class name:** `MtimeFileCache` no longer uses mtime. The name is kept so callers do
+  not change; the rename is tracked in
+  [PYPOST-1314](https://pypost.atlassian.net/browse/PYPOST-1314).
 
 **Explicit invalidation (PYPOST-1088):**
 
 | Function | Module | Clears |
 | --- | --- | --- |
-| `MtimeFileCache.clear()` | `pypost/core/key_sources/file_cache.py` | The calling cache instance's `_path` / `_mtime_ns` / `_value` |
+| `MtimeFileCache.clear()` | `pypost/core/key_sources/file_cache.py` | The calling cache instance's `_path` / `_digest` / `_value` |
 | `clear_registry_cache()` | `pypost/core/key_sources/env.py` | The module-level `_registry_cache` used by `EnvKeySource` |
 | `clear_spec_cache()` | `pypost/core/key_sources/secret_store.py` | The module-level `_spec_cache` used by `SecretStoreKeySource` |
 
-Production read paths do not need to call these — `MtimeFileCache` self-invalidates the next time
-`get()` observes a different `st_mtime_ns`. They exist for callers (today: tests, and any future
-admin/reload tooling) that rewrite the registry/spec file and need the *next* read to be
-guaranteed fresh without depending on filesystem timestamp resolution.
+Neither production code nor tests need these functions to see a rewrite — the next `get()`
+detects changed content by itself. They remain only for test isolation: dropping a cached value
+so that state from one test's files cannot affect another test.
 
-**Why this matters — same-tick stale-cache race:** `st_mtime_ns` is still filesystem-resolution
-bound. Two writes to the same registry file within the same timestamp tick (common on fast
-filesystems during automated tests — e.g. simulating a key rotation with two back-to-back
-`Path.write_text()` calls) can leave `st_mtime_ns` unchanged, so `MtimeFileCache.get()` returns the
-*stale* pre-rewrite value instead of re-reading. This caused order-dependent flakiness in
-encryption-migration tests that rotate the active key mid-test (PYPOST-1088):
-`tests/test_encryption_migration.py` and `tests/test_encryption_migrate_cli.py` now call
-`clear_registry_cache()` immediately after rewriting the registry file mid-test, forcing the next
-resolve to re-read instead of risking a race with the mtime tick.
-`tests/test_key_sources_chain_coverage.py` covers a different angle of the same mechanism: its
+**Background — the former same-tick race (PYPOST-1088):** before PYPOST-1114 the cache was keyed
+by `st_mtime_ns`. Two writes within one filesystem timestamp tick could leave the mtime unchanged,
+so the next lookup returned the stale pre-rewrite value. This made encryption-migration tests that
+rotate the active key mid-test flaky. `tests/test_encryption_migration.py` and
+`tests/test_encryption_migrate_cli.py` therefore call `clear_registry_cache()` right after
+rewriting the registry file. With content-based identity those calls are redundant; their removal
+is tracked in [PYPOST-1313](https://pypost.atlassian.net/browse/PYPOST-1313).
+`tests/test_key_sources_chain_coverage.py` covers a different angle: its
 `test_clear_registry_cache_forces_reload` / `test_clear_spec_cache_forces_reload` write the
-registry/spec file only once, then call `clear_registry_cache()` / `clear_spec_cache()` and
-re-resolve the *same*, unrewritten file to verify the loader function is invoked a second time —
-proving the cache-clear functions force a fresh load rather than reproducing the rotation race
-itself.
+registry/spec file once, then call `clear_registry_cache()` / `clear_spec_cache()` and re-resolve
+the *same*, unrewritten file to verify the loader is invoked a second time — proving the
+cache-clear functions force a fresh load.
 
 `tests/conftest.py` also registers an autouse `_reset_key_source_caches` fixture that calls
 `clear_registry_cache()` and `clear_spec_cache()` before and after every test, so cache state from
-one test's registry/spec file writes never leaks into the next test. That fixture only resets
-*between* tests — a test that rewrites the registry/spec file mid-test still needs its own
-explicit `clear_registry_cache()` / `clear_spec_cache()` call right after the rewrite (see above).
+one test's registry/spec file writes never leaks into the next test. A test that rewrites the
+registry/spec file mid-test does not need its own clear call: the next lookup sees the new
+content.
 
 **Resolved asymmetry (PYPOST-1112):**
 `EnvKeySource._read_registry_file` mirrors `SecretStoreKeySource._read_spec_file`'s guard against
@@ -729,8 +774,17 @@ Primary coverage files:
 (`test_mtime_file_cache_clear`) and the `clear_registry_cache()` / `clear_spec_cache()` entry
 points forcing a fresh `EnvKeySource` / `SecretStoreKeySource` load
 (`test_clear_registry_cache_forces_reload`, `test_clear_spec_cache_forces_reload`). See § File-backed
-registry caching above for why these exist and how tests use them to avoid the same-tick
-stale-cache race.
+registry caching above for why these exist (test isolation only).
+
+PYPOST-1114 regression tests for content-based cache identity:
+
+- `tests/test_pypost_1114_failing_repro.py` — same-mtime rewrites (generic cache, env registry
+  with two rapid rotations, secret-store spec) are reloaded; an unchanged file and a touch-only
+  change are not re-parsed; a value loaded during a rewrite is not cached, so a later rollback
+  reloads.
+- `tests/test_pypost_1114_observability.py` — exact `file_cache_rewrite_during_load` /
+  `file_cache_recheck_failed` messages, no file content or digest in log messages or arguments,
+  and silent hit/miss paths.
 
 Async orchestration details: [environment_storage_async.md](environment_storage_async.md).
 Migration procedures: [encryption_key_migration.md](encryption_key_migration.md).
