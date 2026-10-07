@@ -427,6 +427,52 @@ contains the payload. The contract is covered by
 `tests/test_websocket_outbound_metrics_repro.py` and the Qt adapter tests in
 `tests/test_websocket_session_engine_repro.py`.
 
+### End-to-End Loopback Coverage (PYPOST-1297)
+
+The fake-transport tests in `tests/test_websocket_outbound_metrics_repro.py` check the
+presenter wiring and the Qt handoff result separately.
+`test_real_loopback_send_records_outbound_metrics_and_reaches_peer` in the same file checks
+the whole outbound path through a real local connection: `ws_test_server` (`SILENT`), a real
+`QtWebSocketTransport` behind `WebSocketSessionController`, and a `WebSocketPresenter` with
+its own `MetricsRegistry`. It sends four rows and, for each send, asserts:
+
+| Row | Payload | `websocket_messages_total` delta | `websocket_message_bytes_total` delta |
+| --- | --- | --- | --- |
+| Text | `"héllo 💡 мир"` (11 chars) | `kind="text"` +1 | +18 (UTF-8 size) |
+| Binary | 6 raw bytes | `kind="binary"` +1 | +6 (raw size) |
+| Empty text | `""` | `kind="text"` +1 | +0 |
+| Empty binary | `b""` | `kind="binary"` +1 | +0 |
+
+Deltas are read with `registry.get_sample_value` (a missing sample counts as `0`) before and
+after each `send_*` call, and the other kind must not change. After the metric check, the
+test waits for the peer to receive the same payload with the same kind (text or binary),
+including both empty messages. No metric, label, or production code changed for this
+coverage.
+
+Run it through `make` (the file has a 30 s module timeout; this test has 60 s and 5 s
+bounded waits):
+
+```bash
+make test WORKERS=1 PYTEST_ARGS='tests/test_websocket_outbound_metrics_repro.py -q'
+```
+
+Pattern for similar real-loopback metric tests:
+
+- Configure the server as `ServerBehavior.SILENT` so it records frames without replying;
+  inbound echoes would not change outbound counters, but they would add frames to wait for.
+  `SILENT` also ignores pings, so open with `HeartbeatConfig(interval_seconds=0)`.
+- Give the presenter its own `MetricsRegistry` so other tests cannot change the counters.
+- Assert the metric delta right after `send_*`, before any peer wait. `frame_sent` is emitted
+  synchronously on acceptance, so the counter is already updated; asserting first keeps the
+  check about acceptance, not delivery.
+- Then wait for peer receipt with `wait_until(..., timeout=5.0)`. Never use `time.sleep`.
+- Call `presenter.teardown()` in `finally`.
+
+If a row fails, the assertion message names the row, kind, and size, and shows the expected
+and actual delta (for example `row 0 text (18 bytes) bytes delta: expected +18, got +11`).
+A count or byte failure points to the transport acceptance check or `_on_frame_sent`; a
+`not received by peer` timeout with correct deltas points to the socket or the test server.
+
 ---
 
 ## Boundary and Quarantine Constraints

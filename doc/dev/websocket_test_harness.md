@@ -535,6 +535,14 @@ The server emits structured `key=value` debug events via the standard logger `lo
    - The `ws_test_server` fixture is function-scoped to guarantee complete isolation and zero socket leakage between tests.
 5. **Fast vs Slow Marks**:
    - Keep standard protocol tests fast (<1s per test). If adding heavy load stress benchmarks that take >5s, mark them with `@pytest.mark.slow`.
+6. **Client-Side Metrics Through Real Sends**:
+   - Use `ServerBehavior.SILENT` when a test sends through the real client and checks
+     client-side counters. Assert the metric delta right after the send, then wait for
+     `server.received_messages`.
+   - Example: `test_real_loopback_send_records_outbound_metrics_and_reaches_peer` in
+     `tests/test_websocket_outbound_metrics_repro.py` (PYPOST-1297). See
+     [websocket_session_engine.md](websocket_session_engine.md) § End-to-End Loopback
+     Coverage.
 
 ---
 
