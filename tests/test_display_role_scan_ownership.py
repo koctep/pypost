@@ -61,29 +61,35 @@ def _has_display_role_attr(fn: ast.AST) -> bool:
     return False
 
 
-def _module_all_exports(tree: ast.AST) -> set[str]:
-    """Return the string names listed in the module-level ``__all__`` assignment.
+def _module_all_exports(tree: ast.AST) -> set[str] | None:
+    """Return the string names in the first module-level literal ``__all__``.
 
-    Returns an empty set when the module declares no ``__all__`` or assigns it
-    something other than a list/tuple literal, so a missing manifest fails the
-    caller's subset assertion instead of raising.
+    Reads both ``__all__ = [...]`` and the annotated ``__all__: list[str] = [...]``
+    spelling (list or tuple literal; non-string elements are dropped). Returns
+    ``set()`` for an empty literal and ``None`` when no statically readable literal
+    exists (absent, bare annotation only, or computed value). Never raises.
     """
     for node in ast.iter_child_nodes(tree):
-        if not isinstance(node, ast.Assign):
+        targets: list[ast.expr]
+        value: ast.expr | None
+        if isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        elif isinstance(node, ast.AnnAssign):
+            targets, value = [node.target], node.value
+        else:
             continue
         if not any(
             isinstance(target, ast.Name) and target.id == "__all__"
-            for target in node.targets
+            for target in targets
         ):
             continue
-        value = node.value
         if isinstance(value, (ast.List, ast.Tuple)):
             return {
                 elt.value
                 for elt in value.elts
                 if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
             }
-    return set()
+    return None
 
 
 _FLAT_DELEGATION_DIAGNOSTIC = (
@@ -548,12 +554,17 @@ def test_flat_and_tree_share_display_role_match_helper() -> None:
     _assert_flat_shared_ownership(tree_defs)
     _assert_flat_no_duplicate_ownership(tree_defs)
 
-    tree_exports = _module_all_exports(tree_index_ast)
     expected_exports = {
         "display_role_equals",
         "find_child_index_by_display_text",
         "find_tree_index_by_display_text",
     }
+    tree_exports = _module_all_exports(tree_index_ast)
+    assert tree_exports is not None, (
+        f"pypost.agent.tree_index.__all__ must export {sorted(expected_exports)}; "
+        "no statically readable literal __all__ found "
+        "(absent, bare annotation, or computed value)"
+    )
     assert expected_exports.issubset(tree_exports), (
         f"pypost.agent.tree_index.__all__ must export {sorted(expected_exports)}; "
         f"found {sorted(tree_exports)}"

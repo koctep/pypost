@@ -249,11 +249,30 @@ involved — and asserts all four rules inside one test,
 `test_flat_and_tree_share_display_role_match_helper` (module-level
 `pytestmark = pytest.mark.timeout(10)`). Its AST helpers are `_calls_name`
 (delegation), `_has_display_role_attr` (inline-DisplayRole probe),
-`_imports_from_tree_index` (import edge), and `_module_all_exports` (literal
-`__all__` manifest). The test also requires the recursive/tree lookup helper
+`_imports_from_tree_index` (import edge), and `_module_all_exports` (plain or
+annotated literal `__all__` manifest). The test also requires the recursive/tree lookup helper
 `find_tree_index_by_display_text` and the item-view selection helper
 `_select_item_view` to be present. The test is fail-fast: a run reports the
 first violated rule only.
+
+`_module_all_exports(tree) -> set[str] | None` accepts module-level list and
+tuple literals in both `__all__ = [...]` and `__all__: list[str] = [...]`
+forms (including `__all__: tuple[str, ...] = (...)`). It returns string names
+from the first readable literal, dropping non-string elements; an empty
+literal returns `set()`. A bare annotation is skipped, so a later literal
+assignment can still be read. `None` means no readable literal was found.
+This static reader does not evaluate computed values or follow `+=`,
+`.extend()`, conditional manifests, or star imports. It does not model
+runtime reassignment or mutation of an earlier literal.
+
+PYPOST-1235 covers the spellings and both diagnostic paths in
+`tests/test_display_role_scan_ownership_all_exports.py`. Run the focused
+regression and ownership suite through Make:
+
+```bash
+make test PYTEST_ARGS='tests/test_display_role_scan_ownership_all_exports.py \
+  tests/test_display_role_scan_ownership.py -p no:randomly -rA'
+```
 
 PYPOST-1240 adds two focused source-inspection repro tests in
 `tests/test_display_role_scan_ownership_repro.py`:
@@ -398,12 +417,18 @@ widgets that already have `objectName` set via `set_widget_id`.
   (PYPOST-942). Live `COLLECTION_TREE` proofs:
   `test_live_collection_tree_missing_option_raises` /
   `test_live_collection_tree_index_out_of_range_raises` (PYPOST-975).
-- **Ownership suite fails with `__all__ must export [...]; found []`** —
-  either `pypost.agent.tree_index.__all__` really lost a name, or it was
-  respelled as an annotated (`__all__: list[str] = [...]`) or computed
-  assignment, which `_module_all_exports` skips because it matches `ast.Assign`
-  only. Keep the plain literal list (TD-1 in
-  [60-tech-debt.md](../../ai-tasks/PYPOST-1041/60-tech-debt.md)).
+- **Ownership suite fails with `__all__ must export [...]; found [...]`** —
+  a readable literal in `pypost.agent.tree_index.__all__` is missing required
+  names. Restore the missing exports in the plain or annotated list/tuple
+  literal. `found []` means the readable literal contains no string names,
+  including an empty literal.
+- **Ownership suite reports `no statically readable literal __all__ found`** —
+  `pypost.agent.tree_index.__all__` is absent, has only a bare annotation, or
+  uses a computed value without a readable literal. Provide a module-level
+  list or tuple literal; annotated literals are supported. The single-line
+  assertion names the owner and required exports without claiming `found []`.
+  Computed and mutation-based manifests remain outside the static reader's
+  scope; see [PYPOST-1235 technical debt](../../ai-tasks/PYPOST-1235/60-tech-debt.md).
 - **Repro fails but the ownership suite passes** — an ownership assertion was
   deleted, renamed, reworded, or folded into a helper/loop. Restore the
   assertion shape rather than relaxing
