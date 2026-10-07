@@ -49,6 +49,10 @@ class TemplateService:
 
         self._compile_template = _compile_template
 
+    def clear_cache(self) -> None:
+        """Clear cached compiled Jinja templates."""
+        self._compile_template.cache_clear()
+
     def validate_function_expressions(self, content: str) -> ValidationResult:
         """Validate placeholder forms against allowed function expressions."""
         return self._function_expression_resolver.validate_content(content)

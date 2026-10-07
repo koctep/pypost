@@ -305,12 +305,80 @@ the GUI thread (PYPOST-1144):
    [`StreamExportSnapshot`](file:///home/src/pypost/core/websocket_stream_export.py)
    (satisfying the `MessageStream | StreamExportSnapshot` typing union for core export helpers;
    see [static_type_checking.md](static_type_checking.md)).
-3. **Completion:** `export_completed` / `export_failed` signals return to the view; Export
-   button re-enables after `QThread.finished`.
+3. **Completion:** the worker's `export_completed` / `export_failed` signals return to the
+   view, which logs them and re-emits its own `export_completed` / `export_failed`. The
+   Export button re-enables only after finalization (see below), not on `QThread.finished`.
 
 `WebSocketStreamView.is_export_busy()` guards overlapping exports. Core helpers
 (`export_stream_to_json_file`, `export_stream_to_text_file`) remain synchronous and Qt-free
 for headless callers.
+
+#### Export Lifecycle and Teardown (PYPOST-1286)
+
+The output file can exist before the worker is done: the file is written, then the queued
+completion and `QThread.finished` are delivered, and only then is the native thread joined.
+The view therefore owns the worker until all of these steps have finished.
+
+1. **Busy ownership:** `is_export_busy()` returns `True` while `_export_worker` is set. It no
+   longer checks `isRunning()`, so a worker whose `run()` has returned but whose queued
+   completion has not been processed still counts as busy.
+2. **Worker identity check:** `_on_export_worker_finished` compares `self.sender()` with the
+   owned worker. A `finished` from any other object is ignored (DEBUG
+   `websocket_stream_export_worker_finished_ignored reason=stale_worker`) and ownership is kept.
+3. **Nonblocking join with retry:** `_finalize_export_worker` calls `worker.wait(0)`. If the
+   native join is not ready, it re-arms
+   `QTimer.singleShot(_FINALIZE_RETRY_MS, self, ...)` (10 ms). The context-object overload
+   drops the retry if the view is destroyed first. The retry has no cap (accepted, TD-8).
+4. **Release:** when the join succeeds, the view clears `_export_worker`, re-enables the
+   Export button, calls `deleteLater()` on the worker, and emits `export_finished`.
+
+| Public API | Behavior |
+| --- | --- |
+| `export_completed(str, str)` | Signal: output path and export format on success |
+| `export_failed(str, object)` | Signal: export format and error on failure |
+| `export_finished()` | Signal: worker finalized and released; emitted after cleanup |
+| `is_export_busy() -> bool` | `True` until the owned worker is finalized |
+| `wait_for_export(timeout_ms=5000) -> bool` | Bounded local `QEventLoop` until `export_finished` |
+| `cleanup() -> bool` | `wait_for_export(_WORKER_FINISH_WAIT_MS)` (100 ms); `True` if released |
+| `closeEvent(event)` | Calls `cleanup()`; ignores the close event while export is still owned |
+
+`wait_for_export` returns `True` right away when idle. A timeout of zero or less only checks
+the current state and does not process events. Otherwise it runs a nested `QEventLoop` that
+stops on `export_finished` or on a single-shot timer, and it always stops the timer and
+disconnects the signal. A `False` result is the contract; the caller decides the severity.
+
+`closeEvent` refuses the close (`event.ignore()`) when `cleanup()` returns `False`, and logs
+`websocket_stream_export_worker_finish_wait_timeout wait_ms=100 action=close_refused`
+(WARNING). The user gets no other feedback, and no deferred close is scheduled.
+
+**Known limitation (PYPOST-1301):** `WebSocketStreamView` is a child widget inside the
+WebSocket tab. Removing the tab (`QTabWidget.removeTab`) does not call `close()` on the view,
+and no production code calls `cleanup()` yet. The close guard is therefore only exercised by
+an explicit `close()` or by tests. Exiting the app during an export can still destroy a running
+parentless `QThread`.
+
+**Log events:**
+
+| Event | Level | When |
+| --- | --- | --- |
+| `websocket_stream_export_worker_finish_wait_timeout` | WARNING | `closeEvent` refused |
+| `websocket_stream_export_worker_finalize_deferred` | DEBUG | First failed `wait(0)` |
+| `websocket_stream_export_worker_finalized` | DEBUG | Worker released |
+| `websocket_stream_export_worker_finished_ignored` | DEBUG | Non-owned sender (`reason`) |
+
+Fields: the WARNING carries `wait_ms` and `action=close_refused`; `finalize_deferred`
+carries `retry_ms` and is logged once per worker; `finalized` carries `deferrals`, the
+number of join retries, so DEBUG traces show how long the native join took.
+
+**Testing rules:**
+
+- After `export_json` / `export_text`, wait with `view.wait_for_export(...)` (assert it returns
+  `True`) or on `export_finished`. Never wait only for the output file to appear: the file
+  exists before ownership is released, so a test that checks `is_export_busy()` or starts the
+  next export too early becomes flaky under parallel load.
+- Keep waits bounded and give the test module a timeout marker (see [testing.md](testing.md)).
+- Regression and log-contract coverage: `tests/test_pypost_1286_failing_repro.py`,
+  `tests/test_pypost_1286_observability.py`, `tests/test_websocket_stream_view_repro.py`.
 
 ---
 
@@ -581,3 +649,17 @@ print(f"Batch flushed: inserted={inserted}, evicted={evicted}")
 | Sensitive variable value visible in stream transcript | Variable key was not listed in `hidden_keys` when invoking `build_stream_entry`. | Verify that environment variable keys marked as hidden are passed in `hidden_keys` parameter to `build_stream_entry`. |
 | Transcript export fails with `WebSocketExportError` | Target export path is unwritable, disk is full, or parent directory creation failed. | Check file permissions and directory paths. `export_stream_to_json_file` and `export_stream_to_text_file` wrap underlying `OSError` into `WebSocketExportError`. |
 | `QAbstractItemModelTester` or Qt list view asserts invalid row indices during streaming | Direct modifications made to `MessageStream` bypassing `StreamListModel.append_batch`. | Ensure all stream additions on the UI thread route through `StreamListModel.append_batch(entries)` to emit matching `beginInsertRows`/`endInsertRows` and `beginRemoveRows`/`endRemoveRows` signals. |
+
+### Export Lifecycle Issues (PYPOST-1286)
+
+- **Export test flaky under parallel load; the file exists but `is_export_busy()` is `True`.**
+  The test waited only for the output file. Ownership lasts until queued completion and the
+  native join finish. Wait with `view.wait_for_export()` and assert `True`, or wait on
+  `export_finished`.
+- **Stream view refuses to close; WARNING `websocket_stream_export_worker_finish_wait_timeout`
+  with `action=close_refused`.** The export is still owned after the 100 ms `cleanup()`
+  budget. This is the intended guard; close again after `export_finished`. Tab removal does
+  not reach this guard yet (PYPOST-1301).
+- **Repeated 10 ms finalize retries; `finalized deferrals=N` with a large N.** `wait(0)` keeps
+  failing after `QThread.finished`, and the retry has no cap. Look for a worker that never
+  leaves its native thread (TD-8 in `ai-tasks/PYPOST-1286/60-tech-debt.md`).

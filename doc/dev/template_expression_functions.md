@@ -73,6 +73,11 @@ function name. Re-registering a name replaces both its callable and strictness c
 Only explicitly registered callables are exposed through `allowed_names()` and
 `register_into_env()`; registry instances do not share dynamic registrations.
 
+The module-level default catalog `_DEFAULT_CATALOG` is a read-only `MappingProxyType`
+(PYPOST-1286). Each registry copies it in `__init__`, and `FunctionRegistry.reset()` restores
+that copy. See
+[template_service.md](template_service.md#test-isolation-and-the-default-catalog-pypost-1286).
+
 Outside the narrow strict HTTP conversion boundary described below, implemented
 behavior is backward compatible:
 
