@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from PySide6.QtCore import (
+    QEventLoop,
     QModelIndex,
     QObject,
     QPersistentModelIndex,
@@ -19,9 +20,11 @@ from PySide6.QtCore import (
     QSize,
     QSortFilterProxyModel,
     Qt,
+    QTimer,
     Signal,
 )
 from PySide6.QtGui import (
+    QCloseEvent,
     QColor,
     QFont,
     QPainter,
@@ -82,6 +85,8 @@ logger = logging.getLogger(__name__)
 
 # Short join after QThread.finished so native cleanup completes before GC/delete
 _WORKER_FINISH_WAIT_MS = 100
+# Retry interval while QThread.finished has fired but the native join is not ready yet
+_FINALIZE_RETRY_MS = 10
 
 __all__ = [
     "StreamFilterProxyModel",
@@ -524,6 +529,10 @@ class WebSocketStreamView(QWidget):
     """Main Stream Inspector container combining virtualized list, filters, notices,
     and detail pane."""
 
+    export_completed = Signal(str, str)
+    export_failed = Signal(str, object)
+    export_finished = Signal()
+
     def __init__(
         self,
         stream_model: StreamListModel,
@@ -886,8 +895,8 @@ class WebSocketStreamView(QWidget):
         self._detail_pane.set_hidden_keys(hidden_keys)
 
     def is_export_busy(self) -> bool:
-        """Return True while a transcript export worker is running."""
-        return self._export_worker is not None and self._export_worker.isRunning()
+        """Return True until the export worker and queued completion are cleaned up."""
+        return self._export_worker is not None
 
     def _resolve_export_env(self) -> tuple[dict[str, str], set[str]]:
         env_vars = (
@@ -943,6 +952,7 @@ class WebSocketStreamView(QWidget):
             export_format,
             path,
         )
+        self.export_completed.emit(path, export_format)
 
     def _on_export_failed(self, export_format: str, error: object) -> None:
         logger.error(
@@ -950,18 +960,80 @@ class WebSocketStreamView(QWidget):
             export_format,
             error,
         )
+        self.export_failed.emit(export_format, error)
 
     def _on_export_worker_finished(self) -> None:
-        finished = self._export_worker
+        finished = self.sender()
+        if finished is self._export_worker and isinstance(finished, WebSocketStreamExportWorker):
+            self._finalize_export_worker(finished)
+            return
+        logger.debug("websocket_stream_export_worker_finished_ignored reason=stale_worker")
+
+    def _finalize_export_worker(
+        self, finished: WebSocketStreamExportWorker, deferrals: int = 0
+    ) -> None:
+        if finished is not self._export_worker:
+            return
+        # QThread.finished can precede native thread-local teardown. Keep ownership
+        # until a nonblocking join confirms it is safe to destroy the worker.
+        if not finished.wait(0):
+            if deferrals == 0:
+                # Log once per worker; retries every 10 ms would flood DEBUG output.
+                logger.debug(
+                    "websocket_stream_export_worker_finalize_deferred retry_ms=%d",
+                    _FINALIZE_RETRY_MS,
+                )
+            # Context-object overload drops the retry if this view is destroyed first.
+            QTimer.singleShot(
+                _FINALIZE_RETRY_MS,
+                self,
+                lambda: self._finalize_export_worker(finished, deferrals + 1),
+            )
+            return
         self._export_worker = None
         self._set_export_busy(False)
-        if finished is not None:
-            finished.deleteLater()
-            if not finished.wait(_WORKER_FINISH_WAIT_MS):
-                logger.warning(
-                    "websocket_stream_export_worker_finish_wait_timeout wait_ms=%d",
-                    _WORKER_FINISH_WAIT_MS,
-                )
+        finished.deleteLater()
+        logger.debug("websocket_stream_export_worker_finalized deferrals=%d", deferrals)
+        self.export_finished.emit()
+
+    def wait_for_export(self, timeout_ms: int = 5000) -> bool:
+        """Process events until any running export worker completes.
+
+        Returns True if idle, or False if the timeout was reached. Nonpositive
+        timeouts check the current state without processing events.
+        """
+        if not self.is_export_busy():
+            return True
+        if timeout_ms <= 0:
+            return False
+        loop = QEventLoop()
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(loop.quit)
+        self.export_finished.connect(loop.quit)
+        try:
+            timer.start(timeout_ms)
+            loop.exec()
+        finally:
+            timer.stop()
+            self.export_finished.disconnect(loop.quit)
+        return not self.is_export_busy()
+
+    def cleanup(self) -> bool:
+        """Return whether export teardown completed within the close wait budget."""
+        return self.wait_for_export(_WORKER_FINISH_WAIT_MS)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Refuse to close while an export worker is still owned after the wait budget."""
+        if not self.cleanup():
+            logger.warning(
+                "websocket_stream_export_worker_finish_wait_timeout "
+                "wait_ms=%d action=close_refused",
+                _WORKER_FINISH_WAIT_MS,
+            )
+            event.ignore()
+            return
+        super().closeEvent(event)
 
     def export_json(self, path: Path | str) -> None:
         """Export stream to a JSON transcript file on a background worker thread."""

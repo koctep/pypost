@@ -182,6 +182,36 @@ Parses template source for variable discovery (MCP secrets filtering). Uses the 
 
 Exposes resolver validation without rendering. Used by tests and future authoring checks.
 
+### `clear_cache() -> None`
+
+Clears this instance's compiled-template LRU cache (`_compile_template.cache_clear()`). Added
+in PYPOST-1286 as a test-isolation hook; there is no production caller. Not logged on purpose:
+it has no inputs and no failure mode, and a log would add noise to every test teardown.
+
+## Test isolation and the default catalog (PYPOST-1286)
+
+PYPOST-1286 hardened shared state after
+`test_strict_conversion_keeps_literal_fallback_for_unrelated_failed_token` flaked under
+full-suite parallel load:
+
+- **Immutable default catalog:** `_DEFAULT_CATALOG` in `pypost/core/function_registry.py` is a
+  `types.MappingProxyType`. Item assignment raises `TypeError`, so no test or caller can change
+  the catalog that every new `FunctionRegistry` copies. Add custom functions per instance with
+  `FunctionRegistry.register(...)` (see
+  [template_expression_functions.md](template_expression_functions.md)).
+- **`FunctionRegistry.reset()`:** restores a registry instance to a fresh copy of the default
+  catalog and the default strict set (`{"to_int"}`). It currently has no callers; deleting it
+  or routing `__init__` through it is tracked as PYPOST-1300.
+- **Test teardown:** `TestTemplateServiceRenderString` creates a new `TemplateService` in
+  `setUp` and calls `clear_cache()` in `tearDown`. The compile cache is per instance, so this
+  frees memory sooner but does not change isolation between tests. No autouse `conftest.py`
+  reset fixture was added; it was not needed.
+
+**Root cause not proven (PYPOST-1302):** no deterministic repro showed any of these changes
+being the fix for the strict-conversion flake. The fix is defensive, and the evidence is
+three passing full-suite parallel runs. If the test fails again, record the exception actually
+raised (`IntegerConversionError` or another error) and continue on PYPOST-1302.
+
 ## Troubleshooting
 
 | Symptom | Check |
@@ -191,6 +221,8 @@ Exposes resolver validation without rendering. Used by tests and future authorin
 | Hover differs from sent request for plain vars | Expected when chain depth/cycle limits apply in hover only |
 | Function hover matches send but send fails | Compare `render_path` metrics; validation runs on both paths |
 | Multiple `Environment` instances | Each fallback `TemplateService()` owns its own env — prefer injection from `main.py` |
+| `TypeError` on `_DEFAULT_CATALOG[...] = ...` | Read-only by design; use `register()` |
+| Strict-conversion fallback test flaky | See PYPOST-1302; capture the actual exception |
 
 ## PYPOST-134 verdict
 

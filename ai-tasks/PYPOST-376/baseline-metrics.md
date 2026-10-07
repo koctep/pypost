@@ -23,7 +23,7 @@
 | `pypost/core/request_manager.py` | 201 | 250 | 264 |
 | `pypost/core/request_service.py` | 95 | 437 | — |
 | `pypost/core/storage.py` | 80 | 364 | 380 |
-| `pypost/core/template_service.py` | 36 | 260 | 265 |
+| `pypost/core/template_service.py` | 36 | 264 | 265 |
 | `pypost/core/websocket_registry.py` | — | 129 | 131 |
 | `pypost/ui/mcp_server_controller.py` | — | 722 | 795 |
 | `pypost/ui/presenters/collections_presenter.py` | — | 522 | 535 |

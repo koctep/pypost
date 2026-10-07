@@ -22,6 +22,9 @@ class TestTemplateServiceRenderString(unittest.TestCase):
     def setUp(self):
         self.svc = TemplateService()
 
+    def tearDown(self):
+        self.svc.clear_cache()
+
     def test_render_known_variable(self):
         result = self.svc.render_string("Hello {{ name }}", {"name": "World"})
         self.assertEqual("Hello World", result)

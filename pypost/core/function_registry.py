@@ -8,6 +8,7 @@ import base64
 import hashlib
 import os
 import re
+from types import MappingProxyType
 from typing import Any, Callable
 from urllib.parse import quote
 
@@ -53,7 +54,7 @@ def _env(name: object) -> str:
     return os.environ.get(key_name, "")
 
 
-_DEFAULT_CATALOG: dict[str, Callable[..., Any]] = {
+_DEFAULT_CATALOG: MappingProxyType[str, Callable[..., Any]] = MappingProxyType({
     "urlencode": _urlencode,
     "md5": _md5,
     "base64": _base64_encode,
@@ -61,7 +62,7 @@ _DEFAULT_CATALOG: dict[str, Callable[..., Any]] = {
     "env": _env,
     "to_adf": to_adf,
     "to_json_string": to_json_string,
-}
+})
 
 
 class FunctionRegistry:
@@ -70,6 +71,11 @@ class FunctionRegistry:
     def __init__(self) -> None:
         self._functions: dict[str, Callable[..., Any]] = dict(_DEFAULT_CATALOG)
         self._strict_functions: set[str] = {"to_int"}
+
+    def reset(self) -> None:
+        """Restore the pristine default catalog and strict-conversion set."""
+        self._functions = dict(_DEFAULT_CATALOG)
+        self._strict_functions = {"to_int"}
 
     def allowed_names(self) -> frozenset[str]:
         """Immutable set of permitted function names for template expressions."""
