@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,6 +18,7 @@ import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QPushButton
 
+from pypost.models.models import Collection
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.ui.widget_ids import COLLECTION_IMPORT_BUTTON
 from tests.helpers.collections_tree import (
@@ -70,11 +72,14 @@ def test_event_loop_stays_responsive_during_collection_import_parse(
     timer_during_parse: list[bool] = []
     busy_during_parse: list[bool] = []
 
-    def slow_read_import_file(path: Path):
+    def slow_read_import_file(
+        path: Path, *, on_progress: Callable[[int, int], None]
+    ) -> tuple[list[Collection], list[str]]:
         assert path == _PATH
         parse_started.set()
         try:
             time.sleep(_PARSE_HOLD_S)
+            on_progress(1, 1)
             return [incoming], []
         finally:
             parse_finished.set()

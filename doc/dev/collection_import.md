@@ -81,6 +81,14 @@ refresh the tree, apply results, or emit a collections-changed event. Cancellati
 and best-effort: a reader must call `on_progress` to be interruptible during its record loop, and
 file decoding or one expensive record can delay observation. No forcible thread termination is used.
 
+**PYPOST-1266** makes that cancellation contract explicit for every background file reader.
+`ReadImportFile` is a structural protocol requiring the `on_progress` keyword. The worker calls
+the reader once with its checkpoint, without signature inspection or a no-callback fallback.
+Supported functions, bound methods, callable objects, and opaque callables all use the same
+checkpoint path; single-argument readers must be migrated. The production parser retains its
+optional callback for synchronous callers. Focused contract tests cover reader shapes, cancellation,
+and real JSON parsing without changing the conflict/apply workflow or decoding latency guarantee.
+
 **PYPOST-1230** extracts the repeated presenter-import wait used by the collection-import UI tests
 into the test-only `tests/helpers/collection_import_wait.py` module. It does not add a production
 dependency or change the import lifecycle; it centralizes the test condition that an expected
@@ -178,7 +186,7 @@ CollectionsPresenter.panel          Import Collection… button (COLLECTION_IMPO
         ▼  delegates
 CollectionImportActions (QObject)   pick → async parse → prompt → plan → apply → refresh
         │
-        ├─ CollectionImportParseWorker  QThread: read_import_file(path)
+        ├─ CollectionImportParseWorker  QThread: reader(path, on_progress=checkpoint)
         ├─ Busy cue                     status bar + Import button disabled
         ├─ collection_item_dialogs      QFileDialog + conflict / invalid / result boxes
         ├─ collection_import            pure: parse, conflicts, id reservation, plan, summary
@@ -204,11 +212,12 @@ After:
   ids, computes the resulting collection list, recounts plan results against save
   failures (`recount_collection_import_plan`), and formats the summary text. Directly
   unit-testable without a `QApplication` or a data directory. Called from the parse
-  worker via the injected `read_import_file` callable (default
+  worker via the injected `ReadImportFile` implementation (default
   `load_collection_import_candidates`).
 - **`pypost/core/qt/collection_import_parse_worker.py`** —
-  `CollectionImportParseWorker` (`QThread`). Runs `read_import_file(path)` off the GUI
-  thread; emits `parse_completed(collections, parse_errors)`, `parse_failed(error)`, or
+  declares the structural `ReadImportFile` protocol and owns `CollectionImportParseWorker`
+  (`QThread`). Calls `reader(path, on_progress=checkpoint)` off the GUI thread without signature
+  inspection or fallback; emits `parse_completed(collections, parse_errors)`, `parse_failed(error)`, or
   `parse_cancelled()`. No widget access. Same one-shot worker shape as `PasteJsonFormatWorker` /
   `CollectionStorageWorker` — not a reuse of `CollectionStorageGateway` (different I/O:
   user-chosen file vs data-dir load).
@@ -241,8 +250,8 @@ After:
   sidebar tab now mounts `presenter.panel` (a `QWidget` holding the tree plus an action
   row) instead of the bare tree; `presenter.widget` still returns the `QTreeView`, so
   existing callers and automation are unaffected. Injects status-bar show/clear hooks
-  for the preparing cue; keeps the optional `read_import_file` DI seam. Exposes
-  `wait_import_idle()` and `teardown()` delegating to `CollectionImportActions` for clean
+  for the preparing cue; types the optional `read_import_file` DI seam as `ReadImportFile | None`.
+  Exposes `wait_import_idle()` and `teardown()` delegating to `CollectionImportActions` for clean
   worker termination and panel closure (PYPOST-1148, PYPOST-1182).
 
 ### Async parse and busy cue (PYPOST-1005)
@@ -255,7 +264,8 @@ After:
      to `MSG_IMPORT_VALIDATING` (“Validating collections ({done}/{total})…”) as
      `parse_progress(done, total)` signals arrive from the worker.
    - Import button (`COLLECTION_IMPORT_BUTTON`) disabled via `findChild` on the panel.
-4. Worker runs `read_import_file` off-thread; emits completed, failed, or cancelled.
+4. Worker calls the reader off-thread with the required `on_progress` keyword; emits completed,
+   failed, or cancelled.
 5. If teardown requests interruption, the worker normally exits through `parse_cancelled`;
    however, the final best-effort publication race can still result in `parse_completed` if
    interruption arrives between the final check and emission. In the normal cancellation path,
@@ -282,7 +292,7 @@ sequenceDiagram
     participant R as read_import_file
     UI->>W: start()
     W->>W: Check interruption before reader
-    W->>R: read_import_file(path, on_progress)
+    W->>R: reader(path, on_progress=checkpoint)
     R-->>W: on_progress(done, total)
     W->>W: Emit parse_progress; check interruption
     UI->>W: requestInterruption() during teardown
@@ -290,9 +300,12 @@ sequenceDiagram
     UI->>UI: Set IDLE; clear cue; discard parse result
 ```
 
-The production reader, `load_collection_import_candidates`, invokes `on_progress(done, total)`
-once per record. The worker's callback first emits `parse_progress` and then checks
-`isInterruptionRequested()`. If the flag is set, an internal `CollectionImportCancelled`
+Every supported reader must invoke the supplied checkpoint at its existing safe record boundaries
+and let callback exceptions propagate immediately. The production reader,
+`load_collection_import_candidates`, invokes `on_progress(done, total)` once per record, including
+invalid records. Loading and decoding precede those checkpoints. The worker's callback first emits
+`parse_progress` and then checks `isInterruptionRequested()`. If the flag is set, an internal
+`CollectionImportCancelled`
 exception unwinds the reader call into `run()`, which catches it and emits exactly one
 `parse_cancelled()` signal. A final check after the reader returns narrows, but does not
 eliminate, the publication race: if interruption is observed after the last progress callback,
@@ -431,9 +444,12 @@ Reads and parses an import file. A single JSON object is normalized to a one-ite
 
 - **path**: `Path` to the file to read.
 - **on_progress**: Optional callback invoked as `on_progress(done, total)` once per record.
-  The worker uses this callback as its cooperative cancellation checkpoint.
+  It remains optional for synchronous core and library callers. The background worker always
+  supplies it as its cooperative cancellation checkpoint, including for invalid records.
 - **Returns**: candidate collections, and one formatted message per rejected record.
 - **Raises**: `CollectionImportFileError` for file-level problems only.
+  Exceptions from `on_progress` propagate without becoming per-record validation errors; the
+  worker catches its internal cancellation exception and emits `parse_cancelled`.
 
 ### `find_collection_conflicts(existing, incoming) -> list[str]`
 
@@ -538,9 +554,39 @@ The synchronization guarantee works as follows:
    ensure selection, expansion state, and downstream listeners (e.g. MCP endpoints) reflect
    the durable collection set.
 
+### `ReadImportFile` (PYPOST-1266)
+
+The dependency boundary is declared in `pypost/core/qt/collection_import_parse_worker.py`:
+
+```python
+class ReadImportFile(Protocol):
+    def __call__(
+        self,
+        path: Path,
+        /,
+        *,
+        on_progress: Callable[[int, int], None],
+    ) -> tuple[list[Collection], list[str]]: ...
+```
+
+`path` is positional-only in the protocol so an implementation may name it `_path` without
+affecting compatibility. `on_progress` is a required keyword at the worker boundary. An
+implementation may give the callback an optional default, as the production parser does, provided
+it accepts the supplied keyword and invokes it at safe record checkpoints. Callback exceptions
+must unwind immediately; do not catch them as record errors or continue processing after them.
+
+The protocol is structural: no inheritance, registration, or runtime protocol check is needed.
+Supported shapes include keyword-only and positional-or-keyword callback functions, bound methods,
+callable objects, and correctly typed `**kwargs` forwarding. Opaque callable metadata, including
+unavailable `__signature__` information, does not affect compatibility because the worker does not
+inspect it. A positional-only callback, a differently named keyword without forwarding, or a
+single-argument reader is unsupported. Typing describes call compatibility; contract tests verify
+the checkpoint behavior.
+
 ### `CollectionImportParseWorker`
 
-Background `QThread` that calls the injected `read_import_file(path)` and emits:
+Background `QThread` that, after its pre-read interruption guard passes, calls the injected reader
+exactly once as `reader(path, on_progress=checkpoint)` and emits:
 
 - `parse_completed` — `(list[Collection], list[str])` candidates and per-record errors
 - `parse_failed` — `CollectionImportFileError` or an unexpected `Exception`
@@ -553,6 +599,10 @@ and a short `wait(100)` before dropping the reference (same PYPOST-829 pattern a
 `parse_cancelled` is mutually exclusive with `parse_completed` and `parse_failed` for one
 worker run. It is emitted only for cooperative interruption observed by the worker; it is not
 an error signal.
+
+A reader that cannot accept `on_progress` raises `TypeError` during argument binding. The existing
+unexpected-exception handler logs the error and emits `parse_failed(TypeError)`; it never retries
+without the callback. For a single-argument function, its body does not execute.
 
 ### `CollectionImportActions`
 
@@ -597,22 +647,8 @@ an error signal.
   GUI thread when ready. Callers and the button wire-up do not change.
 
 Constructor DI (beyond the original refresh/emit hooks): optional `show_status` /
-`clear_status` for the preparing message; `read_import_file` for the worker.
-
-When supplying `read_import_file`, prefer the supported callback shape:
-
-```python
-def read_import_file(
-    path: Path,
-    on_progress: Callable[[int, int], None] | None = None,
-) -> tuple[list[Collection], list[str]]:
-    ...
-```
-
-Call `on_progress(done, total)` once per record and let exceptions from that callback propagate.
-The worker uses that callback as its per-record cancellation checkpoint. A legacy one-argument
-reader remains supported, but can only observe interruption before it starts or after it returns;
-it cannot be stopped during its internal work.
+`clear_status` for the preparing message; `read_import_file: ReadImportFile` for the worker.
+Supply a reader meeting the protocol above, including its checkpoint and exception obligations.
 
 ### `CollectionsPresenter.wait_import_idle(timeout_ms: int = 5000) -> bool`
 
@@ -638,14 +674,40 @@ state.
 
 ### Testing seam
 
-`CollectionsPresenter.__init__` accepts an optional `read_import_file` callable,
-defaulting to `load_collection_import_candidates`. Qt tests inject a stub reader to
+`CollectionsPresenter.__init__` accepts `read_import_file: ReadImportFile | None`,
+defaulting to `load_collection_import_candidates`. Qt tests inject a compatible stub reader to
 exercise the flow without touching disk; the end-to-end test omits it and drives the real
 parser, `RequestManager`, and `StorageManager` against a `tmp_path`.
 
 Because parse is async, UI tests must wait for completion rather than asserting immediately after
 `import_collections()`. Use the shared `wait_import()` helper below for the normal outcome-plus-idle
-contract. Stubs used from the worker thread must be thread-safe.
+contract. Stubs used from the worker thread must be thread-safe, accept `on_progress`, and let
+checkpoint exceptions propagate. Record-processing stubs must invoke the checkpoint; a file-error
+stub that fails before any record exists need not emit synthetic progress.
+
+### Reader contract regression coverage (PYPOST-1266)
+
+`tests/test_collection_import_reader_contract.py` covers successful results/progress and
+first-checkpoint cancellation for all six supported shapes, including opaque callable metadata.
+Its original opaque-reader regression verifies exactly one cancellation signal, one processed
+record, and no completion or failure. Production JSON cases exercise valid and invalid records,
+checking normal candidates/errors/progress and cancellation at either record without publication.
+
+`tests/test_collection_import_progress.py` verifies that a legacy single-argument reader is rejected
+with `TypeError` before its body runs, with no completion or cancellation and the existing ERROR
+log. Run the focused checks through Make:
+
+```bash
+make test WORKERS=1 WORKER_TIMEOUT=60 \
+  PYTEST_ARGS="tests/test_collection_import_reader_contract.py \
+    tests/test_collection_import_progress.py"
+```
+
+The contract module uses an explicit 30-second test timeout, direct-connected signal capture for
+deterministic checkpoint interruption, and bounded 5000 ms worker waits/cleanup. The progress
+module has a 60-second test timeout. These checks supplement existing presenter cancellation and
+final-publication guard tests. Broader JSON/YAML and lifecycle matrices remain PYPOST-1265 scope;
+the former legacy-success expectation is now rejection coverage.
 
 ### Shared import wait helper for presenter tests (PYPOST-1230)
 
@@ -886,6 +948,8 @@ synchronization against durable storage:
 There is no new application setting, environment variable, on-disk format,
 `StorageInterface` method, or third-party dependency. The file-dialog filter, caption, and
 preparing status text are constants in `collection_messages.py`.
+PYPOST-1266 changes the injected reader contract through types and direct invocation; there is no
+compatibility flag to restore readers that omit the checkpoint keyword.
 
 The lifecycle methods expose bounded waits for callers that need a different test or teardown
 budget:
@@ -989,7 +1053,8 @@ PYPOST-987. A parse that returns no valid collections also emits that event with
 Unexpected reader exceptions follow a different path: the worker logs
 `collection_import_parse_worker_failed` at ERROR level, and the orchestrator logs
 `collection_import_parse_unexpected` at ERROR level before showing the invalid-file dialog.
-They do not emit `collection_import_file_invalid`.
+They do not emit `collection_import_file_invalid`. Unsupported single-argument readers take this
+path with `TypeError`; no additional logging or metrics configuration is required by PYPOST-1266.
 
 PYPOST-1006 asserts both orchestrator `reason`s via `caplog` in
 `tests/test_collections_import_ui.py` (`test_logs_file_invalid_on_parse_failure`
@@ -1107,24 +1172,32 @@ the collection id, not its name.
   - Fix: Call `presenter.teardown()` in a `finally` block and use
     `wait_import_idle()` before assertions (PYPOST-1148).
 
+- **Custom reader fails with an unexpected `on_progress` keyword**
+  - Cause: The reader does not implement `ReadImportFile`. Single-argument readers are no longer
+    accepted by the background worker; argument binding raises `TypeError` and emits `parse_failed`.
+  - Fix: Add the `on_progress` keyword to the reader or forward it through a compatible wrapper.
+    Invoke it at safe record boundaries and let its exceptions propagate immediately. An optional
+    callback default is allowed, but the worker always supplies the callback. Do not discard it
+    in a wrapper or retry without it.
+
 - **Panel close does not cancel promptly**
   - Cause: The reader is decoding a large file, processing one expensive record, or does
     not invoke `on_progress`.
-  - Fix: Treat cancellation as cooperative. Use the supported reader callback shape and
-    keep per-record work bounded. Large-file decoding and single-record latency are
+  - Fix: Treat cancellation as cooperative. A custom reader that never invokes its supplied
+    callback violates the contract; restore its safe record checkpoints and exception propagation.
+    Keep per-record work bounded. Large-file decoding and single-record latency are
     tracked by [PYPOST-1267](https://pypost.atlassian.net/browse/PYPOST-1267).
 
 - **`parse_completed` appears after cancellation was requested**
   - Cause: `parse_completed` may already have been published before interruption was requested,
     or interruption can arrive in the small residual window after the final guard and before
-    `parse_completed.emit()`. A legacy reader without `on_progress` delays interruption
-    observation while its own work is running, but the final guard still applies when the reader
-    returns. The residual publication race is the only path that can publish after the final
-    check.
+    `parse_completed.emit()`. Supported readers all receive the checkpoint, and the final guard
+    also checks interruption after the reader returns. That guard does not make the check and
+    publication atomic.
   - Fix: Check the worker and presenter cancellation logs. The final post-reader guard narrows
     but does not eliminate the publication race; interruption can still arrive between that
-    check and `parse_completed.emit()`. A legacy reader may be uninterruptible during its own
-    work, and cancellation does not roll back work already in `APPLYING`.
+    check and `parse_completed.emit()`. The typed contract does not remove that residual race,
+    and cancellation does not roll back work already in `APPLYING`.
 
 - **WARNING `collection_import_worker_interrupt_timeout`**
   - Cause: The worker failed to stop within the bounded 100 ms interruption join.
@@ -1134,17 +1207,18 @@ the collection id, not its name.
 
 ### Known follow-ups
 
-The cooperative cancellation and lifecycle behavior have these linked follow-ups, as recorded
-in [PYPOST-1229 technical debt](../../ai-tasks/PYPOST-1229/60-tech-debt.md):
+The reader-dependent guarantee gap from
+[PYPOST-1229 technical debt](../../ai-tasks/PYPOST-1229/60-tech-debt.md) is resolved by
+PYPOST-1266's typed protocol, direct invocation, migrated fakes, and focused contract tests.
+Remaining cancellation and lifecycle work is recorded in
+[PYPOST-1266 technical debt](../../ai-tasks/PYPOST-1266/60-tech-debt.md):
 
 - **[PYPOST-1264](https://pypost.atlassian.net/browse/PYPOST-1264)** — consolidate teardown
   interruption and join policy, including review of the inherited 5000 ms and 100 ms budgets.
 - **[PYPOST-1265](https://pypost.atlassian.net/browse/PYPOST-1265)** — expand cancellation
-  coverage with real JSON/YAML input, pre-start interruption, exact signal counts, and the
-  legacy-reader contract.
-- **[PYPOST-1266](https://pypost.atlassian.net/browse/PYPOST-1266)** — define a typed
-  cancellation-aware `ReadImportFile` protocol, remove the dynamic reader fallback, and add
-  contract tests for supported reader shapes.
+  coverage with broader real JSON/YAML and lifecycle matrices, including pre-start interruption.
+  Account for PYPOST-1266's focused JSON, exact-signal, and single-argument rejection checks;
+  legacy-reader success is no longer supported.
 - **[PYPOST-1267](https://pypost.atlassian.net/browse/PYPOST-1267)** — make large-file
   loading/decoding cancellation-aware through streaming or bounded decode checkpoints, with
   a cancellation-latency test.

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from pathlib import Path
 
 from PySide6.QtCore import QModelIndex, QObject, Qt, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
@@ -13,6 +12,7 @@ from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.request_persisted_fields import copy_request_for_isolated_tab
 from pypost.core.request_manager import RequestManager
+from pypost.core.qt.collection_import_parse_worker import ReadImportFile
 from pypost.core.qt.state_manager import StateManager
 from pypost.models.models import Collection, RequestData
 from pypost.models.mcp_client import McpClientConnection
@@ -59,9 +59,7 @@ class CollectionsPresenter(QObject):
         storage=None,
         parent: QObject | None = None,
         *,
-        read_import_file: (
-            Callable[[Path], tuple[list[Collection], list[str]]] | None
-        ) = None,
+        read_import_file: ReadImportFile | None = None,
         serialize_collection: Callable[[Collection], dict] | None = build_export_payload,
         library_manager: object | None = None,
         library_import_service: object | None = None,
