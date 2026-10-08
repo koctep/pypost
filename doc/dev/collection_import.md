@@ -41,7 +41,9 @@ and `CollectionImportActions` updates the status bar with `MSG_IMPORT_VALIDATING
 Profiling confirmed that in-memory planning executes in ~20ms (< 100ms budget) and batch persistence
 executes with minimal latency, validating that keeping plan/apply on the GUI thread avoids unnecessary
 threading complexity while maintaining interactive responsiveness. Automated benchmarks reside in
-`tests/test_collection_import_profile.py`.
+`tests/test_collection_import_profile.py`. **PYPOST-1263** changed the large-dataset planner
+benchmark to gate on a current-thread CPU-work budget instead of wall time; see
+[Planner CPU-work benchmark](#planner-cpu-work-benchmark-pypost-1263).
 
 **PYPOST-1063** closes remaining asynchronous collection-import test gaps, adding automated test
 coverage for busy re-entry prevention, unexpected reader exceptions caught by the worker thread,
@@ -1028,6 +1030,69 @@ synchronization against durable storage:
   (`manager.get_collections()`), and the rendered `QTreeView` hierarchy (top-level collection
   rows and child request items) strictly match the durably saved state.
 
+### Planner CPU-work benchmark (PYPOST-1263)
+
+`tests/test_collection_import_profile.py::test_plan_collection_import_large_dataset_performance`
+plans 500 incoming collections (2,500 requests, 25 conflicts covering all three decision types)
+against 50 existing ones. The fixture and conflict discovery run before the timed interval.
+
+- **What it measures**: current-thread CPU time (`time.thread_time()`) around the single
+  `plan_collection_import` call. The gate is strict: `cpu_ms < 100.0`. Wall time
+  (`time.perf_counter()`) is measured around the same call, but only appears in the failure
+  message.
+- **What it does not measure**: user-visible UI wall latency. The test is a CPU-work budget for
+  the planner. It does not guarantee a 100ms response on a loaded host.
+- **Why**: the earlier wall-clock gate failed intermittently under parallel full-suite load. The
+  same run passed at about 49ms in isolation. Descheduling and contention from other workers
+  were counted as planner time. Thread CPU time leaves out time the thread is not running and
+  work done by other threads. The budget was not raised, and no retries or skips were added.
+- **Assumption**: the planner is synchronous and in-memory. If it starts handing work to another
+  thread or doing blocking I/O, `thread_time()` will under-count that work and the gate must be
+  revisited.
+
+A failure looks like this:
+
+```text
+plan_collection_import used 132.40ms thread CPU, exceeding 100ms CPU budget (wall elapsed: 140.12ms)
+```
+
+Read it as follows:
+
+- High CPU with wall close to CPU means the planner does more work than before. Treat it as a
+  real regression and profile the planner.
+- High CPU with much higher wall time still means a CPU regression. The extra wall time is
+  scheduling delay on top of it.
+- High wall time alone never fails this test. If a wall-time assertion fails in this module, it
+  is one of the remaining wall-gated tests listed below.
+
+Deterministic regressions for the gating policy live in
+`tests/test_collection_import_profile_clock.py`
+(`test_planner_benchmark_distinguishes_cpu_work_from_wall_delay`). They replace the profile
+module's `time` binding with fake clocks and wrap the real planner in a spy. Four cases are
+covered: `external-descheduling` (20ms CPU, 500ms wall passes), `excess-planner-work` and
+`strict-cpu-boundary` (150ms and exactly 100ms CPU fail), and `synthetic-low-wall-high-cpu`
+(150ms CPU fails even with 10ms wall). They also check that both clocks are read exactly twice,
+after fixture setup and around the one planner call. Because they patch the module-level `time`,
+`plan_collection_import`, `_make_sample_collections`, and `find_collection_conflicts` names,
+renaming those or switching the benchmark to `from time import ...` makes these tests fail.
+
+Run both modules through Make:
+
+```bash
+make test WORKERS=1 PYTEST_ARGS='tests/test_collection_import_profile.py tests/test_collection_import_profile_clock.py'
+```
+
+Remaining wall-clock gates (not changed by PYPOST-1263):
+
+- **[PYPOST-1318](https://pypost.atlassian.net/browse/PYPOST-1318)**:
+  `test_plan_collection_import_conflict_matrix_profile` (50ms wall) and
+  `test_apply_imported_collections_performance` (500ms wall) in the same module can still flake
+  under contention.
+- **[PYPOST-1317](https://pypost.atlassian.net/browse/PYPOST-1317)**: Qt event-loop latency
+  thresholds in `tests/test_pypost_1242_failing_repro.py` and
+  `tests/test_websocket_echo_server.py`. Wall latency is the real metric there, so they need
+  their own design rather than a switch to CPU time.
+
 ## Configuration
 
 There is no new application setting, environment variable, on-disk format,
@@ -1300,6 +1365,14 @@ the collection id, not its name.
   - Fix: Check whether the custom reader is blocked in uninterruptible I/O or decoding,
     or in a long single-record operation. No forcible termination fallback exists
     (PYPOST-1229).
+
+- **`test_plan_collection_import_large_dataset_performance` fails with "thread CPU, exceeding
+  100ms CPU budget"**
+  - Cause: The planner used at least 100ms of current-thread CPU. Host contention alone does
+    not cause this failure; it adds wall time, not thread CPU.
+  - Fix: Treat it as a planner work regression and profile `plan_collection_import`. Use the
+    wall value in the message only as context. See
+    [Planner CPU-work benchmark](#planner-cpu-work-benchmark-pypost-1263).
 
 ### Known follow-ups
 
