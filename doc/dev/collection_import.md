@@ -78,8 +78,8 @@ and back to `IDLE` as its last statement, closing the gap. See [State machine
 `parse_completed`. An interrupted parse emits `parse_cancelled`; it does not emit a completion or
 failure signal. The presenter returns to `IDLE`, clears its busy cue, and does not show a dialog,
 refresh the tree, apply results, or emit a collections-changed event. Cancellation is cooperative
-and best-effort: a reader must call `on_progress` to be interruptible during its record loop, and
-file decoding or one expensive record can delay observation. No forcible thread termination is used.
+and best-effort: a reader must call `on_progress` to be interruptible, and one expensive record
+or an uninterruptible native operation can delay observation. No forcible termination is used.
 
 **PYPOST-1266** makes that cancellation contract explicit for every background file reader.
 `ReadImportFile` is a structural protocol requiring the `on_progress` keyword. The worker calls
@@ -88,6 +88,11 @@ Supported functions, bound methods, callable objects, and opaque callables all u
 checkpoint path; single-argument readers must be migrated. The production parser retains its
 optional callback for synchronous callers. Focused contract tests cover reader shapes, cancellation,
 and real JSON parsing without changing the conflict/apply workflow or decoding latency guarantee.
+
+**PYPOST-1267** adds preparation checkpoints during production file loading and JSON/YAML
+decoding, including YAML fallback and long scalar values. Direct callbacks receive `(0, 0)`
+before record totals are known; the worker consumes these checks without emitting GUI progress.
+See [Preparation checkpoints](#preparation-checkpoints-pypost-1267) for measured latency and limits.
 
 **PYPOST-1230** extracts the repeated presenter-import wait used by the collection-import UI tests
 into the test-only `tests/helpers/collection_import_wait.py` module. It does not add a production
@@ -214,6 +219,9 @@ After:
   unit-testable without a `QApplication` or a data directory. Called from the parse
   worker via the injected `ReadImportFile` implementation (default
   `load_collection_import_candidates`).
+- **`pypost/core/collection_import_decode.py`** — Qt-free UTF-8 reading and instance-local
+  cooperative JSON and safe YAML decoders. Used during preparation when a callback is supplied;
+  synchronous calls without a callback retain standard-library JSON and PyYAML decoding.
 - **`pypost/core/qt/collection_import_parse_worker.py`** —
   declares the structural `ReadImportFile` protocol and owns `CollectionImportParseWorker`
   (`QThread`). Calls `reader(path, on_progress=checkpoint)` off the GUI thread without signature
@@ -293,7 +301,9 @@ sequenceDiagram
     UI->>W: start()
     W->>W: Check interruption before reader
     W->>R: reader(path, on_progress=checkpoint)
-    R-->>W: on_progress(done, total)
+    R-->>W: on_progress(0, 0) during preparation
+    W->>W: Check interruption; suppress progress signal
+    R-->>W: on_progress(done, total) for a record
     W->>W: Emit parse_progress; check interruption
     UI->>W: requestInterruption() during teardown
     W-->>UI: parse_cancelled()
@@ -303,7 +313,8 @@ sequenceDiagram
 Every supported reader must invoke the supplied checkpoint at its existing safe record boundaries
 and let callback exceptions propagate immediately. The production reader,
 `load_collection_import_candidates`, invokes `on_progress(done, total)` once per record, including
-invalid records. Loading and decoding precede those checkpoints. The worker's callback first emits
+invalid records, and sends `(0, 0)` during preparation (PYPOST-1267). The worker checks interruption
+and returns without a progress signal for `(0, 0)`. For real record progress it first emits
 `parse_progress` and then checks `isInterruptionRequested()`. If the flag is set, an internal
 `CollectionImportCancelled`
 exception unwinds the reader call into `run()`, which catches it and emits exactly one
@@ -319,6 +330,79 @@ join. After that bounded join attempt, the worker reference is cleared and the a
 forced to `IDLE`, even if the join times out. This is a cooperative stop, not a kill: a reader
 blocked in I/O or decoding may still be running after the wait and cause teardown to return
 `False` with a timeout warning.
+
+### Preparation checkpoints (PYPOST-1267)
+
+With a callback, `load_collection_import_candidates` delegates preparation to
+`collection_import_decode.read_import_document(path, checkpoint=None)`. The callback remains
+optional for synchronous use; the worker always supplies it through the existing required
+`ReadImportFile.on_progress` keyword. No second cancellation argument is required of injected
+readers. `(0, 0)` means preparation is active and record totals are unknown; it does not mean
+validation is complete or provide a byte percentage. Direct consumers should filter this sentinel
+before calculating record progress. Positive counts remain one update per record, including invalid
+records, in input order.
+
+UTF-8 text reads use chunks of at most 64 Ki characters with checks before and after each read.
+The JSON decoder uses bounded 4096-character lexical windows for strings, keys, numbers, and
+whitespace, plus an explicit container stack with checks during descent and unwinding. The safe
+YAML loader checks printable input and forwarding in bounded windows, every 4096 lookahead calls,
+and at composition/construction boundaries. Merge assembly checks each source/sequence member and
+each batch of at most 4096 entries. Root list validation also checks every 4096 entries. Parsing
+state belongs to each invocation; cancellation does not modify global parser functions.
+
+The iterative JSON path preserves successful 600/900-level standard-decoder inputs without
+changing the process recursion limit. It can also accept deeper valid JSON that `json.loads()`
+would reject with `RecursionError`. This broader acceptance does not guarantee arbitrary-depth
+collection-model validation. Python or PyYAML upgrades should rerun the differential coverage in
+`tests/test_collection_import_decode.py`; the adapted parser behavior and upstream licenses are
+kept in the helper. Detailed implementation decisions are in the
+[task architecture](../../ai-tasks/PYPOST-1267/20-architecture.md).
+
+#### Format selection, exceptions, and cleanup
+
+`.yaml`/`.yml` files use safe YAML decoding. Other suffixes try JSON first; only a JSON syntax
+failure triggers YAML fallback. Fallback accepts an object or list, and otherwise preserves the
+original JSON error, including when YAML raises an ordinary constructor exception such as an
+invalid timestamp `ValueError`. Direct YAML constructor `ValueError` still propagates unchanged;
+ordinary YAML syntax errors retain their file-error translation.
+
+The reader protects preparation callbacks with a private exception carrier before entering I/O
+translation or fallback. It unwraps outside those scopes, preserving the original callback
+exception object and traceback, including `OSError`, `ValueError`, `yaml.YAMLError`, and worker
+cancellation. Callback errors must never trigger YAML retry or become file/record errors. File
+handles close through a context manager; YAML loaders are disposed in `finally`, including
+interruption during initialization. The helper's optional `checkpoint` parameter is an internal
+seam: callers integrating it with broad parser-error translation must use the same origin
+protection. Application callers should use `load_collection_import_candidates`.
+
+#### Measured cancellation bound and regression usage
+
+The accepted regression limit is **1000 ms from interruption request until the worker stops**
+on the normal test environment with readable local files. All 11 real-file cases use inputs of
+at least 16 MiB (16,777,242–17,351,716 bytes). They request cancellation during observed active
+loading or lexical scanning, then allow actual work before the next production checkpoint;
+pre-start cancellation and completed decoding do not satisfy these checks. Scenarios include
+JSON, YAML, fallback YAML, bundles, and retained large text values with plain/quoted YAML scalars.
+
+The final PYPOST-1267 run recorded loading at **1.197–1.985 ms**, JSON scanning at
+**0.412–0.636 ms**, and YAML/fallback scanning at **0.295–0.832 ms**. The run exported fixture
+bytes, phase, shape, format, limit, and measured latency to `/tmp/PYPOST-1267-latency.xml`.
+That temporary report is execution evidence, not a required repository artifact. Reproduce the
+focused checks through Make:
+
+```bash
+make test WORKERS=1 WORKER_TIMEOUT=180 \
+  PYTEST_ARGS="tests/test_collection_import_decode_cancellation.py"
+make test WORKERS=1 WORKER_TIMEOUT=60 \
+  PYTEST_ARGS="tests/test_collection_import_decode.py tests/test_collection_import_progress.py"
+```
+
+The measurements exclude operating-system/storage stalls, resource exhaustion, and abnormal
+scheduling; they are not a hard real-time guarantee for arbitrary inputs. Native allocations,
+final joins/list assembly, numeric conversion, and inherited YAML scalar resolver/constructor
+work cannot be interrupted mid-operation. One expensive model-validation record can still delay
+its next checkpoint. The whole text and decoded tree remain in memory with temporary chunk/string
+pieces; no streaming-memory, throughput, maximum-file-size, or arbitrary-depth guarantee is added.
 
 ### State machine (PYPOST-1228)
 
@@ -443,7 +527,8 @@ tree.
 Reads and parses an import file. A single JSON object is normalized to a one-item list.
 
 - **path**: `Path` to the file to read.
-- **on_progress**: Optional callback invoked as `on_progress(done, total)` once per record.
+- **on_progress**: Optional callback invoked as `on_progress(0, 0)` during preparation and
+  `on_progress(done, total)` once per record. Filter `(0, 0)` when displaying record progress.
   It remains optional for synchronous core and library callers. The background worker always
   supplies it as its cooperative cancellation checkpoint, including for invalid records.
 - **Returns**: candidate collections, and one formatted message per rejected record.
@@ -950,6 +1035,9 @@ There is no new application setting, environment variable, on-disk format,
 preparing status text are constants in `collection_messages.py`.
 PYPOST-1266 changes the injected reader contract through types and direct invocation; there is no
 compatibility flag to restore readers that omit the checkpoint keyword.
+PYPOST-1267's 64 Ki-character read size and 4096-unit scan/lookahead/assembly windows are internal
+bounded-work constants, not configurable file limits. There is no setting to enable checkpoints;
+supplying the callback selects cooperative preparation automatically.
 
 The lifecycle methods expose bounded waits for callers that need a different test or teardown
 budget:
@@ -1181,12 +1269,20 @@ the collection id, not its name.
     in a wrapper or retry without it.
 
 - **Panel close does not cancel promptly**
-  - Cause: The reader is decoding a large file, processing one expensive record, or does
-    not invoke `on_progress`.
+  - Cause: A custom reader omits preparation checkpoints, a native/storage operation stalls,
+    or one record's model validation is expensive.
   - Fix: Treat cancellation as cooperative. A custom reader that never invokes its supplied
     callback violates the contract; restore its safe record checkpoints and exception propagation.
-    Keep per-record work bounded. Large-file decoding and single-record latency are
-    tracked by [PYPOST-1267](https://pypost.atlassian.net/browse/PYPOST-1267).
+    Keep per-record work bounded. The production reader now checks active loading/decoding;
+    run the focused preparation regressions above to isolate a regression from environmental
+    stalls or custom reader behavior. Increasing a teardown budget does not add checkpoints.
+
+- **Direct callback reports zero totals or cancellation becomes a parse error**
+  - Cause: A consumer treats `(0, 0)` as record progress, or a wrapper catches checkpoint
+    exceptions inside a broad file/parser error handler.
+  - Fix: Consume `(0, 0)` as a preparation checkpoint, suppress record percentage updates,
+    and propagate callback exceptions. Use the public reader's origin-protection boundary;
+    preserve YAML fallback's original JSON error only for ordinary decoding failures.
 
 - **`parse_completed` appears after cancellation was requested**
   - Cause: `parse_completed` may already have been published before interruption was requested,
@@ -1219,9 +1315,6 @@ Remaining cancellation and lifecycle work is recorded in
   coverage with broader real JSON/YAML and lifecycle matrices, including pre-start interruption.
   Account for PYPOST-1266's focused JSON, exact-signal, and single-argument rejection checks;
   legacy-reader success is no longer supported.
-- **[PYPOST-1267](https://pypost.atlassian.net/browse/PYPOST-1267)** — make large-file
-  loading/decoding cancellation-aware through streaming or bounded decode checkpoints, with
-  a cancellation-latency test.
 - **[PYPOST-1261](https://pypost.atlassian.net/browse/PYPOST-1261)** — pre-existing malformed
   nested-expression, frozen SOLID snapshot, and process-level Qt baseline failures.
 - **[PYPOST-1262](https://pypost.atlassian.net/browse/PYPOST-1262)** — pre-existing,

@@ -17,7 +17,6 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 import uuid
 
 from pydantic import ValidationError
@@ -41,6 +40,9 @@ from pypost.core.collection_messages import (
     SUMMARY_WEBSOCKETS_IMPORTED,
     format_collection_entry_error,
     format_unnamed_entry_label,
+)
+from pypost.core.collection_import_decode import (
+    _CheckpointRaised, protect_checkpoint, read_import_document,
 )
 from pypost.core.import_conflicts import ImportConflictDecision, generate_import_copy_name
 from pypost.models.models import Collection, RequestData
@@ -74,50 +76,39 @@ class CollectionImportPlanResult:
     websocket_count: int = 0
 
 
-def _read_records(path: Path) -> list[dict]:
-    """Read the file and normalize its JSON or YAML root into a list of records."""
+def _read_records(
+    path: Path, checkpoint: Callable[[], None] | None = None,
+) -> list[dict]:
+    """Normalize records, unwrapping callback errors outside file translation."""
+    check = protect_checkpoint(checkpoint) if checkpoint is not None else None
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        logger.warning("collection_import_file_read_failed path=%s reason=%s", path, exc)
-        raise CollectionImportFileError(MSG_FILE_UNREADABLE.format(reason=exc)) from exc
-
-    data: Any = None
-    if path.suffix.lower() in (".yaml", ".yml"):
         try:
-            data = yaml.safe_load(text)
-        except yaml.YAMLError as exc:
-            logger.warning(
-                "collection_import_yaml_parse_failed path=%s reason=%s", path, exc
-            )
+            data = read_import_document(path, check)
+        except _CheckpointRaised:
+            raise
+        except OSError as exc:
+            logger.warning("collection_import_file_read_failed path=%s reason=%s", path, exc)
+            raise CollectionImportFileError(MSG_FILE_UNREADABLE.format(reason=exc)) from exc
+        except (json.JSONDecodeError, yaml.YAMLError) as exc:
+            logger.warning("collection_import_parse_failed path=%s reason=%s", path, exc)
             raise CollectionImportFileError(MSG_FILE_NOT_JSON.format(reason=exc)) from exc
-    else:
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as exc:
-            try:
-                data = yaml.safe_load(text)
-                if not isinstance(data, (dict, list)):
-                    logger.warning(
-                        "collection_import_json_parse_failed path=%s reason=%s", path, exc
-                    )
-                    raise CollectionImportFileError(MSG_FILE_NOT_JSON.format(reason=exc)) from exc
-            except Exception:
-                logger.warning(
-                    "collection_import_parse_failed path=%s reason=%s", path, exc
-                )
-                raise CollectionImportFileError(MSG_FILE_NOT_JSON.format(reason=exc)) from exc
 
-    if isinstance(data, dict):
-        records = [data]
-    elif isinstance(data, list):
-        records = data
-    else:
-        raise CollectionImportFileError(MSG_FILE_WRONG_ROOT)
-
-    if not all(isinstance(item, dict) for item in records):
-        raise CollectionImportFileError(MSG_FILE_ENTRY_NOT_OBJECT)
-    return records
+        if isinstance(data, dict):
+            records = [data]
+        elif isinstance(data, list):
+            records = data
+        else:
+            raise CollectionImportFileError(MSG_FILE_WRONG_ROOT)
+        for index, item in enumerate(records):
+            if check is not None and index % 4096 == 0:
+                check()
+            if not isinstance(item, dict):
+                raise CollectionImportFileError(MSG_FILE_ENTRY_NOT_OBJECT)
+        if check is not None:
+            check()
+        return records
+    except _CheckpointRaised as exc:
+        raise exc.original.with_traceback(exc.traceback) from None
 
 
 def _record_label(record: dict, index: int) -> str:
@@ -160,6 +151,8 @@ def load_collection_import_candidates(
     (normalized to a one-item list), matching what a copy of a stored
     ``collections/<id>.json`` file or a hand-shared bundle looks like.
 
+    ``on_progress(0, 0)`` checkpoints preparation before record totals are known.
+
     Raises:
         CollectionImportFileError: for file-level problems only (unreadable
             file, malformed JSON, a root that is neither a list nor an object,
@@ -167,7 +160,11 @@ def load_collection_import_candidates(
             reported through the returned error list instead, so one bad entry
             never blocks the rest of the file.
     """
-    records = _read_records(path)
+    def checkpoint() -> None:
+        if on_progress is not None:
+            on_progress(0, 0)
+
+    records = _read_records(path, checkpoint if on_progress is not None else None)
     total_records = len(records)
 
     collections: list[Collection] = []

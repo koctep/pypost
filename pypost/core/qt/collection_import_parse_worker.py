@@ -56,6 +56,10 @@ class CollectionImportParseWorker(QThread):
                 raise CollectionImportCancelled()
 
             def _emit_progress(done: int, total: int) -> None:
+                if (done, total) == (0, 0):
+                    if self.isInterruptionRequested():
+                        raise CollectionImportCancelled()
+                    return
                 self.parse_progress.emit(done, total)
                 if self.isInterruptionRequested():
                     raise CollectionImportCancelled()

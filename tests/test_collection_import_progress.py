@@ -50,6 +50,7 @@ def test_load_collection_import_candidates_invokes_on_progress_callback(tmp_path
 
     assert parse_errors == []
     assert len(collections) == 3
+    progress_calls = [event for event in progress_calls if event != (0, 0)]
     assert progress_calls == [(1, 3), (2, 3), (3, 3)]
 
 
@@ -130,6 +131,7 @@ def test_load_collection_import_candidates_mixed_valid_invalid(tmp_path):
 
     assert len(collections) == 2
     assert len(parse_errors) == 2
+    progress_calls = [event for event in progress_calls if event != (0, 0)]
     assert progress_calls == [(1, 4), (2, 4), (3, 4), (4, 4)]
 
 
