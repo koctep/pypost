@@ -285,8 +285,9 @@ one-line message. No new mutant or aggregate harness is required.
 After the diagnostic change, this focused validation should pass:
 
 ```bash
-make test PYTEST_ARGS='tests/test_display_role_scan_ownership_repro.py \
-  tests/test_display_role_scan_ownership.py -q'
+make test WORKERS=1 \
+  PYTEST_ARGS="tests/test_display_role_scan_ownership_repro.py \
+tests/test_display_role_scan_ownership.py"
 ```
 
 These messages are test-side quality-gate diagnostics. PYPOST-1240 is
@@ -323,6 +324,26 @@ cover the recursive/tree and item-view checks. `_refers_to_find_child` only
 recognises a first argument that names the *flat* finder, so it never sees the
 other two ownership pairs.
 
+PYPOST-1238 makes `_refers_to_find_child(arg: ast.expr) -> bool` strict for bare
+names: only `find_child` and `find_child_index_by_display_text` are accepted,
+case-sensitively. Every other `ast.Name` returns `False` immediately, including
+`child_fn`, `CHILD_FN`, and names containing the full function name as a substring.
+For non-name expressions, the existing `ast.dump` substring fallback remains;
+`tree_defs.get("find_child_index_by_display_text")` and the subscript form are
+still supported. This fallback is a source-shape heuristic, not semantic alias
+or lookup validation.
+
+Both `_has_find_child_delegation_check` and
+`_has_find_child_forbids_display_role_check` share that classifier. Focused
+parameterized tests exercise supported references and misleading names through
+both predicates. A separate source-string regression parses a tree-finder-only
+`for child_fn in (find_tree,):` loop and requires rejection: checking the tree
+finder through a misleading name cannot prove flat finder coverage. These tests
+parse source without executing it, inherit the module's ten-second timeout, and
+do not expand the broader mutation matrix tracked by PYPOST-1236. The command
+above runs both ownership modules. No application configuration, dependencies,
+or runtime behavior change is required for this test-guard correction.
+
 Two constraints follow from that coupling. Both apply when editing either
 file:
 
@@ -340,8 +361,8 @@ file:
 
   - The **`find_child`** pair is the one the repro watches.
     `_refers_to_find_child` accepts a first argument that is either an
-    `ast.Name` whose lowercased id contains `child`, *or* any expression whose
-    `ast.dump` contains `find_child_index_by_display_text` — so an inline
+    `ast.Name` with either exact supported name above, *or* a non-name expression
+    whose `ast.dump` contains `find_child_index_by_display_text` — so an inline
     lookup such as `tree_defs["find_child_index_by_display_text"]` is accepted
     too, not only a bare name. A helper or loop rebinds that argument to a
     generic `fn`, which matches neither branch, so the repro stops seeing the
@@ -435,6 +456,13 @@ widgets that already have `objectName` set via `set_widget_id`.
   `tests/test_display_role_scan_ownership_repro.py`; see
   [DisplayRole ownership boundary and its
   guard](#displayrole-ownership-boundary-and-its-guard-pypost-1041).
+- **Suspected false green after renaming an ownership check** — inspect the
+  first argument passed to `_calls_name` or `_has_display_role_attr`. Keep the
+  supported flat finder reference and verify that it checks the flat finder;
+  a `child_fn` alias for the tree finder must be rejected. Run both ownership
+  modules using the focused command above. Parameter IDs identify the reference
+  case and consuming predicate. Non-name lookup recognition remains lexical;
+  passing that shape check alone does not establish semantic variable bindings.
 - **Tree select did not open the request** — By design; `ui_select` sets
   current index. Use `click_tree_row_by_text` when the product needs a
   viewport click to open/activate.
