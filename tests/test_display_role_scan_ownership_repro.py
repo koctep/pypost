@@ -21,7 +21,7 @@ a synthetic ``tree_index`` mutant and require it to fail.
 from __future__ import annotations
 
 import ast
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -128,11 +128,11 @@ def _calls_to(tree: ast.AST, func_name: str) -> Iterator[ast.Call]:
 def _refers_to_find_child(arg: ast.expr) -> bool:
     """True when ``arg`` denotes the ``find_child_index_by_display_text`` AST node.
 
-    The ownership suite may bind that node to a local (``find_child``) or pass a
-    lookup expression, so accept either spelling.
+    Bare names must match a supported spelling exactly; lookup expressions keep
+    the existing AST-dump fallback for compatibility.
     """
-    if isinstance(arg, ast.Name) and "child" in arg.id.lower():
-        return True
+    if isinstance(arg, ast.Name):
+        return arg.id in {"find_child", "find_child_index_by_display_text"}
     return "find_child_index_by_display_text" in ast.dump(arg)
 
 
@@ -231,6 +231,71 @@ def test_repro_ownership_suite_checks_find_child_delegation() -> None:
         "tests/test_display_role_scan_ownership.py must assert that "
         "find_child_index_by_display_text calls display_role_equals"
     )
+
+
+@pytest.mark.parametrize(
+    ("predicate", "assertion"),
+    [
+        pytest.param(
+            _has_find_child_delegation_check,
+            'assert _calls_name({reference}, "display_role_equals")',
+            id="delegation",
+        ),
+        pytest.param(
+            _has_find_child_forbids_display_role_check,
+            "assert not _has_display_role_attr({reference})",
+            id="forbids-inline-display-role",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("reference", "expected"),
+    [
+        pytest.param("find_child", True, id="short-name"),
+        pytest.param("find_child_index_by_display_text", True, id="full-name"),
+        pytest.param(
+            'tree_defs.get("find_child_index_by_display_text")', True, id="child-lookup"
+        ),
+        pytest.param("child_fn", False, id="child-substring"),
+        pytest.param("CHILD_FN", False, id="uppercase-child-substring"),
+        pytest.param("find_tree", False, id="tree-name"),
+        pytest.param(
+            "prefix_find_child_index_by_display_text_suffix", False, id="full-name-substring"
+        ),
+        pytest.param(
+            'tree_defs.get("find_tree_index_by_display_text")', False, id="tree-lookup"
+        ),
+    ],
+)
+def test_find_child_guard_recognizes_supported_references(
+    predicate: Callable[[ast.AST], bool], assertion: str, reference: str, expected: bool
+) -> None:
+    tree = ast.parse(assertion.format(reference=reference))
+
+    assert predicate(tree) is expected, f"Incorrect flat finder recognition: {reference}"
+
+
+@pytest.mark.parametrize(
+    ("predicate", "assertion"),
+    [
+        pytest.param(
+            _has_find_child_delegation_check,
+            'assert _calls_name(child_fn, "display_role_equals")',
+            id="delegation",
+        ),
+        pytest.param(
+            _has_find_child_forbids_display_role_check,
+            "assert not _has_display_role_attr(child_fn)",
+            id="forbids-inline-display-role",
+        ),
+    ],
+)
+def test_find_child_guard_rejects_tree_only_loop(
+    predicate: Callable[[ast.AST], bool], assertion: str
+) -> None:
+    tree = ast.parse(f"for child_fn in (find_tree,):\n    {assertion}\n")
+
+    assert predicate(tree) is False, "A tree-finder-only loop cannot prove flat finder coverage"
 
 
 def test_repro_ownership_suite_checks_find_child_forbids_inline_display_role() -> None:
