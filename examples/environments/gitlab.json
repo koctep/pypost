@@ -1,0 +1,18 @@
+[
+  {
+    "id": "gitlab-mcp-environment",
+    "name": "GitLab MCP",
+    "variables": {
+      "gitlab_base_url": "https://gitlab.com",
+      "gitlab_project": "your-group/your-project",
+      "gitlab_token": "your-gitlab-access-token"
+    },
+    "hidden_keys": [
+      "gitlab_token"
+    ],
+    "mcp_overridable_keys": [
+      "gitlab_project"
+    ],
+    "enable_mcp": true
+  }
+]

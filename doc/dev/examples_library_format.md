@@ -13,9 +13,12 @@ examples/
 ├── collections/
 │   ├── jira_mcp.json                    # Modernized Jira Cloud MCP collection (with embedded variable metadata)
 │   ├── jira_mcp_critical_rest_paths.json # Offline REST path catalog
+│   ├── gitlab_mcp.json                  # GitLab REST v4 MCP collection, 25 tools (PYPOST-1316)
+│   ├── gitlab_mcp_rest_paths.json       # Locked offline path catalog for all 25 GitLab tools
 │   └── mcp.json                         # Local MCP probe collection
 └── environments/
-    └── jira_cloud.json                  # Standalone environment fixture
+    ├── jira_cloud.json                  # Standalone environment fixture
+    └── gitlab.json                      # GitLab companion environment (PYPOST-1316)
 
 tests/fixtures/legacy_collections/
 ├── README.md                            # Legacy fixtures explanation
@@ -29,3 +32,8 @@ tests/fixtures/legacy_collections/
 
 - `tests/test_examples_modernization_repro.py`: Repro test ensuring manifest existence and collection disk validation.
 - `tests/test_examples_modernization.py`: Comprehensive test suite verifying manifest metadata, embedded variables, and backward compatibility with legacy fixtures.
+- `tests/test_gitlab_mcp_collection.py`: GitLab collection, environment, catalog, manifest and README contracts (PYPOST-1316).
+
+### GitLab MCP collection (PYPOST-1316)
+
+The manifest lists `collections/gitlab_mcp.json` after `jira_mcp.json`, adds the variables `gitlab_base_url`, `gitlab_project` and `gitlab_token` (`secret: true`), and adds the `gitlab_com` preset (no token). The catalog `gitlab_mcp_rest_paths.json` is not importable and is not listed in the manifest. See [GitLab MCP Example Collection](gitlab_mcp_collection.md) for the structure, encoding rules and the `make check-gitlab-mcp-path-freshness` workflow.

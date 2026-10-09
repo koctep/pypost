@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "description": "Locked REST method and path templates for all 25 tools in examples/collections/gitlab_mcp.json (PYPOST-1316). Paths follow {{ gitlab_base_url }}. CI compares the collection to this catalog offline (make check-gitlab-mcp-path-freshness); refresh after reviewing GitLab docs - no live credentials.",
+  "reviewed_on": "2026-10-09",
+  "doc_refs": [
+    "https://docs.gitlab.com/api/rest/authentication/",
+    "https://docs.gitlab.com/api/users/",
+    "https://docs.gitlab.com/api/projects/",
+    "https://docs.gitlab.com/api/branches/",
+    "https://docs.gitlab.com/api/repository_files/",
+    "https://docs.gitlab.com/api/repositories/",
+    "https://docs.gitlab.com/api/commits/",
+    "https://docs.gitlab.com/api/issues/",
+    "https://docs.gitlab.com/api/merge_requests/",
+    "https://docs.gitlab.com/api/notes/",
+    "https://docs.gitlab.com/api/pipelines/",
+    "https://docs.gitlab.com/api/jobs/"
+  ],
+  "tools": [
+    {
+      "id": "gitlab-get-current-user",
+      "tool": "gitlab_get_current_user",
+      "capability": "Identity",
+      "method": "GET",
+      "path": "/api/v4/user"
+    },
+    {
+      "id": "gitlab-list-projects",
+      "tool": "gitlab_list_projects",
+      "capability": "Projects: search/list",
+      "method": "GET",
+      "path": "/api/v4/projects"
+    },
+    {
+      "id": "gitlab-get-project",
+      "tool": "gitlab_get_project",
+      "capability": "Projects: get by ID/path",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}"
+    },
+    {
+      "id": "gitlab-list-branches",
+      "tool": "gitlab_list_branches",
+      "capability": "Branches: list",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/branches"
+    },
+    {
+      "id": "gitlab-get-branch",
+      "tool": "gitlab_get_branch",
+      "capability": "Branches: get",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/branches/{{ urlencode(mcp.request.branch) }}"
+    },
+    {
+      "id": "gitlab-get-file",
+      "tool": "gitlab_get_file",
+      "capability": "Files: read at ref",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/files/{{ urlencode(mcp.request.file_path) }}/raw"
+    },
+    {
+      "id": "gitlab-list-repository-tree",
+      "tool": "gitlab_list_repository_tree",
+      "capability": "Files: tree at ref",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/tree"
+    },
+    {
+      "id": "gitlab-list-commits",
+      "tool": "gitlab_list_commits",
+      "capability": "Commits: list (ref/path filter)",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/commits"
+    },
+    {
+      "id": "gitlab-get-commit",
+      "tool": "gitlab_get_commit",
+      "capability": "Commits: get",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/commits/{{ urlencode(mcp.request.sha) }}"
+    },
+    {
+      "id": "gitlab-list-issues",
+      "tool": "gitlab_list_issues",
+      "capability": "Issues: list",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/issues"
+    },
+    {
+      "id": "gitlab-get-issue",
+      "tool": "gitlab_get_issue",
+      "capability": "Issues: get",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/issues/{{ to_int(mcp.request.issue_iid) }}"
+    },
+    {
+      "id": "gitlab-create-issue",
+      "tool": "gitlab_create_issue",
+      "capability": "Issues: create",
+      "method": "POST",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/issues"
+    },
+    {
+      "id": "gitlab-update-issue",
+      "tool": "gitlab_update_issue",
+      "capability": "Issues: update/close/reopen",
+      "method": "PUT",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/issues/{{ to_int(mcp.request.issue_iid) }}"
+    },
+    {
+      "id": "gitlab-list-merge-requests",
+      "tool": "gitlab_list_merge_requests",
+      "capability": "MRs: list",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests"
+    },
+    {
+      "id": "gitlab-get-merge-request",
+      "tool": "gitlab_get_merge_request",
+      "capability": "MRs: get",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests/{{ to_int(mcp.request.merge_request_iid) }}"
+    },
+    {
+      "id": "gitlab-create-merge-request",
+      "tool": "gitlab_create_merge_request",
+      "capability": "MRs: create",
+      "method": "POST",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests"
+    },
+    {
+      "id": "gitlab-update-merge-request",
+      "tool": "gitlab_update_merge_request",
+      "capability": "MRs: update/close/reopen",
+      "method": "PUT",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests/{{ to_int(mcp.request.merge_request_iid) }}"
+    },
+    {
+      "id": "gitlab-list-issue-notes",
+      "tool": "gitlab_list_issue_notes",
+      "capability": "Comments: list on issue",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/issues/{{ to_int(mcp.request.issue_iid) }}/notes"
+    },
+    {
+      "id": "gitlab-create-issue-note",
+      "tool": "gitlab_create_issue_note",
+      "capability": "Comments: add on issue",
+      "method": "POST",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/issues/{{ to_int(mcp.request.issue_iid) }}/notes"
+    },
+    {
+      "id": "gitlab-list-merge-request-notes",
+      "tool": "gitlab_list_merge_request_notes",
+      "capability": "Comments: list on MR",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests/{{ to_int(mcp.request.merge_request_iid) }}/notes"
+    },
+    {
+      "id": "gitlab-create-merge-request-note",
+      "tool": "gitlab_create_merge_request_note",
+      "capability": "Comments: add on MR",
+      "method": "POST",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests/{{ to_int(mcp.request.merge_request_iid) }}/notes"
+    },
+    {
+      "id": "gitlab-list-pipelines",
+      "tool": "gitlab_list_pipelines",
+      "capability": "CI: list pipelines",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/pipelines"
+    },
+    {
+      "id": "gitlab-get-pipeline",
+      "tool": "gitlab_get_pipeline",
+      "capability": "CI: get pipeline",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/pipelines/{{ to_int(mcp.request.pipeline_id) }}"
+    },
+    {
+      "id": "gitlab-list-pipeline-jobs",
+      "tool": "gitlab_list_pipeline_jobs",
+      "capability": "CI: list jobs of pipeline",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/pipelines/{{ to_int(mcp.request.pipeline_id) }}/jobs"
+    },
+    {
+      "id": "gitlab-get-job",
+      "tool": "gitlab_get_job",
+      "capability": "CI: get job",
+      "method": "GET",
+      "path": "/api/v4/projects/{{ urlencode(gitlab_project) }}/jobs/{{ to_int(mcp.request.job_id) }}"
+    }
+  ]
+}
