@@ -30,6 +30,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PySide6.QtWidgets import QApplication, QWidget
 
+from pypost.core.collection_import_lifecycle_policy import ImportTeardownDeadline
 from pypost.core.qt.collection_import_parse_worker import CollectionImportParseWorker
 from pypost.models.models import Collection
 from pypost.ui.presenters.collection_import_actions import CollectionImportActions
@@ -110,10 +111,12 @@ def test_worker_stops_promptly_when_interrupted_mid_parse(qapp: QApplication) ->
             worker.wait(5000)
 
 
-# Keep a short teardown budget so this regression remains focused on an
-# actually in-flight worker rather than a naturally completed parse. The
-# worker is interrupted before wait_idle() starts polling.
-_TEARDOWN_WAIT_IDLE_MS = 150
+# Keep the teardown budget well under the ~2s full run so this regression
+# remains focused on an actually in-flight worker rather than a naturally
+# completed parse. The worker is interrupted before wait_idle() starts polling.
+# Since PYPOST-1264 every teardown phase shares this one budget (no extra fixed
+# 100 ms final join), so it must also cover cooperative exit on a loaded runner.
+_TEARDOWN_WAIT_IDLE_MS = 1000
 
 
 def test_teardown_worker_stops_after_interruption(
@@ -155,7 +158,7 @@ def test_teardown_worker_stops_after_interruption(
         assert actions._worker is None, "teardown must reap the worker reference"
         assert any("collection_import_worker_interrupted" in m for m in messages), (
             "teardown() should log collection_import_worker_interrupted -- "
-            "i.e. the worker actually stopped within wait(100) once "
+            "i.e. the worker actually stopped within the final join once "
             "interruption was requested"
         )
         assert any(
@@ -163,7 +166,7 @@ def test_teardown_worker_stops_after_interruption(
             for m in messages
         ), "the GUI terminal cancellation event should identify the prior parse state"
         assert not any("collection_import_worker_interrupt_timeout" in m for m in messages), (
-            "teardown() should NOT hit the wait(100) timeout path -- that "
+            "teardown() should NOT hit the final join timeout path -- that "
             "path means the worker ignored requestInterruption() and kept "
             "running (PYPOST-1182 / PYPOST-1229)"
         )
@@ -207,15 +210,17 @@ def test_default_teardown_requests_interruption_before_wait_and_discards_result(
         worker.parse_progress.connect(lambda done, total: first_progress.set())
         process_until(lambda: first_progress.is_set(), timeout_ms=5000)
 
-        real_wait_idle = actions.wait_idle
+        # Teardown's wait-idle phase shares the teardown deadline (PYPOST-1264),
+        # so observe the private phase and record the deadline's budget.
+        real_wait_idle_until = actions._wait_idle_until
 
-        def _observe_wait(timeout_ms: int) -> bool:
+        def _observe_wait(deadline: ImportTeardownDeadline) -> bool:
             wait_observations.append(
-                (timeout_ms, worker.isInterruptionRequested())
+                (deadline.budget_ms, worker.isInterruptionRequested())
             )
-            return real_wait_idle(timeout_ms)
+            return real_wait_idle_until(deadline)
 
-        actions.wait_idle = _observe_wait  # type: ignore[method-assign]
+        actions._wait_idle_until = _observe_wait  # type: ignore[method-assign]
         with patch(
             "pypost.ui.presenters.collection_import_actions.show_collection_import_result"
         ) as result_dialog:

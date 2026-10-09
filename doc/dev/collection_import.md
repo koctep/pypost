@@ -214,6 +214,10 @@ After:
   `CollectionImportActions` is doing right now, following the `ImportConflictDecision(str,
   Enum)` precedent in `import_conflicts.py` (PYPOST-1228). Replaces the earlier `_preparing`
   bool plus `_worker is not None` presence check.
+- **`pypost/core/collection_import_lifecycle_policy.py`** — Qt-free
+  `CollectionImportLifecyclePolicy` (every wait and teardown limit) and
+  `ImportTeardownDeadline` (one monotonic deadline shared by the teardown phases). See
+  [Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264) (PYPOST-1264).
 - **`pypost/core/collection_import.py`** — the pure core. No Qt, no storage. Parses a
   file into candidate `Collection` models, detects name conflicts, reserves colliding
   ids, computes the resulting collection list, recounts plan results against save
@@ -283,8 +287,9 @@ After:
 6. For completion or failure, the orchestrator clears the cue, then on the GUI thread either
    shows the invalid-file dialog or runs conflict prompts → `plan_collection_import` →
    `apply_imported_collections` → refresh → result dialog.
-7. Worker `finished` slot: `deleteLater` + bounded `wait(100)` (PYPOST-829 hygiene;
-   WARNING if the short join times out).
+7. Worker `finished` slot: `deleteLater` + bounded `wait(worker_finish_join_ms)` (100 ms,
+   PYPOST-829 hygiene; WARNING if the short join times out). See
+   [Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264).
 
 There is no modal `QProgressDialog` and no determinate percent bar — same class of
 experience as [Collection Loading](collection_loading.md) startup async load, plus a
@@ -327,9 +332,11 @@ it prevents `parse_completed`, but interruption can still arrive between this ch
 
 `CollectionImportActions.teardown()` requests interruption before entering `wait_idle()`. The
 wait pumps the Qt event loop when one exists so the cancellation signal and worker completion can
-be delivered; any remaining running worker receives a final guarded request and a bounded 100 ms
-join. After that bounded join attempt, the worker reference is cleared and the action state is
-forced to `IDLE`, even if the join times out. This is a cooperative stop, not a kill: a reader
+be delivered; any remaining running worker receives a final guarded request and a join bounded
+by `min(final_join_ms, remaining budget)` (see
+[Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264)). After that bounded join
+attempt, the worker reference is cleared and the action state is forced to `IDLE`, even if the
+join times out. This is a cooperative stop, not a kill: a reader
 blocked in I/O or decoding may still be running after the wait and cause teardown to return
 `False` with a timeout warning.
 
@@ -405,6 +412,195 @@ final joins/list assembly, numeric conversion, and inherited YAML scalar resolve
 work cannot be interrupted mid-operation. One expensive model-validation record can still delay
 its next checkpoint. The whole text and decoded tree remain in memory with temporary chunk/string
 pieces; no streaming-memory, throughput, maximum-file-size, or arbitrary-depth guarantee is added.
+
+### Teardown lifecycle policy (PYPOST-1264)
+
+Every wait and teardown limit used by collection import is in one named, Qt-free policy:
+`pypost/core/collection_import_lifecycle_policy.py`. Before PYPOST-1264 these were the literals
+`5000` (default `timeout_ms`), `100` (final join and `_WORKER_FINISH_WAIT_MS`) and `10` (no-app
+poll), and the teardown phases each had their own budget, so `teardown(B)` could take about
+`2 * B + 100` ms. Design and decisions:
+[PYPOST-1264 requirements](../../ai-tasks/PYPOST-1264/10-requirements.md),
+[architecture](../../ai-tasks/PYPOST-1264/20-architecture.md) and
+[technical debt](../../ai-tasks/PYPOST-1264/60-tech-debt.md).
+
+#### Policy module
+
+- **`CollectionImportLifecyclePolicy`** — frozen dataclass of millisecond limits. Its
+  `__post_init__` raises `ValueError` if a field is not a non-negative `int` (`bool` is rejected)
+  or if `final_join_ms`, `worker_finish_join_ms` or `idle_poll_ms` is larger than
+  `teardown_budget_ms`. `resolve_budget_ms(timeout_ms)` returns `teardown_budget_ms` for `None`
+  and `max(0, int(timeout_ms))` otherwise, so a negative budget becomes 0.
+- **`DEFAULT_COLLECTION_IMPORT_LIFECYCLE_POLICY`** — the default instance (values below).
+- **`ImportTeardownDeadline`** — one monotonic deadline. `start(budget_ms, clock=time.monotonic)`
+  starts it; `budget_ms`, `elapsed_ms()`, `remaining_ms()`, `bounded(limit_ms)` (=
+  `min(limit_ms, remaining_ms())`) and `expired` (no whole millisecond left) read it. Values are
+  computed from whole microseconds and truncated to milliseconds, never rounded up, so float
+  noise such as `1000.1 - 1000.0` cannot change a result.
+- **`Clock`** — type alias `Callable[[], float]` (seconds) for the injectable clock.
+
+| Field | Default (ms) | Purpose |
+| --- | --- | --- |
+| `teardown_budget_ms` | 5000 | Caller budget for `wait_idle` / `teardown` if none is passed |
+| `final_join_ms` | 100 | File-worker join after disconnect, capped by the remaining budget |
+| `worker_finish_join_ms` | 100 | Join after a normal `QThread.finished`; not capped |
+| `idle_poll_ms` | 10 | No-`QApplication` `wait_idle` poll slice, capped by remaining |
+| `budget_tolerance_ms` | 50 | Allowed teardown wall-time overrun on an unloaded machine |
+
+Rationale for the defaults:
+
+- `teardown_budget_ms` keeps the inherited 5000 ms. It matches the main-window shutdown default,
+  is long enough for a cooperative parse cancel, and keeps shutdown bounded. The measurement below
+  showed no reason to change it.
+- `final_join_ms` gives native `QThread` exit a short grace after interruption. Because it is
+  capped by the remaining budget, it can no longer extend the budget.
+- `worker_finish_join_ms` keeps the PYPOST-829 H3 value. It runs on the GUI thread, so it must
+  stay small; outside teardown there is no caller budget to cap it with.
+- `idle_poll_ms` names the former bare `wait(10)` literal.
+- `budget_tolerance_ms` is a contract value only: it is not a wait, only `__post_init__`
+  validates it, and no CI test asserts it. 50 ms is well below the 100 ms final join and the
+  `2 * B` overrun it replaces.
+
+#### One shared deadline
+
+`teardown(timeout_ms)` starts one `ImportTeardownDeadline` and runs its phases in order. Every
+phase wait is taken from what is left of that deadline:
+
+1. **P0** — if busy and the file worker is running, `requestInterruption()` (no wait).
+2. **P1** — if busy, wait for idle until the deadline expires (`_wait_idle_until(deadline)`).
+3. **P2** — disconnect the file worker's signals; if it still runs, request interruption again and
+   `wait(min(final_join_ms, remaining))`; then `deleteLater()` and clear the reference.
+4. **P3** — if the library worker runs, `wait(remaining)`; then disconnect, `deleteLater()` and
+   clear the reference. The library worker cannot be interrupted (design Risk 4,
+   [PYPOST-1324](https://pypost.atlassian.net/browse/PYPOST-1324)).
+5. **P4** — set `IDLE`, run one `processEvents()`, log `collection_import_teardown_completed`.
+
+The sum of the deadline-bounded waits (P1, P2, P3) never exceeds the caller budget. Once the
+budget is used up, P2 and P3 issue only `wait(0)` probes and teardown returns `False`. Public
+`wait_idle(timeout_ms)` starts its own deadline the same way. Two documented exceptions are not
+bounded by the deadline:
+
+- **Nested worker-finish join** — if `_on_worker_finished` runs inside P1's `processEvents()`, its
+  `wait(worker_finish_join_ms)` is uncapped (design Risk 3). `finished` is emitted after `run()`
+  returns, so this join is normally instant, and probing with `wait(0)` could reap a thread that
+  is still exiting. Test coverage is [PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322).
+- **Long queued GUI slots** — a slot that runs inside a `processEvents()` call (for example an
+  apply) is only checked against the deadline when it returns.
+
+Outside those exceptions, teardown wall time is expected to stay within `timeout_ms +
+budget_tolerance_ms` on an unloaded machine. The tolerance covers work outside the waits: the
+last `processEvents()` pass, disconnects, `deleteLater`, logging and millisecond rounding. This
+is a documented contract checked by the slow latency module, not a runtime check.
+
+#### Constructor parameters and presenter delegation
+
+`CollectionImportActions.__init__` takes two keyword-only parameters (after `parent`):
+
+- `lifecycle_policy: CollectionImportLifecyclePolicy | None = None` — `None` uses
+  `DEFAULT_COLLECTION_IMPORT_LIFECYCLE_POLICY`. Read it back with the `lifecycle_policy` property.
+- `clock: Clock | None = None` — `None` uses `time.monotonic`. This is a test seam: it is passed
+  to every `ImportTeardownDeadline.start`, so a fake clock makes the wait arithmetic exact.
+
+`wait_idle(timeout_ms: int | None = None)` and `teardown(timeout_ms: int | None = None)` resolve
+`None` through the policy. `CollectionsPresenter.wait_import_idle` and
+`CollectionsPresenter.teardown` keep the same `None` default and pass `timeout_ms` through
+unchanged; the presenter resolves it only for its own `collections_presenter_teardown_started
+timeout_ms=%d` log line (`self._import_actions.lifecycle_policy.resolve_budget_ms(timeout_ms)`).
+The presenter does not take a policy; it always uses the actions' default.
+
+#### Preserved behaviour
+
+- Cooperative interruption only; no `QThread.terminate()` fallback.
+- Signals are disconnected before the file worker is joined and reaped; the reference is cleared
+  and the state forced to `IDLE` even after a join timeout.
+- Teardown is idempotent: a second call on an idle action returns `True` without waiting.
+- Event names and levels are unchanged; PYPOST-1264 only appended fields (see
+  [Observability](#observability)).
+- The `_on_worker_finished` join keeps its 100 ms value and is still uncapped.
+- Explicit `timeout_ms` values from callers mean the same thing as before: an overall budget.
+  The difference is that P2 and P3 no longer add time on top of it, so callers that relied on
+  the old extra 100 ms grace need a larger budget (for example the cancellation repro moved
+  from 150 to 1000 ms).
+
+#### Tests
+
+- **`tests/test_collection_import_lifecycle_policy.py`** (Qt-free, `timeout(10)`) — defaults,
+  `resolve_budget_ms`, immutability, `ValueError` cases, deadline arithmetic and truncation.
+- **`tests/test_collection_import_teardown_policy.py`** (fake clock and spy workers,
+  `timeout(30)`) — an injected policy drives the default waits; a deadline used up in P1 leaves
+  only `wait(0)` probes; no-app poll slices; idle teardown is clean and idempotent; the presenter
+  resolves `None` to 5000; exact log fields via `caplog`.
+- **`tests/test_collection_import_teardown_budget_repro.py`** (Step 3 repro, `timeout(30)`) —
+  test A (`test_teardown_requested_waits_fit_caller_budget`, spies whose `wait(ms)` really
+  sleeps): requested waits sum to at most the budget; test B
+  (`test_teardown_wait_arithmetic_with_fake_clock`): exact P2/P3 values; and the loose
+  real-thread guard below.
+- **`tests/test_collection_import_teardown_latency.py`** (`slow`, `timeout(120)`) —
+  measurement only: N = 20 per scenario, writes min/p50/p95/max; asserts only `n` and `clean`.
+
+The deterministic tests use the `clock=` seam and spy workers, so they do not depend on machine
+load. The only real-thread wall-time assertion in the fast suite is
+`test_teardown_real_threads_stay_within_loose_bound`: with both workers blocked, teardown must
+finish in under `2 * B` for `B = 300` and under 100 ms for `B = 0` (the old code took about
+`2 * B + 100`). During the timed `teardown(...)` call it sets the
+`pypost.ui.presenters.collection_import_actions` logger `disabled` and restores it in `finally`.
+Under parallel `make test`, pytest live logging (`log_cli = true`, `log_cli_level = "WARNING"` in
+`pyproject.toml`) cost up to about 400 ms per WARNING record, and teardown emits several, so the
+guard measured logging rather than teardown. CI already passes `-o log_cli=false` (PYPOST-671).
+The workaround is removed when [PYPOST-1326](https://pypost.atlassian.net/browse/PYPOST-1326)
+fixes local live logging. Log content is asserted in `test_collection_import_teardown_policy.py`.
+
+Run the fast modules and the slow measurement through Make:
+
+```bash
+make test WORKERS=1 PYTEST_ARGS="tests/test_collection_import_lifecycle_policy.py \
+  tests/test_collection_import_teardown_policy.py \
+  tests/test_collection_import_teardown_budget_repro.py"
+make test-slow PYTEST_ARGS="tests/test_collection_import_teardown_latency.py -m slow -s"
+```
+
+`make test` excludes the latency module (`-m "not slow"` by default). `make test-slow` runs
+pytest directly on one process; `-s` shows the printed environment and percentile lines.
+
+#### Measured latency and configurability decision
+
+Measured with `make test-slow PYTEST_ARGS="tests/test_collection_import_teardown_latency.py -m
+slow -s"` (one worker; N = 20 per scenario; default 5000 ms budget except the reference row).
+Environment: Linux 6.8.0-117 aarch64, 6 CPUs, Python 3.13.5, PySide6/Qt 6.11.1,
+`QT_QPA_PLATFORM=offscreen`, load average 0.10 / 0.30 / 0.19 before and 0.08 / 0.29 / 0.19
+after.
+
+| Scenario | min | p50 | p95 | max | clean |
+| --- | --- | --- | --- | --- | --- |
+| Idle | 0.03 | 0.04 | 0.06 | 0.19 | 20/20 |
+| Active file import cancelled | 2.19 | 2.34 | 2.43 | 2.45 | 20/20 |
+| Active library operation (200 ms) | 202.12 | 204.99 | 208.71 | 211.59 | 20/20 |
+| Reference: blocked library op, 100 ms budget | 100.49 | 104.81 | 111.05 | 111.17 | 0/20 |
+
+Times in ms. Decision rule (fixed before measuring): keep fixed policy values if idle p95 ≤ 5 ms,
+file-cancel p95 ≤ 25 % of `teardown_budget_ms` (1250 ms), and every run of the first three
+scenarios is clean and within `budget + tolerance`. All hold (0.06 ms, 2.43 ms, max 211.59 ms ≤
+5050 ms); the reference run also stays within `100 + 50` ms. **Outcome: the limits stay fixed
+policy values**; there is no user-visible setting or environment variable. A different policy
+can still be injected through `lifecycle_policy` if a future caller needs it.
+
+The evidence comes from one machine and is not re-run automatically (the module asserts only
+structure). Re-run the command above and compare against the rule after any change to teardown,
+the worker shutdown path or the policy values.
+
+#### Scope limits
+
+- Application shutdown does not call `CollectionsPresenter.teardown`: the presenter is not in the
+  main-window teardown owner list (`pypost/ui/main_window_lifecycle.py`), so closing the app
+  during an import is not covered by this budget
+  ([PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)). The main-window 5000 ms
+  literals are not part of this policy
+  ([PYPOST-1325](https://pypost.atlassian.net/browse/PYPOST-1325)).
+- Other components still have their own `_WORKER_FINISH_WAIT_MS = 100`
+  ([PYPOST-1323](https://pypost.atlassian.net/browse/PYPOST-1323)).
+- One test patches the private `_wait_idle_until`, and no runtime code reads
+  `budget_tolerance_ms`
+  ([PYPOST-1327](https://pypost.atlassian.net/browse/PYPOST-1327)).
 
 ### State machine (PYPOST-1228)
 
@@ -681,8 +877,9 @@ exactly once as `reader(path, on_progress=checkpoint)` and emits:
   completion could be published
 
 Workers are one-shot. On `finished`, `CollectionImportActions` schedules `deleteLater`
-and a short `wait(100)` before dropping the reference (same PYPOST-829 pattern as
-[Collection Loading](collection_loading.md) / [Async Environment Storage](environment_storage_async.md)).
+and a short `wait(worker_finish_join_ms)` (100 ms) before dropping the reference (same
+PYPOST-829 pattern as [Collection Loading](collection_loading.md) /
+[Async Environment Storage](environment_storage_async.md)).
 `parse_cancelled` is mutually exclusive with `parse_completed` and `parse_failed` for one
 worker run. It is emitted only for cooperative interruption observed by the worker; it is not
 an error signal.
@@ -705,53 +902,72 @@ without the callback. For a single-argument function, its body does not execute.
   [State machine (PYPOST-1228)](#state-machine-pypost-1228). `self._worker` remains, but purely
   for `QThread` lifecycle mechanics (`wait_idle()`'s no-`QApplication` fallback, `teardown()`'s
   disconnect/interrupt/cleanup sequence); it no longer feeds `is_busy()`.
-- **`wait_idle(timeout_ms: int = 5000) -> bool`** — while the action is busy, pumps the Qt
-  event loop (`QApplication.processEvents()`) or performs short worker waits when no
-  `QApplication` exists until `is_busy()` becomes `False`. The event-loop passes allow queued
+- **`lifecycle_policy -> CollectionImportLifecyclePolicy`** (property) — the policy that sets
+  every wait limit (PYPOST-1264).
+- **`wait_idle(timeout_ms: int | None = None) -> bool`** — `None` uses the policy
+  `teardown_budget_ms` (5000 ms). While the action is busy, pumps the Qt
+  event loop (`QApplication.processEvents()`) or performs short worker waits
+  (`min(idle_poll_ms, remaining)`) when no `QApplication` exists until `is_busy()` becomes
+  `False`. The event-loop passes allow queued
   parse, result, and worker-cleanup handlers to run, but this method does not explicitly call
   `QThread.wait()` on the `QApplication` path or guarantee that `finished` has been processed
   and the worker reaped when it returns. It performs one additional event-loop pass after idle
   to allow deferred deletion (`deleteLater()`) to run. Returns `True` if idle is observed within
   `timeout_ms`, or `False` if the bounded wait expires (PYPOST-1182, PYPOST-1148).
-- **`teardown(timeout_ms: int = 5000) -> bool`** — coordinates interruption, signal
-  disconnection, bounded waiting, and worker cleanup (PYPOST-1148):
+- **`teardown(timeout_ms: int | None = None) -> bool`** — coordinates interruption, signal
+  disconnection, bounded waiting, and worker cleanup (PYPOST-1148). `None` uses the policy
+  `teardown_budget_ms`. All waits below share one deadline of that budget (PYPOST-1264; see
+  [Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264)):
   1. If the worker is running, requests interruption before waiting so an in-flight parse can
      reach its next checkpoint.
-  2. If `is_busy()`, calls `wait_idle(timeout_ms)` to process events while cancellation or
-     completion settles. `wait_idle()` does not synchronously join or reap on the
-     `QApplication` path.
+  2. If `is_busy()`, waits for idle on the shared deadline (`_wait_idle_until(deadline)`, the
+     same loop as `wait_idle()`) to process events while cancellation or completion settles.
+     The idle wait does not synchronously join or reap on the `QApplication` path.
   3. Safely disconnects all worker Qt signals (`parse_progress`, `parse_completed`,
      `parse_failed`, `parse_cancelled`, `finished`) within guarded `try...except
      (RuntimeError, TypeError)` blocks, preventing callbacks from firing on a dying presenter.
-  4. If the worker remains active, requests interruption again and waits boundedly (100ms) for
-     thread exit. This final join can time out.
-  5. After that bounded join attempt, schedules `worker.deleteLater()`, clears
-     `self._worker = None`, and resets the state to `IDLE`, even if the join timed out.
-  6. Flushes pending Qt events via `app.processEvents()` to process deferred deletions.
-  Returns `True` if no bounded wait timed out, or `False` if the idle wait or final join timed
-  out. A `False` result does not prevent the reference/state cleanup in steps 5–6.
+  4. If the worker remains active, requests interruption again and waits
+     `min(final_join_ms, remaining)` for thread exit (`wait(0)` once the budget is used up).
+     This final join can time out.
+  5. After that bounded join attempt, schedules `worker.deleteLater()` and clears
+     `self._worker = None`, even if the join timed out.
+  6. If a library worker exists, waits `remaining` for it if it is running (no interruption;
+     PYPOST-1324), then disconnects, schedules `deleteLater()` and clears the reference.
+  7. Resets the state to `IDLE` and flushes pending Qt events via `app.processEvents()` to
+     process deferred deletions.
+  Returns `True` if no bounded wait timed out, or `False` if the idle wait, final join or
+  library join timed out. A `False` result does not prevent the reference/state cleanup in
+  steps 5–7.
 - **`import_collections() -> None`** — pick file; dispatch async parse; finish on the
   GUI thread when ready. Callers and the button wire-up do not change.
 
 Constructor DI (beyond the original refresh/emit hooks): optional `show_status` /
 `clear_status` for the preparing message; `read_import_file: ReadImportFile` for the worker.
 Supply a reader meeting the protocol above, including its checkpoint and exception obligations.
+Keyword-only `lifecycle_policy: CollectionImportLifecyclePolicy | None = None` (default policy)
+and `clock: Clock | None = None` (`time.monotonic`; test seam for the teardown deadline) were
+added by PYPOST-1264.
 
-### `CollectionsPresenter.wait_import_idle(timeout_ms: int = 5000) -> bool`
+### `CollectionsPresenter.wait_import_idle(timeout_ms: int | None = None) -> bool`
 
-Delegates directly to `CollectionImportActions.wait_idle(timeout_ms)`. Allows UI harnesses, parent
+Delegates directly to `CollectionImportActions.wait_idle(timeout_ms)`; `None` uses the import
+lifecycle policy budget (5000 ms). Allows UI harnesses, parent
 presenters, and automated test fixtures to wait, within a bound, for the import action to report
 `IDLE` while giving queued Qt lifecycle handlers an opportunity to run. It does not itself
 guarantee that the native worker has been joined and reaped; call `teardown()` before destroying
 widgets or closing panels (PYPOST-1182).
 
-### `CollectionsPresenter.teardown(timeout_ms: int = 5000) -> bool`
+### `CollectionsPresenter.teardown(timeout_ms: int | None = None) -> bool`
 
 Deterministically tears down import actions and presenter resources (PYPOST-1148). Delegates to
 `self._import_actions.teardown(timeout_ms=timeout_ms)` and closes the presenter panel
-(`self._panel.close()`). Returns `True` if background worker resources were cleanly drained and
-stopped. Test fixtures and parent widget cleanup routines invoke `teardown()` in `finally:` blocks
-to prevent background thread leaks and C++ destructor futex deadlocks during test suite runs.
+(`self._panel.close()`). `None` uses the import lifecycle policy budget; the presenter resolves
+it only to log `collections_presenter_teardown_started timeout_ms=<budget>`. Application
+shutdown does not call this method yet
+([PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)). Returns `True` if background
+worker resources were cleanly drained and stopped. Test fixtures and parent widget cleanup
+routines invoke `teardown()` in `finally:` blocks to prevent background thread leaks and C++
+destructor futex deadlocks during test suite runs.
 
 Presenter integrations should call `wait_import_idle()` before making assertions that depend on
 parse completion, and call `teardown()` before closing the panel or destroying its parent. Do not
@@ -902,11 +1118,11 @@ Without deterministic synchronization:
    in `make test`.
 
 Use the lifecycle synchronization as follows:
-- **`CollectionImportActions.wait_idle(timeout_ms=5000)`** pumps the `QApplication` event loop
-  in a bounded loop until `is_busy()` returns `False`. It may deliver queued worker-finish and
-  deferred-cleanup handlers, but it is not an explicit native-thread join on the
-  `QApplication` path.
-- **`CollectionsPresenter.wait_import_idle(timeout_ms=5000)`** exposes this wait condition on the
+- **`CollectionImportActions.wait_idle(timeout_ms=None)`** (policy default 5000 ms) pumps the
+  `QApplication` event loop in a bounded loop until `is_busy()` returns `False`. It may deliver
+  queued worker-finish and deferred-cleanup handlers, but it is not an explicit native-thread
+  join on the `QApplication` path.
+- **`CollectionsPresenter.wait_import_idle(timeout_ms=None)`** exposes this wait condition on the
   presenter.
 - In `tests/test_collections_import_ui.py`, shared test helper `wait_import(done, presenter)` waits
   until `done()` is `True` and, when a presenter is supplied, checks
@@ -963,14 +1179,15 @@ deadlock (`futex_wait_queue`) around worker cleanup
   provide bounded lifecycle cleanup:
   - **Interrupt**: Requests `worker.requestInterruption()` before waiting so a running reader can
     unwind at its next checkpoint (PYPOST-1229).
-  - **Wait**: Invokes `wait_idle(timeout_ms)` to process events while active workers cancel or
-    finish until `is_busy()` reports `False`. It does not explicitly join or reap on the
-    `QApplication` path.
+  - **Wait**: Runs the `wait_idle()` loop on the shared teardown deadline (PYPOST-1264) to
+    process events while active workers cancel or finish until `is_busy()` reports `False`. It
+    does not explicitly join or reap on the `QApplication` path.
   - **Disconnect**: Safely disconnects all Qt signals (`parse_progress`, `parse_completed`,
     `parse_failed`, `parse_cancelled`, `finished`) within `try...except (RuntimeError, TypeError)`
     blocks.
-  - **Join**: If the worker thread remains running, requests interruption again and waits boundedly
-    (100ms) for clean exit. This final join can time out.
+  - **Join**: If the worker thread remains running, requests interruption again and waits
+    `min(final_join_ms, remaining)` for clean exit (PYPOST-1264; originally a fixed 100 ms).
+    This final join can time out.
   - **Cleanup & Defer Delete**: After the bounded join attempt, invokes `worker.deleteLater()`,
     clears `self._worker = None`, resets state to `IDLE`, and pumps `app.processEvents()` to
     process deferred deletion events before widget teardown. Clearing the reference and forcing
@@ -1105,14 +1322,20 @@ bounded-work constants, not configurable file limits. There is no setting to ena
 supplying the callback selects cooperative preparation automatically.
 
 The lifecycle methods expose bounded waits for callers that need a different test or teardown
-budget:
+budget. Their limits come from `CollectionImportLifecyclePolicy` (PYPOST-1264); they are fixed
+policy values, not a user setting or environment variable (see
+[Measured latency and configurability decision](#measured-latency-and-configurability-decision)):
 
-- `CollectionImportActions.wait_idle(timeout_ms=5000)` pumps the Qt event loop while waiting for
-  the action to report `IDLE`; queued cleanup may clear the worker reference, but this method does
-  not explicitly join the worker on the `QApplication` path.
-- `CollectionImportActions.teardown(timeout_ms=5000)` requests interruption before waiting. If a
-  worker is still running after that wait, teardown performs one additional fixed 100 ms join
-  (`_WORKER_FINISH_WAIT_MS` is also 100 ms for the normal `finished` path).
+- `CollectionImportActions.wait_idle(timeout_ms=None)` pumps the Qt event loop while waiting for
+  the action to report `IDLE`; `None` means `teardown_budget_ms` (5000 ms). Queued cleanup may
+  clear the worker reference, but this method does not explicitly join the worker on the
+  `QApplication` path.
+- `CollectionImportActions.teardown(timeout_ms=None)` requests interruption before waiting. All
+  of its waits share one deadline: if a worker is still running after the idle wait, the final
+  join gets `min(final_join_ms, remaining)` (100 ms at most) and the library join gets the rest.
+  `worker_finish_join_ms` (100 ms) is the join on the normal `finished` path and is not capped.
+- Code that needs other limits passes a `CollectionImportLifecyclePolicy` as the keyword-only
+  `lifecycle_policy` constructor argument of `CollectionImportActions`.
 
 These are lifecycle bounds, not a guarantee that parsing itself can be preempted. A custom reader
 that blocks in I/O, decoding, or one expensive record can cause `wait_idle()` or `teardown()` to
@@ -1129,16 +1352,18 @@ routinely carries credentials in a header template. Paths are logged for triage
 `ai-tasks/PYPOST-1006/50-observability.md`,
 `ai-tasks/PYPOST-1058/50-observability.md`,
 `ai-tasks/PYPOST-1059/50-observability.md`,
-`ai-tasks/PYPOST-1182/50-observability.md`, and
-`ai-tasks/PYPOST-1148/50-observability.md`.
+`ai-tasks/PYPOST-1182/50-observability.md`,
+`ai-tasks/PYPOST-1148/50-observability.md`, and
+`ai-tasks/PYPOST-1264/50-observability.md`.
 
 ### Async parse, lifecycle synchronization, and teardown (PYPOST-1005 / PYPOST-1182 / PYPOST-1148 /
-PYPOST-1229)
+PYPOST-1229 / PYPOST-1264)
 
 In `collections_presenter.py`:
 
 - **INFO** `collections_presenter_teardown_started timeout_ms=%d` — start of presenter-level
-  teardown sequence (PYPOST-1148)
+  teardown sequence (PYPOST-1148); `timeout_ms` is the resolved budget, so a `None` argument
+  logs the policy default 5000 (PYPOST-1264)
 - **INFO** `collections_presenter_teardown_completed clean=%s` — completion of presenter
   teardown (PYPOST-1148)
 
@@ -1155,15 +1380,18 @@ In `collection_import_actions.py`:
   action become idle within the timeout; this is not an explicit native-thread join
   (PYPOST-1182)
 - **WARNING** `collection_import_wait_idle_timeout elapsed_ms=%d` — `wait_idle()` reached
-  its timeout before the action became idle (PYPOST-1182)
+  its timeout before the action became idle (PYPOST-1182). Inside teardown, `elapsed_ms` is
+  counted from the start of teardown (shared deadline, PYPOST-1264)
 - **INFO** `collection_import_teardown_started timeout_ms=%d` — start of actions teardown
-  (PYPOST-1148)
-- **INFO** `collection_import_teardown_completed clean=%s` — completion of actions teardown
-  (PYPOST-1148)
+  (PYPOST-1148); `timeout_ms` is the resolved budget of the shared deadline
+- **INFO** `collection_import_teardown_completed clean=%s elapsed_ms=%d timeout_ms=%d` —
+  completion of actions teardown (PYPOST-1148). `elapsed_ms` is the total teardown time and
+  `timeout_ms` the budget, so an overrun can be read from this one line (PYPOST-1264)
 - **WARNING** `collection_import_worker_interrupting` — worker active when teardown started;
   interruption requested (PYPOST-1148)
-- **WARNING** `collection_import_worker_interrupt_timeout` — worker interruption wait (100ms)
-  timed out (PYPOST-1148)
+- **WARNING** `collection_import_worker_interrupt_timeout wait_ms=%d elapsed_ms=%d` — the
+  final file-worker join timed out (PYPOST-1148). `wait_ms` is the join it actually got,
+  `min(final_join_ms, remaining)`; `elapsed_ms` is time since teardown started (PYPOST-1264)
 - **INFO** `collection_import_worker_interrupted` — running worker stopped successfully after
   interruption (PYPOST-1148)
 - **INFO** `collection_import_parse_cancelled from_state=…` — the GUI received the dedicated
@@ -1173,7 +1401,11 @@ In `collection_import_actions.py`:
 - **ERROR** `collection_import_parse_unexpected error=…` — unexpected exception from the
   worker, handled on the GUI thread (invalid-file dialog)
 - **WARNING** `collection_import_worker_finish_wait_timeout wait_ms=…` — short join after
-  `QThread.finished` did not complete
+  `QThread.finished` did not complete; `wait_ms` is `worker_finish_join_ms` (100), which is not
+  on the teardown deadline
+- **WARNING** `collection_library_import_worker_timeout wait_ms=%d elapsed_ms=%d` — the
+  library-worker join in teardown timed out. `wait_ms` is the remaining budget it got;
+  `elapsed_ms` is time since teardown started (PYPOST-1264)
 
 In `collection_import_parse_worker.py`:
 
@@ -1196,6 +1428,40 @@ Cancellation order is normally `collection_import_worker_interrupting` →
 → `collection_import_teardown_completed clean=True`. The exact order of worker-finish and teardown
 lines can vary with Qt event delivery; the cancellation and completion signals remain mutually
 exclusive.
+
+Reading the teardown timeout fields (PYPOST-1264):
+
+- `wait_ms=0` on `collection_import_worker_interrupt_timeout` or
+  `collection_library_import_worker_timeout` means the budget was already used up before that
+  join, so the worker only got a `wait(0)` probe. Look for an earlier phase that used it,
+  usually `collection_import_wait_idle_timeout`. The worker itself may not be stuck.
+- `wait_ms>0` means the worker got that much time and still did not stop: a reader blocked
+  outside its checkpoints, or a library operation (which cannot be interrupted).
+- On `collection_import_teardown_completed`, `elapsed_ms` above `timeout_ms + 50`
+  (`budget_tolerance_ms`) means time was spent outside the bounded waits. See "Teardown takes
+  longer than its budget" in the Troubleshooting section below.
+
+Examples (messages only; the first is the exact output of the fake-clock test
+`test_teardown_timeout_logs_report_phase_waits_and_elapsed`, the second has illustrative
+timings). Both workers stuck, policy budget 200 ms and `final_join_ms=30`:
+
+```text
+INFO    collection_import_teardown_started timeout_ms=200
+WARNING collection_import_worker_interrupting
+WARNING collection_import_worker_interrupt_timeout wait_ms=30 elapsed_ms=30
+WARNING collection_library_import_worker_timeout wait_ms=170 elapsed_ms=200
+INFO    collection_import_teardown_completed clean=False elapsed_ms=200 timeout_ms=200
+```
+
+Budget of 100 ms used up in the idle wait, so both joins only probe (excerpt):
+
+```text
+WARNING collection_import_wait_idle_timeout elapsed_ms=100
+WARNING collection_import_worker_interrupting
+WARNING collection_import_worker_interrupt_timeout wait_ms=0 elapsed_ms=100
+WARNING collection_library_import_worker_timeout wait_ms=0 elapsed_ms=101
+INFO    collection_import_teardown_completed clean=False elapsed_ms=101 timeout_ms=100
+```
 
 Malformed, unreadable, or wrong-shaped file failures (`CollectionImportFileError`) are logged
 twice on purpose: worker WARNING confirms the off-thread failure, and the orchestrator then
@@ -1301,8 +1567,10 @@ the collection id, not its name.
     [MCP Integration](mcp_integration.md).
 
 - **WARNING `collection_import_worker_finish_wait_timeout`**
-  - Cause: The short post-`finished` join did not complete within
-    `_WORKER_FINISH_WAIT_MS`.
+  - Cause: The short post-`finished` join did not complete within the policy
+    `worker_finish_join_ms` (100 ms). This join is not on the teardown deadline, so when it
+    runs during teardown it can push `elapsed_ms` past the budget (design Risk 3,
+    [PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322)).
   - Fix: This is the same class of issue as storage gateway finish hygiene (PYPOST-829).
     It is usually transient; escalate if paired with crashes under rapid import churn.
 
@@ -1311,7 +1579,9 @@ the collection id, not its name.
     A slow reader or queued worker cleanup may be responsible.
   - Fix: Check whether `read_import_file` is blocked on slow I/O or a deadlocked event
     loop. Use `teardown()` when interruption and a bounded final worker wait are needed;
-    increase `timeout_ms` for legitimate massive-file parses.
+    increase `timeout_ms` for legitimate massive-file parses. Inside teardown this line means
+    the idle wait used the whole shared budget; the following join timeouts then show
+    `wait_ms=0`.
 
 - **Test suite stalls or hangs on `test_collections_import_ui.py`**
   - Cause: Widget teardown or garbage collection occurred while
@@ -1361,10 +1631,36 @@ the collection id, not its name.
     and cancellation does not roll back work already in `APPLYING`.
 
 - **WARNING `collection_import_worker_interrupt_timeout`**
-  - Cause: The worker failed to stop within the bounded 100 ms interruption join.
-  - Fix: Check whether the custom reader is blocked in uninterruptible I/O or decoding,
-    or in a long single-record operation. No forcible termination fallback exists
-    (PYPOST-1229).
+  - Cause: The worker failed to stop within its final join, `min(final_join_ms, remaining)`
+    (100 ms at most). With `wait_ms=0` the budget was already used up and the join was only a
+    probe.
+  - Fix: With `wait_ms>0`, check whether the custom reader is blocked in uninterruptible I/O or
+    decoding, or in a long single-record operation. With `wait_ms=0`, look at the earlier
+    phase that used the budget first (usually `collection_import_wait_idle_timeout`). No
+    forcible termination fallback exists (PYPOST-1229).
+
+- **WARNING `collection_library_import_worker_timeout`**
+  - Cause: A connected-library import or refresh was still running when teardown gave it the
+    remaining budget (`wait_ms`). The library worker cannot be interrupted, so it always uses
+    all of the remaining budget and is then released while still running
+    ([PYPOST-1324](https://pypost.atlassian.net/browse/PYPOST-1324)).
+  - Fix: With `wait_ms=0`, an earlier phase used the budget. With `wait_ms>0`, check what the
+    library operation is blocked on. Pass a larger `timeout_ms` only if the caller
+    can afford it.
+
+- **Teardown takes longer than its budget**
+  - Cause: Find `collection_import_teardown_completed clean=… elapsed_ms=… timeout_ms=…`. If
+    `elapsed_ms` is within `timeout_ms + 50` (`budget_tolerance_ms`), teardown met its contract.
+    If it is larger, time went to work outside the bounded waits: the nested worker-finish join
+    (look for `collection_import_worker_finish_wait_timeout` in the same span), a long queued
+    GUI slot run by `processEvents()` (for example an apply), or slow logging handlers.
+  - Fix: Read the `wait_ms` / `elapsed_ms` of each timeout line in order to see which phase used
+    the budget (see the [Observability](#observability) reading guide). In tests run under
+    `make test`, pytest live logging can cost hundreds of ms per WARNING record
+    ([PYPOST-1326](https://pypost.atlassian.net/browse/PYPOST-1326)); confirm with
+    `PYTEST_ARGS="... -o log_cli=false"` before treating it as a product regression. If the
+    whole app hangs on close during an import, note that application shutdown does not call
+    collection import teardown yet ([PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)).
 
 - **`test_plan_collection_import_large_dataset_performance` fails with "thread CPU, exceeding
   100ms CPU budget"**
@@ -1382,8 +1678,9 @@ PYPOST-1266's typed protocol, direct invocation, migrated fakes, and focused con
 Remaining cancellation and lifecycle work is recorded in
 [PYPOST-1266 technical debt](../../ai-tasks/PYPOST-1266/60-tech-debt.md):
 
-- **[PYPOST-1264](https://pypost.atlassian.net/browse/PYPOST-1264)** — consolidate teardown
-  interruption and join policy, including review of the inherited 5000 ms and 100 ms budgets.
+- **[PYPOST-1264](https://pypost.atlassian.net/browse/PYPOST-1264)** — done: see
+  [Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264). Its own follow-ups are
+  listed below.
 - **[PYPOST-1265](https://pypost.atlassian.net/browse/PYPOST-1265)** — expand cancellation
   coverage with broader real JSON/YAML and lifecycle matrices, including pre-start interruption.
   Account for PYPOST-1266's focused JSON, exact-signal, and single-argument rejection checks;
@@ -1392,6 +1689,26 @@ Remaining cancellation and lifecycle work is recorded in
   nested-expression, frozen SOLID snapshot, and process-level Qt baseline failures.
 - **[PYPOST-1262](https://pypost.atlassian.net/browse/PYPOST-1262)** — pre-existing,
   load-sensitive nested-Make timeout failures.
+
+Follow-ups from [PYPOST-1264 technical debt](../../ai-tasks/PYPOST-1264/60-tech-debt.md):
+
+- **[PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)** (High) — register
+  collection import teardown with main-window shutdown; today app close during an import does
+  not interrupt or join its workers under any budget.
+- **[PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322)** (Lowest) — test the
+  uncapped nested worker-finish join during teardown (Risk 3).
+- **[PYPOST-1323](https://pypost.atlassian.net/browse/PYPOST-1323)** (Low) — move the other
+  `_WORKER_FINISH_WAIT_MS = 100` constants behind named lifecycle policies.
+- **[PYPOST-1324](https://pypost.atlassian.net/browse/PYPOST-1324)** (Medium) — make
+  `LibraryOperationWorker` interruptible so teardown does not use the whole remaining budget.
+- **[PYPOST-1325](https://pypost.atlassian.net/browse/PYPOST-1325)** (Low) — name the
+  application shutdown budget (the main-window 5000 ms literals) and its per-owner allocation.
+- **[PYPOST-1326](https://pypost.atlassian.net/browse/PYPOST-1326)** (Medium) — make `make test`
+  live logging cheap or off for parallel runs, then remove the guard's logger-disable
+  workaround.
+- **[PYPOST-1327](https://pypost.atlassian.net/browse/PYPOST-1327)** (Low) — public teardown
+  observation seam instead of patching `_wait_idle_until`; decide whether `budget_tolerance_ms`
+  is checked anywhere.
 
 ### Pre-existing baseline failures
 
@@ -1407,6 +1724,19 @@ full run with the task-base evidence in [PYPOST-1229 technical debt](../../ai-ta
 - **PYPOST-1262** tracks load-sensitive nested-Make timeouts in
   `tests/test_makefile_lifecycle.py::TestVenvExtraStampIdempotency::test_venv_test_installs_when_stamp_stale`
   and `tests/test_makefile_targets.py::TestTargetExecution::test_test_succeeds_from_bare_venv_via_venv_test`.
+
+PYPOST-1264 runs also saw these filed, pre-existing failures (all reproduced or known at base
+`c3f8e183`):
+
+- **PYPOST-1299** — `tests/test_pytest_exit_policy.py` times out at 120 s.
+- **PYPOST-1311** — `tests/test_env_persistence_e2e.py` tmp cleanup `OSError: Directory not
+  empty`.
+- **PYPOST-1315** — `tests/test_environment_export_ui.py` process exits -11/-7 after its tests
+  pass.
+- **PYPOST-1320** — intermittent hang in
+  `tests/test_collection_import_teardown_repro.py` and `tests/test_collections_import_ui.py`:
+  the main thread blocks starting the `process_until` watchdog `threading.Timer`, before any
+  teardown code runs.
 
 These baseline issues do not explain a cancellation regression. A cancellation-specific failure
 is indicated by a missing `parse_cancelled` signal, an unexpected `parse_completed`/`parse_failed`

@@ -12,11 +12,12 @@ and app state.
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
-from PySide6.QtCore import QElapsedTimer, QObject
+from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QApplication, QPushButton, QWidget
 
 from pypost.core.collection_import import (
@@ -27,6 +28,12 @@ from pypost.core.collection_import import (
     recount_collection_import_plan,
 )
 from pypost.core.collection_import_apply import apply_imported_collections
+from pypost.core.collection_import_lifecycle_policy import (
+    DEFAULT_COLLECTION_IMPORT_LIFECYCLE_POLICY,
+    Clock,
+    CollectionImportLifecyclePolicy,
+    ImportTeardownDeadline,
+)
 from pypost.core.collection_import_state import CollectionImportState
 from pypost.core.collection_messages import (
     MSG_IMPORT_NO_VALID_COLLECTIONS,
@@ -65,9 +72,6 @@ except (ImportError, ModuleNotFoundError):
 
 logger = logging.getLogger(__name__)
 
-# Short join after QThread.finished so native cleanup completes before GC/delete
-# (PYPOST-829 H3). Bound must stay small — slot runs on the GUI thread.
-_WORKER_FINISH_WAIT_MS = 100
 _FILE_IMPORT_OPERATION = "collection_import_file"
 _LIBRARY_IMPORT_OPERATION = "collection_import_library"
 _LIBRARY_REFRESH_OPERATION = "collection_import_refresh"
@@ -94,8 +98,16 @@ class CollectionImportActions(QObject):
         | None = None,
         library_mode_selector: Callable[[QWidget], object | None] | None = None,
         parent: QObject | None = None,
+        lifecycle_policy: CollectionImportLifecyclePolicy | None = None,
+        clock: Clock | None = None,
     ) -> None:
         super().__init__(parent)
+        self._policy = (
+            DEFAULT_COLLECTION_IMPORT_LIFECYCLE_POLICY
+            if lifecycle_policy is None
+            else lifecycle_policy
+        )
+        self._clock: Clock = time.monotonic if clock is None else clock
         self._parent = parent_widget
         self._request_manager = request_manager
         self._read_import_file = read_import_file
@@ -117,39 +129,63 @@ class CollectionImportActions(QObject):
         """True while an import is in flight (any stage but idle)."""
         return self._state is not CollectionImportState.IDLE
 
-    def wait_idle(self, timeout_ms: int = 5000) -> bool:
-        """Pump event loop / wait until background worker has finished and joined."""
+    @property
+    def lifecycle_policy(self) -> CollectionImportLifecyclePolicy:
+        """The time limits governing wait and teardown."""
+        return self._policy
+
+    def _start_deadline(self, timeout_ms: int | None) -> ImportTeardownDeadline:
+        budget_ms = self._policy.resolve_budget_ms(timeout_ms)
+        return ImportTeardownDeadline.start(budget_ms, clock=self._clock)
+
+    def wait_idle(self, timeout_ms: int | None = None) -> bool:
+        """Pump event loop / wait until background worker has finished and joined.
+
+        ``None`` uses the policy ``teardown_budget_ms``.
+        """
         if not self.is_busy():
             return True
+        return self._wait_idle_until(self._start_deadline(timeout_ms))
 
-        timer = QElapsedTimer()
-        timer.start()
+    def _wait_idle_until(self, deadline: ImportTeardownDeadline) -> bool:
         app = QApplication.instance()
         logger.info("collection_import_wait_idle_started")
         while self.is_busy():
-            if timer.elapsed() >= timeout_ms:
+            if deadline.expired:
                 logger.warning(
                     "collection_import_wait_idle_timeout elapsed_ms=%d",
-                    timer.elapsed(),
+                    deadline.elapsed_ms(),
                 )
                 return False
             if app is not None:
                 app.processEvents()
             elif self._worker is not None:
-                self._worker.wait(10)
+                self._worker.wait(deadline.bounded(self._policy.idle_poll_ms))
         if app is not None:
             app.processEvents()
         logger.info(
             "collection_import_wait_idle_completed elapsed_ms=%d",
-            timer.elapsed(),
+            deadline.elapsed_ms(),
         )
         return True
 
-    def teardown(self, timeout_ms: int = 5000) -> bool:
+    def teardown(self, timeout_ms: int | None = None) -> bool:
         """Safely disconnect, interrupt/wait, join, and reap background workers
         deterministically.
+
+        The deadline-bounded phase waits (wait-idle, file-worker join, library-worker
+        join) share one deadline of ``timeout_ms`` (``None`` uses the policy
+        ``teardown_budget_ms``), so their sum never exceeds it. Two overruns are not
+        bounded by that deadline: the nested ``_on_worker_finished`` join
+        (``worker_finish_join_ms``, uncapped, design Risk 3) can run inside the
+        wait-idle ``processEvents()``, and a long queued GUI slot can run between
+        deadline checks. The documented allowed wall-time overrun is the policy
+        ``budget_tolerance_ms`` (50 ms); it is a contract value, not a runtime check.
         """
-        logger.info("collection_import_teardown_started timeout_ms=%d", timeout_ms)
+        deadline = self._start_deadline(timeout_ms)
+        logger.info(
+            "collection_import_teardown_started timeout_ms=%d", deadline.budget_ms
+        )
         clean = True
         interruption_requested = False
         worker = self._worker
@@ -158,7 +194,7 @@ class CollectionImportActions(QObject):
             worker.requestInterruption()
             interruption_requested = True
         if self.is_busy():
-            clean = self.wait_idle(timeout_ms)
+            clean = self._wait_idle_until(deadline)
         worker = self._worker
         if worker is not None:
             try:
@@ -185,9 +221,15 @@ class CollectionImportActions(QObject):
                 logger.warning("collection_import_worker_interrupting")
                 worker.requestInterruption()
                 interruption_requested = True
-                if not worker.wait(100):
+                join_ms = deadline.bounded(self._policy.final_join_ms)
+                if not worker.wait(join_ms):
                     clean = False
-                    logger.warning("collection_import_worker_interrupt_timeout")
+                    logger.warning(
+                        "collection_import_worker_interrupt_timeout "
+                        "wait_ms=%d elapsed_ms=%d",
+                        join_ms,
+                        deadline.elapsed_ms(),
+                    )
                 else:
                     logger.info("collection_import_worker_interrupted")
             worker.deleteLater()
@@ -197,9 +239,14 @@ class CollectionImportActions(QObject):
             logger.info("collection_import_worker_interrupted")
         library_worker = self._library_worker
         if library_worker is not None:
-            if library_worker.isRunning() and not library_worker.wait(timeout_ms):
+            library_join_ms = deadline.remaining_ms()
+            if library_worker.isRunning() and not library_worker.wait(library_join_ms):
                 clean = False
-                logger.warning("collection_library_import_worker_timeout")
+                logger.warning(
+                    "collection_library_import_worker_timeout wait_ms=%d elapsed_ms=%d",
+                    library_join_ms,
+                    deadline.elapsed_ms(),
+                )
             try:
                 library_worker.operation_completed.disconnect()
             except (RuntimeError, TypeError):
@@ -218,7 +265,12 @@ class CollectionImportActions(QObject):
         app = QApplication.instance()
         if app is not None:
             app.processEvents()
-        logger.info("collection_import_teardown_completed clean=%s", clean)
+        logger.info(
+            "collection_import_teardown_completed clean=%s elapsed_ms=%d timeout_ms=%d",
+            clean,
+            deadline.elapsed_ms(),
+            deadline.budget_ms,
+        )
         return clean
 
     def import_collections(self) -> None:
@@ -534,10 +586,14 @@ class CollectionImportActions(QObject):
         self._worker = None
         if finished is not None:
             finished.deleteLater()
-            if not finished.wait(_WORKER_FINISH_WAIT_MS):
+            # Deliberately not capped by a teardown deadline (PYPOST-1264 Risk 3):
+            # ``finished`` fires after ``run()`` returns, so this join is normally
+            # instant, and probing with wait(0) could reap a still-exiting thread.
+            wait_ms = self._policy.worker_finish_join_ms
+            if not finished.wait(wait_ms):
                 logger.warning(
                     "collection_import_worker_finish_wait_timeout wait_ms=%d",
-                    _WORKER_FINISH_WAIT_MS,
+                    wait_ms,
                 )
 
     def _finish_import(
