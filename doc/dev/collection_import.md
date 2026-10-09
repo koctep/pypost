@@ -1009,8 +1009,166 @@ make test WORKERS=1 WORKER_TIMEOUT=60 \
 The contract module uses an explicit 30-second test timeout, direct-connected signal capture for
 deterministic checkpoint interruption, and bounded 5000 ms worker waits/cleanup. The progress
 module has a 60-second test timeout. These checks supplement existing presenter cancellation and
-final-publication guard tests. Broader JSON/YAML and lifecycle matrices remain PYPOST-1265 scope;
-the former legacy-success expectation is now rejection coverage.
+final-publication guard tests. The former legacy-success expectation is now rejection coverage.
+PYPOST-1265 adds real YAML and lifecycle coverage; see
+[Cancellation test layout](#cancellation-test-layout-pypost-1265).
+
+### Cancellation test layout (PYPOST-1265)
+
+PYPOST-1265 changes tests only; production code is unchanged. Each
+`CollectionImportParseWorker.run()` checkpoint described in
+[Cooperative cancellation](#cooperative-cancellation-pypost-1229) has a test that fails when the
+checkpoint is removed. The test doubles (`_GatedWorker`, `_HeldReader`, `_RecordingReader`,
+`_OutcomeRecorder`, `_release_on_interrupt`, `_stop_worker`) are local to
+`tests/test_collection_import_cancellation_repro.py`.
+
+- **Pre-start (pre-read check)**:
+  - `test_worker_pre_start_interruption_skips_reader`
+  - `test_teardown_pre_start_interruption_applies_nothing`
+- **Record checkpoint, real parser** (in `tests/test_collection_import_reader_contract.py`):
+  - `test_production_json_reader_contract[None|1|2]`
+  - `test_production_yaml_reader_contract[None|1|2]`
+- **Record checkpoint, in flight**:
+  - `test_worker_stops_promptly_when_interrupted_mid_parse`
+  - `test_teardown_worker_stops_after_interruption` (explicit 1000 ms budget)
+  - `test_default_teardown_requests_interruption_before_wait_and_discards_result`
+    (default 5000 ms budget)
+- **Post-read final guard** (unchanged):
+  - `test_final_publication_guard_discards_result_after_last_checkpoint`
+
+All tests except the two contract tests are in
+`tests/test_collection_import_cancellation_repro.py`.
+
+#### Pre-start interruption: why `_GatedWorker`
+
+Qt ignores `QThread.requestInterruption()` while the thread is not running, so a request made
+before `start()` never reaches `run()`. The production pre-read check can only fire in the short
+window after `start()` and before `run()` reaches that check (for example, an immediate teardown
+after `_start_parse()`). `_GatedWorker` subclasses `CollectionImportParseWorker` and holds that
+window open: its `run()` sets `entered`, waits on the bounded `release` event, and then calls the
+unmodified `super().run()`. The test calls `requestInterruption()` while the real thread is held,
+then releases it. The predicate is never patched and no production line is skipped.
+
+Rejected alternatives: calling `run()` synchronously (the flag is `False` off-thread, so the test
+would have to mock `isInterruptionRequested()`), and a barrier inside the reader (the reader runs
+after the pre-read check, so the `(0, 0)` decode checkpoint would catch the request instead).
+
+The proof is that `_RecordingReader.calls == []`: the reader was never called. The tests also
+check no progress, `cancelled == [True]`, no completion and no failure. The teardown variant
+patches `CollectionImportParseWorker` in `pypost.ui.presenters.collection_import_actions` with
+`_GatedWorker` and calls `teardown(timeout_ms=1000)`. It then asserts that `refresh_tree`,
+`restore_tree_state`, `emit_collections_changed` and the result dialog were not called, that
+`FakeRequestManager.collections == []`, that the worker was reaped and that the action is idle.
+
+#### Record-level cancellation with the real parser
+
+`test_production_json_reader_contract` (PYPOST-1266) and `test_production_yaml_reader_contract`
+run `load_collection_import_candidates` on a real file in `tmp_path`. The file holds three
+records: `c1/First`, an invalid record with no `name`, and `c3/Third`. For `cancel_at=k` the
+progress is exactly `[(1, 3) .. (k, 3)]`, with one cancellation and no completion. For `None`
+the parse completes with `c1` and `c3` and one error that mentions `name`. A `(k, 3)` checkpoint
+exists only after decoding produced the records, so these tests prove the record checkpoint, not
+the decode checkpoint. Decode cancellation on large files is covered by
+`tests/test_collection_import_decode_cancellation.py` (see
+[Preparation checkpoints](#preparation-checkpoints-pypost-1267)).
+
+#### In-flight proof without wall-clock thresholds
+
+The three in-flight tests use `_HeldReader(hold_at=1)`, a 40-record reader. After checkpoint 1
+returns, it sets `holding` and waits on `release`, so it cannot finish while held. The worker
+test calls `requestInterruption()` and then sets `release`. The teardown tests wrap the worker's
+`requestInterruption` with `_release_on_interrupt`, which sets `release` only after the real
+request, so the worker always sees the flag when it resumes. Each test asserts:
+
+- `processed == [1, 2]` and `processed[-1] < total`: the worker stopped at the next checkpoint;
+- `observed == ["CollectionImportCancelled"]`: the reader saw the cancellation exception;
+- `hold_timed_out` is `False`.
+
+This replaces the PYPOST-1229 sleep-based reader (40 records, 50 ms each) and its 300 ms
+wall-clock check, which depended on runner speed. The explicit-budget test keeps
+`_TEARDOWN_WAIT_IDLE_MS = 1000`; after the release the budget only has to cover one checkpoint
+and thread exit. The default-budget test asserts the 5000 ms deadline by patching the private
+`_wait_idle_until` ([PYPOST-1327](https://pypost.atlassian.net/browse/PYPOST-1327)).
+
+#### Exact outcome counts
+
+`_OutcomeRecorder` connects `parse_progress`, `parse_cancelled`, `parse_completed` and
+`parse_failed` with `Qt.ConnectionType.DirectConnection`. It counts emissions on the worker
+thread, whether or not queued delivery happens later. Every cancellation test asserts
+`cancelled == [True]`, `completed == []` and `failed == []`. The explicit-budget teardown test
+also patches `show_collection_import_result`, so a regression that publishes a result fails
+instead of blocking on a dialog.
+
+#### Bounds and cleanup
+
+Both modules set `pytestmark = pytest.mark.timeout(30)`. Every gate and hold wait is
+`Event.wait(timeout=_GATE_S)` with `_GATE_S = 5.0`, and worker joins use
+`wait(_WORKER_WAIT_MS)` (5000 ms). On a timeout the double records `gate_timed_out` or
+`hold_timed_out`, which the test asserts is `False`, so a lost release fails instead of hanging.
+`finally` sets the release event first and then calls `_stop_worker`. No new `process_until`
+call is added ([PYPOST-1320](https://pypost.atlassian.net/browse/PYPOST-1320)).
+
+#### Running the tests
+
+```bash
+make test WORKERS=1 PYTEST_ARGS='tests/test_collection_import_cancellation_repro.py \
+  tests/test_collection_import_reader_contract.py'
+```
+
+The run collects 25 tests (6 in the repro module, 19 in the contract module) and takes about
+3 s.
+
+#### Mutation-red validation
+
+Production did not change, so there was no natural red. Instead, each mutation below was applied
+alone to production code in a throwaway worktree, with the new tests copied in, and reverted
+afterwards. Each one turned the named tests red with assertion failures:
+
+- **M1**: delete the pre-read `isInterruptionRequested()` check in `run()`. Both pre-start tests
+  fail (`reader calls` is not empty). No older test noticed.
+- **M2**: swallow record `on_progress` exceptions for `.yaml`/`.yml` in
+  `load_collection_import_candidates`. YAML `[1]` and `[2]` fail. JSON and YAML `[None]` stay
+  green, so this proves YAML-specific coverage.
+- **M3**: emit `parse_cancelled` twice. All five new or changed worker and teardown tests fail
+  on `cancelled == [True]`. The old PYPOST-1229 versions passed.
+- **M4**: `_emit_progress` ignores interruption for `done > 0`. The three in-flight tests fail
+  with `processed=[1..40]`. The old default-teardown test passed, and the old worker test failed
+  only through its 300 ms wall clock.
+
+Repeat this check when changing these tests: a mutation that keeps a test green means that test
+no longer proves its checkpoint. The full table is in the PYPOST-1265 roadmap, STEP 3
+(`ai-tasks/PYPOST-1265/00-roadmap.md`).
+
+#### Log events on these paths
+
+No log events were added. The paths emit existing events (see [Observability](#observability)):
+
+- Worker: INFO `collection_import_parse_worker_cancelled path=…`. One handler serves the
+  pre-read, record and post-read checkpoints, so the line does not say which one fired.
+- Presenter: INFO `collection_import_parse_cancelled from_state=…`, and the teardown events
+  `collection_import_teardown_started`, WARNING `collection_import_worker_interrupting`,
+  `collection_import_wait_idle_*`, INFO `collection_import_worker_interrupted`, WARNING
+  `collection_import_worker_interrupt_timeout` and DEBUG `collection_import_worker_reaped`.
+
+Only two tests assert logs. `test_worker_pre_start_interruption_skips_reader` expects exactly one
+`collection_import_parse_worker_cancelled` record. `test_teardown_worker_stops_after_interruption`
+expects `collection_import_worker_interrupted`, exactly one
+`collection_import_parse_cancelled from_state=parsing` and no
+`collection_import_worker_interrupt_timeout`. The other tests check behaviour only; behaviour is
+the primary proof.
+
+#### Follow-ups
+
+From [PYPOST-1265 technical debt](../../ai-tasks/PYPOST-1265/60-tech-debt.md):
+
+- **[PYPOST-1328](https://pypost.atlassian.net/browse/PYPOST-1328)** (Low) — add
+  `stage=pre_read|record|post_read` (plus `done`/`total`) to the worker cancellation log.
+- **[PYPOST-1329](https://pypost.atlassian.net/browse/PYPOST-1329)** (Low) — record a distinct
+  metric outcome for cancellation instead of `rejected`, which file-picker dismissal also uses.
+- **[PYPOST-1330](https://pypost.atlassian.net/browse/PYPOST-1330)** (Low) — move
+  `_OutcomeRecorder` (and optionally `_stop_worker`) into a shared `tests/helpers/` module.
+- **[PYPOST-1331](https://pypost.atlassian.net/browse/PYPOST-1331)** (Lowest) — move the
+  final-guard test to `_stop_worker` and bounded `Event.wait` waits.
 
 ### Shared import wait helper for presenter tests (PYPOST-1230)
 
@@ -1681,10 +1839,10 @@ Remaining cancellation and lifecycle work is recorded in
 - **[PYPOST-1264](https://pypost.atlassian.net/browse/PYPOST-1264)** — done: see
   [Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264). Its own follow-ups are
   listed below.
-- **[PYPOST-1265](https://pypost.atlassian.net/browse/PYPOST-1265)** — expand cancellation
-  coverage with broader real JSON/YAML and lifecycle matrices, including pre-start interruption.
-  Account for PYPOST-1266's focused JSON, exact-signal, and single-argument rejection checks;
-  legacy-reader success is no longer supported.
+- **[PYPOST-1265](https://pypost.atlassian.net/browse/PYPOST-1265)** — done: see
+  [Cancellation test layout](#cancellation-test-layout-pypost-1265) (pre-start interruption,
+  real YAML record checkpoint, exact outcome counts, in-flight proof). Its follow-ups
+  PYPOST-1328..1331 are listed in that section.
 - **[PYPOST-1261](https://pypost.atlassian.net/browse/PYPOST-1261)** — pre-existing malformed
   nested-expression, frozen SOLID snapshot, and process-level Qt baseline failures.
 - **[PYPOST-1262](https://pypost.atlassian.net/browse/PYPOST-1262)** — pre-existing,
