@@ -8,9 +8,9 @@ You can clone or connect this repository directly into PyPost via the **Library 
 
 The library manifest [`pypost-library.yaml`](pypost-library.yaml) declares:
 - Metadata (`id`, `name`, `version`, `description`)
-- Bundled collections ([`collections/jira_mcp.json`](collections/jira_mcp.json), [`collections/gitlab_mcp.json`](collections/gitlab_mcp.json), [`collections/mcp.json`](collections/mcp.json))
+- Bundled collections ([`collections/jira_mcp.json`](collections/jira_mcp.json), [`collections/gitlab_mcp.json`](collections/gitlab_mcp.json), [`collections/github_mcp.json`](collections/github_mcp.json), [`collections/mcp.json`](collections/mcp.json))
 - Default variable schemas with secrets isolation
-- Profile presets (`jira_cloud`, `gitlab_com`); presets never carry tokens
+- Profile presets (`jira_cloud`, `gitlab_com`, `github_com`); presets never carry tokens
 
 ## Standalone Inventory
 
@@ -38,6 +38,19 @@ The library manifest [`pypost-library.yaml`](pypost-library.yaml) declares:
 - [`environments/gitlab.json`](environments/gitlab.json) — **End users.**
   Companion environment: `gitlab_base_url`, visible MCP-overridable `gitlab_project`,
   hidden `gitlab_token`. Its retained `enable_mcp: true` field is legacy migration input.
+- [`collections/github_mcp.json`](collections/github_mcp.json) — **End users.**
+  Curated GitHub MCP collection (30 REST tools) for github.com and GitHub Enterprise
+  Server: authenticated user, repository, Actions workflows, runs and jobs (dispatch,
+  re-run, cancel), pull requests (files, commits, review comments, conversation
+  comments, reviews), issues, and issue comments.
+- [`collections/github_mcp_rest_paths.json`](collections/github_mcp_rest_paths.json)
+  — **Contributors.** Locked REST method, path and API version catalog for all 30 GitHub
+  tools, checked offline by `make check-github-mcp-path-freshness`. Not an importable
+  collection.
+- [`environments/github.json`](environments/github.json) — **End users.**
+  Companion environment: `github_api_url`, visible MCP-overridable `github_owner` and
+  `github_repo`, hidden `github_token`. Its retained `enable_mcp: true` field is legacy
+  migration input.
 - [`collections/mcp.json`](collections/mcp.json) — **Contributors / local
   probing.** Local MCP/SSE probe against PyPost ports (`127.0.0.1:1080` /
   `9080`); used by test helpers. Not the primary “learn Jira + MCP” starter.
@@ -248,11 +261,134 @@ suitable (responses are also subject to the existing `max_response_bytes` size c
 - Groups, users and members administration, wikis, releases, packages and registries
 - Webhooks, project settings and access token management
 
+## Recommended import order (GitHub pair)
+
+1. **Import the environment** — **Manage Environments → Import…** and choose
+   `examples/environments/github.json`.
+2. **Replace placeholders locally** (do not commit real secrets):
+   - `github_api_url` — `https://api.github.com` for github.com, or
+     `https://<host>/api/v3` for GitHub Enterprise Server
+   - `github_owner` and `github_repo` — the default repository (for example `octo-org`
+     and `hello-world`) in place of `your-org` and `your-repo`
+   - `github_token` — your personal access token in place of `your-github-token`;
+     keep the key **Hidden**
+3. **Import the collection** — **Import Collection…** and choose
+   `examples/collections/github_mcp.json`.
+4. **Select** the **GitHub MCP** environment in the top dropdown for manual GUI sends.
+5. **Create and start an endpoint** — open **MCP Servers…**, add a row selecting the GitHub
+   collection and GitHub MCP environment, choose a unique host/port, then click **Start**.
+   Point the agent at that row's `/mcp` URL. The example's `enable_mcp: true` is migration
+   input only.
+
+When you attach the library instead, apply the `github_com` preset and enter the token
+in the secret `github_token` variable.
+
+## GitHub authentication
+
+- Prefer a **fine-grained** personal access token limited to the repositories the agent
+  needs. Minimum repository permissions per tool group:
+  - Repository and identity: Metadata read (always granted) for the repository lookup;
+    the authenticated-user lookup (`GET /user`) needs no repository permission
+  - Actions: Actions read for workflows, runs and jobs; Actions write to dispatch,
+    re-run or cancel runs
+  - Pull requests: Pull requests read; Pull requests write to create or update pull
+    requests, review comments, replies and reviews
+  - Issues and conversation comments: Issues read; Issues write to create or update
+    issues and comments (conversation comments on a pull request accept Issues or Pull
+    requests write)
+- A **classic** personal access token needs the `repo` scope. `github_dispatch_workflow`,
+  `github_rerun_workflow_run` and `github_cancel_workflow_run` require `repo` even on public
+  repositories. For every other tool, `public_repo` is enough on public repositories only
+  (the Actions read tools need `repo` only for private repositories).
+- Merging pull requests is not part of the collection; it would also need Contents write.
+- Enter the token only in the hidden key `github_token`. It is never published in an MCP
+  tool schema and cannot be overridden by the agent.
+- Every request sends `Authorization: Bearer {{ github_token }}`,
+  `Accept: application/vnd.github+json` and the pinned `X-GitHub-Api-Version: 2022-11-28`.
+  PyPost redacts `Authorization` headers and `Bearer` values in logs and MCP results.
+- GitHub also accepts the `Authorization: token <token>` form. If you prefer it, edit the
+  header in your imported copy.
+
+## GitHub.com vs GitHub Enterprise Server
+
+- github.com: keep `github_api_url` set to `https://api.github.com`.
+- GitHub Enterprise Server: set `github_api_url` to `https://<host>/api/v3` (the REST API
+  base, not the web URL), with no trailing slash.
+- Both use the same REST paths and headers, so one environment covers both. API version
+  `2022-11-28` is the one version supported by github.com and every supported GitHub
+  Enterprise Server release. TLS certificates, proxies and network access to the server
+  are your concern.
+
+## GitHub default repository and identifiers
+
+- `github_owner` and `github_repo` are a soft default for normal work. They are not a
+  security boundary or permission control. Every repository-scoped tool publishes
+  optional `github_owner` and `github_repo` arguments, so the agent can target any other
+  repository the token can access. A blank default is not supported: keep values
+  configured or pass both arguments on every call.
+- Owner and repository are URL-encoded as one path segment each, so a value cannot add
+  or split path segments.
+- Pull requests and issues use the repository-scoped **number** shown in the UI
+  (`pull_number`, `issue_number`), not a global ID. Runs, jobs and comments use their
+  numeric ID (`run_id`, `job_id`, `comment_id`). These arguments accept a native integer
+  or a decimal string; any other value is rejected before an HTTP request is sent.
+- `workflow_id` accepts the numeric workflow ID as a decimal string or the workflow file
+  name (`ci.yml`); it is encoded as one path segment.
+- Query values such as `branch`, `head` (`user:branch`) and `labels` are sent as raw
+  values and encoded once by the HTTP client. `labels` is a comma-separated string when
+  listing issues, but a JSON array of strings when creating or updating an issue (an
+  empty array clears all labels).
+- Limitation: an owner, repository or workflow file name that is exactly `.` or `..` is
+  not supported, because dots are not encoded. GitHub does not allow these names.
+
+## GitHub coverage vs gaps
+
+The GitHub collection is a practical subset of the GitHub REST API for agent workflows,
+not a full dump of the API.
+
+**Included (30 MCP tools):**
+
+| Area | MCP tools |
+| ---- | --------- |
+| Identity | `github_get_authenticated_user` |
+| Repository | `github_get_repository` |
+| Actions workflows | `github_list_workflows`, `github_dispatch_workflow` |
+| Actions runs | `github_list_workflow_runs`, `github_list_workflow_runs_for_workflow`, `github_get_workflow_run`, `github_rerun_workflow_run`, `github_cancel_workflow_run` |
+| Actions jobs | `github_list_workflow_run_jobs`, `github_get_workflow_job` |
+| Pull requests | `github_list_pull_requests`, `github_get_pull_request`, `github_create_pull_request`, `github_update_pull_request` |
+| Pull request contents | `github_list_pull_request_files`, `github_list_pull_request_commits` |
+| Pull request review comments | `github_list_pull_request_review_comments`, `github_create_pull_request_review_comment`, `github_reply_to_pull_request_review_comment` |
+| Pull request conversation comments | `github_list_pull_request_comments`, `github_create_pull_request_comment` |
+| Pull request reviews | `github_list_pull_request_reviews`, `github_create_pull_request_review` |
+| Issues | `github_list_issues`, `github_get_issue`, `github_create_issue`, `github_update_issue` |
+| Issue comments | `github_list_issue_comments`, `github_create_issue_comment` |
+
+List tools accept `page` (default `1`) and `per_page` (default `30`, GitHub max `100`).
+Closing and reopening use the update tools with `state`. For
+`github_create_pull_request_review`, `event` is required and must be `APPROVE`,
+`REQUEST_CHANGES` or `COMMENT`; the review is submitted on create. Issue listing also
+returns pull requests (GitHub behaviour).
+
+**Explicit gaps** (out of scope unless added later):
+
+- Delete operations of any kind
+- Merging pull requests (irreversible; add
+  `PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge` to your imported copy if needed)
+- Pending (draft) reviews and submitting a pending review
+  (`POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events`); reading
+  one review by ID
+- Workflow run details from dispatch (`return_run_details`); find the run with the run
+  listing tools instead
+- Job logs, artifacts, caches, secrets and variables of GitHub Actions
+- Writing repository files, commits, branches, tags or releases
+- Organization, team, member, webhook and repository settings administration
+
 ## Secret handling
 
 - Committed fixtures contain **placeholders only** (sample site URL and
-  `you@example.com:your-api-token`; for GitLab, `your-gitlab-access-token`).
-  Never put real API tokens or passwords in git.
+  `you@example.com:your-api-token`; for GitLab, `your-gitlab-access-token`; for GitHub,
+  `your-github-token`). Never put real API tokens or passwords in git, such as GitHub
+  `ghp_…` or `github_pat_…` tokens.
 - After import, substitute your own values in PyPost (or in a private copy of the
   JSON). Keep credential keys in `hidden_keys`.
 - Local runtime data under `collections/` and `environments.json` stays
@@ -264,4 +400,5 @@ suitable (responses are also subject to the existing `max_response_bytes` size c
 Use `collections/mcp.json` when you are developing or probing PyPost’s own
 MCP/SSE endpoints locally. For a ready-to-adapt Jira Cloud + MCP workflow, use
 the `jira_mcp.json` + `jira_cloud.json` pair instead; for GitLab, use the
-`gitlab_mcp.json` + `gitlab.json` pair.
+`gitlab_mcp.json` + `gitlab.json` pair; for GitHub, use the `github_mcp.json` +
+`github.json` pair.

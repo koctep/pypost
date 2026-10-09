@@ -1,0 +1,20 @@
+[
+  {
+    "id": "github-mcp-environment",
+    "name": "GitHub MCP",
+    "variables": {
+      "github_api_url": "https://api.github.com",
+      "github_owner": "your-org",
+      "github_repo": "your-repo",
+      "github_token": "your-github-token"
+    },
+    "hidden_keys": [
+      "github_token"
+    ],
+    "mcp_overridable_keys": [
+      "github_owner",
+      "github_repo"
+    ],
+    "enable_mcp": true
+  }
+]

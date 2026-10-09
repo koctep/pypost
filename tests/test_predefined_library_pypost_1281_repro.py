@@ -47,6 +47,7 @@ def test_predefined_library_lists_valid_manifest_collections(tmp_path: Path):
     assert [entry["path"] for entry in entries] == [
         "collections/jira_mcp.json",
         "collections/gitlab_mcp.json",  # PYPOST-1316
+        "collections/github_mcp.json",  # PYPOST-1334
         "collections/mcp.json",
     ]
     assert all(entry["library_id"] == "pypost-examples" for entry in entries)

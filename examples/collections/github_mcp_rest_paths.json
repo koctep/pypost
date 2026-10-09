@@ -1,0 +1,232 @@
+{
+  "version": 1,
+  "description": "Locked REST method and path templates for all 30 tools in examples/collections/github_mcp.json (PYPOST-1334). Paths follow {{ github_api_url }}; every tool sends X-GitHub-Api-Version equal to api_version. CI compares the collection to this catalog offline (make check-github-mcp-path-freshness); refresh after reviewing GitHub docs - no live credentials.",
+  "reviewed_on": "2026-10-09",
+  "api_version": "2022-11-28",
+  "doc_refs": [
+    "https://docs.github.com/en/rest/about-the-rest-api/api-versions",
+    "https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api",
+    "https://docs.github.com/en/rest/users/users",
+    "https://docs.github.com/en/rest/repos/repos",
+    "https://docs.github.com/en/rest/actions/workflows",
+    "https://docs.github.com/en/rest/actions/workflow-runs",
+    "https://docs.github.com/en/rest/actions/workflow-jobs",
+    "https://docs.github.com/en/rest/pulls/pulls",
+    "https://docs.github.com/en/rest/pulls/comments",
+    "https://docs.github.com/en/rest/pulls/reviews",
+    "https://docs.github.com/en/rest/issues/issues",
+    "https://docs.github.com/en/rest/issues/comments"
+  ],
+  "tools": [
+    {
+      "id": "github-get-authenticated-user",
+      "tool": "github_get_authenticated_user",
+      "capability": "Identity",
+      "method": "GET",
+      "path": "/user"
+    },
+    {
+      "id": "github-get-repository",
+      "tool": "github_get_repository",
+      "capability": "Repository: get",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}"
+    },
+    {
+      "id": "github-list-workflows",
+      "tool": "github_list_workflows",
+      "capability": "Actions: list workflows",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/workflows"
+    },
+    {
+      "id": "github-list-workflow-runs",
+      "tool": "github_list_workflow_runs",
+      "capability": "Actions: list runs (repository)",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs"
+    },
+    {
+      "id": "github-list-workflow-runs-for-workflow",
+      "tool": "github_list_workflow_runs_for_workflow",
+      "capability": "Actions: list runs (workflow)",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/workflows/{{ urlencode(mcp.request.workflow_id) }}/runs"
+    },
+    {
+      "id": "github-get-workflow-run",
+      "tool": "github_get_workflow_run",
+      "capability": "Actions: get run",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs/{{ to_int(mcp.request.run_id) }}"
+    },
+    {
+      "id": "github-rerun-workflow-run",
+      "tool": "github_rerun_workflow_run",
+      "capability": "Actions: re-run run",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs/{{ to_int(mcp.request.run_id) }}/rerun"
+    },
+    {
+      "id": "github-cancel-workflow-run",
+      "tool": "github_cancel_workflow_run",
+      "capability": "Actions: cancel run",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs/{{ to_int(mcp.request.run_id) }}/cancel"
+    },
+    {
+      "id": "github-list-workflow-run-jobs",
+      "tool": "github_list_workflow_run_jobs",
+      "capability": "Actions: list jobs",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs/{{ to_int(mcp.request.run_id) }}/jobs"
+    },
+    {
+      "id": "github-get-workflow-job",
+      "tool": "github_get_workflow_job",
+      "capability": "Actions: get job",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/jobs/{{ to_int(mcp.request.job_id) }}"
+    },
+    {
+      "id": "github-dispatch-workflow",
+      "tool": "github_dispatch_workflow",
+      "capability": "Actions: dispatch",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/workflows/{{ urlencode(mcp.request.workflow_id) }}/dispatches"
+    },
+    {
+      "id": "github-list-pull-requests",
+      "tool": "github_list_pull_requests",
+      "capability": "PRs: list",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls"
+    },
+    {
+      "id": "github-get-pull-request",
+      "tool": "github_get_pull_request",
+      "capability": "PRs: get",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}"
+    },
+    {
+      "id": "github-create-pull-request",
+      "tool": "github_create_pull_request",
+      "capability": "PRs: create",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls"
+    },
+    {
+      "id": "github-update-pull-request",
+      "tool": "github_update_pull_request",
+      "capability": "PRs: update/close/reopen",
+      "method": "PATCH",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}"
+    },
+    {
+      "id": "github-list-pull-request-files",
+      "tool": "github_list_pull_request_files",
+      "capability": "PR contents: files",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/files"
+    },
+    {
+      "id": "github-list-pull-request-commits",
+      "tool": "github_list_pull_request_commits",
+      "capability": "PR contents: commits",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/commits"
+    },
+    {
+      "id": "github-list-pull-request-review-comments",
+      "tool": "github_list_pull_request_review_comments",
+      "capability": "PR discussion: list review comments",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/comments"
+    },
+    {
+      "id": "github-create-pull-request-review-comment",
+      "tool": "github_create_pull_request_review_comment",
+      "capability": "PR discussion: create review comment",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/comments"
+    },
+    {
+      "id": "github-reply-to-pull-request-review-comment",
+      "tool": "github_reply_to_pull_request_review_comment",
+      "capability": "PR discussion: reply to review comment",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/comments/{{ to_int(mcp.request.comment_id) }}/replies"
+    },
+    {
+      "id": "github-list-pull-request-comments",
+      "tool": "github_list_pull_request_comments",
+      "capability": "PR discussion: list conversation comments",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.pull_number) }}/comments"
+    },
+    {
+      "id": "github-create-pull-request-comment",
+      "tool": "github_create_pull_request_comment",
+      "capability": "PR discussion: create conversation comment",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.pull_number) }}/comments"
+    },
+    {
+      "id": "github-list-pull-request-reviews",
+      "tool": "github_list_pull_request_reviews",
+      "capability": "PR reviews: list",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/reviews"
+    },
+    {
+      "id": "github-create-pull-request-review",
+      "tool": "github_create_pull_request_review",
+      "capability": "PR reviews: create (submitted only)",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/reviews"
+    },
+    {
+      "id": "github-list-issues",
+      "tool": "github_list_issues",
+      "capability": "Issues: list",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues"
+    },
+    {
+      "id": "github-get-issue",
+      "tool": "github_get_issue",
+      "capability": "Issues: get",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.issue_number) }}"
+    },
+    {
+      "id": "github-create-issue",
+      "tool": "github_create_issue",
+      "capability": "Issues: create",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues"
+    },
+    {
+      "id": "github-update-issue",
+      "tool": "github_update_issue",
+      "capability": "Issues: update/close/reopen",
+      "method": "PATCH",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.issue_number) }}"
+    },
+    {
+      "id": "github-list-issue-comments",
+      "tool": "github_list_issue_comments",
+      "capability": "Issue comments: list",
+      "method": "GET",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.issue_number) }}/comments"
+    },
+    {
+      "id": "github-create-issue-comment",
+      "tool": "github_create_issue_comment",
+      "capability": "Issue comments: create",
+      "method": "POST",
+      "path": "/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.issue_number) }}/comments"
+    }
+  ]
+}
