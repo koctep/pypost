@@ -8,9 +8,9 @@ You can clone or connect this repository directly into PyPost via the **Library 
 
 The library manifest [`pypost-library.yaml`](pypost-library.yaml) declares:
 - Metadata (`id`, `name`, `version`, `description`)
-- Bundled collections ([`collections/jira_mcp.json`](collections/jira_mcp.json), [`collections/mcp.json`](collections/mcp.json))
+- Bundled collections ([`collections/jira_mcp.json`](collections/jira_mcp.json), [`collections/gitlab_mcp.json`](collections/gitlab_mcp.json), [`collections/mcp.json`](collections/mcp.json))
 - Default variable schemas with secrets isolation
-- Profile presets (`jira_cloud`)
+- Profile presets (`jira_cloud`, `gitlab_com`); presets never carry tokens
 
 ## Standalone Inventory
 
@@ -27,6 +27,17 @@ The library manifest [`pypost-library.yaml`](pypost-library.yaml) declares:
 - [`environments/jira_cloud.json`](environments/jira_cloud.json) — **End users.**
   Companion environment: `jira_base_url`, visible `jira_project_key`, hidden `jira_credentials`.
   Its retained `enable_mcp: true` field is legacy migration input.
+- [`collections/gitlab_mcp.json`](collections/gitlab_mcp.json) — **End users.**
+  Curated GitLab MCP collection (25 REST tools) for GitLab.com and self-managed
+  GitLab: current user, projects, branches, repository files and tree, commits,
+  issues, merge requests, issue and merge request comments, pipelines, and jobs.
+- [`collections/gitlab_mcp_rest_paths.json`](collections/gitlab_mcp_rest_paths.json)
+  — **Contributors.** Locked REST method and path catalog for all 25 GitLab tools,
+  checked offline by `make check-gitlab-mcp-path-freshness`. Not an importable
+  collection.
+- [`environments/gitlab.json`](environments/gitlab.json) — **End users.**
+  Companion environment: `gitlab_base_url`, visible MCP-overridable `gitlab_project`,
+  hidden `gitlab_token`. Its retained `enable_mcp: true` field is legacy migration input.
 - [`collections/mcp.json`](collections/mcp.json) — **Contributors / local
   probing.** Local MCP/SSE probe against PyPost ports (`127.0.0.1:1080` /
   `9080`); used by test helpers. Not the primary “learn Jira + MCP” starter.
@@ -139,11 +150,109 @@ per batch by Jira Agile).
 External Atlassian MCP may remain configured for agents; these fixtures do not
 replace that server — they ship a PyPost-native analog for the in-scope set.
 
+## Recommended import order (GitLab pair)
+
+1. **Import the environment** — **Manage Environments → Import…** and choose
+   `examples/environments/gitlab.json`.
+2. **Replace placeholders locally** (do not commit real secrets):
+   - `gitlab_base_url` — `https://gitlab.com` or your self-managed instance URL
+   - `gitlab_project` — the default project as a numeric ID (for example `42`) or a
+     full path (for example `your-group/your-project`)
+   - `gitlab_token` — your access token in place of `your-gitlab-access-token`;
+     keep the key **Hidden**
+3. **Import the collection** — **Import Collection…** and choose
+   `examples/collections/gitlab_mcp.json`.
+4. **Select** the **GitLab MCP** environment in the top dropdown for manual GUI sends.
+5. **Create and start an endpoint** — open **MCP Servers…**, add a row selecting the GitLab
+   collection and GitLab MCP environment, choose a unique host/port, then click **Start**.
+   Point the agent at that row's `/mcp` URL. The example's `enable_mcp: true` is migration
+   input only.
+
+When you attach the library instead, apply the `gitlab_com` preset and enter the token
+in the secret `gitlab_token` variable.
+
+## GitLab authentication
+
+- Use a personal, project or group access token. Choose the `read_api` scope for
+  read-only tools and the `api` scope when the agent must create or update issues,
+  merge requests or comments.
+- Enter the token only in the hidden key `gitlab_token`. It is never published in
+  an MCP tool schema and cannot be overridden by the agent.
+- Every request sends `Authorization: Bearer {{ gitlab_token }}`, which GitLab accepts for
+  personal, project and group access tokens. PyPost redacts `Authorization` headers and
+  `Bearer` values in logs and MCP results.
+- GitLab also accepts the `PRIVATE-TOKEN: <token>` header. If you prefer it, edit the
+  header in your imported copy; note that PyPost then masks the token only by its hidden
+  value, not by header name.
+
+## GitLab.com vs self-managed
+
+- GitLab.com: keep `gitlab_base_url` set to `https://gitlab.com`.
+- Self-managed GitLab: set `gitlab_base_url` to your instance URL, including any
+  sub-path (for example `https://git.example.com/gitlab`), with no trailing slash.
+  Every tool appends `/api/v4/...` to it.
+- Both expose the same REST API v4 and token headers, so one environment covers both.
+  TLS certificates, proxies and network access to the instance are your concern.
+
+## GitLab default project and identifiers
+
+- `gitlab_project` is a soft default for normal work. It is not a security boundary
+  or permission control. Every project-scoped tool publishes an optional
+  `gitlab_project` argument, so the agent can target any other project the token can
+  access. A blank default is not supported for project-scoped tools: keep a value
+  configured or pass `gitlab_project` on every call.
+- A project is identified by its numeric ID (`42`) or its full path
+  (`group/subgroup/project`). The path is URL-encoded automatically
+  (`group%2Fsubgroup%2Fproject`).
+- Issues and merge requests use the project-scoped **IID** (`issue_iid`,
+  `merge_request_iid`), the number shown in the UI. Pipelines and jobs use their
+  global numeric ID (`pipeline_id`, `job_id`). These arguments accept a native integer
+  or a decimal string; any other value is rejected before an HTTP request is sent.
+- File paths, branch names and commit references in the URL path are encoded as one
+  path segment (`src/app/main.py` → `src%2Fapp%2Fmain.py`, `feature/x` → `feature%2Fx`).
+  Query values such as `ref` and `search` are sent as raw values and encoded once by
+  the HTTP client.
+- Limitation: a file path, branch or SHA that is exactly `.` or `..` is not supported,
+  because dots are not encoded and such a dot segment may be normalised away. Git does
+  not allow these names, so valid input does not reach this case.
+
+## GitLab coverage vs gaps
+
+The GitLab collection is a practical subset of GitLab REST API v4 for agent workflows,
+not a full dump of the API.
+
+**Included (25 MCP tools):**
+
+| Area | MCP tools |
+| ---- | --------- |
+| Identity | `gitlab_get_current_user` |
+| Projects | `gitlab_list_projects`, `gitlab_get_project` |
+| Branches | `gitlab_list_branches`, `gitlab_get_branch` |
+| Files | `gitlab_get_file`, `gitlab_list_repository_tree` |
+| Commits | `gitlab_list_commits`, `gitlab_get_commit` |
+| Issues | `gitlab_list_issues`, `gitlab_get_issue`, `gitlab_create_issue`, `gitlab_update_issue` |
+| Merge requests | `gitlab_list_merge_requests`, `gitlab_get_merge_request`, `gitlab_create_merge_request`, `gitlab_update_merge_request` |
+| Comments | `gitlab_list_issue_notes`, `gitlab_create_issue_note`, `gitlab_list_merge_request_notes`, `gitlab_create_merge_request_note` |
+| CI/CD | `gitlab_list_pipelines`, `gitlab_get_pipeline`, `gitlab_list_pipeline_jobs`, `gitlab_get_job` |
+
+List tools accept `page` (default `1`) and `per_page` (default `20`). `gitlab_get_file`
+returns the raw file content as decoded text, so binary or very large files are not
+suitable (responses are also subject to the existing `max_response_bytes` size cap).
+
+**Explicit gaps** (out of scope unless added later):
+
+- Delete operations of any kind
+- Merging or approving merge requests, diffs and discussions (threaded review comments)
+- Writing repository files, commits, branches or tags
+- Triggering, retrying or cancelling pipelines and jobs; job logs and artifacts
+- Groups, users and members administration, wikis, releases, packages and registries
+- Webhooks, project settings and access token management
+
 ## Secret handling
 
 - Committed fixtures contain **placeholders only** (sample site URL and
-  `you@example.com:your-api-token`). Never put real API tokens or passwords in
-  git.
+  `you@example.com:your-api-token`; for GitLab, `your-gitlab-access-token`).
+  Never put real API tokens or passwords in git.
 - After import, substitute your own values in PyPost (or in a private copy of the
   JSON). Keep credential keys in `hidden_keys`.
 - Local runtime data under `collections/` and `environments.json` stays
@@ -154,4 +263,5 @@ replace that server — they ship a PyPost-native analog for the in-scope set.
 
 Use `collections/mcp.json` when you are developing or probing PyPost’s own
 MCP/SSE endpoints locally. For a ready-to-adapt Jira Cloud + MCP workflow, use
-the `jira_mcp.json` + `jira_cloud.json` pair instead.
+the `jira_mcp.json` + `jira_cloud.json` pair instead; for GitLab, use the
+`gitlab_mcp.json` + `gitlab.json` pair.

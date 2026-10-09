@@ -24,19 +24,27 @@ class TestModernizedExamplesLibrary:
         assert manifest.version == "2.0.0"
         assert "collections/jira_mcp.json" in manifest.collections
         assert "collections/mcp.json" in manifest.collections
+        # PYPOST-1316: GitLab MCP collection is bundled.
+        assert "collections/gitlab_mcp.json" in manifest.collections
 
         # Variables schema
         var_names = [v.name for v in manifest.variables]
         assert "jira_base_url" in var_names
         assert "jira_project_key" in var_names
         assert "jira_credentials" in var_names
+        assert "gitlab_base_url" in var_names
+        assert "gitlab_project" in var_names
+        assert "gitlab_token" in var_names
 
         # Secret variable flags
         creds_var = next(v for v in manifest.variables if v.name == "jira_credentials")
         assert creds_var.secret is True
+        token_var = next(v for v in manifest.variables if v.name == "gitlab_token")
+        assert token_var.secret is True
 
         # Presets
         assert "jira_cloud" in manifest.presets
+        assert "gitlab_com" in manifest.presets
 
     def test_examples_collections_load_as_collections(self):
         jira_coll_path = Path("examples/collections/jira_mcp.json")
@@ -51,6 +59,16 @@ class TestModernizedExamplesLibrary:
         assert isinstance(mcp_coll, Collection)
         assert mcp_coll.name == "MCP"
         assert len(mcp_coll.requests) == 3
+
+        # PYPOST-1316: GitLab MCP collection (25 REST tools).
+        gitlab_coll_path = Path("examples/collections/gitlab_mcp.json")
+        assert gitlab_coll_path.is_file(), (
+            "examples/collections/gitlab_mcp.json missing (PYPOST-1316)"
+        )
+        gitlab_coll = read_collection_file(gitlab_coll_path)
+        assert isinstance(gitlab_coll, Collection)
+        assert gitlab_coll.name == "GitLab MCP"
+        assert len(gitlab_coll.requests) == 25
 
 
 class TestLegacyFixturesRegression:

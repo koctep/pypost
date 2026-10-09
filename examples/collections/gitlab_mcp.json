@@ -1,0 +1,986 @@
+{
+  "id": "gitlab-mcp",
+  "name": "GitLab MCP",
+  "description": "Curated GitLab REST API v4 collection with 25 MCP tools (GitLab.com and self-managed).",
+  "version": "1.0.0",
+  "variables": [
+    {
+      "name": "gitlab_base_url",
+      "type": "string",
+      "default": "https://gitlab.com",
+      "description": "GitLab instance base URL without a trailing slash (GitLab.com or self-managed, optional sub-path)",
+      "required": true,
+      "secret": false
+    },
+    {
+      "name": "gitlab_project",
+      "type": "string",
+      "default": "your-group/your-project",
+      "description": "Default GitLab project: numeric ID or full path",
+      "required": false,
+      "secret": false
+    },
+    {
+      "name": "gitlab_token",
+      "type": "string",
+      "default": "",
+      "description": "GitLab personal, project or group access token",
+      "required": true,
+      "secret": true
+    }
+  ],
+  "requests": [
+    {
+      "id": "gitlab-get-current-user",
+      "name": "GitLab Get Current User",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/user",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Return the GitLab user that owns the configured access token.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-projects",
+      "name": "GitLab List Projects",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "search": "{{ mcp.request.search }}",
+        "membership": "{{ mcp.request.membership }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List or search GitLab projects visible to the token (paginated). Each project has a numeric id and a path_with_namespace usable as gitlab_project.",
+      "mcp_params": {
+        "search": {
+          "type": "string",
+          "description": "Optional text matched against project names and paths.",
+          "required": false
+        },
+        "membership": {
+          "type": "string",
+          "description": "Optional: true limits results to projects the user is a member of; false (default) lists all visible projects.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-get-project",
+      "name": "GitLab Get Project",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one GitLab project. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-branches",
+      "name": "GitLab List Branches",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/branches",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "search": "{{ mcp.request.search }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List repository branches (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "search": {
+          "type": "string",
+          "description": "Optional text matched against branch names.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-get-branch",
+      "name": "GitLab Get Branch",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/branches/{{ urlencode(mcp.request.branch) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one repository branch with its latest commit. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "branch": {
+          "type": "string",
+          "description": "Branch name, e.g. main or feature/x (slashes are encoded automatically).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-get-file",
+      "name": "GitLab Get File",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/files/{{ urlencode(mcp.request.file_path) }}/raw",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "ref": "{{ mcp.request.ref }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Read the raw content of one repository file. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "file_path": {
+          "type": "string",
+          "description": "Repository file path, e.g. src/app/main.py (slashes and reserved characters are encoded automatically).",
+          "required": true
+        },
+        "ref": {
+          "type": "string",
+          "description": "Optional branch, tag or commit SHA; defaults to the project's HEAD.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-repository-tree",
+      "name": "GitLab List Repository Tree",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/tree",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "path": "{{ mcp.request.path }}",
+        "ref": "{{ mcp.request.ref }}",
+        "recursive": "{{ mcp.request.recursive }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List files and directories in the repository tree (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "path": {
+          "type": "string",
+          "description": "Optional directory path inside the repository.",
+          "required": false
+        },
+        "ref": {
+          "type": "string",
+          "description": "Optional branch, tag or commit SHA; defaults to the default branch.",
+          "required": false
+        },
+        "recursive": {
+          "type": "string",
+          "description": "Optional: true lists the tree recursively; false (default) lists one level.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-commits",
+      "name": "GitLab List Commits",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/commits",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "ref_name": "{{ mcp.request.ref_name }}",
+        "path": "{{ mcp.request.path }}",
+        "since": "{{ mcp.request.since }}",
+        "until": "{{ mcp.request.until }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List repository commits, optionally filtered by ref and path (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "ref_name": {
+          "type": "string",
+          "description": "Optional branch, tag or SHA to list commits from; defaults to the default branch.",
+          "required": false
+        },
+        "path": {
+          "type": "string",
+          "description": "Optional file or directory path; only commits touching it are listed.",
+          "required": false
+        },
+        "since": {
+          "type": "string",
+          "description": "Optional ISO 8601 timestamp; only commits after it.",
+          "required": false
+        },
+        "until": {
+          "type": "string",
+          "description": "Optional ISO 8601 timestamp; only commits before it.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-get-commit",
+      "name": "GitLab Get Commit",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/repository/commits/{{ urlencode(mcp.request.sha) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one commit. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "sha": {
+          "type": "string",
+          "description": "Commit SHA, branch name or tag name.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-issues",
+      "name": "GitLab List Issues",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/issues",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "state": "{{ mcp.request.state }}",
+        "labels": "{{ mcp.request.labels }}",
+        "search": "{{ mcp.request.search }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List project issues (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "state": {
+          "type": "string",
+          "description": "Optional state filter: opened, closed or all.",
+          "required": false
+        },
+        "labels": {
+          "type": "string",
+          "description": "Optional comma-separated label names; issues must have all of them.",
+          "required": false
+        },
+        "search": {
+          "type": "string",
+          "description": "Optional text matched against issue titles and descriptions.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-get-issue",
+      "name": "GitLab Get Issue",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/issues/{{ to_int(mcp.request.issue_iid) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one project issue by IID. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "issue_iid": {
+          "type": "integer_or_string",
+          "description": "Project-scoped issue IID (the number shown in the UI, not the global ID); decimal string or integer.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-create-issue",
+      "name": "GitLab Create Issue",
+      "method": "POST",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/issues",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.description is defined and mcp.request.description is not none %}{{ ns.sep }}\"description\": {{ to_json_string(mcp.request.description) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": {{ to_json_string(mcp.request.labels) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Create a project issue. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "title": {
+          "type": "string",
+          "description": "Issue title.",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "description": "Description (Markdown).",
+          "required": false
+        },
+        "labels": {
+          "type": "string",
+          "description": "Comma-separated label names, e.g. bug,backend.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-update-issue",
+      "name": "GitLab Update Issue",
+      "method": "PUT",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/issues/{{ to_int(mcp.request.issue_iid) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.description is defined and mcp.request.description is not none %}{{ ns.sep }}\"description\": {{ to_json_string(mcp.request.description) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": {{ to_json_string(mcp.request.labels) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state_event is defined and mcp.request.state_event is not none %}{{ ns.sep }}\"state_event\": {{ to_json_string(mcp.request.state_event) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Update, close or reopen a project issue; only the fields you pass are changed. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "issue_iid": {
+          "type": "integer_or_string",
+          "description": "Project-scoped issue IID (the number shown in the UI, not the global ID); decimal string or integer.",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "description": "New title.",
+          "required": false
+        },
+        "description": {
+          "type": "string",
+          "description": "Description (Markdown).",
+          "required": false
+        },
+        "labels": {
+          "type": "string",
+          "description": "Comma-separated label names; replaces the current labels.",
+          "required": false
+        },
+        "state_event": {
+          "type": "string",
+          "description": "Optional state change: close or reopen.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-merge-requests",
+      "name": "GitLab List Merge Requests",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "state": "{{ mcp.request.state }}",
+        "source_branch": "{{ mcp.request.source_branch }}",
+        "target_branch": "{{ mcp.request.target_branch }}",
+        "search": "{{ mcp.request.search }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List project merge requests (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "state": {
+          "type": "string",
+          "description": "Optional state filter: opened, closed, locked, merged or all.",
+          "required": false
+        },
+        "source_branch": {
+          "type": "string",
+          "description": "Optional source branch name.",
+          "required": false
+        },
+        "target_branch": {
+          "type": "string",
+          "description": "Optional target branch name.",
+          "required": false
+        },
+        "search": {
+          "type": "string",
+          "description": "Optional text matched against merge request titles and descriptions.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-get-merge-request",
+      "name": "GitLab Get Merge Request",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests/{{ to_int(mcp.request.merge_request_iid) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one project merge request by IID. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "merge_request_iid": {
+          "type": "integer_or_string",
+          "description": "Project-scoped merge request IID (the number shown in the UI, not the global ID); decimal string or integer.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-create-merge-request",
+      "name": "GitLab Create Merge Request",
+      "method": "POST",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.source_branch is defined and mcp.request.source_branch is not none %}{{ ns.sep }}\"source_branch\": {{ to_json_string(mcp.request.source_branch) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.target_branch is defined and mcp.request.target_branch is not none %}{{ ns.sep }}\"target_branch\": {{ to_json_string(mcp.request.target_branch) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.description is defined and mcp.request.description is not none %}{{ ns.sep }}\"description\": {{ to_json_string(mcp.request.description) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": {{ to_json_string(mcp.request.labels) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Create a merge request. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "source_branch": {
+          "type": "string",
+          "description": "Source branch name.",
+          "required": true
+        },
+        "target_branch": {
+          "type": "string",
+          "description": "Target branch name.",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "description": "Merge request title.",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "description": "Description (Markdown).",
+          "required": false
+        },
+        "labels": {
+          "type": "string",
+          "description": "Comma-separated label names, e.g. bug,backend.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-update-merge-request",
+      "name": "GitLab Update Merge Request",
+      "method": "PUT",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests/{{ to_int(mcp.request.merge_request_iid) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.description is defined and mcp.request.description is not none %}{{ ns.sep }}\"description\": {{ to_json_string(mcp.request.description) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": {{ to_json_string(mcp.request.labels) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.target_branch is defined and mcp.request.target_branch is not none %}{{ ns.sep }}\"target_branch\": {{ to_json_string(mcp.request.target_branch) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state_event is defined and mcp.request.state_event is not none %}{{ ns.sep }}\"state_event\": {{ to_json_string(mcp.request.state_event) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Update, close or reopen a merge request; only the fields you pass are changed. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "merge_request_iid": {
+          "type": "integer_or_string",
+          "description": "Project-scoped merge request IID (the number shown in the UI, not the global ID); decimal string or integer.",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "description": "New title.",
+          "required": false
+        },
+        "description": {
+          "type": "string",
+          "description": "Description (Markdown).",
+          "required": false
+        },
+        "labels": {
+          "type": "string",
+          "description": "Comma-separated label names; replaces the current labels.",
+          "required": false
+        },
+        "target_branch": {
+          "type": "string",
+          "description": "New target branch name.",
+          "required": false
+        },
+        "state_event": {
+          "type": "string",
+          "description": "Optional state change: close or reopen.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-issue-notes",
+      "name": "GitLab List Issue Notes",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/issues/{{ to_int(mcp.request.issue_iid) }}/notes",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "sort": "{{ mcp.request.sort }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List comments (notes) on a project issue (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "issue_iid": {
+          "type": "integer_or_string",
+          "description": "Project-scoped issue IID (the number shown in the UI, not the global ID); decimal string or integer.",
+          "required": true
+        },
+        "sort": {
+          "type": "string",
+          "description": "Optional sort order: asc or desc.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-create-issue-note",
+      "name": "GitLab Create Issue Note",
+      "method": "POST",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/issues/{{ to_int(mcp.request.issue_iid) }}/notes",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.note_body is defined and mcp.request.note_body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.note_body) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Add a comment (note) to a project issue. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "issue_iid": {
+          "type": "integer_or_string",
+          "description": "Project-scoped issue IID (the number shown in the UI, not the global ID); decimal string or integer.",
+          "required": true
+        },
+        "note_body": {
+          "type": "string",
+          "description": "Comment text (Markdown); sent as the GitLab note body.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-merge-request-notes",
+      "name": "GitLab List Merge Request Notes",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests/{{ to_int(mcp.request.merge_request_iid) }}/notes",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "sort": "{{ mcp.request.sort }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List comments (notes) on a merge request (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "merge_request_iid": {
+          "type": "integer_or_string",
+          "description": "Project-scoped merge request IID (the number shown in the UI, not the global ID); decimal string or integer.",
+          "required": true
+        },
+        "sort": {
+          "type": "string",
+          "description": "Optional sort order: asc or desc.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-create-merge-request-note",
+      "name": "GitLab Create Merge Request Note",
+      "method": "POST",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/merge_requests/{{ to_int(mcp.request.merge_request_iid) }}/notes",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.note_body is defined and mcp.request.note_body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.note_body) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Add a comment (note) to a merge request. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "merge_request_iid": {
+          "type": "integer_or_string",
+          "description": "Project-scoped merge request IID (the number shown in the UI, not the global ID); decimal string or integer.",
+          "required": true
+        },
+        "note_body": {
+          "type": "string",
+          "description": "Comment text (Markdown); sent as the GitLab note body.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-pipelines",
+      "name": "GitLab List Pipelines",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/pipelines",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "ref": "{{ mcp.request.ref }}",
+        "status": "{{ mcp.request.status }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List CI/CD pipelines (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "ref": {
+          "type": "string",
+          "description": "Optional branch or tag name.",
+          "required": false
+        },
+        "status": {
+          "type": "string",
+          "description": "Optional status filter, e.g. running, pending, success, failed, canceled.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-get-pipeline",
+      "name": "GitLab Get Pipeline",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/pipelines/{{ to_int(mcp.request.pipeline_id) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one CI/CD pipeline by its global ID. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "pipeline_id": {
+          "type": "integer_or_string",
+          "description": "Global pipeline ID; decimal string or integer.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-list-pipeline-jobs",
+      "name": "GitLab List Pipeline Jobs",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/pipelines/{{ to_int(mcp.request.pipeline_id) }}/jobs",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List the jobs of one CI/CD pipeline (paginated). Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "pipeline_id": {
+          "type": "integer_or_string",
+          "description": "Global pipeline ID; decimal string or integer.",
+          "required": true
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitLab max 100). Defaults to 20.",
+          "required": false,
+          "default": 20
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "gitlab-get-job",
+      "name": "GitLab Get Job",
+      "method": "GET",
+      "url": "{{ gitlab_base_url }}/api/v4/projects/{{ urlencode(gitlab_project) }}/jobs/{{ to_int(mcp.request.job_id) }}",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ gitlab_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one CI/CD job by its global ID. Uses the endpoint's gitlab_project (numeric ID or full path, e.g. group/subgroup/project); pass gitlab_project to target another project; if no default is configured you must pass it.",
+      "mcp_params": {
+        "job_id": {
+          "type": "integer_or_string",
+          "description": "Global job ID; decimal string or integer.",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    }
+  ]
+}

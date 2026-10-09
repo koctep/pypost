@@ -2,9 +2,10 @@ schema_version: "1.0.0"
 id: "pypost-examples"
 name: "PyPost Official Examples"
 version: "2.0.0"
-description: "Reference collection library showcasing Jira Cloud MCP integration, REST workflows, and local probing."
+description: "Reference collection library showcasing Jira Cloud and GitLab MCP integrations, REST workflows, and local probing."
 collections:
   - "collections/jira_mcp.json"
+  - "collections/gitlab_mcp.json"
   - "collections/mcp.json"
 variables:
   - name: "jira_base_url"
@@ -19,7 +20,22 @@ variables:
     default: ""
     description: "Atlassian account email:api_token"
     secret: true
+  - name: "gitlab_base_url"
+    default: "https://gitlab.com"
+    description: "GitLab instance base URL (GitLab.com or self-managed, no trailing slash)"
+    secret: false
+  - name: "gitlab_project"
+    default: "your-group/your-project"
+    description: "Default GitLab project: numeric ID or full path"
+    secret: false
+  - name: "gitlab_token"
+    default: ""
+    description: "GitLab personal, project or group access token"
+    secret: true
 presets:
   jira_cloud:
     jira_base_url: "https://your-company.atlassian.net"
     jira_project_key: "DEMO"
+  gitlab_com:
+    gitlab_base_url: "https://gitlab.com"
+    gitlab_project: "your-group/your-project"
