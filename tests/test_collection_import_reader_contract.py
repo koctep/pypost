@@ -144,6 +144,41 @@ def test_production_json_reader_contract(
         assert completed == []
 
 
+@pytest.mark.parametrize("cancel_at", [None, 1, 2])
+def test_production_yaml_reader_contract(
+    qapp: QApplication, tmp_path: Path, cancel_at: int | None
+) -> None:
+    """Real YAML import honors record-level cancellation after decoding (PYPOST-1265)."""
+    path = tmp_path / "collections.yaml"
+    path.write_text(
+        "- id: c1\n"
+        "  name: First\n"
+        "- id: invalid\n"
+        "  requests: []\n"
+        "- id: c3\n"
+        "  name: Third\n",
+        encoding="utf-8",
+    )
+    progress, cancelled, completed, failed = _run_reader(
+        load_collection_import_candidates, path, cancel_at
+    )
+    assert failed == []
+    if cancel_at is None:
+        assert progress == [(1, 3), (2, 3), (3, 3)]
+        assert cancelled == []
+        assert len(completed) == 1
+        collections, errors = completed[0]
+        assert [(col.id, col.name) for col in collections] == [("c1", "First"), ("c3", "Third")]
+        assert len(errors) == 1
+        assert "name" in errors[0]
+    else:
+        # A (k, 3) checkpoint exists only after decoding produced the records,
+        # so stopping here proves cancellation at a YAML record checkpoint.
+        assert progress == [(done, 3) for done in range(1, cancel_at + 1)]
+        assert cancelled == [True]
+        assert completed == []
+
+
 def _run_reader(
     reader: ReadImportFile, path: Path, cancel_at: int | None
 ) -> tuple[
