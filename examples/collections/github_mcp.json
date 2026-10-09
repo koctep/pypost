@@ -1,0 +1,1241 @@
+{
+  "id": "github-mcp",
+  "name": "GitHub MCP",
+  "description": "Curated GitHub REST API collection with 30 MCP tools (github.com and GitHub Enterprise Server).",
+  "version": "1.0.0",
+  "variables": [
+    {
+      "name": "github_api_url",
+      "type": "string",
+      "default": "https://api.github.com",
+      "description": "GitHub REST API base URL without a trailing slash: https://api.github.com or https://<host>/api/v3 for GitHub Enterprise Server",
+      "required": true,
+      "secret": false
+    },
+    {
+      "name": "github_owner",
+      "type": "string",
+      "default": "your-org",
+      "description": "Default repository owner (user or organization login)",
+      "required": false,
+      "secret": false
+    },
+    {
+      "name": "github_repo",
+      "type": "string",
+      "default": "your-repo",
+      "description": "Default repository name (without the owner)",
+      "required": false,
+      "secret": false
+    },
+    {
+      "name": "github_token",
+      "type": "string",
+      "default": "",
+      "description": "GitHub fine-grained or classic personal access token",
+      "required": true,
+      "secret": true
+    }
+  ],
+  "requests": [
+    {
+      "id": "github-get-authenticated-user",
+      "name": "GitHub Get Authenticated User",
+      "method": "GET",
+      "url": "{{ github_api_url }}/user",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Return the GitHub user that owns the configured token.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "github-get-repository",
+      "name": "GitHub Get Repository",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get the repository (default branch, visibility, permissions). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {},
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-workflows",
+      "name": "GitHub List Workflows",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/workflows",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List GitHub Actions workflows of the repository (paginated); each has a numeric id and a file path. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-workflow-runs",
+      "name": "GitHub List Workflow Runs",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "branch": "{{ mcp.request.branch }}",
+        "status": "{{ mcp.request.status }}",
+        "event": "{{ mcp.request.event }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List GitHub Actions workflow runs across the whole repository (paginated, filterable). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "branch": {
+          "type": "string",
+          "description": "Optional branch name filter (raw value, encoded once by the HTTP client).",
+          "required": false
+        },
+        "status": {
+          "type": "string",
+          "description": "Optional status or conclusion filter, e.g. queued, in_progress, completed, success, failure.",
+          "required": false
+        },
+        "event": {
+          "type": "string",
+          "description": "Optional triggering event filter, e.g. push, pull_request, workflow_dispatch.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-workflow-runs-for-workflow",
+      "name": "GitHub List Workflow Runs For Workflow",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/workflows/{{ urlencode(mcp.request.workflow_id) }}/runs",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "branch": "{{ mcp.request.branch }}",
+        "status": "{{ mcp.request.status }}",
+        "event": "{{ mcp.request.event }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List runs of one GitHub Actions workflow, identified by numeric ID or file name (paginated, filterable). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "workflow_id": {
+          "type": "string",
+          "description": "Workflow numeric ID as a decimal string (for example 161335) or the workflow file name (for example ci.yml).",
+          "required": true
+        },
+        "branch": {
+          "type": "string",
+          "description": "Optional branch name filter (raw value, encoded once by the HTTP client).",
+          "required": false
+        },
+        "status": {
+          "type": "string",
+          "description": "Optional status or conclusion filter, e.g. queued, in_progress, completed, success, failure.",
+          "required": false
+        },
+        "event": {
+          "type": "string",
+          "description": "Optional triggering event filter, e.g. push, pull_request, workflow_dispatch.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-get-workflow-run",
+      "name": "GitHub Get Workflow Run",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs/{{ to_int(mcp.request.run_id) }}",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one GitHub Actions workflow run by numeric run ID. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "run_id": {
+          "type": "integer_or_string",
+          "description": "Workflow run numeric ID (decimal string or integer).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-rerun-workflow-run",
+      "name": "GitHub Rerun Workflow Run",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs/{{ to_int(mcp.request.run_id) }}/rerun",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.enable_debug_logging is defined and mcp.request.enable_debug_logging is not none %}{{ ns.sep }}\"enable_debug_logging\": {% if mcp.request.enable_debug_logging %}true{% else %}false{% endif %}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Re-run a whole GitHub Actions workflow run. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "run_id": {
+          "type": "integer_or_string",
+          "description": "Workflow run numeric ID (decimal string or integer).",
+          "required": true
+        },
+        "enable_debug_logging": {
+          "type": "boolean",
+          "description": "Optional: true enables debug logging for the re-run.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-cancel-workflow-run",
+      "name": "GitHub Cancel Workflow Run",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs/{{ to_int(mcp.request.run_id) }}/cancel",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{}",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Cancel a queued or in-progress GitHub Actions workflow run. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "run_id": {
+          "type": "integer_or_string",
+          "description": "Workflow run numeric ID (decimal string or integer).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-workflow-run-jobs",
+      "name": "GitHub List Workflow Run Jobs",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/runs/{{ to_int(mcp.request.run_id) }}/jobs",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "filter": "{{ mcp.request.filter }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List jobs of a GitHub Actions workflow run (paginated). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "run_id": {
+          "type": "integer_or_string",
+          "description": "Workflow run numeric ID (decimal string or integer).",
+          "required": true
+        },
+        "filter": {
+          "type": "string",
+          "description": "Optional: latest (default) returns jobs of the latest attempt; all returns every attempt.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-get-workflow-job",
+      "name": "GitHub Get Workflow Job",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/jobs/{{ to_int(mcp.request.job_id) }}",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one GitHub Actions job (steps, status, conclusion) by numeric job ID. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "job_id": {
+          "type": "integer_or_string",
+          "description": "Workflow job numeric ID (decimal string or integer).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-dispatch-workflow",
+      "name": "GitHub Dispatch Workflow",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/actions/workflows/{{ urlencode(mcp.request.workflow_id) }}/dispatches",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.inputs is defined and mcp.request.inputs is not none %}{{ ns.sep }}\"inputs\": { {% for k, v in mcp.request.inputs.items() %}{% if not loop.first %}, {% endif %}{{ to_json_string(k) }}: {% if v is sameas true %}\"true\"{% elif v is sameas false %}\"false\"{% else %}{{ to_json_string(v) }}{% endif %}{% endfor %} }{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.ref is defined and mcp.request.ref is not none %}{{ ns.sep }}\"ref\": {{ to_json_string(mcp.request.ref) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Trigger a workflow_dispatch event for a GitHub Actions workflow. The workflow must declare an on: workflow_dispatch trigger; ref is a branch or tag. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "workflow_id": {
+          "type": "string",
+          "description": "Workflow numeric ID as a decimal string (for example 161335) or the workflow file name (for example ci.yml).",
+          "required": true
+        },
+        "ref": {
+          "type": "string",
+          "description": "Branch or tag name to run the workflow on.",
+          "required": true
+        },
+        "inputs": {
+          "type": "object",
+          "description": "Optional workflow inputs as a JSON object with scalar values only, at most 25 keys; values are sent as strings (booleans as \"true\"/\"false\").",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-pull-requests",
+      "name": "GitHub List Pull Requests",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "state": "{{ mcp.request.state }}",
+        "head": "{{ mcp.request.head }}",
+        "base": "{{ mcp.request.base }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List pull requests of the repository (paginated, filterable by state, head and base). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "state": {
+          "type": "string",
+          "description": "Optional state filter: open (default), closed or all.",
+          "required": false
+        },
+        "head": {
+          "type": "string",
+          "description": "Optional head filter in user:branch or org:branch form.",
+          "required": false
+        },
+        "base": {
+          "type": "string",
+          "description": "Optional base branch name filter.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-get-pull-request",
+      "name": "GitHub Get Pull Request",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one pull request by its repository-scoped number. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-create-pull-request",
+      "name": "GitHub Create Pull Request",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.head is defined and mcp.request.head is not none %}{{ ns.sep }}\"head\": {{ to_json_string(mcp.request.head) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.base is defined and mcp.request.base is not none %}{{ ns.sep }}\"base\": {{ to_json_string(mcp.request.base) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.draft is defined and mcp.request.draft is not none %}{{ ns.sep }}\"draft\": {% if mcp.request.draft %}true{% else %}false{% endif %}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Open a pull request. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "title": {
+          "type": "string",
+          "description": "Pull request title.",
+          "required": true
+        },
+        "head": {
+          "type": "string",
+          "description": "Branch containing the changes (owner:branch for cross-repository pull requests).",
+          "required": true
+        },
+        "base": {
+          "type": "string",
+          "description": "Branch the changes should be merged into.",
+          "required": true
+        },
+        "body": {
+          "type": "string",
+          "description": "Optional pull request description (Markdown).",
+          "required": false
+        },
+        "draft": {
+          "type": "boolean",
+          "description": "Optional: true opens the pull request as a draft.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-update-pull-request",
+      "name": "GitHub Update Pull Request",
+      "method": "PATCH",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state is defined and mcp.request.state is not none %}{{ ns.sep }}\"state\": {{ to_json_string(mcp.request.state) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.base is defined and mcp.request.base is not none %}{{ ns.sep }}\"base\": {{ to_json_string(mcp.request.base) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Update, close (state closed) or reopen (state open) a pull request. Merging is not supported. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional new title.",
+          "required": false
+        },
+        "body": {
+          "type": "string",
+          "description": "Optional new description (Markdown).",
+          "required": false
+        },
+        "state": {
+          "type": "string",
+          "description": "Optional new state: open (reopen) or closed (close).",
+          "required": false
+        },
+        "base": {
+          "type": "string",
+          "description": "Optional new base branch.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-pull-request-files",
+      "name": "GitHub List Pull Request Files",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/files",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List files changed in a pull request (paginated). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-pull-request-commits",
+      "name": "GitHub List Pull Request Commits",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/commits",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List commits of a pull request (paginated). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-pull-request-review-comments",
+      "name": "GitHub List Pull Request Review Comments",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/comments",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List review (diff line) comments of a pull request (paginated). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-create-pull-request-review-comment",
+      "name": "GitHub Create Pull Request Review Comment",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/comments",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.commit_id is defined and mcp.request.commit_id is not none %}{{ ns.sep }}\"commit_id\": {{ to_json_string(mcp.request.commit_id) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.path is defined and mcp.request.path is not none %}{{ ns.sep }}\"path\": {{ to_json_string(mcp.request.path) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.line is defined and mcp.request.line is not none %}{{ ns.sep }}\"line\": {{ to_int(mcp.request.line) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.side is defined and mcp.request.side is not none %}{{ ns.sep }}\"side\": {{ to_json_string(mcp.request.side) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.start_line is defined and mcp.request.start_line is not none %}{{ ns.sep }}\"start_line\": {{ to_int(mcp.request.start_line) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.start_side is defined and mcp.request.start_side is not none %}{{ ns.sep }}\"start_side\": {{ to_json_string(mcp.request.start_side) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.subject_type is defined and mcp.request.subject_type is not none %}{{ ns.sep }}\"subject_type\": {{ to_json_string(mcp.request.subject_type) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Create a review comment on a diff line or file of a pull request. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "body": {
+          "type": "string",
+          "description": "Comment text (Markdown).",
+          "required": true
+        },
+        "commit_id": {
+          "type": "string",
+          "description": "SHA of the commit to comment on (usually the pull request head SHA).",
+          "required": true
+        },
+        "path": {
+          "type": "string",
+          "description": "Relative path of the file to comment on.",
+          "required": true
+        },
+        "line": {
+          "type": "integer_or_string",
+          "description": "Optional diff line number (decimal string or integer).",
+          "required": false
+        },
+        "side": {
+          "type": "string",
+          "description": "Optional diff side: LEFT or RIGHT.",
+          "required": false
+        },
+        "start_line": {
+          "type": "integer_or_string",
+          "description": "Optional first line of a multi-line comment (decimal string or integer).",
+          "required": false
+        },
+        "start_side": {
+          "type": "string",
+          "description": "Optional side of start_line: LEFT or RIGHT.",
+          "required": false
+        },
+        "subject_type": {
+          "type": "string",
+          "description": "Optional: line (default) or file.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-reply-to-pull-request-review-comment",
+      "name": "GitHub Reply To Pull Request Review Comment",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/comments/{{ to_int(mcp.request.comment_id) }}/replies",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Reply to a top-level pull request review comment. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "comment_id": {
+          "type": "integer_or_string",
+          "description": "Review comment numeric ID (decimal string or integer).",
+          "required": true
+        },
+        "body": {
+          "type": "string",
+          "description": "Reply text (Markdown).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-pull-request-comments",
+      "name": "GitHub List Pull Request Comments",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.pull_number) }}/comments",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List conversation (non-diff) comments of a pull request (paginated). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-create-pull-request-comment",
+      "name": "GitHub Create Pull Request Comment",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.pull_number) }}/comments",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Add a conversation (non-diff) comment to a pull request. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "body": {
+          "type": "string",
+          "description": "Comment text (Markdown).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-pull-request-reviews",
+      "name": "GitHub List Pull Request Reviews",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/reviews",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List reviews of a pull request (paginated). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-create-pull-request-review",
+      "name": "GitHub Create Pull Request Review",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/pulls/{{ to_int(mcp.request.pull_number) }}/reviews",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\", \") %}{ \"event\": {{ to_json_string(mcp.request.event) }}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.commit_id is defined and mcp.request.commit_id is not none %}{{ ns.sep }}\"commit_id\": {{ to_json_string(mcp.request.commit_id) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Create and submit a pull request review. event is required and must be one of APPROVE, REQUEST_CHANGES, COMMENT (other values are rejected by GitHub with 422); REQUEST_CHANGES and COMMENT also need body. The review is submitted immediately: pending (draft) reviews are not supported. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "pull_number": {
+          "type": "integer_or_string",
+          "description": "Pull request number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "event": {
+          "type": "string",
+          "description": "Required review action: one of APPROVE, REQUEST_CHANGES, COMMENT (other values are rejected by GitHub with 422).",
+          "required": true
+        },
+        "body": {
+          "type": "string",
+          "description": "Review text (Markdown); required by GitHub for REQUEST_CHANGES and COMMENT.",
+          "required": false
+        },
+        "commit_id": {
+          "type": "string",
+          "description": "Optional commit SHA the review applies to (defaults to the latest commit).",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-issues",
+      "name": "GitHub List Issues",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "state": "{{ mcp.request.state }}",
+        "labels": "{{ mcp.request.labels }}",
+        "assignee": "{{ mcp.request.assignee }}",
+        "creator": "{{ mcp.request.creator }}",
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List issues of the repository (paginated). GitHub also returns pull requests here (they carry a pull_request key). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "state": {
+          "type": "string",
+          "description": "Optional state filter: open (default), closed or all.",
+          "required": false
+        },
+        "labels": {
+          "type": "string",
+          "description": "Optional comma-separated label names (a string here, unlike the labels array of create/update).",
+          "required": false
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Optional assignee login, none or *.",
+          "required": false
+        },
+        "creator": {
+          "type": "string",
+          "description": "Optional creator login.",
+          "required": false
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-get-issue",
+      "name": "GitHub Get Issue",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.issue_number) }}",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Get one issue by its repository-scoped number. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "issue_number": {
+          "type": "integer_or_string",
+          "description": "Issue number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-create-issue",
+      "name": "GitHub Create Issue",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": [{% for x in mcp.request.labels %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.assignees is defined and mcp.request.assignees is not none %}{{ ns.sep }}\"assignees\": [{% for x in mcp.request.assignees %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Create an issue. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "title": {
+          "type": "string",
+          "description": "Issue title.",
+          "required": true
+        },
+        "body": {
+          "type": "string",
+          "description": "Optional issue description (Markdown).",
+          "required": false
+        },
+        "labels": {
+          "type": "array",
+          "description": "Optional JSON array of strings; an empty array clears all labels. Example: [\"bug\"].",
+          "required": false
+        },
+        "assignees": {
+          "type": "array",
+          "description": "Optional JSON array of strings; an empty array clears all assignees. Example: [\"octocat\"].",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-update-issue",
+      "name": "GitHub Update Issue",
+      "method": "PATCH",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.issue_number) }}",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state is defined and mcp.request.state is not none %}{{ ns.sep }}\"state\": {{ to_json_string(mcp.request.state) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state_reason is defined and mcp.request.state_reason is not none %}{{ ns.sep }}\"state_reason\": {{ to_json_string(mcp.request.state_reason) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": [{% for x in mcp.request.labels %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.assignees is defined and mcp.request.assignees is not none %}{{ ns.sep }}\"assignees\": [{% for x in mcp.request.assignees %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Update, close (state closed) or reopen (state open) an issue. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "issue_number": {
+          "type": "integer_or_string",
+          "description": "Issue number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional new title.",
+          "required": false
+        },
+        "body": {
+          "type": "string",
+          "description": "Optional new description (Markdown).",
+          "required": false
+        },
+        "state": {
+          "type": "string",
+          "description": "Optional new state: open (reopen) or closed (close).",
+          "required": false
+        },
+        "state_reason": {
+          "type": "string",
+          "description": "Optional reason: completed, not_planned or reopened.",
+          "required": false
+        },
+        "labels": {
+          "type": "array",
+          "description": "Optional JSON array of strings; an empty array clears all labels. Replaces the existing labels.",
+          "required": false
+        },
+        "assignees": {
+          "type": "array",
+          "description": "Optional JSON array of strings; an empty array clears all assignees. Replaces the existing assignees.",
+          "required": false
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-list-issue-comments",
+      "name": "GitHub List Issue Comments",
+      "method": "GET",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.issue_number) }}/comments",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {
+        "page": "{{ to_int(mcp.request.page) }}",
+        "per_page": "{{ to_int(mcp.request.per_page) }}"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "List comments of an issue (paginated). Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "issue_number": {
+          "type": "integer_or_string",
+          "description": "Issue number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "page": {
+          "type": "integer_or_string",
+          "description": "Page number (decimal string or integer, 1-based). Defaults to 1.",
+          "required": false,
+          "default": 1
+        },
+        "per_page": {
+          "type": "integer_or_string",
+          "description": "Items per page (decimal string or integer, GitHub max 100). Defaults to 30.",
+          "required": false,
+          "default": 30
+        }
+      },
+      "retry_policy": null
+    },
+    {
+      "id": "github-create-issue-comment",
+      "name": "GitHub Create Issue Comment",
+      "method": "POST",
+      "url": "{{ github_api_url }}/repos/{{ urlencode(github_owner) }}/{{ urlencode(github_repo) }}/issues/{{ to_int(mcp.request.issue_number) }}/comments",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{ github_token }}"
+      },
+      "params": {},
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Add a comment to an issue. Uses the endpoint's github_owner/github_repo; pass github_owner and/or github_repo to target another repository; if no default is configured you must pass them.",
+      "mcp_params": {
+        "issue_number": {
+          "type": "integer_or_string",
+          "description": "Issue number shown in the UI: a repository-scoped number, not a global ID (decimal string or integer).",
+          "required": true
+        },
+        "body": {
+          "type": "string",
+          "description": "Comment text (Markdown).",
+          "required": true
+        }
+      },
+      "retry_policy": null
+    }
+  ]
+}

@@ -1167,6 +1167,7 @@ def test_gitlab_library_manifest_lists_collection_variables_and_preset():
     assert collections == [
         "collections/jira_mcp.json",
         "collections/gitlab_mcp.json",
+        "collections/github_mcp.json",  # PYPOST-1334 (shared manifest)
         "collections/mcp.json",
     ]
     assert validate_manifest_collections(manifest, EXAMPLES_DIR) == []

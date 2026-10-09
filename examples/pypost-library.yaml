@@ -2,10 +2,11 @@ schema_version: "1.0.0"
 id: "pypost-examples"
 name: "PyPost Official Examples"
 version: "2.0.0"
-description: "Reference collection library showcasing Jira Cloud and GitLab MCP integrations, REST workflows, and local probing."
+description: "Reference collection library showcasing Jira Cloud, GitLab and GitHub MCP integrations, REST workflows, and local probing."
 collections:
   - "collections/jira_mcp.json"
   - "collections/gitlab_mcp.json"
+  - "collections/github_mcp.json"
   - "collections/mcp.json"
 variables:
   - name: "jira_base_url"
@@ -32,6 +33,22 @@ variables:
     default: ""
     description: "GitLab personal, project or group access token"
     secret: true
+  - name: "github_api_url"
+    default: "https://api.github.com"
+    description: "GitHub REST API base URL (https://api.github.com or https://<host>/api/v3 for GitHub Enterprise Server, no trailing slash)"
+    secret: false
+  - name: "github_owner"
+    default: "your-org"
+    description: "Default GitHub repository owner (user or organization login)"
+    secret: false
+  - name: "github_repo"
+    default: "your-repo"
+    description: "Default GitHub repository name (without the owner)"
+    secret: false
+  - name: "github_token"
+    default: ""
+    description: "GitHub fine-grained or classic personal access token"
+    secret: true
 presets:
   jira_cloud:
     jira_base_url: "https://your-company.atlassian.net"
@@ -39,3 +56,7 @@ presets:
   gitlab_com:
     gitlab_base_url: "https://gitlab.com"
     gitlab_project: "your-group/your-project"
+  github_com:
+    github_api_url: "https://api.github.com"
+    github_owner: "your-org"
+    github_repo: "your-repo"

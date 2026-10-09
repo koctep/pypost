@@ -1,7 +1,7 @@
 .PHONY: help venv venv-test venv-otel install lock check-lock lock-dev check-lock-dev \
 	lock-otel check-lock-otel run run-daemon run-agent-ui-mcp clean test test-slow \
 	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
-	check-gitlab-mcp-path-freshness \
+	check-gitlab-mcp-path-freshness check-github-mcp-path-freshness \
 	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
 	check-license-inventory lint-docs check-docs-links check-lock-all test-gui-batch \
@@ -193,6 +193,11 @@ check-gitlab-mcp-path-freshness: $(VENV_MARKER) venv-test venv-otel ## Offline g
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		tests/test_gitlab_mcp_collection.py::test_gitlab_mcp_http_contracts_match_locked_catalog \
 		tests/test_gitlab_mcp_collection.py::test_gitlab_mcp_catalog_check_rejects_path_drift -q
+
+check-github-mcp-path-freshness: $(VENV_MARKER) venv-test venv-otel ## Offline github_mcp REST paths vs locked catalog (PYPOST-1334)
+	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
+		tests/test_github_mcp_collection.py::test_github_mcp_http_contracts_match_locked_catalog \
+		tests/test_github_mcp_collection.py::test_github_mcp_catalog_check_rejects_path_drift -q
 
 test-cov: $(VENV_MARKER) venv-test venv-otel ## Run fast tests with coverage report
 	@if [ ! -f scripts/run_parallel_tests.py ]; then \

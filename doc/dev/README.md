@@ -123,6 +123,7 @@ conventions.
 1. [Optional protected Jira MCP live smoke (PYPOST-1039)](jira_mcp_live_smoke.md)
 1. [CI-safe Jira MCP collection e2e (PYPOST-1053)](jira_mcp_collection_e2e.md)
 1. [GitLab MCP example collection and path freshness (PYPOST-1316)](gitlab_mcp_collection.md)
+1. [GitHub MCP example collection and path freshness (PYPOST-1334)](github_mcp_collection.md)
 1. [Inbound MCP Trust Model (PYPOST-705)](mcp_trust_model.md)
 1. [MCP Secrets Policy](mcp_secrets_policy.md)
 1. [Dual-Mode (GUI + MCP) Example Requests (PYPOST-1283)](dual_mode_example_requests.md)

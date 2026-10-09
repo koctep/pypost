@@ -26,6 +26,8 @@ class TestModernizedExamplesLibrary:
         assert "collections/mcp.json" in manifest.collections
         # PYPOST-1316: GitLab MCP collection is bundled.
         assert "collections/gitlab_mcp.json" in manifest.collections
+        # PYPOST-1334: GitHub MCP collection is bundled.
+        assert "collections/github_mcp.json" in manifest.collections
 
         # Variables schema
         var_names = [v.name for v in manifest.variables]
@@ -35,16 +37,23 @@ class TestModernizedExamplesLibrary:
         assert "gitlab_base_url" in var_names
         assert "gitlab_project" in var_names
         assert "gitlab_token" in var_names
+        assert "github_api_url" in var_names
+        assert "github_owner" in var_names
+        assert "github_repo" in var_names
+        assert "github_token" in var_names
 
         # Secret variable flags
         creds_var = next(v for v in manifest.variables if v.name == "jira_credentials")
         assert creds_var.secret is True
         token_var = next(v for v in manifest.variables if v.name == "gitlab_token")
         assert token_var.secret is True
+        github_token_var = next(v for v in manifest.variables if v.name == "github_token")
+        assert github_token_var.secret is True
 
         # Presets
         assert "jira_cloud" in manifest.presets
         assert "gitlab_com" in manifest.presets
+        assert "github_com" in manifest.presets
 
     def test_examples_collections_load_as_collections(self):
         jira_coll_path = Path("examples/collections/jira_mcp.json")
@@ -69,6 +78,16 @@ class TestModernizedExamplesLibrary:
         assert isinstance(gitlab_coll, Collection)
         assert gitlab_coll.name == "GitLab MCP"
         assert len(gitlab_coll.requests) == 25
+
+        # PYPOST-1334: GitHub MCP collection (30 REST tools).
+        github_coll_path = Path("examples/collections/github_mcp.json")
+        assert github_coll_path.is_file(), (
+            "examples/collections/github_mcp.json missing (PYPOST-1334)"
+        )
+        github_coll = read_collection_file(github_coll_path)
+        assert isinstance(github_coll, Collection)
+        assert github_coll.name == "GitHub MCP"
+        assert len(github_coll.requests) == 30
 
 
 class TestLegacyFixturesRegression:
