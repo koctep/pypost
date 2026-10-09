@@ -379,13 +379,20 @@ class CollectionsPresenter(QObject):
         """Refresh a linked active collection from its connected library source."""
         return self._import_actions.refresh_linked_collection(collection_id)
 
-    def wait_import_idle(self, timeout_ms: int = 5000) -> bool:
-        """Wait until collection import actions are completely idle."""
+    def wait_import_idle(self, timeout_ms: int | None = None) -> bool:
+        """Wait until collection import actions are completely idle.
+
+        ``None`` uses the import lifecycle policy default budget.
+        """
         return self._import_actions.wait_idle(timeout_ms)
 
-    def teardown(self, timeout_ms: int = 5000) -> bool:
-        """Tears down import actions and presenter resources cleanly."""
-        logger.info("collections_presenter_teardown_started timeout_ms=%d", timeout_ms)
+    def teardown(self, timeout_ms: int | None = None) -> bool:
+        """Tears down import actions and presenter resources cleanly.
+
+        ``None`` uses the import lifecycle policy default budget.
+        """
+        budget_ms = self._import_actions.lifecycle_policy.resolve_budget_ms(timeout_ms)
+        logger.info("collections_presenter_teardown_started timeout_ms=%d", budget_ms)
         result = self._import_actions.teardown(timeout_ms=timeout_ms)
         self._panel.close()
         logger.info("collections_presenter_teardown_completed clean=%s", result)
