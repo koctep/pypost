@@ -6,6 +6,7 @@ import logging
 import shutil
 from typing import Optional
 
+from pypost.core.bundled_resources import bundled_examples_root
 from pypost.core.collection_import import load_collection_import_candidates
 from pypost.core.library_manifest import find_and_read_manifest, validate_manifest_collections
 from pypost.models.library_manager import LibraryConnectionRecord, LibrarySourceType
@@ -20,16 +21,26 @@ class PredefinedLibraryService:
     DEFAULT_LIBRARY_ID = "pypost-examples"
 
     def __init__(self, root: Path | str | None = None) -> None:
-        self.root = (
+        self.root: Optional[Path] = (
             Path(root)
             if root is not None
-            else Path(__file__).resolve().parents[2] / "examples"
+            else bundled_examples_root()
         )
         self.diagnostics: list[str] = []
 
     def discover(self) -> Optional[LibraryConnectionRecord]:
         """Return the predefined record when the bundled content is valid."""
         self.diagnostics.clear()
+        if self.root is None:
+            self.diagnostics.append(
+                "Predefined library is unavailable: bundled examples root not found."
+            )
+            logger.warning(
+                "predefined_library_discovery_failed library_id=%s error_type=%s",
+                self.DEFAULT_LIBRARY_ID,
+                "RootNotFound",
+            )
+            return None
         logger.info(
             "predefined_library_discovery_started library_id=%s", self.DEFAULT_LIBRARY_ID
         )
@@ -107,7 +118,7 @@ class PredefinedLibraryService:
     def copy_to(self, destination: Path | str) -> LibraryConnectionRecord:
         """Copy the validated template to a new editable local library."""
         source_record = self.discover()
-        if source_record is None:
+        if source_record is None or self.root is None:
             raise ValueError("predefined_invalid: bundled examples are unavailable")
         source = self.root.expanduser().resolve(strict=False)
         target = Path(destination).expanduser().resolve(strict=False)
@@ -121,7 +132,11 @@ class PredefinedLibraryService:
             target.name,
         )
         try:
-            shutil.copytree(source, target)
+            shutil.copytree(
+                source,
+                target,
+                ignore=shutil.ignore_patterns("__init__.py", "__pycache__", "*.pyc"),
+            )
         except Exception:
             if target.is_dir():
                 shutil.rmtree(target, ignore_errors=True)
