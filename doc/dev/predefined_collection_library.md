@@ -104,7 +104,7 @@ synthetic test fixture remains available only through the examples library.
 | PYPOST-1350 | `builtin-collections.yaml` view and structural validation | Implemented |
 | PYPOST-1351 | Persisted marker, runtime resolution and headless daemon startup | Implemented |
 | PYPOST-1352 | Checked save, reconciliation, replacement and env refresh | Implemented |
-| PYPOST-1353 | Built-in dialog source, read-only picker and server-table UI | Planned |
+| PYPOST-1353 | Built-in dialog source, read-only picker and server-table UI | Implemented |
 | PYPOST-1354 | Editable paired-environment copy | Planned |
 | PYPOST-1355 | Copy for editing into a workspace collection | Planned |
 | PYPOST-1356 | Offline upgrade/copy end-to-end verification and user docs | Planned |
@@ -326,6 +326,59 @@ Built-in server rows:
   `self.registry.reconfigure`. If stopped or new, it commits candidate settings via the transaction
   and updates the registry via `self.registry.upsert`. Any failure during save or registry upsert
   triggers atomic rollback of settings and registry snapshots, leaving existing state intact.
+
+### Built-in Collection Source in MCP Servers Dialog (PYPOST-1353)
+
+`_McpServerEditor`, `McpServersDialog`, and `McpControlsPresenter` integrate the curated
+`BuiltinCollectionView` into the interactive UI:
+
+#### Collection Source Selection and Widget Visibility (`_McpServerEditor`)
+
+- **Third collection source option**: The Collection Source dropdown in `_McpServerEditor`
+  provides `"Built-in"` (`"builtin"`) alongside `"Workspace collection"` (`"workspace"`) and
+  `"Connected library"` (`"library"`).
+- **Curated picker population**: Selecting `"Built-in"` displays the `_builtin_collection` picker,
+  dynamically populated from `BuiltinCollectionView.list_entries()`. Each entry item text is
+  formatted with a `(read-only)` suffix (e.g., `Jira Cloud MCP (read-only)`).
+- **Informational tooltip**: Each picker entry carries a tooltip:
+  `"Shipped with PyPost and updated on application upgrade (read-only)."`
+- **Hiding preset and overlay widgets**: Built-in collections do not support user presets or
+  variable overlays. When `"Built-in"` is selected, `_library_profile` and `_library_variables`
+  (and their layout labels) are hidden, alongside workspace `_collection` and library pickers.
+- **Strict environment requirement**: Saving a Built-in server requires both a collection and a
+  workspace environment selection. If no environment is chosen, `_accept_if_complete` rejects save
+  with inline error `"Collection and environment are required."`.
+
+#### Configuration Emission and Editing Preselection
+
+- **Emitted configuration**: On save, `_McpServerEditor.configuration()` emits an
+  `McpServerConfiguration` with:
+  - `bundled_library = True`
+  - `library_id = "pypost-examples"`
+  - `manifest_id = "pypost-examples"`
+  - `library_collection_path = entry.collection_path`
+  - `library_collection_index = None`
+  - `collection_id = None`
+  - `environment_id = str(self._environment.currentData())`
+- **Editing preselection**: Opening an existing server with `configuration.bundled_library=True`
+  preselects `"Built-in"` in `_collection_source`, preselects the matching entry in
+  `_builtin_collection`, and preselects the saved `environment_id`.
+- **Backward compatibility guard**: Legacy rows pointing to `library_id="pypost-examples"` where
+  `bundled_library=False` continue to open under `"Connected library"` (`"library"`), preserving
+  backward compatibility for unbundled library rows.
+
+#### Server Overview Table (`McpServersDialog`)
+
+- **Read-only description in table**: In `McpServersDialog._populate_table`, rows with
+  `configuration.bundled_library=True` render their collection column as:
+  `Built-in / <name> (read-only)` (e.g. `Built-in / Jira Cloud MCP (read-only)`), resolved via
+  `_builtin_view` by matching `configuration.library_collection_path`.
+
+#### Presenter Dependency Injection (`McpControlsPresenter`)
+
+- **View injection**: `McpControlsPresenter._open_mcp_servers` resolves `builtin_view` from
+  `controller.registry._builtin_view` and injects it into `McpServersDialog`. The dialog passes
+  `builtin_view` down to `_McpServerEditor` instances during server addition and editing.
 
 ### Structural Consistency Testing Principles
 

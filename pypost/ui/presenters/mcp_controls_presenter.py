@@ -328,6 +328,7 @@ class McpControlsPresenter(QObject):
             "mcp_servers_dialog_opened server_count=%d",
             controller.mcp_server_count(),
         )
+        builtin_view = getattr(getattr(controller, "registry", None), "_builtin_view", None)
         dialog = McpServersDialog(
             configurations=controller.mcp_server_configurations,
             status_for=controller.mcp_server_status,
@@ -343,6 +344,7 @@ class McpControlsPresenter(QObject):
             legacy_host=settings.mcp_host,
             legacy_port=settings.mcp_port,
             library_service=self._library_service,
+            builtin_view=builtin_view,
             parent=self._dialog_parent,
         )
         dialog.exec()
