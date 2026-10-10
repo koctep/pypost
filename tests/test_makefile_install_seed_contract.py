@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests.makefile_test_helpers import (
     POST_INSTALL_SANITY_SNIPPETS,
@@ -106,3 +107,81 @@ def test_slow_smoke_seed_materializes_minimum_pypost_tree(tmp_path: Path) -> Non
         "Update the policy constant and _seed_installable_package together when "
         "pyproject.toml requires additional install-time modules."
     )
+
+
+def _write_explicit_seed_project(root: Path) -> Path:
+    pyproject = root / "pyproject.toml"
+    pyproject.write_text(
+        '[project]\nname = "demo"\n'
+        '[tool.setuptools]\npackages = ["pypost", "pypost.core", '
+        '"pypost.bundled_examples"]\n'
+        '[tool.setuptools.package-dir]\n"pypost.bundled_examples" = "examples"\n'
+        '[tool.setuptools.package-data]\n'
+        '"pypost.bundled_examples" = ["collections/*.json", "environments/*.json"]\n',
+        encoding="utf-8",
+    )
+    for relative in ("pypost", "pypost/core", "examples"):
+        directory = root / relative
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "__init__.py").write_text("", encoding="utf-8")
+    return pyproject
+
+
+def test_seed_resolves_mapped_package_data(tmp_path: Path) -> None:
+    pyproject = _write_explicit_seed_project(tmp_path)
+    expected = {Path("examples/collections/demo.json"), Path("examples/environments/dev.json")}
+    for relative in expected:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("{}\n", encoding="utf-8")
+    actual = set(_required_seed_paths_from_pyproject(pyproject, repo_root=tmp_path))
+    assert expected <= actual, f"missing mapped package data: {expected - actual}"
+
+
+def test_seed_includes_every_explicit_package_initializer(tmp_path: Path) -> None:
+    pyproject = _write_explicit_seed_project(tmp_path)
+    expected = {
+        Path("pypost/__init__.py"), Path("pypost/core/__init__.py"),
+        Path("examples/__init__.py"),
+    }
+    actual = set(_required_seed_paths_from_pyproject(pyproject, repo_root=tmp_path))
+    assert expected <= actual, f"missing explicit package initializers: {expected - actual}"
+
+
+@pytest.mark.parametrize(
+    ("package", "source"), [("pypost.core", "pypost/core"), ("pypost.bundled_examples", "examples")]
+)
+def test_seed_rejects_missing_declared_package_source(
+    tmp_path: Path, package: str, source: str,
+) -> None:
+    pyproject = _write_explicit_seed_project(tmp_path)
+    directory = tmp_path / source
+    (directory / "__init__.py").unlink()
+    directory.rmdir()
+    with pytest.raises((AssertionError, ValueError, FileNotFoundError)) as error:
+        _required_seed_paths_from_pyproject(pyproject, repo_root=tmp_path)
+    assert package in str(error.value), "missing-source failure must identify the package"
+    assert source in str(error.value), "missing-source failure must identify the source path"
+
+
+def test_committed_seed_covers_independent_source_inventory(tmp_path: Path) -> None:
+    examples = REPO_ROOT / "examples"
+    manifest = yaml.safe_load((examples / "pypost-library.yaml").read_text(encoding="utf-8"))
+    required = {
+        Path("examples/__init__.py"), Path("examples/pypost-library.yaml"),
+        Path("examples/README.md"),
+    }
+    required.update(Path("examples") / collection for collection in manifest["collections"])
+    required.update(
+        path.relative_to(REPO_ROOT) for path in (examples / "environments").glob("*.json")
+    )
+    required.update(
+        path.relative_to(REPO_ROOT) for path in (REPO_ROOT / "pypost").rglob("__init__.py")
+    )
+    if (examples / "builtin-collections.yaml").is_file():
+        required.add(Path("examples/builtin-collections.yaml"))
+    _materialize_slow_smoke_workspace(tmp_path)
+    missing = sorted(str(path) for path in required if not (tmp_path / path).is_file())
+    assert not missing, f"incomplete committed install seed: {missing}"
+    for path in required:
+        assert (tmp_path / path).read_bytes() == (REPO_ROOT / path).read_bytes(), path
