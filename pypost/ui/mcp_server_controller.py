@@ -575,6 +575,68 @@ class McpServerSettingsController:
 
     def upsert_mcp_server(self, configuration: McpServerConfiguration) -> None:
         """Save one endpoint configuration without disturbing other endpoints."""
+        if configuration.bundled_library:
+            curated_paths = {
+                entry.collection_path for entry in self.registry._builtin_view.list_entries()
+            }
+            if configuration.library_collection_path not in curated_paths:
+                raise ValueError(
+                    f"builtin_invalid: uncurated built-in collection path "
+                    f"'{configuration.library_collection_path}'"
+                )
+            selection = configuration.library_selection
+            if selection is None:
+                raise ValueError("builtin_invalid: built-in identity is incomplete")
+            from pypost.core.library_runtime_resolver import LibraryRuntimeResolver
+            from pypost.core.predefined_library import PredefinedLibraryService
+            from pypost.models.library_manifest import LocalLibraryOverlay
+
+            LibraryRuntimeResolver(
+                library_service=self.registry._bundled_adapter,
+                environment_lookup=getattr(self.registry, "_environment_lookup", None),
+                metrics=self._metrics,
+            ).resolve(
+                selection,
+                configuration.environment_id,
+                candidate_overlay=LocalLibraryOverlay(
+                    library_id=PredefinedLibraryService.DEFAULT_LIBRARY_ID
+                ),
+            )
+            try:
+                previous = self._mcp_server_configuration(configuration.id)
+            except KeyError:
+                previous = None
+            if previous is not None and self.registry.is_running(configuration.id):
+                self.registry.reconfigure(configuration.id, configuration)
+                return
+            reason = "update" if previous is not None else "create"
+            previous_settings = deepcopy(self._settings)
+            previous_registry = self.registry.snapshot()
+            configurations = {
+                existing.id: existing.model_copy(deep=True)
+                for existing in self._settings.mcp_servers
+            }
+            configurations[configuration.id] = configuration.model_copy(deep=True)
+            candidate = previous_settings.model_copy(
+                update={"mcp_servers": list(configurations.values())}
+            )
+            store = self._checked_store()
+            result = LibraryMcpSaveTransaction(
+                store=store, previous=previous_settings, candidate=candidate, overlay={}
+            ).commit()
+            if not result.committed:
+                raise ValueError(f"{result.category}: {result.safe_message}")
+            try:
+                self.registry.upsert(configuration)
+            except Exception:
+                store.restore(previous_settings)
+                self.registry.restore_snapshot(previous_registry)
+                raise
+            self._settings.mcp_servers = list(configurations.values())
+            if not isinstance(store, ConfigManagerSettingsStore):
+                self._save_mcp_server_configurations(reason)
+            return
+
         if configuration.library_id:
             selection = configuration.library_selection
             if selection is None:

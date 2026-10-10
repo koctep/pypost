@@ -103,7 +103,7 @@ synthetic test fixture remains available only through the examples library.
 | PYPOST-1349 | Shared locator and predefined-library integration | Complete |
 | PYPOST-1350 | `builtin-collections.yaml` view and structural validation | Implemented |
 | PYPOST-1351 | Persisted marker, runtime resolution and headless daemon startup | Implemented |
-| PYPOST-1352 | Checked save, reconciliation, replacement and env refresh | Planned |
+| PYPOST-1352 | Checked save, reconciliation, replacement and env refresh | Implemented |
 | PYPOST-1353 | Built-in dialog source, read-only picker and server-table UI | Planned |
 | PYPOST-1354 | Editable paired-environment copy | Planned |
 | PYPOST-1355 | Copy for editing into a workspace collection | Planned |
@@ -251,6 +251,81 @@ workspace and normal library servers:
 - **Headless daemon compatibility**: `DaemonRuntime` instantiates `MCPServerRegistry` without
   an external `library_service`. Built-in MCP servers start seamlessly in headless daemon mode
   without requiring external library services or manual wiring changes.
+
+### Built-in MCP Server Lifecycle and Controller Save (PYPOST-1352)
+
+`MCPServerRegistry` and `McpServerSettingsController` implement robust lifecycle management,
+dynamic reconfigure, manifest-preserving environment refresh, and checked persistence for
+Built-in MCP server rows (`configuration.bundled_library=True`).
+
+#### Registry Lifecycle Management (`MCPServerRegistry.reconcile_references`)
+
+When workspace collection sets change or configuration dialogs (such as the Environment Manager)
+close, `MCPServerRegistry.reconcile_references(valid_collection_ids, valid_environment_ids)`
+reconciles reference validity across all running server instances:
+- **Decoupling from workspace collections**: For Built-in rows
+  (`configuration.bundled_library=True`), reference validation is completely decoupled from
+  `collection_id` and `valid_collection_ids`. Because Built-in rows have `collection_id=None`,
+  evaluating workspace collections would falsely stop running Built-in endpoints. Changes to
+  `valid_collection_ids` have zero effect on running Built-in servers.
+- **Validation against curated catalog**: Collection validity is checked against the curated
+  catalog entries retrieved via `self._builtin_view.list_entries()`. Specifically,
+  `configuration.library_collection_path` must exist within the set of curated entry paths.
+- **Environment lookup**: Environment validity is checked against `valid_environment_ids` (or
+  `self._environment_lookup` when IDs are omitted).
+- **Diagnostic status on failure**: Running Built-in instances are halted only when their selected
+  environment is deleted (`"{instance_id} cannot run: missing environment for port {port}"`) or if
+  the curated collection entry is missing from the bundle (`"{instance_id} cannot run: missing`
+  `built-in collection for port {port}"`).
+
+#### Dynamic Reconfiguration (`MCPServerRegistry.reconfigure`)
+
+Running Built-in instances can be reconfigured dynamically (such as updating ports or host settings)
+without interruption:
+- **Reference validation (`_validate_replacement_references`)**: Checks that the replacement's
+  `library_collection_path` belongs to `self._builtin_view.list_entries()` and that its
+  `environment_id` resolves in `_environment_lookup`. Workspace collections are never evaluated and
+  no `collection_id` is required.
+- **In-place migration**: The registry performs zero-downtime reconfiguration by binding the new
+  manager before stopping the existing instance, keeping the endpoint active.
+
+#### Environment Refresh with Preserved Manifest Defaults (`MCPServerRegistry.refresh_environment`)
+
+When workspace environment variables are updated:
+- **Targeted resolution**: `MCPServerRegistry.refresh_environment(environment_id)` identifies all
+  servers selecting that environment ID. For Built-in rows, it re-resolves the runtime configuration
+  via `LibraryRuntimeResolver` using `self._bundled_adapter` and candidate overlay
+  `LocalLibraryOverlay(library_id="pypost-examples")`.
+- **Preservation of manifest defaults**: Rather than replacing runtime variables with raw
+  environment key-values (which would discard manifest defaults for variables the user environment
+  omits), resolver re-execution guarantees that manifest default variables survive when the
+  environment omits them, while applying updated workspace values and overridable key suppliers.
+
+#### Controller Save and Checked Persistence (`McpServerSettingsController.upsert_mcp_server`)
+
+`McpServerSettingsController.upsert_mcp_server` provides dedicated persistence and validation for
+Built-in server rows:
+- **Dedicated branch**: Built-in saving executes in an explicit branch
+  (`if configuration.bundled_library:`) that strictly precedes generic library handling
+  (`if configuration.library_id:`).
+- **Curated view membership validation**: The controller verifies that
+  `configuration.library_collection_path` matches a curated entry in
+  `self.registry._builtin_view.list_entries()`. Uncurated or non-catalog paths are rejected with
+  `ValueError("builtin_invalid: uncurated built-in collection path ...")`.
+- **Preflight resolution**: Resolves runtime configuration through `LibraryRuntimeResolver` using
+  `self.registry._bundled_adapter` and an empty overlay candidate to preflight validation before
+  touching persisted settings.
+- **Complete overlay isolation**: Executes
+  `LibraryMcpSaveTransaction(store=store, ..., overlay={})`. Passing `overlay={}` guarantees that
+  no overlay files are created or modified on disk. Shipped bundled library resources remain
+  strictly read-only.
+- **Isolation against duplicate external libraries**: Resolving via `self.registry._bundled_adapter`
+  ensures that user-connected external libraries sharing the identifier `pypost-examples` cannot
+  shadow, corrupt, or alter curated Built-in definitions.
+- **Transactional rollback**: If the server is running, the controller applies changes via
+  `self.registry.reconfigure`. If stopped or new, it commits candidate settings via the transaction
+  and updates the registry via `self.registry.upsert`. Any failure during save or registry upsert
+  triggers atomic rollback of settings and registry snapshots, leaving existing state intact.
 
 ### Structural Consistency Testing Principles
 

@@ -348,6 +348,37 @@ class MCPServerRegistry(QObject):
                 continue
 
             # Local server
+            if configuration.bundled_library:
+                if valid_environment_ids is not None:
+                    env_valid = (
+                        not configuration.environment_id
+                        or configuration.environment_id in valid_environment_ids
+                    )
+                else:
+                    env = (
+                        self._environment_lookup(configuration.environment_id)
+                        if configuration.environment_id
+                        else None
+                    )
+                    env_valid = not configuration.environment_id or env is not None
+
+                curated_paths = {
+                    entry.collection_path for entry in self._builtin_view.list_entries()
+                }
+                coll_valid = configuration.library_collection_path in curated_paths
+                if coll_valid and env_valid:
+                    continue
+                self.stop(instance_id)
+                missing = "built-in collection" if not coll_valid else "environment"
+                self._set_status(
+                    instance_id,
+                    "failed",
+                    f"{instance_id} cannot run: missing {missing} for port "
+                    f"{configuration.port}",
+                )
+                changed = True
+                continue
+
             if valid_collection_ids is not None:
                 coll_valid = (
                     configuration.collection_id is not None
@@ -395,23 +426,48 @@ class MCPServerRegistry(QObject):
                 )
             return
 
-        variables = dict(environment.variables)
-        hidden_keys = set(environment.hidden_keys)
-        overridable_keys = set(environment.mcp_overridable_keys)
-
-        def supply_variables(snapshot: dict[str, str] = variables) -> dict[str, str]:
-            return dict(snapshot)
-
-        def supply_hidden_keys(snapshot: set[str] = hidden_keys) -> set[str]:
-            return set(snapshot)
-
-        def supply_overridable_keys(snapshot: set[str] = overridable_keys) -> set[str]:
-            return set(snapshot)
+        from pypost.core.library_runtime_resolver import LibraryRuntimeResolver
+        from pypost.models.library_manifest import LocalLibraryOverlay
 
         for instance_id in instance_ids:
             manager = self._managers.get(instance_id)
             if manager is None:
                 continue
+            configuration = self._configuration(instance_id)
+            if configuration.bundled_library:
+                selection = configuration.library_selection
+                if selection is None:
+                    continue
+                try:
+                    resolved = LibraryRuntimeResolver(
+                        library_service=self._bundled_adapter,
+                        environment_lookup=self._environment_lookup,
+                    ).resolve(
+                        selection,
+                        environment_id=environment_id,
+                        candidate_overlay=LocalLibraryOverlay(
+                            library_id=PredefinedLibraryService.DEFAULT_LIBRARY_ID
+                        ),
+                    )
+                except ValueError:
+                    continue
+                vars_dict = dict(resolved.environment)
+                hidden_set = set(resolved.hidden_keys)
+                overridable_set = set(resolved.overridable_keys)
+            else:
+                vars_dict = dict(environment.variables)
+                hidden_set = set(environment.hidden_keys)
+                overridable_set = set(environment.mcp_overridable_keys)
+
+            def supply_variables(snapshot: dict[str, str] = vars_dict) -> dict[str, str]:
+                return dict(snapshot)
+
+            def supply_hidden_keys(snapshot: set[str] = hidden_set) -> set[str]:
+                return set(snapshot)
+
+            def supply_overridable_keys(snapshot: set[str] = overridable_set) -> set[str]:
+                return set(snapshot)
+
             manager.set_variable_supplier(supply_variables)
             manager.set_hidden_keys_supplier(supply_hidden_keys)
             manager.set_overridable_keys_supplier(supply_overridable_keys)
@@ -680,7 +736,15 @@ class MCPServerRegistry(QObject):
         self, instance_id: str, configuration: McpServerConfiguration
     ) -> None:
         if configuration.server_type == "local":
-            if (
+            if configuration.bundled_library:
+                curated_paths = {
+                    entry.collection_path for entry in self._builtin_view.list_entries()
+                }
+                if configuration.library_collection_path not in curated_paths:
+                    raise ValueError(
+                        f"MCP server {instance_id} references a missing built-in collection"
+                    )
+            elif (
                 not configuration.collection_id
                 or self._collection_lookup(configuration.collection_id) is None
             ):
