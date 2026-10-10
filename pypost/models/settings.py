@@ -29,6 +29,7 @@ class McpServerConfiguration(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
     timeout: float = 30.0
     enabled: bool = False
+    bundled_library: bool = False
 
     @model_validator(mode="after")
     def validate_server_type_requirements(self) -> "McpServerConfiguration":
@@ -42,6 +43,12 @@ class McpServerConfiguration(BaseModel):
                     raise ValueError(
                         "Library MCP server requires manifest and collection identity"
                     )
+                if self.bundled_library and self.library_id != "pypost-examples":
+                    raise ValueError(
+                        "bundled_library requires library_id 'pypost-examples'"
+                    )
+            elif self.bundled_library:
+                raise ValueError("bundled_library requires library_id")
             elif not self.collection_id or not self.collection_id.strip():
                 raise ValueError("Local MCP server requires a non-empty collection_id")
         return self

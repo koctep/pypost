@@ -102,7 +102,7 @@ synthetic test fixture remains available only through the examples library.
 | PYPOST-1348 | Package `examples/` as `pypost.bundled_examples`; build guards | Complete |
 | PYPOST-1349 | Shared locator and predefined-library integration | Complete |
 | PYPOST-1350 | `builtin-collections.yaml` view and structural validation | Implemented |
-| PYPOST-1351 | Persisted marker, runtime resolution and headless daemon startup | Planned |
+| PYPOST-1351 | Persisted marker, runtime resolution and headless daemon startup | Implemented |
 | PYPOST-1352 | Checked save, reconciliation, replacement and env refresh | Planned |
 | PYPOST-1353 | Built-in dialog source, read-only picker and server-table UI | Planned |
 | PYPOST-1354 | Editable paired-environment copy | Planned |
@@ -204,6 +204,53 @@ subsystems without hardcoding path structures elsewhere.
   `McpServerConfiguration` targets a valid curated built-in collection by verifying that
   `configuration.library_id == "pypost-examples"` and that `configuration.library_collection_path`
   matches one of the curated entries.
+
+### Built-in MCP Server Configuration and Startup (PYPOST-1351)
+
+`McpServerConfiguration` and `MCPServerRegistry` support out-of-the-box built-in MCP servers
+backed directly by the shipped bundled examples library.
+
+#### Configuration Model (`McpServerConfiguration.bundled_library`)
+
+`McpServerConfiguration.bundled_library: bool = False` distinguishes built-in MCP servers from
+workspace and normal library servers:
+- **Default value**: Defaults to `False` when omitted, ensuring backward compatibility with
+  existing persisted configuration files.
+- **Validation rules (`validate_server_type_requirements`)**:
+  - When `bundled_library` is `True`: requires `library_id="pypost-examples"`, `manifest_id`, and
+    `library_collection_path`.
+  - Rejection of non-examples `library_id`: setting `bundled_library=True` with any `library_id`
+    other than `"pypost-examples"` raises
+    `ValueError("bundled_library requires library_id 'pypost-examples'")`.
+  - Rejection of missing `library_id`: setting `bundled_library=True` on a workspace server
+    (where `library_id` is unset) raises `ValueError("bundled_library requires library_id")`.
+  - Normal library and workspace rows: unaffected by this flag when `bundled_library=False`.
+    Existing legacy rows carrying both `library_id` and a stale `collection_id` continue to validate
+    and run with `library_id` precedence.
+
+#### Runtime Resolution and Startup (`MCPServerRegistry`)
+
+`MCPServerRegistry` resolves and manages the runtime lifecycle of built-in MCP server instances:
+- **Default bundled adapter (`_BundledLibraryAdapter`)**: `MCPServerRegistry` initializes an
+  internal private adapter backed by `BuiltinCollectionView` and `PredefinedLibraryService`. It
+  exposes authoritative connections for `library_id="pypost-examples"` independently of whether
+  an external `library_service` was injected.
+- **View membership validation**: In `_runtime_inputs`, only curated entries returned by
+  `BuiltinCollectionView.list_entries()` are permitted to start. If `library_collection_path` is
+  missing from the curated view (for instance, uncurated test fixtures like `collections/mcp.json`
+  or missing paths), startup cleanly fails and `_missing_reference` reports diagnostic
+  `"missing built-in collection"`.
+- **Runtime isolation**: Resolution calls `LibraryRuntimeResolver.resolve` with an empty
+  `LocalLibraryOverlay(library_id="pypost-examples")` and no preset. This guarantees that user
+  library configurations, stored overlays, or presets never shadow or alter the shipped
+  collection or environment variable values. Variables are resolved strictly from the selected
+  workspace environment and manifest defaults.
+- **Auto-update on application upgrade**: Because resolution loads the bundled library directly
+  on each server start, any updates to the shipped package collection files automatically reflect
+  on subsequent server start without requiring modifications to persisted server settings.
+- **Headless daemon compatibility**: `DaemonRuntime` instantiates `MCPServerRegistry` without
+  an external `library_service`. Built-in MCP servers start seamlessly in headless daemon mode
+  without requiring external library services or manual wiring changes.
 
 ### Structural Consistency Testing Principles
 
