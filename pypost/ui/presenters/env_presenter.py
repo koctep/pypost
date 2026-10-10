@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from pypost.core.config_manager import ConfigManager
 from pypost.core.encryption_config import resolve_encryption_enabled
 from pypost.core.env_variable_snapshot import EnvVariableSnapshot
+from pypost.core.environment_creation import EnvironmentCreationCompletion
 from pypost.core.environment_import import load_import_candidates
 from pypost.core.environment_variable_resolver import resolve_environment_variables
 from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
@@ -33,7 +34,7 @@ from pypost.ui.collection_item_dialogs import (
 )
 from pypost.ui.dialogs.env_dialog import EnvironmentDialog
 from pypost.ui.presenters.mcp_controls_presenter import McpControlsPresenter
-from pypost.ui.presenters import env_presenter_lifecycle
+from pypost.ui.presenters import env_presenter_creation, env_presenter_lifecycle
 from pypost.ui.widget_ids import (
     ENV_BAR,
     ENV_MANAGE_BUTTON,
@@ -75,6 +76,9 @@ class EnvPresenter(QObject):
         self._get_collections = get_collections
         self._metrics = metrics
         self._environments: list[Environment] = []
+        self._staged_environment: Environment | None = None
+        self._creation_completion: EnvironmentCreationCompletion | None = None
+        self._creation_sequence = 0
         self._current_env_index: int = 0
         self._env_snapshot = EnvVariableSnapshot()
         self._pending_env_manager_refresh = False
@@ -119,6 +123,7 @@ class EnvPresenter(QObject):
             get_collections=get_collections,
             get_environments=lambda: self._environments,
             current_environment=self._selected_environment,
+            create_environment=self.create_workspace_environment,
             metrics=metrics,
             dialog_parent=self._widget,
             mcp_registry=mcp_registry,
@@ -187,6 +192,15 @@ class EnvPresenter(QObject):
             None,
         )
 
+    def create_workspace_environment(
+        self, candidate: Environment, completion: EnvironmentCreationCompletion
+    ) -> bool:
+        """Admit one copy and publish it only after its own durable save succeeds."""
+        return env_presenter_creation.create_workspace_environment(self, candidate, completion)
+
+    def _finish_environment_creation(self, outcome: str) -> None:
+        env_presenter_creation.finish_environment_creation(self, outcome)
+
     @property
     def mcp_controls(self) -> McpControlsPresenter:
         return self._mcp_controls
@@ -239,19 +253,22 @@ class EnvPresenter(QObject):
             if self._admission_closed() and not accepted_during_teardown:
                 logger.info("environment_save_rejected reason=teardown")
                 return False
+            snapshot = list(self._environments)
+            if self._staged_environment is not None:
+                snapshot.append(self._staged_environment)
             if self._encryption_enabled():
                 logger.info(
                     "environment_storage_async_save_dispatched count=%d",
                     len(self._environments),
                 )
                 self._storage_gateway.save_async(
-                    self._environments,
+                    snapshot,
                     update_sequences=update_sequences,
                     accepted_during_teardown=accepted_during_teardown,
                 )
                 return True
             try:
-                self._storage.save_environments(self._environments)
+                self._storage.save_environments(snapshot)
             except Exception:
                 for sequence in update_sequences:
                     self.environment_update_disposition.emit(sequence, "failed")
@@ -267,6 +284,11 @@ class EnvPresenter(QObject):
         env_presenter_lifecycle.on_storage_load_completed(self, environments)
 
     def _on_storage_save_outcome(self, sequence: object, outcome: str) -> None:
+        if isinstance(sequence, int) and sequence < 0:
+            if (sequence == self._creation_sequence
+                    and outcome in {"persisted", "failed", "incomplete"}):
+                self._finish_environment_creation(outcome)
+            return
         env_presenter_lifecycle.on_storage_save_outcome(self, sequence, outcome)
 
     def _on_storage_load_failed(self, error: object) -> None:

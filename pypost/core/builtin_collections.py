@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
+from uuid import uuid4
 
 import yaml
 
@@ -229,6 +230,31 @@ class BuiltinCollectionView:
                 f"Expected environment object in {target}, got {type(env_item).__name__}"
             )
         return Environment(**env_item)
+
+    def derive_paired_environment(
+        self, collection_path: str, existing_environments: Sequence[Environment] = ()
+    ) -> Environment:
+        """Create an independent sanitized workspace copy of a validated template."""
+        template = self.load_paired_environment(collection_path)
+        entry = next(e for e in self.list_entries() if e.collection_path == collection_path)
+        candidate = template.model_copy(deep=True)
+        candidate.id = str(uuid4())
+        base = template.name or entry.name
+        occupied = {env.name for env in existing_environments}
+        candidate.name = base
+        suffix = 2
+        while candidate.name in occupied:
+            candidate.name = f"{base} ({suffix})"
+            suffix += 1
+        for key in candidate.hidden_keys:
+            if key in candidate.variables:
+                candidate.variables[key] = ""
+        candidate.builtin_environment_path = entry.environment_path
+        logger.debug(
+            "builtin_paired_environment_derived env_id=%s variable_count=%d secret_count=%d",
+            candidate.id, len(candidate.variables), len(candidate.hidden_keys),
+        )
+        return candidate
 
     def _resolve_entry_path(self, collection_path: str, *, is_environment: bool) -> Path:
         """Validate collection_path against curated entries and resolve file path."""

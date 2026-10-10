@@ -140,6 +140,7 @@ class Environment(BaseModel):
     hidden_keys: Set[str] = Field(default_factory=set)
     mcp_overridable_keys: Set[str] = Field(default_factory=set)
     enable_mcp: bool = False
+    builtin_environment_path: str | None = None
 
 
 class HistoryEntry(BaseModel):
