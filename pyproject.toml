@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -48,9 +48,24 @@ otel = [
 pypost-agent-ui-mcp = "pypost.agent.ui_actions_mcp:main"
 pypost-daemon = "pypost.daemon:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["pypost*"]
+[tool.setuptools]
+packages = [
+    "pypost", "pypost.agent", "pypost.core", "pypost.core.key_sources", "pypost.core.qt",
+    "pypost.fixtures", "pypost.models", "pypost.ui", "pypost.ui.delegates",
+    "pypost.ui.dialogs", "pypost.ui.presenters", "pypost.ui.widgets",
+    "pypost.ui.widgets.environments", "pypost.ui.widgets.fold", "pypost.ui.widgets.mcp_client",
+    "pypost.ui.widgets.settings", "pypost.ui.widgets.validate", "pypost.ui.widgets.websocket",
+    "pypost.bundled_examples",
+]
+
+[tool.setuptools.package-dir]
+"pypost.bundled_examples" = "examples"
+
+[tool.setuptools.package-data]
+"pypost.bundled_examples" = [
+    "pypost-library.yaml", "builtin-collections.yaml", "README.md",
+    "collections/*.json", "environments/*.json",
+]
 
 [tool.setuptools.dynamic]
 version = { attr = "pypost.version.__version__" }

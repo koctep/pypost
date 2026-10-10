@@ -142,5 +142,19 @@ updates. This action differs from the existing whole-library copy API above.
 There is no migration of existing workspace or Library servers. Missing marker fields
 will default to `False`, and `library_id` precedence over a stale `collection_id` will
 remain intact. Ordinary-library lifecycle repairs belong to independent Debt PYPOST-1347,
-outside this epic and sprint. New packaging and end-to-end checks belong to the children;
-`make check-package-data` is a planned target, not a current validation command.
+outside this epic and sprint.
+
+### Packaging Implementation and Verification (PYPOST-1348)
+
+The packaging foundation introduced in PYPOST-1348 establishes `examples/` as package data
+without maintaining a separate source copy:
+- `pyproject.toml` explicitly declares `packages` including `pypost.bundled_examples`, mapped via
+  `[tool.setuptools.package-dir]` to the repository `examples/` directory.
+- `[tool.setuptools.package-data]` explicitly matches `pypost-library.yaml`, `README.md`,
+  `collections/*.json`, `environments/*.json`, and reserves `builtin-collections.yaml`.
+- An isolated verification script `scripts/check_package_data.py` inspects built wheels to verify
+  that every application initializer and all required bundled examples members are present and
+  identical to their canonical sources.
+- The `make check-package-data` target builds an isolated wheel with `pip wheel --no-deps` into a
+  temporary directory and executes `scripts/check_package_data.py` to ensure package integrity.
+  This check runs as part of `make test-slow`.

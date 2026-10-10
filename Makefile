@@ -5,7 +5,7 @@
 	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
 	check-license-inventory lint-docs check-docs-links check-lock-all test-gui-batch \
-	baseline-metrics check-baseline-metrics
+	baseline-metrics check-baseline-metrics check-package-data
 
 .DEFAULT_GOAL := help
 
@@ -170,7 +170,15 @@ test: $(VENV_MARKER) venv-test venv-otel ## Run fast test suite (excludes slow i
 		--worker-timeout $(WORKER_TIMEOUT) \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),-m "not slow")
 
-test-slow: $(VENV_MARKER) venv-test venv-otel ## Run slow integration tests only (Makefile install smoke)
+check-package-data: $(VENV_MARKER) venv-test ## Build isolated wheel and verify bundled examples
+	@set -eu; wheel_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$wheel_dir"' EXIT HUP INT TERM; \
+	$(BIN)/python -m pip wheel --no-deps --wheel-dir "$$wheel_dir" .; \
+	set -- "$$wheel_dir"/*.whl; \
+	[ "$$#" -eq 1 ] && [ -f "$$1" ]; \
+	$(BIN)/python scripts/check_package_data.py "$$1" --source-root .
+
+test-slow: $(VENV_MARKER) venv-test venv-otel check-package-data ## Run slow tests and wheel check
 	QT_QPA_PLATFORM=offscreen $(BIN)/python -m pytest \
 		$(if $(PYTEST_ARGS),$(PYTEST_ARGS),tests/ -m slow)
 

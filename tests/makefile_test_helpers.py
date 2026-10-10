@@ -151,6 +151,13 @@ SLOW_SMOKE_MINIMUM_PYPPOST_FILES = frozenset(
         "agent/__init__.py",
         "agent/ui_actions_mcp.py",
         "daemon.py",
+        "core/__init__.py", "core/key_sources/__init__.py", "core/qt/__init__.py",
+        "fixtures/__init__.py", "models/__init__.py", "ui/__init__.py",
+        "ui/delegates/__init__.py", "ui/dialogs/__init__.py", "ui/presenters/__init__.py",
+        "ui/widgets/__init__.py", "ui/widgets/environments/__init__.py",
+        "ui/widgets/fold/__init__.py", "ui/widgets/mcp_client/__init__.py",
+        "ui/widgets/settings/__init__.py", "ui/widgets/validate/__init__.py",
+        "ui/widgets/websocket/__init__.py",
     }
 )
 
@@ -184,13 +191,20 @@ def _script_target_modules(pyproject_path: Path) -> frozenset[Path]:
     )
 
 
-def _paths_from_package_data(package_data: dict[str, list[str]], repo_root: Path) -> list[Path]:
+def _package_source(package: str, mapping: dict[str, str], repo_root: Path) -> Path:
+    source = Path(mapping.get(package, package.replace(".", "/")))
+    if not (repo_root / source).is_dir():
+        raise FileNotFoundError(f"missing declared package {package} source: {source}")
+    return source
+
+
+def _paths_from_package_data(
+    package_data: dict[str, list[str]], repo_root: Path, mapping: dict[str, str],
+) -> list[Path]:
     """Resolve ``[tool.setuptools.package-data]`` globs to repo-relative file paths."""
     resolved: list[Path] = []
     for package, patterns in package_data.items():
-        package_dir = repo_root / package.replace(".", "/")
-        if not package_dir.is_dir():
-            continue
+        package_dir = repo_root / _package_source(package, mapping, repo_root)
         for pattern in patterns:
             for match in package_dir.glob(pattern):
                 if match.is_file():
@@ -245,7 +259,15 @@ def _required_seed_paths_from_pyproject(
         required.update(_package_init_paths_for_module(module_path))
 
     package_data = setuptools_cfg.get("package-data", {})
-    required.update(_paths_from_package_data(package_data, root))
+    mapping = setuptools_cfg.get("package-dir", {})
+    for package in setuptools_cfg.get("packages", []):
+        initializer = _package_source(package, mapping, root) / "__init__.py"
+        if not (root / initializer).is_file():
+            raise FileNotFoundError(
+                f"missing declared package {package} initializer: {initializer}"
+            )
+        required.add(initializer)
+    required.update(_paths_from_package_data(package_data, root, mapping))
 
     return sorted(required)
 
@@ -324,6 +346,9 @@ def _materialize_slow_smoke_workspace(workspace: Path) -> None:
     shutil.copy(MAKEFILE, workspace / "Makefile")
     _copy_pyproject(workspace)
     _seed_installable_package(workspace)
+    scripts_dir = workspace / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    shutil.copy(REPO_ROOT / "scripts/check_package_data.py", scripts_dir)
 
 
 # Post-install sanity snippets for slow-smoke venv (PYPOST-559, PYPOST-966).
