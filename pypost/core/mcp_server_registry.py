@@ -6,13 +6,17 @@ import socket
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable, Literal
+from pathlib import Path
+from typing import Any, Callable, Literal
 
 from PySide6.QtCore import QObject, Signal
 
+from pypost.core.builtin_collections import BuiltinCollectionView
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
+from pypost.core.predefined_library import PredefinedLibraryService
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.template_service import TemplateService
+from pypost.models.library_manager import LibraryConnectionRecord
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import McpServerConfiguration
 
@@ -40,6 +44,24 @@ class _PendingReconfiguration:
     candidate_manager: MCPServerManager
 
 
+class _BundledLibraryAdapter:
+    """Minimal library service adapter exposing the authoritative shipped bundle."""
+
+    def __init__(self, builtin_view: BuiltinCollectionView) -> None:
+        self._view = builtin_view
+        self._predefined = builtin_view._predefined
+        self.overlay_manager = None
+
+    def get_connection(self, library_id: str) -> LibraryConnectionRecord | None:
+        if library_id != PredefinedLibraryService.DEFAULT_LIBRARY_ID:
+            return None
+        return self._predefined.discover()
+
+    def resolve_path(self, record: Any) -> Path | None:
+        local_path = getattr(record, "local_path", None)
+        return Path(local_path) if local_path else None
+
+
 class MCPServerRegistry(QObject):
     """Own one ``MCPServerManager`` per configured MCP endpoint.
 
@@ -59,6 +81,7 @@ class MCPServerRegistry(QObject):
         metrics: MetricsTrackerProtocol | None = None,
         template_service: TemplateService | None = None,
         library_service=None,
+        builtin_view: BuiltinCollectionView | None = None,
     ) -> None:
         super().__init__()
         self._collection_lookup = collection_lookup or (lambda _id: None)
@@ -66,6 +89,8 @@ class MCPServerRegistry(QObject):
         self._metrics = metrics
         self._template_service = template_service
         self.library_service = library_service
+        self._builtin_view = builtin_view or BuiltinCollectionView()
+        self._bundled_adapter = _BundledLibraryAdapter(self._builtin_view)
         self._configurations: dict[str, McpServerConfiguration] = {}
         self._managers: dict[str, MCPServerManager] = {}
         self._statuses: dict[str, McpServerStatus] = {}
@@ -474,16 +499,34 @@ class MCPServerRegistry(QObject):
 
         if configuration.library_id:
             from pypost.core.library_runtime_resolver import LibraryRuntimeResolver
+            from pypost.models.library_manifest import LocalLibraryOverlay
 
             selection = configuration.library_selection
             if selection is None:
                 return None
+
+            if configuration.bundled_library:
+                curated_paths = {
+                    entry.collection_path for entry in self._builtin_view.list_entries()
+                }
+                if configuration.library_collection_path not in curated_paths:
+                    return None
+                service = self._bundled_adapter
+                candidate_overlay = LocalLibraryOverlay(
+                    library_id=PredefinedLibraryService.DEFAULT_LIBRARY_ID
+                )
+            else:
+                service = self.library_service
+                candidate_overlay = None
+
             try:
                 runtime = LibraryRuntimeResolver(
-                    library_service=self.library_service,
+                    library_service=service,
                     environment_lookup=self._environment_lookup,
                 ).resolve(
-                    selection, environment_id=configuration.environment_id
+                    selection,
+                    environment_id=configuration.environment_id,
+                    candidate_overlay=candidate_overlay,
                 )
             except ValueError:
                 return None
@@ -509,6 +552,8 @@ class MCPServerRegistry(QObject):
     def _missing_reference(self, configuration: McpServerConfiguration) -> str:
         if configuration.server_type == "proxy":
             return "environment"
+        if configuration.bundled_library:
+            return "built-in collection"
         if configuration.library_id:
             return "library, manifest, collection, or profile"
         if (
