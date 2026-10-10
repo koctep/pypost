@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from pypost.core.builtin_collections import BuiltinCollectionView
 from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.core.mcp_server_registry import McpServerStatus
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
@@ -67,6 +68,7 @@ class McpServersDialog(QDialog):
         legacy_host: str,
         legacy_port: int,
         library_service=None,
+        builtin_view: BuiltinCollectionView | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -86,6 +88,7 @@ class McpServersDialog(QDialog):
         self._legacy_host = legacy_host
         self._legacy_port = legacy_port
         self._library_service = library_service
+        self._builtin_view = builtin_view or BuiltinCollectionView()
         self._table = QTableWidget(0, len(self._COLUMNS), self)
         self._build_ui()
         self.refresh()
@@ -156,7 +159,9 @@ class McpServersDialog(QDialog):
                     else "Proxy"
                 )
             else:
-                if configuration.library_id:
+                if configuration.bundled_library:
+                    target_desc = self._builtin_collection_description(configuration)
+                elif configuration.library_id:
                     target_desc = self._library_collection_description(configuration)
                 else:
                     cid = configuration.collection_id or ""
@@ -176,6 +181,21 @@ class McpServersDialog(QDialog):
                     item.setToolTip(status.message)
                 self._table.setItem(row, column, item)
         self._table.resizeColumnsToContents()
+
+    def _builtin_collection_description(
+        self, configuration: McpServerConfiguration
+    ) -> str:
+        """Describe a built-in server row with (read-only) marker."""
+        display_name = configuration.library_collection_path or "unknown collection"
+        if self._builtin_view is not None:
+            try:
+                for entry in self._builtin_view.list_entries():
+                    if entry.collection_path == configuration.library_collection_path:
+                        display_name = entry.name
+                        break
+            except Exception:
+                pass
+        return f"Built-in / {display_name} (read-only)"
 
     def _library_collection_description(
         self, configuration: McpServerConfiguration
@@ -220,6 +240,7 @@ class McpServersDialog(QDialog):
             default_host=self._legacy_host,
             default_port=self._legacy_port,
             library_service=self._library_service,
+            builtin_view=self._builtin_view,
             parent=self,
         )
         if dialog.exec():
@@ -256,6 +277,7 @@ class McpServersDialog(QDialog):
             default_host=self._legacy_host,
             default_port=self._legacy_port,
             library_service=self._library_service,
+            builtin_view=self._builtin_view,
             parent=self,
         )
         if dialog.exec():
@@ -361,6 +383,7 @@ class _McpServerEditor(QDialog):
         library_selections: list[dict[str, object]] | None = None,
         library_service=None,
         library_worker_factory=None,
+        builtin_view: BuiltinCollectionView | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -378,10 +401,28 @@ class _McpServerEditor(QDialog):
         self._server_type.addItem("Local Collection", "local")
         self._server_type.addItem("Upstream Proxy", "proxy")
 
+        self._builtin_view = builtin_view or BuiltinCollectionView()
         self._collection = QComboBox()
         self._collection_source = QComboBox()
         self._collection_source.addItem("Workspace collection", "workspace")
         self._collection_source.addItem("Connected library", "library")
+        self._collection_source.addItem("Built-in", "builtin")
+
+        self._builtin_collection = QComboBox()
+        try:
+            entries = self._builtin_view.list_entries()
+        except Exception as exc:
+            logger.warning("Failed to load builtin collection entries: %s", exc)
+            entries = []
+        for entry in entries:
+            self._builtin_collection.addItem(f"{entry.name} (read-only)", entry)
+            idx = self._builtin_collection.count() - 1
+            self._builtin_collection.setItemData(
+                idx,
+                "This collection is shipped with PyPost and updated on application upgrade.",
+                3,  # Qt.ItemDataRole.ToolTipRole
+            )
+
         self._library = QComboBox()
         self._library_records: dict[str, Any] = {}
         self._library_collection = QComboBox()
@@ -455,11 +496,20 @@ class _McpServerEditor(QDialog):
                 self._select_data(self._server_type, "proxy")
             else:
                 self._select_data(self._server_type, "local")
-            if configuration.collection_id:
-                self._select_data(self._collection, configuration.collection_id)
-            if configuration.library_id:
+            if configuration.bundled_library:
+                self._select_data(self._collection_source, "builtin")
+                # Preselect matching entry by library_collection_path
+                for idx in range(self._builtin_collection.count()):
+                    entry_data = self._builtin_collection.itemData(idx)
+                    entry_path = getattr(entry_data, "collection_path", entry_data)
+                    if entry_path == configuration.library_collection_path:
+                        self._builtin_collection.setCurrentIndex(idx)
+                        break
+            elif configuration.library_id:
                 self._select_data(self._collection_source, "library")
                 self._select_data(self._library, configuration.library_id)
+            elif configuration.collection_id:
+                self._select_data(self._collection, configuration.collection_id)
             if configuration.upstream_transport:
                 self._select_data(self._upstream_transport, configuration.upstream_transport)
         if target_environment:
@@ -474,6 +524,7 @@ class _McpServerEditor(QDialog):
         self._layout.addRow("Server Type", self._server_type)
         self._layout.addRow("Collection Source", self._collection_source)
         self._layout.addRow("Collection", self._collection)
+        self._layout.addRow("Built-in Collection", self._builtin_collection)
         self._layout.addRow("Connected Library", self._library)
         self._layout.addRow("Library Collection", self._library_collection)
         self._layout.addRow("Library Profile", self._library_profile)
@@ -514,10 +565,10 @@ class _McpServerEditor(QDialog):
 
     def _on_server_type_changed(self) -> None:
         is_proxy = self._server_type.currentData() == "proxy"
-        self._collection.setVisible(not is_proxy)
-        label_collection = self._layout.labelForField(self._collection)
-        if label_collection:
-            label_collection.setVisible(not is_proxy)
+        self._collection_source.setVisible(not is_proxy)
+        label_source = self._layout.labelForField(self._collection_source)
+        if label_source:
+            label_source.setVisible(not is_proxy)
 
         self._upstream_url.setVisible(is_proxy)
         label_url = self._layout.labelForField(self._upstream_url)
@@ -536,20 +587,25 @@ class _McpServerEditor(QDialog):
         self._on_collection_source_changed()
 
     def _on_collection_source_changed(self) -> None:
-        is_library = self._collection_source.currentData() == "library"
+        source_data = self._collection_source.currentData()
+        is_builtin = source_data == "builtin"
+        is_library = source_data == "library"
+        is_workspace = source_data == "workspace"
         is_local = self._server_type.currentData() == "local"
-        source = "library" if is_library else "workspace"
+        source = str(source_data or "workspace")
         if not self._initializing and source != self._last_collection_source:
             self._cancel_library_discovery()
             # A source switch must never retain an incompatible identity.
             self._collection.setCurrentIndex(-1)
             self._library_collection.setCurrentIndex(-1)
         self._last_collection_source = source
-        self._collection.setVisible(is_local and not is_library)
+        self._collection.setVisible(is_local and is_workspace)
+        self._builtin_collection.setVisible(is_local and is_builtin)
         self._library.setVisible(is_local and is_library)
         self._library_collection.setVisible(is_local and is_library)
         for field in (
             self._collection,
+            self._builtin_collection,
             self._library,
             self._library_collection,
             self._library_profile,
@@ -969,6 +1025,9 @@ class _McpServerEditor(QDialog):
         ) or (
             self._collection_source.currentData() == "library"
             and self._library_collection.currentData() is None
+        ) or (
+            self._collection_source.currentData() == "builtin"
+            and self._builtin_collection.currentData() is None
         ):
             self._error.setText("Collection and environment are required.")
             logger.debug("MCP server editor rejected save: collection and environment are required")
@@ -1002,6 +1061,28 @@ class _McpServerEditor(QDialog):
                 upstream_transport=upstream_transport,
                 headers=self._headers_table.get_data(),
                 environment_id=str(self._environment.currentData() or ""),
+                enabled=self._enabled,
+            )
+        if self._collection_source.currentData() == "builtin":
+            entry_data = self._builtin_collection.currentData()
+            col_path = (
+                entry_data.collection_path
+                if hasattr(entry_data, "collection_path")
+                else str(entry_data)
+            )
+            return McpServerConfiguration(
+                id=self._id,
+                name=self._name.text().strip() or None,
+                host=self._host.text().strip(),
+                port=self._port.value(),
+                server_type="local",
+                library_id="pypost-examples",
+                manifest_id="pypost-examples",
+                library_collection_path=col_path,
+                library_collection_index=None,
+                bundled_library=True,
+                collection_id=None,
+                environment_id=str(self._environment.currentData()),
                 enabled=self._enabled,
             )
         if self._collection_source.currentData() == "library":
