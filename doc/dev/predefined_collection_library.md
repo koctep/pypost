@@ -21,10 +21,22 @@ registry. This prevents automatic startup discovery from changing user configura
 
 ## API / Usage
 
+### `pypost.core.bundled_resources.bundled_examples_root()`
+
+Provides authoritative filesystem discovery of the bundled PyPost examples root directory.
+It resolves candidate paths using a strict hierarchy:
+1. **Sibling source checkout**: Checks `examples/` relative to the active `pypost` module
+   (`Path(pypost.__file__).resolve().parent.parent / "examples"`). Requires `__init__.py` and
+   a readable `pypost-library.yaml` whose `id` matches `pypost-examples`.
+2. **Package resource**: Queries `importlib.resources.files("pypost.bundled_examples")` traversable
+   when backed by a filesystem directory containing `pypost-library.yaml`.
+3. **Fallback**: Returns `None` when neither location is present or valid.
+
 ### `PredefinedLibraryService(root=None)`
 
-Creates the bundled-library boundary. In a source checkout, `root` defaults to the repository's
-`examples/` directory. Packaged applications should inject the installed examples resource root.
+Creates the bundled-library boundary. When `root` is omitted (`None`), it automatically calls
+`bundled_examples_root()` to locate the shipped examples root. Callers may also pass an explicit
+`Path` or `str` root (e.g. in test suites).
 
 ### `LibraryManagerService(..., predefined_root=None)`
 
@@ -37,11 +49,15 @@ When constructing a manager around an explicitly injected test or alternate conn
 pass `include_predefined=True` to include the template deliberately; the default application
 manager enables it automatically.
 
-### `copy_predefined_library(destination)`
+### `copy_predefined_library(destination)` / `PredefinedLibraryService.copy_to(destination)`
 
 Copies the validated examples to a new destination, rejects an existing destination or a path
 inside the bundled source, validates the copy, and registers it as an ordinary editable local
 library. Changes to the copy do not change `examples/`.
+
+During copying, `copy_to` filters out packaging and runtime artifacts (`__init__.py`,
+`__pycache__`, `*.pyc`) via `shutil.ignore_patterns`. This ensures user library copies stay pure
+collection data without Python packaging artifacts.
 
 ## Configuration
 
