@@ -12,6 +12,7 @@ from typing import Callable, Protocol
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
+from pypost.core.environment_creation import CreateEnvironment
 from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.core.mcp_server_registry import MCPServerRegistry, McpServerStatus
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
@@ -64,6 +65,7 @@ class McpControlsPresenter(QObject):
         dialog_parent: QWidget,
         mcp_registry: MCPServerRegistry | None = None,
         library_service=None,
+        create_environment: CreateEnvironment | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -71,6 +73,7 @@ class McpControlsPresenter(QObject):
         self._settings_provider = settings_provider
         self._get_collections = get_collections
         self._get_environments = get_environments
+        self._create_environment = create_environment
         self._current_environment = current_environment
         self._metrics = metrics
         self._dialog_parent = dialog_parent
@@ -345,6 +348,7 @@ class McpControlsPresenter(QObject):
             legacy_port=settings.mcp_port,
             library_service=self._library_service,
             builtin_view=builtin_view,
+            create_environment=self._create_environment,
             parent=self._dialog_parent,
         )
         dialog.exec()

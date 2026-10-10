@@ -105,7 +105,7 @@ synthetic test fixture remains available only through the examples library.
 | PYPOST-1351 | Persisted marker, runtime resolution and headless daemon startup | Implemented |
 | PYPOST-1352 | Checked save, reconciliation, replacement and env refresh | Implemented |
 | PYPOST-1353 | Built-in dialog source, read-only picker and server-table UI | Implemented |
-| PYPOST-1354 | Editable paired-environment copy | Planned |
+| PYPOST-1354 | Editable paired-environment copy | Implemented |
 | PYPOST-1355 | Copy for editing into a workspace collection | Planned |
 | PYPOST-1356 | Offline upgrade/copy end-to-end verification and user docs | Planned |
 
@@ -380,6 +380,145 @@ Built-in server rows:
   `controller.registry._builtin_view` and injects it into `McpServersDialog`. The dialog passes
   `builtin_view` down to `_McpServerEditor` instances during server addition and editing.
 
+### Editable Paired Environment Workflow (PYPOST-1354)
+
+#### Overview
+
+The Built-in server editor offers an optional **Create editable copy of paired environment**
+action for local Built-in servers. It derives an editable workspace environment, saves it through
+the canonical environment owner, then selects it after durable acknowledgment. Any existing
+workspace environment remains a valid manual choice, and saving still requires an environment.
+The raw paired template loader and shipped template files remain unchanged.
+
+#### Architecture and Ownership
+
+```mermaid
+flowchart LR
+    Editor[MCP server editor] --> View[BuiltinCollectionView derivation]
+    Editor --> Dialog[McpServersDialog]
+    Dialog --> Controls[McpControlsPresenter]
+    Controls --> Owner[EnvPresenter canonical owner]
+    Owner --> Storage[StorageManager or encrypted gateway]
+    Storage --> Ack[Durable outcome]
+    Ack --> Owner
+    Owner --> Published[Canonical list and editor selection]
+```
+
+`EnvPresenter` injects its `create_workspace_environment` bound method into
+`McpControlsPresenter`. The callback is forwarded through `McpServersDialog` to each
+`_McpServerEditor`, alongside a live environment supplier. Dialogs never construct another
+storage manager or persist their local environment snapshots.
+
+The presenter delegates the scoped staging algorithm to `env_presenter_creation.py`. A copy
+is staged outside the canonical list and selectors until its save succeeds. Saves initiated
+while the copy is pending include the staged candidate, preserving unrelated environment
+updates. Successful publication appends to the latest canonical list and preserves the
+application-wide active environment; only the initiating editor selects the new copy.
+
+Encrypted creation uses a reserved negative save sequence. Only that sequence's `persisted`
+outcome publishes the candidate; worker dispatch, unrelated outcomes, and
+`coalesced_into_newer_save` cannot acknowledge it. On failed/incomplete completion the staging
+state is cleared. `discard_pending_environment` removes the failed candidate from an already
+queued snapshot before dispatch, retaining its existing request-update disposition sequences.
+The gateway delivers save outcomes before starting its pending worker.
+
+The editor disables repeated copy while pending. Completion uses a weak reference, checks Qt
+object validity and closed-dialog state, and captures the selected paired path/source. A saved
+copy remains canonical if the editor changes source, but is not selected into the changed
+context. Closing the editor leaves persistence owned by the presenter.
+
+#### API and Usage
+
+`BuiltinCollectionView.load_paired_environment(collection_path)` reads the raw template. Use
+`derive_paired_environment(collection_path, existing_environments=())` to build a sanitized
+copy without persisting it:
+
+```python
+candidate = builtin_view.derive_paired_environment(collection_path, workspace_environments)
+```
+
+Derivation deep-copies variable containers and metadata, clears values whose keys are hidden,
+preserves non-secret defaults and `enable_mcp`, assigns a fresh UUID, and chooses the first
+available display name (`name`, `name (2)`, and so on). The presenter rechecks ID and name
+collisions against its current canonical environments at admission.
+
+The shared callback types live in `pypost.core.environment_creation`:
+
+```python
+EnvironmentCreationCompletion = Callable[[Environment | None, str | None], None]
+CreateEnvironment = Callable[[Environment, EnvironmentCreationCompletion], bool]
+```
+
+Call `EnvPresenter.create_workspace_environment(candidate, completion)` on the GUI thread.
+A `True` result means admitted, not necessarily persisted. The completion receives
+`(persisted_environment, None)` on success or `(None, user_safe_error)` on failure, exactly once
+for an admitted operation. With encryption disabled, completion can run before the call returns.
+With encryption enabled, it follows the correlated gateway outcome on the GUI thread.
+A `False` result means rejection with no later completion; keep the existing selection and allow
+retry. Register pending UI state before invoking the callback to support synchronous completion.
+
+Standalone editors may omit `create_environment`; their copy action is disabled. Production
+composition supplies both creation and the live environment supplier. Do not treat a missing
+persistence owner as successful creation or add a candidate directly to a dialog-local list.
+
+#### Configuration, Provenance, and Encryption
+
+`Environment.builtin_environment_path: str | None = None` stores the exact validated
+manifest-relative paired path, such as `environments/github.json`. It is serialized through
+the existing environment adapter and survives rename/reload. Legacy environments default to
+`None`; names, prefixes, and variable overlap do not infer origin.
+
+The action is highlighted only when no canonical environment has that exact provenance.
+Entries sharing one paired template legitimately share the marker. The action stays available
+for repeated copies after the first matching environment exists.
+
+No new setting or secret store is introduced. `AppSettings.env_encryption_enabled` controls the
+existing save route; `None` follows `PYPOST_ENV_ENCRYPTION_ENABLED`. Key sources and encryption
+policy are unchanged; see [environment encryption](environment_encryption_at_rest.md) and
+[asynchronous environment storage](environment_storage_async.md). Unencrypted saves complete
+synchronously, while encrypted saves use the existing worker and atomic workspace write.
+
+#### Troubleshooting and Diagnostics
+
+- **Copy is disabled:** verify local/Built-in source, a valid paired entry, and the injected
+  creation callback. A pending copy also disables repeated creation.
+- **Creation is rejected:** admission closes during teardown or while another copy/storage
+  operation is active. Wait for storage to drain and retry; preserve the previous selection.
+- **Template loading fails:** verify the curated collection's paired file and validated entry.
+  The inline error reports a safe retry message; bundled files must remain read-only.
+- **Persistence fails:** use the existing storage failure reporting. The failed candidate is
+  not published, and a queued staged snapshot is cleaned before dispatch. Resolve workspace
+  permission/key configuration problems and retry.
+- **Copy saved but not selected:** check whether the editor changed source or closed during
+  persistence. This intentionally prevents a late callback selecting into an unrelated context.
+- **Highlight remains after a similarly named environment exists:** inspect exact provenance.
+  Legacy and unrelated environments remain selectable but do not prove template derivation.
+
+The derivation event is `builtin_paired_environment_derived`. The canonical workflow emits
+`workspace_environment_creation_admitted`, `_rejected`, `_succeeded`, and `_failed` with stable
+reason codes, IDs, negative correlation sequences, and counts. UI template/owner exceptions
+emit `builtin_paired_environment_copy_failed` with a fixed reason. New diagnostics omit variable
+values, display names, template contents, and raw exception text. Existing storage/lifecycle
+metrics are reused; no copy-specific metric schema or dashboard is introduced.
+
+#### Make Validation
+
+```bash
+make test PYTEST_ARGS='tests/test_mcp_builtin_paired_env.py'
+make test PYTEST_ARGS='tests/test_env_presenter.py tests/test_environment_storage_gateway.py'
+make lint
+make typecheck
+make verify-ai-tasks
+make check
+```
+
+The 18-case paired-copy repro uses explicit timeouts and bounded worker/event-loop gates. It
+covers immutable sanitized derivation, provenance, UI optionality/highlighting, callback
+admission/completion, canonical ownership/wiring, failed retry, and real encrypted acknowledgment
+with unrelated queued updates. Baseline full-suite failures are tracked separately in
+[the task debt report](../../ai-tasks/PYPOST-1354/60-tech-debt.md); focused green evidence must
+not be presented as a claim that all repository tests pass.
+
 ### Structural Consistency Testing Principles
 
 Paired template environments serve as user templates and configuration baselines. To ensure
@@ -401,16 +540,16 @@ consistency rules:
    and test fixtures (e.g. `tests/test_example_fixtures.py`, `tests/test_jira_mcp_live_smoke.py`)
    remain functional and uncorrupted.
 
-### Future Usage and Configuration
+### Usage and Remaining Collection Copy Workflow
 
-After the remaining child issues are implemented, users will select Built-in in the MCP server
-editor, choose a read-only collection, and select a workspace environment. Save will require an
-environment. Users may create an editable copy of the paired environment; the copy will have a
-fresh ID, conflict-safe name, hidden-key metadata, and empty secret values.
+Users select Built-in in the MCP server editor, choose a read-only collection, and select a
+workspace environment. Saving requires an environment. The implemented optional paired-copy
+workflow is described above; it creates fresh identity, conflict-safe naming, retained metadata,
+and empty secret values.
 
-Built-in variables will use the selected workspace environment, with manifest defaults only for
-missing keys. Built-in resolution will apply no library preset or overlay, and the controller save
-will write no shared library overlay.
+Built-in variables use the selected workspace environment, with manifest defaults only for
+missing keys. Built-in resolution applies no library preset or overlay, and the controller save
+writes no shared library overlay.
 
 Copy for editing will create an editable workspace collection and select it in the open editor.
 Only Save will switch the persisted server to that copy; Cancel will leave the server on Built-in

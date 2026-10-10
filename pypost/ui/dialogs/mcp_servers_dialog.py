@@ -5,9 +5,12 @@ from __future__ import annotations
 import logging
 import json
 import uuid
+import weakref
+
 from collections.abc import Callable, Iterable
 from typing import Any, Literal
 
+from shiboken6 import isValid
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -25,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.core.builtin_collections import BuiltinCollectionView
+from pypost.core.environment_creation import CreateEnvironment
 from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.core.mcp_server_registry import McpServerStatus
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
@@ -69,6 +73,7 @@ class McpServersDialog(QDialog):
         legacy_port: int,
         library_service=None,
         builtin_view: BuiltinCollectionView | None = None,
+        create_environment: CreateEnvironment | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -84,6 +89,7 @@ class McpServersDialog(QDialog):
         self._activity = activity
         self._collections = collections
         self._environments = environments
+        self._create_environment = create_environment
         self._legacy_environment = legacy_environment
         self._legacy_host = legacy_host
         self._legacy_port = legacy_port
@@ -241,6 +247,8 @@ class McpServersDialog(QDialog):
             default_port=self._legacy_port,
             library_service=self._library_service,
             builtin_view=self._builtin_view,
+            create_environment=self._create_environment,
+            get_environments=self._environments,
             parent=self,
         )
         if dialog.exec():
@@ -278,6 +286,8 @@ class McpServersDialog(QDialog):
             default_port=self._legacy_port,
             library_service=self._library_service,
             builtin_view=self._builtin_view,
+            create_environment=self._create_environment,
+            get_environments=self._environments,
             parent=self,
         )
         if dialog.exec():
@@ -384,12 +394,18 @@ class _McpServerEditor(QDialog):
         library_service=None,
         library_worker_factory=None,
         builtin_view: BuiltinCollectionView | None = None,
+        create_environment: CreateEnvironment | None = None,
+        get_environments: Callable[[], Iterable[Environment]] | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Edit MCP server" if configuration else "Add MCP server")
         self._id = configuration.id if configuration else str(uuid.uuid4())
         self._enabled = configuration.enabled if configuration else False
+        self._create_environment = create_environment
+        self._get_environments = get_environments or (lambda: environments)
+        self._copy_pending = False
+        self._copy_closed = False
         self._layout = QFormLayout(self)
         self._name = QLineEdit(configuration.name or "" if configuration else "")
         self._host = QLineEdit(configuration.host if configuration else default_host)
@@ -533,6 +549,12 @@ class _McpServerEditor(QDialog):
         self._layout.addRow("Transport", self._upstream_transport)
         self._layout.addRow("Custom Headers", self._headers_table)
         self._layout.addRow("Environment", self._environment)
+        self._copy_environment = QPushButton("Create editable copy of paired environment")
+        self._copy_environment.setAutoDefault(False)
+        self._copy_environment.clicked.connect(self._create_paired_environment)
+        self._layout.addRow(self._copy_environment)
+        self._builtin_collection.currentIndexChanged.connect(self._refresh_copy_action)
+        self.finished.connect(self._mark_copy_closed)
 
         self._error = QLabel()
         self._error.setStyleSheet("color: #b00020;")
@@ -557,6 +579,76 @@ class _McpServerEditor(QDialog):
         self._on_collection_source_changed()
         if self._collection_source.currentData() == "library":
             self._begin_library_listing()
+
+    def _mark_copy_closed(self, _result: int) -> None:
+        self._copy_closed = True
+
+    def _copy_context(self) -> tuple[object, object, object]:
+        entry = self._builtin_collection.currentData()
+        return (self._server_type.currentData(), self._collection_source.currentData(),
+                getattr(entry, "environment_path", None))
+
+    def _refresh_copy_action(self) -> None:
+        local, source, paired_path = self._copy_context()
+        visible = local == "local" and source == "builtin"
+        self._copy_environment.setVisible(visible)
+        self._copy_environment.setEnabled(
+            self._create_environment is not None
+            and paired_path is not None and not self._copy_pending
+        )
+        known = any(env.builtin_environment_path == paired_path for env in self._get_environments())
+        self._copy_environment.setDefault(visible and paired_path is not None and not known)
+
+    def _create_paired_environment(self) -> None:
+        context = self._copy_context()
+        if (self._create_environment is None or self._copy_pending or self._copy_closed
+                or context[0:2] != ("local", "builtin") or context[2] is None):
+            return
+        try:
+            entry = self._builtin_collection.currentData()
+            candidate = self._builtin_view.derive_paired_environment(
+                entry.collection_path, list(self._get_environments())
+            )
+        except Exception:
+            logger.warning("builtin_paired_environment_copy_failed reason=template_load")
+            self._error.setText("Could not load the paired environment. Please retry.")
+            return
+        self._copy_pending = True
+        self._error.clear()
+        self._refresh_copy_action()
+        editor_ref = weakref.ref(self)
+
+        def completed(environment: Environment | None, error: str | None) -> None:
+            widget = editor_ref()
+            if widget is None or not isValid(widget) or widget._copy_closed:
+                return
+            widget._copy_pending = False
+            if environment is None or error:
+                widget._error.setText(
+                    error or "Could not save the paired environment. Please retry."
+                )
+            else:
+                selected = widget._environment.currentData()
+                available = list(widget._get_environments())
+                widget._environments_by_id = {env.id: env for env in available}
+                widget._environment.blockSignals(True)
+                widget._environment.clear()
+                for env in available:
+                    widget._environment.addItem(env.name, env.id)
+                target = environment.id if widget._copy_context() == context else selected
+                widget._environment.setCurrentIndex(widget._environment.findData(target))
+                widget._environment.blockSignals(False)
+                widget._on_environment_changed()
+            widget._refresh_copy_action()
+
+        try:
+            admitted = self._create_environment(candidate, completed)
+        except Exception:
+            logger.warning("builtin_paired_environment_copy_failed reason=owner_exception")
+            completed(None, "Environment creation is unavailable. Please retry.")
+            return
+        if not admitted:
+            completed(None, "Environment creation is unavailable. Please retry.")
 
     def _on_environment_changed(self) -> None:
         env_id = self._environment.currentData()
@@ -601,6 +693,7 @@ class _McpServerEditor(QDialog):
         self._last_collection_source = source
         self._collection.setVisible(is_local and is_workspace)
         self._builtin_collection.setVisible(is_local and is_builtin)
+        self._refresh_copy_action()
         self._library.setVisible(is_local and is_library)
         self._library_collection.setVisible(is_local and is_library)
         for field in (

@@ -137,6 +137,14 @@ class EnvironmentStorageGateway(QObject):
             for sequence in coalesced:
                 self._emit_save_outcome(sequence, "coalesced_into_newer_save")
 
+    def discard_pending_environment(self, environment_id: str) -> None:
+        """Remove a failed staged copy without changing queued update dispositions."""
+        with self._lifecycle_lock:
+            if self._pending_save is not None:
+                self._pending_save = [
+                    env for env in self._pending_save if env.id != environment_id
+                ]
+
     def begin_teardown(self) -> None:
         """Close storage admission before the owner starts its bounded drain."""
         with self._lifecycle_lock:
