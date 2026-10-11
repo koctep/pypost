@@ -631,6 +631,61 @@ Save/Cancel and environment boundaries, callback forwarding, rejection/failure c
 safe diagnostics. Filed full-suite baseline failures remain separate in
 [the collection-copy debt report](../../ai-tasks/PYPOST-1355/60-tech-debt.md).
 
+### Offline Upgrade and Editable Copy Acceptance (PYPOST-1356)
+
+[The user feature guide](../user/builtin-mcp.md) explains Built-in selection, read-only
+collections, both editable-copy actions, shipped updates, and the explicit exclusion of
+existing examples-library servers and workspace copies from automatic migration.
+
+The maintained discovery boundaries are
+[`bundled_resources.py`](../../pypost/core/bundled_resources.py), which locates the authoritative
+installed/source examples root, and
+[`builtin_collections.py`](../../pypost/core/builtin_collections.py), which validates curated
+catalog entries and loads their collections or paired environments. Keep existing example-path
+references unchanged when documenting these boundaries.
+
+Run the connected offline acceptance scenario with:
+
+```bash
+make test PYTEST_ARGS='tests/test_mcp_builtin_upgrade_e2e.py -q'
+```
+
+The single scenario uses actual editor copy and Save buttons, canonical `EnvPresenter` and
+`CollectionsPresenter` persistence, `RequestManager` indexing, on-disk settings through
+`McpServerSettingsController`, and the real `MCPServerRegistry`. Its recording manager subclasses
+`MCPServerManager` and replaces only socket/thread start/stop. Real `MCPServerImpl.register_tools`
+and asynchronous `list_tools` still produce the exposed tool schemas. Resolution, collection
+loading, copy ownership, and configuration persistence are not mocked.
+
+The sequence starts a Built-in server with its copied paired environment, then stops it and
+replaces the complete temporary bundle at the same injected root with version 2. The next start
+must expose updated/added tools and exclude the old tool without changing the saved Built-in
+association. It then creates a workspace collection copy, verifies durable contents and identity,
+and saves the server against that copy while retaining the selected environment. Removing the
+installed bundle root must not prevent the workspace-backed server from starting with its
+persisted copied tools. Shipped source bytes remain unchanged by copying.
+
+The fixture uses a temporary valid manifest/catalog and JSON assets, placeholder secret values,
+and explicit disabled environment encryption; it needs no credential/key configuration. Hidden
+values are emptied in the environment copy. No sockets, network threads, HTTP invocation, live
+accounts, or real installation service are exercised. Transport/invocation and encrypted-storage
+coverage remain in their focused suites. The test has a 60-second timeout and 5-second bounded
+GUI waits and teardown, and closes editors before clearing the registry and presenters.
+
+If this scenario fails, first identify the boundary: environment persistence/selection, saved
+source association, fresh shipped resolution, tool registration, or detached workspace lookup.
+Do not hide an actual behavior failure behind a skip or an artificial red expectation. A live
+bind error cannot originate from this recording transport. Known repository-wide audit snapshots,
+Make install timeouts, and fixture flake8 reporter failures are separately recorded in
+[the task debt report](../../ai-tasks/PYPOST-1356/60-tech-debt.md); distinguish their exact nodes
+from an acceptance failure.
+
+User documentation validation runs through `make lint-docs check-docs-links`; artifact validation
+uses `make verify-ai-tasks`. The default documentation targets scan user guides/README files,
+so validate this developer guide explicitly with the existing validators through a temporary
+Make target when editing it. The task roadmap records the complete `make check` result and
+baseline-relative classification.
+
 ### Structural Consistency Testing Principles
 
 Paired template environments serve as user templates and configuration baselines. To ensure
