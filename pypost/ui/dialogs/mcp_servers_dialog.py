@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from pypost.core.builtin_collections import BuiltinCollectionView
+from pypost.core.collection_creation import CreateWorkspaceCollection
 from pypost.core.environment_creation import CreateEnvironment
 from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.core.mcp_server_registry import McpServerStatus
@@ -36,6 +37,7 @@ from pypost.models.models import Collection, Environment
 from pypost.models.settings import McpServerConfiguration
 from pypost.ui.dialogs.mcp_activity_dialog import McpActivityDialog
 from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
+from pypost.ui.mcp_builtin_collection_copy import BuiltinCollectionCopy
 from pypost.ui.widgets.mcp_server_headers_table import McpServerHeadersTable
 from pypost.ui.mcp_library_source_picker import LibraryMcpSourcePicker
 
@@ -74,6 +76,7 @@ class McpServersDialog(QDialog):
         library_service=None,
         builtin_view: BuiltinCollectionView | None = None,
         create_environment: CreateEnvironment | None = None,
+        create_collection: CreateWorkspaceCollection | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -90,6 +93,7 @@ class McpServersDialog(QDialog):
         self._collections = collections
         self._environments = environments
         self._create_environment = create_environment
+        self._create_collection = create_collection
         self._legacy_environment = legacy_environment
         self._legacy_host = legacy_host
         self._legacy_port = legacy_port
@@ -248,6 +252,8 @@ class McpServersDialog(QDialog):
             library_service=self._library_service,
             builtin_view=self._builtin_view,
             create_environment=self._create_environment,
+            create_collection=self._create_collection,
+            get_collections=self._collections,
             get_environments=self._environments,
             parent=self,
         )
@@ -287,6 +293,8 @@ class McpServersDialog(QDialog):
             library_service=self._library_service,
             builtin_view=self._builtin_view,
             create_environment=self._create_environment,
+            create_collection=self._create_collection,
+            get_collections=self._collections,
             get_environments=self._environments,
             parent=self,
         )
@@ -396,6 +404,8 @@ class _McpServerEditor(QDialog):
         builtin_view: BuiltinCollectionView | None = None,
         create_environment: CreateEnvironment | None = None,
         get_environments: Callable[[], Iterable[Environment]] | None = None,
+        create_collection: CreateWorkspaceCollection | None = None,
+        get_collections: Callable[[], Iterable[Collection]] | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -549,6 +559,9 @@ class _McpServerEditor(QDialog):
         self._layout.addRow("Transport", self._upstream_transport)
         self._layout.addRow("Custom Headers", self._headers_table)
         self._layout.addRow("Environment", self._environment)
+        self._collection_copy = BuiltinCollectionCopy(
+            self, create_collection, get_collections or (lambda: collections)
+        )
         self._copy_environment = QPushButton("Create editable copy of paired environment")
         self._copy_environment.setAutoDefault(False)
         self._copy_environment.clicked.connect(self._create_paired_environment)
@@ -589,6 +602,7 @@ class _McpServerEditor(QDialog):
                 getattr(entry, "environment_path", None))
 
     def _refresh_copy_action(self) -> None:
+        self._collection_copy.refresh()
         local, source, paired_path = self._copy_context()
         visible = local == "local" and source == "builtin"
         self._copy_environment.setVisible(visible)
