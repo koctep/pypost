@@ -144,6 +144,9 @@ class MainWindow(QMainWindow):
         main_window_lifecycle.configure_env_update_consumer(self)
         self.mcp_controls = self.env.mcp_controls
         self.mcp_controls.set_server_controller(self.mcp_controller)
+        self.mcp_controls.set_collection_creator(
+            getattr(self.collections, "create_workspace_collection", None)
+        )
         self._build_layout()
         wire_presenter_signals(self)
         self._create_menu_bar()

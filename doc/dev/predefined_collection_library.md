@@ -106,7 +106,7 @@ synthetic test fixture remains available only through the examples library.
 | PYPOST-1352 | Checked save, reconciliation, replacement and env refresh | Implemented |
 | PYPOST-1353 | Built-in dialog source, read-only picker and server-table UI | Implemented |
 | PYPOST-1354 | Editable paired-environment copy | Implemented |
-| PYPOST-1355 | Copy for editing into a workspace collection | Planned |
+| PYPOST-1355 | Copy for editing into a workspace collection | Implemented |
 | PYPOST-1356 | Offline upgrade/copy end-to-end verification and user docs | Planned |
 
 These nine children belong to epic PYPOST-1335 and sprint 2025, totaling 37 SP. Completed
@@ -519,6 +519,118 @@ with unrelated queued updates. Baseline full-suite failures are tracked separate
 [the task debt report](../../ai-tasks/PYPOST-1354/60-tech-debt.md); focused green evidence must
 not be presented as a claim that all repository tests pass.
 
+### Editable Workspace Collection Workflow (PYPOST-1355)
+
+#### Overview
+
+The local Built-in MCP editor offers **Copy for editing** for the selected curated collection.
+It creates an independent workspace collection and selects it in the open editor. The visible
+note states that workspace copies no longer receive shipped updates. The original bundled
+collection remains read-only and unchanged; other servers retain their associations.
+
+Copying persists an asset independently of configuring a server. **Save** switches that server
+to the selected Workspace collection. **Cancel** retains the original server association and
+keeps the workspace copy; cancelling a new-server editor creates no server configuration.
+The selected workspace environment is preserved. This action does not create an environment.
+
+#### Architecture and Canonical Ownership
+
+MainWindow injects `CollectionsPresenter.create_workspace_collection` through
+`McpControlsPresenter.set_collection_creator`, `McpServersDialog`, and `_McpServerEditor`.
+`BuiltinCollectionCopy` in `pypost.ui.mcp_builtin_collection_copy` handles action visibility,
+safe inline feedback, and selection. It never writes storage or inserts into a dialog-local list.
+
+The owner rejects active collection loads/imports and teardown. It deep-copies the source,
+clears `library_link`, allocates a fresh collection UUID, and chooses a free display name:
+`<Built-in name> (copy)`, then `(copy) (2)`, `(copy) (3)`, and so on. The pure import planner
+reserves request/WebSocket IDs; copy preparation also reserves MCP profile IDs. Request payloads,
+variables, presets, descriptions, and versions remain equivalent; identity changes prevent
+global workspace lookup indexes from shadowing another editable copy. Nested presets are
+isolated by the initial deep copy.
+
+The creation helper saves the new collection through `RequestManager.storage.save_collection`
+before publishing it. Successful saving is followed by `RequestManager.apply_loaded_collections`,
+request-index rebuilding, tree refresh/state restoration, and `collections_changed`. Existing
+listeners refresh MCP tools and environment choices. The returned copy is resolvable through
+`CollectionsPresenter.collection_by_id` and normal editable request lookup. The editor reloads
+choices from the live provider, switches source, then selects the saved ID after source-change
+handling clears incompatible identities.
+
+#### API and Usage
+
+The shared type and pure preparation function live in `pypost.core.collection_creation`:
+
+```python
+CreateWorkspaceCollection = Callable[[Collection], Collection | None]
+plan = prepare_workspace_collection(source, existing_collections)
+```
+
+The planner returns an import plan and performs no IO. For application creation, call
+`CollectionsPresenter.create_workspace_collection(source)` on the GUI thread. It returns the
+canonical saved Collection on success, `None` on busy/disposed rejection, or raises the original
+save error after attempting narrow cleanup. This callback is synchronous: a returned collection
+means persistence and publication completed. There is no separate admission acknowledgement,
+worker, delayed completion, or pending snapshot as there is for encrypted environment creation.
+
+`BuiltinCollectionView.load_collection(collection_path)` remains the raw loading API. The editor
+loads the selected curated entry, deep-copies it, applies the entry's display name, and invokes
+the owner. It receives `create_collection` plus `get_collections`, the live canonical supplier.
+Standalone controls/dialogs/editors may omit the creation capability; the action is disabled
+while existing manual Workspace selection and Save/Cancel continue to work.
+
+#### Configuration and Storage
+
+No new setting, collection provenance field, library connection, or encryption route is added.
+Collection copies use the existing workspace JSON storage; environment encryption settings do
+not encrypt collection files. Collection definitions retain their values and templates. The
+paired-environment action separately clears secret environment defaults as described above.
+
+On Save, the server keeps its server ID and chosen environment, uses the selected workspace
+`collection_id`, has `bundled_library=False`, and clears `library_id`, `manifest_id`,
+`library_collection_path`, and `library_collection_index`. No other server is reassociated.
+The detached collection has `library_link=None` and follows workspace editing rather than
+future shipped collection updates.
+
+#### Troubleshooting and Diagnostics
+
+- **Copy is disabled:** verify local/Built-in source, a valid entry, and injected
+  `create_collection`. Repeated clicks are disabled during the synchronous operation.
+- **Workspace is busy:** finish the active import/load and retry. Teardown also rejects
+  admission. No copy is written or selected when admission returns `None`.
+- **Template loading fails:** check the curated catalog, manifest membership, and readable
+  shipped collection. Keep shipped resources unchanged; the editor shows a safe retry message.
+- **Saving fails:** the owner leaves canonical collections, the tree, and editor selection
+  unchanged and attempts `delete_collection(new_id)` once. It does not pass a collection name,
+  which could delete an unrelated legacy name-based file. Resolve filesystem problems and retry.
+- **Cleanup also fails:** `workspace_collection_cleanup_failed` identifies the fresh ID safely.
+  A partial file may remain on disk because existing collection writes are not atomic. Inspect
+  only that ID's workspace file after resolving filesystem access; do not delete by display name.
+  The original save error remains the operation outcome, and no live copy was published.
+
+Owner diagnostics use `workspace_collection_creation_admitted`, `_rejected`, `_succeeded`, and
+`_failed`, with IDs, counts, and fixed reasons. Editor exceptions use
+`builtin_collection_copy_failed` with `reason=load` or `reason=create`. New logs exclude names,
+request/variable values, credentials, and raw exception text. Existing logging/metrics
+infrastructure is retained; no copy-specific metric schema is introduced.
+
+#### Make Validation
+
+```bash
+make test PYTEST_ARGS='tests/test_mcp_builtin_collection_copy.py'
+make test PYTEST_ARGS='tests/test_mcp_servers_dialog.py tests/test_collections_presenter.py'
+make lint
+make typecheck
+make check-baseline-metrics
+make verify-ai-tasks
+make check
+```
+
+The 16-case repro has explicit timeouts and bounded teardown. It covers canonical persistence,
+tree/index editability, repeated identity/name safety, independent contents, shipped bytes,
+Save/Cancel and environment boundaries, callback forwarding, rejection/failure cleanup, and
+safe diagnostics. Filed full-suite baseline failures remain separate in
+[the collection-copy debt report](../../ai-tasks/PYPOST-1355/60-tech-debt.md).
+
 ### Structural Consistency Testing Principles
 
 Paired template environments serve as user templates and configuration baselines. To ensure
@@ -540,7 +652,7 @@ consistency rules:
    and test fixtures (e.g. `tests/test_example_fixtures.py`, `tests/test_jira_mcp_live_smoke.py`)
    remain functional and uncorrupted.
 
-### Usage and Remaining Collection Copy Workflow
+### Usage and Editable Copy Workflows
 
 Users select Built-in in the MCP server editor, choose a read-only collection, and select a
 workspace environment. Saving requires an environment. The implemented optional paired-copy
@@ -551,9 +663,9 @@ Built-in variables use the selected workspace environment, with manifest default
 missing keys. Built-in resolution applies no library preset or overlay, and the controller save
 writes no shared library overlay.
 
-Copy for editing will create an editable workspace collection and select it in the open editor.
-Only Save will switch the persisted server to that copy; Cancel will leave the server on Built-in
-while retaining the workspace copy. Copies will not receive shipped updates.
+Copy for editing creates an editable workspace collection and selects it in the open editor.
+Only Save switches the persisted server to that copy; Cancel leaves the server on Built-in
+while retaining the workspace copy. Copies no longer receive shipped updates.
 
 ### Diagnostics and Limits
 

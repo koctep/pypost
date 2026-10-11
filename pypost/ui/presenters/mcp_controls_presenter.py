@@ -12,6 +12,7 @@ from typing import Callable, Protocol
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
+from pypost.core.collection_creation import CreateWorkspaceCollection
 from pypost.core.environment_creation import CreateEnvironment
 from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.core.mcp_server_registry import MCPServerRegistry, McpServerStatus
@@ -66,6 +67,7 @@ class McpControlsPresenter(QObject):
         mcp_registry: MCPServerRegistry | None = None,
         library_service=None,
         create_environment: CreateEnvironment | None = None,
+        create_collection: CreateWorkspaceCollection | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -82,6 +84,7 @@ class McpControlsPresenter(QObject):
         # active editor environment can no longer retarget a running MCP endpoint.
         self._mcp_registry = mcp_registry
         self._library_service = library_service
+        self._create_collection = create_collection
         self._mcp_server_controller: McpServerController | None = None
         self._active_environment: Environment | None = None
 
@@ -134,6 +137,10 @@ class McpControlsPresenter(QObject):
         return self._mcp_activity_btn.text()
 
     # -- collaboration with the environment presenter ----------------------------------
+
+    def set_collection_creator(self, callback: CreateWorkspaceCollection | None) -> None:
+        """Install canonical collection creation at application composition time."""
+        self._create_collection = callback
 
     def set_server_controller(self, controller: McpServerController) -> None:
         """Attach the window's persistence/lifecycle API to the server manager UI."""
@@ -349,6 +356,7 @@ class McpControlsPresenter(QObject):
             library_service=self._library_service,
             builtin_view=builtin_view,
             create_environment=self._create_environment,
+            create_collection=self._create_collection,
             parent=self._dialog_parent,
         )
         dialog.exec()

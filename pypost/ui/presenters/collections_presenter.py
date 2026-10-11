@@ -26,6 +26,7 @@ from pypost.ui.presenters.collection_tree_incremental import (
     try_incremental_tree_refresh,
 )
 from pypost.ui.presenters.collections_async_loader import CollectionsAsyncLoader
+from pypost.ui.presenters.collections_presenter_creation import create_workspace_collection
 from pypost.ui.presenters.collections_panel import build_collections_panel
 from pypost.ui.widget_ids import COLLECTION_TREE, set_widget_id
 
@@ -68,6 +69,7 @@ class CollectionsPresenter(QObject):
         library_mode_selector: Callable[[QWidget], object | None] | None = None,
     ) -> None:
         super().__init__(parent)
+        self._collection_creation_closed = False
         self._request_manager = request_manager
         self._state_manager = state_manager
         self._metrics = resolve_metrics(metrics)
@@ -386,11 +388,16 @@ class CollectionsPresenter(QObject):
         """
         return self._import_actions.wait_idle(timeout_ms)
 
+    def create_workspace_collection(self, source: Collection) -> Collection | None:
+        """Persist and publish one independent workspace copy."""
+        return create_workspace_collection(self, source)
+
     def teardown(self, timeout_ms: int | None = None) -> bool:
         """Tears down import actions and presenter resources cleanly.
 
         ``None`` uses the import lifecycle policy default budget.
         """
+        self._collection_creation_closed = True
         budget_ms = self._import_actions.lifecycle_policy.resolve_budget_ms(timeout_ms)
         logger.info("collections_presenter_teardown_started timeout_ms=%d", budget_ms)
         result = self._import_actions.teardown(timeout_ms=timeout_ms)
