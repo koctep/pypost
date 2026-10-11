@@ -66,6 +66,8 @@ legacy HTTP-editor path until migration completes. For new outbound MCP work, al
 
 ## Related guides
 
+- [Built-in MCP Collections](builtin-mcp.md) — shipped inbound tools, copies, and updates
+
 - [Interface](interface.md) — MCP Client editor layout in the workspace
 - [MCP Tools for AI Agents](mcp-tools.md) — inbound tool exposure for agents
 - [MCP Integration (full reference)](../mcp_integration.md) — transport and envelope details

@@ -51,6 +51,9 @@ secrets.
 
 ### 3. Create and start an MCP endpoint
 
+For shipped tools, see [Built-in MCP Collections](builtin-mcp.md): choose a read-only
+Built-in source, copy its paired environment, or copy the collection for editing.
+
 1. Select **MCP Servers…** in the top bar, then **Add…**.
 2. Choose the collection that contains the requests the agent may use.
 3. Choose the environment that supplies this endpoint's variables and hidden keys.
