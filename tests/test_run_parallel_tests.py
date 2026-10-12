@@ -41,6 +41,113 @@ from scripts.run_parallel_tests import (
 pytestmark = pytest.mark.timeout(60)
 
 
+@pytest.mark.timeout(30)
+@pytest.mark.parametrize("coverage", [False, True])
+@pytest.mark.parametrize("fail_preparation", [False, True, "nonzero"])
+def test_make_fixture_preparation_precedes_dispatch_and_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, coverage: bool,
+    fail_preparation: bool | str,
+) -> None:
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "makefile_test_helpers.py").write_text("", encoding="utf-8")
+    (tests_dir / "test_makefile_example.py").write_text("", encoding="utf-8")
+    events: list[str] = []
+    preparation_calls: list[tuple[list[str], dict[str, Any]]] = []
+
+    def prepare(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if "_get_shared_base_venv" not in " ".join(str(arg) for arg in cmd):
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        events.append("prepare")
+        preparation_calls.append((cmd, kwargs))
+        if fail_preparation == "nonzero":
+            raise subprocess.CalledProcessError(1, cmd, stderr="fixture prerequisite rejected")
+        if fail_preparation:
+            raise subprocess.TimeoutExpired(cmd, 95, output="fixture prerequisite stalled")
+        return subprocess.CompletedProcess(cmd, 0, stdout="ready", stderr="")
+
+    def dispatch(self: SubprocessTestExecutor, **kwargs: Any) -> RunResult:
+        events.append("dispatch")
+        return RunResult(
+            kind="test", status=TestStatus.PASSED,
+            target=str(kwargs["unit"].file_path), exit_code=0,
+            duration_seconds=0.01, message="",
+        )
+
+    monkeypatch.setattr("scripts.run_parallel_tests._run_fixture_preparation", prepare)
+    monkeypatch.setattr("scripts.run_parallel_tests.subprocess.run", prepare)
+    monkeypatch.setattr(SubprocessTestExecutor, "run_dispatch_unit", dispatch)
+    if coverage:
+        monkeypatch.setattr(
+            CoverageManager, "combine",
+            lambda *args, **kwargs: RunResult(
+                kind="coverage", status=TestStatus.PASSED, target=None,
+                exit_code=0, duration_seconds=0, message="",
+            ),
+        )
+    config = RunnerConfig(
+        workers=2, enable_coverage=coverage, report_json_path=tmp_path / "report.json",
+        test_targets=["tests/test_makefile_example.py"], pytest_args=[],
+        repo_root=tmp_path, python_bin=Path(sys.executable),
+    )
+    summary = run_parallel_tests(config)
+    if fail_preparation:
+        assert not summary.is_success, "fixture preparation failure was reported as success"
+        assert "dispatch" not in events, "workers launched after prerequisite failure"
+        assert summary.scheduled_units == 0
+        assert summary.exit_code is not None and summary.exit_code != 0
+        assert any("prepar" in result.message.lower() for result in summary.results)
+        report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+        assert report["summary"]["status"] != "passed"
+    else:
+        assert summary.is_success
+        assert events == ["prepare", "dispatch"], "preparation must finish before dispatch"
+    assert len(preparation_calls) == 1
+    command, options = preparation_calls[0]
+    assert str(config.python_bin) == str(command[0])
+    assert options["cwd"] == tmp_path
+    assert 0 < options["timeout"] <= 95
+    assert "_get_shared_base_venv" in " ".join(command)
+    assert "conftest" not in " ".join(command)
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.parametrize(
+    ("filename", "with_helper"),
+    [("test_unrelated.py", True), ("test_makefile_example.py", False)],
+)
+def test_make_fixture_preparation_omitted_for_unrelated_or_helper_free_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filename: str, with_helper: bool,
+) -> None:
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / filename).write_text("", encoding="utf-8")
+    if with_helper:
+        (tests_dir / "makefile_test_helpers.py").write_text("", encoding="utf-8")
+    preparation_calls: list[list[str]] = []
+
+    def prepare(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        preparation_calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    def dispatch(self: SubprocessTestExecutor, **kwargs: Any) -> RunResult:
+        return RunResult(
+            kind="test", status=TestStatus.PASSED,
+            target=str(kwargs["unit"].file_path), exit_code=0,
+            duration_seconds=0.01, message="",
+        )
+
+    monkeypatch.setattr("scripts.run_parallel_tests._run_fixture_preparation", prepare)
+    monkeypatch.setattr(SubprocessTestExecutor, "run_dispatch_unit", dispatch)
+    config = RunnerConfig(
+        workers=2, enable_coverage=False, report_json_path=None,
+        test_targets=[f"tests/{filename}"], pytest_args=[],
+        repo_root=tmp_path, python_bin=Path(sys.executable),
+    )
+    assert run_parallel_tests(config).is_success
+    assert preparation_calls == []
+
+
 @pytest.fixture
 def sample_test_workspace(tmp_path: Path) -> Path:
     """Create a temporary test workspace with sample test files."""

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import errno
 import fcntl
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -385,41 +387,97 @@ def _assert_post_install_sanity(bin_python: Path) -> None:
 _SHARED_BASE_VENV: Path | None = None
 
 
-def _get_shared_base_venv() -> Path:
+def _run_preparation_command(
+    cmd: list[str], *, timeout: float, cleanup_budget: float = 5,
+) -> subprocess.CompletedProcess[str]:
+    """Reap a prerequisite and its process group within a finite cleanup budget."""
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        stdout, stderr = proc.communicate(timeout=cleanup_budget)
+        raise subprocess.TimeoutExpired(cmd, timeout, stdout, stderr) from error
+    if proc.returncode:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        raise subprocess.CalledProcessError(proc.returncode, cmd, stdout, stderr)
+    return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+
+
+def _venv_ready(venv: Path) -> bool:
+    return (venv / MARKER_NAME).is_file() and (venv / "bin" / "python").is_file()
+
+
+def _get_shared_base_venv(*, preparation_budget: float = 20) -> Path:
+    """Publish readiness after one bounded, serialized and validated bootstrap."""
     global _SHARED_BASE_VENV
-    if _SHARED_BASE_VENV is not None and _SHARED_BASE_VENV.is_dir():
+    deadline = time.monotonic() + preparation_budget
+    if _SHARED_BASE_VENV is not None and _venv_ready(_SHARED_BASE_VENV):
         return _SHARED_BASE_VENV
+    _SHARED_BASE_VENV = None
     base_dir = Path(tempfile.gettempdir()) / f"pypost_shared_base_venv_{PYTHON_VERSION}"
     venv_dir = base_dir / ".venv"
     marker = venv_dir / MARKER_NAME
-    if marker.is_file():
+    if _venv_ready(venv_dir):
         _SHARED_BASE_VENV = venv_dir
         return _SHARED_BASE_VENV
     lock_file = base_dir.with_suffix(".lock")
     lock_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_file, "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+
+    def remaining(stage: str) -> float:
+        budget = deadline - time.monotonic()
+        if budget <= 0:
+            raise RuntimeError(
+                f"shared venv {stage} deadline exceeded: {venv_dir} "
+                f"({preparation_budget}s preparation budget)"
+            )
+        return budget
+
+    with open(lock_file, "w", encoding="utf-8") as lock:
+        while True:
+            remaining("lock")
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as error:
+                if error.errno not in (errno.EACCES, errno.EAGAIN):
+                    raise
+                time.sleep(min(0.05, remaining("lock")))
         try:
-            if not marker.is_file():
+            if not _venv_ready(venv_dir):
+                if venv_dir.exists():
+                    shutil.rmtree(venv_dir)
                 base_dir.mkdir(parents=True, exist_ok=True)
-                subprocess.run(
-                    [sys.executable, "-m", "venv", str(venv_dir)],
-                    check=True,
-                    capture_output=True,
-                )
-                subprocess.run(
-                    [
-                        str(venv_dir / "bin" / "python"),
-                        "-m",
-                        "pip",
-                        "install",
-                        "--quiet",
-                        "pytest>=8,<9",
-                        "flake8>=7,<8",
-                    ],
-                    check=True,
-                    capture_output=True,
-                )
+                commands = [
+                    ("creation", [sys.executable, "-m", "venv", str(venv_dir)]),
+                    ("installation", [
+                        str(venv_dir / "bin" / "python"), "-m", "pip", "install",
+                        "--quiet", "pytest>=8,<9", "flake8>=7,<8",
+                    ]),
+                    ("validation", [str(venv_dir / "bin" / "python"), "-c",
+                                    "import pytest, flake8"]),
+                ]
+                for stage, command in commands:
+                    try:
+                        _run_preparation_command(command, timeout=remaining(stage))
+                    except (subprocess.SubprocessError, OSError) as error:
+                        detail = getattr(error, "stderr", None) or getattr(error, "output", None)
+                        raise RuntimeError(
+                            f"shared venv {stage} failed: {venv_dir} "
+                            f"({preparation_budget}s preparation budget): {error}; {detail or ''}"
+                        ) from error
+                remaining("publication")
+                if not (venv_dir / "bin" / "python").is_file():
+                    raise RuntimeError(f"shared venv validation missing interpreter: {venv_dir}")
                 marker.touch()
         finally:
             fcntl.flock(lock, fcntl.LOCK_UN)
@@ -430,12 +488,18 @@ def _get_shared_base_venv() -> Path:
 def _materialize_prewarmed_venv(ws: Path) -> None:
     base = _get_shared_base_venv()
     target = ws / ".venv"
-    if not target.exists():
-        subprocess.run(
-            ["cp", "-al", str(base), str(target)],
-            check=True,
-            capture_output=True,
+    if _venv_ready(target):
+        return
+    if target.exists():
+        shutil.rmtree(target)
+    try:
+        _run_preparation_command(
+            ["cp", "-al", str(base), str(target)], timeout=20, cleanup_budget=1,
         )
+    except (subprocess.SubprocessError, OSError) as error:
+        if target.exists():
+            shutil.rmtree(target)
+        raise RuntimeError(f"shared venv materialization failed: {target}: {error}") from error
 
 
 @pytest.fixture(scope="class")

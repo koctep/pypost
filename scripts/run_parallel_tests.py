@@ -1638,6 +1638,26 @@ def _log_run_completed(
     )
 
 
+def _run_fixture_preparation(
+    cmd: list[str], *, cwd: Path, timeout: float,
+) -> subprocess.CompletedProcess[str]:
+    """Run cold fixture preparation with a finite watchdog and process-group cleanup."""
+    proc = subprocess.Popen(
+        cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, start_new_session=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        kill_process_group(proc.pid, run_id="fixture-preparation")
+        stdout, stderr = proc.communicate(timeout=5)
+        raise subprocess.TimeoutExpired(cmd, timeout, stdout, stderr) from error
+    if proc.returncode:
+        kill_process_group(proc.pid, run_id="fixture-preparation")
+        raise subprocess.CalledProcessError(proc.returncode, cmd, stdout, stderr)
+    return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+
+
 def run_parallel_tests(config: RunnerConfig) -> RunSummary:
     """Main orchestration function executing test files across dynamic worker pool."""
     run_start_time = time.perf_counter()
@@ -1771,6 +1791,39 @@ def run_parallel_tests(config: RunnerConfig) -> RunSummary:
                 duration_seconds=time.perf_counter() - run_start_time,
                 failure_phase="coverage_prepare",
                 failure_code=error.code,
+            )
+            return summary
+
+    if (config.repo_root / "tests" / "makefile_test_helpers.py").is_file() and any(
+        unit.file_path.parent.resolve() == (config.repo_root / "tests").resolve()
+        and unit.file_path.name.startswith("test_makefile_") for unit in discovery.units
+    ):
+        try:
+            _run_fixture_preparation(
+                [str(config.python_bin), "-c",
+                 "import sys; sys.path.insert(0, '.'); "
+                 "from tests.makefile_test_helpers import _get_shared_base_venv; "
+                 "_get_shared_base_venv(preparation_budget=90)"],
+                cwd=config.repo_root, timeout=95,
+            )
+        except (subprocess.SubprocessError, OSError) as error:
+            detail = getattr(error, "stderr", None) or getattr(error, "output", None)
+            failure = RunnerValidationError(
+                "fixture_preparation", f"shared Make fixture preparation failed: {error}; "
+                f"{detail or ''}",
+            )
+            summary = invalid_summary(failure, config.workers)
+            if cov_mgr is not None:
+                cov_mgr.cleanup_root_fragments()
+            if config.report_json_path:
+                JsonReporter.write_report(summary, config.report_json_path)
+            _log_validation_failure(
+                failure, run_id=run_id, phase="fixture_preparation",
+                worker_count=config.workers,
+            )
+            _log_run_completed(
+                summary, run_id=run_id, duration_seconds=time.perf_counter() - run_start_time,
+                failure_phase="fixture_preparation", failure_code=failure.code,
             )
             return summary
 
