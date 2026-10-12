@@ -114,7 +114,26 @@ make check-lock-dev
 ```
 
 CI runs the same check in the `check-lock-dev` job (`.github/workflows/test.yml`) on every
-push and pull request (PYPOST-804).
+push and pull request (PYPOST-804). The workflow pins the `uv` toolchain version
+(currently `0.11.31`, configured via the `version:` parameter of `astral-sh/setup-uv`)
+to guarantee reproducible resolutions and prevent compiler version drift (PYPOST-995,
+PYPOST-1359).
+
+For local verification, install or pin the matching `uv` version (`0.11.31`) in your
+environment and run:
+
+```bash
+make check-lock-dev
+```
+
+The `Makefile` automatically discovers `uv` with fallback logic: it first checks for `uv`
+on the global `PATH`, and if not found, falls back to `.venv/bin/uv` if an executable
+binary exists in the project virtual environment (`UV ?= $(shell command -v uv 2>/dev/null || ( [ -x $(BIN)/uv ] && echo $(BIN)/uv ) || echo uv)`).
+You can also override the binary explicitly by passing `UV=/path/to/uv make check-lock-dev`.
+
+Like `make check-lock`, `make check-lock-dev` retries transient compiler failures up to
+3 times with exponential backoff and cleanly removes scratch comparison files
+(`requirements-dev.txt.check`, `.body`) on both success and failure.
 
 **Dependabot / upgrade workflow:** weekly pip PRs may bump `requirements.in` or `requirements.txt`.
 After merging dependency changes, run `make lock`, commit both files, and run `make check`.
