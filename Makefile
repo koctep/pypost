@@ -13,9 +13,9 @@
 PYTHON := python3
 PYTHON_VERSION := $(shell $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])')
 LOCK_PYTHON_VERSION ?= 3.11
-UV ?= uv
 VENV := .venv
 BIN := $(VENV)/bin
+UV ?= $(shell command -v uv 2>/dev/null || ( [ -x $(BIN)/uv ] && echo $(BIN)/uv ) || echo uv)
 VENV_MARKER := $(VENV)/.initialized-$(PYTHON_VERSION)
 VENV_TEST_STAMP := $(VENV)/.venv-test-$(PYTHON_VERSION)
 VENV_OTEL_STAMP := $(VENV)/.venv-otel-$(PYTHON_VERSION)
