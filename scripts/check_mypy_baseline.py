@@ -248,7 +248,15 @@ def main() -> int:
         print(output, file=sys.stderr, end="")
         return 1
 
+    if returncode >= 2:
+        print(output, file=sys.stderr, end="")
+        return 1
+
     current = _parse_errors(output)
+
+    if returncode != 0 and len(current) == 0:
+        print(output, file=sys.stderr, end="")
+        return 1
 
     if args.update_baseline:
         _write_baseline(current)
