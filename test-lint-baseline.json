@@ -1,0 +1,4695 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "tests/test_about_dialog.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_about_dialog_shows_package_version(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_agent_e2e_websocket.py",
+      "code": "F401",
+      "message": [
+        "'time' imported but unused"
+      ],
+      "source": [
+        "import time"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_agent_e2e_websocket.py",
+      "code": "F841",
+      "message": [
+        "local variable 'url_input' is assigned to but never used"
+      ],
+      "source": [
+        "url_input = ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_agent_ui_actions_mcp.py",
+      "code": "F401",
+      "message": [
+        "'asyncio' imported but unused"
+      ],
+      "source": [
+        "import asyncio"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_alert_manager.py",
+      "code": "E741",
+      "message": [
+        "ambiguous variable name 'l'"
+      ],
+      "source": [
+        "lines = [l for l in self.log_path.read_text(encoding=\"utf-8\"",
+        ").splitlines() if l.strip()]"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_alert_manager.py",
+      "code": "E741",
+      "message": [
+        "ambiguous variable name 'l'"
+      ],
+      "source": [
+        "return len([l for l in self.log_path.read_text(encoding=\"utf",
+        "-8\").splitlines() if l.strip()])"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_apply_settings_font.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestApplySettingsFont:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_builtin_collections.py",
+      "code": "E501",
+      "message": [
+        "line too long (103 > 100 characters)"
+      ],
+      "source": [
+        "broken_view = BuiltinCollectionView(predefined=PredefinedLib",
+        "raryService(root=Path(\"/nonexistent\")))"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_ci_check_lock_job.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 5,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCodeEditorBasics(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCodeEditorKeyHandling(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCodeEditorLineNumbers(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCodeEditorPaste(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCodeEditorReformat(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 6,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _collect_gutter_numbers(editor: CodeEditor) -> list[str]",
+        ":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _replace_once(editor: CodeEditor, old: str, new: str) ->",
+        " None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _root_region(editor: CodeEditor):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _visible_block_numbers(editor: CodeEditor) -> list[int]:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCodeEditorFolding(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestFoldRemappingAfterEdits(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestJsonStructureScanner(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestXmlStructureScanner(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestYamlStructureScanner(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestYamlXmlCodeEditorFolding(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "_NESTED_JSON = json.dumps("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_folding.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_validation.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_validation.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestJsonBodyValidator(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_validation.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestXmlBodyValidator(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_validation.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestYamlBodyValidator(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_validation.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCodeEditorValidation(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_code_editor_validation.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_format_v2_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (101 > 100 characters)"
+      ],
+      "source": [
+        "(\"boolean\", None),  # None is valid when passed as default, ",
+        "but not as non-None type mismatch"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_format_v2_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (101 > 100 characters)"
+      ],
+      "source": [
+        "type=\"string\", description=\"Currency ISO code\", required=Fal",
+        "se, default=\"USD\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_format_v2_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (103 > 100 characters)"
+      ],
+      "source": [
+        "headers={\"Authorization\": \"Bearer {{secret_key}}\", \"Content-",
+        "Type\": \"application/json\"},"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_format_v2_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (103 > 100 characters)"
+      ],
+      "source": [
+        "post_script=\"assert response.status_code == 200\\nprint('Char",
+        "ge created successfully')\","
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_import_library_pypost_1279_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (103 > 100 characters)"
+      ],
+      "source": [
+        "(file_control.click() if isinstance(file_control, QPushButto",
+        "n) else file_control.trigger())"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_import_library_pypost_1279_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (106 > 100 characters)"
+      ],
+      "source": [
+        "\"requests\": [{\"id\": \"new-request\", \"name\": \"Updated\", \"url\":",
+        " \"https://new.example.test\"}],"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_import_library_pypost_1279_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (107 > 100 characters)"
+      ],
+      "source": [
+        "connections_before = [record.model_copy(deep=True) for recor",
+        "d in manager.list_connections.return_value]"
+      ],
+      "count": 2,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_import_library_pypost_1279_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (111 > 100 characters)"
+      ],
+      "source": [
+        "connections_before = [record.model_copy(deep=True) for recor",
+        "d in manager.list_connections.return_value]"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_import_library_pypost_1279_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (112 > 100 characters)"
+      ],
+      "source": [
+        "(library_control.click() if isinstance(library_control, QPus",
+        "hButton) else library_control.trigger())"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_import_teardown_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (102 > 100 characters)"
+      ],
+      "source": [
+        "\"\"\"Verify structured logging on teardown start, timeout, wor",
+        "ker interrupt/reap, and completion.\"\"\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_item_dialogs.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCollectionItemDialogs(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_item_dialogs.py",
+      "code": "F401",
+      "message": [
+        "'pypost.ui.collection_item_dialogs.show_invalid_retryable_st",
+        "atus_codes' imported but unused"
+      ],
+      "source": [
+        "from pypost.ui.collection_item_dialogs import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_item_dialogs.py",
+      "code": "F401",
+      "message": [
+        "'pypost.ui.collection_item_dialogs.show_mcp_server_start_fai",
+        "led' imported but unused"
+      ],
+      "source": [
+        "from pypost.ui.collection_item_dialogs import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_item_dialogs.py",
+      "code": "F401",
+      "message": [
+        "'pypost.ui.collection_item_dialogs.show_metrics_server_start",
+        "_failed' imported but unused"
+      ],
+      "source": [
+        "from pypost.ui.collection_item_dialogs import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_item_dialogs.py",
+      "code": "F401",
+      "message": [
+        "'pypost.ui.collection_item_dialogs.show_save_collection_name",
+        "_required' imported but unused"
+      ],
+      "source": [
+        "from pypost.ui.collection_item_dialogs import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_item_rename_delegate.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCollectionItemRenameDelegate(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_item_rename_delegate.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_item_rename_delegate.py",
+      "code": "F401",
+      "message": [
+        "'PySide6.QtWidgets.QTreeView' imported but unused"
+      ],
+      "source": [
+        "from PySide6.QtWidgets import QAbstractItemDelegate, QLineEd",
+        "it, QTreeView"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_serializer.py",
+      "code": "F401",
+      "message": [
+        "'json' imported but unused"
+      ],
+      "source": [
+        "import json"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_serializer.py",
+      "code": "F401",
+      "message": [
+        "'pydantic.ValidationError' imported but unused"
+      ],
+      "source": [
+        "from pydantic import ValidationError"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_serializer.py",
+      "code": "F401",
+      "message": [
+        "'pypost.core.collection_serializer.serialize_collection_to_d",
+        "ict' imported but unused"
+      ],
+      "source": [
+        "from pypost.core.collection_serializer import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_serializer.py",
+      "code": "F401",
+      "message": [
+        "'pypost.core.collection_serializer.serialize_collection_to_j",
+        "son' imported but unused"
+      ],
+      "source": [
+        "from pypost.core.collection_serializer import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_serializer.py",
+      "code": "F401",
+      "message": [
+        "'pypost.core.collection_serializer.serialize_collection_to_y",
+        "aml' imported but unused"
+      ],
+      "source": [
+        "from pypost.core.collection_serializer import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_delete_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_delete_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class FakeRequestManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_delete_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class FakeStateManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_delete_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_request(req_id: str, name: str, method: str = \"GET",
+        "\") -> RequestData:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_delete_metrics.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCollectionTreeDeleteMetrics(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_delete_metrics.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_incremental.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCollectionTreeIncremental(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_incremental.py",
+      "code": "F401",
+      "message": [
+        "'pypost.models.models.Collection' imported but unused"
+      ],
+      "source": [
+        "from pypost.models.models import Collection, RequestData"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_incremental.py",
+      "code": "F401",
+      "message": [
+        "'pypost.models.models.RequestData' imported but unused"
+      ],
+      "source": [
+        "from pypost.models.models import Collection, RequestData"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_rename_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_rename_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class FakeRequestManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_rename_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class FakeStateManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_rename_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_request(req_id: str, name: str, method: str = \"GET",
+        "\") -> RequestData:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_rename_metrics.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCollectionTreeRenameMetrics(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collection_tree_rename_metrics.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collections_presenter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestCollectionsPresenter(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_collections_presenter.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_default_retry_policy_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_default_retry_policy_integration.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestDefaultRetryPolicyIntegration(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_default_retry_policy_integration.py",
+      "code": "F401",
+      "message": [
+        "'pypost.models.models.RequestData' imported but unused"
+      ],
+      "source": [
+        "from pypost.models.models import RequestData"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class CollectionsFakeRequestManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class FakeMetrics:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class FakeStateManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TabsFakeRequestManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_collection(col_id: str, name: str, requests=None) ",
+        "-> Collection:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_request(req_id: str, name: str, method: str = \"GET",
+        "\") -> RequestData:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestDeleteOpenTabsIntegration(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_delete_open_tabs_integration.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_display_role_scan_ownership_aggregate_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (111 > 100 characters)"
+      ],
+      "source": [
+        "\"find_tree_index_by_display_text must call display_role_equa",
+        "ls instead of inlining DisplayRole comparison\","
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_display_role_scan_ownership_aggregate_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (112 > 100 characters)"
+      ],
+      "source": [
+        "\"find_child_index_by_display_text must call display_role_equ",
+        "als instead of inlining DisplayRole comparison\","
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_display_role_scan_ownership_aggregate_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (112 > 100 characters)"
+      ],
+      "source": [
+        "\"find_tree_index_by_display_text must not compare ItemDataRo",
+        "le.DisplayRole inline; use display_role_equals\","
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_display_role_scan_ownership_discoverability.py",
+      "code": "E203",
+      "message": [
+        "whitespace before ':'"
+      ],
+      "source": [
+        "remaining = remaining[: block.start()] + remaining[block.end",
+        "() :]"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_doc_user_markdown_lint.py",
+      "code": "E501",
+      "message": [
+        "line too long (107 > 100 characters)"
+      ],
+      "source": [
+        "\"\"\"Markdown files must have line length <=100, no trailing w",
+        "hitespace, ATX headers, and '-' bullets.\"\"\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_env_mcp_signals_decoupled.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_environment_variables_adapter.py",
+      "code": "F841",
+      "message": [
+        "local variable 'kid_b' is assigned to but never used"
+      ],
+      "source": [
+        "kid_b = build_key_id(key_b)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_function_arg_safe_paths.py",
+      "code": "E501",
+      "message": [
+        "line too long (102 > 100 characters)"
+      ],
+      "source": [
+        "\"\"\"TemplateService renders dotted paths as function argument",
+        "s across nested dict variables.\"\"\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_function_arg_safe_paths.py",
+      "code": "E501",
+      "message": [
+        "line too long (105 > 100 characters)"
+      ],
+      "source": [
+        "f\"Expected function_name '{fn}' for '{expression}', got: {re",
+        "sult.function_name}\","
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_function_expression_resolver.py",
+      "code": "E303",
+      "message": [
+        "too many blank lines (2)"
+      ],
+      "source": [
+        "def test_env_function_validation_valid(self):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_git_library_service_repro.py",
+      "code": "F401",
+      "message": [
+        "'pypost.models.git_library.GitOperationResult' imported but ",
+        "unused"
+      ],
+      "source": [
+        "from pypost.models.git_library import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_git_library_service_repro.py",
+      "code": "F541",
+      "message": [
+        "f-string is missing placeholders"
+      ],
+      "source": [
+        "secret_url = f\"https://myuser:mysecretpass@localhost/repo.gi",
+        "t\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_git_library_service_repro.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_gitlab_mcp_collection.py",
+      "code": "E203",
+      "message": [
+        "whitespace before ':'"
+      ],
+      "source": [
+        "for line in lines[header_index + 1 :]:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_gui_batch_segfault_repro.py",
+      "code": "E203",
+      "message": [
+        "whitespace before ':'"
+      ],
+      "source": [
+        "chunks = [target_modules[i : i + 4] for i in range(0, len(ta",
+        "rget_modules), 4)]"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_manager.py",
+      "code": "F401",
+      "message": [
+        "'time' imported but unused"
+      ],
+      "source": [
+        "import time"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_masking_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _assert_no_secret_leak(text: str) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_masking_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _execute_and_persist(history_path: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_masking_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _history_manager_at(history_path: Path) -> HistoryManage",
+        "r:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_masking_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_request() -> RequestData:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_masking_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_response(status=200, body=\"OK\"):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_masking_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _reloaded_panel(history_path: Path) -> HistoryPanel:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_masking_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_hidden_values_stay_masked_after_history_reload_in_p",
+        "anel(qapp):  # noqa: ARG001"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_panel.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestHistoryPanel(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_panel.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_panel.py",
+      "code": "E501",
+      "message": [
+        "line too long (107 > 100 characters)"
+      ],
+      "source": [
+        "with patch(\"pypost.ui.widgets.history_panel.CurlGenerator.ge",
+        "nerate_from_history\") as mock_generate:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_history_panel.py",
+      "code": "W293",
+      "message": [
+        "blank line contains whitespace"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 5,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_hotkeys.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_collect_hotkey_rows_from_registered_actions(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_hotkeys.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_format_shortcut_display_collapses_range():"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_hotkeys.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_format_shortcut_display_joins_alternatives():"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_hotkeys.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_hotkeys_dialog_uses_parent_actions(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_hotkeys.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_register_hotkey_group_collapsed_display(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_http_client.py",
+      "code": "F401",
+      "message": [
+        "'pypost.core.http_client.ResolvedRequestFields' imported but",
+        " unused"
+      ],
+      "source": [
+        "from pypost.core.http_client import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_json_highlighter.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_json_highlighter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestJsonHighlighter(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_json_highlighter.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_key_sources_chain_coverage.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_manifest_and_overlay_repro.py",
+      "code": "F401",
+      "message": [
+        "'pathlib.Path' imported but unused"
+      ],
+      "source": [
+        "from pathlib import Path"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_manifest_and_overlay_repro.py",
+      "code": "F401",
+      "message": [
+        "'pypost.core.library_manifest.deserialize_manifest_from_dict",
+        "' imported but unused"
+      ],
+      "source": [
+        "from pypost.core.library_manifest import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_manifest_and_overlay_repro.py",
+      "code": "F401",
+      "message": [
+        "'pypost.models.library_manifest.VariableResolutionResult' im",
+        "ported but unused"
+      ],
+      "source": [
+        "from pypost.models.library_manifest import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_manifest_and_overlay_repro.py",
+      "code": "F401",
+      "message": [
+        "'typing.Any' imported but unused"
+      ],
+      "source": [
+        "from typing import Any"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_manifest_observability.py",
+      "code": "F401",
+      "message": [
+        "'json' imported but unused"
+      ],
+      "source": [
+        "import json"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_manifest_observability.py",
+      "code": "F401",
+      "message": [
+        "'pathlib.Path' imported but unused"
+      ],
+      "source": [
+        "from pathlib import Path"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_manifest_observability.py",
+      "code": "F401",
+      "message": [
+        "'pypost.core.variable_resolver.resolve_effective_variables' ",
+        "imported but unused"
+      ],
+      "source": [
+        "from pypost.core.variable_resolver import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_manifest_observability.py",
+      "code": "F841",
+      "message": [
+        "local variable 'result' is assigned to but never used"
+      ],
+      "source": [
+        "result = resolver.resolve(manifest=manifest, overlay=overlay",
+        ")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_library_overlay_encryption.py",
+      "code": "F401",
+      "message": [
+        "'pathlib.Path' imported but unused"
+      ],
+      "source": [
+        "from pathlib import Path"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestMainWindow(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_alert_reload.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_main_window(qapp, *, alert_manager=None, env_prese",
+        "nter=None):  # noqa: ARG001"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_alert_reload.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _open_settings_with_alert_log_path(window, log_path: str",
+        ") -> AppSettings:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_alert_reload.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _open_settings_with_webhook_url(window, webhook_url: str",
+        ") -> AppSettings:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_alert_reload.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_open_settings_emit_after_log_path_change_writes_to_",
+        "new_file(qapp, tmp_path):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_alert_reload.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_open_settings_reloads_alert_manager_when_webhook_ch",
+        "anges(qapp, caplog):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_alert_reload.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_open_settings_skips_reload_when_alert_fields_unchan",
+        "ged(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_alert_reload.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_reload_alert_manager_closes_old_and_propagates_to_t",
+        "abs(qapp, tmp_path):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_alert_reload.py",
+      "code": "F401",
+      "message": [
+        "'pathlib.Path' imported but unused"
+      ],
+      "source": [
+        "from pathlib import Path"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_hotkeys.py",
+      "code": "E303",
+      "message": [
+        "too many blank lines (2)"
+      ],
+      "source": [
+        "def test_active_tab_kind_returns_websocket(self):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_hotkeys.py",
+      "code": "F401",
+      "message": [
+        "'tests.helpers.qt_activation.ACTIVATION_SKIP as _ACTIVATION_",
+        "SKIP' imported but unused"
+      ],
+      "source": [
+        "from tests.helpers.qt_activation import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_shutdown.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_handle_exit_flushes_pending_state_manager_save(qapp",
+        "):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_shutdown.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_handle_exit_skips_storage_wait_when_encryption_disa",
+        "bled(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_shutdown.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_handle_exit_waits_for_storage_when_encryption_enabl",
+        "ed(qapp, monkeypatch):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_main_window_shutdown.py",
+      "code": "F401",
+      "message": [
+        "'PySide6.QtWidgets.QApplication' imported but unused"
+      ],
+      "source": [
+        "from PySide6.QtWidgets import QApplication"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_check_lock_retry.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_exit_behavior.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace' imported but un",
+        "used"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import _run_make, make_work",
+        "space"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_exit_behavior.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_clean_exits_zero_on_empty_tree(self, make_workspace",
+        ": Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_exit_behavior.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_unknown_target_exits_nonzero(self, make_workspace: ",
+        "Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_exit_behavior.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "make_workspace: Path,"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_install_stamp_contract.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace' imported but un",
+        "used"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_install_stamp_contract.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "make_workspace: Path,"
+      ],
+      "count": 2,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_markers.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace' imported but un",
+        "used"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import MARKER_NAME, _run_ma",
+        "ke, make_workspace"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_markers.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_clean_removes_venv_and_marker(self, make_workspace:",
+        " Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_markers.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_venv_creates_version_marker(self, make_workspace: P",
+        "ath) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_markers.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_venv_is_idempotent(self, make_workspace: Path) -> N",
+        "one:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace' imported but un",
+        "used"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_check_license_inventory_depends_on_install(self, ma",
+        "ke_workspace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_check_mcp_fixtures_depends_on_marker(self, make_wor",
+        "kspace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_generate_license_inventory_depends_on_install(self,",
+        " make_workspace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_generate_mcp_fixtures_depends_on_marker(self, make_",
+        "workspace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_help_lists_test_agent_e2e(self, make_workspace: Pat",
+        "h) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_help_prints_non_empty_output(self, make_workspace: ",
+        "Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_install_depends_on_marker_only(self, make_workspace",
+        ": Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_lock_dev_target_has_no_venv_prerequisites(self, mak",
+        "e_workspace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_lock_otel_target_has_no_venv_prerequisites(self, ma",
+        "ke_workspace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_lock_target_has_no_venv_prerequisites(self, make_wo",
+        "rkspace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_run_depends_on_marker_only(self, make_workspace: Pa",
+        "th) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_security_audit_depends_on_install(self, make_worksp",
+        "ace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_recipes.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "make_workspace: Path,"
+      ],
+      "count": 9,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_slow_smoke.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace_full_deps' impor",
+        "ted but unused"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_slow_smoke.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace_full_deps' from line ",
+        "<previous>"
+      ],
+      "source": [
+        "make_workspace_full_deps: Path,"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_stamp_otel_idempotency.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace' imported but un",
+        "used"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_stamp_otel_idempotency.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_venv_otel_depends_on_stamp(self, make_workspace: Pa",
+        "th) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_stamp_otel_idempotency.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_venv_otel_skips_pip_when_current(self, make_workspa",
+        "ce: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_stamp_otel_idempotency.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "make_workspace: Path,"
+      ],
+      "count": 2,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_stamp_test_idempotency.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace' imported but un",
+        "used"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_stamp_test_idempotency.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_venv_test_depends_on_stamp(self, make_workspace: Pa",
+        "th) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_stamp_test_idempotency.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_venv_test_skips_pip_when_current(self, make_workspa",
+        "ce: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_stamp_test_idempotency.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "make_workspace: Path,"
+      ],
+      "count": 2,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_filtering.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace' imported but un",
+        "used"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import _run_make, make_work",
+        "space"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_filtering.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_lint_succeeds_after_install(self, make_workspace: P",
+        "ath) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_filtering.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_make_test_excludes_slow_marker(self, make_workspace",
+        ": Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_filtering.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_pytest_args_narrows_test_run(self, make_workspace: ",
+        "Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_filtering.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "make_workspace: Path,"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_install_test.py",
+      "code": "F401",
+      "message": [
+        "'tests.makefile_test_helpers.make_workspace' imported but un",
+        "used"
+      ],
+      "source": [
+        "from tests.makefile_test_helpers import _run_make, make_work",
+        "space"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_install_test.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_test_succeeds_after_install(self, make_workspace: P",
+        "ath) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_install_test.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "def test_venv_test_installs_pytest_and_flake8(self, make_wor",
+        "kspace: Path) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_makefile_target_install_test.py",
+      "code": "F811",
+      "message": [
+        "redefinition of unused 'make_workspace' from line <previous>"
+      ],
+      "source": [
+        "make_workspace: Path,"
+      ],
+      "count": 2,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_builtin_lifecycle.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_builtin_paired_env.py",
+      "code": "E128",
+      "message": [
+        "continuation line under-indented for visual indent"
+      ],
+      "source": [
+        "(PAIRED, False)])"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_builtin_paired_env.py",
+      "code": "F401",
+      "message": [
+        "'pathlib.Path' imported but unused"
+      ],
+      "source": [
+        "from pathlib import Path"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_builtin_startup.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_library_collection_pypost_1280_repro.py",
+      "code": "E127",
+      "message": [
+        "continuation line over-indented for visual indent"
+      ],
+      "source": [
+        "\"overrides\": {\"host\": 42}, \"secrets\": {}}},"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_library_collection_pypost_1280_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (103 > 100 characters)"
+      ],
+      "source": [
+        "resolver.resolve(_library_selection(), \"dev\", candidate_over",
+        "lay=overlay if candidate else None)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_library_collection_pypost_1280_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (114 > 100 characters)"
+      ],
+      "source": [
+        "library_service=service, environment_lookup=lambda value: en",
+        "vironment if value == environment.id else None"
+      ],
+      "count": 2,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_server_headers_table.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_servers_dialog.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_mcp_test_collection_integration.py",
+      "code": "F401",
+      "message": [
+        "'unittest.mock.MagicMock' imported but unused"
+      ],
+      "source": [
+        "from unittest.mock import MagicMock"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_metrics_manager_modularization.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "_WEBSOCKET_METHODS = ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_metrics_registry.py",
+      "code": "E501",
+      "message": [
+        "line too long (105 > 100 characters)"
+      ],
+      "source": [
+        "'lifecycle_teardown_duration_seconds_count{outcome=\"incomple",
+        "te\",owner=\"tabs_presenter\"} 1.0',"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_new_variable_flow_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestNewVariableFlowIntegration:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_parallel_runner_followups_repro.py",
+      "code": "E203",
+      "message": [
+        "whitespace before ':'"
+      ],
+      "source": [
+        "assert command[sentinel + 1 :] == [\"tests/test_ok.py\"]"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_parallel_runner_followups_repro.py",
+      "code": "E203",
+      "message": [
+        "whitespace before ':'"
+      ],
+      "source": [
+        "assert command[sentinel - 2 : sentinel] == [\"--cov=sample_pk",
+        "g\", \"--cov-report=\"]"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_presenter_font_inheritance.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_collections_tree_inherits_application_font(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_presenter_font_inheritance.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_tabs_widget_inherits_application_font(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_pypost_1179_mypy_baseline_repro.py",
+      "code": "F401",
+      "message": [
+        "'scripts.check_mypy_baseline.MypyError' imported but unused"
+      ],
+      "source": [
+        "from scripts.check_mypy_baseline import BaselineEntry, MypyE",
+        "rror, _diff_errors, _parse_errors"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_body_format.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_body_format.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestRequestWidgetBodyFormat(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_body_format.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_body_gutter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestRequestWidgetBodyGutter(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_body_gutter.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_body_validation.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestRequestWidgetBodyValidation(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_body_validation.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_gui_metrics.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_gui_metrics.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestRequestWidgetGuiActionMetrics(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_gui_metrics.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_method_tab_switch.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_method_tab_switch.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestAutoSwitchMetrics(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_method_tab_switch.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestAutoSwitchToBodyTab(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_method_tab_switch.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_editor_variable_propagation.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestRequestWidgetVariablePropagation(unittest.TestCase",
+        "):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_save_orchestrator.py",
+      "code": "F401",
+      "message": [
+        "'pypost.models.models.RequestData' imported but unused"
+      ],
+      "source": [
+        "from pypost.models.models import Collection, RequestData"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_request_service.py",
+      "code": "E303",
+      "message": [
+        "too many blank lines (3)"
+      ],
+      "source": [
+        "class TestRequestServiceExecuteHTTP(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_response_search_flow_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_response_search_flow_integration.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestResponseSearchFlowIntegration(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_response_search_flow_integration.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_safe_path_grammar_edge_locks.py",
+      "code": "E501",
+      "message": [
+        "line too long (101 > 100 characters)"
+      ],
+      "source": [
+        "assert svc.render_string(\"{{ payload.user.contact.address.ci",
+        "ty }}\", variables) == \"San Francisco\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_safe_path_grammar_edge_locks.py",
+      "code": "E501",
+      "message": [
+        "line too long (109 > 100 characters)"
+      ],
+      "source": [
+        "@pytest.mark.parametrize(\"arg\", [\".mcp.request\", \"data.\", \"a",
+        "..b\", \"data._private\", \"root.__dict__\", \"a.b-c\"])"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_safe_path_grammar_edge_locks.py",
+      "code": "E501",
+      "message": [
+        "line too long (114 > 100 characters)"
+      ],
+      "source": [
+        "assert svc.render_string(\"{{ urlencode(payload.user.contact.",
+        "address.city) }}\", variables) == \"San%20Francisco\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_save_flow_integration.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestSaveFlowIntegration(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_save_flow_integration.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_script_executor.py",
+      "code": "E501",
+      "message": [
+        "line too long (104 > 100 characters)"
+      ],
+      "source": [
+        "return ResponseData(status_code=status, headers={}, body=bod",
+        "y, elapsed_time=0.0, size=len(body))"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_script_executor.py",
+      "code": "E501",
+      "message": [
+        "line too long (104 > 100 characters)"
+      ],
+      "source": [
+        "script = \"pypost.set('method', request.method); pypost.set('",
+        "status', str(response.status_code))\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_script_executor.py",
+      "code": "E741",
+      "message": [
+        "ambiguous variable name 'l'"
+      ],
+      "source": [
+        "self.assertTrue(any(\"[STDOUT]\" in l for l in logs))"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 2,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _assert_listen_address(port: int, expected: frozenset[st",
+        "r]) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _free_port() -> int:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _listen_addresses_for_port(port: int) -> set[str]:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _wait_for_listen(host: str, port: int, timeout: float = ",
+        "10.0) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestMcpServerBindHost(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestMetricsServerBindHost(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "BIND_HOST_CASES = ("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_server_bind_host_integration.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_alert_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_main_window(qapp, config_manager):  # noqa: ARG001"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_alert_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _open_settings_with_alert_fields("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_alert_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_open_settings_alert_fields_round_trip_via_settings_",
+        "json(qapp, tmp_path, monkeypatch):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_alert_main_window_e2e.py",
+      "code": "F401",
+      "message": [
+        "'tempfile' imported but unused"
+      ],
+      "source": [
+        "import tempfile"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_dialog.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestResolveWebhookAuthHeader:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_dialog.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestSettingsDialogAlertSettings:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_dialog.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestSettingsDialogBindAddressValidation:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_dialog.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestSettingsDialogLogHiddenKeyNames:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_dialog.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestSettingsDialogRetryableCodesValidation:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_dialog.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestSettingsDialogSecurityLoggingSection:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_dialog.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestSettingsDialogTheme:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.parametrize("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestConfigManagerEncryptionPersistence:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "def test_parse_env_encryption_enabled_from_mode(mode, expect",
+        "ed):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.parametrize("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_main_window(qapp, storage, config_manager, request",
+        "_manager=None):  # noqa: ARG001"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_storage(tmp_path, monkeypatch) -> StorageManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _open_settings_with_mode(window, mode_data: str) -> AppS",
+        "ettings:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _run_open_settings_chain("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _save_hidden_env(storage: StorageManager) -> dict:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption_main_window_e2e.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "def test_open_settings_applies_encryption_policy_to_storage("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_encryption_migration_ui.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _assert_no_value_leak(caplog) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_env_presenter() -> EnvPresenter:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_integration_window(qapp, env_presenter):  # noqa: ",
+        "ARG001"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _patch_env_dialog_exec(caplog):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _run_settings_to_toggle_chain("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _settings_after_accept(current: AppSettings, *, log_hidd",
+        "en_key_names: bool) -> AppSettings:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _toggle_hidden_during_exec(dialog: EnvironmentDialog, ca",
+        "plog) -> None:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_default_masked_toggle_log_after_settings_apply(qapp",
+        ", caplog):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_hidden_toggle_logging_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_readable_toggle_log_when_settings_opt_in(qapp, capl",
+        "og):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_key_source_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_main_window(qapp, storage, config_manager):  # noq",
+        "a: ARG001"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_key_source_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_storage(tmp_path, monkeypatch) -> StorageManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_key_source_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _open_settings_with_key_source("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_key_source_main_window_e2e.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_open_settings_secret_store_with_env_fallback_encryp",
+        "t_decrypt_round_trip("
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_persistence.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestConfigManagerErrorLogging(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_persistence.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestStateManagerPersistence(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_persistence.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_request_timeout_survives_settings_dialog_save_and_r",
+        "estart(qapp):  # noqa: ARG001"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_persistence.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_state_manager_debounced_save_persists_after_timer(q",
+        "app):  # noqa: ARG001"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_settings_persistence.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_appearance.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_apply_appearance_call_order(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_appearance.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_apply_appearance_sets_application_font(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_appearance.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_apply_appearance_stylesheet_contains_font_rule(qapp",
+        "):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_appearance.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_font_size_min(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_appearance.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_font_size_second_call_wins(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_appearance.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_font_size_survives_stylesheet_reset(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_font.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_apply_styles_without_font_size_omits_rule(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_font.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_load_styles_includes_tooltip_qss():"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_theme.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_apply_theme_light_uses_fusion_and_light_window(qapp",
+        "):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_theme.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_apply_theme_system_restores_custom_style(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_style_manager_theme.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_apply_theme_unknown_value_falls_back_to_system(qapp",
+        "):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.parametrize(\"module_name\", _PRIORITY_MODULES)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _all_test_modules() -> list[str]:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _class_has_usefixtures_qapp(class_def: ast.ClassDef) -> ",
+        "bool:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _is_usefixtures_qapp(decorator: ast.AST) -> bool:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _module_defines_get_app_helper(tree: ast.Module) -> bool",
+        ":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _module_defines_local_qapp(tree: ast.Module) -> bool:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _parse(path: Path) -> ast.Module:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _qt_testcase_classes(tree: ast.Module) -> list[ast.Class",
+        "Def]:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _setUpClass_creates_qapplication(class_def: ast.ClassDef",
+        ") -> bool:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_suite_has_no_local_qapp_fixtures_or_setupclass_qapp",
+        "lication():"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_suite_qapp_alignment.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "def test_priority_module_aligned_to_shared_qapp(module_name:",
+        " str):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_header.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestRequestTabHeader(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.fixture()"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.fixture(scope=\"module\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _assert_native_tab_spacing(bar: QTabBar, labels) -> None",
+        ":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _close_indicator_metrics():"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _make_tab_bar(labels) -> QTabBar:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _tab_close_button(bar: QTabBar, index: int):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_apply_theme_system_uses_native_close_metrics(qapp_p",
+        "ypost_style):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_close_indicator_defaults_to_base_style_metric(qapp)",
+        ":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_close_indicator_override_is_opt_in(qapp):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_default_close_icon_dark_theme_contrast_contract():"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_editor_subtabs_have_native_spacing(qapp_with_styles",
+        "):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_loaded_styles_do_not_customize_tab_geometry():"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_request_tab_close_button_uses_native_size(qapp_pypo",
+        "st_style):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tab_layout_regression.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def test_sidebar_tabs_have_native_spacing(qapp_with_styles):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 5,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class FakeRequestManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class FakeStateManager:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _plus_tab_index(presenter: TabsPresenter) -> int:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _request_tab_count(presenter: TabsPresenter) -> int:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestRequestSync(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestTabsPresenter(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestTabsPresenterAlertManagerPropagation(unittest.Test",
+        "Case):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestTabsPresenterHiddenKeysForwarding(unittest.TestCas",
+        "e):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestTabsPresenterSaveTabBinding(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestTabsPresenterSendRequestTabBinding(unittest.TestCa",
+        "se):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_tabs_presenter.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_template_service_strict_provenance.py",
+      "code": "E501",
+      "message": [
+        "line too long (104 > 100 characters)"
+      ],
+      "source": [
+        "\"\"\"Assert TemplateService emits structured logs on strict co",
+        "nversion failure without secrets.\"\"\""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_template_service_strict_provenance.py",
+      "code": "W391",
+      "message": [
+        "blank line at end of file"
+      ],
+      "source": [
+        ""
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_ui_library_manager_pypost_1278_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (103 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"library_operation_started library_id=opaque-\" in",
+        " message for message in presenter_logs)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_autocomplete_focus_integration.py",
+      "code": "E127",
+      "message": [
+        "continuation line over-indented for visual indent"
+      ],
+      "source": [
+        "QLineEdit]:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 3,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestVariableHoverHelper(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class TestVariableHoverSplit(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class _FixedCursorHoverPlainText(VariableHoverMixin, QPlainT",
+        "extEdit):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "class _FixedHoverTableWidget(VariableAwareTableWidget):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _mouse_move_event(widget, local_point: QPoint) -> QMouse",
+        "Event:"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestVariableAwareLineEditTooltips(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestVariableAwarePlainTextEditTooltips(unittest.TestCa",
+        "se):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestVariableAwareTableWidgetTooltips(unittest.TestCase",
+        "):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_variable_hover.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (101 > 100 characters)"
+      ],
+      "source": [
+        "records = [r for r in caplog.records if r.name == \"pypost.co",
+        "re.qt.websocket_sequence_runner\"]"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (102 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"preset_loaded_into_composer\" in msg and \"name=My",
+        " Auth\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (102 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"sequence_runner_step_executed\" in msg and \"name=",
+        "Step1\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (102 > 100 characters)"
+      ],
+      "source": [
+        "records = [r for r in caplog.records if r.name == \"pypost.ui",
+        ".widgets.websocket.presets_panel\"]"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (104 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"sequence_runner_started\" in msg and \"seq_id=seq_",
+        "run_obs\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (104 > 100 characters)"
+      ],
+      "source": [
+        "p1 = WebSocketMessagePreset(id=\"p1\", name=\"Step1\", format=Ws",
+        "MessageFormat.TEXT, payload=\"hello\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (106 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"sequence_runner_completed\" in msg and \"seq_id=se",
+        "q_run_obs\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (106 > 100 characters)"
+      ],
+      "source": [
+        "panel.add_sequence_step(seq_id, preset_id=preset_id, format=",
+        "WsMessageFormat.TEXT, delay_ms=50)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (107 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"composer_format_validation_failed\" in msg and \"f",
+        "ormat=json\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (108 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"compile_sequence_plan_completed\" in msg and \"is_",
+        "valid=False\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (108 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"compile_sequence_plan_step_invalid\" in msg and \"",
+        "format=json\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (111 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"compile_sequence_plan_started\" in msg and \"seq_i",
+        "d=seq_test_obs\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (112 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"sequence_runner_stopped_by_user\" in msg and \"seq",
+        "_id=seq_run_obs\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (114 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"sequence_runner_rejected_invalid_plan\" in msg an",
+        "d \"seq_id=seq_inv\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (116 > 100 characters)"
+      ],
+      "source": [
+        "preset = panel.create_new_preset(name=\"My Auth\", format=WsMe",
+        "ssageFormat.TEXT, payload=\"token:secret123\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (123 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"compile_sequence_plan_missing_preset\" in msg and",
+        " \"preset_id=preset_missing\" in msg for msg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_websocket_composer_and_sequence_repro.py",
+      "code": "E501",
+      "message": [
+        "line too long (143 > 100 characters)"
+      ],
+      "source": [
+        "assert any(\"composer_payload_dispatched\" in msg and \"format=",
+        "text\" in msg and f\"bytes={len(secret_content)}\" in msg for m",
+        "sg in messages)"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_worker.py",
+      "code": "F401",
+      "message": [
+        "'pypost.models.retry.RetryPolicy' imported but unused"
+      ],
+      "source": [
+        "from pypost.models.retry import RetryPolicy"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_worker_race.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "@pytest.mark.usefixtures(\"qapp\")"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_worker_race.py",
+      "code": "E302",
+      "message": [
+        "expected 2 blank lines, found 1"
+      ],
+      "source": [
+        "def _ok_result():"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_worker_race.py",
+      "code": "E304",
+      "message": [
+        "blank lines found after function decorator"
+      ],
+      "source": [
+        "class TestWorkerRaceCondition(unittest.TestCase):"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_worker_race.py",
+      "code": "E305",
+      "message": [
+        "expected 2 blank lines after class or function definition, f",
+        "ound 1"
+      ],
+      "source": [
+        "if __name__ == \"__main__\":"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    },
+    {
+      "path": "tests/test_worker_race.py",
+      "code": "F401",
+      "message": [
+        "'pypost.ui.presenters.tabs_presenter.RequestTab' imported bu",
+        "t unused"
+      ],
+      "source": [
+        "from pypost.ui.presenters.tabs_presenter import TabsPresente",
+        "r, RequestTab"
+      ],
+      "count": 1,
+      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
+    }
+  ]
+}

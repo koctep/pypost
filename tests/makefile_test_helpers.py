@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import fcntl
+import json
 import os
 import shutil
 import signal
@@ -140,6 +141,13 @@ def _seed_minimal_project(workspace: Path) -> None:
     pypost_dir = workspace / "pypost"
     pypost_dir.mkdir(exist_ok=True)
     (pypost_dir / "__init__.py").write_text("", encoding="utf-8")
+    scripts_dir = workspace / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    shutil.copy(REPO_ROOT / "scripts" / "check_test_lint_baseline.py", scripts_dir)
+    shutil.copy(REPO_ROOT / ".flake8", workspace / ".flake8")
+    (workspace / "test-lint-baseline.json").write_text(
+        json.dumps({"version": 1, "entries": []}) + "\n", encoding="utf-8",
+    )
 
 
 # Minimum pypost/ tree for slow-smoke isolated workspace (PYPOST-963, PYPOST-964).
@@ -326,6 +334,7 @@ dependencies = []
 dev = [
     "pytest>=8,<9",
     "flake8>=7,<8",
+    "flake8-print>=5,<6",
 ]
 otel = []
 

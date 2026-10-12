@@ -76,7 +76,7 @@ installs `[dev,otel]` before pytest the same way.
 **Safety net:** `make test`, `make test-slow`, `make test-cov`, and
 `make test-agent-e2e` depend on `venv-test` and `venv-otel`, so a bare
 `.venv` (marker only) still gets `[dev]` + `[otel]` before pytest runs.
-`lint` and `typecheck` also depend on `venv-test`, so a bare venv gets
+`lint`, `lint-tests`, and `typecheck` also depend on `venv-test`, so a bare venv gets
 `[dev]` (flake8 / mypy) before those targets run (PYPOST-906). `run`
 stays marker-only — run `make install` before `make run` if the base
 venv is incomplete. See [setup.md](setup.md).
@@ -1251,16 +1251,15 @@ must retain explicit module-level `pytest.mark.timeout(30)` markers, while produ
 runtime behavior, test scenarios, and lint configuration remain unchanged.
 
 **Usage and validation.** Run `make test` to verify the existing test behavior and `make lint`
-for the repository quality gate. The `make lint` target scans `pypost/` and runs its configured
-documentation checks; it does not provide an exact Flake8 target for these four test modules.
+for the repository quality gate. The current gate checks production sources, test-source
+regressions against the legacy baseline described below, and configured documentation checks.
 
 **Configuration impact.** None. Do not add timeout defaults, lint suppressions, or Makefile,
 `.flake8`, or pytest configuration changes for this maintenance record.
 
 **Troubleshooting and limitations.** If a scoped module loses its timeout marker, restore the
-module-level declaration after its imports. Treat `make lint` as the repository gate, not as
-the exact four-module `F401`/`E501`/`W293` assessment, because that Make target does not scan
-the test paths.
+module-level declaration after its imports. Current `make lint-tests` checks the whole test
+tree; accepted legacy occurrences do not authorize additional findings in those files.
 
 ```bash
 make test
@@ -1273,6 +1272,67 @@ Troubleshooting import-order lint failures:
 - **Timeout enforcement fails after reordering** — confirm the module still assigns
   `pytestmark = pytest.mark.timeout(...)`; its position after imports does not change pytest's
   module-level marker behavior.
+
+### Test-source lint gate (PYPOST-1303)
+
+**Overview and architecture.** `make lint` includes `lint-tests` alongside the existing
+production flake8 command and documentation checks. `make check` includes it through `lint`.
+The standalone [checker](../../scripts/check_test_lint_baseline.py) runs actual flake8 on
+`tests/`, then compares findings with the frozen
+[test baseline](../../test-lint-baseline.json). Production lint remains outside that baseline.
+
+```bash
+make lint
+make lint-tests
+make check
+```
+
+**Legacy adoption.** The initial inventory contains 409 existing occurrences across 375
+identities, with a reason for each allowance. New F401, E501, T201, and other selected findings
+fail with their current file, row, column, code, and message. Success prints the accepted
+legacy count; it does not mean all historical findings have been corrected.
+
+An identity combines relative test path, code, diagnostic message, and stripped physical
+source text. Duplicate counts are significant. Row/column are excluded from identity so
+preceding edits can move a finding; F811 `from line N` references are normalized. Identical
+replacements or moves with unchanged identity/count cannot be distinguished. Changed source
+and additional duplicate occurrences fail, even within a file that has accepted legacy debt.
+
+**Fixing existing debt.** After correcting an accepted finding, lint fails with a fixed-count
+message until its stale allowance is removed:
+
+```bash
+make lint-tests-prune
+make lint
+```
+
+Pruning removes only resolved allowances after a valid scan. It refuses new findings and
+tool/schema/source failures; remaining reasons and counts are preserved, and the replacement
+is atomic. Normal lint never writes the baseline. There is no automatic mode to accept new
+debt. Review any deliberate baseline edit under its Jira scope, including tool/configuration
+upgrades that change diagnostic identities. Run scans/pruning on a stable checkout.
+
+**Configuration and fixtures.** The dev environment must include flake8 and flake8-print;
+the scan explicitly requires the print plugin so T201 cannot silently disappear. Repository
+`.flake8` remains at 100 columns with T201 selected. The checker and version-1 baseline are
+required assets; missing files are errors. Each entry contains path/code, message/source
+fragments of at most 60 characters, a positive count, and a nonempty reason. The flake8 scan
+has a 60-second subprocess timeout; local filesystem/process creation must remain responsive.
+
+Isolated Make workspaces receive the real checker/configuration and a valid empty baseline
+for their miniature test tree. Their minimal dev project includes flake8-print; original
+integration tests continue exercising real dependency installation and lint behavior.
+
+**Troubleshooting.** Correct new findings at their reported location. For resolved legacy
+findings, use the prune command rather than retaining stale allowances. Missing baseline,
+invalid schema/source path, contradictory/unrecognized output, missing plugin, and tool
+launch/timeout errors fail with `Test lint failed:` on stderr. Restore the tracked assets or
+refresh dev dependencies through `make install`; do not bypass checking or relax selected
+codes. Tool diagnostic changes require deliberate review, not an automatic baseline refresh.
+
+Regression coverage: `tests/test_makefile_test_lint_gate.py` verifies actual Make feedback
+offline; `tests/test_test_lint_baseline.py` verifies occurrence counts, ratcheting, schema,
+source, and tool failure paths. Both retain explicit timeout markers.
 
 ### Strict markers (PYPOST-865)
 
