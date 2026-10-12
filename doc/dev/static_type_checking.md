@@ -110,6 +110,18 @@ broad `object` declaration when one concrete payload class describes every live 
 8. The internal mypy subprocess is limited to 60 seconds. On timeout, the gate preserves any
    partial output, adds `mypy timed out after 60 seconds`, writes it visibly to stderr, and exits
    nonzero. A timeout does not perform a baseline comparison or rewrite the baseline.
+9. **Fatal mypy execution errors (`exit code >= 2`):** When mypy crashes, encounters severe
+   configuration or command-line syntax errors, or cannot read files, it exits with code 2 or
+   higher. The gate immediately prints the tool's raw diagnostic output to `sys.stderr` and exits
+   with status `1`. It never compares against the baseline or allows `--update-baseline` to modify
+   `mypy-baseline.json`.
+10. **Fail-closed execution validation (non-zero exit with empty parsed errors):** If the runner
+    subprocess terminates with any non-zero exit code (such as exit code `1` when the Python
+    environment lacks `mypy` or when runner execution aborts before type checking) and zero errors
+    match the diagnostic regex, the gate fails closed: it prints the raw error output to `sys.stderr`
+    and exits with status `1`. It refuses to interpret missing checker diagnostics as "all errors
+    resolved", preventing accidental baseline wipeout or false passes. Both baseline diffing and
+    `--update-baseline` are strictly aborted on unparseable non-zero exits.
 
 ### Reading occurrence reports
 
@@ -142,6 +154,12 @@ automatically:
 .venv/bin/python scripts/check_mypy_baseline.py --update-baseline
 git add mypy-baseline.json
 ```
+
+`--update-baseline` is protected by the same fail-closed execution validation checks. If mypy times
+out, exits with code >= 2, or exits non-zero with no parseable errors (such as when mypy is missing),
+the script fails immediately and will **not** overwrite `mypy-baseline.json`. This ensures that an
+environment or tool failure cannot accidentally wipe out or corrupt the committed baseline with an
+empty error list.
 
 ### Automated ratchet reconciliation
 
@@ -339,6 +357,10 @@ The baseline error count reflects known technical debt across `pypost/core`, `py
   direct `pypost/core/alert_manager.py` webhook `arg-type` occurrences. Added a 60-second internal
   mypy subprocess timeout with visible nonzero failure handling and regression coverage for the
   timeout and Counter-key contracts.
+- **PYPOST-1337 (October 2026):** Implemented fail-closed execution validation in
+  `scripts/check_mypy_baseline.py`. Prevents non-zero exit codes with empty parsed error lists (e.g.,
+  missing `mypy` package) or fatal mypy failures (`exit code >= 2`) from being treated as 0 errors,
+  protecting both baseline diffing and `--update-baseline` from false passes and baseline corruption.
 
 Per-code breakdown below is the original July 2026 snapshot; it illustrates *typical* fixes rather
 than a live count. Open `mypy-baseline.json` (one JSON object per error, with an `error_count`
@@ -413,6 +435,27 @@ The gate fails visibly after the internal 60-second mypy limit with
 `mypy timed out after 60 seconds`. Investigate the environment or checker run and retry; the
 timeout path never rewrites `mypy-baseline.json`.
 
+### `make typecheck` reports `No module named mypy` or runner execution failure
+
+If mypy is not installed in the active environment, Python will output:
+```text
+/usr/bin/python3: No module named mypy
+```
+`check_mypy_baseline.py` fails closed on non-zero exit codes with empty parsed errors rather than
+falsely treating missing checker output as zero errors. To install mypy and all development tools in
+the repository virtual environment, run:
+```bash
+make install
+```
+or `make venv-test`. Always ensure commands run using the repository `.venv` Python interpreter.
+
+### `make typecheck` reports fatal mypy errors (exit code >= 2)
+
+If mypy encounters command-line syntax issues, malformed configuration files, or unreadable source
+files, it exits with returncode 2. The gate prints mypy's raw diagnostic output to stderr and exits
+with status 1 without diffing or overwriting the baseline. Inspect the output to resolve the
+configuration or syntax error.
+
 ### Fixed errors but the gate still fails
 
 Run `check_mypy_baseline.py --update-baseline` and commit the updated JSON.
@@ -441,3 +484,5 @@ module import; do not patch `_ERROR_RE` separately.
   message)` key and Counter-based multiset diff, including the PYPOST-987 line-shift incident
 - `ai-tasks/PYPOST-1241/20-architecture.md` — full architectural design for generic
   save orchestrator, protocol dialog, and stream export typing reconciliation
+- `ai-tasks/PYPOST-1337/20-architecture.md` — design for fail-closed execution validation
+  and baseline integrity protection under tool runner or environment failures

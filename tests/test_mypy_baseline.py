@@ -577,3 +577,104 @@ class TestWriteBaseline:
             and entry["message"] == '"Widget" has no attribute "foo"'
         ]
         assert len(matching) == 2
+
+
+class TestMypyBaselineExecutionIntegrity:
+    """Repro tests for PYPOST-1337: fail closed when mypy execution fails or cannot be trusted."""
+
+    def test_gate_fails_closed_when_mypy_exits_nonzero_with_zero_parsed_errors(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """When mypy fails to execute (e.g. exit code 1, missing module output),
+        check_mypy_baseline must fail closed with an execution diagnostic on stderr
+        rather than diffing 0 errors against baseline and claiming baseline errors were resolved.
+        """
+        missing_module_output = "/usr/bin/python3: No module named mypy\n"
+        monkeypatch.setattr(
+            check_mypy_baseline,
+            "_run_mypy",
+            lambda: (1, missing_module_output),
+        )
+        monkeypatch.setattr(sys, "argv", ["check_mypy_baseline.py"])
+
+        exit_code = check_mypy_baseline.main()
+        captured = capsys.readouterr()
+
+        assert exit_code != 0
+        assert "Resolved baseline errors" not in captured.err
+        assert "Baseline: 181 errors; current: 0 errors" not in captured.err
+        assert "No module named mypy" in captured.err
+
+    def test_gate_fails_closed_when_mypy_exits_fatal_code_2(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """When mypy exits with code >= 2 (fatal/config error), check_mypy_baseline
+        must fail closed with output on stderr instead of diffing or succeeding.
+        """
+        fatal_output = "mypy: error: Configuration file not found\n"
+        monkeypatch.setattr(
+            check_mypy_baseline,
+            "_run_mypy",
+            lambda: (2, fatal_output),
+        )
+        monkeypatch.setattr(sys, "argv", ["check_mypy_baseline.py"])
+
+        exit_code = check_mypy_baseline.main()
+        captured = capsys.readouterr()
+
+        assert exit_code != 0
+        assert "Resolved baseline errors" not in captured.err
+        assert "Baseline:" not in captured.err
+        assert "Configuration file not found" in captured.err
+
+    def test_update_baseline_refuses_when_mypy_execution_failed(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """When --update-baseline is requested but mypy run failed with non-zero exit code
+        and 0 parsed errors, the baseline file must NOT be overwritten with an empty error list.
+        """
+        baseline_file = tmp_path / "mypy-baseline.json"
+        original_content = json.dumps(
+            {
+                "version": check_mypy_baseline.BASELINE_VERSION,
+                "scope": list(check_mypy_baseline.MYPY_PATHS),
+                "error_count": 1,
+                "errors": [
+                    {
+                        "path": "pypost/core/client.py",
+                        "code": "assignment",
+                        "message": "Incompatible value",
+                    },
+                ],
+            },
+            indent=2,
+        )
+        baseline_file.write_text(original_content, encoding="utf-8")
+        monkeypatch.setattr(check_mypy_baseline, "BASELINE_PATH", baseline_file)
+
+        missing_module_output = "/usr/bin/python3: No module named mypy\n"
+        monkeypatch.setattr(
+            check_mypy_baseline,
+            "_run_mypy",
+            lambda: (1, missing_module_output),
+        )
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["check_mypy_baseline.py", "--update-baseline"],
+        )
+
+        exit_code = check_mypy_baseline.main()
+        captured = capsys.readouterr()
+
+        assert exit_code != 0
+        assert "No module named mypy" in captured.err
+        # Baseline file must NOT have been updated or overwritten with 0 errors
+        assert baseline_file.read_text(encoding="utf-8") == original_content
