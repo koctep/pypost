@@ -1506,6 +1506,36 @@ The focused readiness regressions cover contention, stale caches, cumulative dea
 partial copies, and descendant cleanup; runner regressions cover ordering, fail-closed dispatch,
 coverage preparation, and selection exclusions.
 
+### Offline missing-runner checks (PYPOST-1299)
+
+`tests/test_pytest_exit_policy.py` tests the real `make test` and `make test-cov` guards
+in temporary workspaces without `scripts/run_parallel_tests.py`. Its
+`_prepare_missing_runner_workspace` helper copies the Makefile, writes minimal project
+metadata, and links `.venv/bin/python` to the current `sys.executable`. It then writes
+`.initialized-<major.minor>` and both `.venv-test-<major.minor>` and
+`.venv-otel-<major.minor>` stamps, after the metadata and initialization marker. This
+pre-readied negative fixture needs no dependency installation or shared-base preparation;
+it exercises early rejection rather than validating a usable installed environment.
+
+Both checks retain the real Make diagnostic (`parallel runner unavailable`) and nonzero
+exit assertions. Coverage cleanup must remove root `.coverage.*` fragments while preserving
+the root `.coverage` file and nested fragments. The original 75-second test markers and
+60-second subprocess bounds remain unchanged. The companion offline repro rejects preparation
+subprocesses and missing/stale prerequisites before delegating exactly one real Make target;
+its own limits are a 20-second test timeout and a 10-second subprocess bound.
+
+```bash
+make test WORKERS=1 PYTEST_ARGS='tests/test_pytest_exit_policy.py -q'
+make test WORKERS=1 PYTEST_ARGS='tests/test_pytest_exit_policy_offline_repro.py -q'
+```
+
+If a negative check attempts bootstrap or installation, inspect its temporary workspace:
+the linked interpreter must exist, and both extra stamps must be at least as new as
+`pyproject.toml` and the initialization marker. Write metadata first and readiness stamps last;
+do not run a real install to repair this fixture. The offline repro reports the missing or
+stale prerequisite before Make can install dependencies. For positive installation coverage,
+use the existing Makefile installation suites and `make test-slow` instead.
+
 Shared static parsers for `##` help lines and target recipe bodies live in
 `tests/makefile_contract_helpers.py` (`makefile_target_help_comment`,
 `makefile_target_recipe_body`) — use them when adding make-entry contract locks (PYPOST-937).
