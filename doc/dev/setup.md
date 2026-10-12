@@ -259,10 +259,13 @@ Common targets:
   ```bash
   make test
   ```
-- **Lint code** (`flake8` on `pypost/`; T201 bans `print()` in application code):
+- **Lint code** (production flake8, test-source regression gate, and documentation checks):
   ```bash
   make lint
   ```
+  `make lint-tests` runs just the test-source baseline gate. Corrected legacy allowances are
+  removed with `make lint-tests-prune`; it cannot accept new findings. See the
+  [test-source lint workflow](testing.md#test-source-lint-gate-pypost-1303).
 - **Optional static type check** (mypy on `pypost/core/`, `pypost/models/`, and `pypost/ui/`; baseline gate):
   ```bash
   make typecheck
@@ -288,7 +291,7 @@ Common targets:
 - `run` depends on `$(VENV_MARKER)` only and does not trigger
   `venv-test` / `install` (run `make install` first if the base venv is
   incomplete).
-- `lint` and `typecheck` depend on `$(VENV_MARKER)` and `venv-test`, so
+- `lint`, `lint-tests`, and `typecheck` depend on `$(VENV_MARKER)` and `venv-test`, so
   a bare venv gets `[dev]` (flake8 / mypy) before those targets run
   (PYPOST-906; same ensure path as typecheck).
 - `test`, `test-slow`, `test-cov`, and `test-agent-e2e` depend on

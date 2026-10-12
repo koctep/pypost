@@ -2,7 +2,8 @@
 	lock-otel check-lock-otel run run-daemon run-agent-ui-mcp clean test test-slow \
 	test-mcp-collection-e2e test-jira-mcp-live check-jira-mcp-path-freshness \
 	check-gitlab-mcp-path-freshness check-github-mcp-path-freshness \
-	test-cov test-agent-e2e lint typecheck verify-ai-tasks check security-audit \
+	test-cov test-agent-e2e lint lint-tests lint-tests-prune typecheck verify-ai-tasks \
+	check security-audit \
 	generate-mcp-fixtures check-mcp-fixtures generate-license-inventory \
 	check-license-inventory lint-docs check-docs-links check-lock-all test-gui-batch \
 	baseline-metrics check-baseline-metrics check-package-data
@@ -229,7 +230,13 @@ lint-docs: $(VENV_MARKER) ## Run Markdown formatting checks on doc/user/ and doc
 check-docs-links: $(VENV_MARKER) ## Check relative links in User Guide and README files (PYPOST-1021)
 	$(BIN)/python scripts/check_user_docs_links.py
 
-lint: $(VENV_MARKER) venv-test ## Run flake8 static analysis on pypost/ and documentation checks
+lint-tests: $(VENV_MARKER) venv-test ## Check tests/ against frozen legacy lint occurrences
+	$(BIN)/python scripts/check_test_lint_baseline.py
+
+lint-tests-prune: $(VENV_MARKER) venv-test ## Remove fixed test lint allowances; reject new findings
+	$(BIN)/python scripts/check_test_lint_baseline.py --prune-fixed
+
+lint: $(VENV_MARKER) venv-test lint-tests ## Check production/tests and documentation
 	$(BIN)/python -m flake8 --jobs=1 pypost/
 	@if [ -f scripts/lint_user_docs.py ]; then $(BIN)/python scripts/lint_user_docs.py; fi
 	@if [ -f scripts/check_user_docs_links.py ]; then $(BIN)/python scripts/check_user_docs_links.py; fi
