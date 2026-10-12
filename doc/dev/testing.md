@@ -1432,25 +1432,79 @@ further decomposed into 7 focused files (all with `pytestmark = pytest.mark.time
 - `tests/test_makefile_target_filtering.py`: marker filtering, PYTEST_ARGS narrowing, lint.
 - `tests/test_makefile_slow_smoke.py`: slow editable install smoke with real `pyproject.toml`.
 
-### Pre-warmed shared base virtualenv caching (PYPOST-1262)
+### Shared Make fixture preparation (PYPOST-1262 / PYPOST-1298)
 
-To eliminate repetitive, slow `python -m venv` creations and package wheel extractions during
-parallel test execution, `tests/makefile_test_helpers.py` provides a pre-warmed shared virtualenv
-mechanism:
+`tests/makefile_test_helpers.py` prepares one shared base virtualenv containing `pytest` and
+`flake8`, then materializes separate class-scoped `make_workspace` fixtures using archive
+hardlinks (`cp -al`). This avoids repeated dependency installation while keeping workspace
+directories and Make stamp behavior separate. Treat the published shared base as immutable.
 
-- **Shared base caching (`_get_shared_base_venv`)**: Creates a base virtualenv in
-  `/tmp/pypost_shared_base_venv_<PYTHON_VERSION>` once with pre-installed `pytest` and `flake8`.
-  Concurrent process initialization is coordinated safely across test workers using an exclusive
-  file lock via `fcntl.flock(lock, fcntl.LOCK_EX)`.
-- **Fast hardlink workspace materialization (`_materialize_prewarmed_venv`)**: Workspaces
-  materialize their `.venv` using `cp -al <shared_base> <workspace>/.venv`, which creates hardlinks
-  for virtualenv files in single-digit milliseconds without copying data blocks or invoking pip.
-- **Class-scoped workspace fixture**: The `make_workspace` fixture uses `scope="class"`, sharing
-  the materialized workspace across related tests within a test class while keeping test classes
-  isolated.
-- **Worker timeout headroom**: By reducing per-file execution times from 90–120s down to ~15–35s,
-  every modular Makefile test suite completes reliably within the 120s parallel worker timeout
-  even under heavy 8-worker contention.
+For both `make test` and `make test-cov`, `scripts/run_parallel_tests.py` prepares that base
+after discovery and coverage validation, before submitting any workers. Preparation runs in a
+fresh subprocess using the configured Python interpreter and repository working directory;
+it does not import conftest or collect tests. The hook runs when the helper exists and discovery
+selects at least one `tests/test_makefile_*.py` file directly inside the repository's `tests/`
+directory. Contract-only Makefile selections may therefore warm the base too. Unrelated
+selections and copied runners in helper-free workspaces skip preparation. Future fixture
+consumers outside this filename family must extend the selection rule.
+
+`_get_shared_base_venv(preparation_budget=20)` retains its zero-argument helper API. Its base is
+`<tempfile.gettempdir()>/pypost_shared_base_venv_<major.minor>/.venv` (normally under `/tmp`).
+Readiness requires both `.initialized-<major.minor>` and `bin/python`. A new base publishes the
+marker only after interpreter creation, package installation, and successful `pytest`/`flake8`
+imports. Each cache reuse checks marker and interpreter presence; a missing component clears
+the process cache and triggers bounded recovery.
+
+One monotonic deadline covers lock waiting and all bootstrap stages. The helper polls an
+exclusive nonblocking `fcntl.flock` in intervals of at most 50 ms, then checks readiness again
+under the lock so only one competing caller builds. Incomplete bases are removed before
+rebuilding while holding the lock. Failure leaves readiness unpublished and releases the lock;
+the next invocation can retry. Workspace materialization removes incomplete destinations before
+copying and after a failed copy, allowing a later attempt to start cleanly.
+
+| Operation | Preparation budget | Process cleanup allowance |
+| --- | --- | --- |
+| Runner cold preparation | 90 seconds across lock, creation, install, validation | 5 seconds |
+| Ordinary helper call | 20 seconds across lock and bootstrap | 5 seconds |
+| Workspace hardlink copy | 20 seconds for the copy command | 1 second |
+
+The runner watchdog is 95 seconds. Helper and runner failures terminate prerequisite process
+groups, including descendants, before returning failure. These preparation budgets are fixed
+implementation settings; they do not change `pytest.mark.timeout`, worker concurrency, or the
+Make `WORKER_TIMEOUT` default of 120 seconds. Cold preparation precedes worker execution;
+workspace materialization still consumes the existing fixture/test deadline. Network or local
+filesystem delays can exhaust a preparation budget; successful completion is not guaranteed.
+
+#### Usage and troubleshooting
+
+Run fixture and runner regressions through the standard Make targets:
+
+```bash
+make test PYTEST_ARGS='tests/test_makefile_shared_readiness.py tests/test_run_parallel_tests.py'
+make test PYTEST_ARGS='tests/test_makefile_markers.py tests/test_makefile_stamp_test_idempotency.py'
+make test-cov PYTEST_ARGS='tests/test_makefile_markers.py'
+```
+
+On a preparation failure, the runner returns a nonzero failure summary with
+`fixture_preparation`, writes the configured JSON report, and dispatches zero workers. Inspect
+the captured stage, shared path, budget, and subprocess stderr before retrying:
+
+- **Lock deadline:** check for another active Make fixture preparation using the reported base;
+  let that run finish or stop it through its owning runner, then repeat the Make command.
+- **Creation or installation failure:** check temporary-directory permissions, disk space, and
+  the package-service/network diagnostic in stderr. Restore the dependency service or local
+  resource and retry; the helper rebuilds an incomplete base under the lock.
+- **Validation or stale readiness:** check the reported interpreter and marker paths. Missing
+  components trigger automatic rebuild on the next call; a marker alone is insufficient. Avoid
+  manually publishing a marker or mutating a ready shared base.
+- **Materialization failure:** inspect the workspace path and copy diagnostic for filesystem,
+  space, or hardlink support problems. Correct that condition and repeat the Make command;
+  the failed partial `.venv` is removed automatically.
+
+Keep the existing test deadlines and worker settings when investigating prerequisite failures.
+The focused readiness regressions cover contention, stale caches, cumulative deadlines, retry,
+partial copies, and descendant cleanup; runner regressions cover ordering, fail-closed dispatch,
+coverage preparation, and selection exclusions.
 
 Shared static parsers for `##` help lines and target recipe bodies live in
 `tests/makefile_contract_helpers.py` (`makefile_target_help_comment`,
@@ -2202,7 +2256,8 @@ python scripts/audit_test_durations.py tests.txt
   `test_makefile_install_stamp_contract.py`, `test_makefile_exit_behavior.py`,
   `test_makefile_target_install_test.py`, `test_makefile_target_filtering.py`) with
   explicit per-module timeout budgets (<= 60s) and pre-warmed virtualenv caching to
-  guarantee execution well under the 120s worker timeout ceiling during parallel contention.
+  reduce repeated setup work. PYPOST-1298 adds bounded preparation and materialization;
+  caching does not guarantee completion within test or worker deadlines under contention.
 - Optional verbose CI job: `--durations=10 --durations-min=5` on manual/workflow_dispatch runs
   (PYPOST-667).
 
