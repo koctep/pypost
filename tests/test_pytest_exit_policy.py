@@ -36,27 +36,19 @@ include = ["pypost*"]
 """
 
 
-def _seed_minimal_project(workspace: Path) -> None:
-    pypost_dir = workspace / "pypost"
-    pypost_dir.mkdir(exist_ok=True)
-    (pypost_dir / "__init__.py").write_text("", encoding="utf-8")
-
-
 def _prepare_missing_runner_workspace(tmp_path: Path) -> None:
+    """Satisfy early Make prerequisites locally without installing dependencies."""
     shutil.copy(MAKEFILE, tmp_path / "Makefile")
     (tmp_path / "pyproject.toml").write_text(_MINIMAL_PYPROJECT, encoding="utf-8")
-    _seed_minimal_project(tmp_path)
-    (tmp_path / "tests").mkdir()
-
-    install = subprocess.run(
-        ["make", f"PYTHON={sys.executable}", "install"],
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert install.returncode == 0, install.stderr
+    venv = tmp_path / ".venv"
+    bin_dir = venv / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "python").symlink_to(sys.executable)
+    version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    (venv / f".initialized-{version}").touch()
+    # Write stamps after metadata and initialization so Make does not rebuild them.
+    for extra in ("test", "otel"):
+        (venv / f".venv-{extra}-{version}").touch()
 
 
 def _seed_missing_runner_coverage_files(tmp_path: Path) -> tuple[Path, Path, Path]:
