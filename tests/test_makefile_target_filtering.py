@@ -19,7 +19,7 @@ class TestTargetFiltering:
     def test_make_test_excludes_slow_marker(self, make_workspace: Path) -> None:
         slow_test = make_workspace / "tests" / "test_slow_fail.py"
         slow_test.write_text(
-            "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n"
+            "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n\n"
             "@pytest.mark.slow\n"
             "def test_would_fail_if_run() -> None:\n"
             "    assert False\n",
@@ -48,7 +48,7 @@ class TestTargetFiltering:
         )
         unmarked = make_workspace / "tests" / "test_unmarked_fail.py"
         unmarked.write_text(
-            "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n"
+            "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n\n"
             "def test_would_fail_if_run() -> None:\n"
             "    assert False\n",
             encoding="utf-8",
@@ -56,7 +56,7 @@ class TestTargetFiltering:
         marked = make_workspace / "tests" / "test_agent_marked.py"
         marked.write_text(
             "import pytest\n\n"
-            "pytestmark = [pytest.mark.timeout(10), pytest.mark.agent_e2e]\n\n"
+            "pytestmark = [pytest.mark.timeout(10), pytest.mark.agent_e2e]\n\n\n"
             "def test_agent_marked_ok() -> None:\n"
             "    assert True\n",
             encoding="utf-8",
@@ -72,7 +72,7 @@ class TestTargetFiltering:
         """PYPOST-791: PYTEST_ARGS must be forwarded to pytest (not silently ignored)."""
         failing = make_workspace / "tests" / "test_failing.py"
         failing.write_text(
-            "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n"
+            "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n\n"
             "def test_always_fails() -> None:\n"
             "    assert False\n",
             encoding="utf-8",
