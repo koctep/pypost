@@ -63,6 +63,9 @@ server-provided handoff value; do not reconstruct it or substitute the normal Dr
 - `google_drive_upload_base_url`: Base URL for file upload endpoints
   (default: `https://www.googleapis.com/upload/drive/v3`).
 - `google_drive_access_token`: OAuth 2.0 Bearer access token (`secret: true`).
+  Includes rich setup guidance (`help_text`) detailing Google Cloud Console project creation,
+  OAuth consent screen configuration, API enablement, scopes, and token exchange. See
+  [Collection Variable Setup Guidance](collection_variable_guidance.md).
 - `google_drive_upload_session_url`: The `Location` header returned by the initiation request.
   The fixture leaves it blank until a session is created.
 - `google_drive_chunk_start`, `google_drive_chunk_end`, and `google_drive_chunk_length`:
