@@ -86,6 +86,19 @@ partially installed row. Normal workspace rows and upstream proxy rows retain
 their existing save and runtime paths; library-only identity and overlay logic
 is not applied to them.
 
+#### Planned Variable Setup Wizard (PYPOST-1284)
+
+Epic [PYPOST-1284](https://pypost.atlassian.net/browse/PYPOST-1284) enhances library variable
+configuration in `_McpServerEditor` with a dedicated setup wizard and rich guidance:
+- `CollectionVariable.help_text` schema extension ([PYPOST-1372](https://pypost.atlassian.net/browse/PYPOST-1372)).
+- Expandable `VariableGuidanceCard` and `VariableSetupWizardDialog` components ([PYPOST-1373](https://pypost.atlassian.net/browse/PYPOST-1373)).
+- Wizard launch and overlay persistence in `_McpServerEditor` ([PYPOST-1374](https://pypost.atlassian.net/browse/PYPOST-1374)).
+- Reference collection fixtures with OAuth guidance and contract tests ([PYPOST-1375](https://pypost.atlassian.net/browse/PYPOST-1375)).
+
+Full component architecture, UI interaction flows, and schema prose belong to child
+stories PYPOST-1372..1375 when they run their respective Step 8.
+
+
 ## Configuration and lifecycle
 
 `AppSettings.mcp_servers` is a list of `McpServerConfiguration` objects saved
