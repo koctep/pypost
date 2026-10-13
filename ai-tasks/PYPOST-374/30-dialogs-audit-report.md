@@ -1,8 +1,8 @@
 # PYPOST-374: Individual Dialog SOLID Audit Report
 
 **Date:** 2026-06-11
-**Inventory refreshed:** 2026-10-07 (PYPOST-1287)
-**Scope:** `pypost/ui/dialogs/` (nine dialog modules, 2,505 LOC total)
+**Inventory refreshed:** 2026-10-13 (PYPOST-1361)
+**Scope:** `pypost/ui/dialogs/` (nine dialog modules, 2,693 LOC total)
 **Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)
 **Baseline comparison:** PYPOST-40 grouped inventory ~400 LOC, five dialogs named
 
@@ -31,14 +31,14 @@ complete for the full current scope.
 | `about_dialog.py` | 43 | `AboutDialog` | Static app information | `main_window.py` |
 | `env_dialog.py` | 112 | `EnvironmentDialog` | Environment manager shell | env presenter |
 | `hotkeys_dialog.py` | 69 | `HotkeysDialog` | Shared shortcut reference table | `main_window.py` |
-| `library_dialogs.py` | 703 | `GitCommitDialog` + auth/clone | Git library manager dialogs | library manager |
+| `library_dialogs.py` | 703 | `GitCommitDialog` + auth/clone | Git library dialogs | library mgr |
 | `mcp_activity_dialog.py` | 117 | `McpActivityDialog` | MCP activity viewer | env presenter |
-| `mcp_servers_dialog.py` | 1,031 | `McpServersDialog` + editor | MCP server manager | main window |
+| `mcp_servers_dialog.py` | 1,219 | `McpServersDialog` + editor | MCP server manager | main window |
 | `mcp_tools_overview_dialog.py` | 74 | Tool overview | MCP tools | env |
 | `save_dialog.py` | 93 | `SaveRequestDialog` | Save-as picker | save orchestrator |
 | `settings_dialog.py` | 263 | `SettingsDialog` | Settings composition | main window |
 
-**Total:** 2,505 LOC (vs PYPOST-40 grouped ~400 LOC).
+**Total:** 2,693 LOC (vs PYPOST-40 grouped ~400 LOC).
 
 Verify counts against discovery (each failure names the module or aggregate with its recorded
 and discovered values):
@@ -97,8 +97,8 @@ Display behavior is low risk.
 | ISP | Good | Clean parameter interfaces per dialog role |
 | DIP | Good | Interacts through Git service / presenter abstractions without transport lock-in |
 
-**Maintainability:** Strong separation across commit, authentication, and clone workflows. **Test coverage:**
-Covered via unit and UI tests in `tests/test_ui_library_manager.py`.
+**Maintainability:** Strong separation across commit, authentication, and clone workflows.
+**Test coverage:** Covered via unit and UI tests in `tests/test_ui_library_manager.py`.
 
 ### `mcp_activity_dialog.py` — McpActivityDialog
 

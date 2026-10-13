@@ -6,8 +6,8 @@
 
 | Metric | Audit era (PYPOST-40) | Baseline | Cap |
 | --- | ---: | ---: | ---: |
-| `main_window.py` file LOC | 1040 | 459 | 477 |
-| `MainWindow` class LOC | 1040 | 411 | 426 |
+| `main_window.py` file LOC | 1040 | 462 | 477 |
+| `MainWindow` class LOC | 1040 | 414 | 426 |
 
 ## Module inventory caps
 
@@ -25,10 +25,10 @@
 | `pypost/core/storage.py` | 80 | 364 | 380 |
 | `pypost/core/template_service.py` | 36 | 264 | 265 |
 | `pypost/core/websocket_registry.py` | — | 129 | 131 |
-| `pypost/ui/mcp_server_controller.py` | — | 722 | 795 |
-| `pypost/ui/presenters/collections_presenter.py` | — | 527 | 535 |
-| `pypost/ui/presenters/env_presenter.py` | — | 438 | 482 |
-| `pypost/ui/presenters/mcp_controls_presenter.py` | — | 370 | 407 |
+| `pypost/ui/mcp_server_controller.py` | — | 784 | 795 |
+| `pypost/ui/presenters/collections_presenter.py` | — | 534 | 535 |
+| `pypost/ui/presenters/env_presenter.py` | — | 460 | 482 |
+| `pypost/ui/presenters/mcp_controls_presenter.py` | — | 384 | 407 |
 | `pypost/ui/presenters/tabs_presenter.py` | — | 1053 | 1165 |
 | `pypost/ui/widgets/mixins.py` | — | 396 | 411 |
 
