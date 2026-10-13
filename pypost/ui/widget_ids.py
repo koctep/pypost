@@ -219,6 +219,14 @@ KEY_WIDGET_IDS = (
     MCP_CLIENT_RESULT_UNFOLD_ALL_BUTTON,
 )
 
+# Variable Setup Wizard surfaces (PYPOST-1373).
+VARIABLE_SETUP_WIZARD_DIALOG = "pypost_variable_setup_wizard_dialog"
+VARIABLE_GUIDANCE_CARD = "pypost_variable_guidance_card"
+VARIABLE_GUIDANCE_EXPAND_BUTTON = "pypost_variable_guidance_expand_button"
+VARIABLE_GUIDANCE_SECRET_TOGGLE = "pypost_variable_guidance_secret_toggle"
+VARIABLE_SETUP_APPLY_BUTTON = "pypost_variable_setup_apply_button"
+VARIABLE_SETUP_CANCEL_BUTTON = "pypost_variable_setup_cancel_button"
+
 
 def set_widget_id(widget: QObject, widget_id: str) -> None:
     """Set ``objectName`` and mirror ``accessibleIdentifier`` on QWidgets."""
