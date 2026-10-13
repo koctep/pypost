@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 import yaml
-
+from scripts import check_test_lint_baseline as gate
+from tests import makefile_test_helpers as helpers
 from tests.makefile_test_helpers import (
     POST_INSTALL_SANITY_SNIPPETS,
     PYPROJECT,
@@ -185,3 +186,11 @@ def test_committed_seed_covers_independent_source_inventory(tmp_path: Path) -> N
     assert not missing, f"incomplete committed install seed: {missing}"
     for path in required:
         assert (tmp_path / path).read_bytes() == (REPO_ROOT / path).read_bytes(), path
+
+
+@pytest.mark.timeout(10)
+def test_seed_minimal_project_conforms_to_flake8(tmp_path: Path) -> None:
+    """_seed_minimal_project must produce flake8-compliant test stubs."""
+    helpers._seed_minimal_project(tmp_path)
+    findings = gate.run_flake8(tmp_path)
+    assert findings == []

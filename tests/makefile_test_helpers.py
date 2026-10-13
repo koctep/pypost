@@ -134,7 +134,7 @@ def _seed_minimal_project(workspace: Path) -> None:
     tests_dir = workspace / "tests"
     tests_dir.mkdir(exist_ok=True)
     (tests_dir / "test_noop.py").write_text(
-        "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n"
+        "import pytest\n\npytestmark = pytest.mark.timeout(10)\n\n\n"
         "def test_noop() -> None:\n    assert True\n",
         encoding="utf-8",
     )
