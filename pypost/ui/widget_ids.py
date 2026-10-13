@@ -54,6 +54,8 @@ MCP_CLIENT_INVOKE_BUTTON = "pypost_mcp_client_invoke_button"
 MCP_CLIENT_ARG_FORM = "pypost_mcp_client_arg_form"
 MCP_CLIENT_ARG_JSON = "pypost_mcp_client_arg_json"
 MCP_CLIENT_RESULT_PANE = "pypost_mcp_client_result_pane"
+MCP_CLIENT_RESULT_FOLD_ALL_BUTTON = "pypost_mcp_client_result_fold_all_button"
+MCP_CLIENT_RESULT_UNFOLD_ALL_BUTTON = "pypost_mcp_client_result_unfold_all_button"
 MCP_CLIENT_ELAPSED_LABEL = "pypost_mcp_client_elapsed_label"
 
 # WebSocket session surfaces (PYPOST-1132 / WS-4).
@@ -213,6 +215,8 @@ KEY_WIDGET_IDS = (
     WS_SEQUENCE_STEP_REMOVE_BUTTON,
     WS_SEQUENCE_STEP_UP_BUTTON,
     WS_SEQUENCE_STEP_DOWN_BUTTON,
+    MCP_CLIENT_RESULT_FOLD_ALL_BUTTON,
+    MCP_CLIENT_RESULT_UNFOLD_ALL_BUTTON,
 )
 
 
