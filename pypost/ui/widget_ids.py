@@ -10,6 +10,8 @@ See ``doc/dev/ui_identity.md`` for the naming convention and lookup rules.
 
 from __future__ import annotations
 
+from typing import Final
+
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QWidget
 
@@ -145,6 +147,11 @@ LIBRARY_COMMIT_PUSH_DIALOG = "pypost_library_commit_push_dialog"
 LIBRARY_DIRTY_PULL_WARNING_DIALOG = "pypost_library_dirty_pull_warning_dialog"
 LIBRARY_BRANCH_SWITCH_DIALOG = "pypost_library_branch_switch_dialog"
 
+# MCP Server Editor surfaces (PYPOST-1374).
+MCP_SERVER_CONFIGURE_VARIABLES_BUTTON: Final[str] = (
+    "pypost_mcp_server_configure_variables_button"
+)
+
 KEY_WIDGET_IDS = (
     MAIN_WINDOW,
     COLLECTION_TREE,
@@ -217,6 +224,7 @@ KEY_WIDGET_IDS = (
     WS_SEQUENCE_STEP_DOWN_BUTTON,
     MCP_CLIENT_RESULT_FOLD_ALL_BUTTON,
     MCP_CLIENT_RESULT_UNFOLD_ALL_BUTTON,
+    MCP_SERVER_CONFIGURE_VARIABLES_BUTTON,
 )
 
 # Variable Setup Wizard surfaces (PYPOST-1373).

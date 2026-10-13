@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from pypost.core.builtin_collections import BuiltinCollectionView
@@ -33,13 +34,21 @@ from pypost.core.environment_creation import CreateEnvironment
 from pypost.core.mcp_activity_log import McpActivityEntry
 from pypost.core.mcp_server_registry import McpServerStatus
 from pypost.core.mcp_tools_overview import collect_mcp_tool_overview
+from pypost.models.collection_variable import CollectionVariable
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import McpServerConfiguration
 from pypost.ui.dialogs.mcp_activity_dialog import McpActivityDialog
 from pypost.ui.dialogs.mcp_tools_overview_dialog import McpToolsOverviewDialog
 from pypost.ui.mcp_builtin_collection_copy import BuiltinCollectionCopy
-from pypost.ui.widgets.mcp_server_headers_table import McpServerHeadersTable
 from pypost.ui.mcp_library_source_picker import LibraryMcpSourcePicker
+from pypost.ui.widget_ids import (
+    MCP_SERVER_CONFIGURE_VARIABLES_BUTTON,
+    set_widget_id,
+)
+from pypost.ui.widgets.mcp_server_headers_table import McpServerHeadersTable
+from pypost.ui.variable_setup_wizard_dialog import (
+    VariableSetupWizardDialog,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -381,9 +390,41 @@ class McpServersDialog(QDialog):
     ) -> None:
         selection = dialog.library_selection()
         if selection is not None and self._save_library is not None:
-            self._save_library(config, selection, dialog.library_handoff())
+            handoff = dialog.library_handoff()
+            overlay = handoff.get("overlay", {}) if isinstance(handoff, dict) else {}
+            overrides = overlay.get("overrides", {}) if isinstance(overlay, dict) else {}
+            secrets = overlay.get("secrets", {}) if isinstance(overlay, dict) else {}
+            overrides_count = len(overrides) if isinstance(overrides, dict) else 0
+            secrets_count = len(secrets) if isinstance(secrets, dict) else 0
+            logger.info(
+                "Saving MCP server %s with library overlay: library_id=%s, "
+                "overrides_count=%d, secrets_count=%d",
+                config.id,
+                selection.get("library_id"),
+                overrides_count,
+                secrets_count,
+            )
+            self._save_library(config, selection, handoff)
             return
         self._save(config)
+
+
+class _ConfigureVariablesButton(QPushButton):
+    """Action button with explicit visibility tracking for headless testing."""
+
+    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(text, parent)
+        self._explicit_visible: bool = False
+
+    def setVisible(self, visible: bool) -> None:
+        self._explicit_visible = visible
+        super().setVisible(visible)
+
+    def isVisible(self) -> bool:
+        parent = self.parentWidget()
+        if parent is not None and not parent.isVisible():
+            return self._explicit_visible
+        return super().isVisible()
 
 
 class _McpServerEditor(QDialog):
@@ -555,6 +596,14 @@ class _McpServerEditor(QDialog):
         self._layout.addRow("Library Collection", self._library_collection)
         self._layout.addRow("Library Profile", self._library_profile)
         self._layout.addRow("Library Variables", self._library_variables)
+        self._configure_variables_btn = _ConfigureVariablesButton("Configure Variables…")
+        self._configure_variables_btn.setAutoDefault(False)
+        set_widget_id(
+            self._configure_variables_btn,
+            MCP_SERVER_CONFIGURE_VARIABLES_BUTTON,
+        )
+        self._configure_variables_btn.clicked.connect(self._on_configure_variables_clicked)
+        self._layout.addRow("", self._configure_variables_btn)
         self._layout.addRow("Upstream URL", self._upstream_url)
         self._layout.addRow("Transport", self._upstream_transport)
         self._layout.addRow("Custom Headers", self._headers_table)
@@ -592,6 +641,7 @@ class _McpServerEditor(QDialog):
         self._on_collection_source_changed()
         if self._collection_source.currentData() == "library":
             self._begin_library_listing()
+        self._update_configure_variables_button_state()
 
     def _mark_copy_closed(self, _result: int) -> None:
         self._copy_closed = True
@@ -691,6 +741,7 @@ class _McpServerEditor(QDialog):
         if label_headers:
             label_headers.setVisible(is_proxy)
         self._on_collection_source_changed()
+        self._update_configure_variables_button_state()
 
     def _on_collection_source_changed(self) -> None:
         source_data = self._collection_source.currentData()
@@ -725,6 +776,7 @@ class _McpServerEditor(QDialog):
             variables_label.setVisible(is_local and is_library)
         self._library_profile.setVisible(is_local and is_library)
         self._library_variables_widget_visible(is_local and is_library)
+        self._update_configure_variables_button_state()
         if is_local and is_library and self._library.count() == 0:
             self._begin_library_listing()
 
@@ -864,6 +916,7 @@ class _McpServerEditor(QDialog):
             )
         elif self._library_collection.currentIndex() >= 0:
             self._populate_library_environment(self.library_selection() or {})
+        self._update_configure_variables_button_state()
 
     @staticmethod
     def _selection_identity(selection: object) -> tuple[str, str, str, object] | None:
@@ -881,6 +934,7 @@ class _McpServerEditor(QDialog):
             return
         selection = self.library_selection()
         self._populate_library_environment(selection or {})
+        self._update_configure_variables_button_state()
 
     def _on_library_profile_changed(self) -> None:
         if self._collection_source.currentData() == "library":
@@ -1006,6 +1060,7 @@ class _McpServerEditor(QDialog):
             self._server_type.currentData() == "local"
             and self._collection_source.currentData() == "library"
         )
+        self._update_configure_variables_button_state()
 
     def library_selection(self) -> dict[str, object] | None:
         if self._collection_source.currentData() != "library":
@@ -1074,6 +1129,156 @@ class _McpServerEditor(QDialog):
             declarations=declarations,
         )
         return overlay
+
+    def _update_configure_variables_button_state(self) -> None:
+        """Update visibility and enabled state of the Configure Variables action button."""
+        if not hasattr(self, "_configure_variables_btn"):
+            return
+        is_local = self._server_type.currentData() == "local"
+        is_library = self._collection_source.currentData() == "library"
+        selection = self.library_selection() if is_library else None
+        raw_variables = selection.get("manifest_variables", []) if selection else []
+        has_variables = bool(raw_variables)
+
+        should_show = is_local and is_library and has_variables
+        self._configure_variables_btn.setVisible(should_show)
+        self._configure_variables_btn.setEnabled(should_show)
+
+        btn_label = self._layout.labelForField(self._configure_variables_btn)
+        if btn_label is not None:
+            btn_label.setVisible(should_show)
+
+    def _create_variable_wizard(
+        self,
+        variables: list[CollectionVariable],
+        initial_values: dict[str, Any],
+        collection_name: str,
+    ) -> VariableSetupWizardDialog:
+        """Instantiate VariableSetupWizardDialog (seam for unit tests)."""
+        return VariableSetupWizardDialog(
+            variables=variables,
+            initial_values=initial_values,
+            collection_name=collection_name,
+            parent=self,
+        )
+
+    def _launch_variable_wizard(self, dialog: VariableSetupWizardDialog) -> int:
+        """Execute wizard dialog modally (seam for unit tests)."""
+        return dialog.exec()
+
+    def _on_configure_variables_clicked(self) -> None:
+        """Open the VariableSetupWizardDialog pre-populated with current overlay state."""
+        selection = self.library_selection()
+        if not selection:
+            return
+
+        raw_variables = selection.get("manifest_variables", [])
+        if not isinstance(raw_variables, list) or not raw_variables:
+            return
+
+        variables: list[CollectionVariable] = []
+        for raw in raw_variables:
+            if isinstance(raw, CollectionVariable):
+                variables.append(raw)
+            elif isinstance(raw, dict):
+                data = {
+                    k: v
+                    for k, v in raw.items()
+                    if k in CollectionVariable.model_fields or k == "default_value"
+                }
+                if "default" not in data and "default_value" in raw:
+                    data["default"] = raw["default_value"]
+                variables.append(CollectionVariable.model_validate(data))
+
+        initial_values: dict[str, Any] = {}
+        profiles = selection.get("manifest_profiles", {})
+        active_profile = self._library_profile.currentData()
+        profile_values = (
+            profiles.get(active_profile, {})
+            if isinstance(profiles, dict) and active_profile
+            else {}
+        )
+        if not isinstance(profile_values, dict):
+            profile_values = {}
+        overrides = self._library_overlay.get("overrides", {})
+        if not isinstance(overrides, dict):
+            overrides = {}
+        secrets = self._library_overlay.get("secrets", {})
+        if not isinstance(secrets, dict):
+            secrets = {}
+
+        for var in variables:
+            val = profile_values.get(var.name, var.default)
+            if var.name in overrides:
+                val = overrides[var.name]
+            if var.name in secrets:
+                val = secrets[var.name]
+            if var.name in self._library_variable_fields:
+                text = self._library_variable_fields[var.name].text()
+                if text:
+                    val = text
+            if val is not None:
+                initial_values[var.name] = val
+
+        collection_name = str(
+            selection.get("name") or selection.get("path") or "Library Collection"
+        )
+
+        logger.info(
+            "mcp_server_editor_wizard_launched server=%s collection=%s variable_count=%d",
+            self._id,
+            collection_name,
+            len(variables),
+        )
+        dialog = self._create_variable_wizard(
+            variables=variables,
+            initial_values=initial_values,
+            collection_name=collection_name,
+        )
+        if self._launch_variable_wizard(dialog) == QDialog.DialogCode.Accepted:
+            result = dialog.get_configured_variables()
+            overrides = result.get("overrides", {})
+            secrets = result.get("secrets", {})
+            overrides_count = len(overrides) if isinstance(overrides, dict) else 0
+            secrets_count = len(secrets) if isinstance(secrets, dict) else 0
+            values = result.get("values", {})
+            configured_count = len(values) if isinstance(values, dict) else 0
+            logger.info(
+                "mcp_server_editor_wizard_applied server=%s collection=%s "
+                "configured_count=%d overrides_count=%d secrets_count=%d",
+                self._id,
+                collection_name,
+                configured_count,
+                overrides_count,
+                secrets_count,
+            )
+            self._sync_wizard_results_to_overlay(result)
+        else:
+            logger.info(
+                "mcp_server_editor_wizard_cancelled server=%s collection=%s",
+                self._id,
+                collection_name,
+            )
+
+    def _sync_wizard_results_to_overlay(self, result: dict[str, Any]) -> None:
+        """Synchronize accepted wizard variables into draft overlay and inline editor fields."""
+        values = result.get("values", {})
+        overrides = result.get("overrides", {})
+        secrets = result.get("secrets", {})
+
+        if "overrides" not in self._library_overlay:
+            self._library_overlay["overrides"] = {}
+        if "secrets" not in self._library_overlay:
+            self._library_overlay["secrets"] = {}
+
+        self._library_overlay["overrides"].update(overrides)
+        self._library_overlay["secrets"].update(secrets)
+
+        for name, value in values.items():
+            if name in self._library_variable_fields:
+                self._library_variable_fields[name].setText(
+                    "" if value is None else str(value)
+                )
 
     def _parse_headers(self) -> dict[str, str]:
         return self._headers_table.get_data()

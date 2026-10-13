@@ -141,7 +141,56 @@ A modal `QDialog` (widget ID `pypost_variable_setup_wizard_dialog`) hosting a sc
   - `get_configured_variables() -> dict[str, dict[str, Any]]`: Returns a partitioned payload with `"values"`, `"overrides"` (non-secrets for settings storage), and `"secrets"` (sensitive credentials for secure overlay storage).
 - **Test Automation Identifiers**: All interactive components are registered in `pypost/ui/widget_ids.py` (`VARIABLE_SETUP_WIZARD_DIALOG`, `VARIABLE_GUIDANCE_CARD`, `VARIABLE_GUIDANCE_EXPAND_BUTTON`, `VARIABLE_GUIDANCE_SECRET_TOGGLE`, `VARIABLE_SETUP_APPLY_BUTTON`, `VARIABLE_SETUP_CANCEL_BUTTON`).
 
+#### MCP Server Editor Wizard Integration (PYPOST-1374)
 
+Story [PYPOST-1374](https://pypost.atlassian.net/browse/PYPOST-1374) (under parent epic [PYPOST-1284](https://pypost.atlassian.net/browse/PYPOST-1284)) integrates `VariableSetupWizardDialog` into `_McpServerEditor` in `pypost/ui/dialogs/mcp_servers_dialog.py`, enabling interactive configuration and local overlay persistence for library-backed MCP servers:
+
+##### "Configure Variables…" Action Button
+
+- **Widget Identification**: The action button is registered as `_ConfigureVariablesButton` with automation ID `MCP_SERVER_CONFIGURE_VARIABLES_BUTTON` (`pypost_mcp_server_configure_variables_button`) in `pypost/ui/widget_ids.py` and included in `KEY_WIDGET_IDS`.
+- **Placement**: Embedded directly below the library variables form layout in `_McpServerEditor`.
+- **Visibility and Enablement Lifecycle**: Governed by `_update_configure_variables_button_state()`. The button and its layout row label are dynamically shown and enabled if and only if:
+  1. The server type is `local` (`self._server_type.currentData() == "local"`),
+  2. The collection source is `library` (`self._collection_source.currentData() == "library"`), and
+  3. The currently selected collection declares at least one variable (`manifest_variables` is non-empty).
+  If the source switches away from library (e.g. to `workspace` or `builtin`), or the selected library collection defines no variables, the button is hidden and disabled. State is evaluated whenever server type, collection source, or library collection selections change.
+
+##### Wizard Launch and Pre-population Flow
+
+When the user clicks "Configure Variables…" (`_on_configure_variables_clicked()`):
+1. **Manifest Parsing**: Deserializes raw collection variables from `selection.get("manifest_variables", [])` into `CollectionVariable` models, supporting legacy `default_value` mappings.
+2. **Initial Values Hierarchy**: Merges active configuration state in order of precedence:
+   - Selected active profile values (`manifest_profiles[active_profile]`),
+   - Manifest default fallbacks (`var.default`),
+   - Draft overlay non-secret overrides (`_library_overlay["overrides"]`),
+   - Draft overlay secrets (`_library_overlay["secrets"]`),
+   - Any uncommitted inline text currently entered in `_library_variable_fields`.
+3. **Modal Dialog Launch**: Instantiates `VariableSetupWizardDialog` via the `_create_variable_wizard` factory seam, logging operational launch metadata (`mcp_server_editor_wizard_launched`), and executes it modally via `_launch_variable_wizard(dialog)`.
+
+##### Acceptance, Synchronization, and Cancellation Semantics
+
+- **Modal Acceptance (`QDialog.DialogCode.Accepted`)**:
+  - Extracts partitioned results via `dialog.get_configured_variables()`, containing:
+    - `"values"`: All resolved variables.
+    - `"overrides"`: Non-secret variable overrides.
+    - `"secrets"`: Sensitive credentials.
+  - Invokes `_sync_wizard_results_to_overlay(result)`:
+    - Merges `overrides` into `self._library_overlay["overrides"]`.
+    - Merges `secrets` into `self._library_overlay["secrets"]`.
+    - Synchronizes matching inline editor fields (`_library_variable_fields[name].setText(...)`). Secret fields remain masked via password echo mode.
+  - Logs safe operational counts (`mcp_server_editor_wizard_applied` with `configured_count`, `overrides_count`, `secrets_count`), ensuring zero credential or payload leakage.
+- **Modal Cancellation (`QDialog.DialogCode.Rejected`)**:
+  - Discards changes made in the wizard, preserving all existing draft overlay state and inline field values intact.
+  - Emits `mcp_server_editor_wizard_cancelled` operational log.
+- **Persistence Pipeline**:
+  - On editor save (`_accept_if_complete()`), `library_handoff()` produces an overlay candidate from `_library_overlay` and inline fields, validated through `LibraryRuntimeResolver.prepare_environment(...)`.
+  - Routed through `McpServerSettingsController.save_library_server(...)`, which persists the validated `LocalLibraryOverlay` to `~/.pypost/overlays/{library_id}.json`.
+
+##### Headless Test Seams
+
+To ensure fast, deterministic UI unit testing without hanging on modal Qt event loops:
+- `_create_variable_wizard(variables, initial_values, collection_name) -> VariableSetupWizardDialog`: Factory method hook for creating the wizard dialog instance.
+- `_launch_variable_wizard(dialog) -> int`: Invocation hook delegating to `dialog.exec()`. In unit test suites (such as `tests/test_mcp_servers_dialog_variable_wizard_repro.py`), tests mock `_launch_variable_wizard` to simulate `Accepted` or `Rejected` return codes and inspect pre-populated parameters without displaying native modal windows.
 
 ## Configuration and lifecycle
 
@@ -248,5 +297,5 @@ for the metric contract.
 Run the focused checks after changing this subsystem:
 
 ```bash
-make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py'
+make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py'
 ```
