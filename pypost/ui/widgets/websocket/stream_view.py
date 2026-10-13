@@ -45,7 +45,6 @@ from PySide6.QtWidgets import (
     QStyle,
     QStyleOptionViewItem,
     QStyledItemDelegate,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -62,8 +61,10 @@ from pypost.ui.widget_ids import (
     WS_STREAM_CLEAR_FILTER_BUTTON,
     WS_STREAM_DETAIL,
     WS_STREAM_DETAIL_COPY_BUTTON,
+    WS_STREAM_DETAIL_FOLD_ALL_BUTTON,
     WS_STREAM_DETAIL_HEX_BUTTON,
     WS_STREAM_DETAIL_SET_VAR_BUTTON,
+    WS_STREAM_DETAIL_UNFOLD_ALL_BUTTON,
     WS_STREAM_DETAIL_WRAP_BUTTON,
     WS_STREAM_DIRECTION_FILTER,
     WS_STREAM_DROP_NOTICE,
@@ -76,6 +77,9 @@ from pypost.ui.widget_ids import (
     WS_STREAM_VIEW,
     set_widget_id,
 )
+from pypost.ui.widgets.fold.fold_region import BodyFormat
+from pypost.ui.widgets.fold.format_detector import detect_body_format
+from pypost.ui.widgets.foldable_code_view import FoldableCodeView
 from pypost.ui.widgets.websocket.stream_model import StreamListModel
 
 if TYPE_CHECKING:
@@ -385,13 +389,25 @@ class StreamDetailPane(QWidget):
         self._hex_btn.clicked.connect(self._on_toggle_hex)
         toolbar.addWidget(self._hex_btn)
 
+        self._fold_all_btn = QPushButton("Fold All", self)
+        set_widget_id(self._fold_all_btn, WS_STREAM_DETAIL_FOLD_ALL_BUTTON)
+        self._fold_all_btn.clicked.connect(self.fold_all)
+        self._fold_all_btn.setEnabled(False)
+        toolbar.addWidget(self._fold_all_btn)
+
+        self._unfold_all_btn = QPushButton("Unfold All", self)
+        set_widget_id(self._unfold_all_btn, WS_STREAM_DETAIL_UNFOLD_ALL_BUTTON)
+        self._unfold_all_btn.clicked.connect(self.unfold_all)
+        self._unfold_all_btn.setEnabled(False)
+        toolbar.addWidget(self._unfold_all_btn)
+
         toolbar.addStretch()
         layout.addLayout(toolbar)
 
         # Payload display editor
-        self._editor = QTextEdit(self)
+        self._editor = FoldableCodeView(self)
         self._editor.setReadOnly(True)
-        self._editor.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._editor.setLineWrapMode(FoldableCodeView.LineWrapMode.WidgetWidth)
         font = QFont("Monospace")
         font.setStyleHint(QFont.StyleHint.Monospace)
         self._editor.setFont(font)
@@ -422,6 +438,24 @@ class StreamDetailPane(QWidget):
         """Return the truncation banner label widget."""
         return self._truncation_banner
 
+    def fold_controller(self):
+        """Return the underlying fold controller."""
+        return self._editor.fold_controller()
+
+    def fold_all(self) -> None:
+        """Fold all collapsible blocks."""
+        logger.debug("websocket_stream_folding_fold_all_invoked")
+        self._editor.fold_all()
+
+    def unfold_all(self) -> None:
+        """Unfold all collapsible blocks."""
+        logger.debug("websocket_stream_folding_unfold_all_invoked")
+        self._editor.unfold_all()
+
+    def body_format(self) -> BodyFormat:
+        """Return the current body format."""
+        return self._editor.body_format()
+
     def set_entry(self, entry: Optional[StreamEntry]) -> None:
         """Display metadata and payload for the given StreamEntry."""
         self._current_entry = entry
@@ -429,7 +463,9 @@ class StreamDetailPane(QWidget):
             self._meta_lbl.setText("No message selected")
             self._is_truncated_flag = False
             self._truncation_banner.setVisible(False)
+            self._editor.set_body_format(BodyFormat.PLAIN)
             self._editor.setPlainText("")
+            self._update_fold_buttons(BodyFormat.PLAIN)
             return
 
         # Format metadata string
@@ -457,16 +493,36 @@ class StreamDetailPane(QWidget):
 
         self._render_payload()
 
+    def _update_fold_buttons(self, fmt: BodyFormat) -> None:
+        can_fold = (not self._is_hex_mode) and (
+            fmt in (BodyFormat.JSON, BodyFormat.XML, BodyFormat.YAML)
+        )
+        self._fold_all_btn.setEnabled(can_fold)
+        self._unfold_all_btn.setEnabled(can_fold)
+
     def _render_payload(self) -> None:
         if self._current_entry is None:
+            self._editor.set_body_format(BodyFormat.PLAIN)
             self._editor.setPlainText("")
+            self._update_fold_buttons(BodyFormat.PLAIN)
             return
 
         content = self._current_entry.payload
         if self._is_hex_mode:
+            self._editor.set_body_format(BodyFormat.PLAIN)
             self._editor.setPlainText(_format_hex_dump(content))
+            self._update_fold_buttons(BodyFormat.PLAIN)
         else:
+            fmt = detect_body_format(None, content)
+            logger.debug(
+                "websocket_stream_folding_format_detected format=%s byte_size=%d",
+                fmt.name,
+                len(content),
+            )
+            self._editor.set_body_format(fmt)
             self._editor.setPlainText(content)
+            self._editor.fold_controller().ensure_scanned()
+            self._update_fold_buttons(fmt)
 
     def _on_copy_clicked(self) -> None:
         cursor = self._editor.textCursor()
@@ -508,10 +564,10 @@ class StreamDetailPane(QWidget):
     def _on_toggle_wrap(self) -> None:
         self._is_wrap = not self._is_wrap
         if self._is_wrap:
-            self._editor.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+            self._editor.setLineWrapMode(FoldableCodeView.LineWrapMode.WidgetWidth)
             self._wrap_btn.setText("Wrap: ON")
         else:
-            self._editor.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+            self._editor.setLineWrapMode(FoldableCodeView.LineWrapMode.NoWrap)
             self._wrap_btn.setText("Wrap: OFF")
         logger.debug("websocket_detail_wrap_toggled wrap=%s", self._is_wrap)
 

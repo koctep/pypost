@@ -23,5 +23,11 @@ class LineNumberArea(QWidget):
         self._editor.line_number_area_mouse_press(event)
         event.accept()
 
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        handler = getattr(self._editor, "line_number_area_mouse_double_click", None)
+        if callable(handler):
+            handler(event)
+        event.accept()
+
     def keyPressEvent(self, event: QKeyEvent):
         event.accept()

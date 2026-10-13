@@ -84,6 +84,8 @@ WS_STREAM_DETAIL_COPY_BUTTON = "pypost_ws_stream_detail_copy_button"
 WS_STREAM_DETAIL_SET_VAR_BUTTON = "pypost_ws_stream_detail_set_var_button"
 WS_STREAM_DETAIL_WRAP_BUTTON = "pypost_ws_stream_detail_wrap_button"
 WS_STREAM_DETAIL_HEX_BUTTON = "pypost_ws_stream_detail_hex_button"
+WS_STREAM_DETAIL_FOLD_ALL_BUTTON = "pypost_ws_stream_detail_fold_all_button"
+WS_STREAM_DETAIL_UNFOLD_ALL_BUTTON = "pypost_ws_stream_detail_unfold_all_button"
 WS_STREAM_FOLLOW_TAIL_BADGE = "pypost_ws_stream_follow_tail_badge"
 
 # WebSocket composer & presets surfaces (PYPOST-1134 / WS-6).
@@ -183,6 +185,8 @@ KEY_WIDGET_IDS = (
     WS_STREAM_DETAIL_SET_VAR_BUTTON,
     WS_STREAM_DETAIL_WRAP_BUTTON,
     WS_STREAM_DETAIL_HEX_BUTTON,
+    WS_STREAM_DETAIL_FOLD_ALL_BUTTON,
+    WS_STREAM_DETAIL_UNFOLD_ALL_BUTTON,
     WS_STREAM_FOLLOW_TAIL_BADGE,
     WS_COMPOSER_FORMAT_COMBO,
     WS_PRESET_COMBO,

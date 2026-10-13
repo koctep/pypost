@@ -38,8 +38,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QPlainTextEdit,
     QStyleOptionViewItem,
-    QTextEdit,
     QWidget,
 )
 
@@ -625,7 +625,7 @@ def test_stream_detail_pane_selection_and_metadata(qapp: QApplication):
 
         # Metadata header text check
         assert pane.current_entry == entry
-        editor = pane.findChild(QTextEdit)
+        editor = pane.findChild(QPlainTextEdit)
         assert editor is not None
         assert '"status": "active"' in editor.toPlainText()
     finally:
@@ -648,7 +648,7 @@ def test_stream_detail_pane_wrap_and_hex_toggles(qapp: QApplication):
 
         wrap_btn = pane.findChild(QPushButton, widget_ids.WS_STREAM_DETAIL_WRAP_BUTTON)
         hex_btn = pane.findChild(QPushButton, widget_ids.WS_STREAM_DETAIL_HEX_BUTTON)
-        editor = pane.findChild(QTextEdit)
+        editor = pane.findChild(QPlainTextEdit)
 
         # 1. Toggle wrap
         initial_wrap = pane.is_wrap_mode
@@ -760,7 +760,7 @@ def test_stream_detail_pane_set_as_variable_signal(qapp: QApplication):
         qapp.processEvents()
 
         set_var_btn = pane.findChild(QPushButton, widget_ids.WS_STREAM_DETAIL_SET_VAR_BUTTON)
-        editor = pane.findChild(QTextEdit)
+        editor = pane.findChild(QPlainTextEdit)
         # Select specific token in editor
         cursor = editor.textCursor()
         cursor.select(cursor.SelectionType.Document)

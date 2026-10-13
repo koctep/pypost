@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 
+import logging
 from PySide6.QtCore import QEvent, QRect, Qt
 from PySide6.QtGui import (
     QFontMetrics,
@@ -15,6 +16,8 @@ from PySide6.QtWidgets import QPlainTextEdit
 from pypost.ui.widgets.fold.fold_controller import FoldController
 from pypost.ui.widgets.fold.fold_region import BodyFormat
 from pypost.ui.widgets.line_number_area import LineNumberArea
+
+logger = logging.getLogger(__name__)
 
 _CHEVRON_WIDTH = 14
 _CHEVRON_PADDING = 2
@@ -165,12 +168,9 @@ class FoldableCodeView(QPlainTextEdit):
             bottom = top + round(self.blockBoundingRect(block).height())
             block_number += 1
 
-    def line_number_area_mouse_press(self, event: QMouseEvent) -> None:
-        if event.button() != Qt.MouseButton.LeftButton:
-            return
-        event.accept()
-
-        y = event.position().y()
+    def _toggle_fold_at_y(
+        self, y: float, require_chevron_zone: bool = True, x: float = 0.0
+    ) -> None:
         block = self.firstVisibleBlock()
         block_number = block.blockNumber()
         top = round(
@@ -180,9 +180,15 @@ class FoldableCodeView(QPlainTextEdit):
 
         while block.isValid():
             if block.isVisible() and top <= y <= bottom:
-                if event.position().x() <= _CHEVRON_WIDTH:
+                if not require_chevron_zone or x <= _CHEVRON_WIDTH:
                     region = self._fold_controller.fold_header_at_block(block_number)
                     if region is not None:
+                        logger.debug(
+                            "foldable_code_view_gutter_toggle block=%d region=%s dblclick=%s",
+                            block_number,
+                            region.region_id,
+                            not require_chevron_zone,
+                        )
                         self._fold_controller.toggle(region.region_id)
                         self._line_number_area.update()
                 return
@@ -191,3 +197,19 @@ class FoldableCodeView(QPlainTextEdit):
             top = bottom
             bottom = top + round(self.blockBoundingRect(block).height())
             block_number += 1
+
+    def line_number_area_mouse_press(self, event: QMouseEvent) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        event.accept()
+        self._toggle_fold_at_y(
+            event.position().y(), require_chevron_zone=True, x=event.position().x()
+        )
+
+    def line_number_area_mouse_double_click(self, event: QMouseEvent) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        event.accept()
+        self._toggle_fold_at_y(
+            event.position().y(), require_chevron_zone=False, x=event.position().x()
+        )
