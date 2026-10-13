@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QPushButton,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +25,8 @@ from pypost.ui.widget_ids import (
     RESPONSE_STATUS,
     set_widget_id,
 )
+from pypost.ui.widgets.fold import BodyFormat, detect_body_format
+from pypost.ui.widgets.foldable_code_view import FoldableCodeView
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ SEARCH_DEBOUNCE_MS = 250
 
 class ResponseView(QWidget):
     variable_set_requested = Signal(object, str)
+    body_view: FoldableCodeView
 
     def __init__(self, indent_size=2, metrics: MetricsTrackerProtocol | None = None):
         super().__init__()
@@ -81,12 +83,18 @@ class ResponseView(QWidget):
         self.search_case_cb = QCheckBox("Match case")
         self.search_case_cb.toggled.connect(self._schedule_search_text_changed)
         self.search_status_label = QLabel("")
+        self.fold_all_btn = QPushButton("Fold All")
+        self.fold_all_btn.clicked.connect(lambda: self.body_view.fold_all())
+        self.unfold_all_btn = QPushButton("Unfold All")
+        self.unfold_all_btn.clicked.connect(lambda: self.body_view.unfold_all())
 
         self.status_layout.addWidget(self.search_input)
         self.status_layout.addWidget(self.search_prev_btn)
         self.status_layout.addWidget(self.search_next_btn)
         self.status_layout.addWidget(self.search_case_cb)
         self.status_layout.addWidget(self.search_status_label)
+        self.status_layout.addWidget(self.fold_all_btn)
+        self.status_layout.addWidget(self.unfold_all_btn)
         self.status_layout.addStretch()
 
         layout.addLayout(self.status_layout)
@@ -95,7 +103,7 @@ class ResponseView(QWidget):
         QShortcut(QKeySequence("Ctrl+F"), self, self.search_input.setFocus)
 
         # Body View
-        self.body_view = QTextEdit()
+        self.body_view = FoldableCodeView(self, indent_size=self.indent_size)
         set_widget_id(self.body_view, RESPONSE_BODY)
         self.body_view.setReadOnly(True)
         self.body_view.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -132,14 +140,18 @@ class ResponseView(QWidget):
         text = self._search_text_or_clear()
         if text is None:
             return
-        self.body_view.find(text, self._search_flags(backward=False))
+        found = self.body_view.find(text, self._search_flags(backward=False))
+        if found:
+            self.body_view.reveal_block(self.body_view.textCursor().blockNumber())
         self._track_search_result(source)
 
     def _find_previous(self, source: str = "previous") -> None:
         text = self._search_text_or_clear()
         if text is None:
             return
-        self.body_view.find(text, self._search_flags(backward=True))
+        found = self.body_view.find(text, self._search_flags(backward=True))
+        if found:
+            self.body_view.reveal_block(self.body_view.textCursor().blockNumber())
         self._track_search_result(source)
 
     def _is_large_document(self) -> bool:
@@ -225,7 +237,9 @@ class ResponseView(QWidget):
             self.search_status_label.setText("")
             return
         self.body_view.moveCursor(QTextCursor.Start)
-        self.body_view.find(text, self._search_flags(backward=False))
+        found = self.body_view.find(text, self._search_flags(backward=False))
+        if found:
+            self.body_view.reveal_block(self.body_view.textCursor().blockNumber())
         total = self._update_match_count()
         self._metrics.track_gui_response_search_action(source="typed", has_matches=(total > 0))
         logger.debug("response_search_typed query_len=%d matches=%d", len(text), total)
@@ -267,6 +281,14 @@ class ResponseView(QWidget):
 
         select_all = menu.addAction("Select All")
         select_all.triggered.connect(self.body_view.selectAll)
+
+        # 3. Fold actions (if fold regions exist)
+        if self.body_view.fold_controller().regions():
+            menu.addSeparator()
+            fold_all_action = menu.addAction("Fold All")
+            fold_all_action.triggered.connect(self.body_view.fold_all)
+            unfold_all_action = menu.addAction("Unfold All")
+            unfold_all_action.triggered.connect(self.body_view.unfold_all)
 
         menu.exec(self.body_view.mapToGlobal(pos))
 
@@ -317,6 +339,20 @@ class ResponseView(QWidget):
             if isinstance(response.body, str)
             else response.body.decode("utf-8", errors="replace")
         )
+        detected_format = detect_body_format(response.headers, body_str)
+        self.body_view.set_body_format(detected_format)
+        logger.info(
+            "response_view_displayed status=%s size=%d format=%s",
+            response.status_code,
+            response.size,
+            detected_format.value,
+        )
+
+        if detected_format == BodyFormat.JSON:
+            self.json_highlighter.setDocument(self.body_view.document())
+        else:
+            self.json_highlighter.setDocument(None)
+
         if len(body_str) > LARGE_DOC_CHAR_THRESHOLD:
             logger.info(
                 "display_response_skip_pretty_print body_chars=%d threshold=%d",
@@ -324,10 +360,15 @@ class ResponseView(QWidget):
                 LARGE_DOC_CHAR_THRESHOLD,
             )
             self.body_view.setText(body_str)
-            return
-        try:
-            parsed = json.loads(body_str)
-            pretty_json = json.dumps(parsed, indent=self.indent_size)
-            self.body_view.setText(pretty_json)
-        except Exception:
-            self.body_view.setText(body_str)
+        else:
+            if detected_format == BodyFormat.JSON:
+                try:
+                    parsed = json.loads(body_str)
+                    pretty_json = json.dumps(parsed, indent=self.indent_size)
+                    self.body_view.setText(pretty_json)
+                except Exception:
+                    self.body_view.setText(body_str)
+            else:
+                self.body_view.setText(body_str)
+
+        self.body_view.fold_controller().ensure_scanned()

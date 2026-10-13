@@ -8,9 +8,9 @@ from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QLabel,
+    QPlainTextEdit,
     QPushButton,
     QTabWidget,
-    QTextEdit,
     QTreeView,
     QWidget,
 )
@@ -114,7 +114,7 @@ def _assert_key_identities(window: QWidget) -> None:
     assert status is not None
     _assert_id(status, RESPONSE_STATUS)
 
-    response_body = response.findChild(QTextEdit, RESPONSE_BODY)
+    response_body = response.findChild(QPlainTextEdit, RESPONSE_BODY)
     assert response_body is not None
     _assert_id(response_body, RESPONSE_BODY)
 
@@ -181,7 +181,7 @@ def test_second_request_tab_exposes_role_object_names(
     status = response.findChild(QLabel, RESPONSE_STATUS)
     assert status is not None, RESPONSE_STATUS
     _assert_id(status, RESPONSE_STATUS)
-    response_body = response.findChild(QTextEdit, RESPONSE_BODY)
+    response_body = response.findChild(QPlainTextEdit, RESPONSE_BODY)
     assert response_body is not None, RESPONSE_BODY
     _assert_id(response_body, RESPONSE_BODY)
 
