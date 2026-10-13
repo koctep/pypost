@@ -50,8 +50,8 @@ make test-cov PYTEST_ARGS="--cov=pypost.core.qt.mcp_server tests/test_mcp_server
 make test-agent-e2e PYTEST_ARGS="tests/test_agent_golden_e2e.py -v"
 ```
 
-See § Reproducible test environment, § Per-test timeouts, § CI guardrails, and § Makefile
-automation tests below.
+See § Reproducible test environment, § Per-test timeouts, § Parallel Test Execution,
+§ CI guardrails, and § Makefile automation tests below.
 
 ## Reproducible test environment (PYPOST-465)
 
@@ -1387,6 +1387,46 @@ When using `HistoryManager` with `tempfile.TemporaryDirectory`, call `hm.flush()
 context exits. SSE probe tests must inject `TemplateService()` (or rely on the `HTTPClient`
 default from PYPOST-403).
 
+## Parallel Test Execution
+
+`make test` and `make test-cov` run test modules concurrently through the parallel file-level
+orchestrator (`scripts/run_parallel_tests.py`, PYPOST-1149). Each `tests/test_*.py` module
+executes in an isolated subprocess with its own process session (`start_new_session=True` on
+POSIX). Full orchestrator CLI flags, worker pooling, and troubleshooting are documented in
+[Parallel Test Runner Orchestrator](parallel_test_runner.md).
+
+### Process group termination and worker timeouts (PYPOST-1306)
+
+When testing process group termination and worker timeout handling (specifically
+`test_worker_timeout_terminates_grandchild_process_group` in `tests/test_run_parallel_tests.py`),
+worker timeouts must be budgeted to absorb interpreter startup and test discovery overhead.
+
+Under high concurrency or parallel CPU load across multiple worker processes, dispatching a
+worker subprocess involves:
+1. Spawning the Python interpreter (`subprocess.Popen([sys.executable, "-c", ...])`).
+2. Initializing the pytest runtime, loading core plugins, and importing configured extensions.
+3. Performing test discovery and collection on the generated test file.
+4. Executing the test function, which spawns grandchild processes and writes identifier files.
+
+On an unloaded machine, discovery and startup complete in ~0.2s–0.4s. However, under heavy
+parallel CPU load or continuous integration (CI) contention, interpreter initialization latency
+can rise to 0.8s–1.2s.
+
+#### Worker timeout budget guidelines
+
+- **Sufficient startup headroom**: Tests exercising worker timeout behavior must allocate
+  adequate worker timeout headroom (e.g. `--worker-timeout=3.0` or 4.0s) rather than tight
+  thresholds (such as 1.0s or lower). An overly tight timeout causes `SubprocessTestExecutor`
+  to trigger `TimeoutExpired` prematurely during pytest discovery before the test payload
+  spawns grandchild processes and records PID tracking files, producing false-positive failures
+  ([PYPOST-1306](https://pypost.atlassian.net/browse/PYPOST-1306)).
+- **Hierarchical timeout margin**: The overall test timeout (`@pytest.mark.timeout(15)`) must
+  comfortably exceed the worker timeout plus verification and cleanup overhead (3.0s worker
+  timeout + 1.0s post-kill verification deadline = ~4.0s total runtime, safely within 15s).
+- **Durable filesystem synchronization**: Child processes writing process state (such as
+  `grandchild.pid`) must flush and close files immediately upon process spawn so assertions
+  in parent runners observe state deterministically prior to timeout evaluation.
+
 ## Collections tree test helpers
 
 Shared fixtures for presenter and `CollectionTreeActions` tests live in
@@ -2505,6 +2545,8 @@ both in the same PR or file a Debt follow-up.
 - [observability_audit.md](observability_audit.md) — observability audit summary, Test and CI
   Logging (`log_cli` local vs CI, guardrail baseline)
 - [gui_testing.md](gui_testing.md) — Qt offscreen setup, `qapp` fixture, GUI test patterns
+- [Parallel Test Runner Orchestrator](parallel_test_runner.md) — parallel orchestrator, worker
+  pool, process group termination, and timeouts
 - [.cursor/lsr/do-testing.md](../../.cursor/lsr/do-testing.md) — AI assistant rules
 - [MCP Integration](mcp_integration.md) — MCP setup
 - [Collection item delete](collection_item_delete.md) — delete flow and metric matrix
