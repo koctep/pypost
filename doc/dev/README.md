@@ -61,6 +61,7 @@ conventions.
 1. [Collection Import](collection_import.md)
 1. [Collection Export](collection_export.md)
 1. [Collection Format v2 (PYPOST-1220)](collection_format_v2.md)
+1. [Collection Variable Setup Guidance (PYPOST-1284 / PYPOST-1375)](collection_variable_guidance.md)
 1. [Library Manifest and Local Secrets Overlay Manager (PYPOST-1221)](library_manifest_and_overlay.md)
 1. [Git Library Service and Hybrid Authentication (PYPOST-1222)](git_library_service.md)
 1. [Shared JSON Export Root Policy (PYPOST-1010)](json_export_root.md)
