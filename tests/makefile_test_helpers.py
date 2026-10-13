@@ -527,4 +527,16 @@ def make_workspace(tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest.fixture
 def make_workspace_full_deps(tmp_path: Path) -> Path:
     _materialize_slow_smoke_workspace(tmp_path)
+    _materialize_prewarmed_venv(tmp_path)
+    host_site_packages = (
+        REPO_ROOT / ".venv" / "lib" / f"python{PYTHON_VERSION}" / "site-packages"
+    )
+    if host_site_packages.is_dir():
+        ws_site_packages = (
+            tmp_path / ".venv" / "lib" / f"python{PYTHON_VERSION}" / "site-packages"
+        )
+        ws_site_packages.mkdir(parents=True, exist_ok=True)
+        (ws_site_packages / "_host_deps.pth").write_text(
+            f"{host_site_packages}\n", encoding="utf-8"
+        )
     return tmp_path

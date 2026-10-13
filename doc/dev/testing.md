@@ -1818,6 +1818,22 @@ When adding new dynamic or install-time paths to `pyproject.toml`, extend the se
 `SLOW_SMOKE_MINIMUM_PYPPOST_FILES` (if under `pypost/`), and the contract parser together;
 see `ai-tasks/PYPOST-943/20-architecture.md` § Packaging fields the seed must satisfy.
 
+#### Pre-warmed dependency linking (PYPOST-1360)
+
+To keep packaging installation testing fast and deterministic, the `make_workspace_full_deps`
+fixture in `tests/makefile_test_helpers.py` pre-warms the isolated workspace virtual environment
+(`workspace/.venv`) and links the host `.venv` site-packages directory via a `_host_deps.pth` file
+when present (`REPO_ROOT / ".venv" / "lib" / f"python{PYTHON_VERSION}" / "site-packages"`).
+
+Because the slow install smoke exercises `make install` (`pip install -e ".[dev,otel]"`), pip
+resolves all project dependencies. In an unlinked clean environment, downloading heavyweight
+third-party wheels (such as `PySide6` and its binaries, exceeding 700 MB) across public network
+connections routinely exceeds the 180-second test timeout budget. By linking the host site-packages
+via `_host_deps.pth`, pip recognizes heavyweight dependencies as already satisfied without remote
+downloads, ensuring predictable execution under 30 seconds and staying comfortably within the 180s
+test timeout budget. Meanwhile, the fixture still verifies the real editable package installation
+for `pypost` and post-install import sanity directly within the isolated workspace.
+
 #### Post-install sanity (PYPOST-559, PYPOST-966)
 
 After `make install` succeeds in the slow smoke workspace, `TestSlowInstallSmoke` runs each
