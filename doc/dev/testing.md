@@ -2160,21 +2160,20 @@ PYPOST-376 records LOC baselines and caps for audit-scoped modules (especially
 `main_window.py` and presenters).
 
 ```bash
-# Regenerate human-readable snapshot
-.venv/bin/python scripts/audit_baseline_metrics.py \
-  --markdown ai-tasks/PYPOST-376/baseline-metrics.md
+# Regenerate human-readable snapshot via standard Makefile target
+make baseline-metrics
 
-# Fail if any cap exceeded
-.venv/bin/python scripts/audit_baseline_metrics.py --check
+# Fail if any cap exceeded via standard Makefile target
+make check-baseline-metrics
 
 # Focused regression tests through the standard Makefile target
 make test PYTEST_ARGS='tests/test_solid_audit_baseline.py -v'
 ```
 
 The regression test checks both module caps and exact equality between the committed
-snapshot and the canonical generated report. Regenerate the snapshot whenever measured
-values or caps intentionally change. For cap policy, component ownership, and drift
-troubleshooting, see
+snapshot and the canonical generated report. Regenerate the snapshot via `make baseline-metrics`
+whenever measured values or caps intentionally change. For cap policy, component ownership,
+and drift troubleshooting, see
 [solid_audit.md](solid_audit.md#regression-baseline-metrics-pypost-376).
 
 Baseline date: **2026-06-11**. Audit-era vs current vs cap table:
@@ -2192,11 +2191,33 @@ PYPOST-374 adds a per-dialog SOLID audit and a regression guard so new files und
 # Fail if 30-dialogs-audit-report.md missing a module filename
 .venv/bin/python scripts/audit_dialogs_inventory.py --check
 
-pytest tests/test_dialogs_audit.py -v
+# Focused regression tests through the standard Makefile target
+make test PYTEST_ARGS='tests/test_dialogs_audit.py -v'
 ```
 
 Report: [ai-tasks/PYPOST-374/30-dialogs-audit-report.md](../../ai-tasks/PYPOST-374/30-dialogs-audit-report.md).
 See also [solid_audit.md](solid_audit.md#individual-dialog-audit-pypost-374).
+
+### Dialog LOC synchronization
+
+When existing dialogs grow or shrink or when new dialog modules are added under
+`pypost/ui/dialogs/`, `ai-tasks/PYPOST-374/30-dialogs-audit-report.md` must be synchronized
+with live discovery:
+
+1. Discover current dialog module line counts:
+   ```bash
+   .venv/bin/python scripts/audit_dialogs_inventory.py --markdown
+   ```
+2. Update `ai-tasks/PYPOST-374/30-dialogs-audit-report.md`:
+   - Update the **Scope** header with the current module count and total LOC.
+   - Update the module row LOC in the **Module inventory** table.
+   - Update the **Total** row at the bottom of the table.
+   - Update the final verdict module count.
+3. Verify that the refreshed report passes exact inventory, scope total, and contract guards:
+   ```bash
+   make test PYTEST_ARGS='tests/test_pypost_1077_verification_artifacts.py \
+     tests/test_pypost_1287_failing_repro.py tests/test_dialogs_audit.py -v'
+   ```
 
 ### Audit scripts CLI testing (PYPOST-1258)
 

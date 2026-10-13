@@ -111,6 +111,14 @@ report is needed. With no output flag, the command prints the canonical Markdown
 Always run both `--check` and the pytest module after reconciliation. A green cap check alone
 does not prove that the committed snapshot is fresh.
 
+**PYPOST-1361 (2026-10-13):** Refreshed stale SOLID metric snapshot via `make baseline-metrics`
+(updating `MainWindow` class LOC to 414 and file LOC to 462, `mcp_server_controller.py` to 784,
+`collections_presenter.py` to 534, `env_presenter.py` to 460, and `mcp_controls_presenter.py`
+to 384; all within established caps). Synchronized dialog inventory in
+`ai-tasks/PYPOST-374/30-dialogs-audit-report.md` to 9 dialog modules / 2,693 LOC
+(reflecting `mcp_servers_dialog.py` growth to 1,219 LOC). Verified passing contracts via
+`make check-baseline-metrics` and targeted verification suites.
+
 **PYPOST-1111 (2026-08-31):** Raised `FILE_CAPS` for `pypost/core/template_service.py`
 225 → cap **265** (measured 241 LOC + ~10% headroom) accommodating structured template errors,
 AST enhancements, and environment variable resolver (PYPOST-143, PYPOST-378, PYPOST-1118).
@@ -203,11 +211,12 @@ Full report:
 
 ```bash
 .venv/bin/python scripts/audit_dialogs_inventory.py --check
-pytest tests/test_dialogs_audit.py -v
+make test PYTEST_ARGS='tests/test_dialogs_audit.py -v'
 ```
 
-When adding a new dialog, extend `30-dialogs-audit-report.md` so `--check` and
-`test_dialogs_audit.py` keep passing.
+When adding a new dialog or updating dialog lines, synchronize `30-dialogs-audit-report.md` so
+`--check`, `tests/test_dialogs_audit.py`, `tests/test_pypost_1077_verification_artifacts.py`, and
+`tests/test_pypost_1287_failing_repro.py` keep passing.
 
 ## Collection tree performance (PYPOST-383)
 
