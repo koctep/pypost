@@ -31,7 +31,7 @@ pypost/
 ```mermaid
 graph TD
     subgraph Models [pypost.models]
-        CV[CollectionVariable<br/>- name: str<br/>- type: str<br/>- default: Any<br/>- description: str<br/>- required: bool<br/>- secret: bool]
+        CV[CollectionVariable<br/>- name: str<br/>- type: str<br/>- default: Any<br/>- description: str<br/>- help_text: Optional[str]<br/>- required: bool<br/>- secret: bool]
         RD[RequestData]
         WS[WebSocketConnection]
         MCP[McpClientConnection]
@@ -83,9 +83,54 @@ graph TD
 | `name` | `str` | *required* | Unique variable identifier (non-empty). |
 | `type` | `str` | `"string"` | Declared data type from `COLLECTION_VARIABLE_TYPES`. |
 | `default` | `Any \| None` | `None` | Optional default fallback value conforming to `type`. Aliased as `default_value`. |
-| `description` | `str` | `""` | Human-readable explanation / documentation for consumers and agents. |
+| `description` | `str` | `""` | Human-readable explanation / summary for consumers and tooltips. |
+| `help_text` | `str \| None` | `None` | Detailed setup instructions and credential guidance ([PYPOST-1372](https://pypost.atlassian.net/browse/PYPOST-1372)). |
 | `required` | `bool` | `False` | When `True`, an effective value must be supplied before request execution. |
 | `secret` | `bool` | `False` | When `True`, indicates sensitive credentials (passwords, tokens) to exclude from version-controlled defaults. |
+
+### Guidance Attribute (`help_text`) Validation & Normalization
+
+Introduced in [PYPOST-1372](https://pypost.atlassian.net/browse/PYPOST-1372) (Layer 1 of the guided variable setup wizard epic [PYPOST-1284](https://pypost.atlassian.net/browse/PYPOST-1284)), `help_text` supports multi-paragraph markdown instructions, external acquisition URLs, and setup walkthroughs for complex credentials (e.g., OAuth tokens, Jira API tokens, GitHub PATs).
+
+#### Validation Rules
+
+1. **Strict String Type Enforcement**: If provided, `help_text` must be an instance of `str` or `None`. Any non-string scalar or collection type (e.g. `int`, `bool`, `list`, `dict`, `float`) is immediately rejected during pre-validation (`@field_validator("help_text", mode="before")`), raising a `ValueError` (encapsulated as a Pydantic `ValidationError`).
+2. **Boundary Whitespace Trimming**: Leading and trailing whitespace is automatically stripped (`value.strip()`). Internal markdown indentation, multiline breaks, and code block formatting are preserved.
+3. **Empty / Blank Normalization**: Any empty string (`""`) or whitespace-only string (e.g., `"   \n\t  "`) is normalized to `None`. This ensures persistent representations do not store extraneous blank strings.
+4. **Backward Compatibility**: Omission of `help_text` defaults safely to `None`. Existing collection files, YAML/JSON fixtures, and manifest definitions continue to deserialize without error or behavioral change.
+
+#### Example Representation (JSON / YAML)
+
+**JSON snippet:**
+
+```json
+{
+  "name": "google_oauth_token",
+  "type": "string",
+  "default": null,
+  "description": "Google Cloud OAuth Bearer Token",
+  "help_text": "### How to obtain a token:\n1. Open Google Cloud Console: https://console.cloud.google.com\n2. Navigate to APIs & Services > Credentials.\n3. Create OAuth 2.0 Client ID or generate a temporary access token via `gcloud auth print-access-token`.",
+  "required": true,
+  "secret": true
+}
+```
+
+**YAML snippet:**
+
+```yaml
+variables:
+  - name: google_oauth_token
+    type: string
+    default: null
+    description: Google Cloud OAuth Bearer Token
+    help_text: |
+      ### How to obtain a token:
+      1. Open Google Cloud Console: https://console.cloud.google.com
+      2. Navigate to APIs & Services > Credentials.
+      3. Create OAuth 2.0 Client ID or generate a temporary access token via `gcloud auth print-access-token`.
+    required: true
+    secret: true
+```
 
 ### Supported Type Whitelist
 
