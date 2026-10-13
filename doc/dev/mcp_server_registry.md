@@ -95,8 +95,52 @@ configuration in `_McpServerEditor` with a dedicated setup wizard and rich guida
 - Wizard launch and overlay persistence in `_McpServerEditor` ([PYPOST-1374](https://pypost.atlassian.net/browse/PYPOST-1374)).
 - Reference collection fixtures with OAuth guidance and contract tests ([PYPOST-1375](https://pypost.atlassian.net/browse/PYPOST-1375)).
 
-Full component architecture, UI interaction flows, and schema prose belong to child
-stories PYPOST-1372..1375 when they run their respective Step 8.
+#### Variable Setup Wizard & Guidance Card Components (PYPOST-1373)
+
+Story [PYPOST-1373](https://pypost.atlassian.net/browse/PYPOST-1373) implements the UI component
+layer for interactive variable configuration under `pypost/ui/variable_setup_wizard_dialog.py`:
+
+##### `VariableGuidanceCard`
+
+A reusable `QFrame` widget rendering input, guidance, and validation states for a single `CollectionVariable`.
+
+- **Visual Header**: Displays variable name, type badge (e.g. `[string]`, `[integer]`), and a `* Required` indicator in warning red when `variable.required=True`. An optional brief `variable.description` is shown as muted label text.
+- **Input Field**: A `QLineEdit` pre-populated from `initial_value`, falling back to `variable.default`, or empty string.
+- **Secret Masking & Eye Toggle**: When `variable.secret=True`, `input_field` initializes with `QLineEdit.EchoMode.Password`. A companion `QToolButton` ("Show" / "Hide", widget ID `pypost_variable_guidance_secret_toggle`) allows toggling echo mode between `Password` and `Normal` so users can inspect sensitive credentials without shoulder-surfing exposure.
+- **Expandable Guidance**: When `variable.help_text` is populated, a toggle button ("Show Guidance" / "Hide Guidance", widget ID `pypost_variable_guidance_expand_button`) controls visibility of a collapsible instructions container. The panel renders rich text / HTML instructions via `QLabel` with `openExternalLinks=True`, allowing users to open documentation or OAuth token generation URLs directly in their browser. If `help_text` is absent or empty, the toggle button and container are omitted for a compact card display.
+- **Validation & Visual Feedback**: `is_valid()` checks whether required variables have non-empty text. `set_validation_error(msg)` displays an inline error label in red and applies a red border to the input field (`QLineEdit { border: 1px solid #e74c3c; }`). Error indicators automatically clear when the user edits text (`textChanged` signal).
+
+##### `VariableSetupWizardDialog`
+
+A modal `QDialog` (widget ID `pypost_variable_setup_wizard_dialog`) hosting a scrollable sequence of `VariableGuidanceCard` widgets.
+
+- **Instantiation**: Downstream callers instantiate the wizard by passing a list of `CollectionVariable` models, optional existing values dictionary (`initial_values: dict[str, Any]`), and an optional collection display name:
+  ```python
+  from pypost.models.collection_variable import CollectionVariable
+  from pypost.ui.variable_setup_wizard_dialog import (
+      VariableSetupWizardDialog,
+  )
+
+  dialog = VariableSetupWizardDialog(
+      variables=collection.variables,
+      initial_values={"WORKSPACE_ID": "ws-123"},
+      collection_name=collection.name,
+      parent=editor_widget,
+  )
+  if dialog.exec() == QDialog.DialogCode.Accepted:
+      resolved_values = dialog.get_values()
+      configured = dialog.get_configured_variables()
+      # configured["values"]: dict[str, Any] -> all values
+      # configured["overrides"]: dict[str, Any] -> non-secret overrides
+      # configured["secrets"]: dict[str, Any] -> secret credentials
+  ```
+- **Scroll Container**: Contains cards inside a `QScrollArea(widgetResizable=True)` to comfortably handle collections with numerous variables.
+- **Validation on Accept**: Clicking "Save" (`VARIABLE_SETUP_APPLY_BUTTON`) invokes `accept()`, which triggers `validate_all()`. If any required card is empty, validation error cues are highlighted on the offending card(s) and dialog acceptance is prevented until all required fields are satisfied.
+- **Value Extraction**:
+  - `get_values() -> dict[str, Any]`: Returns a flattened dictionary mapping variable names to user-entered values. Automatically coerces integer and number types where applicable.
+  - `get_configured_variables() -> dict[str, dict[str, Any]]`: Returns a partitioned payload with `"values"`, `"overrides"` (non-secrets for settings storage), and `"secrets"` (sensitive credentials for secure overlay storage).
+- **Test Automation Identifiers**: All interactive components are registered in `pypost/ui/widget_ids.py` (`VARIABLE_SETUP_WIZARD_DIALOG`, `VARIABLE_GUIDANCE_CARD`, `VARIABLE_GUIDANCE_EXPAND_BUTTON`, `VARIABLE_GUIDANCE_SECRET_TOGGLE`, `VARIABLE_SETUP_APPLY_BUTTON`, `VARIABLE_SETUP_CANCEL_BUTTON`).
+
 
 
 ## Configuration and lifecycle
