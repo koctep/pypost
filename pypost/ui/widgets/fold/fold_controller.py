@@ -1,13 +1,14 @@
-"""Debounced structure scan, collapse state, and block visibility."""
-
 from __future__ import annotations
 
+import logging
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QPlainTextEdit
 
 from pypost.ui.widgets.fold.fold_region import BodyFormat, FoldRegion
 from pypost.ui.widgets.fold.structure_scanner import get_scanner
+
+logger = logging.getLogger(__name__)
 
 _DEBOUNCE_MS = 200
 
@@ -47,18 +48,68 @@ class FoldController:
     def toggle(self, region_id: str) -> None:
         if region_id in self._collapsed_ids:
             self._collapsed_ids.discard(region_id)
+            collapsed = False
         else:
             self._collapsed_ids.add(region_id)
+            collapsed = True
+        logger.debug("fold_region_toggled region_id=%s collapsed=%s", region_id, collapsed)
         self.apply_visibility()
         self._editor.viewport().update()
 
     def expand_all(self) -> None:
+        count = len(self._collapsed_ids)
         self._collapsed_ids.clear()
         block = self._editor.document().firstBlock()
         while block.isValid():
             block.setVisible(True)
             block = block.next()
+        logger.debug("fold_all_expanded previously_collapsed=%d", count)
         self._editor.viewport().update()
+
+    def collapse_all(self) -> None:
+        if self._scan_timer.isActive():
+            self._scan_timer.stop()
+            self._run_scan()
+        for region in self._regions:
+            self._collapsed_ids.add(region.region_id)
+        logger.debug("fold_all_collapsed total_regions=%d", len(self._regions))
+        self.apply_visibility()
+        self._editor.viewport().update()
+
+    def fold_all(self) -> None:
+        self.collapse_all()
+
+    def unfold_all(self) -> None:
+        self.expand_all()
+
+    def reveal_block(self, block_number: int) -> None:
+        """Expand any collapsed fold regions that enclose the given block."""
+        if not self._collapsed_ids:
+            return
+        region_by_id = {r.region_id: r for r in self._regions}
+        to_unfold: list[str] = []
+        for region_id in self._collapsed_ids:
+            region = region_by_id.get(region_id)
+            if region is not None and region.start_block <= block_number <= region.end_block:
+                to_unfold.append(region_id)
+        if to_unfold:
+            for rid in to_unfold:
+                self._collapsed_ids.discard(rid)
+            logger.debug(
+                "fold_block_revealed block=%d revealed_regions=%s",
+                block_number,
+                to_unfold,
+            )
+            self.apply_visibility()
+            self._editor.viewport().update()
+
+    def ensure_scanned(self) -> None:
+        """Run scan immediately if scheduled."""
+        if self._scan_timer.isActive():
+            self._scan_timer.stop()
+            self._run_scan()
+        elif not self._regions and self._editor.toPlainText().strip():
+            self._run_scan()
 
     def fold_header_at_block(self, block_number: int) -> FoldRegion | None:
         return self._header_by_block.get(block_number)
@@ -117,6 +168,12 @@ class FoldController:
 
         self._regions = new_regions
         self._header_by_block = {r.header_block: r for r in new_regions}
+        logger.debug(
+            "fold_scan_completed format=%s regions=%d collapsed=%d",
+            self._body_format.value,
+            len(new_regions),
+            len(self._collapsed_ids),
+        )
         self.apply_visibility()
         self._editor.viewport().update()
 
