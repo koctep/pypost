@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 COLLECTION_VARIABLE_TYPES: frozenset[str] = frozenset(
     {"string", "integer", "number", "boolean", "array", "object"}
@@ -49,8 +49,30 @@ class CollectionVariable(BaseModel):
     type: str = "string"
     default: Optional[Any] = Field(default=None, alias="default_value")
     description: str = ""
+    help_text: Optional[str] = Field(
+        default=None,
+        description="Detailed guidance and instructions for configuring the variable.",
+    )
     required: bool = False
     secret: bool = False
+
+    @field_validator("help_text", mode="before")
+    @classmethod
+    def _validate_help_text(cls, value: Any) -> Optional[str]:
+        """Validate and normalize help_text guidance attribute.
+
+        Rejects non-string types (unless None) to enforce type safety.
+        Strips leading/trailing boundary whitespace and normalizes empty
+        or whitespace-only strings to None.
+        """
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError(
+                f"help_text must be a string or None, got {type(value).__name__}"
+            )
+        trimmed = value.strip()
+        return trimmed if trimmed else None
 
     @property
     def default_value(self) -> Optional[Any]:
