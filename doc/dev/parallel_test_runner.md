@@ -323,6 +323,16 @@ On `subprocess.TimeoutExpired`:
 5. Any grandchild processes, helper scripts, or background threads spawned by the worker are
    terminated, preventing orphan processes, leaked file handles, or locked network ports.
 
+#### Grandchild process-group termination verification (PYPOST-1306)
+
+In `tests/test_run_parallel_tests.py`, `test_worker_timeout_terminates_grandchild_process_group`
+exercises cascading termination of grandchild processes upon worker timeout. Under parallel
+test runs or CPU contention, worker subprocesses require sufficient timeout headroom (e.g.
+`--worker-timeout=3` or 4.0s) to absorb interpreter initialization and pytest discovery latency
+before the test payload spawns grandchild processes and writes identifier files. See
+[Testing via MCP and Prometheus § Process group termination and worker timeouts](
+testing.md#process-group-termination-and-worker-timeouts-pypost-1306) for budget guidelines.
+
 ### Structured logs (timeout path)
 
 | Level | Event | Fields |
@@ -514,6 +524,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_parallel_tests.py \
   diagnostic warnings
 - `ai-tasks/PYPOST-1260/50-observability.md` — structured logging specification for
   `invalid_worker_timeout_env`
+- `ai-tasks/PYPOST-1306/20-architecture.md` — deterministic process-group timeout verification
+- `ai-tasks/PYPOST-1306/60-tech-debt.md` — timeout headroom and technical debt analysis
 
 ## PYPOST-1153 maintainability contracts
 

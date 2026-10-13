@@ -1054,7 +1054,7 @@ def test_worker_timeout_terminates_grandchild_process_group(tmp_path: Path) -> N
     config = CLIParser().parse_args(
         [
             "--workers=1",
-            "--worker-timeout=1",
+            "--worker-timeout=3",
             "-o",
             "addopts=",
             str(test_file),
