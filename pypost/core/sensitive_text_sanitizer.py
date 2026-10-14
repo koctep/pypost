@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
+
+logger = logging.getLogger(__name__)
 
 HIDDEN_PLACEHOLDER = "***"
 
@@ -54,17 +57,107 @@ def sanitize_headers(
     *,
     env_vars: Mapping[str, str] | None = None,
     hidden_keys: Iterable[str] | None = None,
+    hidden_response_fields: Iterable[str] | None = None,
 ) -> dict[str, str]:
     """Redact sensitive header values and apply text heuristics."""
+    extra_hidden: set[str] = set()
+    if hidden_response_fields:
+        for field in hidden_response_fields:
+            if field.lower().startswith("header:"):
+                extra_hidden.add(field[7:].strip().lower())
     result: dict[str, str] = {}
     for key, value in headers.items():
-        if key.lower() in _SENSITIVE_HEADER_NAMES:
+        if key.lower() in _SENSITIVE_HEADER_NAMES or key.lower() in extra_hidden:
             result[key] = HIDDEN_PLACEHOLDER
         else:
             result[key] = sanitize_text(
                 value, env_vars=env_vars, hidden_keys=hidden_keys
             )
     return result
+
+
+def redact_json_response_fields(
+    body: str,
+    hidden_fields: Sequence[str] | Iterable[str] | None = None,
+    placeholder: str = HIDDEN_PLACEHOLDER,
+) -> str:
+    """Recursively redacts configured keys and selector paths in JSON response text."""
+    if not body or not hidden_fields:
+        return body
+    selectors = {s.strip() for s in hidden_fields if s and s.strip()}
+    if not selectors:
+        return body
+    try:
+        parsed = json.loads(body)
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        logger.debug(
+            "redact_json_response_fields_skipped_non_json reason=%s",
+            type(exc).__name__,
+        )
+        return body
+    if not isinstance(parsed, (dict, list)):
+        logger.debug(
+            "redact_json_response_fields_skipped_non_container type=%s",
+            type(parsed).__name__,
+        )
+        return body
+    masked_count = [0]
+    redacted = _redact_node(parsed, [], selectors, placeholder, masked_count)
+    logger.debug(
+        "redact_json_response_fields_completed selectors_count=%d masked_fields_count=%d",
+        len(selectors),
+        masked_count[0],
+    )
+    return json.dumps(redacted, ensure_ascii=False)
+
+
+def _format_path_variants(path: list[str], key: str) -> set[str]:
+    tokens = path + [key]
+    full_dot = ".".join(tokens)
+    shorthand_tokens = [t for t in tokens if t != "*"]
+    shorthand_dot = ".".join(shorthand_tokens)
+
+    wildcard_parts: list[str] = []
+    for t in tokens:
+        if t == "*":
+            if wildcard_parts:
+                wildcard_parts[-1] = f"{wildcard_parts[-1]}[*]"
+            else:
+                wildcard_parts.append("[*]")
+        else:
+            wildcard_parts.append(t)
+    wildcard_dot = ".".join(wildcard_parts)
+
+    return {key, full_dot, shorthand_dot, wildcard_dot}
+
+
+def _redact_node(
+    node: Any,
+    path: list[str],
+    selectors: set[str],
+    placeholder: str,
+    masked_count: list[int] | None = None,
+) -> Any:
+    if isinstance(node, dict):
+        res: dict[str, Any] = {}
+        for key, val in node.items():
+            key_str = str(key)
+            variants = _format_path_variants(path, key_str)
+            if any(v in selectors for v in variants):
+                res[key] = placeholder
+                if masked_count is not None:
+                    masked_count[0] += 1
+            else:
+                res[key] = _redact_node(
+                    val, path + [key_str], selectors, placeholder, masked_count
+                )
+        return res
+    if isinstance(node, list):
+        return [
+            _redact_node(item, path + ["*"], selectors, placeholder, masked_count)
+            for item in node
+        ]
+    return node
 
 
 def _redact_hidden_values(
