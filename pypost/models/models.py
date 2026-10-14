@@ -89,6 +89,7 @@ class RequestData(BaseModel):
     mcp_description: str = ""  # Agent-visible tool description (falls back to name)
     mcp_params: Dict[str, McpToolParam] = Field(default_factory=dict)
     retry_policy: Optional[RetryPolicy] = None
+    hidden_response_fields: list[str] = Field(default_factory=list)
 
 
 class LibraryCollectionLink(BaseModel):

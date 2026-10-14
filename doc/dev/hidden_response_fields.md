@@ -60,23 +60,69 @@ under active **Sprint 2032** ("Hide Selected Response Fields"):
 
 ## Architectural Specifications
 
-### 1. RequestData Schema Extension and Tab Copy Isolation (MASK-1)
+### 1. RequestData Schema Extension, Tab Copy Isolation, and RequestEditor UI (MASK-1)
 
-The configuration of which response fields to hide lives as part of the request definition:
+The configuration of which response fields to hide lives as part of the canonical request definition:
 
-- **Model Extension (`pypost/models/models.py`)**:
+#### Data Model Extension (`pypost/models/models.py`)
+- **Schema Field**:
   ```python
   class RequestData(BaseModel):
       ...
       hidden_response_fields: list[str] = Field(default_factory=list)
   ```
-  Using `Field(default_factory=list)` guarantees backward compatibility: existing saved collections, test fixtures, or exports lacking this field load cleanly without schema migration errors.
-- **Tab Copy Isolation (`pypost/core/request_persisted_fields.py`)**:
-  Per the [Request Data Copy Policy](request_data_copy_policy.md), tab isolation deep-copies `RequestData` via `copy_request_for_isolated_tab(data)`. Adding `"hidden_response_fields"` to `_PERSISTED_FIELD_NAMES` ensures:
-  1. Configured hidden fields are preserved across tab duplication and workspace state restoration.
-  2. Dirty checking (`persisted_fields_equal` and `request_draft_fields_equal`) accurately detects unsaved modifications.
-- **Request Editor Configuration UI (`pypost/ui/widgets/request_editor.py`)**:
-  `RequestWidget` provides a configuration UI table/list allowing users to add, edit, and remove field selectors for the active request draft.
+- **Serialization & Backward Compatibility**:
+  - Pydantic serializes `hidden_response_fields` into standard JSON string arrays when persisting requests via `StorageManager.save_collection`.
+  - Using `Field(default_factory=list)` guarantees 100% backward compatibility: legacy collections, fixtures, or exports lacking `hidden_response_fields` load cleanly with an empty list `[]` without requiring schema migrations or disk rewrites.
+  - Strict type validation enforces that all configured selectors are strings (`list[str]`).
+
+#### Persisted Field Dirty-Tracking (`pypost/core/request_persisted_fields.py`)
+- **Canonical Registry**:
+  `"hidden_response_fields"` is registered in `_PERSISTED_FIELD_NAMES` and `_DRAFT_FIELD_NAMES`.
+- **Dirty Checking Mechanics**:
+  - `persisted_fields_equal(a, b)`: Compares `a.hidden_response_fields == b.hidden_response_fields` across request versions.
+  - `request_draft_fields_equal(a, b)`: Validates draft changes against `factory_request_draft()`.
+  - Any addition, deletion, or reordering of selectors compared to a tab's baseline snapshot triggers `is_tab_dirty(tab)` in `tab_dirty.py`, correctly marking the tab dirty (`*`) and informing unsaved change prompts.
+
+#### Tab Copy Isolation Deep-Copy Semantics (`pypost/core/request_persisted_fields.py`)
+- **Copy Semantics**:
+  Per the [Request Data Copy Policy](request_data_copy_policy.md), `copy_request_for_isolated_tab(data: RequestData) -> RequestData` performs a deep copy of the request model:
+  ```python
+  copy = data.model_copy(deep=True)
+  copy.hidden_response_fields = list(data.hidden_response_fields)
+  return copy
+  ```
+- **Isolation Guarantee**:
+  Ensures that mutable list instances of `hidden_response_fields` are completely detached across tabs. Modifying field selectors in an isolated tab draft never mutates the original request or sibling tabs.
+
+#### `HiddenFieldsTable` Component API (`pypost/ui/widgets/hidden_fields_table.py`)
+A specialized single-column `QTableWidget` component designed for managing list-based string selectors:
+- **Widget Identification**: Registered with `REQUEST_HIDDEN_FIELDS_TABLE = "request_hidden_fields_table"` via `set_widget_id()`.
+- **Table Structure**: Single column labeled `"Field Selector"`, configured with `QHeaderView.ResizeMode.Stretch`.
+- **Auto-Expanding Trailing Row**: Always maintains a trailing empty row. Editing the trailing empty row automatically appends a new empty row, matching the interaction pattern of PyPost's `KeyValueTable`.
+- **Public API**:
+  - `set_data(data: list[str]) -> None`: Populates the table with existing non-empty selectors, filtering out whitespace, and appends a trailing empty row.
+  - `get_data() -> list[str]`: Extracts all non-empty selector strings in row order, omitting trailing or intermediate blank rows.
+  - `add_row(selector: str = "") -> None`: Appends a selector row or focuses and edits the trailing empty row if currently blank.
+  - `remove_selected_rows() -> None`: Deletes highlighted rows (preserving the trailing empty row structure) and emits change signals.
+- **Signals**:
+  - `data_changed = Signal()`
+  - `changed = Signal()`
+- **User Interactions**:
+  - Context menu (`QContextMenuEvent`): Provides "Add Selector" and "Remove Selected" actions.
+  - Keyboard shortcuts (`QKeyEvent`): Pressing `Delete` or `Backspace` outside cell edit mode deletes selected rows.
+
+#### `RequestEditor` Detail Tab Integration (`pypost/ui/widgets/request_editor.py`)
+- **Tab Layout**:
+  Embedded as a dedicated `"Hidden Fields"` tab in `RequestWidget.detail_tabs`:
+  - Informational label with styling guidance: `"Response fields or dot-notation paths to hide (e.g. token, password, user.secret)"`.
+  - Action toolbar containing "Add Selector" and "Remove Selected" buttons connected to table methods.
+  - Embedded `HiddenFieldsTable(self)`.
+- **Data Lifecycle Integration**:
+  - `load_data(req)`: Calls `self.hidden_fields_table.set_data(self.request_data.hidden_response_fields)` when initializing or switching requests.
+  - `update_request_data()`: Updates `self.request_data.hidden_response_fields = self.hidden_fields_table.get_data()`.
+  - `get_request_data_from_ui()`: Extracts draft state with `hidden_response_fields=self.hidden_fields_table.get_data()`.
+  - Change propagation: Connected signals `data_changed` and `changed` to `self.on_data_changed` to immediately update tab dirty state.
 
 ### 2. Fail-Closed MCP Permanent Masking Boundary (MASK-2)
 
