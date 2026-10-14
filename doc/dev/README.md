@@ -97,6 +97,7 @@ conventions.
 1. [Copy as cURL](copy_curl.md)
 1. [Method / Body Auto-Switch](method_body_autoswitch.md)
 1. [JSON Syntax Highlighting](json_syntax_highlighting.md)
+1. [Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376)](hidden_response_fields.md)
 
 ### Body editor
 
