@@ -235,6 +235,9 @@ VARIABLE_GUIDANCE_SECRET_TOGGLE = "pypost_variable_guidance_secret_toggle"
 VARIABLE_SETUP_APPLY_BUTTON = "pypost_variable_setup_apply_button"
 VARIABLE_SETUP_CANCEL_BUTTON = "pypost_variable_setup_cancel_button"
 
+# Request Hidden Fields surfaces (PYPOST-1377).
+REQUEST_HIDDEN_FIELDS_TABLE: Final[str] = "request_hidden_fields_table"
+
 
 def set_widget_id(widget: QObject, widget_id: str) -> None:
     """Set ``objectName`` and mirror ``accessibleIdentifier`` on QWidgets."""

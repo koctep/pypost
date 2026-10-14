@@ -40,6 +40,7 @@ from pypost.ui.widgets.fold import BodyFormat
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.mixins import VariableHoverResolver, push_snapshot_to_widgets
 from pypost.ui.widgets.empty_row_key_value_table import EmptyRowKeyValueTable
+from pypost.ui.widgets.hidden_fields_table import HiddenFieldsTable
 from pypost.ui.widgets.variable_aware_widgets import VariableAwareLineEdit
 from pypost.ui.widgets.variable_autocomplete_line_edit import VariableAutocompleteDelegate
 from pypost.ui.widget_ids import (
@@ -210,6 +211,32 @@ class RequestWidget(QWidget):
         mcp_tab_layout.addWidget(self.mcp_preview_edit)
         self.detail_tabs.addTab(mcp_tab, "MCP")
 
+        self.hidden_fields_table = HiddenFieldsTable(self)
+        hidden_tab = QWidget()
+        hidden_layout = QVBoxLayout(hidden_tab)
+        hidden_layout.setContentsMargins(0, 0, 0, 0)
+        hidden_info = QLabel(
+            "Response fields or dot-notation paths to hide (e.g. token, password, user.secret)"
+        )
+        hidden_info.setStyleSheet("color: gray;")
+        hidden_layout.addWidget(hidden_info)
+
+        hidden_btn_layout = QHBoxLayout()
+        add_hidden_btn = QPushButton("Add Selector")
+        add_hidden_btn.clicked.connect(lambda: self.hidden_fields_table.add_row())
+        remove_hidden_btn = QPushButton("Remove Selected")
+        remove_hidden_btn.clicked.connect(self.hidden_fields_table.remove_selected_rows)
+        hidden_btn_layout.addWidget(add_hidden_btn)
+        hidden_btn_layout.addWidget(remove_hidden_btn)
+        hidden_btn_layout.addStretch()
+        hidden_layout.addLayout(hidden_btn_layout)
+
+        hidden_layout.addWidget(self.hidden_fields_table)
+        self.detail_tabs.addTab(hidden_tab, "Hidden Fields")
+
+        self.hidden_fields_table.data_changed.connect(self.on_data_changed)
+        self.hidden_fields_table.changed.connect(self.on_data_changed)
+
         layout.addWidget(self.detail_tabs)
 
         self.load_data()
@@ -306,9 +333,15 @@ class RequestWidget(QWidget):
             self.mcp_check.setChecked(self.request_data.expose_as_mcp)
             self.mcp_description_edit.setPlainText(self.request_data.mcp_description)
             self.mcp_params_table.set_data(self.request_data.mcp_params)
+            self.hidden_fields_table.set_data(self.request_data.hidden_response_fields)
             self._refresh_mcp_preview()
         finally:
             self._loading = False
+
+    def on_data_changed(self) -> None:
+        """Handle data modifications from child editors."""
+        if not self._loading:
+            self.update_request_data()
 
     def _wire_mcp_preview_refresh(self) -> None:
         self.mcp_check.toggled.connect(self._on_mcp_preview_source_changed)
@@ -326,6 +359,7 @@ class RequestWidget(QWidget):
             params=self.params_table.get_data(),
             body=self.body_edit.toPlainText(),
             mcp_params=self.mcp_params_table.get_data(),
+            hidden_response_fields=self.hidden_fields_table.get_data(),
         )
 
     def _sync_mcp_params_from_template(self) -> None:
@@ -385,6 +419,7 @@ class RequestWidget(QWidget):
         self.request_data.expose_as_mcp = self.mcp_check.isChecked()
         self.request_data.mcp_description = self.mcp_description_edit.toPlainText()
         self.request_data.mcp_params = self.mcp_params_table.get_data()
+        self.request_data.hidden_response_fields = self.hidden_fields_table.get_data()
 
     def get_request_data_from_ui(self) -> RequestData:
         request_data = copy_request_for_isolated_tab(self.request_data)
@@ -399,6 +434,7 @@ class RequestWidget(QWidget):
         request_data.expose_as_mcp = self.mcp_check.isChecked()
         request_data.mcp_description = self.mcp_description_edit.toPlainText()
         request_data.mcp_params = self.mcp_params_table.get_data()
+        request_data.hidden_response_fields = self.hidden_fields_table.get_data()
         return request_data
 
     def on_send(self):

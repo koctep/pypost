@@ -41,6 +41,31 @@ Useful editor features:
 Hover over `{{ ... }}` placeholders to preview the resolved value (hidden variables stay
 masked).
 
+## Hidden fields
+
+On the **Hidden Fields** tab, configure response field selectors to mask sensitive
+information (such as tokens, passwords, secret keys, or PII) returned by the API.
+
+### Adding and managing selectors
+
+- Enter a field name or path into the empty row at the bottom of the table. A new
+  empty row appears automatically when you begin typing.
+- Click **Add Selector** to add or jump to the trailing entry row.
+- Select one or more rows and click **Remove Selected**, press `Delete` / `Backspace`,
+  or right-click to use the context menu.
+- Selectors are saved with the request draft and persist when saving to collections.
+
+### Selector formats
+
+| Format | Example | Description |
+| --- | --- | --- |
+| Simple key | `token`, `password` | Matches JSON keys with this name at any depth. |
+| Dot-notation path | `auth.token`, `user.secret` | Matches exact hierarchical object paths. |
+| Array wildcard path | `users[*].email` | Matches fields inside array elements. |
+
+Masked fields protect confidential values during screen sharing and prevent sensitive data
+from leaking when requests are executed by AI coding agents via MCP.
+
 ## Response
 
 After send, the response pane shows:

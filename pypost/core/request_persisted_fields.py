@@ -28,6 +28,7 @@ _PERSISTED_FIELD_NAMES = (
     "mcp_description",
     "mcp_params",
     "retry_policy",
+    "hidden_response_fields",
 )
 
 
@@ -38,7 +39,9 @@ def copy_request_for_isolated_tab(data: RequestData) -> RequestData:
     place. Cost scales with editor field size (headers, params, body); keep
     ``RequestData`` free of large response buffers.
     """
-    return data.model_copy(deep=True)
+    copy = data.model_copy(deep=True)
+    copy.hidden_response_fields = list(data.hidden_response_fields)
+    return copy
 
 
 def snapshot_persisted_fields(data: RequestData) -> RequestData:
