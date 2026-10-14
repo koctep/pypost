@@ -111,7 +111,7 @@ def redact_json_response_fields(
     return json.dumps(redacted, ensure_ascii=False)
 
 
-def _format_path_variants(path: list[str], key: str) -> set[str]:
+def format_path_variants(path: list[str], key: str) -> set[str]:
     tokens = path + [key]
     full_dot = ".".join(tokens)
     shorthand_tokens = [t for t in tokens if t != "*"]
@@ -129,6 +129,9 @@ def _format_path_variants(path: list[str], key: str) -> set[str]:
     wildcard_dot = ".".join(wildcard_parts)
 
     return {key, full_dot, shorthand_dot, wildcard_dot}
+
+
+_format_path_variants = format_path_variants
 
 
 def _redact_node(

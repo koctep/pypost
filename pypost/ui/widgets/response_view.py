@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from typing import Sequence
+
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.models.response import ResponseData
 from pypost.ui.widget_ids import (
@@ -28,6 +30,10 @@ from pypost.ui.widget_ids import (
 from pypost.ui.widgets.fold import BodyFormat, detect_body_format
 from pypost.ui.widgets.foldable_code_view import FoldableCodeView
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
+from pypost.ui.widgets.response_mask_controller import (
+    ResponseMaskController,
+    format_masked_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +53,8 @@ class ResponseView(QWidget):
         self.indent_size = indent_size
         self._metrics = resolve_metrics(metrics)
         self.current_env_keys = None
+        self._last_response: ResponseData | None = None
+        self._last_hidden_fields: list[str] | None = None
         self.init_ui()
 
     def init_ui(self):
@@ -109,6 +117,7 @@ class ResponseView(QWidget):
         self.body_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.body_view.customContextMenuRequested.connect(self.show_context_menu)
         self.json_highlighter = JsonHighlighter(self.body_view.document())
+        self.mask_controller = ResponseMaskController(self.body_view, self)
         layout.addWidget(self.body_view)
 
     def set_env_keys(self, keys):
@@ -297,6 +306,9 @@ class ResponseView(QWidget):
 
     def set_indent_size(self, size: int):
         self.indent_size = size
+        if self._last_response is not None:
+            self.display_response(self._last_response, hidden_fields=self._last_hidden_fields)
+            return
         # Refresh current view if it contains JSON
         text = self.body_view.toPlainText()
         if not text or len(text) > LARGE_DOC_CHAR_THRESHOLD:
@@ -311,6 +323,9 @@ class ResponseView(QWidget):
     def clear_body(self):
         """Clears the response body and status labels."""
         self._search_timer.stop()
+        self.mask_controller.clear()
+        self._last_response = None
+        self._last_hidden_fields = None
         self.body_view.clear()
         self.status_label.setText("Status: -")
         self.time_label.setText("Time: -")
@@ -326,13 +341,21 @@ class ResponseView(QWidget):
         self.body_view.insertPlainText(text)
         self.body_view.moveCursor(QTextCursor.End)
 
-    def display_response(self, response: ResponseData):
+    def display_response(
+        self,
+        response: ResponseData,
+        hidden_fields: Sequence[str] | None = None,
+    ):
         self._search_timer.stop()
         self.status_label.setText(f"Status: {response.status_code}")
         self.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
         self.size_label.setText(f"Size: {response.size} bytes")
         self.search_input.clear()
         self.search_status_label.setText("")
+
+        self._last_response = response
+        self._last_hidden_fields = list(hidden_fields) if hidden_fields is not None else None
+        self.mask_controller.clear()
 
         body_str = (
             response.body
@@ -359,15 +382,39 @@ class ResponseView(QWidget):
                 len(body_str),
                 LARGE_DOC_CHAR_THRESHOLD,
             )
+            if hidden_fields:
+                logger.debug(
+                    "response_masking_large_doc_fallback payload_size=%d threshold=%d",
+                    len(body_str),
+                    LARGE_DOC_CHAR_THRESHOLD,
+                )
             self.body_view.setText(body_str)
         else:
             if detected_format == BodyFormat.JSON:
-                try:
-                    parsed = json.loads(body_str)
-                    pretty_json = json.dumps(parsed, indent=self.indent_size)
-                    self.body_view.setText(pretty_json)
-                except Exception:
-                    self.body_view.setText(body_str)
+                if hidden_fields:
+                    try:
+                        pretty_json, spans = format_masked_json(
+                            body_str, hidden_fields, indent=self.indent_size
+                        )
+                        self.body_view.setText(pretty_json)
+                        self.mask_controller.set_masked_spans(spans)
+                        if spans:
+                            self._metrics.track_hidden_value_mask_applied("gui_response")
+                        logger.debug(
+                            "response_masking_initialized span_count=%d selectors_count=%d",
+                            len(spans),
+                            len(hidden_fields),
+                        )
+                    except Exception:
+                        logger.debug("response_masking_failed")
+                        self.body_view.setText(body_str)
+                else:
+                    try:
+                        parsed = json.loads(body_str)
+                        pretty_json = json.dumps(parsed, indent=self.indent_size)
+                        self.body_view.setText(pretty_json)
+                    except Exception:
+                        self.body_view.setText(body_str)
             else:
                 self.body_view.setText(body_str)
 

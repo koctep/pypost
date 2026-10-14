@@ -78,6 +78,28 @@ After send, the response pane shows:
 Very large response bodies may be truncated around 50 MB. This limit is built in;
 there is no Settings control for it.
 
+### Interacting with masked fields
+
+When hidden fields are configured on the request, matching sensitive values in JSON responses
+are masked by default as `"***"` with a neutral dashed underline:
+
+- **Hover tooltips and cursor**: Hovering your mouse over a masked value changes the cursor to
+  a pointing hand and displays a tooltip reading `Click to reveal`.
+- **Click to reveal**: Left-click on the masked placeholder `"***"` to reveal the raw secret value
+  in place. The visual styling changes to a subtle green background with a dotted underline, and
+  the hover tooltip updates to `Click to re-mask`.
+- **Click to re-mask**: Left-click the revealed value again at any time to re-mask the secret back
+  to `"***"`.
+- **Copying or setting variables**: You can highlight revealed text by clicking and dragging.
+  Drag selection does not trigger a re-mask toggle. Right-click to open the context menu:
+  - **Copy**: Copies the highlighted raw secret to your clipboard.
+  - **Set Variable**: Saves the raw secret directly into an active environment variable
+    (`Set Variable → <key>` or `New Variable...`).
+- **Search synchronization**: Searching with `Ctrl+F` searches the rendered text. Revealing a
+  masked secret makes it immediately searchable, and re-masking updates search matches accordingly.
+- **Large responses**: Response payloads larger than 100 KB bypass interactive masking and render
+  in plain text for optimal UI performance.
+
 ### Search in the response
 
 - Press `Ctrl+F` to focus the search field

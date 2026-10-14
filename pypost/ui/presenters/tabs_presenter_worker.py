@@ -103,7 +103,12 @@ class TabsPresenterWorkerHandlers:
             response.size,
         )
         self._metrics.track_response_received(method, str(response.status_code))
-        tab.response_view.display_response(response)
+        hidden_fields = (
+            tab.request_data.hidden_response_fields
+            if tab.request_data and hasattr(tab.request_data, "hidden_response_fields")
+            else None
+        )
+        tab.response_view.display_response(response, hidden_fields=hidden_fields)
         self._reset_tab_ui_state(tab)
         tab.response_view.status_label.setText(f"Status: {response.status_code}")
         tab.response_view.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
