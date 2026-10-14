@@ -319,6 +319,32 @@
         }
       },
       "retry_policy": null
+    },
+    {
+      "id": "gdrive-about-get",
+      "name": "Get Current User and Storage Quota",
+      "method": "GET",
+      "url": "{{ google_drive_base_url }}/about",
+      "headers": {
+        "Accept": "application/json",
+        "Authorization": "Bearer {{ google_drive_access_token }}"
+      },
+      "params": {
+        "fields": "user(displayName, emailAddress, permissionId), storageQuota"
+      },
+      "body": "",
+      "body_type": "json",
+      "yaml_as_json": false,
+      "post_script": "",
+      "expose_as_mcp": true,
+      "mcp_description": "Retrieve Google Drive user identity and storage quota information with masked PII response fields.",
+      "mcp_params": {},
+      "retry_policy": null,
+      "hidden_response_fields": [
+        "emailAddress",
+        "permissionId",
+        "user.emailAddress"
+      ]
     }
   ]
 }
