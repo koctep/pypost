@@ -204,29 +204,151 @@ The engine in `sensitive_text_sanitizer.redact_json_response_fields` parses and 
   - `redact_json_response_fields_skipped_non_json reason=<exception_type>` (DEBUG in `sensitive_text_sanitizer`)
   - All log entries strictly record numeric counts and schema keys, never logging payload secrets or sensitive token values.
 
-### 3. GUI Click-to-Reveal Token Span Model in ResponseView (MASK-3)
+### 3. Interactive Click-to-Reveal GUI Masking Architecture in ResponseView (MASK-3)
 
-In desktop GUI mode, users need confidentiality during screen sharing while retaining full interactive access to response data:
+In desktop GUI mode, users need confidentiality during screen sharing and pair programming while retaining full interactive access to inspect, copy, or set variables from response data:
 
 ```
 display_response(response, hidden_fields)
   → ResponseMaskController.format_masked_json(raw_json, hidden_fields)
-    → FoldableCodeView.setPlainText(masked_json)
-      → JsonHighlighter highlights "***" as valid string token
-        → User left-clicks on masked token
-          → ResponseMaskController.handle_click(char_pos)
-            → In-place text toggle via QTextCursor ("***" <-> raw_value)
+    → FoldableCodeView.setText(masked_json)
+      → ResponseMaskController.set_masked_spans(spans)
+        → Apply ExtraSelection visual formats
+        → JsonHighlighter highlights "***" as valid string literal
+          → Viewport Mouse Hover: PointingHandCursor & Tooltips
+          → Viewport Left-Click: In-place QTextCursor toggle ("***" <-> raw_value)
+            → Downstream span offset delta shifting
+            → Search match counter & code folding synchronization
 ```
 
-- **Token Span Management (`ResponseMaskController`)**:
-  - Maintains `MaskedTokenSpan` records tracking character ranges `[start_pos, end_pos]`, raw secret values, placeholder values (`"***"`), and toggle state (`is_revealed`).
-  - Detects click events in `FoldableCodeView` (`QPlainTextEdit`) via `cursorForPosition(event.pos())` and maps coordinates to token ranges.
-- **Subsystem Coexistence**:
-  - **Syntax Highlighting (`JsonHighlighter`)**: Masked tokens formatted as `"***"` comply with standard JSON string literal regex rules. Toggling values via `QTextCursor.insertText()` automatically triggers Qt's incremental block re-highlighting without modifying `JsonHighlighter`.
-  - **Search & Match Counting**: Search navigation (`self.body_view.find(...)`) and match count calculation (`_count_matches`) operate consistently. Revealed tokens become searchable immediately upon unmasking.
-  - **Code Folding Integrity**: In-place replacement of scalar tokens alters single-line character lengths without altering line counts or indentation structures, preserving `FoldController` block folding boundaries.
-  - **Context Menu Actions**: Selecting text and using context menu actions ("Set Variable", "Copy") operates seamlessly; selecting an unmasked token and choosing "Set Variable" emits `variable_set_requested` with the true secret value.
-  - **Large Document Bypass**: Payloads exceeding `LARGE_DOC_CHAR_THRESHOLD` (100 KB) bypass complex token tracking to maintain UI thread responsiveness.
+#### MaskedTokenSpan Data Structure and JsonMaskFormatter AST Parsing
+- **`MaskedTokenSpan` Model (`pypost/ui/widgets/response_mask_controller.py`)**:
+  A lightweight dataclass that tracks character boundaries and state transitions within the `QTextDocument`:
+  ```python
+  @dataclass
+  class MaskedTokenSpan:
+      start_pos: int          # Character offset start in QTextDocument
+      end_pos: int            # Character offset end in QTextDocument
+      raw_value: str          # Unmasked JSON serialized literal (e.g. '"secret_token_123"' or '42')
+      masked_value: str = '"***"'  # Masked placeholder string
+      is_revealed: bool = False    # Presentation toggle state
+      path: str = ""          # JSON dot-notation path (e.g. 'auth.token')
+  ```
+- **AST Parsing and Span Discovery (`JsonMaskFormatter`)**:
+  - Rather than regex scraping (which is prone to false positives on escaped strings or keys matching value names), `format_masked_json` parses the JSON body into a Python AST structure (`dict` / `list` / primitive nodes).
+  - `JsonMaskFormatter` walks the structure recursively, building the formatted JSON string buffer with `indent=self.indent_size`.
+  - At each node, it resolves hierarchical path variants using `format_path_variants(path, key_str)` from `sensitive_text_sanitizer.py` (matching simple keys, dot paths, and array wildcards).
+  - When a node matches a configured selector:
+    - Instead of emitting the node's serialized value, it emits the placeholder string `'"***"'`.
+    - It records the exact start and end character offsets in the emitted output stream: `start_pos = current_offset`, `end_pos = current_offset + len(masked_value)`.
+    - It stores the true raw value (serialized with matching indentation via `json.dumps(val, indent=indent, ensure_ascii=False)`) in `raw_value`.
+    - Appends a `MaskedTokenSpan` instance to the tracking list.
+  - Returns `(pretty_json_str, spans)`.
+
+#### ResponseMaskController Lifecycle & Visual Styling
+`ResponseMaskController` (`QObject`) manages span tracking and user interactions for `FoldableCodeView`:
+- **Viewport Event Filtering**:
+  - Installs an event filter on `FoldableCodeView.viewport()` and enables `setMouseTracking(True)`.
+  - On `QEvent.Type.MouseMove`:
+    - Maps coordinate to character index via `code_view.cursorForPosition(pos).position()`.
+    - Hit-tests against tracked spans via `span_at(char_pos)`.
+    - If hovering over a span: updates cursor to `Qt.CursorShape.PointingHandCursor` and displays a tooltip via `QToolTip.showText` (`"Click to reveal"` or `"Click to re-mask"`).
+    - If hovering outside all spans: restores `Qt.CursorShape.IBeamCursor` and hides tooltips via `QToolTip.hideText()`.
+  - On `QEvent.Type.Leave`: restores `IBeamCursor` and dismisses tooltips.
+- **ExtraSelection Visual Affordance (`update_visual_formats`)**:
+  - Masking affordances are rendered using Qt's `QTextEdit.ExtraSelection` API on `FoldableCodeView`.
+  - `ExtraSelection` paints decorations directly in the viewport layer without mutating document text, modifying character offsets, or interfering with `QSyntaxHighlighter`.
+  - **Masked State (`is_revealed == False`)**:
+    - Background: neutral gray tint (`QColor(128, 128, 128, 48)`).
+    - Underline: dashed underline (`QTextCharFormat.UnderlineStyle.DashUnderline`).
+    - Tooltip: `"Click to reveal"`.
+  - **Revealed State (`is_revealed == True`)**:
+    - Background: subtle green tint (`QColor(76, 175, 80, 40)`).
+    - Underline: dotted underline (`QTextCharFormat.UnderlineStyle.DotLine`).
+    - Tooltip: `"Click to re-mask"`.
+- **Lifecycle Cleanup**:
+  - `clear()` empties tracked spans, clears extra selections, restores `IBeamCursor`, and hides active tooltips.
+  - Automatically invoked on `clear_body()` and prior to new response rendering in `display_response()`.
+
+#### In-Place Click-to-Reveal Toggle Mechanics and Span Offset Shifting
+- **Click Detection (`eventFilter` & `handle_click`)**:
+  - On `QEvent.Type.MouseButtonRelease` with `Qt.MouseButton.LeftButton`:
+    - Checks `not self.code_view.textCursor().hasSelection()` to ensure text drag-selection is not mistaken for a click.
+    - Resolves `char_pos = self.code_view.cursorForPosition(pos).position()`.
+    - Calls `handle_click(char_pos)`.
+- **In-Place QTextCursor Replacement**:
+  - Locates target span `span = self.span_at(char_pos)`.
+  - Computes `old_len = span.end_pos - span.start_pos`.
+  - Selects replacement text: `new_text = span.raw_value if not span.is_revealed else span.masked_value`.
+  - Toggles `span.is_revealed = not span.is_revealed`.
+  - Uses `QTextCursor` to perform in-place replacement:
+    ```python
+    cursor = QTextCursor(self.code_view.document())
+    cursor.setPosition(span.start_pos)
+    cursor.setPosition(span.end_pos, QTextCursor.MoveMode.KeepAnchor)
+    cursor.insertText(new_text)
+    ```
+    *(Note: In Qt `QPlainTextEdit`, programmatic cursor edits succeed even when `isReadOnly() == True`, preventing user typing while allowing scriptable modifications).*
+- **Downstream Span Offset Delta Shifting**:
+  - Calculates length delta: `delta = len(new_text) - old_len`.
+  - Updates target span boundary: `span.end_pos = span.start_pos + len(new_text)`.
+  - Shifts all subsequent spans (`other.start_pos > span.start_pos`) in the tracked list:
+    ```python
+    for other in self._spans:
+        if other.start_pos > span.start_pos:
+            other.start_pos += delta
+            other.end_pos += delta
+    ```
+  - Spans preceding the toggled position remain unaffected. This preserves exact coordinate integrity across any sequence of reveals and re-masks.
+  - Updates visual formats via `update_visual_formats()`.
+
+#### Subsystem Coexistence
+- **Syntax Highlighting (`JsonHighlighter`)**:
+  - Masked placeholder `'"***"'` matches the standard JSON string literal regex pattern (`r'"[^"\\]*(\\.[^"\\]*)*"'`).
+  - Replacing text via `QTextCursor.insertText()` automatically triggers Qt's incremental block re-highlighting without modifying `JsonHighlighter` rules.
+  - Highlighting updates smoothly without infinite loops or UI flickering.
+- **Search Navigation & Match Counter Synchronization**:
+  - PyPost's search engine searches directly within the active `QTextDocument`.
+  - While masked, searching for the raw secret produces zero matches; searching for `"***"` matches masked fields.
+  - When revealed, the raw secret is physically present in the document and immediately searchable via `Ctrl+F`, `Next`, and `Previous`.
+  - After toggling a span, if `response_view.search_input` has text, `handle_click` triggers `_on_search_text_changed()`, instantly updating match navigation and the match count indicator (e.g. `"1 of 2"`).
+  - Re-masking immediately updates search matches back to the masked state.
+- **Code Folding Block Stability (`FoldController`)**:
+  - PyPost's `FoldController` identifies foldable block regions from indentation and brace/bracket structure (`{}`, `[]`).
+  - Toggling scalar strings alters character count on the current line but preserves line numbers, indentation, and brace pairs.
+  - Following each toggle, `self.code_view.fold_controller().ensure_scanned()` is called to ensure fold regions remain valid and intact.
+- **Context Menu Integration ("Set Variable" & "Copy")**:
+  - When text is highlighted in `FoldableCodeView`, the custom context menu provides:
+    - `"Set Variable"` (active when environment keys exist): emits `variable_set_requested(key, selected_text)`.
+    - `"Copy"`: copies selected text to system clipboard.
+  - If a user selects an unmasked secret and clicks "Set Variable" or "Copy", the authentic secret value is read from the cursor (`cursor.selectedText()`) and emitted or copied.
+  - Because `eventFilter` checks `not self.code_view.textCursor().hasSelection()`, drag-selecting revealed text never accidentally triggers a re-mask toggle.
+
+#### Large-Document Fallback & Streaming Safety
+- **Large-Document Fallback (> 100 KB)**:
+  - If the response payload exceeds `LARGE_DOC_CHAR_THRESHOLD` (100 * 1024 characters), `display_response` logs `response_masking_large_doc_fallback` and bypasses pretty-printing, AST traversal, and span tracking.
+  - The raw payload is passed directly to `self.body_view.setText(body_str)` and `mask_controller.clear()` is called.
+  - This prevents UI event loop freezes or memory bloat on multi-megabyte payloads.
+- **In-Flight Streaming Response Safety**:
+  - During streaming requests, chunks arrive incrementally via `ResponseView.append_body(chunk)` without attempting partial AST parsing.
+  - Upon request completion, `TabsPresenterWorker._on_request_finished` calls `display_response(response, hidden_fields=tab.request_data.hidden_response_fields)`, cleanly replacing the streamed text with the formatted, masked JSON document.
+
+#### Raw ResponseData Immutability & Telemetry Metrics
+- **Immutability of In-Memory `ResponseData`**:
+  - All masking and unmasking transformations are presentation-only, operating strictly on the `QTextDocument` in `ResponseView`.
+  - `response.body` on the `ResponseData` instance and history records stored via `HistoryManager` remain completely unmodified.
+  - Re-indenting JSON via `set_indent_size()` safely re-applies formatting from `self._last_response` and `self._last_hidden_fields`.
+- **Telemetry Counter**:
+  - When masking spans are initialized in `display_response`, the system tracks telemetry via:
+    - Metric: `hidden_value_masks_applied_total`
+    - Label: `surface="gui_response"`
+    - Invocation: `self._metrics.track_hidden_value_mask_applied("gui_response")`
+- **Structured Logging (Zero Leakage)**:
+  - `response_masking_initialized span_count=<count> selectors_count=<count>` (DEBUG)
+  - `response_masking_spans_updated span_count=<count>` (DEBUG)
+  - `click_to_reveal_toggle path=<path> revealed=<bool>` (DEBUG)
+  - `response_masking_large_doc_fallback payload_size=<size> threshold=<threshold>` (DEBUG)
+  - All logs record paths and counts, never exposing secret values.
 
 ### 4. Selector Syntax & Matching Rules
 

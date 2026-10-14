@@ -35,10 +35,17 @@ class FoldableCodeView(QPlainTextEdit):
         self._fold_controller = FoldController(self, self._body_format)
         self._line_number_area = LineNumberArea(self)
 
+        self._mask_controller = None
         self.blockCountChanged.connect(self._update_line_number_area_width)
         self.updateRequest.connect(self._update_line_number_area)
         self._update_line_number_area_width(0)
         self.update_indent_size(indent_size)
+
+    def set_mask_controller(self, controller) -> None:
+        self._mask_controller = controller
+
+    def mask_controller(self):
+        return self._mask_controller
 
     def fold_controller(self) -> FoldController:
         return self._fold_controller
