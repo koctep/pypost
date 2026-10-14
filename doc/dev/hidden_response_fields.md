@@ -361,6 +361,107 @@ The selector engine supports four syntax formats:
 | **Array Wildcard Path** | `<array>[*].<field>` | `users[*].email`, `items[*].secret` | Matches specific fields across array elements. |
 | **Header Selector** | `header:<Name>` | `header:Authorization` | Targets HTTP response headers for MCP sanitization. |
 
+### 5. Integration Testing, Edge-Case Verification, and Reference Collections (MASK-4)
+
+The final phase of Epic PYPOST-1312 (Story [PYPOST-1380](https://pypost.atlassian.net/browse/PYPOST-1380)) establishes an end-to-end integration test harness, a comprehensive edge-case validation matrix, and realistic reference collection fixtures to prove the safety and correctness of the dual-surface masking architecture.
+
+#### Test Architecture (`tests/test_hidden_response_fields_integration_edge_cases.py`)
+
+The integration test suite lives in `tests/test_hidden_response_fields_integration_edge_cases.py` and exercises the end-to-end pipelines across both MCP server serialization and desktop GUI `ResponseView` rendering:
+
+```
+                              ExecutionResult (ResponseData)
+                                     /             \
+                                    /               \
+                                   v                 v
+                 MCP Serialization Pipeline     GUI Presentation Pipeline
+               (format_structured_tool_result)   (ResponseView.display_response)
+                            |                                 |
+                            v                                 v
+                 Irreversible "***" Redaction     MaskedTokenSpan AST Tracking
+                 Zero Agent Reveal Parameters     Interactive Click-to-Reveal
+                            \                                 /
+                             \                               /
+                              v                             v
+                       Verified Invariant: ResponseData.body Unmutated
+```
+
+- **Test Suite Structure**:
+  - Test class: `TestHiddenResponseFieldsIntegrationEdgeCases` parameterized with Qt application fixture (`qapp: QApplication`).
+  - Strict execution timeout: `pytestmark = pytest.mark.timeout(60)` to prevent test hangs.
+  - Realistic mock factory: `_make_exec_result(body, status_code, headers)` builds authentic `ExecutionResult` and `ResponseData` instances matching live runtime execution.
+- **Architectural Verification Guarantees**:
+  - **Dual-Surface Consistency**: Exercises identical `ResponseData` instances sequentially through MCP serialization and GUI `ResponseView`, verifying expected redactions across both boundaries.
+  - **Memory Immutability Invariant**: Asserts that `exec_result.response.body == original_body_str` remains byte-for-byte identical after all transformations.
+  - **MCP Fail-Closed Schema Invariant**: Validates via `server.list_tools()` that registered tool definitions expose zero reveal/unmask parameters, preventing agent prompt injection or leakage.
+  - **Span Index Stability**: Verifies that toggling arbitrary spans in `ResponseMaskController` shifts downstream character positions correctly without off-by-one errors or text corruption.
+
+#### Edge-Case Validation Matrix
+
+The test suite validates 8 comprehensive integration scenarios covering complex JSON topologies, primitive values, error formats, and concurrency:
+
+| Scenario | Scope / Area | Verification Criteria | Test Method |
+| :--- | :--- | :--- | :--- |
+| **Scenario 1** | **Cross-Cutting Dual Consumption** | Same `ResponseData` passed to MCP and GUI. MCP produces permanent `***`; GUI produces interactive `MaskedTokenSpan`s allowing reveal and re-mask. Raw `ResponseData.body` remains unmutated. Tool schema has zero reveal params. | `test_scenario_1_cross_cutting_e2e_contract` |
+| **Scenario 2** | **Deeply Nested Keys (>5 Levels)** | Path `level1.level2.level3.level4.level5.level6.secret` resolves exact target in deep AST hierarchy. Sibling keys at depth 6 (`public`) and parallel branches at depth 3 (`other.secret`) remain unmasked. | `test_scenario_2_deeply_nested_paths` |
+| **Scenario 3** | **Array Wildcards & Heterogeneity** | Nested wildcards (`items[*].token`), root array wildcards (`[*].id`), and heterogeneous arrays (containing strings, integers, `None`, lists, dicts) traversed without exceptions. | `test_scenario_3_array_wildcard_selectors` |
+| **Scenario 4** | **Primitive Values & Nulls** | Non-string primitives (integers `1234`, floats `3.1415`, booleans `true`/`false`, and `null`) masked cleanly as `***`. GUI click-to-reveal faithfully renders literal unquoted/typed values. | `test_scenario_4_non_string_primitives_and_null_masking` |
+| **Scenario 5** | **Duplicate Keys in Distinct Branches** | Qualified dot path `user.id` masks only `user.id` leaving `organization.id` and `metadata.id` intact. Unqualified selector `name` masks all occurrences across distinct object branches. | `test_scenario_5_duplicate_keys_in_distinct_branches` |
+| **Scenario 6** | **Non-JSON Payloads & HTTP 204** | HTML error pages (500), plain text (401), and malformed JSON safely pass through without crashes. HTTP 204 No Content renders empty body with zero spans and valid status display. | `test_scenario_6_non_json_and_empty_response_handling` |
+| **Scenario 7** | **Multi-Tab Concurrency Isolation** | `copy_request_for_isolated_tab` deep-copies `hidden_response_fields`. Selector mutations in Tab B do not pollute Tab A or dirty baselines. Concurrent `ResponseView` instances manage independent spans. | `test_scenario_7_multi_tab_concurrency_isolation` |
+| **Scenario 8** | **Reference Collection Fixture** | Validates `examples/collections/google_drive.json` request `gdrive-about-get`. Asserts disk persistence, Pydantic model serialization, and live execution through MCP and GUI masking pipelines. | `test_scenario_8_reference_collection_fixture_validation` |
+
+#### Reference Collection Fixture (`examples/collections/google_drive.json`)
+
+To provide developers and users with an authentic, production-grade reference configuration, PyPost includes `gdrive-about-get` in the bundled Google Drive collection:
+
+- **Request ID**: `gdrive-about-get`
+- **Request Name**: `"Get Current User and Storage Quota"`
+- **Endpoint**: `GET {{ google_drive_base_url }}/about` with query parameter `fields=user(displayName, emailAddress, permissionId), storageQuota`
+- **Configured `hidden_response_fields`**:
+  ```json
+  "hidden_response_fields": [
+    "emailAddress",
+    "permissionId",
+    "user.emailAddress"
+  ]
+  ```
+- **MCP Configuration**:
+  - `expose_as_mcp: true`
+  - `mcp_description`: `"Retrieve Google Drive user identity and storage quota information with masked PII response fields."`
+- **Masking Behavior**:
+  - When executed, Google Drive's response contains sensitive PII (`user.emailAddress` and `user.permissionId`) alongside non-sensitive metadata (`user.displayName` and `storageQuota`).
+  - **In MCP Mode**: `emailAddress` and `permissionId` are permanently redacted to `***`.
+  - **In Desktop GUI Mode**: `emailAddress` and `permissionId` are visually masked with dashed underlines, allowing the developer to click to reveal while keeping the screen safe during demos.
+
+#### Developer Testing and Verification Guide
+
+Developers extending selector syntax, modifying response views, or altering MCP sanitization pipelines should follow this verification workflow:
+
+1. **Run Integration and Edge-Case Tests**:
+   ```bash
+   make test PYTEST_ARGS="tests/test_hidden_response_fields_integration_edge_cases.py"
+   ```
+2. **Run All Related Unit and Component Suites**:
+   ```bash
+   make test PYTEST_ARGS="tests/test_hidden_response_fields.py tests/test_mcp_response_masking.py tests/test_gui_response_view_click_to_reveal.py"
+   ```
+3. **Verify Reference Collection Integrity**:
+   ```bash
+   make test PYTEST_ARGS="tests/test_collections.py -k test_google_drive"
+   ```
+4. **Execute Static Analysis and Quality Gates**:
+   ```bash
+   # Run flake8 and markdown documentation linters
+   make lint
+
+   # Run type checks against baseline
+   make typecheck
+
+   # Run complete automated repository quality gate
+   make check
+   ```
+
 ---
 
 ## Comparison: GUI vs MCP Masking
@@ -383,3 +484,6 @@ The selector engine supports four syntax formats:
 - Sensitive Data Masking Policy: [`doc/dev/sensitive_data_masking_policy.md`](sensitive_data_masking_policy.md)
 - RequestData Copy Policy: [`doc/dev/request_data_copy_policy.md`](request_data_copy_policy.md)
 - MCP Integration Guide: [`doc/dev/mcp_integration.md`](mcp_integration.md)
+- Integration & Edge-Case Tests: [`tests/test_hidden_response_fields_integration_edge_cases.py`](../../tests/test_hidden_response_fields_integration_edge_cases.py)
+- Reference Collection Fixture: [`examples/collections/google_drive.json`](../../examples/collections/google_drive.json)
+- MASK-4 Roadmap & Verification: [`ai-tasks/PYPOST-1380/00-roadmap.md`](../../ai-tasks/PYPOST-1380/00-roadmap.md)
