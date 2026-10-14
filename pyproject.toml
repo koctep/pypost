@@ -45,6 +45,7 @@ otel = [
 ]
 
 [project.scripts]
+pypost = "pypost.main:main"
 pypost-agent-ui-mcp = "pypost.agent.ui_actions_mcp:main"
 pypost-daemon = "pypost.daemon:main"
 

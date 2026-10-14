@@ -37,7 +37,7 @@ conventions.
 1. [State Manager](state_manager.md)
 1. [Presenter Architecture and Interaction Model (PYPOST-1082)](presenter_architecture.md)
 1. [Uniform Presenter Teardown Contract (PYPOST-1256)](presenter_teardown.md)
-1. [Headless Daemon Mode (PYPOST-1046)](daemon.md)
+1. [Dual Runtime Distribution Modes and Headless Daemon (PYPOST-1046, PYPOST-1269)](daemon.md)
 
 ### Audits
 
@@ -198,6 +198,9 @@ To get the application running immediately using Make:
 # Install dependencies and setup environment
 make install
 
-# Run the application
+# Run the desktop application
 make run
+
+# Run headless daemon services (MCP servers and Prometheus metrics)
+make run-daemon
 ```

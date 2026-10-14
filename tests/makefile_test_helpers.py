@@ -161,6 +161,7 @@ SLOW_SMOKE_MINIMUM_PYPPOST_FILES = frozenset(
         "agent/__init__.py",
         "agent/ui_actions_mcp.py",
         "daemon.py",
+        "main.py",
         "core/__init__.py", "core/key_sources/__init__.py", "core/qt/__init__.py",
         "fixtures/__init__.py", "models/__init__.py", "ui/__init__.py",
         "ui/delegates/__init__.py", "ui/dialogs/__init__.py", "ui/presenters/__init__.py",
