@@ -25,11 +25,26 @@ pip install -e ".[dev,otel]"
 
 ## Run
 
+Start the PyPost desktop application using Make:
+
 ```bash
 make run
 ```
 
-Or with an activated virtual environment:
+When PyPost is installed into an active virtual environment (`pip install -e .` or `make install`),
+launch the desktop application directly using the console script:
+
+```bash
+pypost
+```
+
+Or via the standard Python module launcher:
+
+```bash
+python -m pypost
+```
+
+Direct script execution with `PYTHONPATH` is also supported:
 
 ```bash
 PYTHONPATH=. python pypost/main.py
@@ -37,7 +52,9 @@ PYTHONPATH=. python pypost/main.py
 
 There is no separate end-user CLI for sending requests — the desktop app is the primary
 interface. Local HTTP endpoints exist only for MCP (default port 1080) and Prometheus
-metrics (default port 9080).
+metrics (default port 9080). For running background MCP services and metrics without a display
+server, see [Headless Daemon Mode](../dev/daemon.md) or launch `pypost-daemon` /
+`python -m pypost.daemon`.
 
 ## First steps
 

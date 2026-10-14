@@ -1,3 +1,5 @@
+import argparse
+from collections.abc import Sequence
 import logging
 import sys
 from dataclasses import dataclass
@@ -142,7 +144,16 @@ def compose_app(
     )
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="pypost",
+        description="Run PyPost desktop application.",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    build_parser().parse_args(argv if argv is not None else sys.argv[1:])
     logger.info("app_startup")
     app = QApplication(sys.argv)
     app.setApplicationName("PyPost")

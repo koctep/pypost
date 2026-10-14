@@ -69,15 +69,14 @@ class EnvironmentStorageGateway(QObject):
             )
 
     def wait_idle(self, timeout_ms: int = 30000) -> bool:
-        from PySide6.QtCore import QElapsedTimer
-        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import QCoreApplication, QElapsedTimer
 
         if not self.has_pending_work():
             return True
 
         timer = QElapsedTimer()
         timer.start()
-        app = QApplication.instance()
+        app = QCoreApplication.instance()
         logger.info("environment_storage_gateway_wait_idle_started")
         while self.has_pending_work():
             if timer.elapsed() >= timeout_ms:
