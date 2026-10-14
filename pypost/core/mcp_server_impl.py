@@ -72,11 +72,15 @@ def format_structured_tool_result(
     *,
     env_vars: dict[str, str] | None = None,
     hidden_keys: set[str] | None = None,
+    hidden_response_fields: Sequence[str] | None = None,
 ) -> str:
     """Serialize ExecutionResult as agent-facing JSON (status, error, body, optional logs)."""
     env, hidden = env_vars or {}, hidden_keys or set()
     body = McpResponseSanitizer.sanitize_body(
-        result.response.body, env_vars=env, hidden_keys=hidden
+        result.response.body,
+        env_vars=env,
+        hidden_keys=hidden,
+        hidden_response_fields=hidden_response_fields,
     )
     payload: dict[str, Any] = {
         "status": result.response.status_code,
@@ -201,9 +205,26 @@ class MCPServerImpl:
                 hidden_keys,
                 overridable_keys,
             )
-            output_text = format_structured_tool_result(
-                result, env_vars=env_vars, hidden_keys=hidden_keys
+            hidden_fields = (
+                item.hidden_response_fields
+                if isinstance(item, RequestData)
+                else None
             )
+            output_text = format_structured_tool_result(
+                result,
+                env_vars=env_vars,
+                hidden_keys=hidden_keys,
+                hidden_response_fields=hidden_fields,
+            )
+            if hidden_fields:
+                self._metrics.track_hidden_value_mask_applied("mcp")
+                tool_method = item.method if isinstance(item, RequestData) else "UNKNOWN"
+                logger.debug(
+                    "mcp_response_masking_applied method=%s tool=%s selector_count=%d",
+                    tool_method,
+                    name,
+                    len(hidden_fields),
+                )
             has_error = _tool_result_has_error(result)
             outcome = "error" if has_error else "success"
             detail = result.execution_error.message if result.execution_error else None

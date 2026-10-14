@@ -126,11 +126,11 @@ A specialized single-column `QTableWidget` component designed for managing list-
 
 ### 2. Fail-Closed MCP Permanent Masking Boundary (MASK-2)
 
-When requests are invoked via MCP tools, security isolation from external AI agents is paramount:
+When requests are invoked via MCP tools, security isolation from external AI agents is paramount. Unlike desktop GUI users who can interactively inspect unmasked values using click-to-reveal (MASK-3), automated AI agents are treated as untrusted consumers with respect to sensitive credentials.
 
 ```
 Agent Tool Invocation
-  → MCPServerImpl._call_tool_impl
+  → MCPServerImpl._call_tool_inner
     → RequestService._execute_request_sync
       → ExecutionResult(response)
         → format_structured_tool_result(..., hidden_response_fields=request.hidden_response_fields)
@@ -139,13 +139,70 @@ Agent Tool Invocation
               → Irreversible Output with "***"
 ```
 
-- **Fail-Closed Irreversible Boundary**:
-  - Values matching `hidden_response_fields` are permanently replaced with the placeholder `***`.
-  - No MCP tool parameter (e.g. `reveal_secrets: bool`) or auxiliary tool is provided to AI agents.
-  - Non-JSON payloads or malformed JSON content fallback safely without leaking raw values.
-- **Preservation of Internal State**:
-  - Masking occurs strictly during tool output serialization in `format_structured_tool_result`.
-  - In-memory `ExecutionResult.response` and PyPost history storage remain unmodified.
+#### Pipeline Integration
+1. **Tool Execution Dispatch**:
+   In `MCPServerImpl._call_tool_inner` (`pypost/core/mcp_server_impl.py`), `item` represents the executed `RequestData`. The configured field selectors are extracted:
+   ```python
+   hidden_fields = (
+       item.hidden_response_fields
+       if isinstance(item, RequestData)
+       else None
+   )
+   ```
+2. **Result Serialization**:
+   `format_structured_tool_result` accepts `hidden_response_fields: Sequence[str] | None = None` and passes it directly to `McpResponseSanitizer.sanitize_body`.
+3. **Sanitization Facade**:
+   `McpResponseSanitizer.sanitize_body` (`pypost/core/mcp_response_sanitizer.py`) coordinates body sanitization:
+   ```python
+   fields = hidden_response_fields if hidden_response_fields is not None else hidden_fields
+   if fields:
+       body = sts.redact_json_response_fields(body, fields)
+   return sts.sanitize_text(body, env_vars=env_vars, hidden_keys=hidden_keys)
+   ```
+   This ensures both request-level field selectors and global environment variable secrets (`hidden_keys`, Bearer tokens, Authorization headers) are redacted before output serialization.
+
+#### Irreversible Security Boundary Invariant
+- **Zero Reveal Parameters**:
+  `build_tool_input_schema` in `pypost/core/mcp_tool_contract.py` constructs MCP tool schemas exclusively from discovered `{{mcp.request.<param>}}` placeholders and permitted environment variable overrides. No parameter (e.g. `unmask`, `reveal`, `reveal_secrets`, `show_hidden`, `raw`) exists or is advertised to agents.
+- **Zero Reveal Tools**:
+  `MCPServerImpl` registers only user-defined endpoints where `expose_as_mcp == True`. No auxiliary tools (such as `reveal_response_field`, `get_raw_body`, or `unmask_secret`) are registered on the MCP server.
+- **No Reveal Bypass**:
+  Masking is applied unilaterally during output serialization. Even if an agent crafts and sends unexpected parameters (e.g. `{"unmask": true}`), the input validator rejects or ignores them, and output serialization unconditionally redacts all configured fields.
+
+#### Supported Selector Syntax & Path Evaluation
+The engine in `sensitive_text_sanitizer.redact_json_response_fields` parses and evaluates four selector formats:
+- **Simple / Root Keys**: Exact key match (e.g., `"token"`, `"password"`, `"api_key"`). Matches anywhere in the JSON hierarchy (root, nested objects, or list items).
+- **Dot-Notation Paths**: Specific hierarchical paths from root (e.g., `"auth.token"`, `"data.user.credentials.secret"`). Matches exact nested object chains, leaving siblings untouched.
+- **Array Wildcards & Shorthands**: Wildcard path syntax (`"users[*].email"`, `"items[*].secret"`) or dot-notation array shorthand (`"users.email"`, `"items.secret"`). Traverses arrays of objects and redacts the matching key across every array item.
+- **Response Header Prefix**: Selectors prefixed with `header:` (e.g., `"header:Authorization"`, `"header:X-Auth-Token"`). Handled by `sensitive_text_sanitizer.sanitize_headers`, redacting matching response headers alongside standard sensitive header names.
+
+#### Non-JSON Pass-Through and Graceful Error Fallback
+- **Robust Exception Handling**:
+  If the response body is plain text, HTML, XML, binary, or malformed JSON, `redact_json_response_fields` safely catches `(json.JSONDecodeError, TypeError, ValueError)`.
+- **Pass-Through Behavior**:
+  On exception, the raw body text is returned intact to allow standard downstream text sanitization (`sanitize_text`), which continues to mask known environment secret variable values and Bearer tokens without raising unhandled exceptions or failing open.
+- **Diagnostic Safety**:
+  Debug logs record only the exception type name (`reason=JSONDecodeError`), guaranteeing no partial or malformed sensitive payloads are leaked to logging streams.
+
+#### Display-Only Immutability of In-Memory ResponseData
+- **Output-Only Transformation**:
+  Masking occurs strictly during serialization into the `TextContent(type="text", text=output_text)` payload returned across the MCP JSON-RPC protocol.
+- **Pristine Internal State**:
+  The underlying `ExecutionResult.response` (`ResponseData`) and history entries stored via `HistoryManager` remain completely unmodified.
+- **Compliance & Post-Processing**:
+  In-memory response data remains authentic for post-request scripts, test assertions, audit logs, and desktop GUI inspection.
+
+#### Telemetry Metrics & Structured Logging
+- **Observability Metric**:
+  When `hidden_fields` are configured on an executed request, `MCPServerImpl._call_tool_inner` increments the low-cardinality Prometheus / OpenTelemetry counter:
+  - Metric name: `hidden_value_masks_applied_total`
+  - Label: `surface="mcp"`
+  - Method: `self._metrics.track_hidden_value_mask_applied("mcp")`
+- **Structured Logging (Zero Secret Leakage)**:
+  - `mcp_response_masking_applied method=<method> tool=<tool> selector_count=<count>` (DEBUG in `MCPServerImpl`)
+  - `redact_json_response_fields_completed selectors_count=<count> masked_fields_count=<count>` (DEBUG in `sensitive_text_sanitizer`)
+  - `redact_json_response_fields_skipped_non_json reason=<exception_type>` (DEBUG in `sensitive_text_sanitizer`)
+  - All log entries strictly record numeric counts and schema keys, never logging payload secrets or sensitive token values.
 
 ### 3. GUI Click-to-Reveal Token Span Model in ResponseView (MASK-3)
 

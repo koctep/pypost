@@ -15,7 +15,7 @@
 | --- | ---: | ---: | ---: |
 | `pypost/core/collection_item_dispatch.py` | — | 83 | 83 |
 | `pypost/core/http_client.py` | 198 | 381 | 418 |
-| `pypost/core/mcp_server_impl.py` | 231 | 370 | 407 |
+| `pypost/core/mcp_server_impl.py` | 231 | 391 | 407 |
 | `pypost/core/qt/metrics.py` | 286 | 63 | 70 |
 | `pypost/core/qt/metrics_tracking.py` | — | 166 | 180 |
 | `pypost/core/qt/metrics_websocket.py` | — | 40 | 45 |
