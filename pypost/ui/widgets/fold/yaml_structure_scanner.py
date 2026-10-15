@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 
+from collections.abc import Callable
 import io
+import logging
 
 import yaml
 from PySide6.QtGui import QTextDocument
@@ -11,6 +13,8 @@ from yaml.nodes import MappingNode, SequenceNode
 
 from pypost.ui.widgets.fold.fold_region import FoldRegion
 from pypost.ui.widgets.fold.scan_utils import append_region_if_multiline, path_id
+
+logger = logging.getLogger(__name__)
 
 
 def _collect_regions(
@@ -46,15 +50,24 @@ def _collect_regions(
 
 
 class YamlStructureScanner:
-    def scan(self, document: QTextDocument) -> list[FoldRegion]:
-        text = document.toPlainText()
+    def scan_text(
+        self, text: str, is_interrupted: Callable[[], bool] | None = None
+    ) -> list[FoldRegion]:
         if not text.strip():
+            return []
+        if is_interrupted is not None and is_interrupted():
             return []
         try:
             stream = io.StringIO(text)
             regions: list[FoldRegion] = []
             for node in yaml.compose_all(stream, Loader=yaml.SafeLoader):
+                if is_interrupted is not None and is_interrupted():
+                    return []
                 _collect_regions(node, [], regions)
             return regions
-        except yaml.YAMLError:
+        except yaml.YAMLError as exc:
+            logger.debug("yaml_scan_parse_skipped error=%s", exc)
             return []
+
+    def scan(self, document: QTextDocument) -> list[FoldRegion]:
+        return self.scan_text(document.toPlainText())

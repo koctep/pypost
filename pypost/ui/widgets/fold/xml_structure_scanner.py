@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 
-import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from collections import defaultdict
+import logging
+import xml.etree.ElementTree as ET
 
 from PySide6.QtGui import QTextDocument
 
 from pypost.ui.widgets.fold.fold_region import FoldRegion
 from pypost.ui.widgets.fold.scan_utils import append_region_if_multiline, line_at_offset, path_id
 
+logger = logging.getLogger(__name__)
 
-def _scan_regions(text: str) -> list[FoldRegion]:
+
+def _scan_regions(
+    text: str, is_interrupted: Callable[[], bool] | None = None
+) -> list[FoldRegion]:
     regions: list[FoldRegion] = []
     stack: list[tuple[str, int, list[str]]] = []
     sibling_counts: dict[tuple[str, ...], dict[str, int]] = defaultdict(
@@ -22,6 +28,8 @@ def _scan_regions(text: str) -> list[FoldRegion]:
     length = len(text)
 
     while index < length:
+        if is_interrupted is not None and (index & 1023 == 0) and is_interrupted():
+            return []
         if text[index] != "<":
             index += 1
             continue
@@ -103,12 +111,21 @@ def _scan_regions(text: str) -> list[FoldRegion]:
 
 
 class XmlStructureScanner:
-    def scan(self, document: QTextDocument) -> list[FoldRegion]:
-        text = document.toPlainText()
+    def scan_text(
+        self, text: str, is_interrupted: Callable[[], bool] | None = None
+    ) -> list[FoldRegion]:
         if not text.strip():
+            return []
+        if is_interrupted is not None and is_interrupted():
             return []
         try:
             ET.fromstring(text)
-        except ET.ParseError:
+        except ET.ParseError as exc:
+            logger.debug("xml_scan_parse_skipped error=%s", exc)
             return []
-        return _scan_regions(text)
+        if is_interrupted is not None and is_interrupted():
+            return []
+        return _scan_regions(text, is_interrupted=is_interrupted)
+
+    def scan(self, document: QTextDocument) -> list[FoldRegion]:
+        return self.scan_text(document.toPlainText())

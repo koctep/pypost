@@ -28,7 +28,9 @@ and activates the matching scanner.
 - **`LineNumberArea` (`pypost/ui/widgets/line_number_area.py`)** — Forwards mouse presses to the
   host editor.
 
-See also [Body Editor Line Numbers](body_editor_line_numbers.md) for gutter layout basics.
+See also [Body Editor Line Numbers](body_editor_line_numbers.md) for gutter layout basics
+and [Background Folding Scanner for Large Documents](background_folding_scanner.md) for
+asynchronous parsing architecture.
 
 ```mermaid
 flowchart LR
