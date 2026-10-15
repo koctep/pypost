@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from collections.abc import Callable
 import json
 import logging
@@ -33,17 +32,16 @@ class JsonStructureScanner:
             return []
         try:
             json.loads(text)
-        except json.JSONDecodeError as exc:
-            logger.debug(
-                "json_scan_parse_skipped line=%d col=%d msg=%s",
-                exc.lineno,
-                exc.colno,
-                exc.msg,
+            if is_interrupted is not None and is_interrupted():
+                return []
+            return _scan_regions(text, is_interrupted=is_interrupted)
+        except (json.JSONDecodeError, RecursionError, ValueError) as exc:
+            logger.warning(
+                "json_scan_parse_skipped error_type=%s length=%d",
+                type(exc).__name__,
+                len(text),
             )
             return []
-        if is_interrupted is not None and is_interrupted():
-            return []
-        return _scan_regions(text, is_interrupted=is_interrupted)
 
     def scan(self, document: QTextDocument) -> list[FoldRegion]:
         return self.scan_text(document.toPlainText())

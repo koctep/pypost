@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from collections.abc import Callable
 import io
 import logging
@@ -65,8 +64,12 @@ class YamlStructureScanner:
                     return []
                 _collect_regions(node, [], regions)
             return regions
-        except yaml.YAMLError as exc:
-            logger.debug("yaml_scan_parse_skipped error=%s", exc)
+        except (yaml.YAMLError, RecursionError, ValueError) as exc:
+            logger.warning(
+                "yaml_scan_parse_skipped error_type=%s length=%d",
+                type(exc).__name__,
+                len(text),
+            )
             return []
 
     def scan(self, document: QTextDocument) -> list[FoldRegion]:

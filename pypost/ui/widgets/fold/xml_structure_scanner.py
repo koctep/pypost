@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from collections.abc import Callable
 from collections import defaultdict
 import logging
@@ -120,12 +119,16 @@ class XmlStructureScanner:
             return []
         try:
             ET.fromstring(text)
-        except ET.ParseError as exc:
-            logger.debug("xml_scan_parse_skipped error=%s", exc)
+            if is_interrupted is not None and is_interrupted():
+                return []
+            return _scan_regions(text, is_interrupted=is_interrupted)
+        except (ET.ParseError, RecursionError, ValueError) as exc:
+            logger.warning(
+                "xml_scan_parse_skipped error_type=%s length=%d",
+                type(exc).__name__,
+                len(text),
+            )
             return []
-        if is_interrupted is not None and is_interrupted():
-            return []
-        return _scan_regions(text, is_interrupted=is_interrupted)
 
     def scan(self, document: QTextDocument) -> list[FoldRegion]:
         return self.scan_text(document.toPlainText())
