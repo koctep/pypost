@@ -100,6 +100,7 @@ conventions.
 1. [Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376)](hidden_response_fields.md)
 1. [Shared Foldable Plain Text Edit Base Class (PYPOST-1365 / PYPOST-1369)](foldable_plain_text_edit.md)
 1. [Background Folding Scanner for Large Documents (PYPOST-1365 / PYPOST-1370)](background_folding_scanner.md)
+1. [Code Folding Stress and Edge-Case Payload Test Suite (PYPOST-1365 / PYPOST-1371)](folding_stress_and_edge_cases.md)
 
 ### Body editor
 
@@ -108,6 +109,7 @@ conventions.
 1. [Body Editor Line Numbers (PYPOST-510)](body_editor_line_numbers.md)
 1. [Body Editor Folding (PYPOST-511)](body_editor_folding.md)
 1. [Background Folding Scanner for Large Documents (PYPOST-1365 / PYPOST-1370)](background_folding_scanner.md)
+1. [Code Folding Stress and Edge-Case Payload Test Suite (PYPOST-1365 / PYPOST-1371)](folding_stress_and_edge_cases.md)
 1. [Body Editor Validation (PYPOST-512)](body_editor_validation.md)
 1. [Body Format Selector (PYPOST-513)](body_format_selector.md)
 1. [YAML as JSON Send Conversion (PYPOST-514)](yaml_as_json.md)
@@ -180,6 +182,7 @@ conventions.
 1. [Agent E2E Presentation Matrix (PYPOST-890)](agent_e2e_presentation_matrix.md)
 1. [Scripted WebSocket Test Server and Fixture (PYPOST-1129)](websocket_test_harness.md)
 1. [Metric Rename Migration (PYPOST-443)](metric_rename_migration.md)
+1. [Code Folding Stress and Edge-Case Payload Test Suite (PYPOST-1365 / PYPOST-1371)](folding_stress_and_edge_cases.md)
 
 ### Tech debt
 
