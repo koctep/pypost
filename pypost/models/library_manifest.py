@@ -80,8 +80,16 @@ class LibraryManifest(BaseModel):
     version: str = "1.0.0"
     description: str = ""
     collections: List[str] = Field(default_factory=list)
-    variables: List[CollectionVariable] = Field(default_factory=list)
-    presets: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    variables: List[CollectionVariable] = Field(
+        default_factory=list,
+        deprecated=True,
+        description="Deprecated: Use Collection.variables instead.",
+    )
+    presets: Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict,
+        deprecated=True,
+        description="Deprecated: Use Collection.presets instead.",
+    )
 
     @field_validator("id")
     @classmethod

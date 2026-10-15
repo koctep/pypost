@@ -9,6 +9,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Optional
+import warnings
 import yaml
 from pydantic import ValidationError
 
@@ -47,7 +48,12 @@ MANIFEST_CANDIDATE_NAMES = [
 
 def serialize_manifest_to_dict(manifest: LibraryManifest) -> dict[str, Any]:
     """Serialize a LibraryManifest instance into a JSON-compatible dictionary."""
-    return manifest.model_dump(mode="json")
+    data = manifest.model_dump(mode="json")
+    if not manifest.variables and "variables" in data:
+        del data["variables"]
+    if not manifest.presets and "presets" in data:
+        del data["presets"]
+    return data
 
 
 def serialize_manifest_to_yaml(manifest: LibraryManifest) -> str:
@@ -60,7 +66,8 @@ def serialize_manifest_to_json(
     manifest: LibraryManifest, indent: int = 2
 ) -> str:
     """Serialize a LibraryManifest into an indented JSON string."""
-    return manifest.model_dump_json(indent=indent)
+    data = serialize_manifest_to_dict(manifest)
+    return json.dumps(data, indent=indent)
 
 
 def deserialize_manifest_from_dict(
@@ -80,6 +87,33 @@ def deserialize_manifest_from_dict(
             message=f"Expected dict, got {type(data).__name__}",
             path=path,
         )
+
+    if "variables" in data and data["variables"]:
+        logger.warning(
+            "legacy_manifest_variables_detected path=%s: "
+            "Library-level variables are deprecated; migrate variables to collection definitions.",
+            path,
+        )
+        warnings.warn(
+            "Library-level variables in LibraryManifest are deprecated and will be removed "
+            "in a future release. Define variables within individual Collection files instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if "presets" in data and data["presets"]:
+        logger.warning(
+            "legacy_manifest_presets_detected path=%s: "
+            "Library-level presets are deprecated; migrate presets to collection definitions.",
+            path,
+        )
+        warnings.warn(
+            "Library-level presets in LibraryManifest are deprecated and will be removed "
+            "in a future release. Define presets within individual Collection files instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     try:
         manifest = LibraryManifest(**data)
         logger.debug(

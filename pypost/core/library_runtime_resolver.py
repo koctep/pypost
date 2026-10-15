@@ -116,13 +116,8 @@ class LibraryRuntimeResolver:
 
         if active_profile:
             profile_id = active_profile
-            # A collection may define a profile that is not present in the
-            # library manifest.  Keep manifest values authoritative when both
-            # layers define the same key, while still making collection-only
-            # profiles available to the resolver.
             profile = dict(manifest.presets.get(active_profile, {}))
-            for name, value in collection_profiles.get(active_profile, {}).items():
-                profile.setdefault(name, value)
+            profile.update(collection_profiles.get(active_profile, {}))
         elif environment is not None:
             # An MCP row selects a workspace Environment by ID.  Library preset
             # names are optional and must not be confused with that identity.
@@ -138,20 +133,21 @@ class LibraryRuntimeResolver:
         if environment is not None and active_profile:
             profile = dict(environment.variables)
             profile.update(manifest.presets.get(active_profile, {}))
-            for name, value in collection_profiles.get(active_profile, {}).items():
-                profile.setdefault(name, value)
-        if profile_id not in manifest.presets:
-            manifest = manifest.model_copy(
-                update={"presets": {**manifest.presets, profile_id: profile}}
+            profile.update(collection_profiles.get(active_profile, {}))
+        if profile_id not in collection_profiles:
+            collection = collection.model_copy(
+                update={"presets": {**collection_profiles, profile_id: profile}}
             )
+        logger.debug(
+            "mcp_library_profile_resolved profile_id=%s active_profile=%s environment_id=%s",
+            profile_id,
+            active_profile,
+            environment_id,
+        )
         resolved = LibraryVariableResolver().resolve(
             manifest=manifest, overlay=overlay, active_profile=profile_id,
             collection=collection, strict_required=False,
         )
-        if resolved.missing_required:
-            raise ValueError("profile_invalid: required library variables are missing")
-        if resolved.errors:
-            raise ValueError("profile_invalid: library variables are invalid")
         hidden_keys = {
             variable.name for variable in manifest.variables if variable.secret
         }
@@ -166,6 +162,28 @@ class LibraryRuntimeResolver:
             # override-permission concept; only an actual selected Environment
             # can mark a variable MCP-overridable.
             overridable_keys = set(environment.mcp_overridable_keys)
+        logger.debug(
+            "mcp_library_secret_masking_applied hidden_keys_count=%d overridable_keys_count=%d",
+            len(hidden_keys),
+            len(overridable_keys),
+        )
+        missing_non_secret = [
+            name for name in resolved.missing_required if name not in hidden_keys
+        ]
+        if missing_non_secret:
+            logger.warning(
+                "mcp_library_missing_required_variables count=%d missing_names=%s",
+                len(missing_non_secret),
+                missing_non_secret,
+            )
+            raise ValueError("profile_invalid: required library variables are missing")
+        if resolved.errors:
+            logger.warning(
+                "mcp_library_variable_validation_failed error_count=%d errors=%s",
+                len(resolved.errors),
+                resolved.errors,
+            )
+            raise ValueError("profile_invalid: library variables are invalid")
         return RuntimeInputs(
             deepcopy(selection),
             profile_id,
