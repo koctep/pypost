@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QKeyEvent, QMouseEvent, QPaintEvent
-from PySide6.QtWidgets import QPlainTextEdit, QWidget
+from PySide6.QtWidgets import QWidget
+
+if TYPE_CHECKING:
+    from pypost.ui.widgets.foldable_plain_text_edit import FoldablePlainTextEdit
 
 
 class LineNumberArea(QWidget):
     """Read-only gutter widget; painting is delegated to the host editor."""
 
-    def __init__(self, editor: QPlainTextEdit):
+    def __init__(self, editor: FoldablePlainTextEdit):
         super().__init__(editor)
         self._editor = editor
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)

@@ -3,37 +3,33 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Dict, Set, Tuple
 
-from PySide6.QtCore import QEvent, QMimeData, Qt, QRect
+from PySide6.QtCore import QMimeData, Qt
 from PySide6.QtGui import (
-    QFontMetrics,
     QKeyEvent,
     QMouseEvent,
-    QPaintEvent,
-    QPainter,
     QTextCursor,
 )
-from PySide6.QtWidgets import QListWidget, QListWidgetItem, QPlainTextEdit
+from PySide6.QtWidgets import QListWidget, QListWidgetItem, QWidget
 
-from pypost.core.yaml_json_converter import convert_json_object_to_yaml
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
-from pypost.ui.widgets.fold import BodyFormat, FoldController
-from pypost.ui.widgets.line_number_area import LineNumberArea
-from pypost.ui.widgets.validate import ValidationController
-from pypost.ui.widgets.paste_json_worker import PasteJsonFormatWorker
-from pypost.ui.widgets.variable_aware_widgets import VariableAwarePlainTextEdit
-from pypost.ui.widgets.variable_autocomplete_line_edit import reference_statuses
+from pypost.core.yaml_json_converter import convert_json_object_to_yaml
 from pypost.ui.styles.ui_tokens import (
     AUTOCOMPLETE_POPUP_MAX_HEIGHT,
     AUTOCOMPLETE_POPUP_MIN_WIDTH,
     AUTOCOMPLETE_POPUP_ROW_HEIGHT,
     AUTOCOMPLETE_POPUP_VERTICAL_PADDING,
 )
+from pypost.ui.widgets.fold import BodyFormat
+from pypost.ui.widgets.foldable_plain_text_edit import FoldablePlainTextEdit
+from pypost.ui.widgets.mixins import VariableHoverMixin
+from pypost.ui.widgets.paste_json_worker import PasteJsonFormatWorker
+from pypost.ui.widgets.validate import ValidationController
+from pypost.ui.widgets.variable_autocomplete_line_edit import reference_statuses
 
 logger = logging.getLogger(__name__)
 
-_CHEVRON_WIDTH = 14
-_CHEVRON_PADDING = 2
 _PASTE_JSON_FORMAT_CHAR_THRESHOLD = 100 * 1024
 
 
@@ -48,30 +44,23 @@ def _looks_like_json(text: str) -> bool:
     return stripped.startswith("{") or stripped.startswith("[")
 
 
-class CodeEditor(VariableAwarePlainTextEdit):
+class CodeEditor(VariableHoverMixin, FoldablePlainTextEdit):
     def __init__(
         self,
-        parent=None,
-        indent_size=2,
+        parent: QWidget | None = None,
+        indent_size: int = 2,
         metrics: MetricsTrackerProtocol | None = None,
-    ):
-        super().__init__(parent)
+    ) -> None:
+        FoldablePlainTextEdit.__init__(self, parent=parent, indent_size=indent_size)
+        VariableHoverMixin.__init__(self)
+        self._hover_line_scoped_scan = True
+
         self._autocomplete_metrics = resolve_metrics(metrics)
         self._autocomplete_context = "body"
-        self.indent_size = indent_size
-        self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
-        self._body_format = BodyFormat.JSON
+        self._validation_controller = ValidationController(self, BodyFormat.JSON)
+        self.set_body_format(BodyFormat.JSON)
         self._yaml_as_json = False
-        self._fold_controller = FoldController(self, self._body_format)
-        self._validation_controller = ValidationController(self, self._body_format)
-
-        self._line_number_area = LineNumberArea(self)
-        self.blockCountChanged.connect(self._update_line_number_area_width)
-        self.updateRequest.connect(self._update_line_number_area)
-        self._update_line_number_area_width(0)
-
-        self.update_indent_size(indent_size)
 
         self._paste_json_generation = 0
         self._paste_json_worker: PasteJsonFormatWorker | None = None
@@ -86,9 +75,6 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self._autocomplete_popup.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._autocomplete_popup.itemClicked.connect(self._apply_body_completion_item)
         self.textChanged.connect(self._refresh_body_feedback)
-
-    def fold_controller(self) -> FoldController:
-        return self._fold_controller
 
     def validation_controller(self) -> ValidationController:
         return self._validation_controller
@@ -184,154 +170,68 @@ class CodeEditor(VariableAwarePlainTextEdit):
         self.show_reference_feedback(statuses)
         self._track_reference_feedback(statuses)
 
-    def set_variables(self, variables: dict[str, str]) -> None:
-        super().set_variables(variables)
+    def _get_text_at_cursor(self, event: QMouseEvent) -> Tuple[str, int]:
+        cursor = self.cursorForPosition(event.position().toPoint())
+        text = self.toPlainText()
+        index = cursor.position()
+        return text, index
+
+    def set_variables(self, variables: Dict[str, str]) -> None:
+        self._variables = dict(variables)
+        self._clear_hover_scan_cache()
+        if hasattr(self, "refresh_reference_status"):
+            self.refresh_reference_status(self.toPlainText())
         self._autocomplete_metrics.track_gui_variable_autocomplete_environment_refresh(
             self._autocomplete_context
         )
 
+    def set_hidden_keys(self, hidden_keys: Set[str]) -> None:
+        self._hidden_keys = set(hidden_keys)
+        self._clear_hover_scan_cache()
+
+    def _track_reference_feedback(self, statuses) -> None:
+        status_names: set[str] = set(str(status["kind"]) for status in statuses)
+        if not status_names:
+            status_names.add("ok")
+        if self._autocomplete_metrics is not None:
+            for status in status_names:
+                self._autocomplete_metrics.track_gui_variable_autocomplete_feedback(
+                    self._autocomplete_context, status
+                )
+        logger.debug(
+            "variable_autocomplete_feedback context=%s statuses=%s",
+            self._autocomplete_context,
+            ",".join(sorted(status_names)),
+        )
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        try:
+            text, index = self._get_text_at_cursor(event)
+        except NotImplementedError:
+            return
+        if not text:
+            return
+        scan_text, scan_index = self._prepare_hover_scan_context(text, index)
+        expression, resolved = self._resolve_hover_at_scan_index(scan_text, scan_index)
+        self._show_or_hide_tooltip(event, expression, resolved)
+
     def set_body_format(self, body_format: BodyFormat) -> None:
-        self._body_format = body_format
-        self._fold_controller.set_body_format(body_format)
+        super().set_body_format(body_format)
         self._validation_controller.set_body_format(body_format)
-        self._update_line_number_area_width(0)
 
     def set_yaml_as_json(self, enabled: bool) -> None:
         self._yaml_as_json = enabled
 
     def setPlainText(self, text: str) -> None:
-        self._fold_controller.expand_all()
         super().setPlainText(text)
         self._validation_controller.clear()
 
-    def _refresh_font_metrics(self) -> None:
-        """Recalculate tab stops and gutter from the current document font."""
-        font_metrics = QFontMetrics(self.document().defaultFont())
-        self.setTabStopDistance(self.indent_size * font_metrics.horizontalAdvance(" "))
-        self._update_line_number_area_width(0)
-
-    def update_indent_size(self, new_size: int):
-        self.indent_size = new_size
-        self._refresh_font_metrics()
-
-    def changeEvent(self, event: QEvent) -> None:
-        super().changeEvent(event)
-        if event.type() == QEvent.Type.FontChange:
-            self._refresh_font_metrics()
-
-    def line_number_area_width(self) -> int:
-        digits = max(1, len(str(self.blockCount())))
-        font_metrics = QFontMetrics(self.document().defaultFont())
-        number_width = font_metrics.horizontalAdvance("9") * digits
-        return _CHEVRON_WIDTH + _CHEVRON_PADDING + 3 + number_width
-
-    def chevron_width(self) -> int:
-        return _CHEVRON_WIDTH
-
-    def _update_line_number_area_width(self, _block_count: int):
-        width = self.line_number_area_width()
-        self.setViewportMargins(width, 0, 0, 0)
-        cr = self.contentsRect()
-        if cr.height() > 0:
-            self._line_number_area.setGeometry(QRect(cr.left(), cr.top(), width, cr.height()))
-
-    def _update_line_number_area(self, rect: QRect, dy: int):
-        if dy:
-            self._line_number_area.scroll(0, dy)
-        else:
-            self._line_number_area.update(
-                0, rect.y(), self._line_number_area.width(), rect.height()
-            )
-
-        if rect.contains(self.viewport().rect()):
-            self._update_line_number_area_width(0)
-
-    def resizeEvent(self, event):
+    def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        cr = self.contentsRect()
-        self._line_number_area.setGeometry(
-            QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
-        )
         self._validation_controller.layout_error_banner()
 
-    def line_number_area_paint_event(self, event: QPaintEvent):
-        painter = QPainter(self._line_number_area)
-        painter.fillRect(event.rect(), self.palette().color(self.backgroundRole()))
-
-        block = self.firstVisibleBlock()
-        block_number = block.blockNumber()
-        top = round(
-            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
-        )
-        bottom = top + round(self.blockBoundingRect(block).height())
-
-        gutter_color = self.palette().color(self.foregroundRole())
-        gutter_color.setAlpha(128)
-        painter.setPen(gutter_color)
-
-        number_left = _CHEVRON_WIDTH + _CHEVRON_PADDING
-
-        while block.isValid() and top <= event.rect().bottom():
-            if block.isVisible() and bottom >= event.rect().top():
-                region = self._fold_controller.fold_header_at_block(block_number)
-                if region is not None:
-                    chevron = (
-                        "\u25b6"
-                        if self._fold_controller.is_collapsed(region.region_id)
-                        else "\u25bc"
-                    )
-                    painter.drawText(
-                        0,
-                        top,
-                        _CHEVRON_WIDTH,
-                        self.fontMetrics().height(),
-                        Qt.AlignmentFlag.AlignCenter,
-                        chevron,
-                    )
-
-                number = str(block_number + 1)
-                painter.drawText(
-                    number_left,
-                    top,
-                    self._line_number_area.width() - number_left - 3,
-                    self.fontMetrics().height(),
-                    Qt.AlignmentFlag.AlignRight,
-                    number,
-                )
-
-            block = block.next()
-            top = bottom
-            bottom = top + round(self.blockBoundingRect(block).height())
-            block_number += 1
-
-    def line_number_area_mouse_press(self, event: QMouseEvent) -> None:
-        if event.button() != Qt.MouseButton.LeftButton:
-            return
-        event.accept()
-
-        y = event.position().y()
-        block = self.firstVisibleBlock()
-        block_number = block.blockNumber()
-        top = round(
-            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
-        )
-        bottom = top + round(self.blockBoundingRect(block).height())
-
-        while block.isValid():
-            if block.isVisible() and top <= y <= bottom:
-                if event.position().x() <= _CHEVRON_WIDTH:
-                    region = self._fold_controller.fold_header_at_block(block_number)
-                    if region is not None:
-                        self._fold_controller.toggle(region.region_id)
-                        self._line_number_area.update()
-                return
-
-            block = block.next()
-            top = bottom
-            bottom = top + round(self.blockBoundingRect(block).height())
-            block_number += 1
-
-    def reformat_text(self):
+    def reformat_text(self) -> None:
         """Reformat current text with new indent size."""
         text = self.toPlainText()
         if not text:
@@ -344,11 +244,11 @@ class CodeEditor(VariableAwarePlainTextEdit):
         except (json.JSONDecodeError, ValueError):
             pass
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
         if self._complete_body_key(event):
             event.accept()
             return
-        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._handle_enter_key(event)
         elif event.text() in ("}", "]"):
             self._handle_closing_bracket(event)
@@ -356,7 +256,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
             super().keyPressEvent(event)
         self._update_body_popup()
 
-    def _handle_enter_key(self, event: QKeyEvent):
+    def _handle_enter_key(self, event: QKeyEvent) -> None:
         cursor = self.textCursor()
         cursor.select(QTextCursor.SelectionType.LineUnderCursor)
         line_text = cursor.selectedText()
@@ -404,7 +304,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
             )
         self.setTextCursor(cursor)
 
-    def _handle_closing_bracket(self, event: QKeyEvent):
+    def _handle_closing_bracket(self, event: QKeyEvent) -> None:
         cursor = self.textCursor()
         block = cursor.block()
         line_text = block.text()
@@ -415,7 +315,7 @@ class CodeEditor(VariableAwarePlainTextEdit):
 
         super().keyPressEvent(event)
 
-    def insertFromMimeData(self, source: QMimeData):
+    def insertFromMimeData(self, source: QMimeData) -> None:
         if source.hasText():
             text = source.text()
             if not _should_format_pasted_json(text):
