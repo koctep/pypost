@@ -1607,18 +1607,6 @@
       "path": "tests/test_library_manifest_observability.py",
       "code": "F401",
       "message": [
-        "'pathlib.Path' imported but unused"
-      ],
-      "source": [
-        "from pathlib import Path"
-      ],
-      "count": 1,
-      "reason": "Existing occurrence deferred to avoid unrelated test behavior edits."
-    },
-    {
-      "path": "tests/test_library_manifest_observability.py",
-      "code": "F401",
-      "message": [
         "'pypost.core.variable_resolver.resolve_effective_variables' ",
         "imported but unused"
       ],

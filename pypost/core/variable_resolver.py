@@ -10,6 +10,7 @@ Performs type validation and required variable / secret checks with provenance t
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pypost.models.collection_variable import (
@@ -65,19 +66,13 @@ class LibraryVariableResolver:
         schemas: Dict[str, CollectionVariable] = {}
 
         # ---------------------------------------------------------------------
-        # Collect Variable Schemas
+        # Extract Collection & Namespace Prefixes
         # ---------------------------------------------------------------------
+        collection_var_names: set[str] = set()
         if collection and hasattr(collection, "variables") and collection.variables:
             for var in collection.variables:
-                schemas[var.name] = var
+                collection_var_names.add(var.name)
 
-        if manifest and manifest.variables:
-            for var in manifest.variables:
-                schemas[var.name] = var
-
-        # ---------------------------------------------------------------------
-        # Extract Collection Namespace Prefixes
-        # ---------------------------------------------------------------------
         collection_prefixes: set[str] = set()
         if collection:
             col_name = getattr(collection, "name", "")
@@ -89,37 +84,101 @@ class LibraryVariableResolver:
                 collection_prefixes.add(col_name.lower().replace(" ", "-"))
             if col_id:
                 collection_prefixes.add(col_id)
+                collection_prefixes.add(col_id.lower())
+                if col_id.lower().startswith("col-"):
+                    collection_prefixes.add(col_id[4:].lower())
+                if col_id.lower().startswith("col_"):
+                    collection_prefixes.add(col_id[4:].lower())
 
-        def _apply_dict(src: dict[str, Any], prov: VariableProvenance) -> None:
-            # Apply un-namespaced keys first, then namespaced keys to guarantee precedence
-            sorted_keys = sorted(src.keys(), key=lambda k: (1 if "." in k else 0))
-            for k in sorted_keys:
-                v = src[k]
-                variables[k] = v
-                provenance[k] = prov
-                if "." in k and collection_prefixes:
-                    prefix, _, var_name = k.partition(".")
-                    if prefix in collection_prefixes and var_name:
+        other_collection_prefixes: set[str] = set()
+        if manifest and manifest.collections:
+            for coll_path in manifest.collections:
+                stem = Path(coll_path).stem.lower()
+                matches_current = False
+                if collection:
+                    if stem in collection_prefixes:
+                        matches_current = True
+                    elif col_name and stem in col_name.lower():
+                        matches_current = True
+                    elif col_id and stem in col_id.lower():
+                        matches_current = True
+                if matches_current:
+                    collection_prefixes.add(stem)
+                    collection_prefixes.add(stem.replace("-", "_"))
+                    collection_prefixes.add(stem.replace("_", "-"))
+                elif collection:
+                    other_collection_prefixes.add(stem)
+                    other_collection_prefixes.add(stem.replace("-", "_"))
+                    other_collection_prefixes.add(stem.replace("_", "-"))
+
+        def is_other_collection_var(key: str) -> bool:
+            if not collection:
+                return False
+            if key in collection_var_names:
+                return False
+            if "." in key:
+                prefix, _, _ = key.partition(".")
+                if prefix in collection_prefixes:
+                    return False
+                return True
+            for other in other_collection_prefixes:
+                if key == other:
+                    return True
+                if key.startswith(f"{other}_") or key.startswith(f"{other}-"):
+                    return True
+            return False
+
+        def _apply_entry(k: str, v: Any, prov: VariableProvenance) -> None:
+            if is_other_collection_var(k):
+                return
+            if "." in k and collection_prefixes:
+                prefix, _, var_name = k.partition(".")
+                if prefix in collection_prefixes:
+                    variables[k] = v
+                    provenance[k] = prov
+                    if var_name:
                         variables[var_name] = v
                         provenance[var_name] = prov
+                elif k in collection_var_names:
+                    variables[k] = v
+                    provenance[k] = prov
+            else:
+                variables[k] = v
+                provenance[k] = prov
 
         # ---------------------------------------------------------------------
-        # Layer 1 (Base Defaults): Collection then Manifest Defaults
+        # Collect Variable Schemas
         # ---------------------------------------------------------------------
+        # Fallback manifest schemas (excluding other collection vars)
+        if manifest and manifest.variables:
+            for var in manifest.variables:
+                if not is_other_collection_var(var.name):
+                    schemas[var.name] = var
+
+        # Authoritative collection schemas
+        if collection and hasattr(collection, "variables") and collection.variables:
+            for var in collection.variables:
+                schemas[var.name] = var
+
+        # ---------------------------------------------------------------------
+        # Layer 1 (Base Defaults): Manifest Fallback, then Collection Authoritative
+        # ---------------------------------------------------------------------
+        if manifest and manifest.variables:
+            for var in manifest.variables:
+                if is_other_collection_var(var.name):
+                    continue
+                if var.default is not None:
+                    variables[var.name] = var.default
+                    provenance[var.name] = VariableProvenance.DEFAULT
+
         if collection and hasattr(collection, "variables") and collection.variables:
             for var in collection.variables:
                 if var.default is not None:
                     variables[var.name] = var.default
                     provenance[var.name] = VariableProvenance.DEFAULT
 
-        if manifest and manifest.variables:
-            for var in manifest.variables:
-                if var.default is not None:
-                    variables[var.name] = var.default
-                    provenance[var.name] = VariableProvenance.DEFAULT
-
         # ---------------------------------------------------------------------
-        # Layer 2 (Active Preset Profile)
+        # Layer 2 (Active Preset Profile): Manifest Fallback, then Collection Authoritative
         # ---------------------------------------------------------------------
         profile_name = (
             active_profile
@@ -129,32 +188,41 @@ class LibraryVariableResolver:
 
         if profile_name:
             if manifest and manifest.presets and profile_name in manifest.presets:
-                profile_vars = manifest.presets[profile_name]
-                if isinstance(profile_vars, dict):
-                    _apply_dict(profile_vars, VariableProvenance.PROFILE)
+                manifest_preset_vars = manifest.presets[profile_name]
+                if isinstance(manifest_preset_vars, dict):
+                    sorted_keys = sorted(
+                        manifest_preset_vars.keys(), key=lambda k: (1 if "." in k else 0)
+                    )
+                    for k in sorted_keys:
+                        _apply_entry(k, manifest_preset_vars[k], VariableProvenance.PROFILE)
 
             if collection and hasattr(collection, "presets") and collection.presets:
                 if profile_name in collection.presets:
                     col_preset_vars = collection.presets[profile_name]
                     if isinstance(col_preset_vars, dict):
-                        for k, v in col_preset_vars.items():
-                            if (
-                                not manifest
-                                or not manifest.presets
-                                or profile_name not in manifest.presets
-                                or k not in manifest.presets[profile_name]
-                            ):
-                                _apply_dict({k: v}, VariableProvenance.PROFILE)
+                        sorted_keys = sorted(
+                            col_preset_vars.keys(), key=lambda k: (1 if "." in k else 0)
+                        )
+                        for k in sorted_keys:
+                            _apply_entry(k, col_preset_vars[k], VariableProvenance.PROFILE)
 
         # ---------------------------------------------------------------------
-        # Layer 3 (Local Overlay: Overrides & Secrets)
+        # Layer 3 (Local Overlay: Overrides & Secrets): Highest Priority
         # ---------------------------------------------------------------------
         if overlay:
             if overlay.overrides:
-                _apply_dict(overlay.overrides, VariableProvenance.LOCAL_OVERRIDE)
+                sorted_keys = sorted(
+                    overlay.overrides.keys(), key=lambda k: (1 if "." in k else 0)
+                )
+                for k in sorted_keys:
+                    _apply_entry(k, overlay.overrides[k], VariableProvenance.LOCAL_OVERRIDE)
 
             if overlay.secrets:
-                _apply_dict(overlay.secrets, VariableProvenance.LOCAL_SECRET)
+                sorted_keys = sorted(
+                    overlay.secrets.keys(), key=lambda k: (1 if "." in k else 0)
+                )
+                for k in sorted_keys:
+                    _apply_entry(k, overlay.secrets[k], VariableProvenance.LOCAL_SECRET)
 
         # ---------------------------------------------------------------------
         # Schema Validation & Required Variable Checks

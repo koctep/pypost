@@ -30,12 +30,15 @@ from pypost.core.variable_resolver import (
     resolve_detailed_variables,
     resolve_effective_variables,
 )
+from pypost.core.collection_serializer import write_collection_file
+from pypost.core.library_runtime_resolver import LibraryRuntimeResolver
 from pypost.models.collection_variable import CollectionVariable
 from pypost.models.library_manifest import (
     LibraryManifest,
     LocalLibraryOverlay,
     ManifestDiagnosticError,
 )
+from pypost.models.models import Collection
 
 pytestmark = pytest.mark.timeout(30)
 
@@ -229,3 +232,114 @@ def test_variable_resolver_masks_secret_type_validation_errors(caplog):
     assert any("Variable 'secret_port' value [REDACTED]" in err for err in result.errors)
     for record in caplog.records:
         assert secret_val not in record.message
+
+
+def test_manifest_legacy_deprecation_warnings_and_logging(caplog):
+    """Legacy manifest variables and presets log warnings and emit DeprecationWarning."""
+    data = {
+        "id": "lib-deprecate",
+        "name": "Deprecate Lib",
+        "collections": ["col.yaml"],
+        "variables": [{"name": "old_var", "type": "string", "default": "val"}],
+        "presets": {"dev": {"old_var": "dev_val"}},
+    }
+    with caplog.at_level(logging.WARNING, logger="pypost.core.library_manifest"):
+        with pytest.deprecated_call():
+            manifest = deserialize_manifest_from_dict(data)
+
+    assert manifest.id == "lib-deprecate"
+    assert any("legacy_manifest_variables_detected" in r.message for r in caplog.records)
+    assert any("legacy_manifest_presets_detected" in r.message for r in caplog.records)
+
+
+# ============================================================================
+# 4. Library Runtime Resolver Observability Tests
+# ============================================================================
+
+
+class _DummyRecord:
+    def __init__(self, local_path: Path) -> None:
+        self.local_path = local_path
+
+
+class _DummyLibraryService:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+    def get_connection(self, _library_id: str) -> _DummyRecord:
+        return _DummyRecord(self.root)
+
+    def resolve_path(self, record: _DummyRecord) -> Path:
+        return record.local_path
+
+
+def test_library_runtime_resolver_logging_and_secret_masking(caplog, tmp_path):
+    """Runtime resolver logs profile resolution, secret masking, and missing variables."""
+    root = tmp_path / "lib"
+    root.mkdir()
+    col_dir = root / "collections"
+    col_dir.mkdir()
+
+    manifest_file = root / "pypost-library.yaml"
+    manifest = LibraryManifest(
+        id="lib-runtime-obs",
+        name="Runtime Obs Lib",
+        collections=["collections/test.json"],
+    )
+    write_manifest_file(manifest, manifest_file)
+
+    secret_token = "secret_runtime_token_12345"
+    col = Collection(
+        id="test",
+        name="Test Collection",
+        variables=[
+            CollectionVariable(name="token", type="string", secret=True, required=True),
+            CollectionVariable(name="host", type="string", required=True),
+        ],
+        presets={"dev": {"host": "https://api.example.com"}},
+    )
+    write_collection_file(col, col_dir / "test.json")
+
+    service = _DummyLibraryService(root)
+    resolver = LibraryRuntimeResolver(library_service=service)
+    selection = {
+        "library_id": "lib-runtime-obs",
+        "manifest_id": "lib-runtime-obs",
+        "path": "collections/test.json",
+    }
+    overlay = LocalLibraryOverlay(
+        library_id="lib-runtime-obs",
+        secrets={"token": secret_token},
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="pypost.core.library_runtime_resolver"):
+        inputs = resolver.resolve(selection, environment_id="dev", candidate_overlay=overlay)
+        assert inputs.environment["host"] == "https://api.example.com"
+
+    # Verify structured log events
+    assert any("mcp_library_runtime_validation_started" in r.message for r in caplog.records)
+    assert any("mcp_library_profile_resolved" in r.message for r in caplog.records)
+    assert any("mcp_library_secret_masking_applied" in r.message for r in caplog.records)
+    assert any("mcp_library_runtime_validation_completed" in r.message for r in caplog.records)
+
+    # Verify secret masking in log records
+    for record in caplog.records:
+        assert secret_token not in record.message
+
+    # Test missing non-secret required variable logging
+    col_missing = Collection(
+        id="test",
+        name="Test Collection",
+        variables=[
+            CollectionVariable(name="required_unset", type="string", required=True),
+        ],
+        presets={"dev": {}},
+    )
+    write_collection_file(col_missing, col_dir / "test.json")
+
+    with caplog.at_level(logging.WARNING, logger="pypost.core.library_runtime_resolver"):
+        with pytest.raises(ValueError, match="required library variables are missing"):
+            resolver.resolve(selection, environment_id="dev")
+
+    assert any("mcp_library_missing_required_variables" in r.message for r in caplog.records)
+    assert any("mcp_library_runtime_validation_failed" in r.message for r in caplog.records)
