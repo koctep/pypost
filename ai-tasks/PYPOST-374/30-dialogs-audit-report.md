@@ -1,8 +1,8 @@
 # PYPOST-374: Individual Dialog SOLID Audit Report
 
 **Date:** 2026-06-11
-**Inventory refreshed:** 2026-10-13 (PYPOST-1374)
-**Scope:** `pypost/ui/dialogs/` (nine dialog modules, 2,898 LOC total)
+**Inventory refreshed:** 2026-10-15 (PYPOST-1410)
+**Scope:** `pypost/ui/dialogs/` (nine dialog modules, 2,924 LOC total)
 **Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)
 **Baseline comparison:** PYPOST-40 grouped inventory ~400 LOC, five dialogs named
 
@@ -33,12 +33,12 @@ complete for the full current scope.
 | `hotkeys_dialog.py` | 69 | `HotkeysDialog` | Shared shortcut reference table | `main_window.py` |
 | `library_dialogs.py` | 703 | `GitCommitDialog` + auth/clone | Git library dialogs | library mgr |
 | `mcp_activity_dialog.py` | 117 | `McpActivityDialog` | MCP activity viewer | env presenter |
-| `mcp_servers_dialog.py` | 1,424 | `McpServersDialog` + editor | MCP server manager | main window |
+| `mcp_servers_dialog.py` | 1,450 | `McpServersDialog` + editor | MCP server manager | main window |
 | `mcp_tools_overview_dialog.py` | 74 | Tool overview | MCP tools | env |
 | `save_dialog.py` | 93 | `SaveRequestDialog` | Save-as picker | save orchestrator |
 | `settings_dialog.py` | 263 | `SettingsDialog` | Settings composition | main window |
 
-**Total:** 2,898 LOC (vs PYPOST-40 grouped ~400 LOC).
+**Total:** 2,924 LOC (vs PYPOST-40 grouped ~400 LOC).
 
 Verify counts against discovery (each failure names the module or aggregate with its recorded
 and discovered values):

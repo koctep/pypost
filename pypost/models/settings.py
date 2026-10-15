@@ -22,7 +22,7 @@ class McpServerConfiguration(BaseModel):
     manifest_id: Optional[str] = None
     library_collection_path: Optional[str] = None
     library_collection_index: Optional[int] = None
-    environment_id: str
+    environment_id: Optional[str] = None
     server_type: Literal["local", "proxy"] = "local"
     upstream_url: Optional[str] = None
     upstream_transport: Literal["streamable_http", "sse"] = "streamable_http"
@@ -51,6 +51,8 @@ class McpServerConfiguration(BaseModel):
                 raise ValueError("bundled_library requires library_id")
             elif not self.collection_id or not self.collection_id.strip():
                 raise ValueError("Local MCP server requires a non-empty collection_id")
+            elif not self.environment_id or not self.environment_id.strip():
+                raise ValueError("Workspace local MCP server requires a non-empty environment_id")
         return self
 
     @property

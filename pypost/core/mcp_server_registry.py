@@ -172,9 +172,11 @@ class MCPServerRegistry(QObject):
     def start(self, instance_id: str) -> None:
         configuration = self._configuration(instance_id)
         logger.info(
-            "mcp_registry_start_requested instance_id=%s port=%d",
+            "mcp_registry_start_requested instance_id=%s port=%d environment_id=%s standalone=%s",
             instance_id,
             configuration.port,
+            configuration.environment_id,
+            configuration.environment_id is None,
         )
         runtime = self._runtime_inputs(configuration)
         if runtime is None:
@@ -349,6 +351,12 @@ class MCPServerRegistry(QObject):
 
             # Local server
             if configuration.bundled_library:
+                if configuration.environment_id is None:
+                    logger.debug(
+                        "mcp_registry_reconcile_standalone_bundled_server instance_id=%s "
+                        "skipping_environment_check=True",
+                        instance_id,
+                    )
                 if valid_environment_ids is not None:
                     env_valid = (
                         not configuration.environment_id
@@ -379,6 +387,46 @@ class MCPServerRegistry(QObject):
                 changed = True
                 continue
 
+            if configuration.library_id:
+                if configuration.environment_id is None:
+                    logger.debug(
+                        "mcp_registry_reconcile_standalone_library_server instance_id=%s "
+                        "library_id=%s skipping_environment_check=True",
+                        instance_id,
+                        configuration.library_id,
+                    )
+                if valid_environment_ids is not None:
+                    env_valid = (
+                        not configuration.environment_id
+                        or configuration.environment_id in valid_environment_ids
+                    )
+                else:
+                    env = (
+                        self._environment_lookup(configuration.environment_id)
+                        if configuration.environment_id
+                        else None
+                    )
+                    env_valid = not configuration.environment_id or env is not None
+
+                lib_valid = False
+                if self.library_service is not None:
+                    get_connection = getattr(self.library_service, "get_connection", None)
+                    if callable(get_connection):
+                        lib_valid = get_connection(configuration.library_id) is not None
+
+                if lib_valid and env_valid:
+                    continue
+                self.stop(instance_id)
+                missing = "library" if not lib_valid else "environment"
+                self._set_status(
+                    instance_id,
+                    "failed",
+                    f"{instance_id} cannot run: missing {missing} for port "
+                    f"{configuration.port}",
+                )
+                changed = True
+                continue
+
             if valid_collection_ids is not None:
                 coll_valid = (
                     configuration.collection_id is not None
@@ -391,9 +439,15 @@ class MCPServerRegistry(QObject):
                 )
 
             if valid_environment_ids is not None:
-                env_valid = configuration.environment_id in valid_environment_ids
+                env_valid = (
+                    configuration.environment_id is not None
+                    and configuration.environment_id in valid_environment_ids
+                )
             else:
-                env_valid = self._environment_lookup(configuration.environment_id) is not None
+                env_valid = (
+                    configuration.environment_id is not None
+                    and self._environment_lookup(configuration.environment_id) is not None
+                )
 
             if coll_valid and env_valid:
                 continue
@@ -592,7 +646,7 @@ class MCPServerRegistry(QObject):
                 runtime.hidden_keys,
                 runtime.overridable_keys,
             )
-        if not configuration.collection_id:
+        if not configuration.collection_id or not configuration.environment_id:
             return None
         collection = self._collection_lookup(configuration.collection_id)
         environment = self._environment_lookup(configuration.environment_id)
@@ -629,6 +683,14 @@ class MCPServerRegistry(QObject):
         manager.set_variable_supplier(lambda: dict(variables))
         manager.set_hidden_keys_supplier(lambda: set(hidden_keys))
         manager.set_overridable_keys_supplier(lambda: set(overridable_keys))
+        logger.debug(
+            "mcp_registry_manager_starting instance_id=%s server_type=%s "
+            "standalone=%s tool_count=%d",
+            configuration.id,
+            configuration.server_type,
+            configuration.environment_id is None,
+            len(tools),
+        )
         if configuration.server_type == "proxy":
             manager.start_proxy_server(
                 port=configuration.port,
@@ -744,6 +806,13 @@ class MCPServerRegistry(QObject):
                     raise ValueError(
                         f"MCP server {instance_id} references a missing built-in collection"
                     )
+            elif configuration.library_id:
+                if self.library_service is not None:
+                    get_connection = getattr(self.library_service, "get_connection", None)
+                    if callable(get_connection) and (
+                        get_connection(configuration.library_id) is None
+                    ):
+                        raise ValueError(f"MCP server {instance_id} references a missing library")
             elif (
                 not configuration.collection_id
                 or self._collection_lookup(configuration.collection_id) is None
