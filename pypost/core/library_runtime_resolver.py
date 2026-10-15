@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 import logging
 import time
-from typing import Any
+from typing import Any, Optional
 
 from pypost.core.collection_serializer import read_collection_file
 from pypost.core.library_manifest import find_and_read_manifest, validate_manifest_collections
@@ -26,7 +26,7 @@ class EnvironmentDraft:
 @dataclass(frozen=True)
 class RuntimeInputs:
     selection: dict[str, Any]
-    environment_id: str
+    environment_id: Optional[str]
     environment: dict[str, Any]
     collection_requests: list[Any]
     hidden_keys: set[str]
@@ -44,13 +44,15 @@ class LibraryRuntimeResolver:
     def resolve(
         self,
         selection: dict[str, Any],
-        environment_id: str,
+        environment_id: Optional[str] = None,
         candidate_overlay=None,
     ) -> RuntimeInputs:
         started_at = time.monotonic()
         logger.info(
-            "mcp_library_runtime_validation_started library_id=%s manifest_id=%s",
-            selection.get("library_id", "unknown"), selection.get("manifest_id", "unknown"),
+            "mcp_library_runtime_validation_started library_id=%s manifest_id=%s environment_id=%s",
+            selection.get("library_id", "unknown"),
+            selection.get("manifest_id", "unknown"),
+            environment_id,
         )
         try:
             result = self._resolve(selection, environment_id, candidate_overlay)
@@ -65,13 +67,19 @@ class LibraryRuntimeResolver:
         self._metrics.track_mcp_library_validation("success")
         logger.info(
             "mcp_library_runtime_validation_completed duration_seconds=%.3f "
-            "request_count=%d variable_count=%d",
-            time.monotonic() - started_at, len(result.collection_requests), len(result.environment),
+            "request_count=%d variable_count=%d environment_id=%s",
+            time.monotonic() - started_at,
+            len(result.collection_requests),
+            len(result.environment),
+            environment_id,
         )
         return result
 
     def _resolve(
-        self, selection: dict[str, Any], environment_id: str, candidate_overlay=None
+        self,
+        selection: dict[str, Any],
+        environment_id: Optional[str] = None,
+        candidate_overlay=None,
     ) -> RuntimeInputs:
         self.validate_selection(selection, profile_id=environment_id)
         service = self.library_service
@@ -123,10 +131,20 @@ class LibraryRuntimeResolver:
             # names are optional and must not be confused with that identity.
             profile_id = environment_id
             profile = dict(environment.variables)
-        elif environment_id in available_profiles:
+        elif environment_id and environment_id in available_profiles:
             profile_id = environment_id
             profile = dict(manifest.presets.get(environment_id, {}))
             profile.update(collection_profiles.get(environment_id, {}))
+        elif environment_id is None:
+            profile_id = None
+            profile = {}
+            logger.debug(
+                "mcp_library_profile_fallback_to_defaults "
+                "library_id=%s manifest_id=%s active_profile=%s",
+                selection.get("library_id", "unknown"),
+                selection.get("manifest_id", "unknown"),
+                active_profile,
+            )
         else:
             raise ValueError("profile_missing: selected profile is unavailable")
 
@@ -134,7 +152,7 @@ class LibraryRuntimeResolver:
             profile = dict(environment.variables)
             profile.update(manifest.presets.get(active_profile, {}))
             profile.update(collection_profiles.get(active_profile, {}))
-        if profile_id not in collection_profiles:
+        if profile_id is not None and profile_id not in collection_profiles:
             collection = collection.model_copy(
                 update={"presets": {**collection_profiles, profile_id: profile}}
             )
@@ -193,7 +211,9 @@ class LibraryRuntimeResolver:
             overridable_keys,
         )
 
-    def validate_selection(self, selection: dict[str, Any], profile_id: str) -> None:
+    def validate_selection(
+        self, selection: dict[str, Any], profile_id: Optional[str] = None
+    ) -> None:
         if not selection.get("library_id"):
             raise ValueError("library_invalid: library identity is missing")
         if not selection.get("manifest_id") or not selection.get("path"):

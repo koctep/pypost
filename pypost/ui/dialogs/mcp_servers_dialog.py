@@ -185,13 +185,20 @@ class McpServersDialog(QDialog):
                 else:
                     cid = configuration.collection_id or ""
                     target_desc = collection_names.get(cid, cid)
+            env_display = (
+                "—"
+                if configuration.environment_id is None
+                else environment_names.get(
+                    configuration.environment_id, configuration.environment_id
+                )
+            )
             values = (
                 configuration.name or configuration.id,
                 configuration.id,
                 status.state,
                 f"{configuration.host}:{configuration.port}",
                 target_desc,
-                environment_names.get(configuration.environment_id, configuration.environment_id),
+                env_display,
                 status.message,
             )
             for column, value in enumerate(values):
@@ -774,9 +781,21 @@ class _McpServerEditor(QDialog):
         variables_label = self._layout.labelForField(self._library_variables)
         if variables_label:
             variables_label.setVisible(is_local and is_library)
+        show_env = not (is_local and is_library)
+        self._environment.setVisible(show_env)
+        env_label = self._layout.labelForField(self._environment)
+        if env_label:
+            env_label.setVisible(show_env)
         self._library_profile.setVisible(is_local and is_library)
         self._library_variables_widget_visible(is_local and is_library)
         self._update_configure_variables_button_state()
+        if (
+            is_local
+            and is_library
+            and self._library_collection.currentIndex() < 0
+            and self._library_collection.count()
+        ):
+            self._library_collection.setCurrentIndex(0)
         if is_local and is_library and self._library.count() == 0:
             self._begin_library_listing()
 
@@ -1331,12 +1350,14 @@ class _McpServerEditor(QDialog):
                     err_msg,
                 )
                 return
+        elif is_library:
+            if self._library_collection.currentData() is None:
+                self._error.setText("Collection is required.")
+                logger.debug("MCP server editor rejected save: library collection is required")
+                return
         elif self._environment.currentData() is None or (
             self._collection_source.currentData() == "workspace"
             and self._collection.currentData() is None
-        ) or (
-            self._collection_source.currentData() == "library"
-            and self._library_collection.currentData() is None
         ) or (
             self._collection_source.currentData() == "builtin"
             and self._builtin_collection.currentData() is None
@@ -1399,6 +1420,11 @@ class _McpServerEditor(QDialog):
             )
         if self._collection_source.currentData() == "library":
             selection = dict(self._library_collection.currentData() or {})
+            env_id = (
+                str(self._environment.currentData())
+                if (self._environment.isVisible() and self._environment.currentData())
+                else None
+            )
             return McpServerConfiguration(
                 id=self._id,
                 name=self._name.text().strip() or None,
@@ -1409,7 +1435,7 @@ class _McpServerEditor(QDialog):
                 manifest_id=str(selection.get("manifest_id")),
                 library_collection_path=str(selection.get("path")),
                 library_collection_index=selection.get("index"),
-                environment_id=str(self._environment.currentData()),
+                environment_id=env_id,
                 enabled=self._enabled,
             )
         return McpServerConfiguration(
