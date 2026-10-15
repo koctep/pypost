@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 
+from collections.abc import Callable
 import json
+import logging
 from dataclasses import dataclass, field
 
 from PySide6.QtGui import QTextDocument
 
 from pypost.ui.widgets.fold.fold_region import FoldRegion
 from pypost.ui.widgets.fold.scan_utils import append_region_if_multiline, line_at_offset, path_id
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -20,15 +24,29 @@ class _ScanContext:
 
 
 class JsonStructureScanner:
-    def scan(self, document: QTextDocument) -> list[FoldRegion]:
-        text = document.toPlainText()
+    def scan_text(
+        self, text: str, is_interrupted: Callable[[], bool] | None = None
+    ) -> list[FoldRegion]:
         if not text.strip():
+            return []
+        if is_interrupted is not None and is_interrupted():
             return []
         try:
             json.loads(text)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            logger.debug(
+                "json_scan_parse_skipped line=%d col=%d msg=%s",
+                exc.lineno,
+                exc.colno,
+                exc.msg,
+            )
             return []
-        return _scan_regions(text)
+        if is_interrupted is not None and is_interrupted():
+            return []
+        return _scan_regions(text, is_interrupted=is_interrupted)
+
+    def scan(self, document: QTextDocument) -> list[FoldRegion]:
+        return self.scan_text(document.toPlainText())
 
 
 def _child_path(
@@ -49,7 +67,9 @@ def _advance_array_index(contexts: list[_ScanContext]) -> None:
         contexts[-1].array_index += 1
 
 
-def _scan_regions(text: str) -> list[FoldRegion]:
+def _scan_regions(
+    text: str, is_interrupted: Callable[[], bool] | None = None
+) -> list[FoldRegion]:
     regions: list[FoldRegion] = []
     open_stack: list[tuple[int, str, str]] = []
     contexts: list[_ScanContext] = []
@@ -63,6 +83,8 @@ def _scan_regions(text: str) -> list[FoldRegion]:
     i = 0
 
     while i < len(text):
+        if is_interrupted is not None and (i & 1023 == 0) and is_interrupted():
+            return []
         ch = text[i]
 
         if in_string:

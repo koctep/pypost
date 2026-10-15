@@ -99,6 +99,7 @@ conventions.
 1. [JSON Syntax Highlighting](json_syntax_highlighting.md)
 1. [Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376)](hidden_response_fields.md)
 1. [Shared Foldable Plain Text Edit Base Class (PYPOST-1365 / PYPOST-1369)](foldable_plain_text_edit.md)
+1. [Background Folding Scanner for Large Documents (PYPOST-1365 / PYPOST-1370)](background_folding_scanner.md)
 
 ### Body editor
 
@@ -106,6 +107,7 @@ conventions.
 1. [Body Editor Auto-Indent (PYPOST-105)](body_editor_indent.md)
 1. [Body Editor Line Numbers (PYPOST-510)](body_editor_line_numbers.md)
 1. [Body Editor Folding (PYPOST-511)](body_editor_folding.md)
+1. [Background Folding Scanner for Large Documents (PYPOST-1365 / PYPOST-1370)](background_folding_scanner.md)
 1. [Body Editor Validation (PYPOST-512)](body_editor_validation.md)
 1. [Body Format Selector (PYPOST-513)](body_format_selector.md)
 1. [YAML as JSON Send Conversion (PYPOST-514)](yaml_as_json.md)
