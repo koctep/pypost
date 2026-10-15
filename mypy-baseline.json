@@ -1,5 +1,5 @@
 {
-  "error_count": 181,
+  "error_count": 175,
   "errors": [
     {
       "code": "return-value",
@@ -498,21 +498,6 @@
     },
     {
       "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"Key_Enter\"",
-      "path": "pypost/ui/widgets/code_editor.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"type[Qt]\" has no attribute \"Key_Return\"",
-      "path": "pypost/ui/widgets/code_editor.py"
-    },
-    {
-      "code": "no-any-return",
-      "message": "Returning Any from function declared to return \"bool\"",
-      "path": "pypost/ui/widgets/code_editor.py"
-    },
-    {
-      "code": "attr-defined",
       "message": "\"type[QHeaderView]\" has no attribute \"ResizeToContents\"",
       "path": "pypost/ui/widgets/environments/environment_variables_widget.py"
     },
@@ -595,21 +580,6 @@
       "code": "attr-defined",
       "message": "\"type[QFont]\" has no attribute \"Bold\"",
       "path": "pypost/ui/widgets/json_highlighter.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"QPlainTextEdit\" has no attribute \"line_number_area_mouse_press\"",
-      "path": "pypost/ui/widgets/line_number_area.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"QPlainTextEdit\" has no attribute \"line_number_area_paint_event\"",
-      "path": "pypost/ui/widgets/line_number_area.py"
-    },
-    {
-      "code": "attr-defined",
-      "message": "\"QPlainTextEdit\" has no attribute \"line_number_area_width\"",
-      "path": "pypost/ui/widgets/line_number_area.py"
     },
     {
       "code": "attr-defined",

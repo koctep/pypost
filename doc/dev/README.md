@@ -98,9 +98,11 @@ conventions.
 1. [Method / Body Auto-Switch](method_body_autoswitch.md)
 1. [JSON Syntax Highlighting](json_syntax_highlighting.md)
 1. [Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376)](hidden_response_fields.md)
+1. [Shared Foldable Plain Text Edit Base Class (PYPOST-1365 / PYPOST-1369)](foldable_plain_text_edit.md)
 
 ### Body editor
 
+1. [Shared Foldable Plain Text Edit Base Class (PYPOST-1365 / PYPOST-1369)](foldable_plain_text_edit.md)
 1. [Body Editor Auto-Indent (PYPOST-105)](body_editor_indent.md)
 1. [Body Editor Line Numbers (PYPOST-510)](body_editor_line_numbers.md)
 1. [Body Editor Folding (PYPOST-511)](body_editor_folding.md)
