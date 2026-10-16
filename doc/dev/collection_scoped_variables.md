@@ -573,17 +573,18 @@ The runtime resolution engine distinguishes between non-secret and secret missin
 
 ## Integration Test Harness Architecture (`CollectionVariablesIntegrationHarness`)
 
-Automated end-to-end integration and compatibility matrix verification is encapsulated in [`CollectionVariablesIntegrationHarness`](file:///home/src/tests/test_collection_scoped_variables_integration.py) under `tests/test_collection_scoped_variables_integration.py`.
+Automated end-to-end integration and compatibility matrix verification is encapsulated in [`CollectionVariablesIntegrationHarness`](file:///home/src/tests/helpers/collection_integration_harness.py) under `tests.helpers.collection_integration_harness` (established in [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412) and extracted as a shared helper in [PYPOST-1417](https://pypost.atlassian.net/browse/PYPOST-1417)). For complete helper details, see the dedicated guide [Reusable Collection Integration Test Harness](collection_integration_harness.md).
 
 ```mermaid
 flowchart TD
     HARNESS["CollectionVariablesIntegrationHarness(tmp_path)"]
-    LMS["LibraryManagerService"]
-    REG["MCPServerRegistry"]
-    LRR["LibraryRuntimeResolver"]
-    SM["StorageManager"]
-    TS["TemplateService"]
-    OM["LocalOverlayManager"]
+    LMS["LibraryManagerService<br/>(Catalog discovery)"]
+    REG["MCPServerRegistry<br/>(Server lifecycle & ports)"]
+    LRR["LibraryRuntimeResolver<br/>(Dynamic variable resolution)"]
+    SM["StorageManager<br/>(Workspace environments)"]
+    TS["TemplateService<br/>(Request interpolation)"]
+    OM["LocalOverlayManager<br/>(Machine-local secrets)"]
+    CS["LibraryConnectionStore<br/>(Library metadata persistence)"]
 
     HARNESS --> LMS
     HARNESS --> REG
@@ -591,17 +592,70 @@ flowchart TD
     HARNESS --> SM
     HARNESS --> TS
     HARNESS --> OM
+    HARNESS --> CS
 
-    subgraph Operations["Harness Operations"]
-        CL["create_library()<br/>(Catalog vs Legacy Manifest)"]
+    subgraph Operations["Programmatic Helper Operations"]
+        CL["create_library()<br/>(Catalog v2 vs Legacy v1 Manifest)"]
         CE["create_workspace_environment()<br/>(Isolated Environment)"]
-        RL["run_unified_lifecycle()<br/>(Discovery -> MCP -> Import -> Template)"]
+        CO["create_overlay()<br/>(Local secrets & active profile)"]
+        SS["start_standalone_server()<br/>(Standalone MCP Server)"]
+        RL["run_unified_lifecycle()<br/>(End-to-end discovery -> MCP -> import -> template)"]
     end
 
     HARNESS -.-> Operations
 ```
 
-### Core Harness Methods
+### Coordinated Multi-Subsystem Services
+
+The harness constructs and synchronizes an isolated instance of all core subsystem services rooted under a dedicated `tmp_path`:
+- [`StorageManager`](file:///home/src/pypost/core/storage.py): Manages isolated workspace environments under `tmp_path/workspace/`.
+- [`LibraryConnectionStore`](file:///home/src/pypost/core/library_connection_store.py): Persists library connection metadata at `tmp_path/connections.json`.
+- [`LocalOverlayManager`](file:///home/src/pypost/core/local_overlay_manager.py): Persists machine-local secret overrides under `tmp_path/libraries_data/` with `0o600` file permissions.
+- [`TemplateService`](file:///home/src/pypost/core/template_service.py): Evaluates template expressions in URLs, headers, and request bodies.
+- [`LibraryManagerService`](file:///home/src/pypost/core/library_manager_service.py): Discovers catalog and legacy manifests and registers collections.
+- [`LibraryRuntimeResolver`](file:///home/src/pypost/core/library_runtime_resolver.py): Implements 3-tier precedence and standalone environment resolution.
+- [`MCPServerRegistry`](file:///home/src/pypost/core/mcp_server_registry.py): Oversees local and standalone MCP server lifecycles, states, and process supervision.
+
+### Context Manager Usage & Resource Teardown Guarantees
+
+The harness implements the Python context manager protocol (`__enter__` and `__exit__`), guaranteeing that all started MCP server background threads, sub-processes, and connections are cleaned up safely even when assertion errors or exceptions occur during test execution:
+
+```python
+from tests.helpers.collection_integration_harness import CollectionVariablesIntegrationHarness
+
+def test_custom_scenario(tmp_path):
+    with CollectionVariablesIntegrationHarness(tmp_path) as harness:
+        lib_dir = harness.create_library("my-lib", collections_data={...})
+        server_id, port, status = harness.start_standalone_server("my-lib", "col1")
+        assert status == "running"
+    # Guaranteed: harness.teardown() stops all servers and releases ports
+```
+
+- **Idempotent Teardown**: `harness.teardown()` (and its alias `harness.close()`) safely invokes `registry.stop_all()`. Multiple invocations do not raise errors or double-close resources.
+- **Exception Logging**: `__exit__` catches and logs unhandled exceptions during test execution at `ERROR` level before invoking `teardown()`.
+
+### Pytest Fixture Bindings
+
+The helper module exports standard pytest fixture bindings so test suites do not need manual instantiation or teardown logic:
+
+```python
+from tests.helpers.collection_integration_harness import (
+    collection_integration_harness,
+    collection_harness,
+)
+
+def test_with_fixture(collection_integration_harness):
+    result = collection_integration_harness.run_unified_lifecycle(...)
+    assert result.status == "success"
+
+def test_with_alias(collection_harness):
+    env = collection_harness.create_workspace_environment(name="Dev")
+    assert env.name == "Dev"
+```
+
+Both `collection_integration_harness` and `collection_harness` automatically yield the harness and execute `teardown()` in a `finally` block upon test completion.
+
+### Core Programmatic Helper Methods
 
 1. **`create_library(manifest_id, is_legacy_manifest, collections_data, manifest_variables, manifest_presets) -> Path`**:
    - Synthesizes an isolated library directory under `tmp_path/libraries/<manifest_id>`.
@@ -609,17 +663,42 @@ flowchart TD
    - Automatically connects the directory to `LibraryManagerService`.
 2. **`create_workspace_environment(name, variables, hidden_keys) -> Environment`**:
    - Persists an isolated workspace environment under `tmp_path/workspace/environments/` using [`StorageManager`](file:///home/src/pypost/core/storage.py).
-3. **`run_unified_lifecycle(manifest_id, collection_data, active_profile, overlay_secrets, workspace_env_name, conflict_strategy) -> UnifiedLifecycleResult`**:
-   - Orchestrates the full 5-step integration lifecycle in a single call.
-   - Registers and starts a standalone MCP server with allocated TCP ports.
-   - Copies collection to workspace, imports variables into an environment with secret masking, and renders request templates via [`TemplateService`](file:///home/src/pypost/core/template_service.py).
+3. **`create_overlay(library_id, active_profile, secrets) -> LocalLibraryOverlay`**:
+   - Persists a machine-local overlay under `tmp_path/libraries_data/<library_id>/overlay.json` with active profile and encrypted secrets.
+4. **`start_standalone_server(manifest_id, collection_id, collection_filename, collection_name, host, port) -> tuple[str, int, str]`**:
+   - Allocates an ephemeral collision-free port via `allocate_tcp_port()`, configures `McpServerConfiguration(environment_id=None)`, validates the candidate, starts the server in `MCPServerRegistry`, and waits for the `"running"` state.
+5. **`run_unified_lifecycle(manifest_id, collection_data, active_profile, overlay_secrets, workspace_env_name, conflict_strategy) -> UnifiedLifecycleResult`**:
+   - Orchestrates the complete 5-step integration lifecycle in a single call:
+     1. Discovers and connects catalog library.
+     2. Configures machine-local overlay secrets and active profile.
+     3. Starts standalone MCP server without a workspace environment.
+     4. Copies collection into workspace environment with conflict resolution.
+     5. Renders request URLs, headers, and request body via [`TemplateService`](file:///home/src/pypost/core/template_service.py).
+
+### Unified Lifecycle Result Dataclass
+
+```python
+@dataclass
+class UnifiedLifecycleResult:
+    """Outcome of end-to-end multi-subsystem workflow execution."""
+    status: str
+    standalone_server_id: str
+    standalone_status: str
+    imported_summary: ImportSummary
+    rendered_request_url: str
+    rendered_auth_header: str
+    rendered_body: str
+```
 
 ### Test Guardrails & Invariants
 
 - **Zero Global State**: All stores and service singletons are bound to isolated temporary directories (`tmp_path`).
 - **Safe Port Allocation**: Local test servers use `tests.helpers.port_allocation.allocate_tcp_port()` to prevent TCP bind collisions.
-- **Strict Timeout Contracts**: All tests declare explicit timeout markers (`pytestmark = [pytest.mark.timeout(30)]`).
+- **Strict Timeout Contracts**: All integration tests declare explicit timeout markers (`pytestmark = [pytest.mark.timeout(30)]`).
 - **Offline Execution**: 100% offline; requires zero network connectivity or external mock servers.
+- **Reference Test Suites**:
+  - `tests/test_collection_integration_harness_repro.py`: Validates harness imports, context manager lifecycle, pytest fixture bindings, and unified orchestration.
+  - `tests/test_collection_scoped_variables_integration.py`: End-to-end compatibility matrix and multi-subsystem integration test suite.
 
 ---
 
@@ -690,7 +769,15 @@ flowchart TD
   - Technical Debt Report: [`ai-tasks/PYPOST-1412/60-tech-debt.md`](file:///home/src/ai-tasks/PYPOST-1412/60-tech-debt.md)
   - Developer Documentation Report: [`ai-tasks/PYPOST-1412/70-dev-docs.md`](file:///home/src/ai-tasks/PYPOST-1412/70-dev-docs.md)
   - Automated Integration & Compatibility Test Suite: [`tests/test_collection_scoped_variables_integration.py`](file:///home/src/tests/test_collection_scoped_variables_integration.py)
+- **Reusable Integration Harness Helper Task**: [PYPOST-1417](https://pypost.atlassian.net/browse/PYPOST-1417)
+  - Requirements Document: [`ai-tasks/PYPOST-1417/10-requirements.md`](file:///home/src/ai-tasks/PYPOST-1417/10-requirements.md)
+  - Architecture Specification: [`ai-tasks/PYPOST-1417/20-architecture.md`](file:///home/src/ai-tasks/PYPOST-1417/20-architecture.md)
+  - Code Cleanup Report: [`ai-tasks/PYPOST-1417/40-code-cleanup.md`](file:///home/src/ai-tasks/PYPOST-1417/40-code-cleanup.md)
+  - Observability Report: [`ai-tasks/PYPOST-1417/50-observability.md`](file:///home/src/ai-tasks/PYPOST-1417/50-observability.md)
+  - Technical Debt Report: [`ai-tasks/PYPOST-1417/60-tech-debt.md`](file:///home/src/ai-tasks/PYPOST-1417/60-tech-debt.md)
+  - Automated Harness Repro & Regression Tests: [`tests/test_collection_integration_harness_repro.py`](file:///home/src/tests/test_collection_integration_harness_repro.py)
 - **Related Developer Guides**:
+  - [Reusable Collection Integration Test Harness](collection_integration_harness.md)
   - [Library Manifest and Local Secrets Overlay Manager](library_manifest_and_overlay.md)
   - [Collection Format v2](collection_format_v2.md)
   - [Collection Variable Setup Guidance](collection_variable_guidance.md)

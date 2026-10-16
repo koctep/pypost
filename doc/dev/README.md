@@ -64,6 +64,7 @@ conventions.
 1. [Collection Variable Setup Guidance (PYPOST-1284 / PYPOST-1375)](collection_variable_guidance.md)
 1. [Library Manifest and Local Secrets Overlay Manager (PYPOST-1221)](library_manifest_and_overlay.md)
 1. [Collection-Scoped Variables, Standalone MCP Servers, and Workspace Import (PYPOST-1407–1412)](collection_scoped_variables.md)
+1. [Reusable Collection Integration Test Harness (PYPOST-1417)](collection_integration_harness.md)
 1. [Git Library Service and Hybrid Authentication (PYPOST-1222)](git_library_service.md)
 1. [Shared JSON Export Root Policy (PYPOST-1010)](json_export_root.md)
 1. [WebSocket Connection Profile Model, Persistence, and Interchange (PYPOST-1128)](websocket_persistence_and_interchange.md)
@@ -186,6 +187,7 @@ conventions.
 1. [Agent E2E Double Response-Body Lock (PYPOST-889)](agent_e2e_double_response_body.md)
 1. [Agent E2E Presentation Matrix (PYPOST-890)](agent_e2e_presentation_matrix.md)
 1. [Scripted WebSocket Test Server and Fixture (PYPOST-1129)](websocket_test_harness.md)
+1. [Reusable Collection Integration Test Harness (PYPOST-1417)](collection_integration_harness.md)
 1. [Metric Rename Migration (PYPOST-443)](metric_rename_migration.md)
 1. [Code Folding Stress and Edge-Case Payload Test Suite (PYPOST-1365 / PYPOST-1371)](folding_stress_and_edge_cases.md)
 
