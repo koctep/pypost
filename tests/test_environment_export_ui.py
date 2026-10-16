@@ -16,11 +16,26 @@ pytestmark = pytest.mark.timeout(60)
 _MODULE = "pypost.ui.widgets.environments.environment_list_widget"
 
 
+_created_widgets: list[EnvironmentListWidget] = []
+
+
 def _make_widget(environments, serialize_export_records=None):
-    return EnvironmentListWidget(
+    w = EnvironmentListWidget(
         environments,
         serialize_export_records=serialize_export_records,
     )
+    _created_widgets.append(w)
+    return w
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_widgets(qapp):
+    yield
+    while _created_widgets:
+        w = _created_widgets.pop()
+        w.close()
+        w.deleteLater()
+    qapp.processEvents()
 
 
 class TestExportEnvironments:

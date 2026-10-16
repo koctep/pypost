@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from typing import Any, Callable, Iterable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
+    QDialog,
     QHBoxLayout,
     QHeaderView,
     QMenu,
+    QMessageBox,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -30,8 +33,15 @@ from pypost.core.environment_messages import (
 )
 from pypost.core.environment_ops import validate_environment_variable_name
 from pypost.core.hidden_toggle_log_policy import HiddenToggleLogPolicy
-from pypost.models.models import Environment
+from pypost.models.models import Collection, Environment
 from pypost.ui.collection_item_dialogs import show_invalid_variable_name_error
+from pypost.ui.dialogs.import_collection_variables_dialog import (
+    ImportCollectionVariablesDialog,
+)
+from pypost.ui.widget_ids import (
+    COLLECTION_VARIABLE_IMPORT_BUTTON,
+    set_widget_id,
+)
 
 HIDDEN_COLUMN_TOOLTIP = (
     "Hidden variables are masked in the UI and encrypted at rest when encryption is enabled. "
@@ -55,10 +65,14 @@ class EnvironmentVariablesWidget(QWidget):
         *,
         log_hidden_key_names: bool = False,
         get_selected_env: Callable[[], Environment | None] | None = None,
+        get_collections: Callable[[], Iterable[Collection]] | None = None,
+        library_service: Any | None = None,
     ) -> None:
         super().__init__(parent)
         self._log_hidden_key_names = log_hidden_key_names
         self._get_selected_env = get_selected_env or (lambda: None)
+        self._get_collections = get_collections
+        self._library_service = library_service
         self._current_env: Environment | None = None
 
         layout = QVBoxLayout(self)
@@ -88,8 +102,19 @@ class EnvironmentVariablesWidget(QWidget):
         self.mcp_check.toggled.connect(self._on_mcp_toggled)
         self.mcp_check.setEnabled(False)
 
+        self.import_btn = QPushButton("Import from Collection…")
+        set_widget_id(self.import_btn, COLLECTION_VARIABLE_IMPORT_BUTTON)
+        self.import_btn.setEnabled(False)
+        self.import_btn.clicked.connect(self._on_import_from_collection)
+        self.import_collection_btn = self.import_btn
+
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addWidget(self.mcp_check)
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(self.import_btn)
+
         layout.addWidget(self.vars_table)
-        layout.addWidget(self.mcp_check)
+        layout.addLayout(bottom_layout)
 
     def load_environment(self, env: Environment | None) -> None:
         self._current_env = env
@@ -97,8 +122,10 @@ class EnvironmentVariablesWidget(QWidget):
             self.vars_table.setRowCount(0)
             self.mcp_check.setEnabled(False)
             self.mcp_check.setChecked(False)
+            self.import_btn.setEnabled(False)
             return
 
+        self.import_btn.setEnabled(True)
         self.mcp_check.setEnabled(True)
         self.mcp_check.blockSignals(True)
         self.mcp_check.setChecked(getattr(env, "enable_mcp", False))
@@ -143,6 +170,42 @@ class EnvironmentVariablesWidget(QWidget):
         env = self._get_selected_env()
         if env is not None:
             env.enable_mcp = checked
+
+    def _on_import_from_collection(self) -> None:
+        env = self._get_selected_env() or self._current_env
+        if env is None:
+            return
+        collections = list(self._get_collections() if self._get_collections else [])
+        logger.info(
+            "env_import_from_collection_clicked env_name=%s available_collections_count=%d",
+            env.name,
+            len(collections),
+        )
+        dialog = ImportCollectionVariablesDialog(
+            target_environment=env,
+            workspace_collections=collections,
+            library_service=self._library_service,
+            parent=self,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            total_imported = dialog.summary.total_imported if dialog.summary else 0
+            logger.info(
+                "env_import_from_collection_dialog_accepted env_name=%s total_imported=%d",
+                env.name,
+                total_imported,
+            )
+            self.load_environment(env)
+            if dialog.summary and dialog.summary.total_imported > 0:
+                QMessageBox.information(
+                    self,
+                    "Import Complete",
+                    dialog.summary.format_summary(),
+                )
+        else:
+            logger.info(
+                "env_import_from_collection_dialog_cancelled env_name=%s",
+                env.name,
+            )
 
     def _make_hidden_checkbox(self, checked: bool = False) -> QWidget:
         widget = QWidget()

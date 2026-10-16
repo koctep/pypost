@@ -76,6 +76,7 @@ conventions.
 1. [Collection Item Rename](collection_item_rename.md)
 1. [Collection Item Strategies and Dispatch Context (PYPOST-1193)](collection_item_strategies.md)
 1. [Environments Dialog](environments_dialog.md)
+1. [Workspace Environment Variable Import from Collections (PYPOST-1411)](workspace_environment_variable_import.md)
 1. [Environment Management and Variable Display (PYPOST-1073)](environments.md)
 1. [Environment-to-MCP State Propagation and Domain Signals (PYPOST-1108)](environment_mcp_signals.md)
 1. [Environment Variable Delete](environment_variable_delete.md)

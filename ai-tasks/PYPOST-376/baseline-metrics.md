@@ -27,7 +27,7 @@
 | `pypost/core/websocket_registry.py` | — | 129 | 131 |
 | `pypost/ui/mcp_server_controller.py` | — | 784 | 795 |
 | `pypost/ui/presenters/collections_presenter.py` | — | 534 | 535 |
-| `pypost/ui/presenters/env_presenter.py` | — | 460 | 482 |
+| `pypost/ui/presenters/env_presenter.py` | — | 468 | 482 |
 | `pypost/ui/presenters/mcp_controls_presenter.py` | — | 384 | 407 |
 | `pypost/ui/presenters/tabs_presenter.py` | — | 1053 | 1165 |
 | `pypost/ui/widgets/mixins.py` | — | 396 | 411 |

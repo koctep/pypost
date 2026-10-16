@@ -75,6 +75,7 @@ class EnvPresenter(QObject):
         self._settings = settings
         self._get_collections = get_collections
         self._metrics = metrics
+        self._mcp_registry = mcp_registry
         self._environments: list[Environment] = []
         self._staged_environment: Environment | None = None
         self._creation_completion: EnvironmentCreationCompletion | None = None
@@ -136,6 +137,11 @@ class EnvPresenter(QObject):
         for mcp_widget in self._mcp_controls.widgets:
             layout.addWidget(mcp_widget)
         layout.addStretch()
+
+    @property
+    def environments(self) -> list[Environment]:
+        """Returns the loaded environments list."""
+        return self._environments
 
     @property
     def widget(self) -> QWidget:
@@ -444,6 +450,8 @@ class EnvPresenter(QObject):
             log_hidden_key_names=self._settings.log_hidden_key_names,
             read_import_file=lambda path: load_import_candidates(path, self._storage),
             serialize_export_records=self._storage.serialize_environment_records,
+            get_collections=self._get_collections,
+            library_service=getattr(self._mcp_registry, "library_service", None),
         )
         dialog.exec()
         logger.info("env_manager_dialog_closed")

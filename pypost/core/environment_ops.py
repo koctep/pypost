@@ -3,10 +3,25 @@ from __future__ import annotations
 
 from pypost.core.variable_name_validation import validate_variable_name
 from pypost.models.models import Environment
+from pypost.core.collection_variable_import import (
+    ConflictStrategy,
+    ImportSummary,
+    import_collection_variables_to_environment,
+)
 from pypost.core.environment_messages import (
     MSG_EMPTY_NAME,
     format_duplicate_environment_name,
 )
+
+__all__ = [
+    "ConflictStrategy",
+    "ImportSummary",
+    "clone_environment",
+    "clone_environments",
+    "import_collection_variables_to_environment",
+    "validate_environment_rename",
+    "validate_environment_variable_name",
+]
 
 
 def validate_environment_variable_name(name: str) -> tuple[bool, str]:

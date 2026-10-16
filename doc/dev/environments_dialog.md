@@ -14,8 +14,8 @@ import constants and small formatter helpers from that module.
 - **`EnvironmentListWidget`**: Left pane — `QListWidget`, Add button, F2/context-menu
   rename, copy, and delete. Emits `environment_selected(int)` when the current row changes.
 - **`EnvironmentVariablesWidget`**: Right pane — variables `QTableWidget` (Variable / Value /
-  Hidden columns) and the MCP checkbox. Loads via `load_environment(Environment | None)` when
-  the selection changes.
+  Hidden / MCP Override columns), MCP checkbox, and "Import from Collection…" button. Loads via
+  `load_environment(Environment | None)` when the selection changes.
 
 `EnvPresenter._open_env_manager` passes presenter-owned environments, opens the dialog, then
 assigns `self._environments = dialog.environments` before saving — the presenter owns state.
@@ -254,6 +254,28 @@ patched `EnvironmentDialog` constructor and invoked against
 export records — invoke, not identity only. Bound-method identity remains in
 `test_open_env_manager_passes_storage_serializer_directly` (local
 `FakeStorage`); that sibling does not replace the invoke lock.
+
+## Import collection variables (PYPOST-1411)
+
+`EnvironmentVariablesWidget` gains an **Import from Collection…** button (`COLLECTION_VARIABLE_IMPORT_BUTTON`
+widget id) alongside the MCP checkbox, wired to `_on_import_from_collection()`.
+
+This enables users to import collection-scoped variables and presets directly into the selected
+workspace environment. The core domain logic lives outside Qt in `pypost/core/collection_variable_import.py`
+(`import_collection_variables_to_environment`, `ConflictStrategy`, `ImportSummary`), and the UI interaction
+is handled by `ImportCollectionVariablesDialog` (`pypost/ui/dialogs/import_collection_variables_dialog.py`).
+
+Key capabilities:
+- **Source selection**: Choose between local workspace collections and catalog collections from connected libraries.
+- **Preset profiles**: Evaluate preset overrides dynamically or import base defaults.
+- **Selective import**: Checkboxes to select or deselect specific variables, with Select All and Deselect All shortcuts.
+- **Conflict resolution**: Choose between `Skip` (preserve existing environment values, default) and `Overwrite`.
+- **Automatic secret protection**: Secret variables are automatically registered in `Environment.hidden_keys`,
+  excluded from `Environment.mcp_overridable_keys`, masked in UI tables, and encrypted at rest.
+- **Variable validation**: Non-conforming variable names are skipped and reported in the summary without aborting valid imports.
+
+For comprehensive architectural design, domain contracts, and testing details, see
+[Workspace Environment Variable Import from Collections](workspace_environment_variable_import.md).
 
 ## Configuration
 N/A

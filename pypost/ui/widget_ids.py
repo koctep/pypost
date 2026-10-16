@@ -152,6 +152,19 @@ MCP_SERVER_CONFIGURE_VARIABLES_BUTTON: Final[str] = (
     "pypost_mcp_server_configure_variables_button"
 )
 
+# Environment Variable Import surfaces (PYPOST-1411).
+COLLECTION_VARIABLE_IMPORT_BUTTON: Final[str] = "pypost_collection_variable_import_button"
+IMPORT_COLLECTION_VARIABLES_DIALOG: Final[str] = "pypost_import_collection_variables_dialog"
+IMPORT_COLLECTION_SOURCE_COMBO: Final[str] = "pypost_import_collection_source_combo"
+IMPORT_COLLECTION_PRESET_COMBO: Final[str] = "pypost_import_collection_preset_combo"
+IMPORT_COLLECTION_VARS_TABLE: Final[str] = "pypost_import_collection_vars_table"
+IMPORT_COLLECTION_CONFLICT_SKIP_RADIO: Final[str] = "pypost_import_collection_conflict_skip_radio"
+IMPORT_COLLECTION_CONFLICT_OVERWRITE_RADIO: Final[str] = (
+    "pypost_import_collection_conflict_overwrite_radio"
+)
+IMPORT_COLLECTION_SELECT_ALL_BUTTON: Final[str] = "pypost_import_collection_select_all_button"
+IMPORT_COLLECTION_DESELECT_ALL_BUTTON: Final[str] = "pypost_import_collection_deselect_all_button"
+
 KEY_WIDGET_IDS = (
     MAIN_WINDOW,
     COLLECTION_TREE,
@@ -225,6 +238,14 @@ KEY_WIDGET_IDS = (
     MCP_CLIENT_RESULT_FOLD_ALL_BUTTON,
     MCP_CLIENT_RESULT_UNFOLD_ALL_BUTTON,
     MCP_SERVER_CONFIGURE_VARIABLES_BUTTON,
+    COLLECTION_VARIABLE_IMPORT_BUTTON,
+    IMPORT_COLLECTION_VARIABLES_DIALOG,
+    IMPORT_COLLECTION_SOURCE_COMBO,
+    IMPORT_COLLECTION_PRESET_COMBO,
+    IMPORT_COLLECTION_VARS_TABLE,
+    IMPORT_COLLECTION_CONFLICT_SKIP_RADIO,
+    IMPORT_COLLECTION_CONFLICT_OVERWRITE_RADIO,
+    IMPORT_COLLECTION_SELECT_ALL_BUTTON,
 )
 
 # Variable Setup Wizard surfaces (PYPOST-1373).

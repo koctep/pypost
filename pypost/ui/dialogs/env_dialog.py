@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, List
+from typing import Any, Callable, Iterable, List
 
 from PySide6.QtWidgets import QDialog, QHBoxLayout
 
 from pypost.core.environment_ops import clone_environments
-from pypost.models.models import Environment
+from pypost.models.models import Collection, Environment
 from pypost.core.environment_messages import DIALOG_TITLE_MANAGE_ENVIRONMENTS
 from pypost.ui.widgets.environments import (
     EnvironmentListWidget,
@@ -23,6 +23,8 @@ class EnvironmentDialog(QDialog):
         log_hidden_key_names: bool = False,
         read_import_file: Callable[[Path], tuple[list[Environment], list[str]]] | None = None,
         serialize_export_records: Callable[[list[Environment]], list[dict]] | None = None,
+        get_collections: Callable[[], Iterable[Collection]] | None = None,
+        library_service: Any | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle(DIALOG_TITLE_MANAGE_ENVIRONMENTS)
@@ -41,6 +43,8 @@ class EnvironmentDialog(QDialog):
         self._vars_widget = EnvironmentVariablesWidget(
             log_hidden_key_names=log_hidden_key_names,
             get_selected_env=self._selected_environment,
+            get_collections=get_collections,
+            library_service=library_service,
         )
 
         layout = QHBoxLayout(self)
@@ -68,6 +72,10 @@ class EnvironmentDialog(QDialog):
     @property
     def mcp_check(self):
         return self._vars_widget.mcp_check
+
+    @property
+    def vars_widget(self) -> EnvironmentVariablesWidget:
+        return self._vars_widget
 
     def _selected_environment(self) -> Environment | None:
         row = self.env_list.currentRow()
