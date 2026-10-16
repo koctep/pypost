@@ -192,6 +192,52 @@ To ensure fast, deterministic UI unit testing without hanging on modal Qt event 
 - `_create_variable_wizard(variables, initial_values, collection_name) -> VariableSetupWizardDialog`: Factory method hook for creating the wizard dialog instance.
 - `_launch_variable_wizard(dialog) -> int`: Invocation hook delegating to `dialog.exec()`. In unit test suites (such as `tests/test_mcp_servers_dialog_variable_wizard_repro.py`), tests mock `_launch_variable_wizard` to simulate `Accepted` or `Rejected` return codes and inspect pre-populated parameters without displaying native modal windows.
 
+#### Live Wire IPC and Stdio Transport Stress Testing (PYPOST-1416)
+
+While in-process unit tests validate tool schema registration and Python supplier dispatches, they bypass the physical operating system networking stack, socket buffers, kernel pipe buffers, and wire framing. Story [PYPOST-1416](https://pypost.atlassian.net/browse/PYPOST-1416) introduces comprehensive live wire IPC and stdio transport stress testing in `tests/test_mcp_standalone_wire_ipc_repro.py`, verifying standalone MCP server implementations under real-world physical wire and pipe conditions. See [mcp_standalone_wire_ipc_stress.md](mcp_standalone_wire_ipc_stress.md) for dedicated reference architecture and failure mode details.
+
+##### Wire-Level Socket Communication
+
+Standalone MCP servers expose two primary HTTP-based wire transports:
+1. **Streamable HTTP (`/mcp`)**: Mounted via `mcp.server.streamable_http_manager.StreamableHTTPSessionManager`. Handles JSON-RPC 2.0 requests over HTTP `POST` requests and maintains session state via the `mcp-session-id` header.
+2. **Server-Sent Events (`/sse` & `/sse/messages`)**: Mounted via `mcp.server.sse.SseServerTransport`. Establishes persistent server-to-client streaming via HTTP `GET /sse` and routes client JSON-RPC requests via `POST /sse/messages?session_id=...`.
+
+The wire stress harness introduces `RawTcpWireClient` (`tests/test_mcp_standalone_wire_ipc_repro.py`), a low-level socket client operating directly on raw TCP streams (`socket.AF_INET`, `socket.SOCK_STREAM`) against the loopback interface (`127.0.0.1`):
+- Transmits raw HTTP/1.1 wire frames with `POST /mcp`, `Host`, `Content-Type: application/json`, `Accept: application/json, text/event-stream`, `Connection: keep-alive`, and `mcp-session-id`.
+- Reassembles raw byte streams into status lines, headers, and bodies, handling both fixed `Content-Length` framing and chunked HTTP transfer encoding (`Transfer-Encoding: chunked`).
+- Decodes incoming JSON-RPC 2.0 payloads from direct JSON responses and Server-Sent Event (`data: {...}`) blocks.
+
+##### Packet Fragmentation Resilience
+
+In production environments, TCP delivers data as an arbitrary stream of bytes rather than discrete packet boundaries (governed by MTU, Nagle's algorithm, and socket buffers). The wire test harness verifies server resilience against severe packet fragmentation:
+- **Header and Body Boundary Splits**: Splits HTTP request headers and JSON-RPC bodies across arbitrary multi-byte boundaries (e.g. 7-byte chunks).
+- **1-Byte Micro-Chunking**: Transmits tool call payloads (`tools/call`) byte-by-byte (`send_fragmented(chunk_size=1)`), simulating extreme MTU fragmentation or sluggish network interfaces.
+- **Chunked Stream Reassembly**: Exercises Uvicorn/Starlette ASGI request stream parsers, verifying that fragmented frames and chunked SSE streams are reassembled without protocol desynchronization, incomplete reads, or frame dropouts.
+
+##### Pipelined Burst Throughput
+
+To ensure high-throughput agent workflows operate without socket stalls:
+- **100-Request Pipelined Bursts**: A client generates and concatenates 100 complete HTTP/JSON-RPC tool execution requests (`pipelined-0` through `pipelined-99`) and transmits them in a single bulk `sendall()` socket write over a single persistent TCP keep-alive connection.
+- **Continuous Stream Processing**: Verifies that the ASGI application and `MCPServerImpl` process queued requests continuously, returning exactly 100 sequential HTTP 200 responses with matched request IDs.
+- **Zero Stall Guarantees**: Asserts absence of connection resets (`ECONNRESET`), socket deadlocks, or dropped frames under burst saturation.
+
+##### OS Pipe Stdio IPC and Buffer Deadlock Avoidance
+
+In addition to socket transports, standalone MCP servers support out-of-process execution over OS standard input/output (`stdio`) pipes via `mcp.server.stdio.stdio_server`:
+- **Subprocess Model**: Launched as an independent OS process via `subprocess.Popen([sys.executable, "-c", ...], stdin=PIPE, stdout=PIPE, stderr=PIPE, bufsize=0)`.
+- **The 64KB `PIPE_BUF` Deadlock Risk**: On Linux, operating system pipes have fixed buffer capacities (typically 64KB / 65,536 bytes). If a client writes a burst of requests or a large payload (>64KB) to `stdin` while synchronously waiting for responses, or if the server produces large responses while the client is blocked on writing, both processes will deadlock indefinitely on full kernel pipe buffers.
+- **Concurrent Non-Blocking Drainer Threads**: The test harness runs concurrent background worker threads (`stdout_worker` and `stderr_worker`) that continuously drain `process.stdout` and `process.stderr` using line iterators and non-blocking locks.
+- **Large Payload Stress**: Stresses the stdio pipe with a 50-request burst containing payloads exceeding 70KB (surpassing the 64KB OS pipe buffer limit). Verifies that large responses are received without corruption, truncation, or deadlocks.
+- **Clean Lifecycle on Stdin EOF**: Closing `process.stdin` signals EOF to `stdio_server`, ensuring orderly event loop termination and process exit with code 0 without orphaned zombie processes.
+
+##### Port Re-Binding and Socket Lifecycle Teardown
+
+Improper socket cleanup can hold TCP ports in `TIME_WAIT` or leak file descriptors, preventing servers from restarting:
+- **Active Hammer Load**: Simulates rapid concurrent connections from multiple background threads hammering `POST /mcp` requests while the server is active.
+- **Rapid Teardown Under Load**: Invokes `manager.stop_server()` while hammer traffic is in flight.
+- **Immediate Port Re-Binding**: Verifies that the server cleanly shuts down its Uvicorn worker thread and releases listening sockets, enabling immediate re-binding on the exact same port with `SO_REUSEADDR` without encountering `EADDRINUSE`.
+- **Successor Instance Startup**: Immediately instantiates and starts a second `MCPServerManager` on the identical port, asserting full readiness.
+
 ## Configuration and lifecycle
 
 `AppSettings.mcp_servers` is a list of `McpServerConfiguration` objects saved
@@ -297,5 +343,5 @@ for the metric contract.
 Run the focused checks after changing this subsystem:
 
 ```bash
-make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py'
+make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py'
 ```

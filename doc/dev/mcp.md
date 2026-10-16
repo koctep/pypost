@@ -151,3 +151,4 @@ make check
 - Inbound MCP Trust Model: [mcp_trust_model.md](mcp_trust_model.md)
 - MCP Integration Guide: [mcp_integration.md](mcp_integration.md)
 - Sensitive Data Masking Policy: [sensitive_data_masking_policy.md](sensitive_data_masking_policy.md)
+- Live Wire IPC & Stdio Stress Testing: [mcp_standalone_wire_ipc_stress.md](mcp_standalone_wire_ipc_stress.md)
