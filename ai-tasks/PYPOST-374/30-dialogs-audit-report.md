@@ -1,14 +1,14 @@
 # PYPOST-374: Individual Dialog SOLID Audit Report
 
 **Date:** 2026-06-11
-**Inventory refreshed:** 2026-10-15 (PYPOST-1410)
-**Scope:** `pypost/ui/dialogs/` (nine dialog modules, 2,924 LOC total)
+**Inventory refreshed:** 2026-10-15 (PYPOST-1411)
+**Scope:** `pypost/ui/dialogs/` (ten dialog modules, 3,409 LOC total)
 **Methodology:** Manual walkthrough aligned with [PYPOST-40](../PYPOST-40/20-architecture.md)
 **Baseline comparison:** PYPOST-40 grouped inventory ~400 LOC, five dialogs named
 
 ## Executive Summary
 
-The current individual-dialog inventory contains nine modules. `SettingsDialog` is a thin
+The current individual-dialog inventory contains ten modules. `SettingsDialog` is a thin
 composition root over dedicated settings sections, while `McpServersDialog` manages explicit,
 persisted MCP server configurations. **Three MCP dialogs**
 (`mcp_activity_dialog.py`, `mcp_servers_dialog.py`, and `mcp_tools_overview_dialog.py`) use
@@ -29,8 +29,9 @@ complete for the full current scope.
 | Module | LOC | Class | Responsibility | Opened from |
 | --- | ---: | --- | --- | --- |
 | `about_dialog.py` | 43 | `AboutDialog` | Static app information | `main_window.py` |
-| `env_dialog.py` | 112 | `EnvironmentDialog` | Environment manager shell | env presenter |
+| `env_dialog.py` | 120 | `EnvironmentDialog` | Environment manager shell | env presenter |
 | `hotkeys_dialog.py` | 69 | `HotkeysDialog` | Shared shortcut reference table | `main_window.py` |
+| `import_collection_variables_dialog.py` | 477 | `ImportCollectionVariablesDialog` | Collection variable import preview | env variables widget |
 | `library_dialogs.py` | 703 | `GitCommitDialog` + auth/clone | Git library dialogs | library mgr |
 | `mcp_activity_dialog.py` | 117 | `McpActivityDialog` | MCP activity viewer | env presenter |
 | `mcp_servers_dialog.py` | 1,450 | `McpServersDialog` + editor | MCP server manager | main window |
@@ -38,7 +39,7 @@ complete for the full current scope.
 | `save_dialog.py` | 93 | `SaveRequestDialog` | Save-as picker | save orchestrator |
 | `settings_dialog.py` | 263 | `SettingsDialog` | Settings composition | main window |
 
-**Total:** 2,924 LOC (vs PYPOST-40 grouped ~400 LOC).
+**Total:** 3,409 LOC (vs PYPOST-40 grouped ~400 LOC).
 
 Verify counts against discovery (each failure names the module or aggregate with its recorded
 and discovered values):
@@ -86,6 +87,19 @@ Display-only; low risk.
 
 **Maintainability:** The table no longer duplicates shortcut definitions. **Test coverage:**
 Display behavior is low risk.
+
+### `import_collection_variables_dialog.py` — ImportCollectionVariablesDialog
+
+| Principle | Rating | Notes |
+| --- | --- | --- |
+| SRP | OK | Manages preview, preset profile selection, and selective variable import |
+| OCP | OK | Delegates domain mutation to import_collection_variables_to_environment |
+| LSP | N/A | Inherits standard QDialog semantics |
+| ISP | OK | Clean parameter interfaces accepting target environment and collections |
+| DIP | Good | Pure domain synchronization separated from PySide6 presentation |
+
+**Maintainability:** Table preview cleanly decouples inspection from domain import engine.
+**Test coverage:** Direct coverage in `tests/test_workspace_environment_import_repro.py`.
 
 ### `library_dialogs.py` — GitCommitDialog, GitAuthDialog, GitCloneDialog
 
@@ -178,6 +192,7 @@ encryption/migration UI tests).
 | `about_dialog.py` | No | Manual/display-only |
 | `env_dialog.py` | Yes | E2E persistence |
 | `hotkeys_dialog.py` | No | Shared collector coverage |
+| `import_collection_variables_dialog.py` | Yes | Workspace environment import repro |
 | `library_dialogs.py` | Yes | Library presenter and manager tests |
 | `mcp_activity_dialog.py` | No | Presenter opens with activity data |
 | `mcp_servers_dialog.py` | Yes | Presenter and configuration mocks |
@@ -221,7 +236,7 @@ encryption/migration UI tests).
 
 ## Verdict
 
-Individual audit **complete** for all nine modules. No dialog-level **blockers** for closing
+Individual audit **complete** for all ten modules. No dialog-level **blockers** for closing
 PYPOST-374; findings are documented maintenance and test follow-ups. The primary maintenance
 focus is preserving the current settings-section boundaries and callback-injected MCP dialog
 design.

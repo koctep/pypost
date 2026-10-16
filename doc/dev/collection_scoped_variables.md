@@ -455,7 +455,7 @@ Epic [PYPOST-1407](https://pypost.atlassian.net/browse/PYPOST-1407) is partition
 flowchart TD
     COLVAR1["[x] PYPOST-1409 (COLVAR-1, 3 SP)<br/>Eliminate library variables & establish catalog manifest"]
     COLVAR2["[x] PYPOST-1410 (COLVAR-2, 5 SP)<br/>Standalone MCP server without workspace environment"]
-    COLVAR3["[ ] PYPOST-1411 (COLVAR-3, 3 SP)<br/>Workspace environment variable import action"]
+    COLVAR3["[x] PYPOST-1411 (COLVAR-3, 3 SP)<br/>Workspace environment variable import action"]
     COLVAR4["[ ] PYPOST-1412 (COLVAR-4, 3 SP)<br/>Integration test suite, compatibility matrix & dev docs"]
 
     COLVAR1 --> COLVAR2
@@ -468,7 +468,7 @@ flowchart TD
 | --- | --- | :---: | :---: | --- | --- |
 | [PYPOST-1409](https://pypost.atlassian.net/browse/PYPOST-1409) | `COLVAR-1` | 3 | **Completed** | Catalog manifest & collection authority | Deprecate manifest variables; update `LibraryManifest`, `LibraryVariableResolver`, and `LibraryRuntimeResolver`. |
 | [PYPOST-1410](https://pypost.atlassian.net/browse/PYPOST-1410) | `COLVAR-2` | 5 | **Completed** | Standalone MCP server execution | Optional `environment_id` in `McpServerConfiguration`; `_McpServerEditor` & `McpServersDialog` decoupling; standalone runtime resolution in `LibraryRuntimeResolver`; server registry preservation in `MCPServerRegistry`. |
-| [PYPOST-1411](https://pypost.atlassian.net/browse/PYPOST-1411) | `COLVAR-3` | 3 | Ready | Workspace variable import action | `EnvironmentVariablesWidget` import trigger; selection dialog; conflict resolution; secret masking. |
+| [PYPOST-1411](https://pypost.atlassian.net/browse/PYPOST-1411) | `COLVAR-3` | 3 | **Completed** | Workspace variable import action | `EnvironmentVariablesWidget` import trigger; selection dialog; conflict resolution; secret masking; [Workspace Environment Variable Import](workspace_environment_variable_import.md). |
 | [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412) | `COLVAR-4` | 3 | To Do | Integration tests & documentation | End-to-end test suite; legacy manifest compatibility matrix; user guide documentation updates. |
 
 ### Phased Roadmap
@@ -498,6 +498,14 @@ flowchart TD
   - Technical Debt Report: [`ai-tasks/PYPOST-1410/60-tech-debt.md`](file:///home/src/ai-tasks/PYPOST-1410/60-tech-debt.md)
   - Developer Documentation Report: [`ai-tasks/PYPOST-1410/70-dev-docs.md`](file:///home/src/ai-tasks/PYPOST-1410/70-dev-docs.md)
   - Automated Repro & Regression Tests: [`tests/test_mcp_standalone_execution_repro.py`](file:///home/src/tests/test_mcp_standalone_execution_repro.py)
+- **Workspace Variable Import Implementation Task**: [PYPOST-1411](https://pypost.atlassian.net/browse/PYPOST-1411)
+  - Requirements Document: [`ai-tasks/PYPOST-1411/10-requirements.md`](file:///home/src/ai-tasks/PYPOST-1411/10-requirements.md)
+  - Architecture Specification: [`ai-tasks/PYPOST-1411/20-architecture.md`](file:///home/src/ai-tasks/PYPOST-1411/20-architecture.md)
+  - Code Cleanup Report: [`ai-tasks/PYPOST-1411/40-code-cleanup.md`](file:///home/src/ai-tasks/PYPOST-1411/40-code-cleanup.md)
+  - Observability Report: [`ai-tasks/PYPOST-1411/50-observability.md`](file:///home/src/ai-tasks/PYPOST-1411/50-observability.md)
+  - Technical Debt Report: [`ai-tasks/PYPOST-1411/60-tech-debt.md`](file:///home/src/ai-tasks/PYPOST-1411/60-tech-debt.md)
+  - Developer Documentation: [`doc/dev/workspace_environment_variable_import.md`](file:///home/src/doc/dev/workspace_environment_variable_import.md)
+  - Automated Repro & Regression Tests: [`tests/test_workspace_environment_import_repro.py`](file:///home/src/tests/test_workspace_environment_import_repro.py)
 - **Related Developer Guides**:
   - [Library Manifest and Local Secrets Overlay Manager](library_manifest_and_overlay.md)
   - [Collection Format v2](collection_format_v2.md)
