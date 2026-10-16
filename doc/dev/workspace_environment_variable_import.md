@@ -43,15 +43,26 @@ The import workflow is structured into three distinct layers:
 
 ```mermaid
 flowchart TB
-    subgraph UI["UI Layer"]
+    subgraph UI["UI Layer (pypost.ui)"]
         EP["EnvPresenter<br/>(Wires collections & library service)"]
         ED["EnvironmentDialog<br/>(Dialog container)"]
         EVW["EnvironmentVariablesWidget<br/>('Import from Collection…' button)"]
-        ICD["ImportCollectionVariablesDialog<br/>(Preview table, preset & conflict UI)"]
+        ICD["ImportCollectionVariablesDialog<br/>(Preset selection, loading, & error UI)"]
+        CVTV["CollectionVariablesTableView<br/>(Virtualized view with compat facade)"]
+        CVTM["CollectionVariablesTableModel<br/>(O(1) virtualized data model)"]
+        CSD["ConflictStrategyDelegate<br/>(On-demand QComboBox cell editor)"]
+        CFW["CollectionFetchWorker<br/>(QThread remote catalog fetcher)"]
         
         EP --> ED
         ED --> EVW
         EVW -->|Opens on click| ICD
+        ICD -->|Manages| CVTV
+        ICD -->|Manages| CVTM
+        ICD -->|Spawns off-thread| CFW
+        CVTV -->|Renders via| CVTM
+        CVTV -->|Delegates Col 4| CSD
+        CSD -->|Commits strategy to| CVTM
+        CFW -->|Signals result to| ICD
     end
 
     subgraph Domain["Domain Engine (pypost.core)"]
@@ -212,7 +223,7 @@ Security is enforced at multiple layers:
 
 ---
 
-## UI Components & Integration
+## UI Components & Virtualized Architecture
 
 ### `EnvironmentVariablesWidget`
 
@@ -228,6 +239,8 @@ Located in `pypost/ui/widgets/environments/environment_variables_widget.py`:
   1. Opens modal `ImportCollectionVariablesDialog(target_environment=env, ...)`.
   2. If accepted (`QDialog.DialogCode.Accepted`), calls `self.load_environment(env)` to refresh the table.
   3. Displays an information box with `summary.format_summary()` if variables were imported.
+
+---
 
 ### `ImportCollectionVariablesDialog`
 
@@ -248,9 +261,6 @@ Located in `pypost/ui/dialogs/import_collection_variables_dialog.py`:
   - *Secret* (col 6): Secret flag (`Yes` or `No`).
   - *Status* (col 7): Collision status (`"Exists (Collision)"` if present in `environment.variables`, or `"New"`).
   - *Description* (col 8): Variable documentation / description string.
-- **Per-Row Conflict Strategy Resolution**:
-  - Each colliding variable can be independently configured to keep the existing environment value or overwrite with candidate value.
-  - User choices in the per-row dropdowns are preserved when switching preset profiles.
 - **Bulk Collision & Selection Controls**:
   - `Select All` / `Deselect All` buttons (`IMPORT_COLLECTION_SELECT_ALL_BUTTON`, `IMPORT_COLLECTION_DESELECT_ALL_BUTTON`).
   - `Keep All Collisions` button (`IMPORT_COLLECTION_BULK_KEEP_CURRENT_BUTTON`): sets all colliding row strategy combo boxes to `"Keep Current"`.
@@ -258,6 +268,141 @@ Located in `pypost/ui/dialogs/import_collection_variables_dialog.py`:
 - **Dynamic Preview Summary Label**:
   Shows real-time import preview reflecting active row selections and chosen strategies:
   `"{will_add} new to add, {will_overwrite} existing to overwrite, {will_keep} existing to keep"`.
+
+---
+
+### `CollectionVariablesTableModel(QAbstractTableModel)`
+
+Prior to [PYPOST-1415](https://pypost.atlassian.net/browse/PYPOST-1415), the import table allocated persistent `QTableWidgetItem` instances and individual `QComboBox` widgets across thousands of rows. This caused severe UI thread blocking (several seconds), high memory consumption, and sluggish scrolling.
+
+`CollectionVariablesTableModel` is a pure virtualized Qt table model that stores raw variable metadata in a lightweight list of dataclass records and evaluates cell representations on demand:
+
+```python
+@dataclass
+class CollectionVariableRowRecord:
+    name: str
+    current_display: str
+    candidate_display: str
+    raw_current: Any
+    raw_candidate: Any
+    var_default: Any
+    strategy: ConflictStrategy
+    var_type: str
+    is_collection_secret: bool
+    is_env_secret: bool
+    is_effective_secret: bool
+    is_collision: bool
+    status: str
+    description: str
+    is_selected: bool = True
+```
+
+#### Key Architecture & Characteristics
+
+1. **Zero Persistent Widget Allocation**:
+   Renders 10,000+ variables with zero persistent `QComboBox` or cell widget overhead.
+2. **$O(1)$ Cell Evaluation (`data()`)**:
+   Cell formatting, string coercion, and secret masking are computed once during model loading (`load_collection()`). Subsequent `data()` calls perform direct array index lookups in $O(1)$ time.
+3. **Dual-Source Secret Masking**:
+   During record generation, both collection declaration (`var.secret`) and target environment (`var.name in env.hidden_keys`) are checked. If either is true, `current_display` and `candidate_display` are masked with `HIDDEN_MASK` (`"********"`). Tooltips for sensitive cells are suppressed to prevent accidental disclosure via mouse hover.
+4. **Native Check State Handling**:
+   Column 0 (`COL_SELECT`) responds to `Qt.ItemDataRole.CheckStateRole`, returning `Qt.CheckState.Checked` or `Qt.CheckState.Unchecked` based on `rec.is_selected`. Toggling emits `selection_changed` without re-rendering unrelated cells.
+5. **High-Performance Bulk Operations**:
+   - `set_all_selected(selected: bool)`: Updates selection states in-memory and emits a single bounding `dataChanged(top_left, bottom_right, [CheckStateRole])` signal.
+   - `set_all_collision_strategy(strategy: ConflictStrategy)`: Updates strategy states in-memory and emits a single `dataChanged` across column 4. Completes across 1,000+ rows in <20ms.
+6. **In-Place Preset Switching**:
+   `update_preset(preset_name)` updates candidate values in place and emits a columnar `dataChanged` across `COL_CANDIDATE_VALUE` without clearing or recreating the model.
+
+---
+
+### `ConflictStrategyDelegate(QStyledItemDelegate)`
+
+`ConflictStrategyDelegate` manages on-demand strategy editing for column 4 (`COL_STRATEGY`):
+
+- **On-Demand Instantiation (`createEditor`)**:
+  When a user double-clicks or interacts with a colliding cell, `createEditor()` instantiates a single temporary `QComboBox` parented to the viewport.
+  - Non-colliding rows (`Status == "New"`) are marked non-editable via `flags()` and cannot open editors.
+  - Widget ID is bound dynamically: `set_widget_id(combo, f"{IMPORT_COLLECTION_ROW_STRATEGY_COMBO_PREFIX}{rec.name}")`.
+- **Commit & Teardown Lifecycle**:
+  - `combo.currentIndexChanged` triggers `commitAndCloseEditor()`.
+  - `commitAndCloseEditor()` emits `commitData(combo)` followed by `closeEditor(combo, NoHint)`.
+  - `setModelData()` maps the selected text (`"Keep Current"` or `"Overwrite"`) to `ConflictStrategy.SKIP` or `ConflictStrategy.OVERWRITE` and updates the model via `model.setData()`.
+  - Upon editor closure, the combobox widget is destroyed. Zero persistent widgets remain in memory.
+
+---
+
+### `CollectionVariablesTableView` (Backward-Compatibility Facade)
+
+To ensure backward compatibility with existing tests and integration code expecting `QTableWidget` APIs, `CollectionVariablesTableView` subclasses `QTableView` and exposes a facade layer:
+
+- **`.item(row, col) -> TableItemProxy`**:
+  Returns a lightweight proxy wrapping model coordinates that mimics `QTableWidgetItem`:
+  - `.text()` $\rightarrow$ queries `model.data(DisplayRole)`.
+  - `.setText(val)` $\rightarrow$ calls `model.setData(DisplayRole)`.
+  - `.checkState()` $\rightarrow$ queries `model.data(CheckStateRole)`.
+  - `.setCheckState(state)` $\rightarrow$ calls `model.setData(CheckStateRole)`.
+  - `.flags()` $\rightarrow$ queries `model.flags()`.
+- **`.cellWidget(row, col) -> QWidget | None`**:
+  For column 4 (`COL_STRATEGY`) on colliding rows, returns a cached, synchronized `QComboBox` widget. This allows automated tests expecting `cellWidget()` combobox interactions to inspect and trigger strategy selections without modification.
+- **`.rowCount() -> int` and `.columnCount() -> int`**:
+  Forwarded directly to underlying model counts.
+- **`.horizontalHeaderItem(col) -> HeaderItemProxy`**:
+  Returns a proxy exposing `.text()` derived from `model.headerData()`.
+- **Signal Forwarding**:
+  Listens to `model.dataChanged` and emits `itemChanged(proxy)` to support legacy event listeners.
+
+---
+
+### `CollectionFetchWorker(QThread)` & Background Remote Fetching
+
+Querying collection manifests from remote connected libraries can incur variable network latency. Running fetch operations on the Qt GUI thread risks freezing the application.
+
+`CollectionFetchWorker` moves remote library collection retrieval to a background `QThread`:
+
+```python
+class CollectionFetchWorker(QThread):
+    fetch_completed = Signal(object, int)  # (Collection, generation_id)
+    fetch_failed = Signal(Exception, int)   # (Exception, generation_id)
+```
+
+#### Off-Thread Retrieval Workflow
+
+1. When a library collection is selected, `_start_fetch_remote_collection(conn_id, path)` starts a new `CollectionFetchWorker`.
+2. The worker calls `library_service.read_collection(conn_id, path)` off-thread.
+3. Upon completion or failure, the worker emits `fetch_completed` or `fetch_failed` alongside its `generation_id`.
+
+#### Race Protection via Monotonic Generation Counter (`_fetch_generation`)
+
+If a user rapidly changes the collection dropdown or triggers multiple requests, responses may return out of order. To prevent race conditions:
+
+- `ImportCollectionVariablesDialog` maintains a monotonic counter `self._fetch_generation: int`.
+- Every new fetch request, cancellation, or reset increments `_fetch_generation`.
+- When `_on_fetch_completed` or `_on_fetch_failed` fires, the incoming `gen` is checked against `self._fetch_generation`.
+- If `gen != self._fetch_generation`, the response is recognized as stale, safely discarded, and logged with `collection_variable_remote_fetch_stale_discarded`.
+
+#### Worker Cancellation
+
+- When a new collection is selected or the user clicks "Cancel", `self._active_fetch_worker.cancel()` is called.
+- `cancel()` sets `_cancelled = True` and calls `self.requestInterruption()`.
+- The worker checks interruption status before emitting signals; cancelled workers do not emit completion or failure events.
+
+---
+
+### Non-Modal Error Handling and Retry Mechanisms
+
+Previous dialog workflows relied on modal error message boxes (`QMessageBox.critical`) that blocked execution and disrupted user focus. PYPOST-1415 introduces non-modal inline status containers:
+
+1. **Inline Loading UI (`loading_container`)**:
+   - Contains `loading_label` ("Loading collection from library...") and `cancel_loading_btn`.
+   - Shown during active background fetches.
+   - Disables the `Import` button, preset dropdown, and variable table to prevent invalid interactions while keeping the Cancel button active.
+2. **Inline Error UI (`error_container`)**:
+   - Contains `error_label` (styled in red with error message) and `retry_fetch_btn`.
+   - Displayed non-modally when remote collection fetching fails (network timeout, invalid manifest, connection error).
+   - Keeps the dialog open and interactive. The user can switch to another collection or click "Retry".
+3. **Retry Mechanism (`_on_retry_fetch`)**:
+   - Clicking `retry_fetch_btn` immediately invokes `_start_fetch_remote_collection()` for the currently selected library collection under a new generation ID.
+   - If the user changes the dropdown selection or cancels, the error container is automatically hidden and reset.
 
 ---
 
@@ -279,6 +424,22 @@ The subsystem emits structured log events conforming to the repository logging p
 | `collection_variable_import_table_populated` | DEBUG | `env_name`, `collection_name`, `total_vars`, `collisions` | Diff table populated |
 | `collection_variable_import_row_strategy_changed` | DEBUG | `env_name`, `key`, `strategy` | User modified individual row strategy |
 | `collection_variable_import_bulk_strategy_applied` | INFO | `env_name`, `strategy`, `count` | Bulk collision action triggered |
+| `collection_variable_fetch_worker_started` | DEBUG | `generation_id`, `connection_id`, `path` | Background worker thread started |
+| `collection_variable_fetch_worker_completed` | DEBUG | `generation_id` | Worker fetched collection successfully |
+| `collection_variable_fetch_worker_failed` | WARNING | `generation_id`, `error` | Worker encountered fetch error |
+| `collection_variable_fetch_worker_cancelled` | DEBUG | `generation_id`, `connection_id` | Worker cancel method invoked |
+| `collection_variable_fetch_worker_interrupted` | DEBUG | `generation_id` | Worker aborted due to interruption |
+| `collection_variable_remote_fetch_started` | INFO | `connection_id`, `path`, `gen` | UI initiated background fetch |
+| `collection_variable_remote_fetch_completed` | INFO | `gen`, `collection_name`, `vars_count` | Remote fetch finished and loaded |
+| `collection_variable_remote_fetch_failed` | ERROR | `gen`, `error` | Remote fetch failed |
+| `collection_variable_remote_fetch_cancelled` | INFO | `gen` | User cancelled active fetch |
+| `collection_variable_remote_fetch_retry_requested` | INFO | `env_name` | User clicked Retry button |
+| `collection_variable_remote_fetch_stale_discarded` | WARNING | `gen`, `current_gen` | Stale completed fetch dropped |
+| `collection_variable_remote_fetch_error_stale_discarded` | WARNING | `gen`, `current_gen`, `error` | Stale error response dropped |
+| `collection_variables_table_model_loaded` | DEBUG | `collection_name`, `row_count`, `collisions`, `preset` | Model loaded collection records |
+| `collection_variables_table_model_strategy_changed` | DEBUG | `row`, `var_name`, `strategy` | Model updated row strategy |
+| `collection_variables_table_model_bulk_strategy_set` | DEBUG | `strategy`, `affected_rows`, `total_rows` | Bulk strategy applied in model |
+| `conflict_strategy_delegate_committed` | DEBUG | `row`, `strategy` | Delegate committed combo choice |
 
 ---
 
@@ -298,6 +459,9 @@ The subsystem emits structured log events conforming to the repository logging p
 - **Can I import variables from an external connected library?**
   Yes. The Source Collection dropdown automatically queries connected libraries via `LibraryManagerService`.
   Selecting a library collection loads its parsed variables without copying the collection to your workspace.
+- **What happens if a remote library fetch fails?**
+  An inline error message with a "Retry" button is displayed in the dialog without blocking popups. You can click "Retry"
+  to attempt fetching again or select another collection from the dropdown.
 
 ---
 
@@ -305,6 +469,13 @@ The subsystem emits structured log events conforming to the repository logging p
 
 Automated test coverage is maintained in:
 
+- `tests/test_variable_import_virtualization_repro.py`:
+  - **Zero-Widget Scaling**: Asserts zero persistent cell widgets across 1,000+ variables, verifying virtualized memory and rendering scaling.
+  - **Background Collection Fetching**: Verifies `CollectionFetchWorker` executes off-thread without freezing the UI, showing the loading container and cancel button.
+  - **Monotonic Generation Counter Race Protection**: Validates that slow or out-of-order responses from superseded fetch operations are safely discarded without overwriting active view state.
+  - **Non-Modal Error Handling & Retry**: Validates inline error container display on library fetch failure and verifies retry button triggers a new background worker.
+  - **Bulk Conflict Performance**: Benchmarks bulk strategy updates (`Keep All Collisions`, `Overwrite All Collisions`) completing across 1,000+ variables in sub-20ms.
+  - **Backward-Compatibility Facade**: Verifies `CollectionVariablesTableView` compatibility methods (`.item()`, `.cellWidget()`, `.rowCount()`, `.columnCount()`, `.horizontalHeaderItem()`, `itemChanged` signal).
 - `tests/test_workspace_environment_import_diff_repro.py`:
   - Domain engine per-variable conflict strategy resolution (`variable_conflict_strategies`) and fallback precedence.
   - UI 9-column side-by-side diff table layout and header verification.
@@ -327,3 +498,4 @@ Run test suite via Make:
 ```bash
 make test
 ```
+
