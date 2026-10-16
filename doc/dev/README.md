@@ -128,6 +128,7 @@ conventions.
 1. [Multiple independent MCP servers (PYPOST-1044)](mcp_server_registry.md)
 1. [Standalone MCP Server Configuration and Execution (PYPOST-1410)](collection_scoped_variables.md#standalone-mcp-server-configuration-and-execution-pypost-1410)
 1. [Standalone MCP Server Live Wire IPC & Stdio Transport Stress Testing (PYPOST-1416)](mcp_standalone_wire_ipc_stress.md)
+1. [Concurrent Multi-Server Lifecycle Execution and Port Contention (PYPOST-1418)](mcp_concurrent_multiserver.md)
 1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
 1. [Jira numeric identifier MCP contract (PYPOST-1038)](mcp_integration.md#jira-numeric-path-identifiers-pypost-1038)
 1. [Optional MCP parameter defaults (PYPOST-1054)](mcp_integration.md#optional-mcp-parameter-defaults-pypost-1054)
@@ -188,6 +189,7 @@ conventions.
 1. [Agent E2E Presentation Matrix (PYPOST-890)](agent_e2e_presentation_matrix.md)
 1. [Scripted WebSocket Test Server and Fixture (PYPOST-1129)](websocket_test_harness.md)
 1. [Reusable Collection Integration Test Harness (PYPOST-1417)](collection_integration_harness.md)
+1. [Concurrent Multi-Server Lifecycle Execution and Port Contention Testing (PYPOST-1418)](mcp_concurrent_multiserver.md)
 1. [Metric Rename Migration (PYPOST-443)](metric_rename_migration.md)
 1. [Code Folding Stress and Edge-Case Payload Test Suite (PYPOST-1365 / PYPOST-1371)](folding_stress_and_edge_cases.md)
 
