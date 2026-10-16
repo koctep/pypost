@@ -340,8 +340,11 @@ for the metric contract.
 | A library discovery result is missing | Check whether the dialog was cancelled or the source/library changed while the worker was running. Cancelled or stale results are discarded; start discovery again. |
 | Library variables are unavailable at runtime | Supply required values through the selected profile, local override, or local secret field. Secret values are masked in the UI and stored only in the local overlay. |
 
+For comprehensive multi-server concurrency, variable isolation, hot reload, and port contention contracts, see [Concurrent Multi-Server Lifecycle Execution and Port Contention](mcp_concurrent_multiserver.md).
+
 Run the focused checks after changing this subsystem:
 
 ```bash
-make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py'
+make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py'
 ```
+
