@@ -427,6 +427,47 @@ def _venv_ready(venv: Path) -> bool:
     return (venv / MARKER_NAME).is_file() and (venv / "bin" / "python").is_file()
 
 
+def _build_skeleton(venv_dir: Path, skeleton_dir: Path) -> None:
+    """Construct lightweight materialization template from base venv."""
+    if skeleton_dir.exists():
+        shutil.rmtree(skeleton_dir)
+    tmp_skeleton = skeleton_dir.with_name(f"{skeleton_dir.name}.tmp")
+    if tmp_skeleton.exists():
+        shutil.rmtree(tmp_skeleton)
+    try:
+        tmp_skeleton.mkdir(parents=True, exist_ok=True)
+        cfg_src = venv_dir / "pyvenv.cfg"
+        if cfg_src.is_file():
+            shutil.copy2(cfg_src, tmp_skeleton / "pyvenv.cfg")
+        else:
+            (tmp_skeleton / "pyvenv.cfg").write_text("home = /usr/bin\n", encoding="utf-8")
+
+        bin_dir = tmp_skeleton / "bin"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        base_bin = venv_dir / "bin"
+        if base_bin.is_dir():
+            for item in base_bin.iterdir():
+                (bin_dir / item.name).symlink_to(item)
+
+        site_packages = (
+            tmp_skeleton / "lib" / f"python{PYTHON_VERSION}" / "site-packages"
+        )
+        site_packages.mkdir(parents=True, exist_ok=True)
+        base_site_packages = (
+            venv_dir / "lib" / f"python{PYTHON_VERSION}" / "site-packages"
+        )
+        (site_packages / "_prewarmed_base.pth").write_text(
+            f"{base_site_packages}\n", encoding="utf-8",
+        )
+        (tmp_skeleton / MARKER_NAME).touch()
+        if skeleton_dir.exists():
+            shutil.rmtree(skeleton_dir)
+        tmp_skeleton.replace(skeleton_dir)
+    finally:
+        if tmp_skeleton.exists():
+            shutil.rmtree(tmp_skeleton)
+
+
 def _get_shared_base_venv(*, preparation_budget: float = 20) -> Path:
     """Publish readiness after one bounded, serialized and validated bootstrap."""
     global _SHARED_BASE_VENV
@@ -436,8 +477,9 @@ def _get_shared_base_venv(*, preparation_budget: float = 20) -> Path:
     _SHARED_BASE_VENV = None
     base_dir = Path(tempfile.gettempdir()) / f"pypost_shared_base_venv_{PYTHON_VERSION}"
     venv_dir = base_dir / ".venv"
+    skeleton_dir = base_dir / ".skeleton"
     marker = venv_dir / MARKER_NAME
-    if _venv_ready(venv_dir):
+    if _venv_ready(venv_dir) and _venv_ready(skeleton_dir):
         _SHARED_BASE_VENV = venv_dir
         return _SHARED_BASE_VENV
     lock_file = base_dir.with_suffix(".lock")
@@ -466,6 +508,8 @@ def _get_shared_base_venv(*, preparation_budget: float = 20) -> Path:
             if not _venv_ready(venv_dir):
                 if venv_dir.exists():
                     shutil.rmtree(venv_dir)
+                if skeleton_dir.exists():
+                    shutil.rmtree(skeleton_dir)
                 base_dir.mkdir(parents=True, exist_ok=True)
                 commands = [
                     ("creation", [sys.executable, "-m", "venv", str(venv_dir)]),
@@ -489,6 +533,8 @@ def _get_shared_base_venv(*, preparation_budget: float = 20) -> Path:
                 if not (venv_dir / "bin" / "python").is_file():
                     raise RuntimeError(f"shared venv validation missing interpreter: {venv_dir}")
                 marker.touch()
+            if not _venv_ready(skeleton_dir):
+                _build_skeleton(venv_dir, skeleton_dir)
         finally:
             fcntl.flock(lock, fcntl.LOCK_UN)
     _SHARED_BASE_VENV = venv_dir
@@ -502,9 +548,11 @@ def _materialize_prewarmed_venv(ws: Path) -> None:
         return
     if target.exists():
         shutil.rmtree(target)
+    skeleton = base.parent / ".skeleton"
+    source = skeleton if _venv_ready(skeleton) else base
     try:
         _run_preparation_command(
-            ["cp", "-al", str(base), str(target)], timeout=20, cleanup_budget=1,
+            ["cp", "-a", str(source), str(target)], timeout=20, cleanup_budget=1,
         )
     except (subprocess.SubprocessError, OSError) as error:
         if target.exists():

@@ -320,3 +320,105 @@ def test_parallel_consumers_wait_for_one_builder_and_receive_ready_workspaces(
                 assert not process.is_alive()
         results.close()
         commands.close()
+
+
+def _load_materialize_worker(
+    worker_id: int,
+    workspace: Path,
+    barrier: Any,
+    results_queue: Any,
+) -> None:
+    try:
+        barrier.wait(timeout=10)
+        start_time = time.monotonic()
+        helpers._materialize_prewarmed_venv(workspace)
+        duration = time.monotonic() - start_time
+        results_queue.put((worker_id, duration, None))
+    except Exception as exc:
+        results_queue.put((worker_id, None, repr(exc)))
+
+
+@pytest.mark.timeout(60)
+def test_parallel_workspace_materialization_under_load_budget(tmp_path: Path) -> None:
+    """Parallel workspace materialization under load must complete within the 5s budget (NFR1)."""
+    base = helpers._get_shared_base_venv()
+    assert helpers._venv_ready(base)
+
+    worker_count = 4
+    workspaces = [tmp_path / f"worker_{i}" for i in range(worker_count)]
+    for ws in workspaces:
+        ws.mkdir()
+
+    ctx = multiprocessing.get_context("fork")
+    barrier = ctx.Barrier(worker_count)
+    results_queue = ctx.Queue()
+
+    processes = [
+        ctx.Process(
+            target=_load_materialize_worker,
+            args=(i, workspaces[i], barrier, results_queue),
+        )
+        for i in range(worker_count)
+    ]
+    try:
+        for p in processes:
+            p.start()
+
+        results: list[tuple[int, float | None, str | None]] = []
+        deadline = time.monotonic() + 35
+        while len(results) < worker_count and time.monotonic() < deadline:
+            try:
+                results.append(
+                    results_queue.get(timeout=max(0.1, deadline - time.monotonic()))
+                )
+            except queue.Empty:
+                break
+
+        assert len(results) == worker_count, (
+            f"Expected {worker_count} worker results, but only got {len(results)}. "
+            "Workers timed out or stalled under load."
+        )
+
+        # Check for errors in workers (e.g. materialization timeout after 20s)
+        for worker_id, duration, err in results:
+            assert err is None, f"Worker {worker_id} failed during materialization: {err}"
+
+        # Assert NFR1 budget: workspace materialization must complete in under 5.0 seconds
+        for worker_id, duration, err in results:
+            assert duration is not None and duration <= 5.0, (
+                f"Worker {worker_id} materialization took {duration:.2f}s, exceeding 5.0s budget"
+            )
+
+        # Verify all materialized venvs are ready and functional
+        for ws in workspaces:
+            target_venv = ws / ".venv"
+            assert helpers._venv_ready(target_venv), f"Venv not ready in {ws}"
+            proc = subprocess.run(
+                [
+                    str(target_venv / "bin" / "python"),
+                    "-c",
+                    "import pytest, flake8; print('ready')",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=True,
+            )
+            assert proc.stdout.strip() == "ready"
+
+        # Verify workspace isolation: mutations in one workspace do not leak
+        marker_file = workspaces[0] / ".venv" / "isolation_check.marker"
+        marker_file.touch()
+        for ws in workspaces[1:]:
+            assert not (ws / ".venv" / "isolation_check.marker").exists()
+        assert not (base / "isolation_check.marker").exists()
+
+    finally:
+        for p in processes:
+            if p.pid is not None:
+                p.join(timeout=2)
+                if p.is_alive():
+                    p.terminate()
+                    p.join(timeout=2)
+                assert not p.is_alive()
+        results_queue.close()
