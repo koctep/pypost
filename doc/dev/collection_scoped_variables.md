@@ -4,7 +4,7 @@
 
 As part of parent epic [PYPOST-1407](https://pypost.atlassian.net/browse/PYPOST-1407) (*Collection-scoped variables for standalone MCP servers and workspace collection import*) and architectural decomposition [PYPOST-1408](https://pypost.atlassian.net/browse/PYPOST-1408), this document details the architectural evolution from hybrid library-level variable management to self-contained collection-scoped variables.
 
-With the completed implementation of [PYPOST-1409](https://pypost.atlassian.net/browse/PYPOST-1409) (*Eliminate library-level variables and establish collection-scoped variables and catalog manifest*) and [PYPOST-1410](https://pypost.atlassian.net/browse/PYPOST-1410) (*Standalone MCP server configuration and execution without workspace environment*), the collection library system transitions to a clean, catalog-only model where each [`Collection`](file:///home/src/pypost/models/models.py) serves as the authoritative single source of truth for its variable declarations and environment presets, and MCP servers execute standalone without requiring phantom workspace environments.
+With the completed implementation of [PYPOST-1409](https://pypost.atlassian.net/browse/PYPOST-1409) (*Eliminate library-level variables and establish collection-scoped variables and catalog manifest*), [PYPOST-1410](https://pypost.atlassian.net/browse/PYPOST-1410) (*Standalone MCP server configuration and execution without workspace environment*), [PYPOST-1411](https://pypost.atlassian.net/browse/PYPOST-1411) (*Workspace environment variable import action from collections*), and [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412) (*Integration test suite, compatibility matrix, and developer documentation*), the collection library system transitions to a clean, catalog-only model where each [`Collection`](file:///home/src/pypost/models/models.py) serves as the authoritative single source of truth for its variable declarations and environment presets, MCP servers execute standalone without requiring phantom workspace environments, and collections copied to user workspaces seamlessly synchronize variables into workspace environments.
 
 In the legacy design, collection libraries declared variable schemas and preset profiles at the overall library manifest level (`manifest.variables` and `manifest.presets`). While functional for single-collection repositories, this design introduced significant architectural drawbacks:
 1. **Global Variable Pollution**: Unrelated collections within a single library (such as Jira, GitLab, and GitHub MCP servers) pooled their variables into a unified namespace, creating naming conflicts and cognitive overhead.
@@ -47,13 +47,21 @@ flowchart TB
         MSD --> MSC
     end
 
-    subgraph WorkspaceLayer["4. Workspace Environment Subsystem (PYPOST-1411)"]
+    subgraph WorkspaceLayer["4. Workspace Environment Subsystem (PYPOST-1411 - COMPLETED)"]
         ENV["Environment<br/>variables{}, hidden_keys{}"]
         EVW["EnvironmentVariablesWidget<br/>('Import from Collection' Action)"]
         ICD["ImportCollectionVariablesDialog<br/>(Conflict Resolution: Overwrite / Skip)"]
         COL -.->|import variables| ICD
         ICD -->|merge & apply| EVW
         EVW --> ENV
+    end
+
+    subgraph ExecutionLayer["5. Request Templating & Integration Verification (PYPOST-1412 - COMPLETED)"]
+        TS["TemplateService<br/>(Resolves {{var}} in URLs, headers, bodies)"]
+        HNS["CollectionVariablesIntegrationHarness<br/>(End-to-End Lifecycle & Compatibility Suite)"]
+        ENV --> TS
+        COL --> TS
+        TS --> HNS
     end
 ```
 
@@ -429,21 +437,189 @@ sequenceDiagram
 
 ---
 
-## Backward Compatibility & Migration Strategy
+## End-to-End Integration Architecture & Unified Lifecycle (PYPOST-1412)
 
-To ensure seamless operation across existing repositories and saved state, the system adheres to strict compatibility rules:
+With the completion of [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412) (COLVAR-4), all four components of epic [PYPOST-1407](https://pypost.atlassian.net/browse/PYPOST-1407) operate as a cohesive, end-to-end integration pipeline connecting catalog discovery, standalone MCP execution, workspace variable synchronization, and template substitution.
 
-1. **Legacy Manifest Ingestion**:
-   - Manifests containing root `variables` or `presets` are accepted without error.
-   - Non-fatal structured warning logs (`legacy_manifest_variables_detected`, `legacy_manifest_presets_detected`) and `DeprecationWarning` exceptions are emitted.
-   - Deserialization continues to succeed, and resolvers use collection-scoped variables primarily, falling back to legacy manifest variables only if undefined in the collection.
-2. **Catalog Serialization Cleanliness**:
-   - Serializing a `LibraryManifest` with empty `variables` or `presets` strips those fields from the output dictionary, generating clean catalog files.
-3. **Existing Workspace Environments**:
-   - Workspace collections that explicitly link to workspace environments continue to operate without regression.
-   - Standalone execution is opt-in for library collections where `environment_id is None`.
-4. **Data Integrity**:
-   - Adding collection-scoped variables or importing them into environments does not alter existing request definitions, authentication headers, or script bindings.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer / QA
+    participant LibMgr as LibraryManagerService
+    participant Resolver as LibraryRuntimeResolver
+    participant Registry as MCPServerRegistry
+    participant Storage as StorageManager
+    participant Importer as CollectionVariableImport
+    participant Template as TemplateService
+
+    Note over LibMgr: 1. Catalog Discovery & Ingestion
+    Dev->>LibMgr: Connect library with catalog manifest (pypost-library.json)
+    LibMgr->>LibMgr: Parse catalog manifest & register collections
+
+    Note over Resolver,Registry: 2. Standalone MCP Server Execution
+    Dev->>Registry: Configure standalone server (environment_id=None, active_profile="staging")
+    Registry->>Resolver: resolve(selection, environment_id=None)
+    Resolver->>Resolver: Resolve collection defaults + preset profile + local overlay secrets
+    Resolver-->>Registry: RuntimeInputs(environment_id=None, environment=effective_env, hidden_keys=secrets)
+    Registry->>Registry: Launch standalone MCP server process (zero workspace env dependency)
+
+    Note over Storage,Importer: 3. Workspace Collection Copy & Variable Import
+    Dev->>Storage: Copy collection into user workspace
+    Dev->>Importer: import_collection_variables_to_environment(env, collection, ConflictStrategy.OVERWRITE)
+    Importer->>Importer: Evaluate collection defaults & active preset profile
+    Importer->>Importer: Apply conflict resolution policy (Skip vs Overwrite)
+    Importer->>Importer: Map secret=True variables to env.hidden_keys
+    Importer-->>Dev: ImportSummary(imported_count=N, updated_count=M, newly_hidden_keys=[...])
+
+    Note over Template: 4. Request Template Variable Substitution
+    Dev->>Template: render_string(request.url, context=env.variables)
+    Dev->>Template: render_string(request.headers["Authorization"], context=env.variables)
+    Dev->>Template: render_string(request.body, context=env.variables)
+    Template-->>Dev: Fully interpolated HTTP request ready for execution
+```
+
+### Integrated Subsystem Interactions
+
+1. **Catalog Discovery ([`LibraryManagerService`](file:///home/src/pypost/core/library_manager_service.py))**:
+   - Discovers and loads `pypost-library.json` (or `.yaml`) catalog files.
+   - Treats catalog manifests purely as collection indices, decoupling collection schemas from root manifest structures.
+2. **Standalone MCP Execution ([`MCPServerRegistry`](file:///home/src/pypost/core/mcp_server_registry.py))**:
+   - Runs MCP server processes with `environment_id=None`.
+   - Uses [`LibraryRuntimeResolver`](file:///home/src/pypost/core/library_runtime_resolver.py) and [`LibraryVariableResolver`](file:///home/src/pypost/core/variable_resolver.py) to resolve runtime inputs directly from self-contained collection presets and local overlays (`~/.pypost/libraries_data/<library_id>/overlay.json`).
+3. **Workspace Environment Import ([`import_collection_variables_to_environment`](file:///home/src/pypost/core/collection_variable_import.py))**:
+   - Imports declared collection variables directly into workspace environments without altering existing request definitions.
+   - Enforces conflict resolution policies ([`ConflictStrategy.SKIP`](file:///home/src/pypost/core/collection_variable_import.py) or [`ConflictStrategy.OVERWRITE`](file:///home/src/pypost/core/collection_variable_import.py)).
+   - Automatically populates `Environment.hidden_keys` for all variables with `secret=True`.
+4. **Template Substitution ([`TemplateService`](file:///home/src/pypost/core/template_service.py))**:
+   - Resolves mustache-style `{{ variable }}` expressions across request URLs, authentication headers, and JSON/YAML/text payloads using the synchronized environment variables.
+
+---
+
+## 4-Quadrant Backward Compatibility Matrix & Migration Strategy
+
+To guarantee seamless backward compatibility across existing libraries and collections created in earlier PyPost iterations, the resolution engine and catalog deserializer adhere to a formal 4-quadrant compatibility contract.
+
+### 1. 4-Quadrant Compatibility Matrix
+
+| Matrix Quadrant | Manifest Format | Collection Format | Resolution Behavior | Provenance & Precedence | Deprecation Notice | Operational Status |
+| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Q1** | **Modern Catalog Manifest (v2)**<br/>`version: "2.0.0"`<br/>Pure catalog index (no root `variables`/`presets`) | **Modern Collection (v2)**<br/>Self-contained `variables[]` & `presets{}` | Collection variables and presets resolve 100% autonomously. | `DEFAULT` (Collection) → `PROFILE` (Collection) → `LOCAL_OVERLAY` | None (Clean modern operation). | **Supported (Golden Standard)** |
+| **Q2** | **Legacy Library Manifest (v1)**<br/>`version: "1.0.0"`<br/>Declares root `variables[]` & `presets{}` | **Modern Collection (v2)**<br/>Self-contained `variables[]` & `presets{}` | Collection variables take precedence for all defined keys. Legacy manifest variables serve as fallback for un-declared keys. | `DEFAULT` (Collection wins over Manifest) → `PROFILE` (Collection wins over Manifest) → `LOCAL_OVERLAY` | `DeprecationWarning` & `logger.warning("legacy_manifest_variables_detected")` | **Supported (Backward Compatible)** |
+| **Q3** | **Legacy Library Manifest (v1)**<br/>`version: "1.0.0"`<br/>Declares root `variables[]` & `presets{}` | **Legacy Collection (v1)**<br/>Empty `variables: []` & `presets: {}` | Legacy manifest root variables and presets resolve as fallback defaults for the collection. | `DEFAULT` (Manifest fallback) → `PROFILE` (Manifest fallback) → `LOCAL_OVERLAY` | `DeprecationWarning` & `logger.warning("legacy_manifest_variables_detected")` | **Supported (Backward Compatible)** |
+| **Q4** | **Modern Catalog Manifest (v2)**<br/>`version: "2.0.0"`<br/>Pure catalog index | **Legacy Collection (v1)**<br/>Empty `variables: []` & `presets: {}` | No variables resolved (empty variable dictionary). Collection defaults empty. Required variable checks fail gracefully with diagnostic error. | Empty resolution (`{}`) | None (Empty manifest). | **Supported (Degraded / Empty defaults)** |
+
+### 2. Precedence Resolution Hierarchy & Degraded Fallback
+
+Effective variable values are evaluated by [`LibraryVariableResolver`](file:///home/src/pypost/core/variable_resolver.py) in ascending order of priority:
+
+1. **Tier 1 (Base Defaults)**:
+   - Primary: Values declared in `collection.variables` (`var.default`), assigned [`VariableProvenance.DEFAULT`](file:///home/src/pypost/models/library_manifest.py).
+   - Fallback (Q2 & Q3): Values declared in `manifest.variables` are used **only if the key is not defined in `collection.variables`**.
+2. **Tier 2 (Active Preset Profile)**:
+   - Evaluated when an active profile is requested (`active_profile` argument or `overlay.active_profile`).
+   - Primary: Preset values declared in `collection.presets[profile_name]`, assigned [`VariableProvenance.PROFILE`](file:///home/src/pypost/models/library_manifest.py).
+   - Fallback (Q2 & Q3): Values in `manifest.presets[profile_name]` are applied **only for keys omitted from the collection preset**.
+3. **Tier 3 (Local Overlay - Highest Priority)**:
+   - Evaluated from [`LocalLibraryOverlay`](file:///home/src/pypost/models/library_manifest.py) on the local machine (`~/.pypost/libraries_data/<library_id>/overlay.json`).
+   - `overlay.overrides` applied with [`VariableProvenance.LOCAL_OVERRIDE`](file:///home/src/pypost/models/library_manifest.py).
+   - `overlay.secrets` applied with [`VariableProvenance.LOCAL_SECRET`](file:///home/src/pypost/models/library_manifest.py).
+
+### 3. Mixed Multi-Tool Library Support
+
+Libraries often bundle multiple distinct MCP tools (e.g. Jira, GitHub, and GitLab) within a single repository:
+- **Namespace Isolation**: [`LibraryVariableResolver`](file:///home/src/pypost/core/variable_resolver.py) uses prefix matching (`collection_prefixes` vs `other_collection_prefixes`) via `is_other_collection_var()`. Sibling collection variables (e.g. `github.api_key` when resolving Jira) are excluded, preventing cross-tool variable leakage.
+- **Heterogeneous Collections**: A single library catalog can reference both Modern (v2) and Legacy (v1) collections. Modern collections resolve self-contained variables independently, while legacy sibling collections leverage manifest fallback without mutual interference.
+
+### 4. Migration Blueprint for Library Maintainers
+
+To migrate legacy v1 library manifests to modern v2 catalog manifests:
+1. **Relocate Variable Declarations**: Copy `manifest.variables` into the target `collection.json` under `variables: List[CollectionVariable]`.
+2. **Relocate Preset Profiles**: Copy `manifest.presets` into the target `collection.json` under `presets: Dict[str, Dict[str, Any]]`.
+3. **Cleanse Catalog Manifest**: Remove top-level `variables` and `presets` fields from `pypost-library.json` (or `.yaml`), and set `version: "2.0.0"`. Deserialization via [`serialize_manifest_to_dict`](file:///home/src/pypost/core/library_manifest.py) automatically strips empty variable and preset fields.
+
+---
+
+## Secret Safety, Diagnostic Redaction, and Missing Variable Contracts
+
+The integration architecture establishes strict security and diagnostic boundaries to ensure secrets remain safe across all operational flows:
+
+### 1. Unified Secret Masking Boundaries
+
+Sensitive credentials are automatically masked across all layers:
+- **Declared Collection Secrets**: Any variable declared with `secret=True` on [`CollectionVariable`](file:///home/src/pypost/models/collection_variable.py).
+- **Legacy Manifest Secrets**: Any fallback variable with `secret=True` on [`LibraryManifest`](file:///home/src/pypost/models/library_manifest.py).
+- **Machine-Local Overlay Secrets**: All keys defined in `LocalLibraryOverlay.secrets`.
+- **Workspace Environment Hidden Keys**: Any variable tracked in `Environment.hidden_keys`.
+
+When a collection is imported into a workspace environment via [`import_collection_variables_to_environment`](file:///home/src/pypost/core/collection_variable_import.py), all variables marked `secret=True` are automatically added to `target_environment.hidden_keys`, guaranteeing masking in UI tables and secure encryption at rest via the secure storage manager.
+
+### 2. Zero Plaintext Redaction Contract
+
+Secrets are strictly protected from accidental exposure in failure paths:
+- **Validation Errors**: [`LibraryVariableResolver`](file:///home/src/pypost/core/variable_resolver.py) masks secret values as `[REDACTED]` in validation error messages.
+- **Structured Logs**: Log statements across [`LibraryRuntimeResolver`](file:///home/src/pypost/core/library_runtime_resolver.py) and [`MCPServerRegistry`](file:///home/src/pypost/core/mcp_server_registry.py) omit raw secret payloads.
+- **Import Summaries**: The `format_summary()` method of [`ImportSummary`](file:///home/src/pypost/core/collection_variable_import.py) reports only counts and masked key names, never plaintext values.
+
+### 3. Missing Variable Diagnostic Handling
+
+The runtime resolution engine distinguishes between non-secret and secret missing variables:
+- **Missing Non-Secret Required Variables**: If a required non-secret variable has no default value and is not supplied in presets or overlays, [`LibraryRuntimeResolver.resolve`](file:///home/src/pypost/core/library_runtime_resolver.py) immediately raises a fatal diagnostic error:
+  ```python
+  ValueError("profile_invalid: required library variables are missing: ['missing_host']")
+  ```
+- **Missing Secret Required Variables**: Missing secret variables are gracefully tolerated during initial MCP server registration and catalog inspection. This allows headless initialization, automated catalog tests, and UI inspection routines to register MCP servers before a user has configured local secret overrides in [`LocalLibraryOverlay`](file:///home/src/pypost/models/library_manifest.py).
+
+---
+
+## Integration Test Harness Architecture (`CollectionVariablesIntegrationHarness`)
+
+Automated end-to-end integration and compatibility matrix verification is encapsulated in [`CollectionVariablesIntegrationHarness`](file:///home/src/tests/test_collection_scoped_variables_integration.py) under `tests/test_collection_scoped_variables_integration.py`.
+
+```mermaid
+flowchart TD
+    HARNESS["CollectionVariablesIntegrationHarness(tmp_path)"]
+    LMS["LibraryManagerService"]
+    REG["MCPServerRegistry"]
+    LRR["LibraryRuntimeResolver"]
+    SM["StorageManager"]
+    TS["TemplateService"]
+    OM["LocalOverlayManager"]
+
+    HARNESS --> LMS
+    HARNESS --> REG
+    HARNESS --> LRR
+    HARNESS --> SM
+    HARNESS --> TS
+    HARNESS --> OM
+
+    subgraph Operations["Harness Operations"]
+        CL["create_library()<br/>(Catalog vs Legacy Manifest)"]
+        CE["create_workspace_environment()<br/>(Isolated Environment)"]
+        RL["run_unified_lifecycle()<br/>(Discovery -> MCP -> Import -> Template)"]
+    end
+
+    HARNESS -.-> Operations
+```
+
+### Core Harness Methods
+
+1. **`create_library(manifest_id, is_legacy_manifest, collections_data, manifest_variables, manifest_presets) -> Path`**:
+   - Synthesizes an isolated library directory under `tmp_path/libraries/<manifest_id>`.
+   - Generates either a pure catalog manifest (`version: "2.0.0"`) or a legacy manifest (`version: "1.0.0"` with root variables and presets).
+   - Automatically connects the directory to `LibraryManagerService`.
+2. **`create_workspace_environment(name, variables, hidden_keys) -> Environment`**:
+   - Persists an isolated workspace environment under `tmp_path/workspace/environments/` using [`StorageManager`](file:///home/src/pypost/core/storage.py).
+3. **`run_unified_lifecycle(manifest_id, collection_data, active_profile, overlay_secrets, workspace_env_name, conflict_strategy) -> UnifiedLifecycleResult`**:
+   - Orchestrates the full 5-step integration lifecycle in a single call.
+   - Registers and starts a standalone MCP server with allocated TCP ports.
+   - Copies collection to workspace, imports variables into an environment with secret masking, and renders request templates via [`TemplateService`](file:///home/src/pypost/core/template_service.py).
+
+### Test Guardrails & Invariants
+
+- **Zero Global State**: All stores and service singletons are bound to isolated temporary directories (`tmp_path`).
+- **Safe Port Allocation**: Local test servers use `tests.helpers.port_allocation.allocate_tcp_port()` to prevent TCP bind collisions.
+- **Strict Timeout Contracts**: All tests declare explicit timeout markers (`pytestmark = [pytest.mark.timeout(30)]`).
+- **Offline Execution**: 100% offline; requires zero network connectivity or external mock servers.
 
 ---
 
@@ -456,7 +632,7 @@ flowchart TD
     COLVAR1["[x] PYPOST-1409 (COLVAR-1, 3 SP)<br/>Eliminate library variables & establish catalog manifest"]
     COLVAR2["[x] PYPOST-1410 (COLVAR-2, 5 SP)<br/>Standalone MCP server without workspace environment"]
     COLVAR3["[x] PYPOST-1411 (COLVAR-3, 3 SP)<br/>Workspace environment variable import action"]
-    COLVAR4["[ ] PYPOST-1412 (COLVAR-4, 3 SP)<br/>Integration test suite, compatibility matrix & dev docs"]
+    COLVAR4["[x] PYPOST-1412 (COLVAR-4, 3 SP)<br/>Integration test suite, compatibility matrix & dev docs"]
 
     COLVAR1 --> COLVAR2
     COLVAR1 --> COLVAR3
@@ -469,15 +645,15 @@ flowchart TD
 | [PYPOST-1409](https://pypost.atlassian.net/browse/PYPOST-1409) | `COLVAR-1` | 3 | **Completed** | Catalog manifest & collection authority | Deprecate manifest variables; update `LibraryManifest`, `LibraryVariableResolver`, and `LibraryRuntimeResolver`. |
 | [PYPOST-1410](https://pypost.atlassian.net/browse/PYPOST-1410) | `COLVAR-2` | 5 | **Completed** | Standalone MCP server execution | Optional `environment_id` in `McpServerConfiguration`; `_McpServerEditor` & `McpServersDialog` decoupling; standalone runtime resolution in `LibraryRuntimeResolver`; server registry preservation in `MCPServerRegistry`. |
 | [PYPOST-1411](https://pypost.atlassian.net/browse/PYPOST-1411) | `COLVAR-3` | 3 | **Completed** | Workspace variable import action | `EnvironmentVariablesWidget` import trigger; selection dialog; conflict resolution; secret masking; [Workspace Environment Variable Import](workspace_environment_variable_import.md). |
-| [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412) | `COLVAR-4` | 3 | To Do | Integration tests & documentation | End-to-end test suite; legacy manifest compatibility matrix; user guide documentation updates. |
+| [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412) | `COLVAR-4` | 3 | **Completed** | Integration tests & documentation | End-to-end integration test suite; 4-quadrant compatibility matrix; diagnostic safety; developer documentation consolidation. |
 
 ### Phased Roadmap
 
 1. **Phase 1 (Foundation - COMPLETED)**: Executed [PYPOST-1409](https://pypost.atlassian.net/browse/PYPOST-1409) to establish the catalog-only manifest model, deprecate library-level variables, and anchor 3-tier variable resolution within collections.
-2. **Phase 2 (Parallel Feature Tracks)**:
+2. **Phase 2 (Parallel Feature Tracks - COMPLETED)**:
    - **Completed [PYPOST-1410](https://pypost.atlassian.net/browse/PYPOST-1410)**: Standalone MCP server configuration and execution decoupled from workspace environments.
-   - **Execute [PYPOST-1411](https://pypost.atlassian.net/browse/PYPOST-1411)**: Workspace environment variable import action and UI conflict resolution workflow.
-3. **Phase 3 (Consolidation & Verification)**: Execute [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412) to validate end-to-end integration contracts across all components and update user-facing documentation.
+   - **Completed [PYPOST-1411](https://pypost.atlassian.net/browse/PYPOST-1411)**: Workspace environment variable import action and UI conflict resolution workflow.
+3. **Phase 3 (Consolidation & Verification - COMPLETED)**: Executed [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412) to validate end-to-end integration contracts across all components, assert the 4-quadrant compatibility matrix, and consolidate developer documentation.
 
 ---
 
@@ -506,8 +682,17 @@ flowchart TD
   - Technical Debt Report: [`ai-tasks/PYPOST-1411/60-tech-debt.md`](file:///home/src/ai-tasks/PYPOST-1411/60-tech-debt.md)
   - Developer Documentation: [`doc/dev/workspace_environment_variable_import.md`](file:///home/src/doc/dev/workspace_environment_variable_import.md)
   - Automated Repro & Regression Tests: [`tests/test_workspace_environment_import_repro.py`](file:///home/src/tests/test_workspace_environment_import_repro.py)
+- **Integration Test Suite & Documentation Task**: [PYPOST-1412](https://pypost.atlassian.net/browse/PYPOST-1412)
+  - Requirements Document: [`ai-tasks/PYPOST-1412/10-requirements.md`](file:///home/src/ai-tasks/PYPOST-1412/10-requirements.md)
+  - Architecture Specification: [`ai-tasks/PYPOST-1412/20-architecture.md`](file:///home/src/ai-tasks/PYPOST-1412/20-architecture.md)
+  - Code Cleanup Report: [`ai-tasks/PYPOST-1412/40-code-cleanup.md`](file:///home/src/ai-tasks/PYPOST-1412/40-code-cleanup.md)
+  - Observability Report: [`ai-tasks/PYPOST-1412/50-observability.md`](file:///home/src/ai-tasks/PYPOST-1412/50-observability.md)
+  - Technical Debt Report: [`ai-tasks/PYPOST-1412/60-tech-debt.md`](file:///home/src/ai-tasks/PYPOST-1412/60-tech-debt.md)
+  - Developer Documentation Report: [`ai-tasks/PYPOST-1412/70-dev-docs.md`](file:///home/src/ai-tasks/PYPOST-1412/70-dev-docs.md)
+  - Automated Integration & Compatibility Test Suite: [`tests/test_collection_scoped_variables_integration.py`](file:///home/src/tests/test_collection_scoped_variables_integration.py)
 - **Related Developer Guides**:
   - [Library Manifest and Local Secrets Overlay Manager](library_manifest_and_overlay.md)
   - [Collection Format v2](collection_format_v2.md)
   - [Collection Variable Setup Guidance](collection_variable_guidance.md)
   - [Environment Management and Variable Display](environments.md)
+
