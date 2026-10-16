@@ -126,6 +126,7 @@ conventions.
 1. [MCP Server Custom Headers Editor (PYPOST-1104)](mcp_server_headers_editor.md)
 1. [Multiple independent MCP servers (PYPOST-1044)](mcp_server_registry.md)
 1. [Standalone MCP Server Configuration and Execution (PYPOST-1410)](collection_scoped_variables.md#standalone-mcp-server-configuration-and-execution-pypost-1410)
+1. [Standalone MCP Server Live Wire IPC & Stdio Transport Stress Testing (PYPOST-1416)](mcp_standalone_wire_ipc_stress.md)
 1. [MCP argument query/body regression coverage (PYPOST-1034)](mcp_integration.md#mcp-argument-substitution-coverage-pypost-1034)
 1. [Jira numeric identifier MCP contract (PYPOST-1038)](mcp_integration.md#jira-numeric-path-identifiers-pypost-1038)
 1. [Optional MCP parameter defaults (PYPOST-1054)](mcp_integration.md#optional-mcp-parameter-defaults-pypost-1054)
