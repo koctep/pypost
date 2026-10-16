@@ -61,7 +61,7 @@ pip-licenses==5.5.5
     # via -r requirements-dev.in
 pip-requirements-parser==32.0.1
     # via pip-audit
-platformdirs==4.13.0
+platformdirs==4.13.3
     # via pip-audit
 pluggy==1.7.0
     # via

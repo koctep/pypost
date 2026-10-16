@@ -164,6 +164,15 @@ IMPORT_COLLECTION_CONFLICT_OVERWRITE_RADIO: Final[str] = (
 )
 IMPORT_COLLECTION_SELECT_ALL_BUTTON: Final[str] = "pypost_import_collection_select_all_button"
 IMPORT_COLLECTION_DESELECT_ALL_BUTTON: Final[str] = "pypost_import_collection_deselect_all_button"
+IMPORT_COLLECTION_BULK_KEEP_CURRENT_BUTTON: Final[str] = (
+    "pypost_import_collection_bulk_keep_current_button"
+)
+IMPORT_COLLECTION_BULK_OVERWRITE_BUTTON: Final[str] = (
+    "pypost_import_collection_bulk_overwrite_button"
+)
+IMPORT_COLLECTION_ROW_STRATEGY_COMBO_PREFIX: Final[str] = (
+    "pypost_import_strategy_combo_"
+)
 
 KEY_WIDGET_IDS = (
     MAIN_WINDOW,
@@ -246,6 +255,9 @@ KEY_WIDGET_IDS = (
     IMPORT_COLLECTION_CONFLICT_SKIP_RADIO,
     IMPORT_COLLECTION_CONFLICT_OVERWRITE_RADIO,
     IMPORT_COLLECTION_SELECT_ALL_BUTTON,
+    IMPORT_COLLECTION_DESELECT_ALL_BUTTON,
+    IMPORT_COLLECTION_BULK_KEEP_CURRENT_BUTTON,
+    IMPORT_COLLECTION_BULK_OVERWRITE_BUTTON,
 )
 
 # Variable Setup Wizard surfaces (PYPOST-1373).

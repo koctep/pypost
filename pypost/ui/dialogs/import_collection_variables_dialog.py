@@ -6,7 +6,6 @@ from typing import Any, Iterable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -15,7 +14,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QPushButton,
-    QRadioButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -31,10 +29,11 @@ from pypost.core.collection_variable_import import (
 from pypost.core.constants import HIDDEN_MASK
 from pypost.models.models import Collection, Environment
 from pypost.ui.widget_ids import (
-    IMPORT_COLLECTION_CONFLICT_OVERWRITE_RADIO,
-    IMPORT_COLLECTION_CONFLICT_SKIP_RADIO,
+    IMPORT_COLLECTION_BULK_KEEP_CURRENT_BUTTON,
+    IMPORT_COLLECTION_BULK_OVERWRITE_BUTTON,
     IMPORT_COLLECTION_DESELECT_ALL_BUTTON,
     IMPORT_COLLECTION_PRESET_COMBO,
+    IMPORT_COLLECTION_ROW_STRATEGY_COMBO_PREFIX,
     IMPORT_COLLECTION_SELECT_ALL_BUTTON,
     IMPORT_COLLECTION_SOURCE_COMBO,
     IMPORT_COLLECTION_VARIABLES_DIALOG,
@@ -46,11 +45,13 @@ logger = logging.getLogger(__name__)
 
 COL_SELECT = 0
 COL_NAME = 1
-COL_VALUE = 2
-COL_TYPE = 3
-COL_SECRET = 4
-COL_STATUS = 5
-COL_DESC = 6
+COL_CURRENT_VALUE = 2
+COL_CANDIDATE_VALUE = 3
+COL_STRATEGY = 4
+COL_TYPE = 5
+COL_SECRET = 6
+COL_STATUS = 7
+COL_DESC = 8
 
 
 class ImportCollectionVariablesDialog(QDialog):
@@ -66,7 +67,7 @@ class ImportCollectionVariablesDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Import Collection Variables")
-        self.resize(750, 520)
+        self.resize(850, 520)
         set_widget_id(self, IMPORT_COLLECTION_VARIABLES_DIALOG)
 
         self.target_environment = target_environment
@@ -99,22 +100,34 @@ class ImportCollectionVariablesDialog(QDialog):
         layout.addLayout(source_layout)
 
         # Variables Table
-        self.vars_table = QTableWidget(0, 7)
+        self.vars_table = QTableWidget(0, 9)
         set_widget_id(self.vars_table, IMPORT_COLLECTION_VARS_TABLE)
         self.vars_table.setHorizontalHeaderLabels(
-            ["", "Name", "Value", "Type", "Secret", "Status", "Description"]
+            [
+                "",
+                "Name",
+                "Current Value",
+                "Candidate Value",
+                "Conflict Strategy",
+                "Type",
+                "Secret",
+                "Status",
+                "Description",
+            ]
         )
         header = self.vars_table.horizontalHeader()
         header.setSectionResizeMode(COL_SELECT, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(COL_NAME, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(COL_VALUE, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(COL_CURRENT_VALUE, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(COL_CANDIDATE_VALUE, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(COL_STRATEGY, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(COL_TYPE, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(COL_SECRET, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(COL_STATUS, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(COL_DESC, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.vars_table)
 
-        # Table quick actions
+        # Table quick actions and bulk controls
         table_actions_layout = QHBoxLayout()
         self.select_all_btn = QPushButton("Select All")
         set_widget_id(self.select_all_btn, IMPORT_COLLECTION_SELECT_ALL_BUTTON)
@@ -122,35 +135,24 @@ class ImportCollectionVariablesDialog(QDialog):
         self.deselect_all_btn = QPushButton("Deselect All")
         set_widget_id(self.deselect_all_btn, IMPORT_COLLECTION_DESELECT_ALL_BUTTON)
         self.deselect_all_btn.clicked.connect(self.deselect_all)
+
+        self.bulk_keep_current_btn = QPushButton("Keep All Collisions")
+        set_widget_id(self.bulk_keep_current_btn, IMPORT_COLLECTION_BULK_KEEP_CURRENT_BUTTON)
+        self.bulk_keep_current_btn.clicked.connect(
+            lambda: self.bulk_set_collision_strategy(ConflictStrategy.SKIP)
+        )
+        self.bulk_overwrite_btn = QPushButton("Overwrite All Collisions")
+        set_widget_id(self.bulk_overwrite_btn, IMPORT_COLLECTION_BULK_OVERWRITE_BUTTON)
+        self.bulk_overwrite_btn.clicked.connect(
+            lambda: self.bulk_set_collision_strategy(ConflictStrategy.OVERWRITE)
+        )
+
         table_actions_layout.addWidget(self.select_all_btn)
         table_actions_layout.addWidget(self.deselect_all_btn)
+        table_actions_layout.addWidget(self.bulk_keep_current_btn)
+        table_actions_layout.addWidget(self.bulk_overwrite_btn)
         table_actions_layout.addStretch()
         layout.addLayout(table_actions_layout)
-
-        # Conflict resolution strategy
-        conflict_layout = QVBoxLayout()
-        conflict_label = QLabel("Conflict Strategy:")
-        self.skip_radio = QRadioButton(
-            "Skip existing variables (keep current environment values)"
-        )
-        set_widget_id(self.skip_radio, IMPORT_COLLECTION_CONFLICT_SKIP_RADIO)
-        self.overwrite_radio = QRadioButton(
-            "Overwrite existing variables (replace with collection values)"
-        )
-        set_widget_id(self.overwrite_radio, IMPORT_COLLECTION_CONFLICT_OVERWRITE_RADIO)
-        self.skip_radio.setChecked(True)
-
-        radio_group = QButtonGroup(self)
-        radio_group.addButton(self.skip_radio)
-        radio_group.addButton(self.overwrite_radio)
-
-        self.skip_radio.toggled.connect(self._update_preview_summary)
-        self.overwrite_radio.toggled.connect(self._update_preview_summary)
-
-        conflict_layout.addWidget(conflict_label)
-        conflict_layout.addWidget(self.skip_radio)
-        conflict_layout.addWidget(self.overwrite_radio)
-        layout.addLayout(conflict_layout)
 
         # Summary label
         self.summary_label = QLabel()
@@ -257,17 +259,20 @@ class ImportCollectionVariablesDialog(QDialog):
             name_item = self.vars_table.item(row, COL_NAME)
             if not name_item:
                 continue
-            var_name = name_item.text()
+            var_name = name_item.text().strip()
             var = var_by_name.get(var_name)
             if var:
+                is_secret = bool(var.secret) or (var_name in self.target_environment.hidden_keys)
                 raw_val = preset_values.get(var.name, var.default)
                 val_str = format_variable_value(raw_val)
-                display_val = HIDDEN_MASK if var.secret else val_str
-                val_item = self.vars_table.item(row, COL_VALUE)
+                display_val = HIDDEN_MASK if is_secret else val_str
+                val_item = self.vars_table.item(row, COL_CANDIDATE_VALUE)
                 if val_item:
                     val_item.setText(display_val)
                 else:
-                    self.vars_table.setItem(row, COL_VALUE, QTableWidgetItem(display_val))
+                    new_item = QTableWidgetItem(display_val)
+                    new_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    self.vars_table.setItem(row, COL_CANDIDATE_VALUE, new_item)
         self.vars_table.blockSignals(False)
         self._update_preview_summary()
 
@@ -282,6 +287,18 @@ class ImportCollectionVariablesDialog(QDialog):
 
         preset_name = self._get_selected_preset()
         preset_values = col.presets.get(preset_name, {}) if (preset_name and col.presets) else {}
+
+        collision_count = sum(
+            1 for v in col.variables if v.name in self.target_environment.variables
+        )
+        logger.debug(
+            "collection_variable_import_table_populated env_name=%s collection_name=%s "
+            "total_vars=%d collisions=%d",
+            self.target_environment.name,
+            col.name,
+            len(col.variables),
+            collision_count,
+        )
 
         self.vars_table.setRowCount(len(col.variables))
         for i, var in enumerate(col.variables):
@@ -298,12 +315,39 @@ class ImportCollectionVariablesDialog(QDialog):
             name_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
             self.vars_table.setItem(i, COL_NAME, name_item)
 
-            raw_val = preset_values.get(var.name, var.default)
-            val_str = format_variable_value(raw_val)
-            display_val = HIDDEN_MASK if var.secret else val_str
-            val_item = QTableWidgetItem(display_val)
-            val_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            self.vars_table.setItem(i, COL_VALUE, val_item)
+            exists = var.name in self.target_environment.variables
+            is_secret = bool(var.secret) or (var.name in self.target_environment.hidden_keys)
+
+            if exists:
+                raw_current = self.target_environment.variables[var.name]
+                current_str = format_variable_value(raw_current)
+                current_display = HIDDEN_MASK if is_secret else current_str
+            else:
+                current_display = "—"
+
+            current_item = QTableWidgetItem(current_display)
+            current_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            self.vars_table.setItem(i, COL_CURRENT_VALUE, current_item)
+
+            raw_candidate = preset_values.get(var.name, var.default)
+            candidate_str = format_variable_value(raw_candidate)
+            candidate_display = HIDDEN_MASK if is_secret else candidate_str
+            candidate_item = QTableWidgetItem(candidate_display)
+            candidate_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            self.vars_table.setItem(i, COL_CANDIDATE_VALUE, candidate_item)
+
+            if exists:
+                combo = QComboBox()
+                set_widget_id(combo, f"{IMPORT_COLLECTION_ROW_STRATEGY_COMBO_PREFIX}{var.name}")
+                combo.addItem("Keep Current", userData=ConflictStrategy.SKIP)
+                combo.addItem("Overwrite", userData=ConflictStrategy.OVERWRITE)
+                combo.setCurrentIndex(0)
+                combo.currentIndexChanged.connect(self._update_preview_summary)
+                self.vars_table.setCellWidget(i, COL_STRATEGY, combo)
+            else:
+                strategy_item = QTableWidgetItem("—")
+                strategy_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                self.vars_table.setItem(i, COL_STRATEGY, strategy_item)
 
             type_item = QTableWidgetItem(var.type)
             type_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
@@ -314,7 +358,6 @@ class ImportCollectionVariablesDialog(QDialog):
             secret_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
             self.vars_table.setItem(i, COL_SECRET, secret_item)
 
-            exists = var.name in self.target_environment.variables
             status_str = "Exists (Collision)" if exists else "New"
             status_item = QTableWidgetItem(status_str)
             status_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
@@ -326,6 +369,64 @@ class ImportCollectionVariablesDialog(QDialog):
             self.vars_table.setItem(i, COL_DESC, desc_item)
 
         self.vars_table.blockSignals(False)
+        self._update_preview_summary()
+
+    def get_row_strategy(self, row: int) -> ConflictStrategy | None:
+        """Return the selected ConflictStrategy for row, or None if non-colliding."""
+        widget = self.vars_table.cellWidget(row, COL_STRATEGY)
+        if isinstance(widget, QComboBox):
+            text = widget.currentText()
+            if text == "Overwrite":
+                return ConflictStrategy.OVERWRITE
+            return ConflictStrategy.SKIP
+        return None
+
+    def set_row_strategy(self, row: int, strategy: ConflictStrategy) -> None:
+        """Set the ConflictStrategy combo box for row if it is a colliding row."""
+        widget = self.vars_table.cellWidget(row, COL_STRATEGY)
+        if isinstance(widget, QComboBox):
+            target_text = "Overwrite" if strategy == ConflictStrategy.OVERWRITE else "Keep Current"
+            idx = widget.findText(target_text)
+            if idx >= 0:
+                widget.setCurrentIndex(idx)
+            name_item = self.vars_table.item(row, COL_NAME)
+            var_name = name_item.text().strip() if name_item else f"row_{row}"
+            logger.debug(
+                "collection_variable_import_row_strategy_changed env_name=%s key=%s strategy=%s",
+                self.target_environment.name,
+                var_name,
+                strategy.value,
+            )
+            self._update_preview_summary()
+
+    def get_variable_conflict_strategies(self) -> dict[str, ConflictStrategy]:
+        """Return a mapping of variable name to chosen ConflictStrategy for all colliding rows."""
+        result: dict[str, ConflictStrategy] = {}
+        for row in range(self.vars_table.rowCount()):
+            strat = self.get_row_strategy(row)
+            if strat is not None:
+                name_item = self.vars_table.item(row, COL_NAME)
+                if name_item and name_item.text():
+                    result[name_item.text().strip()] = strat
+        return result
+
+    def bulk_set_collision_strategy(self, strategy: ConflictStrategy) -> None:
+        """Set the ConflictStrategy on all colliding rows to strategy and refresh summary."""
+        target_text = "Overwrite" if strategy == ConflictStrategy.OVERWRITE else "Keep Current"
+        updated_count = 0
+        for row in range(self.vars_table.rowCount()):
+            widget = self.vars_table.cellWidget(row, COL_STRATEGY)
+            if isinstance(widget, QComboBox):
+                idx = widget.findText(target_text)
+                if idx >= 0:
+                    widget.setCurrentIndex(idx)
+                    updated_count += 1
+        logger.info(
+            "collection_variable_import_bulk_strategy_applied env_name=%s strategy=%s count=%d",
+            self.target_environment.name,
+            strategy.value,
+            updated_count,
+        )
         self._update_preview_summary()
 
     def is_row_selected(self, row: int) -> bool:
@@ -376,9 +477,8 @@ class ImportCollectionVariablesDialog(QDialog):
             return
 
         will_add = 0
-        will_skip = 0
-        will_update = 0
-        overwrite = self.overwrite_radio.isChecked()
+        will_overwrite = 0
+        will_keep = 0
 
         for row in range(self.vars_table.rowCount()):
             if not self.is_row_selected(row):
@@ -388,25 +488,22 @@ class ImportCollectionVariablesDialog(QDialog):
                 continue
             name = name_item.text().strip()
             if name in self.target_environment.variables:
-                if overwrite:
-                    will_update += 1
+                strat = self.get_row_strategy(row)
+                if strat == ConflictStrategy.OVERWRITE:
+                    will_overwrite += 1
                 else:
-                    will_skip += 1
+                    will_keep += 1
             else:
                 will_add += 1
 
-        total_selected = will_add + will_update + will_skip
+        total_selected = will_add + will_overwrite + will_keep
         if self.import_button:
             self.import_button.setEnabled(total_selected > 0)
 
-        if overwrite:
-            self.summary_label.setText(
-                f"{will_add} new to add, {will_update} existing to overwrite"
-            )
-        else:
-            self.summary_label.setText(
-                f"{will_add} new to add, {will_skip} existing to skip (0 selected to overwrite)"
-            )
+        self.summary_label.setText(
+            f"{will_add} new to add, {will_overwrite} existing to overwrite, "
+            f"{will_keep} existing to keep"
+        )
 
     def reject(self) -> None:
         logger.info(
@@ -421,11 +518,6 @@ class ImportCollectionVariablesDialog(QDialog):
             super().accept()
             return
 
-        strategy = (
-            ConflictStrategy.OVERWRITE
-            if self.overwrite_radio.isChecked()
-            else ConflictStrategy.SKIP
-        )
         preset_name = self._get_selected_preset()
         selected_keys: set[str] = set()
         for row in range(self.vars_table.rowCount()):
@@ -434,23 +526,34 @@ class ImportCollectionVariablesDialog(QDialog):
                 if name_item and name_item.text():
                     selected_keys.add(name_item.text().strip())
 
+        variable_conflict_strategies = self.get_variable_conflict_strategies()
+        overwrite_count = sum(
+            1 for s in variable_conflict_strategies.values() if s == ConflictStrategy.OVERWRITE
+        )
+        keep_count = sum(
+            1 for s in variable_conflict_strategies.values() if s == ConflictStrategy.SKIP
+        )
+
         logger.info(
             "collection_variable_import_dialog_accepted env_name=%s collection_name=%s "
-            "preset=%s strategy=%s selected_count=%d",
+            "preset=%s selected_count=%d collisions=%d overwrite_collisions=%d keep_collisions=%d",
             self.target_environment.name,
             col.name,
             preset_name,
-            strategy.value,
             len(selected_keys),
+            len(variable_conflict_strategies),
+            overwrite_count,
+            keep_count,
         )
 
         try:
             self._summary = import_collection_variables_to_environment(
                 environment=self.target_environment,
                 collection=col,
-                conflict_strategy=strategy,
+                conflict_strategy=ConflictStrategy.SKIP,
                 selected_keys=selected_keys,
                 preset_name=preset_name,
+                variable_conflict_strategies=variable_conflict_strategies,
             )
         except Exception as exc:
             logger.error(
@@ -465,7 +568,7 @@ class ImportCollectionVariablesDialog(QDialog):
 
         logger.info(
             "env_collection_variables_imported env_name=%s collection_name=%s "
-            "total=%d added=%d updated=%d skipped=%d invalid=%d",
+            "total=%d added=%d updated=%d skipped=%d invalid=%d newly_hidden=%d",
             self.target_environment.name,
             col.name,
             self._summary.total_imported,
@@ -473,5 +576,6 @@ class ImportCollectionVariablesDialog(QDialog):
             len(self._summary.updated_keys),
             len(self._summary.skipped_keys),
             len(self._summary.invalid_keys),
+            len(self._summary.newly_hidden_keys),
         )
         super().accept()

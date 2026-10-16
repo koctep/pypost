@@ -65,16 +65,20 @@ def import_collection_variables_to_environment(
     conflict_strategy: ConflictStrategy = ConflictStrategy.SKIP,
     selected_keys: set[str] | None = None,
     preset_name: str | None = None,
+    variable_conflict_strategies: dict[str, ConflictStrategy] | None = None,
 ) -> ImportSummary:
     """Import declared collection variables into the target environment.
 
     Args:
         environment: The destination working environment to mutate.
         collection: The source collection providing variable declarations and presets.
-        conflict_strategy: Conflict policy for existing keys (SKIP or OVERWRITE).
+        conflict_strategy: Default conflict policy for existing keys (fallback).
         selected_keys: Optional set of variable names to selectively import.
             If None, all variables are imported.
         preset_name: Optional preset profile name to take values from instead of base defaults.
+        variable_conflict_strategies: Optional per-variable mapping from variable name
+            to specific ConflictStrategy (SKIP or OVERWRITE). When specified for a
+            colliding key, overrides conflict_strategy.
 
     Returns:
         ImportSummary detailing added, updated, skipped, invalid, and newly hidden variables.
@@ -122,32 +126,76 @@ def import_collection_variables_to_environment(
             raw_val = preset_values.get(var.name, var.default)
             val_str = format_variable_value(raw_val)
 
-            if var.name in environment.variables:
-                if conflict_strategy == ConflictStrategy.OVERWRITE:
+            is_collision = var.name in environment.variables
+            is_secret = bool(var.secret) or (var.name in environment.hidden_keys)
+            was_hidden = var.name in environment.hidden_keys
+            effective_strategy: ConflictStrategy | None = None
+
+            if is_collision:
+                effective_strategy = conflict_strategy
+                if (
+                    variable_conflict_strategies is not None
+                    and var.name in variable_conflict_strategies
+                ):
+                    effective_strategy = variable_conflict_strategies[var.name]
+
+                if effective_strategy == ConflictStrategy.OVERWRITE:
                     environment.variables[var.name] = val_str
                     summary.updated_keys.append(var.name)
                     action = "updated"
                 else:
                     summary.skipped_keys.append(var.name)
                     action = "skipped"
+
+                logger.info(
+                    "collection_variable_import_conflict_decision env_name=%s "
+                    "collection_name=%s key=%s collision=True strategy=%s decision=%s "
+                    "is_secret=%s",
+                    environment.name,
+                    collection.name,
+                    var.name,
+                    effective_strategy.value,
+                    action,
+                    is_secret,
+                )
             else:
                 environment.variables[var.name] = val_str
                 summary.added_keys.append(var.name)
                 action = "added"
 
-            if var.secret:
-                if var.name not in environment.hidden_keys:
+            if action != "skipped" and var.secret:
+                if not was_hidden:
                     summary.newly_hidden_keys.add(var.name)
                     environment.hidden_keys.add(var.name)
+                    logger.info(
+                        "collection_variable_import_secret_hidden env_name=%s "
+                        "collection_name=%s key=%s",
+                        environment.name,
+                        collection.name,
+                        var.name,
+                    )
                 environment.mcp_overridable_keys.discard(var.name)
+
+            if is_secret:
+                logger.debug(
+                    "collection_variable_import_secret_masking_preserved env_name=%s "
+                    "collection_name=%s key=%s already_hidden=%s action=%s",
+                    environment.name,
+                    collection.name,
+                    var.name,
+                    was_hidden,
+                    action,
+                )
 
             logger.debug(
                 "collection_variable_import_key_evaluated env_name=%s collection_name=%s "
-                "key=%s is_secret=%s action=%s",
+                "key=%s is_collision=%s strategy=%s is_secret=%s action=%s",
                 environment.name,
                 collection.name,
                 var.name,
-                bool(var.secret),
+                is_collision,
+                effective_strategy.value if (is_collision and effective_strategy) else "none",
+                is_secret,
                 action,
             )
 
