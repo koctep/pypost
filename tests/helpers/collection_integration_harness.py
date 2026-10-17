@@ -1,7 +1,8 @@
 """Reusable multi-subsystem integration harness helper and pytest fixture bindings.
 
-Provides an isolated environment coordinating storage, overlay management,
-library discovery, template rendering, runtime resolution, and MCP server registry.
+Provides modular mixins and an isolated composite environment coordinating storage,
+overlay management, library discovery, template rendering, runtime resolution,
+and MCP server registry lifecycle.
 """
 
 from __future__ import annotations
@@ -51,25 +52,32 @@ class UnifiedLifecycleResult:
     rendered_body: str
 
 
-class CollectionVariablesIntegrationHarness:
-    """Encapsulates isolated filesystem, configuration stores, and service instances
+class LibraryFixtureMixin:
+    """Mixin providing isolated catalog manifest, collection, and overlay management."""
 
-    for end-to-end integration and compatibility matrix validation.
-    """
+    tmp_path: Path
+    libraries_dir: Path
+    overlay_dir: Path
+    connection_store: LibraryConnectionStore
+    overlay_manager: LocalOverlayManager
+    library_service: LibraryManagerService
+    runtime_resolver: LibraryRuntimeResolver
 
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if tmp_path is not None and not hasattr(self, "libraries_dir"):
+            self.init_library_fixture(tmp_path)
+
+    def init_library_fixture(self, tmp_path: Path) -> None:
+        """Initialize isolated filesystem directories and library services."""
         self.tmp_path = tmp_path
         self.libraries_dir = tmp_path / "libraries"
-        self.workspace_dir = tmp_path / "workspace"
         self.overlay_dir = tmp_path / "libraries_data"
         self.libraries_dir.mkdir(parents=True, exist_ok=True)
-        self.workspace_dir.mkdir(parents=True, exist_ok=True)
         self.overlay_dir.mkdir(parents=True, exist_ok=True)
 
-        self.storage_manager = StorageManager(data_dir=self.workspace_dir)
         self.connection_store = LibraryConnectionStore(self.tmp_path / "connections.json")
         self.overlay_manager = LocalOverlayManager(self.overlay_dir)
-        self.template_service = TemplateService()
         self.library_service = LibraryManagerService(
             connection_store=self.connection_store,
             overlay_manager=self.overlay_manager,
@@ -78,50 +86,6 @@ class CollectionVariablesIntegrationHarness:
             library_service=self.library_service,
             environment_lookup=lambda _id: None,
         )
-        self.registry = MCPServerRegistry(
-            library_service=self.library_service,
-            environment_lookup=lambda _id: None,
-            template_service=self.template_service,
-        )
-        logger.debug(
-            "Initialized CollectionVariablesIntegrationHarness at root=%s",
-            self.tmp_path,
-        )
-
-    def __enter__(self) -> CollectionVariablesIntegrationHarness:
-        """Enter context manager, returning harness instance."""
-        logger.debug("Entered harness context manager scope")
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        """Exit context manager, ensuring all running servers are stopped."""
-        if exc_type is not None:
-            logger.error(
-                "Harness context manager exiting due to exception: %s: %s",
-                exc_type.__name__,
-                exc_val,
-            )
-        else:
-            logger.debug("Exited harness context manager scope normally")
-        self.teardown()
-
-    def teardown(self) -> None:
-        """Stop all running servers in registry and release active resources."""
-        logger.info("Tearing down harness and stopping all registered servers")
-        try:
-            self.registry.stop_all()
-            logger.debug("Harness teardown completed successfully")
-        except Exception as exc:
-            logger.warning("Error stopping servers during harness teardown: %s", exc)
-
-    def close(self) -> None:
-        """Alias for teardown() supporting explicit resource close semantics."""
-        self.teardown()
 
     def create_library(
         self,
@@ -169,27 +133,6 @@ class CollectionVariablesIntegrationHarness:
         )
         return lib_dir
 
-    def create_workspace_environment(
-        self,
-        name: str = "Test Env",
-        variables: dict[str, str] | None = None,
-        hidden_keys: set[str] | None = None,
-    ) -> Environment:
-        """Create and persist an isolated workspace environment."""
-        env = Environment(
-            name=name,
-            variables=variables or {},
-            hidden_keys=hidden_keys or set(),
-        )
-        self.storage_manager.save_environments([env])
-        logger.debug(
-            "Created workspace environment name=%s variable_count=%d hidden_key_count=%d",
-            name,
-            len(env.variables),
-            len(env.hidden_keys),
-        )
-        return env
-
     def create_overlay(
         self,
         library_id: str,
@@ -212,6 +155,98 @@ class CollectionVariablesIntegrationHarness:
             sorted(overlay.secrets.keys()),
         )
         return overlay
+
+
+class EnvironmentFixtureMixin:
+    """Mixin providing isolated workspace environment creation and storage management."""
+
+    tmp_path: Path
+    workspace_dir: Path
+    storage_manager: StorageManager
+
+    def __init__(self, tmp_path: Path | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if tmp_path is not None and not hasattr(self, "workspace_dir"):
+            self.init_environment_fixture(tmp_path)
+
+    def init_environment_fixture(self, tmp_path: Path) -> None:
+        """Initialize isolated workspace directory and storage manager."""
+        self.tmp_path = tmp_path
+        self.workspace_dir = tmp_path / "workspace"
+        self.workspace_dir.mkdir(parents=True, exist_ok=True)
+        self.storage_manager = StorageManager(data_dir=self.workspace_dir)
+
+    def create_workspace_environment(
+        self,
+        name: str = "Test Env",
+        variables: dict[str, str] | None = None,
+        hidden_keys: set[str] | None = None,
+    ) -> Environment:
+        """Create and persist an isolated workspace environment."""
+        env = Environment(
+            name=name,
+            variables=variables or {},
+            hidden_keys=hidden_keys or set(),
+        )
+        self.storage_manager.save_environments([env])
+        logger.debug(
+            "Created workspace environment name=%s variable_count=%d hidden_key_count=%d",
+            name,
+            len(env.variables),
+            len(env.hidden_keys),
+        )
+        return env
+
+
+class ServerRegistryFixtureMixin:
+    """Mixin providing standalone MCP server candidate startup, readiness polling, and teardown."""
+
+    registry: MCPServerRegistry
+    template_service: TemplateService
+
+    def __init__(
+        self,
+        *,
+        registry: MCPServerRegistry | None = None,
+        library_service: Any = None,
+        template_service: TemplateService | None = None,
+        tmp_path: Path | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        if not hasattr(self, "registry"):
+            self.init_server_registry_fixture(
+                registry=registry,
+                library_service=library_service,
+                template_service=template_service,
+            )
+
+    def init_server_registry_fixture(
+        self,
+        *,
+        registry: MCPServerRegistry | None = None,
+        library_service: Any = None,
+        template_service: TemplateService | None = None,
+    ) -> None:
+        """Initialize MCP server registry and template service."""
+        self.template_service = (
+            template_service
+            if template_service is not None
+            else getattr(self, "template_service", None) or TemplateService()
+        )
+        if registry is not None:
+            self.registry = registry
+        else:
+            lib_svc = (
+                library_service
+                if library_service is not None
+                else getattr(self, "library_service", None)
+            )
+            self.registry = MCPServerRegistry(
+                library_service=lib_svc,
+                environment_lookup=lambda _id: None,
+                template_service=self.template_service,
+            )
 
     def start_standalone_server(
         self,
@@ -278,6 +313,97 @@ class CollectionVariablesIntegrationHarness:
                 exc,
             )
             raise
+
+    def teardown(self) -> None:
+        """Stop all running servers in registry and release active resources."""
+        logger.info("Tearing down harness and stopping all registered servers")
+        try:
+            if hasattr(self, "registry") and self.registry is not None:
+                self.registry.stop_all()
+            logger.debug("Harness teardown completed successfully")
+        except Exception as exc:
+            logger.warning("Error stopping servers during harness teardown: %s", exc)
+
+    def close(self) -> None:
+        """Alias for teardown() supporting explicit resource close semantics."""
+        self.teardown()
+
+    def __enter__(self) -> ServerRegistryFixtureMixin:
+        """Enter context manager, returning mixin instance."""
+        logger.debug("Entered server registry fixture context manager scope")
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        """Exit context manager, ensuring all running servers are stopped."""
+        if exc_type is not None:
+            logger.error(
+                "Server registry fixture context manager exiting due to exception: %s: %s",
+                exc_type.__name__,
+                exc_val,
+            )
+        else:
+            logger.debug("Exited server registry fixture context manager scope normally")
+        self.teardown()
+
+
+class CollectionVariablesIntegrationHarness(
+    LibraryFixtureMixin,
+    EnvironmentFixtureMixin,
+    ServerRegistryFixtureMixin,
+):
+    """Encapsulates isolated filesystem, configuration stores, and service instances
+
+    for end-to-end integration and compatibility matrix validation.
+    """
+
+    def __init__(self, tmp_path: Path) -> None:
+        self.tmp_path = tmp_path
+        self.init_library_fixture(tmp_path)
+        self.init_environment_fixture(tmp_path)
+        self.template_service = TemplateService()
+        self.init_server_registry_fixture(
+            library_service=self.library_service,
+            template_service=self.template_service,
+        )
+        logger.debug(
+            "Initialized CollectionVariablesIntegrationHarness at root=%s",
+            self.tmp_path,
+        )
+
+    def __enter__(self) -> CollectionVariablesIntegrationHarness:
+        """Enter context manager, returning harness instance."""
+        logger.debug("Entered harness context manager scope")
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        """Exit context manager, ensuring all running servers are stopped."""
+        if exc_type is not None:
+            logger.error(
+                "Harness context manager exiting due to exception: %s: %s",
+                exc_type.__name__,
+                exc_val,
+            )
+        else:
+            logger.debug("Exited harness context manager scope normally")
+        self.teardown()
+
+    def teardown(self) -> None:
+        """Stop all running servers in registry and release active resources."""
+        super().teardown()
+
+    def close(self) -> None:
+        """Alias for teardown() supporting explicit resource close semantics."""
+        self.teardown()
 
     def run_unified_lifecycle(
         self,
@@ -409,6 +535,9 @@ collection_harness = collection_integration_harness
 
 __all__ = [
     "CollectionVariablesIntegrationHarness",
+    "EnvironmentFixtureMixin",
+    "LibraryFixtureMixin",
+    "ServerRegistryFixtureMixin",
     "UnifiedLifecycleResult",
     "collection_harness",
     "collection_integration_harness",

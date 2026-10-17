@@ -143,6 +143,10 @@ class Environment(BaseModel):
     enable_mcp: bool = False
     builtin_environment_path: str | None = None
 
+    def get_value(self, key: str, default: str | None = None) -> str | None:
+        """Return variable value for key, or default if not set."""
+        return self.variables.get(key, default)
+
 
 class HistoryEntry(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
