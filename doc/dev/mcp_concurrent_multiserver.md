@@ -35,6 +35,14 @@ multi-server operations:
    using an adaptive polling loop (`adaptive_thread_join`). Quickly-exiting workers unblock in
    milliseconds (<50ms) rather than rigid 2.0s sleeps, slow ASGI task drains are logged
    periodically, and uncooperative threads retain truthful `is_running() == True` state.
+7. **Multi-Process Supervisor Evaluation & 10+ Server Stress Testing (PYPOST-1438)**: For
+   enterprise high-density deployments (10+ servers), an architectural evaluation of multi-process
+   supervisor isolation, trade-off matrix, and crash containment is documented in
+   [`mcp_process_supervisor_evaluation.md`](mcp_process_supervisor_evaluation.md), backed by an
+   automated 10+ concurrent server stress test suite
+   ([`tests/test_mcp_multiserver_stress_10x.py`](../../tests/test_mcp_multiserver_stress_10x.py))
+   covering barrier startup, namespace isolation under load, TCP RST drops, and immediate socket
+   reclamation.
 
 ---
 
@@ -475,10 +483,11 @@ polling to dynamically balance rapid termination response with minimal CPU overh
 
 ## Automated Test Suite Reference
 
-The automated regression test suites for concurrent multi-server execution and adaptive backoff
-joins are located in:
+The automated regression test suites for concurrent multi-server execution, adaptive backoff
+joins, and high-density stress testing are located in:
 - [`test_mcp_concurrent_multiserver_repro.py`](../../tests/test_mcp_concurrent_multiserver_repro.py)
 - [`test_mcp_server_adaptive_join.py`](../../tests/test_mcp_server_adaptive_join.py)
+- [`test_mcp_multiserver_stress_10x.py`](../../tests/test_mcp_multiserver_stress_10x.py)
 
 ### Test Matrix
 
@@ -520,21 +529,42 @@ joins are located in:
   - **Target**: `MCPServerManager.stop_server` integration and state retention.
   - **Assertions**: Fast exit, token propagation, and truthful `is_running() == True` on timeout.
 
+#### High-Density 10+ Server Stress Testing (`tests/test_mcp_multiserver_stress_10x.py`)
+
+- `test_mcp_10x_parallel_startup_barrier_synchronization`:
+  - **Target**: Parallel startup of 10 standalone MCP servers via `threading.Barrier(10)`.
+  - **Assertions**: All 10 servers reach `running` state with `is_listening == True` and active tool
+    endpoints without bind collisions.
+- `test_mcp_10x_variable_namespace_isolation_under_concurrent_load`:
+  - **Target**: Variable isolation across 10 distinct servers handling 100 concurrent requests.
+  - **Assertions**: 100% namespace isolation with zero cross-talk across worker threads.
+- `test_mcp_10x_abrupt_client_disconnect_rst_resilience`:
+  - **Target**: Abrupt client disconnections using `SO_LINGER=0` TCP RST mid-flight.
+  - **Assertions**: Zero thread crashes, no descriptor leaks, and subsequent requests succeed.
+- `test_mcp_10x_concurrent_teardown_and_socket_reclamation`:
+  - **Target**: Orderly teardown of 10 servers and immediate socket reclamation.
+  - **Assertions**: All 10 threads terminate within deadline and all 10 OS ports can be
+    rebound immediately without `EADDRINUSE`.
+
 ### Running the Test Suite
 
 Execute the test suites through the repository Makefile:
 
 ```bash
+# Run high-density 10+ server stress test suite (PYPOST-1438)
+make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
+
 # Run dedicated adaptive thread join and cancellation token tests (PYPOST-1437)
 make test PYTEST_ARGS="tests/test_mcp_server_adaptive_join.py"
 
 # Run dedicated concurrent multi-server test suite (PYPOST-1418)
 make test PYTEST_ARGS="tests/test_mcp_concurrent_multiserver_repro.py"
 
-# Run combined standalone MCP, concurrency, and adaptive join tests
+# Run combined standalone MCP, concurrency, and 10x stress tests
 make test PYTEST_ARGS="\
 tests/test_mcp_server_adaptive_join.py \
-tests/test_mcp_concurrent_multiserver_repro.py"
+tests/test_mcp_concurrent_multiserver_repro.py \
+tests/test_mcp_multiserver_stress_10x.py"
 
 # Run full repository quality gate
 make check
@@ -549,5 +579,6 @@ make check
 - [Standalone MCP Wire IPC & Stdio Stress Testing (PYPOST-1416)](mcp_standalone_wire_ipc_stress.md)
 - [Multiple Independent MCP Servers (PYPOST-1044)](mcp_server_registry.md)
 - [Cancellation Architecture (PYPOST-1437)](../../ai-tasks/PYPOST-1437/20-architecture.md)
+- [Multi-Process Supervisor Evaluation (PYPOST-1438)](mcp_process_supervisor_evaluation.md)
 - [Adaptive Backoff Thread Join Implementation](file:///home/src/pypost/core/cancellation.py)
 - [Ephemeral TCP Port Allocation Helper](file:///home/src/tests/helpers/port_allocation.py)
