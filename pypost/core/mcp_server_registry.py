@@ -101,6 +101,10 @@ class MCPServerRegistry(QObject):
         """Return the configuration for instance_id, or None if not found."""
         return self._configurations.get(instance_id)
 
+    def get_config(self, instance_id: str) -> McpServerConfiguration | None:
+        """Return the configuration for instance_id, or None if not found (alias for get)."""
+        return self.get(instance_id)
+
     def upsert(self, configuration: McpServerConfiguration) -> None:
         """Persist an in-memory configuration after globally checking its port."""
         self._validate_available_port(configuration)
