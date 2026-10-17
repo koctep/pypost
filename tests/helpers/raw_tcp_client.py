@@ -14,6 +14,8 @@ import socket
 import time
 from typing import Any
 
+from pypost.core.server_bind import detect_address_family
+
 
 class RawTcpWireClient:
     """Raw TCP socket client for injecting fragmented frames, pipelining, and bursts.
@@ -21,29 +23,53 @@ class RawTcpWireClient:
     Designed for wire-level testing of HTTP/1.1 and MCP streamable transports.
     """
 
-    def __init__(self, host: str, port: int, timeout: float = 10.0) -> None:
-        """Initialize wire client with target host, port, and socket timeout.
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        timeout: float = 10.0,
+        family: socket.AddressFamily | None = None,
+    ) -> None:
+        """Initialize wire client with target host, port, timeout, and address family.
 
         Args:
-            host: Target hostname or IP address (typically '127.0.0.1').
+            host: Target hostname or IP address (e.g. '127.0.0.1', '::1', '[::1]').
             port: Target TCP port number.
             timeout: Socket timeout in seconds for connect and read operations.
+            family: Optional socket address family override (AF_INET or AF_INET6).
+                    If None, automatically detected from host.
         """
         self.host = host
         self.port = port
         self.timeout = timeout
+        self.family: socket.AddressFamily = (
+            family if family is not None else detect_address_family(host)
+        )
+        self.clean_host = host.strip("[]")
         self.sock: socket.socket | None = None
         self.session_id: str | None = None
         self._unread_buffer = bytearray()
 
-    def connect(self) -> None:
-        """Establish physical TCP connection to (host, port).
+    @property
+    def formatted_host(self) -> str:
+        """Return bracketed host for IPv6 or clean host for IPv4."""
+        if self.family == socket.AF_INET6:
+            return f"[{self.clean_host}]"
+        return self.clean_host
 
-        Creates socket.socket(socket.AF_INET, socket.SOCK_STREAM) with timeout.
+    @property
+    def formatted_host_header(self) -> str:
+        """Return RFC 3986 / RFC 7230 compliant Host header value."""
+        return f"{self.formatted_host}:{self.port}"
+
+    def connect(self) -> None:
+        """Establish physical TCP connection to (clean_host, port).
+
+        Creates socket.socket(self.family, socket.SOCK_STREAM) with timeout.
         """
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock = socket.socket(self.family, socket.SOCK_STREAM)
         self.sock.settimeout(self.timeout)
-        self.sock.connect((self.host, self.port))
+        self.sock.connect((self.clean_host, self.port))
 
     def close(self) -> None:
         """Gracefully shut down and close the underlying socket descriptor."""
@@ -64,6 +90,38 @@ class RawTcpWireClient:
         """Close socket upon exiting context block."""
         self.close()
 
+    def format_http_request(
+        self,
+        method: str = "GET",
+        path: str = "/",
+        headers: dict[str, str] | None = None,
+        body: bytes | str | None = None,
+    ) -> bytes:
+        """Construct raw HTTP/1.1 request bytes.
+
+        Args:
+            method: HTTP method (e.g. 'GET', 'POST').
+            path: Target endpoint URI path (default '/').
+            headers: Optional additional headers dictionary.
+            body: Optional request body bytes or string.
+
+        Returns:
+            Formatted raw HTTP/1.1 request bytes.
+        """
+        body_bytes = body.encode("utf-8") if isinstance(body, str) else (body or b"")
+        req_headers = [
+            f"{method} {path} HTTP/1.1",
+            f"Host: {self.formatted_host_header}",
+            "Connection: keep-alive",
+        ]
+        if body_bytes:
+            req_headers.append(f"Content-Length: {len(body_bytes)}")
+        if headers:
+            for k, v in headers.items():
+                req_headers.append(f"{k}: {v}")
+        req_str = "\r\n".join(req_headers) + "\r\n\r\n"
+        return req_str.encode("utf-8") + body_bytes
+
     def build_post_request(
         self,
         payload: dict[str, Any],
@@ -83,7 +141,7 @@ class RawTcpWireClient:
         body = json.dumps(payload).encode("utf-8")
         headers = [
             f"POST {path} HTTP/1.1",
-            f"Host: {self.host}:{self.port}",
+            f"Host: {self.formatted_host_header}",
             "Content-Type: application/json",
             "Accept: application/json, text/event-stream",
             f"Content-Length: {len(body)}",
