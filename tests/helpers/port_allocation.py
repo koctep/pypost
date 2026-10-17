@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 import fcntl
 import os
-import socket
 from pathlib import Path
+import socket
+import time
 
 from pypost.core.server_bind import detect_address_family
 
@@ -65,3 +68,48 @@ def allocate_tcp_port(host: str = "127.0.0.1") -> int:
             return port
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+class EphemeralPortReserve:
+    """Manages batch allocation and reservation of distinct ephemeral ports."""
+
+    def __init__(self, count: int, host: str = "127.0.0.1") -> None:
+        self.count = count
+        self.host = host
+        self.ports: list[int] = []
+
+    def allocate(self) -> list[int]:
+        """Allocate 'count' distinct, verified bindable ports atomically."""
+        allocated: set[int] = set()
+        while len(allocated) < self.count:
+            port = allocate_tcp_port(self.host)
+            allocated.add(port)
+        self.ports = sorted(allocated)
+        return list(self.ports)
+
+    def verify_all_rebound(self, timeout: float = 2.0) -> bool:
+        """Verify all allocated ports can be bound by raw TCP sockets (SO_REUSEADDR)."""
+        deadline = time.monotonic() + timeout
+        for port in self.ports:
+            bound = False
+            while time.monotonic() <= deadline:
+                if _can_bind(self.host, port):
+                    bound = True
+                    break
+                time.sleep(0.01)
+            if not bound:
+                return False
+        return True
+
+
+@contextmanager
+def reserve_ephemeral_ports(
+    count: int, host: str = "127.0.0.1"
+) -> Iterator[list[int]]:
+    """Context manager allocating and managing a batch of ephemeral ports."""
+    reserve = EphemeralPortReserve(count, host)
+    ports = reserve.allocate()
+    try:
+        yield ports
+    finally:
+        pass
