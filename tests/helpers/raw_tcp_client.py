@@ -17,6 +17,149 @@ from typing import Any
 from pypost.core.server_bind import detect_address_family
 
 
+__all__ = [
+    "RawTcpWireClient",
+    "ZeroCopyStreamBuffer",
+    "parse_jsonrpc_from_response",
+]
+
+
+class ZeroCopyStreamBuffer:
+    """Zero-copy stream buffer with sliding read window and amortized compaction.
+
+    Avoids O(N^2) memory copying during iterative stream framing and chunked payload parsing.
+    """
+
+    def __init__(
+        self,
+        initial: bytes | bytearray | None = None,
+        compact_threshold: int = 64 * 1024,
+    ) -> None:
+        """Initialize buffer with optional initial content and compaction threshold.
+
+        Args:
+            initial: Optional initial byte sequence.
+            compact_threshold: Number of consumed bytes before buffer compaction is triggered.
+        """
+        self._raw: bytearray = bytearray(initial) if initial else bytearray()
+        self._read_offset: int = 0
+        self.compact_threshold: int = compact_threshold
+
+    @property
+    def unread_len(self) -> int:
+        """Return number of unconsumed bytes remaining in the active window."""
+        return max(0, len(self._raw) - self._read_offset)
+
+    @property
+    def read_offset(self) -> int:
+        """Return the current read window head offset."""
+        return self._read_offset
+
+    def unread_bytes(self) -> bytes:
+        """Return all remaining unconsumed bytes as an immutable bytes object."""
+        return bytes(self._raw[self._read_offset:])
+
+    def unread_bytearray(self) -> bytearray:
+        """Return all remaining unconsumed bytes as a bytearray for backward compatibility."""
+        return bytearray(self._raw[self._read_offset:])
+
+    def extend(self, data: bytes | bytearray | memoryview) -> None:
+        """Append newly received socket bytes to the underlying buffer.
+
+        Args:
+            data: Incoming byte sequence from socket read.
+        """
+        self._raw.extend(data)
+
+    def find(self, sub: bytes, start: int = 0) -> int:
+        """Search for byte sequence starting from the current read offset.
+
+        Args:
+            sub: Target delimiter sequence to locate.
+            start: Offset relative to the active window head (default 0).
+
+        Returns:
+            Index of the first match relative to active window head, or -1 if not found.
+        """
+        abs_start = self._read_offset + max(0, start)
+        idx = self._raw.find(sub, abs_start)
+        if idx == -1:
+            return -1
+        return idx - self._read_offset
+
+    def read_bytes(self, length: int) -> bytes:
+        """Extract a slice of bytes from the window and advance the read offset.
+
+        Args:
+            length: Number of bytes to consume and return.
+
+        Returns:
+            Extracted bytes object.
+        """
+        if length < 0:
+            raise ValueError(f"length must be non-negative, got {length}")
+        start = self._read_offset
+        end = start + length
+        result = bytes(self._raw[start:end])
+        self.consume(length)
+        return result
+
+    def read_view(self, length: int) -> memoryview:
+        """Return a non-copying memoryview slice and advance the read offset.
+
+        Args:
+            length: Number of bytes to slice.
+
+        Returns:
+            memoryview slice over the active window.
+        """
+        if length < 0:
+            raise ValueError(f"length must be non-negative, got {length}")
+        start = self._read_offset
+        self._read_offset += length
+        return memoryview(self._raw)[start:start + length]
+
+    def consume(self, length: int) -> None:
+        """Advance read offset without returning data (e.g. skipping CRLF delimiters).
+
+        Args:
+            length: Number of bytes to skip.
+        """
+        if length < 0:
+            raise ValueError(f"length must be non-negative, got {length}")
+        self._read_offset += length
+        if self._read_offset >= len(self._raw):
+            try:
+                self._raw.clear()
+                self._read_offset = 0
+            except BufferError:
+                pass
+
+    def compact(self, force: bool = False) -> None:
+        """Discard consumed bytes preceding read offset when threshold is exceeded.
+
+        Args:
+            force: If True, compacts immediately regardless of threshold.
+        """
+        if self._read_offset >= len(self._raw):
+            try:
+                self._raw.clear()
+                self._read_offset = 0
+            except BufferError:
+                pass
+        elif force or self._read_offset >= self.compact_threshold:
+            try:
+                del self._raw[:self._read_offset]
+                self._read_offset = 0
+            except BufferError:
+                pass
+
+    def clear(self) -> None:
+        """Reset buffer and read offset to empty state."""
+        self._raw.clear()
+        self._read_offset = 0
+
+
 class RawTcpWireClient:
     """Raw TCP socket client for injecting fragmented frames, pipelining, and bursts.
 
@@ -48,7 +191,17 @@ class RawTcpWireClient:
         self.clean_host = host.strip("[]")
         self.sock: socket.socket | None = None
         self.session_id: str | None = None
-        self._unread_buffer = bytearray()
+        self._stream_buffer = ZeroCopyStreamBuffer()
+
+    @property
+    def _unread_buffer(self) -> bytearray:
+        """Backward-compatible access to unconsumed stream buffer."""
+        return self._stream_buffer.unread_bytearray()
+
+    @_unread_buffer.setter
+    def _unread_buffer(self, data: bytes | bytearray) -> None:
+        """Backward-compatible setter for unconsumed stream buffer."""
+        self._stream_buffer = ZeroCopyStreamBuffer(data)
 
     @property
     def formatted_host(self) -> str:
@@ -189,9 +342,9 @@ class RawTcpWireClient:
         - Header delimiter search (\\r\\n\\r\\n) across incoming socket reads.
         - Status line parsing and lowercase header map extraction.
         - Capturing 'mcp-session-id' header into self.session_id.
-        - Decoding 'Transfer-Encoding: chunked' bodies.
+        - Decoding 'Transfer-Encoding: chunked' bodies using zero-copy slicing.
         - Decoding 'Content-Length' bounded bodies.
-        - Preserving remaining unread stream bytes in self._unread_buffer.
+        - Preserving remaining unread stream bytes in self._stream_buffer.
 
         Returns:
             Tuple of (status_code: int, headers: dict[str, str], body_bytes: bytes).
@@ -201,18 +354,21 @@ class RawTcpWireClient:
             socket.timeout: If socket timeout expires before full response arrives.
         """
         assert self.sock is not None
-        buf = self._unread_buffer
 
-        while b"\r\n\r\n" not in buf:
+        while True:
+            header_end = self._stream_buffer.find(b"\r\n\r\n")
+            if header_end != -1:
+                break
             chunk = self.sock.recv(4096)
             if not chunk:
                 raise ConnectionResetError(
                     "Connection closed while waiting for HTTP header delimiter"
                 )
-            buf.extend(chunk)
+            self._stream_buffer.extend(chunk)
 
-        header_part, _, body_prefix = buf.partition(b"\r\n\r\n")
-        header_lines = header_part.decode("utf-8", errors="replace").split("\r\n")
+        header_bytes = self._stream_buffer.read_bytes(header_end)
+        self._stream_buffer.consume(4)
+        header_lines = header_bytes.decode("utf-8", errors="replace").split("\r\n")
         status_line = header_lines[0]
         tokens = status_line.split(" ", 2)
         status_code = int(tokens[1]) if len(tokens) > 1 else 0
@@ -229,64 +385,72 @@ class RawTcpWireClient:
         transfer_encoding = headers.get("transfer-encoding", "").lower()
         content_length_str = headers.get("content-length")
 
-        body = bytearray(body_prefix)
         if "chunked" in transfer_encoding:
             decoded_chunks = bytearray()
             while True:
-                crlf = body.find(b"\r\n")
+                crlf = self._stream_buffer.find(b"\r\n")
                 while crlf == -1:
                     more = self.sock.recv(4096)
                     if not more:
                         raise ConnectionResetError(
                             "Connection closed while reading chunk length"
                         )
-                    body.extend(more)
-                    crlf = body.find(b"\r\n")
+                    self._stream_buffer.extend(more)
+                    crlf = self._stream_buffer.find(b"\r\n")
 
-                size_str = body[:crlf].decode("ascii", errors="replace").split(";")[0].strip()
+                size_str = (
+                    self._stream_buffer.read_bytes(crlf)
+                    .decode("ascii", errors="replace")
+                    .split(";")[0]
+                    .strip()
+                )
+                self._stream_buffer.consume(2)
                 chunk_len = int(size_str, 16)
                 if chunk_len == 0:
-                    body = body[crlf + 2:]
-                    while b"\r\n" not in body:
+                    while self._stream_buffer.find(b"\r\n") == -1:
                         more = self.sock.recv(4096)
                         if not more:
                             break
-                        body.extend(more)
-                    end_crlf = body.find(b"\r\n")
+                        self._stream_buffer.extend(more)
+                    end_crlf = self._stream_buffer.find(b"\r\n")
                     if end_crlf != -1:
-                        self._unread_buffer = body[end_crlf + 2:]
+                        self._stream_buffer.consume(end_crlf + 2)
                     else:
-                        self._unread_buffer = bytearray()
+                        self._stream_buffer.clear()
+                    self._stream_buffer.compact()
                     break
 
-                needed = crlf + 2 + chunk_len + 2
-                while len(body) < needed:
-                    more = self.sock.recv(max(4096, needed - len(body)))
+                needed = chunk_len + 2
+                while self._stream_buffer.unread_len < needed:
+                    more = self.sock.recv(max(4096, needed - self._stream_buffer.unread_len))
                     if not more:
                         raise ConnectionResetError(
                             "Connection closed while reading chunk data"
                         )
-                    body.extend(more)
+                    self._stream_buffer.extend(more)
 
-                chunk_content = body[crlf + 2:crlf + 2 + chunk_len]
-                decoded_chunks.extend(chunk_content)
-                body = body[crlf + 2 + chunk_len + 2:]
+                with self._stream_buffer.read_view(chunk_len) as chunk_view:
+                    decoded_chunks.extend(chunk_view)
+                self._stream_buffer.consume(2)
 
+            self._stream_buffer.compact()
             return status_code, headers, bytes(decoded_chunks)
 
         elif content_length_str is not None:
             content_length = int(content_length_str)
-            while len(body) < content_length:
-                more = self.sock.recv(max(4096, content_length - len(body)))
+            while self._stream_buffer.unread_len < content_length:
+                more = self.sock.recv(max(4096, content_length - self._stream_buffer.unread_len))
                 if not more:
                     break
-                body.extend(more)
-            self._unread_buffer = body[content_length:]
-            return status_code, headers, bytes(body[:content_length])
+                self._stream_buffer.extend(more)
+            body = self._stream_buffer.read_bytes(content_length)
+            self._stream_buffer.compact()
+            return status_code, headers, body
 
         else:
-            self._unread_buffer = bytearray()
-            return status_code, headers, bytes(body)
+            body = self._stream_buffer.unread_bytes()
+            self._stream_buffer.clear()
+            return status_code, headers, body
 
 
 def parse_jsonrpc_from_response(body_bytes: bytes) -> list[dict[str, Any]]:

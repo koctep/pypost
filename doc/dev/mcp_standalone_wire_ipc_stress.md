@@ -26,7 +26,11 @@ transport-level UTF-8 pre-validation in
 coverage and the shared test harness to IPv6 loopback (`::1`, `AF_INET6`), validating address
 family negotiation, clean host stripping, RFC 3986 / RFC 7230 bracketed `Host` header compliance,
 and socket binding in
-[`test_mcp_standalone_wire_ipv6.py`](../../tests/test_mcp_standalone_wire_ipv6.py). This document
+[`test_mcp_standalone_wire_ipv6.py`](../../tests/test_mcp_standalone_wire_ipv6.py). Story
+[PYPOST-1432](https://pypost.atlassian.net/browse/PYPOST-1432) implemented zero-copy memory
+optimization for `RawTcpWireClient` via `ZeroCopyStreamBuffer`, eliminating O(N^2) memory
+reallocation churn during chunked payload slicing and large burst scenarios in
+[`test_raw_tcp_client_zerocopy.py`](../../tests/test_raw_tcp_client_zerocopy.py). This document
 describes the architecture, protocols, failure modes, shared test harness design, helper APIs,
 negative fault injection vectors, and execution guidelines for validating standalone MCP server
 transports under physical wire, IPv6, fuzzing, and pipe conditions.
@@ -114,9 +118,12 @@ flowchart TD
 
 To test raw network conditions without high-level HTTP client abstractions (which automatically
 buffer or reassemble packets), the test harness relies on the shared utility module
-[`tests/helpers/raw_tcp_client.py`](file:///home/src/tests/helpers/raw_tcp_client.py). Promoted
-under [PYPOST-1428](https://pypost.atlassian.net/browse/PYPOST-1428), this module exports low-level
+[`tests/helpers/raw_tcp_client.py`](file:///home/src/tests/helpers/raw_tcp_client.py).
+Promoted under [PYPOST-1428](https://pypost.atlassian.net/browse/PYPOST-1428) and optimized under
+[PYPOST-1432](https://pypost.atlassian.net/browse/PYPOST-1432), this module exports low-level
 wire socket testing primitives for all MCP transport test suites:
+- `ZeroCopyStreamBuffer`: High-performance stream buffer with sliding read window, zero-copy
+  `memoryview` slicing, and 64 KB amortized compaction.
 - `RawTcpWireClient`: Low-level TCP socket client for frame injection, pipelining, and parsing.
 - `parse_jsonrpc_from_response`: Parser extracting JSON-RPC messages from JSON or SSE payloads.
 
@@ -147,7 +154,7 @@ class RawTcpWireClient:
         self.clean_host = host.strip("[]")
         self.sock: socket.socket | None = None
         self.session_id: str | None = None
-        self._unread_buffer = bytearray()
+        self._stream_buffer = ZeroCopyStreamBuffer()
 ```
 
 - **`host`** (`str`): Target hostname or loopback address (e.g. `"127.0.0.1"`, `"::1"`, or
@@ -172,8 +179,10 @@ class RawTcpWireClient:
   when disconnected.
 - `session_id: str | None`: Cached MCP session ID extracted automatically from the `mcp-session-id`
   response header.
-- `_unread_buffer: bytearray`: Internal stream buffer preserving unread bytes read ahead during
-  framing for subsequent requests.
+- `_stream_buffer: ZeroCopyStreamBuffer`: Internal zero-copy sliding window stream buffer.
+- `_unread_buffer: bytearray`: Backward-compatible property exposing unconsumed stream bytes as a
+  `bytearray` snapshot (`self._stream_buffer.unread_bytearray()`). Also provides a property setter
+  reinitializing the stream buffer for custom payload injections.
 
 #### Methods Reference
 
@@ -184,7 +193,7 @@ Establishes a physical TCP stream connection (`socket.socket(self.family, socket
 ##### `close() -> None`
 Gracefully shuts down and closes the underlying socket descriptor. Issues `socket.SHUT_RDWR`
 (suppressing `OSError` if the peer has already disconnected or reset) and closes `self.sock`,
-resetting it to `None`.
+reseting it to `None`.
 
 ##### Context Manager Protocol (`__enter__` and `__exit__`)
 Supports `with RawTcpWireClient(host, port) as client:` syntax. Calls `connect()` on entry and
@@ -222,14 +231,18 @@ pipelined bursts.
 ##### `read_http_response() -> tuple[int, dict[str, str], bytes]`
 Reads a single complete HTTP/1.1 response from the persistent socket stream.
 - **Stream Processing**:
-  - Scans `self._unread_buffer` and reads from socket in 4096-byte chunks until the header delimiter
-    (`\r\n\r\n`) is encountered.
+  - Scans `self._stream_buffer` and reads from socket in 4096-byte chunks until the header delimiter
+    (`\r\n\r\n`) is encountered using `find()`.
+  - Extracts header bytes via `read_bytes()` and consumes delimiter without reallocation via
+    `consume(4)`.
   - Parses status line into status code integer.
   - Normalizes headers to lower-case keys.
   - Captures `mcp-session-id` into `self.session_id` when present.
-  - Decodes chunked transfer encoding (`Transfer-Encoding: chunked`) or bounded `Content-Length`
-    bodies.
-  - Retains any excess read bytes in `self._unread_buffer` for subsequent pipelined response reads.
+  - Decodes chunked transfer encoding (`Transfer-Encoding: chunked`) using zero-copy
+    `read_view(chunk_len)` memoryview slices, eliminating $O(N^2)$ chunk tail reallocation churn.
+  - Decodes bounded `Content-Length` bodies via `read_bytes(content_length)`.
+  - Triggers amortized buffer compaction via `self._stream_buffer.compact()` to keep memory bounded.
+  - Retains any excess read bytes in `self._stream_buffer` for subsequent pipelined response reads.
 - **Returns** (`tuple[int, dict[str, str], bytes]`):
   - `status_code` (`int`): HTTP status code (e.g. `200`, `202`, `404`).
   - `headers` (`dict[str, str]`): Mapping of lower-case HTTP header names to header values.
@@ -238,6 +251,141 @@ Reads a single complete HTTP/1.1 response from the persistent socket stream.
   - `ConnectionResetError`: Raised if the connection is closed prematurely by peer while waiting for
     header delimiters or chunk data.
   - `socket.timeout`: Raised if the socket read timeout expires before the full response arrives.
+
+### `ZeroCopyStreamBuffer` Class Architecture & API
+
+Introduced under [PYPOST-1432](https://pypost.atlassian.net/browse/PYPOST-1432),
+`ZeroCopyStreamBuffer` in
+[`tests/helpers/raw_tcp_client.py`](file:///home/src/tests/helpers/raw_tcp_client.py) provides a
+high-performance stream buffer that eliminates $O(N^2)$ memory reallocation churn during
+iterative HTTP stream framing and chunked payload parsing.
+
+#### The $O(N^2)$ Slicing Bottleneck
+
+Prior to [PYPOST-1432](https://pypost.atlassian.net/browse/PYPOST-1432), `RawTcpWireClient` used a
+standard `bytearray` (`_unread_buffer`) for accumulating incoming socket data. In chunked HTTP
+responses (`Transfer-Encoding: chunked`), parsing each chunk required slicing and reallocating the
+entire remainder of the body:
+
+```python
+chunk_content = body[crlf + 2:crlf + 2 + chunk_len]  # Slice copy
+decoded_chunks.extend(chunk_content)
+body = body[crlf + 2 + chunk_len + 2:]  # Re-allocates & copies entire remaining body!
+```
+
+For a response stream containing $M$ chunks with total payload size $N$, every iteration copied the
+remaining buffer tail:
+$$\sum_{k=1}^M (M - k) \cdot C \approx O(M \cdot N)$$
+
+In high-throughput stress tests and long-running fuzzing bursts (e.g. 10,000 chunks of 100 bytes),
+this repeatedly allocated gigabytes of transient memory, triggering high Garbage Collection (GC)
+latency and intermittent socket timeouts.
+
+#### Architecture & Core Mechanisms
+
+`ZeroCopyStreamBuffer` resolves this through three coordinated zero-copy mechanisms:
+
+```mermaid
+flowchart LR
+    subgraph RawBuffer["Underlying bytearray (_raw)"]
+        direction LR
+        Consumed["Consumed Bytes\n[0 : _read_offset]"]
+        Active["Active Window (Unconsumed)\n[_read_offset : len(_raw)]"]
+    end
+
+    subgraph Operations["Zero-Copy Buffer Operations"]
+        Find["find(sub)\nRelative Search"]
+        ReadView["read_view(len)\nmemoryview slice"]
+        Consume["consume(len)\n_read_offset += len"]
+        Compact["compact()\nDiscard Consumed at 64KB"]
+    end
+
+    Active --> Find
+    Active --> ReadView
+    Consumed -.-> Compact
+```
+
+1. **Sliding Window Offset Pointer (`_read_offset`)**:
+   Instead of mutating or slicing the underlying `bytearray` when consuming headers or chunks,
+   `ZeroCopyStreamBuffer` maintains a monotonic integer pointer (`_read_offset`) defining the head
+   of the active, unconsumed data window. Incoming socket reads append directly to the end of the
+   buffer via `extend(data)` in $O(1)$ amortized time without shifting existing bytes.
+
+2. **Zero-Copy Memoryview Slicing (`read_view`)**:
+   The `read_view(length)` method constructs an $O(1)$ Python `memoryview` slice over the active
+   window: `memoryview(self._raw)[start:start + length]`. The slice references the existing
+   buffer memory without allocating a new byte sequence. The caller consumes the chunk directly
+   via `chunk_view` and advances `_read_offset` without memory churn.
+
+3. **Non-Allocating Delimiter Consumption (`consume`)**:
+   The `consume(length)` method advances `_read_offset` by `length` without returning or copying
+   any bytes. Delimiters such as CRLF (`\r\n`) and HTTP header terminators (`\r\n\r\n`) are
+   skipped with zero memory allocation. When all bytes are consumed (`_read_offset >= len(_raw)`),
+   the buffer resets to empty state in $O(1)$.
+
+4. **Amortized 64 KB Compaction & BufferError Safety**:
+   To prevent unbounded memory growth during continuous streaming, `compact(force=False)` checks
+   whether consumed bytes meet the compaction threshold (`self._read_offset >= 64 * 1024` / 64 KB).
+   When reached, it executes `del self._raw[:self._read_offset]` and resets `_read_offset = 0`,
+   amortizing compaction overhead to $O(1)$ per byte.
+
+   **BufferError Safety**: CPython raises `BufferError: Existing exports of data: object cannot`
+   `be re-sized` if a `bytearray` is mutated while active `memoryview` exports exist.
+   `ZeroCopyStreamBuffer` wraps all resizing mutations (`compact()`, `consume()`) in
+   `try ... except BufferError: pass`. If an export is temporarily active, compaction is deferred
+   safely until the next cycle without raising unhandled exceptions or failing tests.
+
+#### Class Signature & Initialization
+
+```python
+class ZeroCopyStreamBuffer:
+    def __init__(
+        self,
+        initial: bytes | bytearray | None = None,
+        compact_threshold: int = 64 * 1024,
+    ) -> None:
+        self._raw: bytearray = bytearray(initial) if initial else bytearray()
+        self._read_offset: int = 0
+        self.compact_threshold: int = compact_threshold
+```
+
+- **`initial`** (`bytes | bytearray | None`, optional): Initial payload bytes.
+- **`compact_threshold`** (`int`, default `65536`): Consumed bytes threshold before compaction.
+
+**Instance Properties**:
+- `unread_len: int`: Returns number of unconsumed bytes remaining in the active window.
+- `read_offset: int`: Returns current read window head offset.
+
+**Methods Reference**:
+- `extend(data: bytes | bytearray | memoryview) -> None`: Appends socket chunk to buffer tail.
+- `find(sub: bytes, start: int = 0) -> int`: Searches for delimiter `sub` relative to the active
+  read offset. Returns relative offset or `-1` if not found.
+- `read_bytes(length: int) -> bytes`: Copies and returns `length` bytes, advancing `_read_offset`.
+- `read_view(length: int) -> memoryview`: Returns non-copying `memoryview` slice spanning `length`
+  bytes and advances `_read_offset`.
+- `consume(length: int) -> None`: Advances `_read_offset` without allocating or returning bytes.
+- `compact(force: bool = False) -> None`: Discards consumed bytes if threshold is exceeded.
+- `unread_bytes() -> bytes`: Returns immutable `bytes` copy of remaining unconsumed data.
+- `unread_bytearray() -> bytearray`: Returns mutable `bytearray` copy of remaining unconsumed data.
+- `clear() -> None`: Clears underlying buffer and resets `_read_offset` to 0.
+
+#### Integration with `RawTcpWireClient`
+
+`RawTcpWireClient` incorporates `ZeroCopyStreamBuffer` as `self._stream_buffer`:
+1. **Chunked Decoding Loop**: During HTTP/1.1 chunked response parsing, chunk sizes are parsed
+   using `find(b"\r\n")` and `read_bytes()`, while payload data is extracted via:
+   ```python
+   with self._stream_buffer.read_view(chunk_len) as chunk_view:
+       decoded_chunks.extend(chunk_view)
+   ```
+   Delimiter CRLFs are skipped with non-allocating `consume(2)`.
+2. **Backward Compatibility**: To preserve compatibility with existing test assertions expecting
+   direct buffer access, `RawTcpWireClient._unread_buffer` is exposed as a `@property`:
+   - Getter: Returns `self._stream_buffer.unread_bytearray()`.
+   - Setter: Replaces `self._stream_buffer` with `ZeroCopyStreamBuffer(data)`.
+3. **Pipelining Integrity**: When multiple HTTP responses arrive in a single TCP frame, residual
+   bytes remain in `self._stream_buffer` and are immediately available for subsequent
+   `read_http_response()` calls with zero slice copying.
 
 ### `parse_jsonrpc_from_response` Helper API
 
@@ -1082,14 +1230,17 @@ make test PYTEST_ARGS='tests/test_mcp_standalone_wire_ipv6.py'
 # Run unit tests for shared raw_tcp_client test helper
 make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py'
 
+# Run ZeroCopyStreamBuffer and RawTcpWireClient zero-copy test suite (PYPOST-1432)
+make test PYTEST_ARGS="tests/test_raw_tcp_client_zerocopy.py"
+
 # Run unit tests for shared mcp_stdio_harness test helper
 make test PYTEST_ARGS='tests/test_mcp_stdio_harness.py'
 
 # Run negative wire framing and malformed JSON-RPC fuzzing suite
 make test PYTEST_ARGS='tests/test_mcp_wire_fuzzing_negative.py'
 
-# Run wire stress, IPv6, and fuzzing suites together with helper tests
-make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py tests/test_mcp_stdio_harness.py tests/test_mcp_standalone_execution_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_wire_fuzzing_negative.py tests/test_mcp_standalone_wire_ipv6.py'
+# Run wire stress, IPv6, fuzzing, and zerocopy suites together with helper tests
+make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py tests/test_raw_tcp_client_zerocopy.py tests/test_mcp_stdio_harness.py tests/test_mcp_standalone_execution_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_wire_fuzzing_negative.py tests/test_mcp_standalone_wire_ipv6.py'
 
 # Run all MCP-related test suites
 make test PYTEST_ARGS='tests/test_mcp*.py'
