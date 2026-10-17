@@ -241,6 +241,55 @@ Improper socket cleanup can hold TCP ports in `TIME_WAIT` or leak file descripto
 - **Immediate Port Re-Binding**: Verifies that the server cleanly shuts down its Uvicorn worker thread and releases listening sockets, enabling immediate re-binding on the exact same port with `SO_REUSEADDR` without encountering `EADDRINUSE`.
 - **Successor Instance Startup**: Immediately instantiates and starts a second `MCPServerManager` on the identical port, asserting full readiness.
 
+#### Concurrent Server Teardown and Parallel Cleanup Support (PYPOST-1434)
+
+When terminating multiple MCP servers—such as during test suite teardown, fixture cleanup, or
+application shutdown—stopping instances sequentially introduces cumulative latency, where each
+server join timeout can take up to 1.0s or more. Story
+[PYPOST-1434](https://pypost.atlassian.net/browse/PYPOST-1434) upgrades `MCPServerRegistry.stop()`
+and `MCPServerRegistry.stop_all()` to execute concurrent shutdowns with bounded parallelism and
+isolated error handling.
+
+##### Lock Scope Narrowing in `MCPServerRegistry.stop()`
+
+Previously, `MCPServerRegistry.stop()` held the internal `_reconfiguration_lock` across the entire
+call to `manager.stop_server()`. Because `stop_server()` halts uvicorn worker event loops and
+performs blocking thread joins (`thread.join(timeout=...)`), holding `_reconfiguration_lock`
+completely serialized multi-server teardowns and created contention when multiple threads or
+workers attempted concurrent stops.
+
+Under PYPOST-1434, the lock window in `MCPServerRegistry.stop(instance_id)` is strictly narrowed:
+1. `_reconfiguration_lock` is acquired only to mutate registry state:
+   - Pops pending candidate managers from `_pending_reconfigurations`.
+   - Fetches the active `MCPServerManager` reference from `_managers`.
+   - Transitions instance status to `"stopped"` via `_set_status()`.
+2. The lock is released immediately after extracting manager references.
+3. Actual server stopping (`pending.candidate_manager.stop_server()` and `manager.stop_server()`)
+   and worker thread joins are executed outside `_reconfiguration_lock`.
+
+This critical narrowing enables multiple worker threads to execute `stop()` concurrently without
+blocking on registry locks during shutdown joins.
+
+##### Concurrent Teardown in `MCPServerRegistry.stop_all()`
+
+`MCPServerRegistry.stop_all(*, timeout: float = 10.0, max_workers: int | None = None) -> None`
+provides bounded parallel teardown across all registered, manager-backed, and pending instances:
+
+- **Target Discovery**: Under `_reconfiguration_lock`, computes the unique union of instance IDs
+  from `_managers`, `_pending_reconfigurations`, and `_configurations`.
+- **Bounded Worker Pool**: Uses a `concurrent.futures.ThreadPoolExecutor` bounded by
+  `worker_count = min(len(target_ids), 16) if max_workers is None else max(1, max_workers)`. This
+  prevents thread exhaustion while allowing fully concurrent shutdown of standard test fixtures.
+- **Join Timeout**: Submits worker tasks (`_worker_stop`) and awaits completion via
+  `concurrent.futures.wait(futures, timeout=timeout)`. If the timeout expires before all workers
+  complete, a warning is logged (`mcp_registry_concurrent_teardown_timed_out`) and the executor is
+  terminated with `shutdown(wait=False, cancel_futures=True)` to prevent hanging test suites or
+  application exit.
+- **Per-Worker Exception Isolation**: Each worker wraps `self.stop(instance_id)` in exception
+  handling, recording errors in a thread-safe `errors` dictionary and logging
+  `mcp_registry_concurrent_teardown_error` with full stack traces. An unhandled exception or crash
+  in one server manager never prevents remaining servers from stopping.
+
 ## Configuration and lifecycle
 
 `AppSettings.mcp_servers` is a list of `McpServerConfiguration` objects saved
@@ -274,7 +323,7 @@ registry.reconfigure(instance_id, configuration)
 registry.remove(instance_id)
 registry.refresh_collection(collection_id)
 registry.refresh_environment(environment_id)
-registry.stop_all()                  # application/agent-session shutdown only
+registry.stop_all(timeout=10.0, max_workers=None)  # concurrent application/test shutdown
 ```
 
 `refresh_collection()` updates only servers selected for that collection;
@@ -348,6 +397,6 @@ For comprehensive multi-server concurrency, variable isolation, hot reload, and 
 Run the focused checks after changing this subsystem:
 
 ```bash
-make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py'
+make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py tests/test_mcp_concurrent_teardown.py'
 ```
 

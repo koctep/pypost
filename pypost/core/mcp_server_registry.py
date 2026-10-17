@@ -5,6 +5,7 @@ import logging
 import socket
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -203,27 +204,138 @@ class MCPServerRegistry(QObject):
         self._start_manager(manager, configuration, runtime)
 
     def stop(self, instance_id: str) -> None:
-        configuration = self._configuration(instance_id)
+        if (
+            instance_id not in self._configurations
+            and instance_id not in self._managers
+            and instance_id not in self._pending_reconfigurations
+        ):
+            raise KeyError(f"Unknown MCP server instance: {instance_id}")
+        configuration = self._configurations.get(instance_id)
+        port = configuration.port if configuration is not None else 0
         logger.info(
             "mcp_registry_stop_requested instance_id=%s port=%d",
             instance_id,
-            configuration.port,
+            port,
         )
         # A candidate is not registered as active until its bind succeeds.
         # Stop must cancel it too, otherwise a late worker signal could commit
         # a replacement after the user explicitly stopped this row.
         with self._reconfiguration_lock:
             pending = self._pending_reconfigurations.pop(instance_id, None)
-            if pending is not None:
-                pending.candidate_manager.stop_server()
             manager = self._managers.get(instance_id)
-            if manager is not None:
-                manager.stop_server()
             self._set_status(instance_id, "stopped")
 
-    def stop_all(self) -> None:
-        for instance_id in tuple(self._managers):
-            self.stop(instance_id)
+        stopped_exc: BaseException | None = None
+        if pending is not None:
+            try:
+                pending.candidate_manager.stop_server()
+            except Exception as exc:
+                logger.error(
+                    "mcp_registry_candidate_stop_error instance_id=%s error=%s",
+                    instance_id,
+                    exc,
+                    exc_info=True,
+                )
+                stopped_exc = exc
+        if manager is not None:
+            try:
+                manager.stop_server()
+            except Exception as exc:
+                logger.error(
+                    "mcp_registry_manager_stop_error instance_id=%s error=%s",
+                    instance_id,
+                    exc,
+                    exc_info=True,
+                )
+                if stopped_exc is None:
+                    stopped_exc = exc
+
+        if stopped_exc is not None:
+            raise stopped_exc
+
+    def stop_all(
+        self,
+        *,
+        timeout: float = 10.0,
+        max_workers: int | None = None,
+    ) -> None:
+        """Concurrently stop all registered and pending MCP server instances.
+
+        Args:
+            timeout: Maximum aggregate seconds to await worker thread joins.
+            max_workers: Maximum parallel worker threads. Defaults to
+                min(len(instances), 16).
+        """
+        with self._reconfiguration_lock:
+            target_ids = tuple(
+                dict.fromkeys(
+                    list(self._managers.keys())
+                    + list(self._pending_reconfigurations.keys())
+                    + list(self._configurations.keys())
+                )
+            )
+
+        if not target_ids:
+            return
+
+        worker_count = (
+            min(len(target_ids), 16) if max_workers is None else max(1, max_workers)
+        )
+        worker_count = max(1, worker_count)
+
+        logger.info(
+            "mcp_registry_concurrent_teardown_started count=%d max_workers=%d timeout=%.1f",
+            len(target_ids),
+            worker_count,
+            timeout,
+        )
+
+        errors: dict[str, Exception] = {}
+        errors_lock = threading.Lock()
+
+        def _worker_stop(instance_id: str) -> None:
+            logger.debug(
+                "mcp_registry_concurrent_teardown_worker_started instance_id=%s",
+                instance_id,
+            )
+            try:
+                self.stop(instance_id)
+                logger.debug(
+                    "mcp_registry_concurrent_teardown_worker_completed instance_id=%s",
+                    instance_id,
+                )
+            except Exception as exc:
+                with errors_lock:
+                    errors[instance_id] = exc
+                logger.error(
+                    "mcp_registry_concurrent_teardown_error instance_id=%s error=%s",
+                    instance_id,
+                    exc,
+                    exc_info=True,
+                )
+
+        executor = ThreadPoolExecutor(max_workers=worker_count)
+        try:
+            futures = [executor.submit(_worker_stop, inst_id) for inst_id in target_ids]
+            done, not_done = wait(futures, timeout=timeout)
+            if not_done:
+                logger.warning(
+                    "mcp_registry_concurrent_teardown_timed_out pending_count=%d timeout=%.1f",
+                    len(not_done),
+                    timeout,
+                )
+                executor.shutdown(wait=False, cancel_futures=True)
+            else:
+                executor.shutdown(wait=True)
+        except Exception:
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
+
+        logger.info(
+            "mcp_registry_concurrent_teardown_finished count=%d errors_count=%d",
+            len(target_ids),
+            len(errors),
+        )
 
     def reconfigure(self, instance_id: str, configuration: McpServerConfiguration) -> None:
         """Replace only the selected endpoint; neighbours keep their managers.

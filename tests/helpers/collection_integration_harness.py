@@ -8,14 +8,18 @@ and MCP server registry lifecycle.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 import json
 import logging
 from pathlib import Path
 import time
 import types
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import pytest
+
+if TYPE_CHECKING:
+    from pypost.core.qt.mcp_server import MCPServerManager
 
 from pypost.core.collection_serializer import read_collection_file
 from pypost.core.collection_variable_import import (
@@ -203,6 +207,7 @@ class ServerRegistryFixtureMixin:
 
     registry: MCPServerRegistry
     template_service: TemplateService
+    _server_candidates: list[MCPServerManager]
 
     def __init__(
         self,
@@ -214,7 +219,7 @@ class ServerRegistryFixtureMixin:
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        if not hasattr(self, "registry"):
+        if not hasattr(self, "registry") or not hasattr(self, "_server_candidates"):
             self.init_server_registry_fixture(
                 registry=registry,
                 library_service=library_service,
@@ -228,7 +233,8 @@ class ServerRegistryFixtureMixin:
         library_service: Any = None,
         template_service: TemplateService | None = None,
     ) -> None:
-        """Initialize MCP server registry and template service."""
+        """Initialize MCP server registry, candidate tracking, and template service."""
+        self._server_candidates: list[MCPServerManager] = []
         self.template_service = (
             template_service
             if template_service is not None
@@ -314,12 +320,62 @@ class ServerRegistryFixtureMixin:
             )
             raise
 
-    def teardown(self) -> None:
+    def teardown(
+        self,
+        *,
+        timeout: float = 10.0,
+        max_workers: int | None = None,
+    ) -> None:
         """Stop all running servers in registry and release active resources."""
         logger.info("Tearing down harness and stopping all registered servers")
         try:
-            if hasattr(self, "registry") and self.registry is not None:
-                self.registry.stop_all()
+            candidates = list(getattr(self, "_server_candidates", []))
+            registry = getattr(self, "registry", None)
+
+            def _stop_candidate(cand: Any) -> None:
+                logger.debug("Harness teardown stopping candidate manager: %r", cand)
+                try:
+                    cand.stop_server()
+                    logger.debug("Harness teardown candidate manager stopped: %r", cand)
+                except Exception as exc:
+                    logger.warning("Error stopping candidate manager during teardown: %s", exc)
+
+            pool_workers = max(1, len(candidates) + (1 if registry is not None else 0))
+            if max_workers is not None:
+                pool_workers = max(1, max_workers)
+            else:
+                pool_workers = min(pool_workers, 16)
+
+            executor = ThreadPoolExecutor(max_workers=pool_workers)
+            try:
+                futures = []
+                if registry is not None:
+                    futures.append(
+                        executor.submit(
+                            registry.stop_all,
+                            timeout=timeout,
+                            max_workers=max_workers,
+                        )
+                    )
+                for cand in candidates:
+                    futures.append(executor.submit(_stop_candidate, cand))
+
+                done, not_done = wait(futures, timeout=timeout)
+                if not_done:
+                    logger.warning(
+                        "Harness teardown timed out with %d pending operations",
+                        len(not_done),
+                    )
+                    executor.shutdown(wait=False, cancel_futures=True)
+                else:
+                    executor.shutdown(wait=True)
+            except Exception:
+                executor.shutdown(wait=False, cancel_futures=True)
+                raise
+            finally:
+                if hasattr(self, "_server_candidates"):
+                    self._server_candidates.clear()
+
             logger.debug("Harness teardown completed successfully")
         except Exception as exc:
             logger.warning("Error stopping servers during harness teardown: %s", exc)
@@ -397,9 +453,14 @@ class CollectionVariablesIntegrationHarness(
             logger.debug("Exited harness context manager scope normally")
         self.teardown()
 
-    def teardown(self) -> None:
+    def teardown(
+        self,
+        *,
+        timeout: float = 10.0,
+        max_workers: int | None = None,
+    ) -> None:
         """Stop all running servers in registry and release active resources."""
-        super().teardown()
+        super().teardown(timeout=timeout, max_workers=max_workers)
 
     def close(self) -> None:
         """Alias for teardown() supporting explicit resource close semantics."""
