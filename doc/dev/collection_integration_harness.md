@@ -499,6 +499,82 @@ class UnifiedLifecycleResult:
 
 ---
 
+## In-Memory Virtual Filesystem Backend (PYPOST-1435)
+
+To bypass physical disk I/O during high-frequency integration matrix runs and CI execution,
+[PYPOST-1435](https://pypost.atlassian.net/browse/PYPOST-1435) provides an in-memory virtual
+filesystem backend (`InMemoryVirtualFS`) and pluggable storage adapters for
+`CollectionVariablesIntegrationHarness`.
+
+### Architecture & Primitives
+
+The virtual filesystem is implemented in `tests.helpers.in_memory_virtual_fs`:
+
+1. **Virtual Node Hierarchy**:
+   - `VirtualNode`: Abstract base class with metadata (`name`, `created_at`, `modified_at`).
+   - `VirtualFile`: Leaf node storing byte payloads (`content: bytes`) with text and binary
+     read/write helpers (`read_text`, `write_text`, `read_bytes`, `write_bytes`).
+   - `VirtualDir`: Interior node maintaining a mapping of child nodes (`children: dict[str, VirtualNode]`).
+2. **Thread Safety**:
+   All tree mutations, traversals, and stat queries are synchronized under a re-entrant lock
+   (`threading.RLock()`), ensuring deterministic behavior across concurrent worker threads.
+3. **Isolated Ephemeral Namespace**:
+   Each virtual filesystem instance provisions a unique root path:
+   `/virtual_pypost_harness_<uuid>/`. Operations outside this prefix pass through unmodified to
+   underlying OS filesystem primitives.
+4. **Transparent Path Interception**:
+   `InMemoryVirtualFS` acts as a context manager (`with vfs:`), monkeypatching standard
+   `pathlib.Path` methods (`mkdir`, `read_text`, `write_text`, `read_bytes`, `write_bytes`,
+   `is_file`, `is_dir`, `exists`, `iterdir`, `glob`, `rglob`, `unlink`, `stat`, `open`).
+   Code interacting with `Path` objects operates seamlessly without knowing storage is virtual.
+
+### Specialized In-Memory Storage Adapters
+
+Three adapters decouple subsystem persistence from disk I/O:
+
+- `InMemoryLibraryConnectionStore(LibraryConnectionStore)`:
+  Stores library connection records in an in-memory list and virtual file catalog, eliminating
+  JSON disk serialization.
+- `InMemoryLocalOverlayManager(LocalOverlayManager)`:
+  Stores local overlay configurations and secrets in memory, bypassing OS `chmod 0600`
+  permissions and file lock overhead.
+- `InMemoryStorageManager(StorageManager)`:
+  Stores workspace environment collections in memory with serialization tracking.
+
+### Harness Integration & Usage
+
+`CollectionVariablesIntegrationHarness` supports `in_memory=True`:
+
+```python
+from tests.helpers.collection_integration_harness import CollectionVariablesIntegrationHarness
+
+# Using the in-memory harness context manager
+with CollectionVariablesIntegrationHarness(in_memory=True) as harness:
+    result = harness.run_unified_lifecycle(
+        manifest_id="catalog_sample",
+        collection_data={"id": "col_1", "info": {"name": "Test"}},
+        server_id="srv_1",
+    )
+    assert result.status_code == 200
+```
+
+Pytest fixtures are available for declarative test injection:
+
+```python
+def test_sample_with_fixture(in_memory_collection_harness):
+    harness = in_memory_collection_harness
+    assert harness.in_memory is True
+    # Zero physical disk I/O
+```
+
+### Zero Disk I/O Guarantees & Teardown
+
+- **Zero Host Filesystem Touches**: Virtual root paths are never written to host storage.
+- **Automated Cleanup**: On `harness.teardown()` or context exit, `vfs.unmount()` restores
+  original `Path` methods and clears all memory nodes, ensuring zero memory retention.
+
+---
+
 ## Testing Guidance & Reference Suites
 
 When authoring new integration tests or extending variable resolution workflows:
@@ -516,6 +592,9 @@ When authoring new integration tests or extending variable resolution workflows:
 - **End-to-End Compatibility Matrix**:
   `tests/test_collection_scoped_variables_integration.py` tests the 4-quadrant
   backward compatibility matrix and conflict resolution strategies.
+- **In-Memory Virtual Filesystem Tests (PYPOST-1435)**:
+  `tests/test_in_memory_virtual_fs.py` validates InMemoryVirtualFS tree node operations,
+  Path interception, in-memory adapters, zero disk I/O guarantees, and backward compatibility.
 - **Related Documentation**:
   - [Collection-Scoped Variables and Standalone MCP Servers](collection_scoped_variables.md)
   - [Workspace Environment Variable Import](workspace_environment_variable_import.md)
@@ -526,9 +605,12 @@ When authoring new integration tests or extending variable resolution workflows:
 To execute the concurrent teardown and integration harness test suites:
 
 ```bash
+# Run in-memory virtual filesystem backend test suite
+make test PYTEST_ARGS='tests/test_in_memory_virtual_fs.py'
+
 # Run concurrent teardown and error isolation tests
 make test PYTEST_ARGS='tests/test_mcp_concurrent_teardown.py'
 
 # Run combined harness and teardown test suites
-make test PYTEST_ARGS='tests/test_mcp_concurrent_teardown.py tests/test_collection_harness_mixins.py tests/test_collection_integration_harness_repro.py'
+make test PYTEST_ARGS='tests/test_mcp_concurrent_teardown.py tests/test_collection_harness_mixins.py tests/test_collection_integration_harness_repro.py tests/test_in_memory_virtual_fs.py'
 ```
