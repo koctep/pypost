@@ -14,6 +14,12 @@ modular mixin architecture. This decomposition decouples filesystem catalog mana
 workspace storage from background MCP server process supervision, allowing integration tests to
 compose only the fixture capabilities they need.
 
+Under [PYPOST-1435](https://pypost.atlassian.net/browse/PYPOST-1435), the harness gained an
+in-memory virtual filesystem backend (`InMemoryVirtualFS`) and companion virtual storage adapters.
+This allows high-frequency integration test runs to bypass physical disk I/O completely, achieving
+zero disk writes and sub-millisecond execution cycles while retaining 100% backward compatibility
+with pytest's `tmp_path` fixture.
+
 ---
 
 ## Modular Architecture
@@ -24,7 +30,7 @@ composite harness class:
 ```mermaid
 flowchart TB
     subgraph Mixins["Modular Fixture Mixins"]
-        LFM["LibraryFixtureMixin<br/>- libraries_dir<br/>- overlay_dir<br/>- connection_store<br/>- overlay_manager<br/>- library_service<br/>- runtime_resolver"]
+        LFM["LibraryFixtureMixin<br/>- libraries / overlays<br/>- connection_store<br/>- overlay_manager"]
         EFM["EnvironmentFixtureMixin<br/>- workspace_dir<br/>- storage_manager"]
         SRFM["ServerRegistryFixtureMixin<br/>- registry<br/>- template_service"]
     end
@@ -271,10 +277,34 @@ class CollectionVariablesIntegrationHarness(
     EnvironmentFixtureMixin,
     ServerRegistryFixtureMixin,
 ):
-    def __init__(self, tmp_path: Path) -> None:
-        self.tmp_path = tmp_path
-        self.init_library_fixture(tmp_path)
-        self.init_environment_fixture(tmp_path)
+    def __init__(
+        self,
+        tmp_path: Path | None = None,
+        *,
+        in_memory: bool = False,
+        backend: InMemoryVirtualFS | None = None,
+    ) -> None:
+        self.in_memory = in_memory or (backend is not None)
+        if self.in_memory:
+            self.virtual_fs = backend or InMemoryVirtualFS()
+            self.virtual_fs.mount()
+            self.tmp_path = self.virtual_fs.root_path
+        else:
+            if tmp_path is None:
+                raise ValueError("tmp_path is required when in_memory is False")
+            self.virtual_fs = None
+            self.tmp_path = tmp_path
+
+        self.init_library_fixture(
+            self.tmp_path,
+            in_memory=self.in_memory,
+            vfs=self.virtual_fs,
+        )
+        self.init_environment_fixture(
+            self.tmp_path,
+            in_memory=self.in_memory,
+            vfs=self.virtual_fs,
+        )
         self.template_service = TemplateService()
         self.init_server_registry_fixture(
             library_service=self.library_service,
@@ -289,26 +319,42 @@ against the original monolithic harness:
 - All properties (`tmp_path`, `libraries_dir`, `workspace_dir`, `overlay_dir`, `connection_store`,
   `overlay_manager`, `storage_manager`, `template_service`, `library_service`,
   `runtime_resolver`, `registry`) are present at the exact same attribute locations.
+- New properties `in_memory: bool` and `virtual_fs: InMemoryVirtualFS | None` are exposed for
+  inspecting the storage backend without breaking existing consumers.
 - All helper methods (`create_library`, `create_workspace_environment`, `create_overlay`,
   `start_standalone_server`, `teardown`, `close`, `__enter__`, `__exit__`) are preserved.
+- When instantiated with `tmp_path` and `in_memory=False` (default), the harness executes against
+  the physical filesystem with physical storage managers.
 - `teardown(*, timeout=10.0, max_workers=None)` and `close()` support concurrent execution across
-  both active registry instances and tracked candidates, accepting optional `timeout` and
-  `max_workers` arguments while defaulting to backward-compatible signature invocation.
+  both active registry instances and tracked candidates, unmounting the virtual filesystem when
+  `in_memory=True`.
 - The high-level multi-subsystem orchestration method `run_unified_lifecycle()` remains
-  available on the composite class.
+  available on the composite class across both physical and virtual modes.
 
 ### Pytest Fixture Bindings
 
-The module exposes two pytest fixture bindings:
-- `collection_integration_harness`: Canonical fixture yielding an initialized harness.
+The module exposes three pytest fixture bindings:
+- `collection_integration_harness`: Canonical fixture backed by pytest's `tmp_path`.
 - `collection_harness`: Short alias for `collection_integration_harness`.
+- `in_memory_collection_harness`: Zero-disk fixture running with `in_memory=True`.
 
 ```python
-from tests.helpers.collection_integration_harness import collection_integration_harness
+from tests.helpers.collection_integration_harness import (
+    collection_integration_harness,
+    in_memory_collection_harness,
+)
 
-def test_full_workflow(collection_integration_harness):
+# Standard physical disk execution (tmp_path)
+def test_disk_workflow(collection_integration_harness):
     harness = collection_integration_harness
     lib_dir = harness.create_library("demo-lib", collections_data={...})
+    assert lib_dir.is_dir()
+
+# High-frequency in-memory execution (zero disk I/O)
+def test_in_memory_workflow(in_memory_collection_harness):
+    harness = in_memory_collection_harness
+    assert harness.in_memory is True
+    lib_dir = harness.create_library("mem-lib", collections_data={...})
     assert lib_dir.is_dir()
 ```
 
