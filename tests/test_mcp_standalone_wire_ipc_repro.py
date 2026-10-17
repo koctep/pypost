@@ -8,11 +8,9 @@ from __future__ import annotations
 
 import json
 import socket
-import subprocess
 import sys
 import threading
 import time
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,6 +18,7 @@ import pytest
 from pypost.core.qt.mcp_server import MCPServerManager
 from pypost.core.request_service import ExecutionResult, ResponseData
 from pypost.models.models import RequestData
+from tests.helpers.mcp_stdio_harness import McpStdioHarness
 from tests.helpers.port_allocation import allocate_tcp_port
 from tests.helpers.qt_wait import wait_until
 from tests.helpers.raw_tcp_client import RawTcpWireClient, parse_jsonrpc_from_response
@@ -288,124 +287,58 @@ if __name__ == "__main__":
     asyncio.run(main())
 """
 
-    process = subprocess.Popen(
-        [sys.executable, "-c", server_script],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        bufsize=0,
-    )
-
-    responses: dict[Any, dict[str, Any]] = {}
-    response_lock = threading.Lock()
-    stderr_output: list[str] = []
-
-    def stdout_worker() -> None:
-        assert process.stdout is not None
-        for raw_line in iter(process.stdout.readline, b""):
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                msg = json.loads(line.decode("utf-8"))
-                with response_lock:
-                    if "id" in msg:
-                        responses[msg["id"]] = msg
-            except Exception as e:
-                stderr_output.append(f"stdout decode error: {e}")
-
-    def stderr_worker() -> None:
-        assert process.stderr is not None
-        for raw_line in iter(process.stderr.readline, b""):
-            stderr_output.append(raw_line.decode("utf-8", errors="replace"))
-
-    t_out = threading.Thread(target=stdout_worker, daemon=True)
-    t_err = threading.Thread(target=stderr_worker, daemon=True)
-    t_out.start()
-    t_err.start()
-
-    try:
-        assert process.stdin is not None
-
+    cmd = [sys.executable, "-c", server_script]
+    with McpStdioHarness(cmd) as harness:
         # 1. Initialize handshake
-        init_msg = {
-            "jsonrpc": "2.0",
-            "id": 0,
-            "method": "initialize",
-            "params": {
+        harness.send_request(
+            request_id=0,
+            method="initialize",
+            params={
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
                 "clientInfo": {"name": "stdio-tester", "version": "1.0"},
             },
-        }
-        process.stdin.write(json.dumps(init_msg).encode("utf-8") + b"\n")
-        process.stdin.flush()
-
-        deadline = time.time() + 5.0
-        while time.time() < deadline:
-            with response_lock:
-                if 0 in responses:
-                    break
-            time.sleep(0.02)
-        assert 0 in responses
+        )
+        init_response = harness.wait_for_response(0, timeout=5.0)
+        assert init_response["id"] == 0
 
         # 2. Initialized notification
-        notif_msg = {
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized",
-        }
-        process.stdin.write(json.dumps(notif_msg).encode("utf-8") + b"\n")
-        process.stdin.flush()
+        harness.send_notification("notifications/initialized")
 
         # 3. Burst of 50 requests including large payloads (>64KB)
         total_requests = 50
         large_payload = "X" * 70000  # 70KB, exceeding 64KB OS pipe buffer
         for seq in range(1, total_requests + 1):
             payload = large_payload if seq > 40 else f"item-{seq}"
-            req = {
-                "jsonrpc": "2.0",
-                "id": seq,
-                "method": "tools/call",
-                "params": {
+            harness.send_request(
+                request_id=seq,
+                method="tools/call",
+                params={
                     "name": "stdio_echo",
                     "arguments": {"payload": payload},
                 },
-            }
-            process.stdin.write(json.dumps(req).encode("utf-8") + b"\n")
-        process.stdin.flush()
+            )
 
-        # Wait for all 50 responses concurrently drained
-        burst_deadline = time.time() + 15.0
-        while time.time() < burst_deadline:
-            with response_lock:
-                if len(responses) >= total_requests + 1:
-                    break
-            time.sleep(0.05)
+        # Wait for all 50 responses concurrently drained (plus initialize response = 51)
+        responses = harness.wait_for_responses(total_requests + 1, timeout=15.0)
 
-        with response_lock:
-            for seq in range(1, total_requests + 1):
-                assert seq in responses, f"Missing response for request id {seq}"
-            # Verify large payload responses (>64KB) were not corrupted or truncated
-            for seq in range(41, total_requests + 1):
-                res = responses[seq]
-                assert "result" in res
-                content_text = res["result"]["content"][0]["text"]
-                parsed = json.loads(content_text)
-                assert parsed["status"] == 200
-                assert parsed["error"] is False
-                inner_body = json.loads(parsed["body"])
-                assert inner_body["echo_length"] == 70000
+        for seq in range(1, total_requests + 1):
+            assert seq in responses, f"Missing response for request id {seq}"
+        # Verify large payload responses (>64KB) were not corrupted or truncated
+        for seq in range(41, total_requests + 1):
+            res = responses[seq]
+            assert "result" in res
+            content_text = res["result"]["content"][0]["text"]
+            parsed = json.loads(content_text)
+            assert parsed["status"] == 200
+            assert parsed["error"] is False
+            inner_body = json.loads(parsed["body"])
+            assert inner_body["echo_length"] == 70000
 
         # 4. Clean exit on stdin close
-        process.stdin.close()
-        retcode = process.wait(timeout=5.0)
+        harness.close_stdin()
+        retcode = harness.wait_for_exit(timeout=5.0)
         assert retcode == 0
-    finally:
-        if process.poll() is None:
-            process.kill()
-            process.wait(timeout=2.0)
-        t_out.join(timeout=1.0)
-        t_err.join(timeout=1.0)
 
 
 def test_wire_lifecycle_teardown_and_port_rebind(qapp) -> None:

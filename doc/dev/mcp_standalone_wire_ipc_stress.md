@@ -13,9 +13,13 @@ stdio transport stress testing in
 Story [PYPOST-1428](https://pypost.atlassian.net/browse/PYPOST-1428) extracted the reusable wire
 client and response decoder into the shared test utility module
 [`tests/helpers/raw_tcp_client.py`](file:///home/src/tests/helpers/raw_tcp_client.py)
-for reuse across all MCP wire transport test suites. This document describes the architecture,
-protocols, failure modes, shared test harness design, helper APIs, and execution guidelines for
-validating standalone MCP server transports under physical wire and pipe conditions.
+for reuse across all MCP wire transport test suites. Story
+[PYPOST-1429](https://pypost.atlassian.net/browse/PYPOST-1429) encapsulated subprocess stdio child
+process management and asynchronous stream draining into the dedicated test harness
+[`tests/helpers/mcp_stdio_harness.py`](file:///home/src/tests/helpers/mcp_stdio_harness.py).
+This document describes the architecture, protocols, failure modes, shared test harness design,
+helper APIs, and execution guidelines for validating standalone MCP server transports under
+physical wire and pipe conditions.
 
 ---
 
@@ -32,7 +36,7 @@ Standalone MCP servers in PyPost support two primary physical communication chan
 flowchart TD
     subgraph ClientHarness["Test Harness / MCP Client"]
         WireClient["RawTcpWireClient (tests/helpers/raw_tcp_client.py)"]
-        StdioHarness["Stdio Subprocess Runner"]
+        StdioHarness["McpStdioHarness (tests/helpers/mcp_stdio_harness.py)"]
     end
 
     subgraph NetworkStack["OS Network Stack & Pipes"]
@@ -282,6 +286,290 @@ with RawTcpWireClient(host="127.0.0.1", port=server_port) as client:
 
 ---
 
+## Shared Stdio Test Harness (`tests/helpers/mcp_stdio_harness.py`)
+
+To test standalone MCP child processes communicating over operating system pipes without
+re-implementing low-level process spawning and thread management in every test suite, the harness
+relies on the dedicated helper module
+[`tests/helpers/mcp_stdio_harness.py`](file:///home/src/tests/helpers/mcp_stdio_harness.py).
+Encapsulated under [PYPOST-1429](https://pypost.atlassian.net/browse/PYPOST-1429),
+`McpStdioHarness` provides child process execution, asynchronous non-blocking stream draining,
+synchronized response dispatching, and bounded timeout enforcement.
+
+### Architectural Design
+
+Testing stdio-based MCP servers out-of-process introduces concurrency and operating system pipe
+constraints:
+
+1. **Daemon Thread Reader Loops**:
+   Child processes write stdout and stderr concurrently. Operating standard blocking reads from the
+   main test thread creates deadlock vulnerabilities when both streams produce output.
+   `McpStdioHarness` spawns two dedicated daemon reader threads upon launch:
+   - `_stdout_worker`: Consumes `process.stdout.readline` line-by-line using `iter(..., b"")`.
+     Each non-empty line is parsed as JSON-RPC. If the decoded payload contains `"id"`, the message
+     is registered in `self._responses` under its request ID, appended to `self._messages`, and
+     waiters are notified via the condition variable.
+   - `_stderr_worker`: Consumes `process.stderr.readline` line-by-line, decoding text with
+     `errors="replace"` and recording it to `self._stderr_lines` under `self._stderr_lock`.
+
+2. **Monitor Condition Variable Synchronization**:
+   To avoid inefficient busy-waiting or thread polling loops, `McpStdioHarness` coordinates worker
+   threads and test consumers through a monitor pattern using `threading.Condition` bound to an
+   underlying re-entrant lock (`threading.RLock`). Whenever `_stdout_worker` decodes a message or
+   response, it acquires the condition and executes `notify_all()`. Test caller threads waiting on
+   `wait_for_response()`, `wait_for_responses()`, or `wait_for_predicate()` block on
+   `self._condition.wait(remaining)` and wake up immediately upon response arrival.
+
+3. **OS Pipe Deadlock Prevention**:
+   Standard OS kernel pipe buffers have limited capacity (typically 64KB on Linux, with atomic
+   `PIPE_BUF` writes up to 4096 bytes). When a child process writes responses exceeding pipe
+   capacity (such as large tool outputs or bursts) while the test process is busy writing to
+   `stdin`, unconsumed stdout buffers saturate, blocking the child write call and stalling both
+   processes in a permanent deadlock.
+   `McpStdioHarness` prevents pipe deadlocks by:
+   - Launching child processes with unbuffered pipes (`bufsize=0`).
+   - Concurrently and continuously draining `stdout` and `stderr` in background threads regardless
+     of test thread write activity.
+   - Synchronizing all `stdin` transmissions with `_stdin_lock` and flushing immediately.
+
+4. **Graceful Stdin EOF Shutdown with SIGKILL Escalation**:
+   Well-behaved stdio MCP servers terminate when their input stream closes (`stdin` EOF).
+   `McpStdioHarness.close_stdin()` flushes and closes `process.stdin`, ignoring `BrokenPipeError` or
+   `OSError` if the process has already exited.
+   `McpStdioHarness.stop(timeout=5.0)` performs graceful teardown:
+   - Closes `stdin` if still open.
+   - Waits up to `timeout` seconds for the process to exit cleanly.
+   - If `subprocess.TimeoutExpired` occurs, automatically escalates to `kill()` (`SIGKILL`) with a
+     bounded 2.0-second grace window.
+   - Joins reader daemon threads and returns the final process returncode.
+
+### `McpStdioHarness` Class API
+
+`McpStdioHarness` encapsulates the lifecycle of a single child subprocess and its stream readers.
+
+#### Class Signature & Initialization
+
+```python
+class McpStdioHarness:
+    def __init__(
+        self,
+        command: Sequence[str | Path] | str,
+        *,
+        cwd: str | Path | None = None,
+        env: dict[str, str] | None = None,
+        auto_start: bool = True,
+    ) -> None:
+```
+
+- **`command`** (`Sequence[str | Path] | str`): Executable arguments sequence (e.g.
+  `[sys.executable, "-c", script]`) or shell command string to execute.
+- **`cwd`** (`str | Path | None`, optional): Working directory for the child process.
+- **`env`** (`dict[str, str] | None`, optional): Custom environment variable mapping.
+- **`auto_start`** (`bool`, default `True`): If `True`, automatically invokes `start()` during
+  initialization. Set to `False` to defer launch or configure custom state prior to starting.
+
+**Instance Properties & Attributes**:
+- `process: subprocess.Popen[bytes] | None`: Underlying `Popen` instance or `None` if unstarted.
+- `is_alive -> bool`: Property returning `True` if the child process is currently active and
+  `process.poll() is None`.
+- `returncode -> int | None`: Property returning the integer exit code or `None` if running.
+
+#### Lifecycle & Process Management Methods
+
+##### `__enter__() -> McpStdioHarness`
+Context manager entry point. Ensures `start()` has run and returns the harness instance.
+
+##### `__exit__(exc_type, exc_val, exc_tb) -> None`
+Context manager exit point. Guarantees deterministic `stop()` and resource cleanup on exit.
+
+##### `start() -> None`
+Launches child process with `stdin=PIPE`, `stdout=PIPE`, `stderr=PIPE`, and `bufsize=0`.
+Spawns background `_stdout_worker` and `_stderr_worker` daemon threads.
+- **Raises**: `RuntimeError` if the process is already running.
+
+##### `close_stdin() -> None`
+Flushes and closes `process.stdin` to signal EOF to the child server. Safe to call multiple times
+or if `stdin` has already closed.
+
+##### `stop(timeout: float = 5.0) -> int`
+Gracefully stops the child process. Closes `stdin`, waits up to `timeout` seconds for exit,
+escalates to `kill()` if the timeout expires, joins background reader threads, and returns the
+exit code.
+- **`timeout`** (`float`, default `5.0`): Maximum time in seconds to wait for graceful exit.
+- **Returns** (`int`): Process exit returncode.
+
+##### `kill(timeout: float = 2.0) -> int`
+Immediately terminates the child process with `process.kill()`, waits up to `timeout` seconds,
+joins reader worker threads, and returns the returncode.
+- **`timeout`** (`float`, default `2.0`): Maximum wait time in seconds after termination signal.
+- **Returns** (`int`): Process exit returncode.
+
+##### `wait_for_exit(timeout: float = 5.0) -> int`
+Blocks until the child process terminates and joins reader worker threads.
+- **`timeout`** (`float`, default `5.0`): Maximum wait time in seconds.
+- **Returns** (`int`): Process exit returncode.
+- **Raises**:
+  - `TimeoutError`: If the child process does not exit within `timeout` seconds.
+  - `RuntimeError`: If the child process was never started.
+
+#### Message Transmission Methods
+
+##### `send_raw(data: bytes | str) -> None`
+Writes raw bytes or string directly to `process.stdin` and flushes immediately under
+`_stdin_lock`.
+- **`data`** (`bytes | str`): Raw data to transmit.
+- **Raises**: `RuntimeError` if the process is not running or `stdin` is closed; `TypeError` if
+  data is not `bytes` or `str`.
+
+##### `send_message(message: dict[str, Any] | str) -> None`
+Serializes a JSON dictionary (or formats a string with trailing newline) and transmits it to
+`process.stdin` via `send_raw`.
+- **`message`** (`dict[str, Any] | str`): Message dictionary or JSON string.
+
+##### `send_request(request_id: Any, method: str, params: dict[str, Any] | None = None) -> None`
+Convenience helper to format and transmit a standard JSON-RPC 2.0 request message:
+`{"jsonrpc": "2.0", "id": request_id, "method": method, "params": ...}`.
+- **`request_id`** (`Any`): Correlating request identifier.
+- **`method`** (`str`): JSON-RPC method name (e.g. `"initialize"`, `"tools/call"`).
+- **`params`** (`dict[str, Any] | None`, optional): Request parameters dictionary.
+
+##### `send_notification(method: str, params: dict[str, Any] | None = None) -> None`
+Convenience helper to format and transmit a standard JSON-RPC 2.0 notification (omits `"id"`):
+`{"jsonrpc": "2.0", "method": method, "params": ...}`.
+- **`method`** (`str`): JSON-RPC notification method (e.g. `"notifications/initialized"`).
+- **`params`** (`dict[str, Any] | None`, optional): Notification parameters dictionary.
+
+#### Response Inspection & Synchronization Methods
+
+##### `get_response(request_id: Any) -> dict[str, Any] | None`
+Thread-safe non-blocking lookup of a received response by ID. Returns a dictionary copy if
+present, or `None` if not yet received.
+
+##### `get_all_responses() -> dict[Any, dict[str, Any]]`
+Thread-safe snapshot copy of all collected JSON-RPC responses keyed by request ID.
+
+##### `get_messages() -> list[dict[str, Any]]`
+Thread-safe ordered list copy of all received JSON-RPC messages (both responses and notifications).
+
+##### `get_stderr() -> str`
+Thread-safe snapshot of all captured stderr text emitted by the child process.
+
+##### `wait_for_response(request_id: Any, timeout: float = 5.0) -> dict[str, Any]`
+Blocks until the response matching `request_id` is received or `timeout` expires.
+- **`request_id`** (`Any`): Expected response identifier.
+- **`timeout`** (`float`, default `5.0`): Maximum wait time in seconds.
+- **Returns** (`dict[str, Any]`): Parsed JSON-RPC response dictionary.
+- **Raises**: `TimeoutError` including captured stderr output if the response is not received
+  within `timeout` seconds.
+
+##### `wait_for_responses(total_count: int, timeout: float = 15.0) -> dict[Any, dict[str, Any]]`
+Blocks until at least `total_count` responses have been collected in the registry.
+- **`total_count`** (`int`): Minimum number of responses required.
+- **`timeout`** (`float`, default `15.0`): Maximum wait time in seconds.
+- **Returns** (`dict[Any, dict[str, Any]]`): Thread-safe dictionary of all collected responses.
+- **Raises**: `TimeoutError` including count diagnostics and stderr output if the threshold is
+  not met.
+
+##### `wait_for_predicate(predicate, timeout=5.0, interval=0.05) -> None`
+Blocks until a custom callable predicate evaluates to `True` or `timeout` expires.
+- **`predicate`** (`Callable[[McpStdioHarness], bool]`): Predicate accepting the harness instance.
+- **`timeout`** (`float`, default `5.0`): Maximum wait time in seconds.
+- **`interval`** (`float`, default `0.05`): Polling interval fallback for condition evaluation.
+- **Raises**: `TimeoutError` with captured stderr output on timeout.
+
+### Usage Patterns in Test Suites
+
+#### 1. Context Manager Lifecycle with Handshake
+
+```python
+import sys
+from tests.helpers.mcp_stdio_harness import McpStdioHarness
+
+server_cmd = [sys.executable, "-c", "import my_server; my_server.main()"]
+
+with McpStdioHarness(server_cmd) as harness:
+    # 1. Send initialize request and wait for correlated response
+    harness.send_request(
+        request_id=1,
+        method="initialize",
+        params={
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0"},
+        },
+    )
+    init_res = harness.wait_for_response(1, timeout=5.0)
+    assert init_res["result"]["serverInfo"]["name"] == "my-server"
+
+    # 2. Complete handshake notification
+    harness.send_notification("notifications/initialized")
+    assert harness.is_alive
+# Process is automatically stopped, stdin closed, and threads joined on exit
+```
+
+#### 2. Burst Request Correlation & Large Payload Verification
+
+```python
+import json
+import sys
+from tests.helpers.mcp_stdio_harness import McpStdioHarness
+
+server_cmd = [sys.executable, "-c", "import my_server; my_server.main()"]
+
+with McpStdioHarness(server_cmd) as harness:
+    # Perform handshake
+    harness.send_request(1, "initialize", {"capabilities": {}})
+    harness.wait_for_response(1, timeout=5.0)
+    harness.send_notification("notifications/initialized")
+
+    # Blast 50 requests including large 70KB payloads (>64KB pipe buffer)
+    for req_id in range(2, 52):
+        payload = "X" * 70000 if req_id > 40 else f"item-{req_id}"
+        harness.send_request(
+            request_id=req_id,
+            method="tools/call",
+            params={"name": "echo", "arguments": {"payload": payload}},
+        )
+
+    # Await all 51 responses (initialize + 50 burst calls)
+    responses = harness.wait_for_responses(51, timeout=15.0)
+    assert len(responses) == 51
+
+    # Verify individual response integrity
+    large_res = responses[51]
+    parsed = json.loads(large_res["result"]["content"][0]["text"])
+    assert len(parsed["payload"]) == 70000
+
+    # Clean EOF shutdown assertion
+    harness.close_stdin()
+    exit_code = harness.wait_for_exit(timeout=5.0)
+    assert exit_code == 0
+```
+
+#### 3. Custom Predicate & Timeout Diagnostics
+
+```python
+from tests.helpers.mcp_stdio_harness import McpStdioHarness
+
+with McpStdioHarness(server_cmd) as harness:
+    harness.send_request("probe", "custom/ping")
+
+    # Await custom condition (e.g. message containing specific result key)
+    harness.wait_for_predicate(
+        lambda h: any(
+            m.get("result", {}).get("ready") is True
+            for m in h.get_messages()
+        ),
+        timeout=5.0,
+    )
+
+    # Inspect captured stderr diagnostics safely
+    stderr_log = harness.get_stderr()
+    assert "FATAL" not in stderr_log
+```
+
+---
+
 ## Stress Test Scenarios & Invariants
 
 The test suite in
@@ -327,15 +615,17 @@ validates four critical architectural stress scenarios:
   processes block on I/O.
 - **Verification Strategy**:
   1. Launch standalone MCP server in an external Python subprocess running
-     `mcp.server.stdio.stdio_server`.
-  2. Spawn two dedicated background drainer threads:
-     - `stdout_worker`: Continuously drains `process.stdout` using line iterators, parsing JSON-RPC
-       messages into a thread-safe dictionary under a lock.
-     - `stderr_worker`: Continuously drains `process.stderr` into a log buffer.
-  3. Send initial handshake (`initialize`, `notifications/initialized`).
+     `mcp.server.stdio.stdio_server` managed by `McpStdioHarness`.
+  2. The harness automatically executes two dedicated background daemon drainer threads:
+     - `_stdout_worker`: Continuously drains `process.stdout` using line iterators, parsing
+       JSON-RPC messages into a thread-safe dictionary under condition variable synchronization.
+     - `_stderr_worker`: Continuously drains `process.stderr` into a log buffer.
+  3. Send initial handshake (`initialize`, `notifications/initialized`) via `harness.send_request`
+     and `harness.send_notification`.
   4. Inject a burst of 50 requests, with requests 41–50 containing large 70KB payloads
      (`"X" * 70000`), exceeding the 64KB OS pipe buffer limit.
-  5. Close `process.stdin` and assert clean exit with return code 0.
+  5. Close `process.stdin` via `harness.close_stdin()` and assert clean exit code 0 via
+     `harness.wait_for_exit()`.
 - **Invariant**: All 50 responses (including the 70KB payloads) are received intact without payload
   corruption or truncation. The server process terminates cleanly on `stdin` EOF.
 
@@ -371,8 +661,11 @@ make test PYTEST_ARGS='tests/test_mcp_standalone_wire_ipc_repro.py'
 # Run unit tests for shared raw_tcp_client test helper
 make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py'
 
+# Run unit tests for shared mcp_stdio_harness test helper
+make test PYTEST_ARGS='tests/test_mcp_stdio_harness.py'
+
 # Run wire stress tests together with helper tests and standalone execution tests
-make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py tests/test_mcp_standalone_execution_repro.py tests/test_mcp_standalone_wire_ipc_repro.py'
+make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py tests/test_mcp_stdio_harness.py tests/test_mcp_standalone_execution_repro.py tests/test_mcp_standalone_wire_ipc_repro.py'
 
 # Run all MCP-related test suites
 make test PYTEST_ARGS='tests/test_mcp*.py'
