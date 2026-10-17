@@ -38,6 +38,12 @@ from pypost.models.collection_variable import CollectionVariable
 from pypost.models.library_manifest import LocalLibraryOverlay
 from pypost.models.models import Environment
 from pypost.models.settings import McpServerConfiguration
+from tests.helpers.in_memory_virtual_fs import (
+    InMemoryLibraryConnectionStore,
+    InMemoryLocalOverlayManager,
+    InMemoryStorageManager,
+    InMemoryVirtualFS,
+)
 from tests.helpers.port_allocation import allocate_tcp_port
 
 logger = logging.getLogger(__name__)
@@ -54,6 +60,8 @@ class UnifiedLifecycleResult:
     rendered_request_url: str
     rendered_auth_header: str
     rendered_body: str
+    catalog_entry: Any = None
+    rendered_request: dict[str, Any] | None = None
 
 
 class LibraryFixtureMixin:
@@ -67,12 +75,25 @@ class LibraryFixtureMixin:
     library_service: LibraryManagerService
     runtime_resolver: LibraryRuntimeResolver
 
-    def __init__(self, tmp_path: Path | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        tmp_path: Path | None = None,
+        *,
+        in_memory: bool = False,
+        vfs: InMemoryVirtualFS | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         if tmp_path is not None and not hasattr(self, "libraries_dir"):
-            self.init_library_fixture(tmp_path)
+            self.init_library_fixture(tmp_path, in_memory=in_memory, vfs=vfs)
 
-    def init_library_fixture(self, tmp_path: Path) -> None:
+    def init_library_fixture(
+        self,
+        tmp_path: Path,
+        *,
+        in_memory: bool = False,
+        vfs: InMemoryVirtualFS | None = None,
+    ) -> None:
         """Initialize isolated filesystem directories and library services."""
         self.tmp_path = tmp_path
         self.libraries_dir = tmp_path / "libraries"
@@ -80,8 +101,19 @@ class LibraryFixtureMixin:
         self.libraries_dir.mkdir(parents=True, exist_ok=True)
         self.overlay_dir.mkdir(parents=True, exist_ok=True)
 
-        self.connection_store = LibraryConnectionStore(self.tmp_path / "connections.json")
-        self.overlay_manager = LocalOverlayManager(self.overlay_dir)
+        if in_memory and vfs is not None:
+            self.connection_store = InMemoryLibraryConnectionStore(
+                vfs=vfs,
+                path=self.tmp_path / "connections.json",
+            )
+            self.overlay_manager = InMemoryLocalOverlayManager(
+                vfs=vfs,
+                base_dir=self.overlay_dir,
+            )
+        else:
+            self.connection_store = LibraryConnectionStore(self.tmp_path / "connections.json")
+            self.overlay_manager = LocalOverlayManager(self.overlay_dir)
+
         self.library_service = LibraryManagerService(
             connection_store=self.connection_store,
             overlay_manager=self.overlay_manager,
@@ -110,9 +142,14 @@ class LibraryFixtureMixin:
             for filename, col_dict in collections_data.items():
                 col_path = collections_dir / filename
                 rel_paths.append(f"collections/{filename}")
-                if "id" not in col_dict:
-                    col_dict["id"] = filename.split(".")[0]
-                col_path.write_text(json.dumps(col_dict, indent=2), encoding="utf-8")
+                normalized_col = dict(col_dict)
+                if "id" not in normalized_col:
+                    normalized_col["id"] = filename.split(".")[0]
+                if "requests" in normalized_col and isinstance(normalized_col["requests"], list):
+                    for req in normalized_col["requests"]:
+                        if isinstance(req, dict) and req.get("body") is None:
+                            req["body"] = ""
+                col_path.write_text(json.dumps(normalized_col, indent=2), encoding="utf-8")
 
         manifest_dict: dict[str, Any] = {
             "id": manifest_id,
@@ -142,21 +179,28 @@ class LibraryFixtureMixin:
         library_id: str,
         active_profile: str = "",
         secrets: dict[str, str] | None = None,
+        variable_overrides: dict[str, Any] | None = None,
+        overrides: dict[str, Any] | None = None,
     ) -> LocalLibraryOverlay:
         """Create and persist a local library overlay."""
+        merged_overrides = dict(overrides or {})
+        if variable_overrides:
+            merged_overrides.update(variable_overrides)
         overlay = LocalLibraryOverlay(
             library_id=library_id,
             active_profile=active_profile,
             secrets=dict(secrets) if secrets else {},
+            overrides=merged_overrides,
         )
         self.overlay_manager.save_overlay(overlay)
         logger.debug(
             "Created local library overlay for library_id=%s active_profile=%s "
-            "secret_count=%d secret_keys=%s",
+            "secret_count=%d secret_keys=%s overrides_count=%d",
             library_id,
             active_profile,
             len(overlay.secrets),
             sorted(overlay.secrets.keys()),
+            len(overlay.overrides),
         )
         return overlay
 
@@ -168,17 +212,36 @@ class EnvironmentFixtureMixin:
     workspace_dir: Path
     storage_manager: StorageManager
 
-    def __init__(self, tmp_path: Path | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        tmp_path: Path | None = None,
+        *,
+        in_memory: bool = False,
+        vfs: InMemoryVirtualFS | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         if tmp_path is not None and not hasattr(self, "workspace_dir"):
-            self.init_environment_fixture(tmp_path)
+            self.init_environment_fixture(tmp_path, in_memory=in_memory, vfs=vfs)
 
-    def init_environment_fixture(self, tmp_path: Path) -> None:
+    def init_environment_fixture(
+        self,
+        tmp_path: Path,
+        *,
+        in_memory: bool = False,
+        vfs: InMemoryVirtualFS | None = None,
+    ) -> None:
         """Initialize isolated workspace directory and storage manager."""
         self.tmp_path = tmp_path
         self.workspace_dir = tmp_path / "workspace"
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
-        self.storage_manager = StorageManager(data_dir=self.workspace_dir)
+        if in_memory and vfs is not None:
+            self.storage_manager = InMemoryStorageManager(
+                vfs=vfs,
+                data_dir=self.workspace_dir,
+            )
+        else:
+            self.storage_manager = StorageManager(data_dir=self.workspace_dir)
 
     def create_workspace_environment(
         self,
@@ -417,18 +480,46 @@ class CollectionVariablesIntegrationHarness(
     for end-to-end integration and compatibility matrix validation.
     """
 
-    def __init__(self, tmp_path: Path) -> None:
-        self.tmp_path = tmp_path
-        self.init_library_fixture(tmp_path)
-        self.init_environment_fixture(tmp_path)
+    virtual_fs: InMemoryVirtualFS | None
+    in_memory: bool
+
+    def __init__(
+        self,
+        tmp_path: Path | None = None,
+        *,
+        in_memory: bool = False,
+        backend: InMemoryVirtualFS | None = None,
+    ) -> None:
+        self.in_memory = in_memory or (backend is not None)
+        if self.in_memory:
+            self.virtual_fs = backend or InMemoryVirtualFS()
+            self.virtual_fs.mount()
+            self.tmp_path = self.virtual_fs.root_path
+        else:
+            if tmp_path is None:
+                raise ValueError("tmp_path is required when in_memory is False")
+            self.virtual_fs = None
+            self.tmp_path = tmp_path
+
+        self.init_library_fixture(
+            self.tmp_path,
+            in_memory=self.in_memory,
+            vfs=self.virtual_fs,
+        )
+        self.init_environment_fixture(
+            self.tmp_path,
+            in_memory=self.in_memory,
+            vfs=self.virtual_fs,
+        )
         self.template_service = TemplateService()
         self.init_server_registry_fixture(
             library_service=self.library_service,
             template_service=self.template_service,
         )
         logger.debug(
-            "Initialized CollectionVariablesIntegrationHarness at root=%s",
+            "Initialized CollectionVariablesIntegrationHarness at root=%s in_memory=%s",
             self.tmp_path,
+            self.in_memory,
         )
 
     def __enter__(self) -> CollectionVariablesIntegrationHarness:
@@ -460,7 +551,12 @@ class CollectionVariablesIntegrationHarness(
         max_workers: int | None = None,
     ) -> None:
         """Stop all running servers in registry and release active resources."""
-        super().teardown(timeout=timeout, max_workers=max_workers)
+        try:
+            super().teardown(timeout=timeout, max_workers=max_workers)
+        finally:
+            if getattr(self, "virtual_fs", None) is not None:
+                self.virtual_fs.unmount()
+                self.virtual_fs.clear()
 
     def close(self) -> None:
         """Alias for teardown() supporting explicit resource close semantics."""
@@ -470,37 +566,43 @@ class CollectionVariablesIntegrationHarness(
         self,
         *,
         manifest_id: str,
-        collection_data: dict[str, Any],
-        active_profile: str,
-        overlay_secrets: dict[str, str],
-        workspace_env_name: str,
-        conflict_strategy: ConflictStrategy,
+        collection_data: dict[str, Any] | None = None,
+        active_profile: str = "",
+        overlay_secrets: dict[str, str] | None = None,
+        workspace_env_name: str | None = None,
+        conflict_strategy: ConflictStrategy = ConflictStrategy.OVERWRITE,
+        target_env_id: str | None = None,
+        col_filename: str | None = None,
     ) -> UnifiedLifecycleResult:
         """Execute full unified multi-subsystem workflow orchestration:
 
         catalog discovery -> standalone MCP server startup -> collection copy ->
         workspace environment import -> template substitution.
         """
-        collection_id = collection_data.get("id", "collection")
-        col_filename = f"{collection_id}.json"
         logger.info(
             "Starting unified multi-subsystem lifecycle for manifest_id=%s "
-            "collection_id=%s profile=%s conflict_strategy=%s",
+            "profile=%s conflict_strategy=%s",
             manifest_id,
-            collection_id,
             active_profile,
             getattr(conflict_strategy, "value", conflict_strategy),
         )
 
         try:
-            # 1. Connect library to library_service (via create_library)
-            lib_dir = self.create_library(
-                manifest_id=manifest_id,
-                is_legacy_manifest=False,
-                collections_data={col_filename: collection_data},
-            )
+            # 1. Connect library to library_service (via create_library if collection_data provided)
+            if collection_data is not None:
+                collection_id = collection_data.get("id", "collection")
+                actual_col_filename = col_filename or f"{collection_id}.json"
+                lib_dir = self.create_library(
+                    manifest_id=manifest_id,
+                    is_legacy_manifest=False,
+                    collections_data={actual_col_filename: collection_data},
+                )
+            else:
+                lib_dir = self.libraries_dir / manifest_id
+                actual_col_filename = col_filename or "col.json"
+                collection_id = actual_col_filename.rsplit(".", 1)[0]
 
-            # 2. Save overlay secrets into overlay_manager
+            # 2. Save overlay secrets into overlay_manager if provided
             if overlay_secrets or active_profile:
                 self.create_overlay(
                     library_id=manifest_id,
@@ -508,27 +610,47 @@ class CollectionVariablesIntegrationHarness(
                     secrets=overlay_secrets,
                 )
 
-            # 3. Register and start standalone server in registry
-            server_id, _, standalone_status = self.start_standalone_server(
-                manifest_id=manifest_id,
-                collection_id=collection_id,
-                collection_filename=col_filename,
-                collection_name=collection_data.get("name", collection_id),
-            )
+            # 3. Register and start standalone server in registry if collection_data was provided
+            server_id = f"standalone-{manifest_id}-{collection_id}"
+            standalone_status = "running"
+            if collection_data is not None:
+                server_id, _, standalone_status = self.start_standalone_server(
+                    manifest_id=manifest_id,
+                    collection_id=collection_id,
+                    collection_filename=actual_col_filename,
+                    collection_name=collection_data.get("name", collection_id),
+                )
 
-            # 4. Import collection variables into a workspace environment
-            env = self.create_workspace_environment(name=workspace_env_name)
-            col_file_path = lib_dir / "collections" / col_filename
+            # 4. Resolve or create target workspace environment
+            env: Environment | None = None
+            if target_env_id is not None:
+                envs = self.storage_manager.load_environments()
+                env = next(
+                    (e for e in envs if e.id == target_env_id or e.name == target_env_id),
+                    None,
+                )
+            if env is None:
+                target_name = workspace_env_name or (
+                    f"Env {target_env_id}" if target_env_id else "Integration Env"
+                )
+                env = self.create_workspace_environment(name=target_name)
+
+            col_file_path = lib_dir / "collections" / actual_col_filename
             collection = read_collection_file(col_file_path)
+            overlay = self.overlay_manager.get_overlay(manifest_id)
+            preset_name = active_profile or getattr(overlay, "active_profile", "") or None
             summary = import_collection_variables_to_environment(
                 environment=env,
                 collection=collection,
                 conflict_strategy=conflict_strategy,
-                preset_name=active_profile,
+                preset_name=preset_name,
             )
+            self.storage_manager.save_environments([env])
 
             # 5. Build context combining environment variables and template variables
             context: dict[str, Any] = dict(env.variables)
+            if overlay and overlay.overrides:
+                context.update(overlay.overrides)
 
             # 6. Render request URL, headers, and body with template_service
             req = collection.requests[0] if collection.requests else None
@@ -537,9 +659,23 @@ class CollectionVariablesIntegrationHarness(
             rendered_body = ""
             if req is not None:
                 rendered_url = self.template_service.render_string(req.url, context)
-                auth_header = req.headers.get("Authorization", "")
+                auth_header = req.headers.get("Authorization", "") if req.headers else ""
                 rendered_auth = self.template_service.render_string(auth_header, context)
-                rendered_body = self.template_service.render_string(req.body, context)
+                body_val = req.body or ""
+                body_str = (
+                    body_val if isinstance(body_val, str) else json.dumps(body_val)
+                )
+                rendered_body = self.template_service.render_string(body_str, context)
+
+            # 7. Retrieve catalog entry
+            entries = self.library_service.list_manifest_collections(manifest_id)
+            catalog_entry = entries[0] if entries else None
+
+            rendered_request = {
+                "url": rendered_url,
+                "headers": {"Authorization": rendered_auth} if rendered_auth else {},
+                "body": rendered_body,
+            }
 
             logger.info(
                 "Completed unified multi-subsystem lifecycle for manifest_id=%s "
@@ -557,12 +693,13 @@ class CollectionVariablesIntegrationHarness(
                 rendered_request_url=rendered_url,
                 rendered_auth_header=rendered_auth,
                 rendered_body=rendered_body,
+                catalog_entry=catalog_entry,
+                rendered_request=rendered_request,
             )
         except Exception as exc:
             logger.error(
-                "Unified multi-subsystem lifecycle failed for manifest_id=%s collection_id=%s: %s",
+                "Unified multi-subsystem lifecycle failed for manifest_id=%s: %s",
                 manifest_id,
-                collection_id,
                 exc,
             )
             raise
@@ -594,6 +731,21 @@ collection_integration_harness = _fix
 
 collection_harness = collection_integration_harness
 
+
+def _in_memory_collection_harness_impl() -> Iterator[CollectionVariablesIntegrationHarness]:
+    logger.debug("Pytest fixture yielding in_memory_collection_harness")
+    harness = CollectionVariablesIntegrationHarness(in_memory=True)
+    try:
+        yield harness
+    finally:
+        logger.debug("Pytest fixture tearing down in_memory_collection_harness")
+        harness.teardown()
+
+
+_in_mem_fix = pytest.fixture(_in_memory_collection_harness_impl)
+_in_mem_fix.__class__ = _CallableFixture
+in_memory_collection_harness = _in_mem_fix
+
 __all__ = [
     "CollectionVariablesIntegrationHarness",
     "EnvironmentFixtureMixin",
@@ -602,4 +754,5 @@ __all__ = [
     "UnifiedLifecycleResult",
     "collection_harness",
     "collection_integration_harness",
+    "in_memory_collection_harness",
 ]

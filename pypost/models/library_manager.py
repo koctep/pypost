@@ -7,7 +7,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class LibrarySourceType(str, Enum):
@@ -16,6 +16,7 @@ class LibrarySourceType(str, Enum):
     CLONED = "Cloned managed copy"
     REGISTERED = "Registered local directory"
     PREDEFINED = "Predefined bundled library"
+    LOCAL_DIRECTORY = "Registered local directory"
 
 
 class LibrarySyncStatus(str, Enum):
@@ -52,6 +53,33 @@ class LibraryConnectionRecord(BaseModel):
     manifest_id: Optional[str] = None
     remote_url: Optional[str] = None
     is_read_only: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap_legacy_or_alias_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "id" in data and "stable_id" not in data:
+                data["stable_id"] = data["id"]
+            if "name" in data and "display_name" not in data:
+                data["display_name"] = data["name"]
+            if "source_path" in data and "local_path" not in data:
+                data["local_path"] = data["source_path"]
+        return data
+
+    @property
+    def id(self) -> str:
+        """Alias for stable_id."""
+        return self.stable_id
+
+    @property
+    def source_path(self) -> Path:
+        """Alias for local_path."""
+        return self.local_path
+
+    @property
+    def name(self) -> Optional[str]:
+        """Alias for display_name."""
+        return self.display_name
 
     @field_validator("stable_id")
     @classmethod
