@@ -78,7 +78,7 @@ zero blockers exist.
 
 | ID | Priority | Class | Jira | Summary |
 | --- | --- | --- | --- | --- |
-| TD-1 | Low | NON-BLOCKER | TBD | Implement multi-process supervisor (Phase 2) |
+| TD-1 | Low | NON-BLOCKER | [PYPOST-1439][jira-1439] | Implement multi-process supervisor (Phase 2) |
 
 ### Draft Field Specifications
 
@@ -95,6 +95,7 @@ zero blockers exist.
 - **Priority**: Low
 - **Labels**: `["tech-debt", "mcp", "architecture"]`
 - **Story Points**: 8.0
+- **Jira**: [PYPOST-1439][jira-1439]
 
 ---
 
@@ -112,6 +113,7 @@ zero blockers exist.
 **SAFE TO PROCEED TO REVIEW**
 
 [jira-1438]: https://pypost.atlassian.net/browse/PYPOST-1438
+[jira-1439]: https://pypost.atlassian.net/browse/PYPOST-1439
 [port-alloc]: file:///home/src/tests/helpers/port_allocation.py
 [stress-test]: file:///home/src/tests/test_mcp_multiserver_stress_10x.py
 [supervisor-eval]: file:///home/src/doc/dev/mcp_process_supervisor_evaluation.md
