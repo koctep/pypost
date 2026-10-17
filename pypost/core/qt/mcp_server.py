@@ -17,6 +17,7 @@ from pypost.core.mcp_proxy_server_impl import MCPProxyServerImpl
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.server_bind import (
+    detect_address_family,
     drain_pending_tasks,
     format_bind_error,
     get_process_exit_original,
@@ -203,7 +204,11 @@ class MCPServerManager(QObject):
         self.status_changed.emit(False)
 
     def is_running(self) -> bool:
-        return self._server_thread is not None and self._server_thread.is_alive()
+        return (
+            self._server_thread is not None
+            and self._server_thread.is_alive()
+            and self._start_error is None
+        )
 
     def update_tools(self, tools: list[RequestData]) -> bool:
         """Restart the server when the exposed tool set changes. Returns True if restarted."""
@@ -229,9 +234,12 @@ class MCPServerManager(QObject):
                 time.sleep(0.05)
                 continue
             try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    sock.bind((self._current_host, self._current_port))
+                family = detect_address_family(self._current_host)
+                raw_host = self._current_host.strip("[]")
+                with socket.socket(family, socket.SOCK_STREAM) as sock:
+                    if hasattr(socket, "SO_REUSEADDR"):
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    sock.bind((raw_host, self._current_port))
                 return
             except OSError:
                 time.sleep(0.05)
