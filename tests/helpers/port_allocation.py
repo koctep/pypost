@@ -7,6 +7,8 @@ import os
 import socket
 from pathlib import Path
 
+from pypost.core.server_bind import detect_address_family
+
 _LOCK_PATH = Path(os.environ.get("PYPOST_TEST_PORT_LOCK", "/tmp/pypost-test-port.lock"))
 _COUNTER_PATH = _LOCK_PATH.with_suffix(".counter")
 _PORT_BASE = 35_000
@@ -28,10 +30,12 @@ def _write_counter(value: int) -> None:
 
 
 def _can_bind(host: str, port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    family = detect_address_family(host)
+    clean_host = host.strip("[]")
+    with socket.socket(family, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            sock.bind((host, port))
+            sock.bind((clean_host, port))
         except OSError:
             return False
     return True
@@ -51,10 +55,12 @@ def allocate_tcp_port(host: str = "127.0.0.1") -> int:
                     _write_counter(counter)
                     return port
 
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            family = detect_address_family(host)
+            clean_host = host.strip("[]")
+            with socket.socket(family, socket.SOCK_STREAM) as sock:
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                sock.bind((host, 0))
-                port = sock.getsockname()[1]
+                sock.bind((clean_host, 0))
+                port = int(sock.getsockname()[1])
             _write_counter(counter + 1)
             return port
         finally:

@@ -21,10 +21,15 @@ process management and asynchronous stream draining into the dedicated test harn
 and wire framing negative fuzzing suite in
 [`test_mcp_wire_fuzzing_negative.py`](../../tests/test_mcp_wire_fuzzing_negative.py) along with
 transport-level UTF-8 pre-validation in
-[`mcp_streamable_http.py`](../../pypost/core/mcp_streamable_http.py). This document describes the
-architecture, protocols, failure modes, shared test harness design, helper APIs, negative fault
-injection vectors, and execution guidelines for validating standalone MCP server transports under
-physical wire, fuzzing, and pipe conditions.
+[`mcp_streamable_http.py`](../../pypost/core/mcp_streamable_http.py). Story
+[PYPOST-1431](https://pypost.atlassian.net/browse/PYPOST-1431) extended wire socket transport
+coverage and the shared test harness to IPv6 loopback (`::1`, `AF_INET6`), validating address
+family negotiation, clean host stripping, RFC 3986 / RFC 7230 bracketed `Host` header compliance,
+and socket binding in
+[`test_mcp_standalone_wire_ipv6.py`](../../tests/test_mcp_standalone_wire_ipv6.py). This document
+describes the architecture, protocols, failure modes, shared test harness design, helper APIs,
+negative fault injection vectors, and execution guidelines for validating standalone MCP server
+transports under physical wire, IPv6, fuzzing, and pipe conditions.
 
 ---
 
@@ -33,7 +38,8 @@ physical wire, fuzzing, and pipe conditions.
 Standalone MCP servers in PyPost support two primary physical communication channels:
 1. **Network Loopback TCP Sockets**: Streamable HTTP and Server-Sent Events (SSE) hosted on an ASGI
    Starlette application running on a background Uvicorn daemon thread managed by
-   [`MCPServerManager`](file:///home/src/pypost/core/qt/mcp_server.py).
+   [`MCPServerManager`](file:///home/src/pypost/core/qt/mcp_server.py). Operates over IPv4 loopback
+   (`127.0.0.1`, `socket.AF_INET`) and IPv6 loopback (`::1`, `socket.AF_INET6`).
 2. **Out-of-Process OS Pipes (Stdio)**: Child subprocesses communicating via standard input/output
    streams (`stdin`/`stdout`/`stderr`) using `mcp.server.stdio.stdio_server`.
 
@@ -45,7 +51,7 @@ flowchart TD
     end
 
     subgraph NetworkStack["OS Network Stack & Pipes"]
-        Loopback["TCP Loopback (127.0.0.1:{port})"]
+        Loopback["TCP Loopback (127.0.0.1 / [::1]:{port})"]
         Pipes["OS Kernel Pipes (stdin/stdout/stderr)"]
     end
 
@@ -116,30 +122,52 @@ wire socket testing primitives for all MCP transport test suites:
 
 ### `RawTcpWireClient` Class API
 
-`RawTcpWireClient` operates directly on physical TCP stream sockets (`socket.AF_INET`,
-`socket.SOCK_STREAM`) against loopback endpoints. It manages connection lifecycles, HTTP/1.1 wire
-framing, arbitrary byte-level transmission fragmentation, and stream reassembly across packet
-chunks.
+`RawTcpWireClient` operates directly on physical TCP stream sockets (`socket.AF_INET` or
+`socket.AF_INET6`, `socket.SOCK_STREAM`) against loopback endpoints. It manages connection
+lifecycles, HTTP/1.1 wire framing, arbitrary byte-level transmission fragmentation, and stream
+reassembly across packet chunks.
 
 #### Class Signature & Initialization
 
 ```python
 class RawTcpWireClient:
-    def __init__(self, host: str, port: int, timeout: float = 10.0) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        timeout: float = 10.0,
+        family: socket.AddressFamily | None = None,
+    ) -> None:
         self.host = host
         self.port = port
         self.timeout = timeout
+        self.family: socket.AddressFamily = (
+            family if family is not None else detect_address_family(host)
+        )
+        self.clean_host = host.strip("[]")
         self.sock: socket.socket | None = None
         self.session_id: str | None = None
         self._unread_buffer = bytearray()
 ```
 
-- **`host`** (`str`): Target hostname or loopback address (typically `"127.0.0.1"`).
+- **`host`** (`str`): Target hostname or loopback address (e.g. `"127.0.0.1"`, `"::1"`, or
+  `"[::1]"`).
 - **`port`** (`int`): Target TCP port number allocated for the standalone server.
 - **`timeout`** (`float`, default `10.0`): Socket timeout in seconds applied to connect and read
   operations.
+- **`family`** (`socket.AddressFamily | None`, optional): Socket address family override (`AF_INET`
+  or `AF_INET6`). When omitted, dynamically resolved via `detect_address_family(host)` from
+  `pypost.core.server_bind`.
 
-**Instance Attributes**:
+**Instance Attributes & Properties**:
+- `clean_host: str`: Clean hostname or IP with bracket delimiters stripped (`host.strip("[]")`)
+  for OS socket connection system calls (`socket.connect((self.clean_host, self.port))`).
+- `family: socket.AddressFamily`: Resolved address family (`AF_INET` or `AF_INET6`).
+- `formatted_host: str`: Property returning bracketed host for IPv6 (`f"[{self.clean_host}]"`)
+  or clean host for IPv4 (`self.clean_host`).
+- `formatted_host_header: str`: Property returning RFC 3986 / RFC 7230 compliant `Host` header
+  value (`f"{self.formatted_host}:{self.port}"`), guaranteeing bracketed notation
+  (`[::1]:<port>`) when communicating over IPv6.
 - `sock: socket.socket | None`: The active underlying operating system socket descriptor, or `None`
   when disconnected.
 - `session_id: str | None`: Cached MCP session ID extracted automatically from the `mcp-session-id`
@@ -150,8 +178,8 @@ class RawTcpWireClient:
 #### Methods Reference
 
 ##### `connect() -> None`
-Establishes a physical TCP stream connection (`socket.AF_INET`, `socket.SOCK_STREAM`) to
-`(self.host, self.port)` with the configured timeout.
+Establishes a physical TCP stream connection (`socket.socket(self.family, socket.SOCK_STREAM)`) to
+`(self.clean_host, self.port)` with the configured timeout.
 
 ##### `close() -> None`
 Gracefully shuts down and closes the underlying socket descriptor. Issues `socket.SHUT_RDWR`
@@ -162,15 +190,20 @@ resetting it to `None`.
 Supports `with RawTcpWireClient(host, port) as client:` syntax. Calls `connect()` on entry and
 guarantees deterministic `close()` on block exit.
 
+##### `format_http_request(method="GET", path="/", headers=None, body=None) -> bytes`
+Constructs arbitrary raw HTTP/1.1 request wire bytes with RFC 3986 / RFC 7230 compliant `Host`
+header (`Host: {self.formatted_host_header}`). Supports custom HTTP methods, headers, and bodies.
+
 ##### `build_post_request(payload, path="/mcp", session_id=None) -> bytes`
 Constructs compliant, raw HTTP/1.1 `POST` request wire bytes with JSON-RPC payload.
 - **`payload`** (`dict[str, Any]`): JSON-serializable dictionary representing the JSON-RPC request.
 - **`path`** (`str`, default `"/mcp"`): Target HTTP endpoint URI path.
 - **`session_id`** (`str | None`, optional): Explicit MCP session ID override; defaults to
   `self.session_id`.
-- **Returns** (`bytes`): Formatted raw HTTP/1.1 wire request including `POST`, `Host`,
-  `Content-Type: application/json`, `Accept: application/json, text/event-stream`, `Content-Length`,
-  `Connection: keep-alive`, and optional `mcp-session-id` headers.
+- **Returns** (`bytes`): Formatted raw HTTP/1.1 wire request including `POST`,
+  `Host: {self.formatted_host_header}`, `Content-Type: application/json`,
+  `Accept: application/json, text/event-stream`, `Content-Length`, `Connection: keep-alive`, and
+  optional `mcp-session-id` headers.
 
 ##### `send_fragmented(data: bytes, chunk_size: int = 7, delay: float = 0.0) -> None`
 Transmits arbitrary byte sequences sliced into small micro-chunks to simulate extreme network
@@ -291,6 +324,35 @@ with RawTcpWireClient(host="127.0.0.1", port=server_port) as client:
         assert status == 200
         msgs = parse_jsonrpc_from_response(body)
         assert msgs[0]["id"] == f"burst-{idx}"
+```
+
+#### 3. IPv6 Loopback Connection with RFC 3986 Bracketed Host Header
+```python
+from tests.helpers.raw_tcp_client import RawTcpWireClient, parse_jsonrpc_from_response
+
+# Connect over IPv6 loopback (::1) with auto-detected AF_INET6
+with RawTcpWireClient(host="::1", port=server_port, timeout=10.0) as client:
+    assert client.family == socket.AF_INET6
+    assert client.clean_host == "::1"
+    assert client.formatted_host == "[::1]"
+    assert client.formatted_host_header == f"[::1]:{server_port}"
+
+    # Build POST request: formatted Host header will be '[::1]:<port>'
+    req = client.build_post_request({
+        "jsonrpc": "2.0",
+        "id": "init-ipv6",
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "ipv6-test-client", "version": "1.0"},
+        },
+    })
+    client.send_all(req)
+    status, headers, body = client.read_http_response()
+    assert status == 200
+    msgs = parse_jsonrpc_from_response(body)
+    assert msgs[0]["id"] == "init-ipv6"
 ```
 
 ---
@@ -887,6 +949,123 @@ Test: `test_wire_fuzzing_interleaved_stress_and_recovery`
 
 ---
 
+## Port Allocation & Environment Capability Probing
+
+Dynamic test execution across concurrent test workers requires robust TCP port allocation and
+graceful degradation when running in containerized or CI environments lacking IPv6 loopback
+support.
+
+### IPv6 Port Allocation (`tests/helpers/port_allocation.py`)
+
+The port allocation helper coordinates safe, non-colliding ephemeral TCP ports across parallel test
+processes via filesystem locks (`PYPOST_TEST_PORT_LOCK`). Under
+[PYPOST-1431](https://pypost.atlassian.net/browse/PYPOST-1431), this module was extended to support
+arbitrary IPv4 and IPv6 target hosts:
+
+- **Address Family Detection**: Uses `detect_address_family(host)` to resolve whether the bind
+  probe requires `socket.AF_INET` or `socket.AF_INET6`.
+- **Clean Host Stripping**: Extracts `clean_host = host.strip("[]")` so OS socket `bind()` calls
+  receive raw IP literals (e.g. `"::1"`) rather than bracketed notation (`"[::1]"`).
+- **Socket Options & Re-Binding**: Sets `socket.SO_REUSEADDR` on test probe sockets to prevent
+  `EADDRINUSE` failures during rapid sequential tests:
+  ```python
+  def _can_bind(host: str, port: int) -> bool:
+      family = detect_address_family(host)
+      clean_host = host.strip("[]")
+      with socket.socket(family, socket.SOCK_STREAM) as sock:
+          sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+          try:
+              sock.bind((clean_host, port))
+          except OSError:
+              return False
+      return True
+  ```
+- **Dynamic Port Allocation**: In `allocate_tcp_port(host="127.0.0.1")`, fallback probing creates
+  a socket with the appropriate family, binds to `(clean_host, 0)`, and reads the OS-assigned port
+  from `sock.getsockname()[1]`.
+
+### Environment Capability Checking (`is_ipv6_loopback_supported`)
+
+Certain virtualized CI runners, Docker containers, or legacy operating system configurations disable
+IPv6 networking or restrict `AF_INET6` socket binding. To prevent false-negative test failures while
+retaining strict assertion coverage on supporting platforms,
+[`test_mcp_standalone_wire_ipv6.py`](../../tests/test_mcp_standalone_wire_ipv6.py) defines an
+environment probe:
+
+```python
+def is_ipv6_loopback_supported() -> bool:
+    """Return True if the runtime environment allows binding to IPv6 loopback (::1)."""
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
+            s.bind(("::1", 0))
+            return True
+    except OSError:
+        return False
+```
+
+The test module configures module-level pytest markers with bounded timeouts and capability skips:
+
+```python
+pytestmark = [
+    pytest.mark.timeout(60),
+    pytest.mark.skipif(
+        not is_ipv6_loopback_supported(),
+        reason="IPv6 loopback (::1) not supported in this environment",
+    ),
+]
+```
+
+---
+
+## IPv6 Standalone MCP Server Wire Protocol Testing
+
+Story [PYPOST-1431](https://pypost.atlassian.net/browse/PYPOST-1431) introduced comprehensive
+end-to-end wire protocol verification over IPv6 loopback (`::1`) in
+[`test_mcp_standalone_wire_ipv6.py`](../../tests/test_mcp_standalone_wire_ipv6.py). This test suite
+validates physical network communication between standalone MCP servers and raw wire clients:
+
+### Tested Behaviors & Invariants
+
+1. **IPv6 Socket Binding & Lifecycle**:
+   - `MCPServerManager` successfully initializes and binds to `host="::1"` on an allocated port.
+   - Background Uvicorn thread starts and accepts incoming `AF_INET6` TCP connections.
+   - `wait_until()` reliably detects server readiness without race conditions.
+
+2. **RFC 3986 & RFC 7230 Host Header Compliance**:
+   - HTTP/1.1 requests transmitted over IPv6 include properly bracketed `Host` headers
+     (`Host: [::1]:<port>`).
+   - Server-side ASGI parsing accepts bracketed IPv6 hosts and processes requests without
+     generating `400 Bad Request` or closing the connection.
+
+3. **Complete JSON-RPC 2.0 MCP Lifecycle over IPv6**:
+   - Initial handshake: Client issues `initialize` request; server returns `HTTP 200 OK` with
+     protocol version, server capabilities, and session ID.
+   - Session confirmation: Client transmits `notifications/initialized`; server returns
+     `HTTP 202 Accepted`.
+   - Tool discovery: Client issues `tools/list`; server returns registered tools.
+   - Tool invocation: Client executes `tools/call` with arguments; server evaluates the tool and
+     returns `HTTP 200 OK` with execution results.
+
+4. **Wire Framing Fidelity over IPv6**:
+   - Validates both bounded `Content-Length` response framing and chunked transfer decoding
+     over persistent IPv6 sockets.
+
+5. **Socket Persistence & Multi-Request Pipelining**:
+   - Multiple sequential and pipelined JSON-RPC requests are transmitted over a single persistent
+     `RawTcpWireClient` connection to verify that TCP keep-alive and socket stream buffering
+     function correctly across `AF_INET6` sockets.
+
+6. **Clean Server Teardown & Port Release**:
+   - Calling `manager.stop()` gracefully closes listener sockets and terminates the Uvicorn worker.
+   - Sockets are released cleanly, allowing immediate port re-use without `EADDRINUSE` leaks.
+
+7. **Negative Address & Framing Tests**:
+   - Verifies rejection of unbracketed IPv6 host headers in HTTP requests.
+   - Verifies proper error handling when attempting connections to conflicting or invalid address
+     families.
+
+---
+
 ## Test Execution Guide
 
 All tests must be run exclusively via `make` targets. Never invoke `pytest` or `pip` directly.
@@ -897,6 +1076,9 @@ All tests must be run exclusively via `make` targets. Never invoke `pytest` or `
 # Run standalone wire IPC and stdio stress test suite
 make test PYTEST_ARGS='tests/test_mcp_standalone_wire_ipc_repro.py'
 
+# Run IPv6 standalone wire socket test suite (PYPOST-1431)
+make test PYTEST_ARGS='tests/test_mcp_standalone_wire_ipv6.py'
+
 # Run unit tests for shared raw_tcp_client test helper
 make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py'
 
@@ -906,8 +1088,8 @@ make test PYTEST_ARGS='tests/test_mcp_stdio_harness.py'
 # Run negative wire framing and malformed JSON-RPC fuzzing suite
 make test PYTEST_ARGS='tests/test_mcp_wire_fuzzing_negative.py'
 
-# Run wire stress and fuzzing suites together with helper tests and standalone execution tests
-make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py tests/test_mcp_stdio_harness.py tests/test_mcp_standalone_execution_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_wire_fuzzing_negative.py'
+# Run wire stress, IPv6, and fuzzing suites together with helper tests
+make test PYTEST_ARGS='tests/test_raw_tcp_client_helper.py tests/test_mcp_stdio_harness.py tests/test_mcp_standalone_execution_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_wire_fuzzing_negative.py tests/test_mcp_standalone_wire_ipv6.py'
 
 # Run all MCP-related test suites
 make test PYTEST_ARGS='tests/test_mcp*.py'
