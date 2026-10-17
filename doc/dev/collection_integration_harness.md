@@ -204,23 +204,29 @@ port allocation, readiness polling, lifecycle supervision, and clean teardown.
 - Instantiates [`MCPServerRegistry`](file:///home/src/pypost/core/mcp_server_registry.py)
   and [`TemplateService`](file:///home/src/pypost/core/template_service.py).
 - Allocates collision-free ephemeral TCP ports via `allocate_tcp_port()`.
+- Tracks ephemeral server candidate managers in `_server_candidates` for parallel cleanup.
 - Validates candidate configuration and initiates daemon server startup.
 - Polls for server readiness or early startup errors.
-- Provides idempotent resource teardown via `teardown()`, `close()`, or context management.
+- Provides concurrent, bounded resource teardown via `teardown()`, `close()`, or context
+  management.
 
 #### Properties
 
 - `registry: MCPServerRegistry`: Registry managing background server processes.
 - `template_service: TemplateService`: Service for rendering template expressions.
+- `_server_candidates: list[MCPServerManager]`: In-flight candidate managers tracked for parallel
+  cleanup upon teardown.
 
 #### Key Methods
 
 - `init_server_registry_fixture(...) -> None`:
-  Initializes registry and template service bindings.
+  Initializes registry, candidate tracking list, and template service bindings.
 - `start_standalone_server(...) -> tuple[str, int, str]`:
   Validates, starts, and polls a standalone MCP server until running.
-- `teardown() -> None`:
-  Stops all registered servers via `registry.stop_all()`. Safe and idempotent.
+- `teardown(*, timeout: float = 10.0, max_workers: int | None = None) -> None`:
+  Stops tracked candidate managers and active registry servers concurrently via
+  `ThreadPoolExecutor` and `registry.stop_all()`. Clears candidate tracking in a `finally` block.
+  Safe and idempotent.
 - `close() -> None`:
   Alias for `teardown()`.
 - `__enter__() -> ServerRegistryFixtureMixin`:
@@ -285,6 +291,9 @@ against the original monolithic harness:
   `runtime_resolver`, `registry`) are present at the exact same attribute locations.
 - All helper methods (`create_library`, `create_workspace_environment`, `create_overlay`,
   `start_standalone_server`, `teardown`, `close`, `__enter__`, `__exit__`) are preserved.
+- `teardown(*, timeout=10.0, max_workers=None)` and `close()` support concurrent execution across
+  both active registry instances and tracked candidates, accepting optional `timeout` and
+  `max_workers` arguments while defaulting to backward-compatible signature invocation.
 - The high-level multi-subsystem orchestration method `run_unified_lifecycle()` remains
   available on the composite class.
 
@@ -473,12 +482,20 @@ class UnifiedLifecycleResult:
 2. **Safe Port Allocation**:
    All local MCP server instances request ports from
    `tests.helpers.port_allocation.allocate_tcp_port()`, preventing TCP collisions.
-3. **Graceful Subprocess Cleanup**:
-   `teardown()` ensures background runners and daemon processes are terminated and joined promptly.
+3. **Graceful Subprocess Cleanup & Concurrent Teardown (PYPOST-1434)**:
+   `teardown(*, timeout: float = 10.0, max_workers: int | None = None)` stops tracked candidate
+   managers (`_server_candidates`) and active registry servers concurrently using a bounded
+   `ThreadPoolExecutor` and `registry.stop_all()`. Server candidate tracking is cleared in a
+   `finally` block upon completion. Timeouts log a warning and cancel pending tasks rather than
+   hanging test runners.
 4. **Idempotence**:
    Calling `teardown()` repeatedly or calling both `__exit__` and `teardown()` produces no errors.
-5. **Exception Traceability**:
-   Context manager `__exit__` logs any active exception before teardown, preserving root cause logs.
+   Consecutive calls complete in <0.10s.
+5. **Exception Traceability & Isolation**:
+   Context manager `__exit__` logs any active exception before teardown, preserving root
+   cause logs. During parallel teardown, exceptions raised when terminating one candidate
+   manager or registry instance are caught, logged at `WARNING` or `ERROR` level, and isolated so
+   remaining servers continue to be stopped cleanly.
 
 ---
 
@@ -489,6 +506,10 @@ When authoring new integration tests or extending variable resolution workflows:
 - **Modular Mixin Tests**:
   `tests/test_collection_harness_mixins.py` validates standalone mixin behavior,
   custom composition, and backward compatibility.
+- **Concurrent Teardown & Parallel Cleanup (PYPOST-1434)**:
+  `tests/test_mcp_concurrent_teardown.py` asserts concurrent teardown acceleration (<0.45s vs
+  >=1.0s serial for 5 servers), error isolation during partial failure, candidate manager tracking
+  cleanup, and teardown idempotence.
 - **Harness Repro & Unit Verification**:
   `tests/test_collection_integration_harness_repro.py` verifies context manager
   protocol, fixture bindings, and unified lifecycle execution.
@@ -499,3 +520,15 @@ When authoring new integration tests or extending variable resolution workflows:
   - [Collection-Scoped Variables and Standalone MCP Servers](collection_scoped_variables.md)
   - [Workspace Environment Variable Import](workspace_environment_variable_import.md)
   - [Library Manifest and Local Secrets Overlay Manager](library_manifest_and_overlay.md)
+
+### Test Execution Guide
+
+To execute the concurrent teardown and integration harness test suites:
+
+```bash
+# Run concurrent teardown and error isolation tests
+make test PYTEST_ARGS='tests/test_mcp_concurrent_teardown.py'
+
+# Run combined harness and teardown test suites
+make test PYTEST_ARGS='tests/test_mcp_concurrent_teardown.py tests/test_collection_harness_mixins.py tests/test_collection_integration_harness_repro.py'
+```
