@@ -12,6 +12,10 @@ from collections.abc import Callable, Sequence
 import uvicorn
 from PySide6.QtCore import QObject, Signal
 
+from pypost.core.cancellation import (
+    CancellationTokenSource,
+    adaptive_thread_join,
+)
 from pypost.core.mcp_activity_log import McpActivityEntry, McpActivityLog
 from pypost.core.mcp_proxy_server_impl import MCPProxyServerImpl
 from pypost.core.mcp_server_impl import MCPServerImpl
@@ -58,6 +62,7 @@ class MCPServerManager(QObject):
         super().__init__()
         self._server_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+        self._cancellation_source: CancellationTokenSource | None = None
         self._server_instance: uvicorn.Server | None = None
         self._metrics = metrics
         self._template_service = template_service
@@ -139,6 +144,7 @@ class MCPServerManager(QObject):
         self._tools_signature = mcp_tools_signature(tools)
         self._impl.register_tools(tools)
         self._stop_event.clear()
+        self._cancellation_source = CancellationTokenSource()
         self._startup_notified = False
         self._start_error = None
 
@@ -176,6 +182,7 @@ class MCPServerManager(QObject):
             template_service=self._template_service,
         )
         self._stop_event.clear()
+        self._cancellation_source = CancellationTokenSource()
         self._startup_notified = False
         self._start_error = None
 
@@ -183,25 +190,44 @@ class MCPServerManager(QObject):
         self._server_thread.start()
         logger.info("MCP proxy server starting on %s:%d", host, port)
 
-    def stop_server(self):
+    def stop_server(self, timeout: float | None = None) -> bool:
         if not self.is_running():
-            return
+            return True
+
+        if self._cancellation_source is not None:
+            self._cancellation_source.cancel(reason="MCPServerManager.stop_server requested")
 
         self._stop_event.set()
         if self._server_instance:
             self._server_instance.should_exit = True
 
+        token = (
+            self._cancellation_source.token
+            if self._cancellation_source is not None
+            else None
+        )
+        joined = True
         if self._server_thread:
-            # Wait for thread to finish (with timeout to avoid freeze).
+            # Adaptive join polling with progressive backoff.
             # Keep the ref if join times out so is_running() stays truthful while
             # the orphaned worker still holds the listen socket (PYPOST-1196).
-            self._server_thread.join(timeout=2.0)
+            joined = adaptive_thread_join(
+                self._server_thread,
+                timeout=timeout,
+                token=token,
+                thread_name=f"mcp-server-{self._current_port}",
+            )
             if not self._server_thread.is_alive():
                 self._server_thread = None
+
+        if self._cancellation_source is not None:
+            self._cancellation_source.dispose()
+            self._cancellation_source = None
 
         self._server_instance = None
         logger.info("MCP server stopped")
         self.status_changed.emit(False)
+        return joined
 
     def is_running(self) -> bool:
         return (
