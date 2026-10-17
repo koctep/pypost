@@ -290,6 +290,80 @@ provides bounded parallel teardown across all registered, manager-backed, and pe
   `mcp_registry_concurrent_teardown_error` with full stack traces. An unhandled exception or crash
   in one server manager never prevents remaining servers from stopping.
 
+#### Structured Errno Normalization and OS Port Preflight Error Classification (PYPOST-1436)
+
+Previously, server bind error detection in `pypost/core/server_bind.py` relied on
+locale-fragile substring inspection (e.g. `"address already in use"` in `str(exc).lower()`),
+which broke on non-English locales (such as German `"Die Adresse wird bereits verwendet"` or
+French `"Adresse déjà utilisée"`). Furthermore, preflight OS port validation was hardcoded to
+IPv4 (`socket.AF_INET`), failing on IPv6 addresses like `::1` or `[::1]`.
+
+Story [PYPOST-1436](https://pypost.atlassian.net/browse/PYPOST-1436) formalizes structured errno
+normalization across POSIX, BSD/macOS, and Windows Winsock platforms, introduces multi-family
+IPv4/IPv6 address detection and socket preflight probing, and removes all substring matching:
+
+##### `BindErrorClassification` and Platform Errno Mapping
+
+`BindErrorClassification` (`pypost/core/server_bind.py`) is an enumeration representing canonical
+OS networking bind error categories:
+- `PORT_IN_USE`: Port is actively bound by another process or held in socket state.
+- `ADDRESS_NOT_AVAILABLE`: Host interface/IP address cannot be assigned on the host system.
+- `PERMISSION_DENIED`: Process lacks privileges to bind (e.g. privileged ports `< 1024` on UNIX).
+- `UNCLASSIFIED`: Any unmapped or generic socket error.
+
+Errno normalization is maintained via frozen integer sets covering POSIX, BSD/macOS, and
+Windows Winsock (WSA) error codes:
+- `ERRNO_PORT_IN_USE`: `errno.EADDRINUSE` (98 on Linux), 48 (BSD/macOS), and 10048
+  (`WSAEADDRINUSE`).
+- `ERRNO_ADDR_NOT_AVAIL`: `errno.EADDRNOTAVAIL` (99 on Linux), 49 (BSD/macOS), and 10049
+  (`WSAEADDRNOTAVAIL`).
+- `ERRNO_PERMISSION_DENIED`: `errno.EACCES` (13), `errno.EPERM` (1), and 10013 (`WSAEACCES`).
+
+##### Numeric Errno Extraction via `extract_errno`
+
+Because Python socket exceptions and OS errors can package error codes differently across
+operating systems and Python runtime versions, `extract_errno(exc: BaseException) -> int | None`:
+1. Inspects standard `exc.errno` if it is an `int`.
+2. Inspects Windows-specific `exc.winerror` if present.
+3. Falls back to inspecting `exc.args[0]` if integer, or unpacking nested socket error tuples
+   `exc.args[0][0]` (common in legacy C-extension socket exceptions).
+4. Returns `None` if no numeric error code can be extracted.
+
+`classify_bind_error(exc: BaseException) -> BindErrorClassification` maps the extracted errno
+against the frozen sets, returning `BindErrorClassification.UNCLASSIFIED` on unknown codes or
+`None`.
+
+##### Multi-Family IPv4/IPv6 Address Detection and Preflight Probing
+
+`MCPServerRegistry._validate_os_port` and background server startup utilize:
+- `detect_address_family(host: str) -> socket.AddressFamily`: Parses literal IPv4 and IPv6
+  strings (supporting bracketed IPv6 notation like `[::1]`) using `ipaddress.ip_address`. If
+  parsing as an IP literal fails (for hostnames), detects `:` to classify IPv6 addresses or falls
+  back to `socket.AF_INET`.
+- `validate_host_and_port(host: str, port: int) -> None`: Probes candidate endpoints prior to
+  stopping active servers or launching services. Creates a temporary stream socket with the
+  detected address family, applies `SO_REUSEADDR` (where available), and performs a test
+  `probe.bind(...)`. If bind fails with an `OSError`, it classifies the failure and raises
+  `ValueError` with structured diagnostic details while preserving exception provenance
+  (`from exc`).
+
+##### Locale-Resilient `format_bind_error` and Signature Compatibility
+
+`format_bind_error` eliminates substring matching and renders user-facing diagnostics based
+exclusively on `classify_bind_error`. It maintains dual-argument signature compatibility across
+call sites:
+- Modern/legacy order: `(exc, host, port, server_label="server")`
+- Inverse order: `(host, port, exc, server_label="server")`
+- Keywords: `server_name` / `server_label`
+
+##### Verification Test Suite
+
+Run unit and integration tests verifying structured errno classification and preflight probing:
+
+```bash
+make test PYTEST_ARGS="tests/test_server_bind_errno.py"
+```
+
 ## Configuration and lifecycle
 
 `AppSettings.mcp_servers` is a list of `McpServerConfiguration` objects saved
@@ -397,6 +471,6 @@ For comprehensive multi-server concurrency, variable isolation, hot reload, and 
 Run the focused checks after changing this subsystem:
 
 ```bash
-make test PYTEST_ARGS='tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py tests/test_mcp_concurrent_teardown.py'
+make test PYTEST_ARGS='tests/test_server_bind_errno.py tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py tests/test_mcp_concurrent_teardown.py'
 ```
 

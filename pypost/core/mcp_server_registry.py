@@ -16,6 +16,10 @@ from pypost.core.builtin_collections import BuiltinCollectionView
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.predefined_library import PredefinedLibraryService
 from pypost.core.qt.mcp_server import MCPServerManager
+from pypost.core.server_bind import (
+    detect_address_family,
+    validate_host_and_port,
+)
 from pypost.core.template_service import TemplateService
 from pypost.models.library_manager import LibraryConnectionRecord
 from pypost.models.models import Collection, Environment
@@ -941,14 +945,22 @@ class MCPServerRegistry(QObject):
             raise ValueError(f"MCP server {instance_id} references a missing environment")
 
     @staticmethod
+    def _detect_address_family(host: str) -> socket.AddressFamily:
+        return detect_address_family(host)
+
+    @staticmethod
     def _validate_os_port(host: str, port: int) -> None:
         """Preflight an external bind conflict before stopping a live endpoint."""
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                probe.bind((host, port))
-        except OSError as exc:
-            raise ValueError(f"MCP server port {port} is unavailable: {exc}") from exc
+            validate_host_and_port(host, port)
+        except ValueError as exc:
+            logger.warning(
+                "mcp_server_registry_port_validation_failed host=%s port=%d error=%s",
+                host,
+                port,
+                exc,
+            )
+            raise
 
     def _new_manager(self, instance_id: str, port: int) -> MCPServerManager:
         manager = MCPServerManager(metrics=self._metrics, template_service=self._template_service)
