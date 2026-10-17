@@ -202,7 +202,10 @@ Standalone MCP servers expose two primary HTTP-based wire transports:
 1. **Streamable HTTP (`/mcp`)**: Mounted via `mcp.server.streamable_http_manager.StreamableHTTPSessionManager`. Handles JSON-RPC 2.0 requests over HTTP `POST` requests and maintains session state via the `mcp-session-id` header.
 2. **Server-Sent Events (`/sse` & `/sse/messages`)**: Mounted via `mcp.server.sse.SseServerTransport`. Establishes persistent server-to-client streaming via HTTP `GET /sse` and routes client JSON-RPC requests via `POST /sse/messages?session_id=...`.
 
-The wire stress harness introduces `RawTcpWireClient` (`tests/test_mcp_standalone_wire_ipc_repro.py`), a low-level socket client operating directly on raw TCP streams (`socket.AF_INET`, `socket.SOCK_STREAM`) against the loopback interface (`127.0.0.1`):
+The wire stress harness introduces `RawTcpWireClient` (`tests/helpers/raw_tcp_client.py`,
+promoted from `tests/test_mcp_standalone_wire_ipc_repro.py`), a low-level socket client
+operating directly on raw TCP streams (`socket.AF_INET`, `socket.SOCK_STREAM`) against the
+loopback interface (`127.0.0.1`):
 - Transmits raw HTTP/1.1 wire frames with `POST /mcp`, `Host`, `Content-Type: application/json`, `Accept: application/json, text/event-stream`, `Connection: keep-alive`, and `mcp-session-id`.
 - Reassembles raw byte streams into status lines, headers, and bodies, handling both fixed `Content-Length` framing and chunked HTTP transfer encoding (`Transfer-Encoding: chunked`).
 - Decodes incoming JSON-RPC 2.0 payloads from direct JSON responses and Server-Sent Event (`data: {...}`) blocks.
