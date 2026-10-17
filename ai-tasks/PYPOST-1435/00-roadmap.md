@@ -54,15 +54,14 @@
   - [x] Link and document existing sprint follow-up tickets ([PYPOST-1437](https://pypost.atlassian.net/browse/PYPOST-1437), [PYPOST-1438](https://pypost.atlassian.net/browse/PYPOST-1438)) with NON-BLOCKER classification
   - [x] Create technical debt artifact in `ai-tasks/PYPOST-1435/60-tech-debt.md`
   - [x] Verify task artifact integrity via `make verify-ai-tasks`
-- [x] **STEP 8: Dev Docs**
-  - [x] Document In-Memory Virtual Filesystem backend and storage adapters in `doc/dev/collection_integration_harness.md`
-  - [x] Detail InMemoryVirtualFS architecture (VirtualNode hierarchy, mount root, Path interception)
-  - [x] Detail in-memory storage adapters (ConnectionStore, OverlayManager, StorageManager)
-  - [x] Document CollectionVariablesIntegrationHarness(in_memory=True) and in_memory_collection_harness fixture
-  - [x] Document zero physical disk I/O guarantees, benchmark characteristics, and test execution commands
-  - [x] Verify documentation format, linting, and task integrity (`make lint`, `make verify-ai-tasks`)
-  - [x] Acceptance gate review PASS
-- [x] **COMMIT: Commit Changes**
+- [/] **STEP 8: Dev Docs**
+  - [/] Document In-Memory Virtual Filesystem backend and storage adapters in `doc/dev/collection_integration_harness.md`
+  - [/] Detail InMemoryVirtualFS architecture (VirtualNode hierarchy, mount root, Path interception)
+  - [/] Detail in-memory storage adapters (ConnectionStore, OverlayManager, StorageManager)
+  - [/] Document CollectionVariablesIntegrationHarness(in_memory=True) and in_memory_collection_harness fixture
+  - [/] Document zero physical disk I/O guarantees, benchmark characteristics, and test execution commands
+  - [/] Verify documentation format, linting, and task integrity (`make lint`, `make verify-ai-tasks`)
+- [ ] **COMMIT: Commit Changes**
 
 ## Status Legend
 
