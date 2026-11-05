@@ -9,6 +9,7 @@ import pytest
 from pypost.core.environment_export import ExportScope
 from pypost.models.models import Environment
 from pypost.ui.widgets.environments.environment_list_widget import EnvironmentListWidget
+from tests.helpers.qt_widget_dispose import dispose_qt_root
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -32,10 +33,7 @@ def _make_widget(environments, serialize_export_records=None):
 def _cleanup_widgets(qapp):
     yield
     while _created_widgets:
-        w = _created_widgets.pop()
-        w.close()
-        w.deleteLater()
-    qapp.processEvents()
+        dispose_qt_root(_created_widgets.pop(), qapp)
 
 
 class TestExportEnvironments:
