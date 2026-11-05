@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 from typing import Any, Callable, Optional, cast
 
+from pypost.core.cancellation import CancellationToken
 from pypost.core.git_service import GitLibraryService, sanitize_git_url
 from pypost.core.library_connection_store import LibraryConnectionStore
 from pypost.core.library_manifest import find_and_read_manifest, validate_manifest_collections
@@ -59,12 +60,21 @@ class LibraryManagerService:
         """Expose the managed clone root for compatibility with existing callers."""
         return self.git_service.base_dir
 
-    def list_connections(self) -> list[LibraryConnectionRecord]:
+    def list_connections(
+        self,
+        cancellation_token: CancellationToken | None = None,
+    ) -> list[LibraryConnectionRecord]:
         """Load explicit registrations and discover legacy managed clones."""
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
         records = self.connection_store.load(legacy_base_dir=self.git_service.base_dir)
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
         predefined = self.predefined_library.discover() if self.include_predefined else None
         self.diagnostics = list(self.connection_store.diagnostics)
         self.diagnostics.extend(self.predefined_library.diagnostics)
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
         if predefined is not None and all(
             record.stable_id != predefined.stable_id for record in records
         ):
@@ -89,12 +99,20 @@ class LibraryManagerService:
             raise ValueError("library_invalid: selected library is no longer connected")
         return find_and_read_manifest(self.resolve_path(record))[0]
 
-    def list_manifest_collections(self, stable_id: str) -> list[dict[str, Any]]:
+    def list_manifest_collections(
+        self,
+        stable_id: str,
+        cancellation_token: CancellationToken | None = None,
+    ) -> list[dict[str, Any]]:
         """Return collection identities with merged manifest/collection metadata."""
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
         record = self.get_connection(stable_id)
         if record is None:
             raise ValueError("library_invalid: selected library is no longer connected")
         root = self.resolve_path(record)
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
         manifest, _ = find_and_read_manifest(root)
         missing = validate_manifest_collections(manifest, manifest_dir=root)
         if missing:
@@ -102,6 +120,8 @@ class LibraryManagerService:
         result = []
         overlay = self.overlay_manager.get_overlay(record.stable_id)
         for index, relative in enumerate(manifest.collections):
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
             collection = read_collection_file(root / relative)
             variables_by_name = {
                 variable.name: variable.model_dump(mode="json", by_alias=True)
@@ -129,12 +149,24 @@ class LibraryManagerService:
             })
         return result
 
-    def read_collection(self, stable_id: str, relative_path: str):
+    def read_collection(
+        self,
+        stable_id: str,
+        relative_path: str,
+        cancellation_token: CancellationToken | None = None,
+    ):
         """Read one manifest-declared collection after path validation."""
-        entries = self.list_manifest_collections(stable_id)
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
+        entries = self.list_manifest_collections(
+            stable_id,
+            cancellation_token=cancellation_token,
+        )
         entry = next((item for item in entries if item["path"] == relative_path), None)
         if entry is None:
             raise ValueError("collection_missing: selected collection is not declared")
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
         record = self.get_connection(stable_id)
         assert record is not None
         return read_collection_file(self.resolve_path(record) / relative_path)

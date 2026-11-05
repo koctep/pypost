@@ -6,6 +6,12 @@ from typing import Any
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+from pypost.core.cancellation import (
+    CancellationTokenSource,
+    OperationCancelledError,
+    call_with_cancellation_token,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,10 +35,12 @@ class CollectionFetchWorker(QThread):
         self.collection_path = collection_path
         self.generation_id = generation_id
         self._cancelled = False
+        self._cts = CancellationTokenSource()
 
     def cancel(self) -> None:
         self._cancelled = True
         self.requestInterruption()
+        self._cts.cancel(reason="collection fetch cancelled")
         logger.debug(
             "collection_variable_fetch_worker_cancelled generation_id=%d connection_id=%s",
             self.generation_id,
@@ -47,9 +55,11 @@ class CollectionFetchWorker(QThread):
             self.collection_path,
         )
         try:
-            col = self.library_service.read_collection(
+            col = call_with_cancellation_token(
+                self.library_service.read_collection,
                 self.connection_id,
                 self.collection_path,
+                cancellation_token=self._cts.token,
             )
             if not self._cancelled and not self.isInterruptionRequested():
                 logger.debug(
@@ -62,6 +72,13 @@ class CollectionFetchWorker(QThread):
                     "collection_variable_fetch_worker_interrupted generation_id=%d",
                     self.generation_id,
                 )
+        except OperationCancelledError as exc:
+            logger.debug(
+                "collection_variable_fetch_worker_transport_aborted generation_id=%d "
+                "error=%s",
+                self.generation_id,
+                exc,
+            )
         except Exception as exc:
             if not self._cancelled and not self.isInterruptionRequested():
                 logger.warning(
@@ -77,3 +94,5 @@ class CollectionFetchWorker(QThread):
                     self.generation_id,
                     exc,
                 )
+        finally:
+            self._cts.dispose()
