@@ -345,7 +345,10 @@ timeouts and process-group SIGKILL cleanup.
 ### Related tests
 - `tests/test_shared_venv_manager.py` — ownership and injected-collaborator stage coverage.
 - `tests/test_makefile_shared_readiness.py` — behavioral regression for lock/budget/materialization
-  and parallel load budget.
+  and parallel load budget (4-worker NFR1).
+- `tests/test_shared_venv_extreme_concurrency.py` — PYPOST-1422 extreme concurrency stress:
+  16+ threaded `materialize` calls under simulated disk latency (`tree_copier` sleep +
+  `copytree`), asserting readiness, isolation, and wall-clock budget.
 
 ## Configuration
 
@@ -355,8 +358,11 @@ timeouts and process-group SIGKILL cleanup.
 | Ordinary helper budget | 20s across lock + bootstrap | `_get_shared_base_venv(preparation_budget=…)` |
 | Runner cold preparation | 90s (watchdog 95s) | See [testing.md](testing.md) shared Make fixture section. |
 | Workspace copy timeout | 20s soft post-copy deadline | `materialize(..., copy_timeout=…)`; checked via injected `_clock` after `tree_copier` returns (no process-group kill). |
-| Default `tree_copier` | `shutil.copytree(..., symlinks=True)` | Overridable for failure injection in unit tests. |
+| Default `tree_copier` | `shutil.copytree(..., symlinks=True)` | Overridable for failure injection and simulated latency in stress tests. |
 | Marker | `.initialized-<major.minor>` | Plus `bin/python` required for readiness. |
+| Extreme stress workers | 16 (`STRESS_WORKER_COUNT`) | `tests/test_shared_venv_extreme_concurrency.py` (PYPOST-1422). |
+| Simulated disk latency | 0.05s per population | Injected in stress `tree_copier` before `copytree`. |
+| Extreme stress wall budget | 15s | All 16 workers must finish within this wall clock. |
 
 These budgets are fixed harness settings; they do not change `pytest.mark.timeout`, worker
 concurrency, or Make `WORKER_TIMEOUT`.
@@ -396,7 +402,16 @@ If that path is missing, empty, unreadable, or not a directory, `is_ready(.skele
 again. Delete the damaged `.skeleton` (or the whole shared base root) and re-run
 `ensure_ready` if a manual reset is needed.
 
+### Extreme concurrency failures (PYPOST-1422)
+If `test_extreme_concurrency_materialization_under_simulated_disk_latency` fails:
+- Check the reported `errors` dict for per-worker `RuntimeError` / timeout messages.
+- Confirm simulated latency and worker constants still match architecture
+  (`STRESS_WORKER_COUNT >= 16`, `SIMULATED_DISK_LATENCY_SECONDS`, budget).
+- Re-run focused:
+  `make test PYTEST_ARGS='tests/test_shared_venv_extreme_concurrency.py'`.
+- The 4-worker load-budget test is a separate ordinary NFR guard; keep both green.
+
 ### Focused regressions
 ```bash
-make test PYTEST_ARGS='tests/test_shared_venv_manager.py tests/test_makefile_shared_readiness.py'
+make test PYTEST_ARGS='tests/test_shared_venv_manager.py tests/test_makefile_shared_readiness.py tests/test_shared_venv_extreme_concurrency.py'
 ```
