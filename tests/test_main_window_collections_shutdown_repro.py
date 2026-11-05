@@ -88,6 +88,7 @@ class _SpyWorker:
     def __init__(self) -> None:
         self.waits: list[int] = []
         self.interruptions = 0
+        self.cancels = 0
         self.deleted = 0
         self.parse_progress = _SpySignal()
         self.parse_completed = _SpySignal()
@@ -95,10 +96,14 @@ class _SpyWorker:
         self.parse_cancelled = _SpySignal()
         self.operation_completed = _SpySignal()
         self.operation_failed = _SpySignal()
+        self.operation_cancelled = _SpySignal()
         self.finished = _SpySignal()
 
     def isRunning(self) -> bool:  # noqa: N802 - mirrors QThread API
         return True
+
+    def cancel(self) -> None:
+        self.cancels += 1
 
     def requestInterruption(self) -> None:  # noqa: N802 - mirrors QThread API
         self.interruptions += 1
@@ -114,9 +119,8 @@ class _SpyWorker:
 class _CollectionsImportOwner:
     """Collections shutdown participant backed by real import-actions teardown.
 
-    After the production fix this owner is invoked by
-    ``main_window_lifecycle.teardown`` with a fair-share budget and must return a
-    ``TeardownResult``. Today the composition root never calls it.
+    Invoked by ``main_window_lifecycle.teardown`` with a fair-share budget and
+    returns a ``TeardownResult``.
     """
 
     def __init__(self, actions: CollectionImportActions) -> None:
@@ -276,7 +280,7 @@ def test_main_window_teardown_runs_collections_during_file_import(qapp) -> None:
 
     assert collections.calls == ["collections"], (
         "main-window teardown must invoke collections.teardown while a file import "
-        "worker is in flight (collections omitted from owner list today)"
+        "worker is in flight"
     )
     assert collections.begin_calls == 1
     assert len(collections.timeouts) == 1
@@ -318,7 +322,7 @@ def test_main_window_teardown_runs_collections_during_library_import(qapp) -> No
 
     assert collections.calls == ["collections"], (
         "main-window teardown must invoke collections.teardown while a library import "
-        "worker is in flight (collections omitted from owner list today)"
+        "worker is in flight"
     )
     assert collections.begin_calls == 1
     assert len(collections.timeouts) == 1
@@ -329,7 +333,11 @@ def test_main_window_teardown_runs_collections_during_library_import(qapp) -> No
     assert collections.last_result is not None
     assert collections.last_result.outcome in {"success", "incomplete"}
     assert collections.last_result.active_count >= 1
-    # Library worker is join-only (PYPOST-1324); unclean/incomplete is allowed.
+    # Library P3 is cancel-then-bounded join (PYPOST-1324); unclean/incomplete OK.
+    assert library_spy.cancels >= 1, (
+        "collections teardown must call library worker cancel() before join "
+        f"(cancels={library_spy.cancels}, waits={library_spy.waits})"
+    )
     assert library_spy.waits, "library worker must be waited under the collections share"
     assert actions._library_worker is None, (
         "library worker field must be cleared after collections teardown"

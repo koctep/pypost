@@ -13,6 +13,7 @@ from enum import Enum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable, Optional
 
+from pypost.core.cancellation import CancellationToken
 from pypost.core.collection_import import (
     CollectionImportFileError,
     CollectionImportPlanResult,
@@ -177,7 +178,10 @@ class LibraryCollectionImportService:
         self.library_manager = library_manager
 
     def list_entries(
-        self, connection: LibraryConnectionRecord | None = None
+        self,
+        connection: LibraryConnectionRecord | None = None,
+        *,
+        cancellation_token: CancellationToken | None = None,
     ) -> list[LibraryCollectionImportEntry]:
         """List declared collection files for connected local libraries.
 
@@ -188,6 +192,8 @@ class LibraryCollectionImportService:
         connections = [connection] if connection is not None else self._connections()
         entries: list[LibraryCollectionImportEntry] = []
         for record in connections:
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
             if not self._is_supported_source(record):
                 continue
             try:
@@ -211,6 +217,8 @@ class LibraryCollectionImportService:
                 continue
 
             for raw_path in manifest.collections:
+                if cancellation_token is not None:
+                    cancellation_token.throw_if_cancellation_requested()
                 path_text = str(raw_path)
                 display_name = path_text
                 error: str | None = None
@@ -273,13 +281,18 @@ class LibraryCollectionImportService:
         return entries
 
     def resolve_entries(
-        self, entries: Iterable[LibraryCollectionImportEntry]
+        self,
+        entries: Iterable[LibraryCollectionImportEntry],
+        *,
+        cancellation_token: CancellationToken | None = None,
     ) -> LibraryCollectionImportResolution:
         """Reload selected connections and resolve each manifest path safely."""
         selected = list(entries)
         candidates: list[LibraryCollectionImportCandidate] = []
         errors: list[str] = []
         for entry in selected:
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
             try:
                 record = self._find_connection(entry.library_id)
                 if record is None:

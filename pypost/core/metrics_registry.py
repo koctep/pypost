@@ -73,7 +73,7 @@ _LIBRARY_OPERATIONS = frozenset(
     }
 )
 _LIBRARY_OPERATION_OUTCOMES = frozenset(
-    {"started", "success", "failure", "blocked", "rejected"}
+    {"started", "success", "failure", "blocked", "rejected", "cancelled"}
 )
 
 
