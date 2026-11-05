@@ -71,7 +71,7 @@ def test_preparation_failure_terminates_descendants(
 def private_shared_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Never prepare, invalidate, or delete the real shared environment."""
     monkeypatch.setattr(helpers.tempfile, "gettempdir", lambda: str(tmp_path))
-    monkeypatch.setattr(helpers, "_SHARED_BASE_VENV", None)
+    helpers._get_shared_venv_manager().clear_readiness()
     return tmp_path / f"pypost_shared_base_venv_{helpers.PYTHON_VERSION}" / ".venv"
 
 
@@ -152,7 +152,8 @@ def test_stale_process_cache_requires_published_readiness(
     private_shared_root: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     private_shared_root.mkdir(parents=True)
-    monkeypatch.setattr(helpers, "_SHARED_BASE_VENV", private_shared_root)
+    manager = helpers._get_shared_venv_manager()
+    manager._resolved_base = private_shared_root
     monkeypatch.setattr(helpers, "_run_preparation_command", _successful_command)
     result = helpers._get_shared_base_venv()
     assert (result / helpers.MARKER_NAME).is_file(), "incomplete cached directory was returned"
@@ -211,7 +212,7 @@ def test_failed_bootstrap_releases_lock_and_allows_clean_retry(
     with pytest.raises(Exception) as error:
         helpers._get_shared_base_venv()
     assert not (private_shared_root / helpers.MARKER_NAME).exists()
-    assert helpers._SHARED_BASE_VENV is None
+    assert helpers._get_shared_venv_manager().resolved_base is None
     with open(private_shared_root.parent.with_suffix(".lock"), "w", encoding="utf-8") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         fcntl.flock(lock, fcntl.LOCK_UN)
@@ -228,7 +229,8 @@ def test_materialization_failure_is_bounded_and_retry_removes_partial_workspace(
 ) -> None:
     _seed_interpreter(private_shared_root)
     (private_shared_root / helpers.MARKER_NAME).touch()
-    monkeypatch.setattr(helpers, "_SHARED_BASE_VENV", private_shared_root)
+    manager = helpers._get_shared_venv_manager()
+    manager._resolved_base = private_shared_root
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     budgets: list[float | None] = []
