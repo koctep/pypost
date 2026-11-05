@@ -53,6 +53,19 @@ logger = logging.getLogger(__name__)
 pytestmark = [pytest.mark.timeout(30)]
 
 
+def _wait_for_manifest_discovery(dialog: Any, qapp: Any, timeout_s: float = 5.0) -> None:
+    """Wait until async library catalog discovery finishes (PYPOST-1424)."""
+    deadline = time.monotonic() + timeout_s
+    while getattr(dialog, "_active_discovery_worker", None) is not None:
+        if time.monotonic() >= deadline:
+            break
+        qapp.processEvents()
+        time.sleep(0.02)
+    for _ in range(5):
+        qapp.processEvents()
+        time.sleep(0.01)
+
+
 @pytest.mark.timeout(30)
 def test_virtualized_model_zero_widget_scaling(qapp: Any) -> None:
     """Verify dialog uses virtualized CollectionVariablesTableModel without persistent widgets."""
@@ -251,6 +264,8 @@ def test_non_blocking_remote_collection_fetch(qapp: Any) -> None:
         assert hasattr(dialog, "cancel_loading_btn"), "Dialog must have cancel_loading_btn"
         assert hasattr(dialog, "_active_fetch_worker"), "Dialog must track _active_fetch_worker"
 
+        _wait_for_manifest_discovery(dialog, qapp)
+        assert dialog.collection_combo.count() >= 1
         assert not dialog.loading_container.isVisible()
 
         # Select remote collection to trigger background fetch
@@ -338,6 +353,9 @@ def test_generation_race_protection_discards_stale_responses(qapp: Any) -> None:
             "Dialog must track _fetch_generation counter to prevent race conditions"
         )
         assert hasattr(dialog, "cancel_loading_btn"), "Dialog must have cancel_loading_btn"
+
+        _wait_for_manifest_discovery(dialog, qapp)
+        assert dialog.collection_combo.count() >= 2
 
         # 1. Trigger ColA fetch (generation 1)
         dialog.collection_combo.setCurrentIndex(0)
@@ -443,6 +461,7 @@ def test_non_modal_error_handling_and_retry(qapp: Any) -> None:
         assert hasattr(dialog, "error_label"), "Dialog must have error_label QLabel"
         assert hasattr(dialog, "retry_fetch_btn"), "Dialog must have retry_fetch_btn QPushButton"
 
+        _wait_for_manifest_discovery(dialog, qapp)
         assert not dialog.error_container.isVisible(), "Error container must initially be hidden"
 
         # Index 0: LocalCol, Index 1: FailingRemote

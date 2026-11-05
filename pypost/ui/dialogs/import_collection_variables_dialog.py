@@ -54,6 +54,7 @@ from pypost.ui.widget_ids import (
     set_widget_id,
 )
 from pypost.ui.workers.collection_fetch_worker import CollectionFetchWorker
+from pypost.ui.workers.manifest_discovery_worker import ManifestDiscoveryWorker
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,7 @@ __all__ = [
     "ConflictStrategyDelegate",
     "HeaderItemProxy",
     "ImportCollectionVariablesDialog",
+    "ManifestDiscoveryWorker",
     "TableItemProxy",
 ]
 
@@ -103,6 +105,8 @@ class ImportCollectionVariablesDialog(QDialog):
         self._current_collection: Collection | None = None
         self._fetch_generation: int = 0
         self._active_fetch_worker: CollectionFetchWorker | None = None
+        self._discovery_generation: int = 0
+        self._active_discovery_worker: ManifestDiscoveryWorker | None = None
 
         logger.info(
             "collection_variable_import_dialog_opened env_name=%s",
@@ -221,29 +225,10 @@ class ImportCollectionVariablesDialog(QDialog):
         self._model.selection_changed.connect(self._update_preview_summary)
         self._model.strategy_changed.connect(self._on_model_strategy_changed)
 
-        # Populate collection options
+        # Populate workspace collections synchronously; library catalogs async.
         self.collection_combo.blockSignals(True)
         for col in self.workspace_collections:
             self.collection_combo.addItem(f"{col.name} (Workspace)", userData=col)
-
-        if self.library_service is not None:
-            try:
-                connections = self.library_service.list_connections()
-                for conn in connections:
-                    manifest_cols = self.library_service.list_manifest_collections(conn.stable_id)
-                    for mcol in manifest_cols:
-                        col_name = mcol.get("name") or mcol.get("path")
-                        label = f"{col_name} ({conn.name or conn.stable_id})"
-                        self.collection_combo.addItem(
-                            label,
-                            userData=("library", conn.stable_id, mcol["path"]),
-                        )
-            except Exception as exc:
-                logger.warning(
-                    "collection_variable_import_library_populate_failed error=%s",
-                    exc,
-                    exc_info=True,
-                )
 
         if self.workspace_collections:
             self.collection_combo.setCurrentIndex(0)
@@ -258,6 +243,9 @@ class ImportCollectionVariablesDialog(QDialog):
             self._load_collection_into_view(self.workspace_collections[0])
         else:
             self._update_preview_summary()
+
+        if self.library_service is not None:
+            self._start_manifest_discovery()
 
         self.show()
 
@@ -279,6 +267,91 @@ class ImportCollectionVariablesDialog(QDialog):
         if not text or text == "(Base Defaults)":
             return None
         return text
+
+    def _cancel_discovery_worker(self) -> None:
+        if self._active_discovery_worker is not None:
+            self._active_discovery_worker.cancel()
+            self._active_discovery_worker.wait(1000)
+            self._active_discovery_worker = None
+
+    def _start_manifest_discovery(self) -> None:
+        self._discovery_generation += 1
+        gen = self._discovery_generation
+        self._cancel_discovery_worker()
+
+        logger.info(
+            "collection_variable_manifest_discovery_started gen=%d",
+            gen,
+        )
+        self.loading_container.setVisible(True)
+        self.loading_label.setText("Discovering library collections...")
+        self.cancel_loading_btn.setEnabled(True)
+
+        worker = ManifestDiscoveryWorker(
+            library_service=self.library_service,
+            generation_id=gen,
+            parent=self,
+        )
+        worker.discovery_completed.connect(self._on_discovery_completed)
+        worker.discovery_failed.connect(self._on_discovery_failed)
+        self._active_discovery_worker = worker
+        worker.start()
+
+    def _on_discovery_completed(self, entries: Any, gen: int) -> None:
+        if gen != self._discovery_generation:
+            logger.warning(
+                "collection_variable_manifest_discovery_stale_discarded gen=%d "
+                "current_gen=%d",
+                gen,
+                self._discovery_generation,
+            )
+            return
+
+        self._active_discovery_worker = None
+        # Only hide loading chrome if a remote collection fetch is not in progress.
+        if self._active_fetch_worker is None:
+            self.loading_container.setVisible(False)
+
+        entry_list = list(entries or [])
+        logger.info(
+            "collection_variable_manifest_discovery_completed gen=%d entry_count=%d",
+            gen,
+            len(entry_list),
+        )
+
+        # Preserve the pre-discovery selection. Qt may auto-select index 0 when
+        # the first item is inserted into an empty combo; without restoring -1,
+        # remote fetch would never start on a later setCurrentIndex(0).
+        previous_index = self.collection_combo.currentIndex()
+        self.collection_combo.blockSignals(True)
+        for label, user_data in entry_list:
+            self.collection_combo.addItem(label, userData=user_data)
+        self.collection_combo.setCurrentIndex(previous_index)
+        self.collection_combo.blockSignals(False)
+
+    def _on_discovery_failed(self, exc: Exception, gen: int) -> None:
+        if gen != self._discovery_generation:
+            logger.warning(
+                "collection_variable_manifest_discovery_error_stale_discarded gen=%d "
+                "current_gen=%d error=%s",
+                gen,
+                self._discovery_generation,
+                exc,
+            )
+            return
+
+        self._active_discovery_worker = None
+        if self._active_fetch_worker is None:
+            self.loading_container.setVisible(False)
+
+        logger.warning(
+            "collection_variable_import_library_populate_failed error=%s",
+            exc,
+            exc_info=True,
+        )
+        self.error_container.setVisible(True)
+        self.error_label.setText(f"Failed to discover library collections: {exc}")
+        self.retry_fetch_btn.setEnabled(True)
 
     def _on_collection_changed(self) -> None:
         data = self.collection_combo.currentData()
@@ -411,6 +484,16 @@ class ImportCollectionVariablesDialog(QDialog):
         self._update_preview_summary()
 
     def _on_cancel_loading(self) -> None:
+        if self._active_discovery_worker is not None:
+            logger.info(
+                "collection_variable_manifest_discovery_cancelled gen=%d",
+                self._discovery_generation,
+            )
+            self._discovery_generation += 1
+            self._cancel_discovery_worker()
+            self.loading_container.setVisible(False)
+            return
+
         logger.info(
             "collection_variable_remote_fetch_cancelled gen=%d",
             self._fetch_generation,
@@ -432,7 +515,12 @@ class ImportCollectionVariablesDialog(QDialog):
         )
         data = self.collection_combo.currentData()
         if isinstance(data, tuple) and len(data) == 3 and data[0] == "library":
+            self.error_container.setVisible(False)
             self._start_fetch_remote_collection(data[1], data[2])
+            return
+        if self.library_service is not None:
+            self.error_container.setVisible(False)
+            self._start_manifest_discovery()
 
     def _load_collection_into_view(self, col: Collection | None) -> None:
         self._current_collection = col
@@ -552,6 +640,8 @@ class ImportCollectionVariablesDialog(QDialog):
         )
 
     def reject(self) -> None:
+        self._discovery_generation += 1
+        self._cancel_discovery_worker()
         if self._active_fetch_worker is not None:
             self._active_fetch_worker.cancel()
             self._active_fetch_worker.wait(1000)
@@ -563,6 +653,8 @@ class ImportCollectionVariablesDialog(QDialog):
         super().reject()
 
     def closeEvent(self, event: Any) -> None:
+        self._discovery_generation += 1
+        self._cancel_discovery_worker()
         if self._active_fetch_worker is not None:
             self._active_fetch_worker.cancel()
             self._active_fetch_worker.wait(1000)
@@ -570,6 +662,8 @@ class ImportCollectionVariablesDialog(QDialog):
         super().closeEvent(event)
 
     def accept(self) -> None:
+        self._discovery_generation += 1
+        self._cancel_discovery_worker()
         if self._active_fetch_worker is not None:
             self._active_fetch_worker.cancel()
             self._active_fetch_worker.wait(1000)
