@@ -74,6 +74,16 @@ with ActivatedWindow() as harness:
     assert harness.line_edit.hasFocus()
 ```
 
+## Teardown note
+
+`ActivatedWindow.__exit__` drains with `close` → `processEvents` → `deleteLater` →
+`processEvents`. That is weaker than the export UI dispose contract, which also calls
+`QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)` so
+`shiboken6.isValid` goes false before process exit. For environment / collection export UI
+roots (and other top-level widgets that must be C++-dead before worker exit), use
+[`dispose_qt_root`](export_ui_qt_dispose.md) (PYPOST-1315). Aligning activation teardown with
+that drain is follow-up [PYPOST-1478](https://pypost.atlassian.net/browse/PYPOST-1478).
+
 ## Troubleshooting
 
 - **Test skipped with `window activation unavailable on this QPA platform`**:

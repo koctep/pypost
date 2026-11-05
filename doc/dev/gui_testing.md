@@ -115,6 +115,11 @@ class TestMyWidget:
             widget.close()
 ```
 
+For **unparented export UI roots** (environment / collection export suites), `close()` alone
+is not enough: drain DeferredDelete with
+[`dispose_qt_root`](export_ui_qt_dispose.md) while `qapp` is alive, or workers can SIGSEGV
+after the last PASS (PYPOST-1315).
+
 ### Patterns
 
 - **Dialogs**: patch `QMessageBox` / `QInputDialog` at the module that shows them.

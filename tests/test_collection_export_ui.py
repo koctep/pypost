@@ -8,6 +8,7 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QPushButton
 
+from pypost.models.models import RequestData
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.ui.widget_ids import COLLECTION_EXPORT_ALL_BUTTON, COLLECTION_EXPORT_BUTTON
 from tests.helpers.collections_tree import (
@@ -17,7 +18,7 @@ from tests.helpers.collections_tree import (
     make_collection,
     make_request,
 )
-from pypost.models.models import RequestData
+from tests.helpers.qt_widget_dispose import dispose_collections_export_fixture
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -81,7 +82,7 @@ class TestExportCollectionEntryPoint:
             button.click()
             mock_export.assert_called_once()
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch.object(CollectionsPresenter, "export_all_collections")
     def test_panel_exposes_export_all_button_wired_to_the_flow(
@@ -94,7 +95,7 @@ class TestExportCollectionEntryPoint:
             button.click()
             mock_export_all.assert_called_once()
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
 
 class TestExportCollection:
@@ -127,7 +128,7 @@ class TestExportCollection:
             assert kwargs["success"] is True
             assert "Billing API" in _args[1]
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
 
 class TestExportAllCollections:
@@ -150,7 +151,7 @@ class TestExportAllCollections:
             assert isinstance(data, dict)
             assert data["name"] == "Billing"
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_ALL_RESULT)
     @patch(_ALL_SAVE)
@@ -177,7 +178,7 @@ class TestExportAllCollections:
             assert "2 collection(s)" in mock_result.call_args.args[1]
             assert "2 request(s)" in mock_result.call_args.args[1]
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_ALL_RESULT)
     @patch(_ALL_SAVE)
@@ -198,7 +199,7 @@ class TestExportAllCollections:
                 for record in caplog.records
             )
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_ALL_RESULT)
     @patch(_ALL_SAVE)
@@ -216,7 +217,7 @@ class TestExportAllCollections:
             assert json.loads(export_path.read_text(encoding="utf-8")) == []
             assert "0 collection(s) (0 request(s))" in mock_result.call_args.args[1]
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_ALL_SAVE, return_value=None)
     def test_cancelled_all_export_does_not_serialize_or_write(self, mock_save, qapp):
@@ -230,7 +231,7 @@ class TestExportAllCollections:
             presenter.export_all_collections()
             mock_save.assert_called_once()
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_ALL_ERROR)
     @patch(_ALL_SAVE)
@@ -252,7 +253,7 @@ class TestExportAllCollections:
             mock_show_error.assert_called_once()
             assert "disk full" in mock_show_error.call_args.args[1]
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_SAVE, return_value=None)
     def test_cancelled_save_dialog_leaves_files_unchanged(self, mock_save, qapp, tmp_path):
@@ -266,7 +267,7 @@ class TestExportAllCollections:
             presenter.export_collection()
             assert not export_path.exists()
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_NO_SELECTION)
     def test_no_tree_selection_shows_error(self, mock_no_selection, qapp):
@@ -279,7 +280,7 @@ class TestExportAllCollections:
             presenter.export_collection()
             mock_no_selection.assert_called_once()
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_RESULT)
     @patch(_SAVE)
@@ -307,7 +308,7 @@ class TestExportAllCollections:
             assert data["name"] == "Billing API"
             mock_result.assert_called_once()
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(f"{_MODULE}.show_collection_export_error")
     @patch(_SAVE)
@@ -332,7 +333,7 @@ class TestExportAllCollections:
             mock_show_error.assert_called_once()
             assert "disk full" in mock_show_error.call_args[0][1]
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     def test_no_serialize_callable_is_noop(self, qapp):
         presenter, _manager = _make_presenter(
@@ -343,7 +344,7 @@ class TestExportAllCollections:
             _select_collection(presenter, "c1")
             presenter.export_collection()
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_RESULT)
     @patch(_SAVE)
@@ -366,7 +367,7 @@ class TestExportAllCollections:
                 for r in caplog.records
             )
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
 
 class TestExportCollectionSourcePrecedence:
@@ -398,7 +399,7 @@ class TestExportCollectionSourcePrecedence:
             mock_result.assert_called_once()
             assert "Collection B" in mock_result.call_args.args[1]
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_RESULT)
     @patch(_SAVE)
@@ -428,7 +429,7 @@ class TestExportCollectionSourcePrecedence:
             mock_result.assert_called_once()
             assert "Collection B" in mock_result.call_args.args[1]
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_RESULT)
     @patch(_SAVE)
@@ -457,7 +458,7 @@ class TestExportCollectionSourcePrecedence:
             mock_result.assert_called_once()
             assert "Collection A" in mock_result.call_args.args[1]
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
 
     @patch(_RESULT)
     @patch(_SAVE)
@@ -484,4 +485,4 @@ class TestExportCollectionSourcePrecedence:
             assert mock_save.call_args.kwargs.get("suggested_name") == "Collection B.json"
             mock_result.assert_called_once()
         finally:
-            presenter.panel.close()
+            dispose_collections_export_fixture(presenter, qapp)
