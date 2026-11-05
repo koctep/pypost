@@ -9,13 +9,14 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtWidgets import QWidget
 
 from pypost.core.collection_import_lifecycle_policy import CollectionImportLifecyclePolicy
 from pypost.core.collection_import_state import CollectionImportState
+from pypost.core.metrics_registry import MetricsRegistry
 from pypost.models.models import Collection
 from pypost.ui.presenters.collection_import_actions import CollectionImportActions
 from pypost.ui.presenters.collections_presenter import CollectionsPresenter
@@ -54,19 +55,25 @@ class _SpySignal:
 class _SpyWorker:
     """Running worker stand-in; ``wait(ms)`` records ``ms``, advances the clock, times out."""
 
-    def __init__(self, clock: FakeClock) -> None:
+    def __init__(self, clock: FakeClock, *, join_ok: bool = False) -> None:
         self._clock = clock
+        self._join_ok = join_ok
         self.waits: list[int] = []
+        self.cancels = 0
         self.parse_progress = _SpySignal()
         self.parse_completed = _SpySignal()
         self.parse_failed = _SpySignal()
         self.parse_cancelled = _SpySignal()
         self.operation_completed = _SpySignal()
         self.operation_failed = _SpySignal()
+        self.operation_cancelled = _SpySignal()
         self.finished = _SpySignal()
 
     def isRunning(self) -> bool:  # noqa: N802 - mirrors QThread API
         return True
+
+    def cancel(self) -> None:
+        self.cancels += 1
 
     def requestInterruption(self) -> None:  # noqa: N802 - mirrors QThread API
         return None
@@ -77,7 +84,7 @@ class _SpyWorker:
     def wait(self, ms: int) -> bool:
         self.waits.append(ms)
         self._clock.advance(ms)
-        return False
+        return self._join_ok
 
 
 def _make_actions(parent: QWidget, **extra: Any) -> CollectionImportActions:
@@ -108,7 +115,8 @@ def test_injected_policy_drives_default_teardown_waits(qapp) -> None:
 
     assert actions.teardown() is False
     assert file_spy.waits == [30]
-    assert library_spy.waits == [170]
+    assert library_spy.waits == [30]
+    assert library_spy.cancels >= 1
 
 
 def test_deadline_passing_in_wait_idle_leaves_only_zero_probes(qapp, caplog) -> None:
@@ -182,25 +190,77 @@ def test_teardown_timeout_logs_report_phase_waits_and_elapsed(qapp, caplog) -> N
 
     messages = [r.message for r in caplog.records]
     assert "collection_import_teardown_started timeout_ms=200" in messages
+    assert "collection_library_import_worker_cancelling phase=p0" in messages
+    assert "collection_library_import_worker_cancelling phase=p3" in messages
     assert (
         "collection_import_worker_interrupt_timeout wait_ms=30 elapsed_ms=30" in messages
     )
     assert (
-        "collection_library_import_worker_timeout wait_ms=170 elapsed_ms=200" in messages
+        "collection_library_import_worker_timeout wait_ms=30 elapsed_ms=60" in messages
     )
     assert (
-        "collection_import_teardown_completed clean=False elapsed_ms=200 timeout_ms=200"
+        "collection_import_teardown_completed clean=False elapsed_ms=60 timeout_ms=200"
         in messages
     )
     levels = {
         r.message.split(" ", 1)[0]: r.levelno
         for r in caplog.records
-        if "_timeout" in r.message
+        if "_timeout" in r.message or "_cancelling" in r.message
     }
     assert levels == {
         "collection_import_worker_interrupt_timeout": logging.WARNING,
         "collection_library_import_worker_timeout": logging.WARNING,
+        "collection_library_import_worker_cancelling": logging.WARNING,
     }
+
+
+def test_library_join_success_logs_bounded_wait(qapp, caplog) -> None:
+    """Honored library cancel logs the final-join bound that was granted (PYPOST-1324 S6)."""
+    clock = FakeClock()
+    policy = CollectionImportLifecyclePolicy(teardown_budget_ms=200, final_join_ms=30)
+    actions = _make_actions(QWidget(), lifecycle_policy=policy, clock=clock)
+    actions._library_worker = _SpyWorker(clock, join_ok=True)  # type: ignore[assignment]
+
+    with caplog.at_level(logging.INFO, logger=_MODULE):
+        assert actions.teardown() is True
+
+    messages = [r.message for r in caplog.records]
+    assert "collection_library_import_worker_cancelling phase=p0" in messages
+    assert "collection_library_import_worker_cancelling phase=p3" in messages
+    assert (
+        "collection_library_import_worker_cancelled wait_ms=30 elapsed_ms=30" in messages
+    )
+    assert (
+        "collection_import_teardown_completed clean=True elapsed_ms=30 timeout_ms=200"
+        in messages
+    )
+
+
+def test_library_operation_cancelled_tracks_cancelled_outcome(qapp, caplog) -> None:
+    """Cooperative library stop uses outcome=cancelled, not rejected (PYPOST-1324 S6)."""
+    metrics = MagicMock()
+    registry = MetricsRegistry()
+    actions = _make_actions(QWidget(), metrics=metrics)
+    actions._state = CollectionImportState.PREPARING
+
+    with caplog.at_level(logging.INFO, logger=_MODULE):
+        actions._on_library_operation_cancelled()
+
+    assert actions._state is CollectionImportState.IDLE
+    metrics.track_gui_library_operation.assert_called_once_with(
+        "collection_import_library", "cancelled"
+    )
+    registry.track_gui_library_operation("collection_import_library", "cancelled")
+    assert (
+        registry.gui_library_operations.labels(
+            operation="collection_import_library", outcome="cancelled"
+        )._value.get()
+        == 1.0
+    )
+    assert any(
+        r.message == "collection_library_import_operation_cancelled from_state=preparing"
+        for r in caplog.records
+    )
 
 
 def test_exhausted_budget_logs_zero_wait_probes(qapp, caplog) -> None:

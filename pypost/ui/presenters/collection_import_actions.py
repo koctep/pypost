@@ -199,6 +199,10 @@ class CollectionImportActions(QObject):
             logger.warning("collection_import_worker_interrupting")
             worker.requestInterruption()
             interruption_requested = True
+        library_worker = self._library_worker
+        if library_worker is not None and library_worker.isRunning():
+            logger.warning("collection_library_import_worker_cancelling phase=p0")
+            library_worker.cancel()
         if self.is_busy():
             clean = self._wait_idle_until(deadline)
         worker = self._worker
@@ -245,14 +249,6 @@ class CollectionImportActions(QObject):
             logger.info("collection_import_worker_interrupted")
         library_worker = self._library_worker
         if library_worker is not None:
-            library_join_ms = deadline.remaining_ms()
-            if library_worker.isRunning() and not library_worker.wait(library_join_ms):
-                clean = False
-                logger.warning(
-                    "collection_library_import_worker_timeout wait_ms=%d elapsed_ms=%d",
-                    library_join_ms,
-                    deadline.elapsed_ms(),
-                )
             try:
                 library_worker.operation_completed.disconnect()
             except (RuntimeError, TypeError):
@@ -262,9 +258,32 @@ class CollectionImportActions(QObject):
             except (RuntimeError, TypeError):
                 pass
             try:
+                library_worker.operation_cancelled.disconnect()
+            except (RuntimeError, TypeError, AttributeError):
+                pass
+            try:
                 library_worker.finished.disconnect(self._on_library_worker_finished)
             except (RuntimeError, TypeError):
                 pass
+            if library_worker.isRunning():
+                logger.warning("collection_library_import_worker_cancelling phase=p3")
+                library_worker.cancel()
+                library_join_ms = deadline.bounded(self._policy.final_join_ms)
+                if not library_worker.wait(library_join_ms):
+                    clean = False
+                    logger.warning(
+                        "collection_library_import_worker_timeout "
+                        "wait_ms=%d elapsed_ms=%d",
+                        library_join_ms,
+                        deadline.elapsed_ms(),
+                    )
+                else:
+                    logger.info(
+                        "collection_library_import_worker_cancelled "
+                        "wait_ms=%d elapsed_ms=%d",
+                        library_join_ms,
+                        deadline.elapsed_ms(),
+                    )
             library_worker.deleteLater()
             self._library_worker = None
         self._set_state(CollectionImportState.IDLE)
@@ -361,8 +380,18 @@ class CollectionImportActions(QObject):
             self._finish_library_import()
             return
 
+        def _resolve_operation(
+            *, cancellation_token: Any | None = None
+        ) -> tuple[list[Collection], list[str]]:
+            return self._resolve_library_candidates(
+                service,
+                selected,
+                mode,
+                cancellation_token=cancellation_token,
+            )
+
         self._start_library_operation(
-            lambda: self._resolve_library_candidates(service, selected, mode),
+            _resolve_operation,
             self._on_library_candidates_resolved,
         )
 
@@ -396,12 +425,22 @@ class CollectionImportActions(QObject):
         self._track_import_event(_LIBRARY_IMPORT_OPERATION, "failure")
         self._finish_library_import()
 
+    def _on_library_operation_cancelled(self) -> None:
+        """Quiet cooperative stop: clear busy state without a failure dialog."""
+        logger.info(
+            "collection_library_import_operation_cancelled from_state=%s",
+            self._state.value,
+        )
+        self._track_import_event(_LIBRARY_IMPORT_OPERATION, "cancelled")
+        self._finish_library_import()
+
     def _start_library_operation(
-        self, operation: Callable[[], Any], on_completed: Callable[[Any], None]
+        self, operation: Callable[..., Any], on_completed: Callable[[Any], None]
     ) -> None:
         worker = LibraryOperationWorker(operation)
         worker.operation_completed.connect(on_completed)
         worker.operation_failed.connect(self._on_library_operation_failed)
+        worker.operation_cancelled.connect(self._on_library_operation_cancelled)
         worker.finished.connect(self._on_library_worker_finished)
         self._library_worker = worker
         worker.start()
@@ -508,11 +547,28 @@ class CollectionImportActions(QObject):
 
     @staticmethod
     def _resolve_library_candidates(
-        service: object, selected: list[object], mode: object
+        service: object,
+        selected: list[object],
+        mode: object,
+        *,
+        cancellation_token: Any | None = None,
     ) -> tuple[list[Collection], list[str]]:
         """Re-resolve selected descriptors and materialize the requested mode."""
+        from pypost.core.cancellation import (
+            OperationCancelledError,
+            call_with_cancellation_token,
+        )
+
         try:
-            resolved = service.resolve_entries(selected)  # type: ignore[attr-defined]
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            resolved = call_with_cancellation_token(
+                service.resolve_entries,  # type: ignore[attr-defined]
+                selected,
+                cancellation_token=cancellation_token,
+            )
+        except OperationCancelledError:
+            raise
         except Exception as error:
             logger.warning(
                 "collection_library_import_resolution_failed error_type=%s",
@@ -532,6 +588,8 @@ class CollectionImportActions(QObject):
 
         materialized: list[Collection] = []
         for candidate in candidates:
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
             try:
                 value = materialize(candidate, mode)
             except Exception as error:

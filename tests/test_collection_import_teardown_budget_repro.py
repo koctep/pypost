@@ -1,19 +1,16 @@
-"""Failing repro: collection import teardown must respect the caller budget (PYPOST-1264).
+"""Collection import teardown respects the caller budget (PYPOST-1264 / PYPOST-1324).
 
-``CollectionImportActions.teardown(timeout_ms)`` runs its phases one after another and
-gives each phase its own budget: the wait-idle phase (P1) can use the full budget, the
-post-disconnect file-worker join (P2) is a fixed ``wait(100)`` even when the budget is
-exhausted, and the library-worker join (P3) gets the full budget again. The worst case is
-about ``2 * timeout_ms + 100`` ms, which breaks the caller budget (DoD 3).
-
-The tests here assert the desired shared-deadline behaviour:
+``CollectionImportActions.teardown(timeout_ms)`` shares one deadline across wait-idle
+(P1), the post-disconnect file-worker join (P2), and the library-worker join (P3).
+P3 is cancel-then-``bounded(final_join_ms)`` (same shape as P2), not a full-remaining
+join.
 
 * Test A (``test_teardown_requested_waits_fit_caller_budget``): spy workers whose
-  ``wait(ms)`` really sleeps; the requested waits must sum to at most the budget, P2 must
-  not exceed the final join limit, and an exhausted budget issues only ``wait(0)`` probes.
-  Built with today's constructor signature, so it fails by assertion, not by error.
+  ``wait(ms)`` really sleeps; the requested waits must sum to at most the budget, P2/P3
+  must not exceed the final join limit, P3 must call library ``cancel()``, and an
+  exhausted budget issues only ``wait(0)``.
 * Test B (``test_teardown_wait_arithmetic_with_fake_clock``): exact P2/P3 values against
-  an injected fake clock (``clock=`` keyword, the designed test seam).
+  an injected fake clock (``clock=`` keyword); library spy must record ``cancel()``.
 * A loose real-thread guard (``test_teardown_real_threads_stay_within_loose_bound``):
   both workers blocked; wall time must stay well under the old ``2B + 100`` ms behaviour.
 """
@@ -30,6 +27,9 @@ from typing import Any
 import pytest
 from PySide6.QtWidgets import QWidget
 
+from pypost.core.collection_import_lifecycle_policy import (
+    DEFAULT_COLLECTION_IMPORT_LIFECYCLE_POLICY,
+)
 from pypost.core.collection_import_state import CollectionImportState
 from pypost.models.models import Collection
 from pypost.ui.presenters.collection_import_actions import CollectionImportActions
@@ -38,8 +38,7 @@ from tests.helpers.collections_tree import FakeRequestManager
 pytestmark = pytest.mark.timeout(30)
 
 _PATH = Path("/tmp/import.json")
-# Step 3 local constant; Step 4 switches it to the policy ``final_join_ms`` field.
-_FINAL_JOIN_MS = 100
+_FINAL_JOIN_MS = DEFAULT_COLLECTION_IMPORT_LIFECYCLE_POLICY.final_join_ms
 # Bounded release wait for blocked fake reader / library operation (seconds).
 _RELEASE_TIMEOUT_S = 5.0
 # Bounded join for real threads in cleanup (ms).
@@ -77,6 +76,7 @@ class _SpyWorker:
         self._on_wait = on_wait
         self.waits: list[int] = []
         self.interruptions = 0
+        self.cancels = 0
         self.deleted = 0
         self.parse_progress = _SpySignal()
         self.parse_completed = _SpySignal()
@@ -84,10 +84,14 @@ class _SpyWorker:
         self.parse_cancelled = _SpySignal()
         self.operation_completed = _SpySignal()
         self.operation_failed = _SpySignal()
+        self.operation_cancelled = _SpySignal()
         self.finished = _SpySignal()
 
     def isRunning(self) -> bool:  # noqa: N802 - mirrors QThread API
         return True
+
+    def cancel(self) -> None:
+        self.cancels += 1
 
     def requestInterruption(self) -> None:  # noqa: N802 - mirrors QThread API
         self.interruptions += 1
@@ -137,7 +141,7 @@ def _install_spies(
 
 @pytest.mark.parametrize("budget_ms", [300, 50, 0])
 def test_teardown_requested_waits_fit_caller_budget(qapp, budget_ms: int) -> None:
-    """Test A: requested waits sum to <= B, P2 <= final join, B=0 issues only wait(0)."""
+    """Test A: waits sum to <= B; P2/P3 <= final join; library cancel(); B=0 → wait(0)."""
     parent = QWidget()
     actions = _make_actions(parent)
     file_spy, library_spy = _install_spies(actions, _real_sleep)
@@ -153,6 +157,13 @@ def test_teardown_requested_waits_fit_caller_budget(qapp, budget_ms: int) -> Non
     assert file_spy.waits and all(w <= _FINAL_JOIN_MS for w in file_spy.waits), (
         f"P2 file-worker join {file_spy.waits} must be <= final join {_FINAL_JOIN_MS} ms"
     )
+    assert library_spy.cancels >= 1, (
+        "P3 must call library worker cancel() before joining "
+        f"(cancels={library_spy.cancels}, waits={library_spy.waits})"
+    )
+    assert library_spy.waits and all(w <= _FINAL_JOIN_MS for w in library_spy.waits), (
+        f"P3 library join {library_spy.waits} must be <= final join {_FINAL_JOIN_MS} ms"
+    )
     if budget_ms == 0:
         assert all(w == 0 for w in all_waits), (
             f"exhausted budget must issue only wait(0) probes, got {all_waits}"
@@ -162,12 +173,13 @@ def test_teardown_requested_waits_fit_caller_budget(qapp, budget_ms: int) -> Non
 
 @pytest.mark.parametrize(
     ("budget_ms", "expected_p2", "expected_p3"),
-    [(300, 100, 200), (50, 50, 0), (0, 0, 0)],
+    # P3 is now interrupt-then-bounded(final_join_ms), not full remaining (PYPOST-1324).
+    [(300, 100, 100), (50, 50, 0), (0, 0, 0)],
 )
 def test_teardown_wait_arithmetic_with_fake_clock(
     qapp, budget_ms: int, expected_p2: int, expected_p3: int
 ) -> None:
-    """Test B: exact P2 = min(final join, remaining), P3 = remaining (fake clock seam)."""
+    """Test B: P2/P3 each = min(final join, remaining) after cooperative stop."""
     clock = FakeClock()
     parent = QWidget()
     actions = _make_actions(parent, clock=clock)
@@ -179,8 +191,13 @@ def test_teardown_wait_arithmetic_with_fake_clock(
         f"P2 file-worker join {file_spy.waits} != [min({_FINAL_JOIN_MS}, remaining)]"
         f" = [{expected_p2}]"
     )
+    assert library_spy.cancels >= 1, (
+        "P3 must call library worker cancel() before joining "
+        f"(cancels={library_spy.cancels}, waits={library_spy.waits})"
+    )
     assert library_spy.waits == [expected_p3], (
-        f"P3 library join {library_spy.waits} != [remaining] = [{expected_p3}]"
+        f"P3 library join {library_spy.waits} != "
+        f"[min({_FINAL_JOIN_MS}, remaining)] = [{expected_p3}]"
     )
     assert sum(file_spy.waits + library_spy.waits) <= budget_ms
     assert clean is False, "live workers past their joins must yield an unclean result"
